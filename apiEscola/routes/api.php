@@ -1,0 +1,103 @@
+<?php
+
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ClassScheduleController;
+use App\Http\Controllers\Api\CourseBundleController;
+use App\Http\Controllers\Api\CoursePlanController;
+use App\Http\Controllers\Api\CourseController;
+use App\Http\Controllers\Api\DomainController;
+use App\Http\Controllers\Api\EnrollmentController;
+use App\Http\Controllers\Api\GuardianController;
+use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\SchoolClassController;
+use App\Http\Controllers\Api\StudentController;
+use App\Http\Controllers\Api\StudentGuardianController;
+use App\Http\Controllers\Api\SubjectController;
+use App\Http\Controllers\Api\TenantApiTokenController;
+use App\Http\Controllers\Api\TenantController;
+use Illuminate\Support\Facades\Route;
+
+// Autenticação (pública)
+Route::post('/login', [AuthController::class, 'login']);
+
+// Domínios / lookups (públicos — usados para popular dropdowns no frontend)
+Route::prefix('domains')->group(function () {
+    Route::get('statuses',               [DomainController::class, 'statuses']);
+    Route::get('user-roles',             [DomainController::class, 'userRoles']);
+    Route::get('periods',                [DomainController::class, 'periods']);
+    Route::get('weekdays',               [DomainController::class, 'weekdays']);
+    Route::get('guardian-relationships', [DomainController::class, 'guardianRelationships']);
+    Route::get('payment-methods',        [DomainController::class, 'paymentMethods']);
+    Route::get('enrollment-statuses',    [DomainController::class, 'enrollmentStatuses']);
+    Route::get('invoice-statuses',       [DomainController::class, 'invoiceStatuses']);
+    Route::get('billing-cycles',         [DomainController::class, 'billingCycles']);
+    Route::get('invoice-types',          [DomainController::class, 'invoiceTypes']);
+});
+
+// Rotas autenticadas via Sanctum
+Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])->group(function () {
+
+    // Auth
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Tenants (somente super_admin)
+    Route::apiResource('tenants', TenantController::class);
+
+    // Alunos
+    Route::apiResource('students', StudentController::class);
+
+    // Responsáveis de um aluno (nested)
+    Route::prefix('students/{student}/guardians')->group(function () {
+        Route::get('/', [StudentGuardianController::class, 'index']);
+        Route::post('/', [StudentGuardianController::class, 'store']);
+        Route::delete('/{guardian}', [StudentGuardianController::class, 'destroy']);
+    });
+
+    // Responsáveis
+    Route::apiResource('guardians', GuardianController::class);
+
+    // Cursos
+    Route::apiResource('courses', CourseController::class);
+
+    // Planos de curso (nested + standalone para update/delete)
+    Route::get('courses/{course}/plans',    [CoursePlanController::class, 'index']);
+    Route::post('courses/{course}/plans',   [CoursePlanController::class, 'store']);
+    Route::get('course-plans/{plan}',       [CoursePlanController::class, 'show']);
+    Route::put('course-plans/{plan}',       [CoursePlanController::class, 'update']);
+    Route::delete('course-plans/{plan}',    [CoursePlanController::class, 'destroy']);
+
+    // Pacotes de cursos (bundles)
+    Route::apiResource('course-bundles', CourseBundleController::class);
+
+    // Disciplinas
+    Route::apiResource('subjects', SubjectController::class);
+
+    // Turmas
+    Route::apiResource('school-classes', SchoolClassController::class);
+
+    // Horários por turma (nested)
+    Route::prefix('school-classes/{schoolClass}/schedules')->group(function () {
+        Route::get('/', [ClassScheduleController::class, 'index']);
+        Route::post('/', [ClassScheduleController::class, 'store']);
+    });
+
+    // Horários (update/delete direto)
+    Route::put('class-schedules/{classSchedule}', [ClassScheduleController::class, 'update']);
+    Route::delete('class-schedules/{classSchedule}', [ClassScheduleController::class, 'destroy']);
+
+    // Matrículas
+    Route::post('enrollments/subscribe',        [EnrollmentController::class, 'subscribe']);
+    Route::post('enrollments/subscribe-bundle', [EnrollmentController::class, 'subscribeBundle']);
+    Route::apiResource('enrollments', EnrollmentController::class);
+
+    // Cobranças
+    Route::apiResource('invoices', InvoiceController::class);
+    Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);
+    Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
+
+    // Tokens de API por tenant
+    Route::get('tenant-api-tokens', [TenantApiTokenController::class, 'index']);
+    Route::post('tenant-api-tokens', [TenantApiTokenController::class, 'store']);
+    Route::delete('tenant-api-tokens/{tenantApiToken}', [TenantApiTokenController::class, 'destroy']);
+});
