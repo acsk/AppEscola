@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\InvoiceResource;
 
 class EnrollmentResource extends JsonResource
 {
@@ -29,6 +30,7 @@ class EnrollmentResource extends JsonResource
             'payment_due_day' => $this->payment_due_day,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'invoices'   => InvoiceResource::collection($this->whenLoaded('invoices')),
         ];
     }
 }

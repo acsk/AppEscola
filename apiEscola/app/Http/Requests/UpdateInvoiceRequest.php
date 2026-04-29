@@ -19,6 +19,8 @@ class UpdateInvoiceRequest extends FormRequest
             'description' => ['sometimes', 'string', 'max:255'],
             'amount' => ['sometimes', 'numeric', 'min:0.01'],
             'due_date' => ['sometimes', 'date'],
+            'status' => ['sometimes', 'exists:domain_invoice_statuses,slug'],
+            'paid_at' => ['nullable', 'date'],
             'payment_method' => ['nullable', 'exists:domain_payment_methods,slug'],
             'notes' => ['nullable', 'string'],
         ];

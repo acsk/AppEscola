@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SubscribeEnrollmentRequest extends FormRequest
 {
@@ -11,11 +12,24 @@ class SubscribeEnrollmentRequest extends FormRequest
         return true;
     }
 
+    public function messages(): array
+    {
+        return [
+            'school_class_id.unique' => 'Este aluno já possui matrícula ativa nesta turma.',
+        ];
+    }
+
     public function rules(): array
     {
         return [
             'student_id'      => ['required', 'exists:students,id'],
-            'school_class_id' => ['required', 'exists:school_classes,id'],
+            'school_class_id' => [
+                'required',
+                'exists:school_classes,id',
+                Rule::unique('enrollments', 'school_class_id')
+                    ->where('student_id', $this->student_id)
+                    ->whereNotIn('status', ['cancelled']),
+            ],
             'course_plan_id'  => ['required', 'exists:course_plans,id'],
             'start_date'      => ['required', 'date'],
             'end_date'        => ['nullable', 'date', 'after_or_equal:start_date'],

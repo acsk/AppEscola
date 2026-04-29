@@ -1,0 +1,523 @@
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import api from "../../services/api";
+import { parseApiErrors } from "../../utils/apiErrors";
+import Modal from "../../components/ui/Modal";
+import FormInput from "../../components/ui/FormInput";
+import FormSelect from "../../components/ui/FormSelect";
+import Badge from "../../components/ui/Badge";
+import Pagination from "../../components/ui/Pagination";
+import ConfirmModal from "../../components/ui/ConfirmModal";
+import { useEnrollmentStatuses, domainToOptions } from "../../hooks/useDomains";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Student = { id: number; name: string };
+type SchoolClass = { id: number; name: string };
+
+type Enrollment = {
+  id: number;
+  enrollment_number: string | null;
+  start_date: string;
+  end_date: string | null;
+  status: string;
+  monthly_amount: string | null;
+  discount_amount: string | null;
+  payment_due_day: number | null;
+  student?: Student;
+  school_class?: SchoolClass;
+};
+
+type EditForm = {
+  student_id: string;
+  school_class_id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  monthly_amount: string;
+  discount_amount: string;
+  payment_due_day: string;
+};
+
+const EMPTY_EDIT: EditForm = {
+  student_id: "",
+  school_class_id: "",
+  start_date: "",
+  end_date: "",
+  status: "active",
+  monthly_amount: "",
+  discount_amount: "",
+  payment_due_day: "",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "Ativo",
+  pending: "Pendente",
+  cancelled: "Cancelado",
+  concluded: "Concluído",
+};
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface Props {
+  navigate: (screen: string, params?: Record<string, any>) => void;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function EnrollmentsScreen({ navigate }: Props) {
+  const [rows, setRows] = useState<Enrollment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 20,
+    total: 0,
+  });
+
+  // Edit modal
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const [editVisible, setEditVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Lookups for edit modal
+  const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+
+  // Delete
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const enrollmentStatuses = useEnrollmentStatuses();
+  const statusOptions = domainToOptions(enrollmentStatuses).map((o) => ({
+    ...o,
+    label: STATUS_LABELS[o.value] ?? o.label,
+  }));
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, any> = { page };
+      if (statusFilter) params.status = statusFilter;
+      if (search.trim()) params.search = search.trim();
+      const { data } = await api.get("/enrollments", { params });
+      setRows(data.data);
+      setMeta(data.meta);
+    } catch {}
+    setLoading(false);
+  }, [page, statusFilter, search]);
+
+  useEffect(() => {
+    fetchRows();
+  }, [fetchRows]);
+
+  const fetchLookups = async () => {
+    try {
+      const [sRes, cRes] = await Promise.all([
+        api.get("/students", { params: { per_page: 200 } }),
+        api.get("/school-classes", { params: { per_page: 200, status: "active" } }),
+      ]);
+      setStudents(sRes.data.data ?? []);
+      setClasses(cRes.data.data ?? []);
+    } catch {}
+  };
+
+  const openEdit = async (row: Enrollment) => {
+    await fetchLookups();
+    setEditId(row.id);
+    setEditForm({
+      student_id: String(row.student?.id ?? ""),
+      school_class_id: String(row.school_class?.id ?? ""),
+      start_date: row.start_date ?? "",
+      end_date: row.end_date ?? "",
+      status: row.status,
+      monthly_amount: row.monthly_amount ?? "",
+      discount_amount: row.discount_amount ?? "",
+      payment_due_day: String(row.payment_due_day ?? ""),
+    });
+    setEditErrors({});
+    setEditVisible(true);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    setEditErrors({});
+    try {
+      const payload: Record<string, any> = {
+        start_date: editForm.start_date,
+        status: editForm.status,
+      };
+      if (editForm.end_date) payload.end_date = editForm.end_date;
+      if (editForm.monthly_amount)
+        payload.monthly_amount = parseFloat(editForm.monthly_amount);
+      if (editForm.discount_amount)
+        payload.discount_amount = parseFloat(editForm.discount_amount);
+      if (editForm.payment_due_day)
+        payload.payment_due_day = Number(editForm.payment_due_day);
+
+      await api.put(`/enrollments/${editId}`, payload);
+      setEditVisible(false);
+      fetchRows();
+    } catch (e: any) {
+      if (e.response?.status === 422) {
+        setEditErrors(parseApiErrors(e.response.data.errors ?? {}));
+      }
+    }
+    setSaving(false);
+  };
+
+  const remove = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/enrollments/${deleteId}`);
+      setDeleteId(null);
+      fetchRows();
+    } catch {}
+    setDeleting(false);
+  };
+
+  const statusFilterOptions = [
+    { value: "", label: "Todos os status" },
+    ...statusOptions,
+  ];
+
+  const fmt = (v: string | null) =>
+    v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  return (
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Header */}
+      <View className="flex-row items-center justify-between mb-6">
+        <View>
+          <Text className="text-2xl font-bold text-gray-800">Matrículas</Text>
+          <Text className="text-sm text-gray-500">
+            Gerencie as matrículas de alunos em turmas
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => navigate("matriculas-form")}
+          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={18} color="white" />
+          <Text className="text-white font-semibold text-sm ml-1.5">
+            Nova Matrícula
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Filters */}
+      <View className="flex-row gap-3 mb-4">
+        <View className="flex-1 max-w-xs">
+          <View
+            className="flex-row items-center bg-white rounded-xl border border-gray-200 px-3"
+            style={{ height: 44 }}
+          >
+            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <input
+              placeholder="Buscar aluno..."
+              value={search}
+              onChange={(e: any) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontSize: 14,
+                color: "#374151",
+                marginLeft: 8,
+                backgroundColor: "transparent",
+              }}
+            />
+          </View>
+        </View>
+        <select
+          value={statusFilter}
+          onChange={(e: any) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          style={{
+            border: "1px solid #E5E7EB",
+            borderRadius: 12,
+            padding: "0 14px",
+            fontSize: 14,
+            color: "#374151",
+            backgroundColor: "white",
+            height: 44,
+            minWidth: 180,
+          }}
+        >
+          {statusFilterOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </View>
+
+      {/* Table */}
+      <View
+        className="bg-white rounded-2xl overflow-hidden"
+        style={{
+          shadowColor: "#000",
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 2,
+        }}
+      >
+        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
+          <Text
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            style={{ flex: 2 }}
+          >
+            Aluno
+          </Text>
+          <Text
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            style={{ flex: 2 }}
+          >
+            Turma
+          </Text>
+          <Text
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            style={{ flex: 1 }}
+          >
+            Nº Matrícula
+          </Text>
+          <Text
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            style={{ flex: 1 }}
+          >
+            Início
+          </Text>
+          <Text
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            style={{ flex: 1 }}
+          >
+            Mensalidade
+          </Text>
+          <Text
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            style={{ flex: 1 }}
+          >
+            Status
+          </Text>
+          <View style={{ width: 72 }} />
+        </View>
+
+        {loading ? (
+          <View className="items-center justify-center py-20">
+            <ActivityIndicator size="large" color="#7C3AED" />
+          </View>
+        ) : rows.length === 0 ? (
+          <View className="items-center justify-center py-16">
+            <Ionicons name="clipboard-outline" size={40} color="#E5E7EB" />
+            <Text className="text-gray-400 mt-3 text-sm">
+              Nenhuma matrícula encontrada
+            </Text>
+          </View>
+        ) : (
+          rows.map((item, i) => (
+            <View
+              key={item.id}
+              className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${
+                i % 2 === 1 ? "bg-gray-50/40" : ""
+              }`}
+            >
+              <Text
+                className="text-sm font-medium text-gray-800"
+                style={{ flex: 2 }}
+              >
+                {item.student?.name ?? "—"}
+              </Text>
+              <Text className="text-sm text-gray-600" style={{ flex: 2 }}>
+                {item.school_class?.name ?? "—"}
+              </Text>
+              <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
+                {item.enrollment_number ?? "—"}
+              </Text>
+              <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
+                {fmt(item.start_date)}
+              </Text>
+              <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
+                {item.monthly_amount
+                  ? `R$ ${parseFloat(item.monthly_amount).toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    })}`
+                  : "—"}
+              </Text>
+              <View style={{ flex: 1 }}>
+                <Badge
+                  slug={item.status}
+                  label={STATUS_LABELS[item.status] ?? item.status}
+                />
+              </View>
+              <View
+                style={{ width: 72 }}
+                className="flex-row justify-end gap-2"
+              >
+                <TouchableOpacity
+                  onPress={() => openEdit(item)}
+                  className="p-1.5 bg-violet-50 rounded-lg"
+                >
+                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setDeleteId(item.id)}
+                  className="p-1.5 bg-red-50 rounded-lg"
+                >
+                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+
+        {meta.total > 0 && (
+          <View className="px-4 border-t border-gray-100">
+            <Pagination
+              currentPage={meta.current_page}
+              lastPage={meta.last_page}
+              total={meta.total}
+              perPage={meta.per_page}
+              onPageChange={setPage}
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={editVisible}
+        title="Editar Matrícula"
+        onClose={() => setEditVisible(false)}
+        size="lg"
+        footer={
+          <>
+            <TouchableOpacity
+              onPress={() => setEditVisible(false)}
+              className="px-5 py-2.5 rounded-xl border border-gray-200"
+            >
+              <Text className="text-sm font-semibold text-gray-700">
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={saveEdit}
+              disabled={saving}
+              className="px-5 py-2.5 rounded-xl bg-violet-600"
+            >
+              {saving ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text className="text-sm font-bold text-white">Salvar</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        }
+      >
+        <View className="flex-row gap-4">
+          <View className="flex-1">
+            <FormInput
+              label="Data de Início"
+              required
+              value={editForm.start_date}
+              onChangeText={(v) => setEditForm({ ...editForm, start_date: v })}
+              error={editErrors.start_date}
+              placeholder="AAAA-MM-DD"
+            />
+          </View>
+          <View className="flex-1">
+            <FormInput
+              label="Data de Término"
+              value={editForm.end_date}
+              onChangeText={(v) => setEditForm({ ...editForm, end_date: v })}
+              error={editErrors.end_date}
+              placeholder="AAAA-MM-DD"
+            />
+          </View>
+        </View>
+        <View className="flex-row gap-4">
+          <View className="flex-1">
+            <FormSelect
+              label="Status"
+              value={editForm.status}
+              options={statusOptions}
+              onChange={(v) => setEditForm({ ...editForm, status: v })}
+              error={editErrors.status}
+            />
+          </View>
+          <View className="flex-1">
+            <FormInput
+              label="Vencimento (dia)"
+              value={editForm.payment_due_day}
+              onChangeText={(v) =>
+                setEditForm({ ...editForm, payment_due_day: v })
+              }
+              error={editErrors.payment_due_day}
+              placeholder="1-28"
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+        <View className="flex-row gap-4">
+          <View className="flex-1">
+            <FormInput
+              label="Mensalidade (R$)"
+              value={editForm.monthly_amount}
+              onChangeText={(v) =>
+                setEditForm({ ...editForm, monthly_amount: v })
+              }
+              error={editErrors.monthly_amount}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+            />
+          </View>
+          <View className="flex-1">
+            <FormInput
+              label="Desconto (R$)"
+              value={editForm.discount_amount}
+              onChangeText={(v) =>
+                setEditForm({ ...editForm, discount_amount: v })
+              }
+              error={editErrors.discount_amount}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <ConfirmModal
+        visible={!!deleteId}
+        title="Excluir Matrícula"
+        message="Esta ação não pode ser desfeita."
+        onConfirm={remove}
+        onCancel={() => setDeleteId(null)}
+        loading={deleting}
+      />
+    </ScrollView>
+  );
+}

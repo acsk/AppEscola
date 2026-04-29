@@ -111,7 +111,14 @@ class InvoiceController extends Controller
             return response()->json(['message' => 'Não é possível editar uma cobrança paga ou cancelada.'], 422);
         }
 
-        $invoice->update($request->validated());
+        $data = $request->validated();
+
+        // Se o status for alterado para 'paid' e paid_at não foi informado, preenche com a data atual
+        if (isset($data['status']) && $data['status'] === 'paid' && empty($data['paid_at'])) {
+            $data['paid_at'] = now();
+        }
+
+        $invoice->update($data);
         $invoice->load(['student', 'guardian']);
 
         return response()->json(new InvoiceResource($invoice));
