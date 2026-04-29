@@ -30,6 +30,8 @@ type SchoolClass = {
   period: string | null;
   capacity: number | null;
   status: string;
+  start_date: string | null;
+  end_date: string | null;
   course?: { id: number; name: string };
   schedules?: Schedule[];
 };
@@ -102,6 +104,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
   };
 
   const fmtTime = (t: string) => t.slice(0, 5);
+  const fmtDate = (d: string | null) =>
+    d ? new Date(d + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : null;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -242,12 +246,16 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                 i % 2 === 1 ? "bg-gray-50/40" : ""
               }`}
             >
-              <Text
-                className="text-sm font-medium text-gray-800"
-                style={{ flex: 2 }}
-              >
-                {item.name}
-              </Text>
+              <View style={{ flex: 2 }}>
+                <Text className="text-sm font-medium text-gray-800">
+                  {item.name}
+                </Text>
+                {(item.start_date || item.end_date) && (
+                  <Text className="text-xs text-gray-400 mt-0.5">
+                    {fmtDate(item.start_date) ?? "?"} – {fmtDate(item.end_date) ?? "?"}
+                  </Text>
+                )}
+              </View>
               <Text className="text-sm text-gray-600" style={{ flex: 2 }}>
                 {item.course?.name ?? "—"}
               </Text>

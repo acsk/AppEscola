@@ -9,8 +9,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
-import { maskTime } from "../../utils/masks";
+import { maskTime, isoToDisplay, displayToISO } from "../../utils/masks";
 import FormInput from "../../components/ui/FormInput";
+import DatePickerInput from "../../components/ui/DatePickerInput";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -31,6 +32,8 @@ type Schedule = {
 type ClassForm = {
   course_id: string;
   name: string;
+  start_date: string;
+  end_date: string;
   year: string;
   period: string;
   capacity: string;
@@ -49,6 +52,8 @@ const CURRENT_YEAR = String(new Date().getFullYear());
 const EMPTY_CLASS: ClassForm = {
   course_id: "",
   name: "",
+  start_date: "",
+  end_date: "",
   year: CURRENT_YEAR,
   period: "",
   capacity: "",
@@ -143,6 +148,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         setForm({
           course_id: String(data.course_id ?? data.course?.id ?? ""),
           name: data.name ?? "",
+          start_date: data.start_date ?? "",
+          end_date: data.end_date ?? "",
           year: String(data.year ?? CURRENT_YEAR),
           period: data.period ?? "",
           capacity: String(data.capacity ?? ""),
@@ -164,6 +171,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
     const localErrors: Record<string, string> = {};
     if (!form.course_id) localErrors.course_id = "Selecione o curso.";
     if (!form.name.trim()) localErrors.name = "Nome é obrigatório.";
+    if (!form.start_date) localErrors.start_date = "Data de início é obrigatória.";
+    if (!form.end_date) localErrors.end_date = "Data de término é obrigatória.";
     if (Object.keys(localErrors).length > 0) {
       setErrors(localErrors);
       scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -176,6 +185,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
       const payload: Record<string, any> = {
         course_id: Number(form.course_id),
         name: form.name,
+        start_date: form.start_date,
+        end_date: form.end_date,
         status: form.status,
       };
       if (form.year) payload.year = Number(form.year);
@@ -377,6 +388,27 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
               error={errors.name}
               placeholder="Ex: TURMA 1"
             />
+
+            <View className="flex-row gap-4 mt-1">
+              <View className="flex-1">
+                <DatePickerInput
+                  label="Data de Início"
+                  required
+                  value={isoToDisplay(form.start_date)}
+                  onChangeText={(v) => setForm({ ...form, start_date: displayToISO(v) })}
+                  error={errors.start_date}
+                />
+              </View>
+              <View className="flex-1">
+                <DatePickerInput
+                  label="Data de Término"
+                  required
+                  value={isoToDisplay(form.end_date)}
+                  onChangeText={(v) => setForm({ ...form, end_date: displayToISO(v) })}
+                  error={errors.end_date}
+                />
+              </View>
+            </View>
 
             <View className="flex-row gap-4 mt-1">
               <View className="flex-1">

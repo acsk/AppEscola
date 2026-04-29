@@ -135,8 +135,9 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
   const [bundleClassMap, setBundleClassMap] = useState<Record<number, string>>({});
 
   // Common
-  const [startDate, setStartDate] = useState(todayDisplay());
+  const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [overrideDates, setOverrideDates] = useState(false);
   const [discount, setDiscount] = useState("0");
   const [dueDay, setDueDay] = useState("10");
 
@@ -254,7 +255,6 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!studentId) e.student_id = "Selecione o aluno.";
-    if (!startDate) e.start_date = "Data de início obrigatória.";
 
     if (mode === "plan") {
       if (!courseId) e.course_id = "Selecione o curso.";
@@ -300,11 +300,11 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
           student_id: Number(studentId),
           school_class_id: Number(classId),
           course_plan_id: Number(planId),
-          start_date: displayToISO(startDate) ?? startDate,
           discount_amount: parseFloat(discount.replace(",", ".")) || 0,
           payment_due_day: dueDay ? Number(dueDay) : undefined,
           guardian_id: guardianId ? Number(guardianId) : undefined,
         };
+        if (startDate) payload.start_date = displayToISO(startDate) ?? startDate;
         if (endDate) payload.end_date = displayToISO(endDate) ?? endDate;
         if (enrollmentPayment) payload.enrollment_payment = enrollmentPayment;
 
@@ -321,11 +321,11 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
           student_id: Number(studentId),
           bundle_id: Number(bundleId),
           school_class_ids: schoolClassIds,
-          start_date: displayToISO(startDate) ?? startDate,
           discount_amount: parseFloat(discount.replace(",", ".")) || 0,
           payment_due_day: dueDay ? Number(dueDay) : undefined,
           guardian_id: guardianId ? Number(guardianId) : undefined,
         };
+        if (startDate) payload.start_date = displayToISO(startDate) ?? startDate;
         if (endDate) payload.end_date = displayToISO(endDate) ?? endDate;
         if (enrollmentPayment) payload.enrollment_payment = enrollmentPayment;
 
@@ -447,7 +447,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
               setStudentId(""); setCourseId(""); setPlanId(""); setClassId("");
               setBundleId(""); setBundleClassMap({}); setGuardianId("");
               setDiscount("0"); setDueDay("10"); setPayNow(false);
-              setStartDate(todayDisplay()); setEndDate(""); setPayNotes("");
+              setStartDate(""); setEndDate(""); setOverrideDates(false); setPayNotes("");
             }}
             className="flex-row items-center gap-2 px-6 py-3 rounded-xl border border-violet-200 bg-violet-50"
             activeOpacity={0.8}
@@ -790,26 +790,57 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
           </>
         )}
 
-        {/* Dates */}
-        <View className="flex-row gap-4 mb-3">
-          <View className="flex-1">
-            <DatePickerInput
-              label="Data de Início"
-              required
-              value={startDate}
-              onChangeText={setStartDate}
-              error={errors.start_date}
-            />
+        {/* Dates — inherited from class, override optional */}
+        <TouchableOpacity
+          onPress={() => {
+            const next = !overrideDates;
+            setOverrideDates(next);
+            if (!next) { setStartDate(""); setEndDate(""); }
+          }}
+          activeOpacity={0.8}
+          className="flex-row items-center gap-2 mb-3"
+        >
+          <View
+            className={`w-4 h-4 rounded border items-center justify-center ${
+              overrideDates ? "bg-violet-600 border-violet-600" : "border-gray-400"
+            }`}
+          >
+            {overrideDates && <Ionicons name="checkmark" size={11} color="white" />}
           </View>
-          <View className="flex-1">
-            <DatePickerInput
-              label="Data de Término"
-              value={endDate}
-              onChangeText={setEndDate}
-              error={errors.end_date}
-            />
+          <Text className="text-xs font-medium text-gray-600">
+            Sobrescrever datas da turma (opcional)
+          </Text>
+        </TouchableOpacity>
+
+        {overrideDates && (
+          <View className="flex-row gap-4 mb-3">
+            <View className="flex-1">
+              <DatePickerInput
+                label="Data de Início"
+                value={startDate}
+                onChangeText={setStartDate}
+                error={errors.start_date}
+              />
+            </View>
+            <View className="flex-1">
+              <DatePickerInput
+                label="Data de Término"
+                value={endDate}
+                onChangeText={setEndDate}
+                error={errors.end_date}
+              />
+            </View>
           </View>
-        </View>
+        )}
+
+        {!overrideDates && (
+          <View className="flex-row items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-3">
+            <Ionicons name="information-circle-outline" size={14} color="#3B82F6" />
+            <Text className="text-xs text-blue-600">
+              As datas serão herdadas automaticamente da turma selecionada.
+            </Text>
+          </View>
+        )}
 
         {/* Discount + Due day */}
         <View className="flex-row gap-4">
