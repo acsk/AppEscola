@@ -39,6 +39,8 @@ export const useGuardianRelationships = () => useDomain("/domains/guardian-relat
 export const useBillingCycles = () => useDomain("/domains/billing-cycles");
 export const useInvoiceTypes = () => useDomain("/domains/invoice-types");
 export const useWeekdays = () => useDomain("/domains/weekdays");
+export const useExamStatuses = () => useDomain("/exam-statuses");
+export const useExamTypes = () => useDomain("/exam-types");
 
 export function domainToOptions(items: DomainItem[]) {
   return items.map((d) => ({ value: d.slug, label: d.label }));

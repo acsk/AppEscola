@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Enrollment extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TracksUserActivity;
 
     protected $fillable = [
         'tenant_id',
@@ -25,6 +26,9 @@ class Enrollment extends Model
         'monthly_amount',
         'discount_amount',
         'payment_due_day',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [

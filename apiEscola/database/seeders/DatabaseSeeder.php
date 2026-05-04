@@ -89,5 +89,8 @@ class DatabaseSeeder extends Seeder
                 'can_access_portal' => true,
             ]);
         });
+
+        // Simulado de demonstração
+        $this->call(ExamSeeder::class);
     }
 }

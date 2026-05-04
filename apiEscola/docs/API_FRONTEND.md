@@ -161,11 +161,30 @@ PUT    /api/school-classes/{id}  → atualizar
 DELETE /api/school-classes/{id}  → remover
 ```
 
-A resposta já inclui `schedules` embutido:
+### Criar turma — campos obrigatórios
+
+```json
+{
+  "course_id": 1,
+  "name": "Turma A — 2026",
+  "start_date": "2026-02-01",   // obrigatório
+  "end_date": "2026-12-15",     // obrigatório
+  "year": 2026,                  // opcional
+  "period": "morning",          // opcional — slug de domain_periods
+  "capacity": 30,                // opcional
+  "status": "active"             // opcional, padrão active
+}
+```
+
+> ⚠️ **`start_date` e `end_date` são obrigatórios** ao criar uma turma. Esses valores serão herdados automaticamente pelas matrículas feitas nessa turma.
+
+A resposta inclui `schedules` embutido:
 ```json
 {
   "id": 1,
-  "name": "Turma A",
+  "name": "Turma A — 2026",
+  "start_date": "2026-02-01",
+  "end_date": "2026-12-15",
   "course": { "id": 1, "name": "Inglês" },
   "schedules": [
     { "weekday": "monday", "start_time": "08:00", "end_time": "10:00" }
@@ -213,19 +232,24 @@ Authorization: Bearer {token}
   "student_id": 1,
   "school_class_id": 2,
   "course_plan_id": 3,
-  "start_date": "2026-05-01",
-  "end_date": "2027-04-30",        // opcional — calculado automaticamente pelo ciclo do plano
-  "discount_amount": 0,            // opcional
-  "payment_due_day": 10,           // opcional, padrão 10
-  "guardian_id": 1,                // opcional — detectado automaticamente pelo flag is_financial_responsible
+  "start_date": "2026-05-01",   // opcional — herdado da turma se omitido
+  "end_date": "2027-04-30",     // opcional — herdado da turma se omitido
+  "discount_amount": 0,         // opcional
+  "payment_due_day": 10,        // opcional, padrão 10
+  "guardian_id": 1,             // opcional — detectado automaticamente pelo flag is_financial_responsible
 
-  "enrollment_payment": {          // opcional — omitir deixa taxa de matrícula como pendente
-    "payment_method": "pix",       // obrigatório dentro do objeto se for informar
-    "paid_at": "2026-05-01",       // opcional, preenche com hoje se omitido
-    "notes": "Pago na recepção"    // opcional
+  "enrollment_payment": {       // opcional — omitir deixa taxa de matrícula como pendente
+    "payment_method": "pix",   // obrigatório dentro do objeto se for informar
+    "paid_at": "2026-05-01",   // opcional, preenche com hoje se omitido
+    "notes": "Pago na recepção" // opcional
   }
 }
 ```
+
+> **Prioridade de datas:**
+> 1. Informado no body da requisição
+> 2. Herdado da turma (`school_class.start_date` / `school_class.end_date`) ← **recomendado**
+> 3. Calculado pelo ciclo do plano (fallback se a turma não tiver datas)
 
 **Resposta 201:**
 ```json
@@ -272,7 +296,7 @@ Authorization: Bearer {token}
 }
 ```
 
-> **Como o `end_date` é calculado automaticamente:**
+> **Como o `end_date` é calculado (quando não vem da turma e não é informado):**
 > - Plano mensal (monthly): `start_date + 1 mês - 1 dia`
 > - Plano semestral (semiannual): `start_date + 6 meses - 1 dia`
 > - Plano anual (annual): `start_date + 12 meses - 1 dia`
@@ -292,14 +316,14 @@ Authorization: Bearer {token}
 {
   "student_id": 1,
   "bundle_id": 2,
-  "school_class_ids": [10, 11, 12],  // um ID de turma por curso do pacote
-  "start_date": "2026-05-01",
-  "end_date": "2027-04-30",           // opcional — calculado automaticamente
-  "discount_amount": 0,               // opcional
-  "payment_due_day": 10,              // opcional, padrão 10
-  "guardian_id": 1,                   // opcional
+  "school_class_ids": [10, 11, 12], // um ID de turma por curso do pacote
+  "start_date": "2026-05-01",       // opcional — herdado da primeira turma se omitido
+  "end_date": "2027-04-30",         // opcional — herdado da primeira turma se omitido
+  "discount_amount": 0,             // opcional
+  "payment_due_day": 10,            // opcional, padrão 10
+  "guardian_id": 1,                 // opcional
 
-  "enrollment_payment": {             // opcional
+  "enrollment_payment": {           // opcional
     "payment_method": "bank_slip",
     "paid_at": "2026-05-01",
     "notes": ""
@@ -448,7 +472,9 @@ DELETE /api/invoices/{id}
 | Regra | Detalhe |
 |---|---|
 | Um aluno não pode ser matriculado duas vezes na mesma turma | Retorna 422 com mensagem de erro |
-| `end_date` é calculado automaticamente | Baseado no `billing_cycle` do plano/pacote, se não informado |
+| `start_date`/`end_date` **obrigatórios na turma** | Ao criar `POST /api/school-classes`, ambas as datas são required |
+| Datas da matrícula herdadas da turma | `start_date`/`end_date` no body são opcionais — a turma é a fonte primária |
+| `end_date` calculado pelo ciclo como fallback | Só usado se a turma não tiver `end_date` e não for informado no body |
 | Taxa de matrícula gerada automaticamente | Sempre criada ao matricular; pode ser paga no ato via `enrollment_payment` |
 | Mensalidades geradas automaticamente | Uma por mês do período, com vencimento no `payment_due_day` |
 | Invoice paga/cancelada não pode ser editada | PUT retorna 422 |

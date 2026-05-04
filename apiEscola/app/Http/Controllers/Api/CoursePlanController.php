@@ -78,7 +78,7 @@ class CoursePlanController extends Controller
 
         $plan->load('course');
 
-        return response()->json(new CoursePlanResource($plan), 201);
+        return $this->created(new CoursePlanResource($plan));
     }
 
     #[OA\Get(
@@ -98,7 +98,7 @@ class CoursePlanController extends Controller
 
         $plan->load('course');
 
-        return response()->json(new CoursePlanResource($plan));
+        return $this->success(new CoursePlanResource($plan));
     }
 
     #[OA\Put(
@@ -120,7 +120,7 @@ class CoursePlanController extends Controller
         $plan->update($request->validated());
         $plan->load('course');
 
-        return response()->json(new CoursePlanResource($plan));
+        return $this->success(new CoursePlanResource($plan));
     }
 
     #[OA\Delete(

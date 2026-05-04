@@ -16,6 +16,8 @@ class Subject extends Model
         'tenant_id',
         'name',
         'description',
+        'icon',
+        'color',
         'status',
     ];
 

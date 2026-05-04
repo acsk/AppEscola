@@ -72,7 +72,7 @@ class ClassScheduleController extends Controller
 
         $schedule->load(['subject', 'teacher']);
 
-        return response()->json(new ClassScheduleResource($schedule), 201);
+        return $this->created(new ClassScheduleResource($schedule));
     }
 
     #[OA\Put(
@@ -94,7 +94,7 @@ class ClassScheduleController extends Controller
         $classSchedule->update($request->validated());
         $classSchedule->load(['subject', 'teacher']);
 
-        return response()->json(new ClassScheduleResource($classSchedule));
+        return $this->success(new ClassScheduleResource($classSchedule));
     }
 
     #[OA\Delete(

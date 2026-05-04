@@ -58,7 +58,7 @@ class GuardianController extends Controller
 
         $guardian = Guardian::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
 
-        return response()->json(new GuardianResource($guardian), 201);
+        return $this->created(new GuardianResource($guardian));
     }
 
     #[OA\Get(
@@ -76,7 +76,7 @@ class GuardianController extends Controller
     {
         $this->authorizeTenant($request, $guardian->tenant_id);
 
-        return response()->json(new GuardianResource($guardian));
+        return $this->success(new GuardianResource($guardian));
     }
 
     #[OA\Put(
@@ -97,7 +97,7 @@ class GuardianController extends Controller
 
         $guardian->update($request->validated());
 
-        return response()->json(new GuardianResource($guardian));
+        return $this->success(new GuardianResource($guardian));
     }
 
     #[OA\Delete(

@@ -21,6 +21,7 @@ import SchoolClassFormScreen from "./screens/turmas/SchoolClassFormScreen";
 import EnrollmentsScreen from "./screens/matriculas";
 import EnrollmentFormScreen from "./screens/matriculas/EnrollmentFormScreen";
 import InvoicesScreen from "./screens/InvoicesScreen";
+import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
 
 type NavState = { screen: string; params?: Record<string, any> };
 
@@ -35,6 +36,8 @@ const SCREEN_SLUGS = [
   "cobrancas",
   "dashboard",
   "pacotes",
+  "simulados",
+  "simulados-tentativas",
 ];
 
 function hashToNav(hash: string): NavState {
@@ -79,6 +82,15 @@ function hashToNav(hash: string): NavState {
     return { screen: "turmas" };
   }
 
+  if (seg0 === "simulados") {
+    if (!seg1) return { screen: "simulados" };
+    if (seg1 === "tentativas") return { screen: "simulados-tentativas" };
+    if (seg1 === "novo") return { screen: "simulados-form", params: { examId: null } };
+    const id = parseInt(seg1, 10);
+    if (!isNaN(id)) return { screen: "simulados-form", params: { examId: id } };
+    return { screen: "simulados" };
+  }
+
   if (seg0 && SCREEN_SLUGS.includes(seg0)) return { screen: seg0 };
   return { screen: "dashboard" };
 }
@@ -97,6 +109,11 @@ function navToHash(nav: NavState): string {
     return id != null ? `#/pacotes/${id}` : "#/pacotes/novo";
   }
   if (nav.screen === "matriculas-form") return "#/matriculas/nova";
+  if (nav.screen === "simulados-form") {
+    const id = nav.params?.examId;
+    return id != null ? `#/simulados/${id}` : "#/simulados/novo";
+  }
+  if (nav.screen === "simulados-tentativas") return "#/simulados/tentativas";
   if (nav.screen === "turmas-form") {
     const id = nav.params?.classId;
     return id != null ? `#/turmas/${id}` : "#/turmas/nova";
@@ -141,6 +158,8 @@ function AppContent() {
     ? "matriculas"
     : nav.screen.startsWith("turmas")
     ? "turmas"
+    : nav.screen.startsWith("simulados")
+    ? "simulados"
     : nav.screen;
 
   if (isLoading) {
@@ -170,6 +189,9 @@ function AppContent() {
       case "matriculas": return <EnrollmentsScreen navigate={navigate} />;
       case "matriculas-form": return <EnrollmentFormScreen navigate={navigate} />;
       case "cobrancas": return <InvoicesScreen />;
+      case "simulados": return <ExamsScreen navigate={navigate} />;
+      case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
+      case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} />;
       default: return <DashboardScreen />;
     }
   };

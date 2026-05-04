@@ -544,35 +544,20 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
         </View>
 
         {/* Aluno */}
-        <View className="mb-3">
-          <Text className="text-xs font-medium text-gray-600 mb-1.5">
-            Aluno <Text className="text-red-500">*</Text>
-          </Text>
-          <select
-            value={studentId}
-            onChange={(e: any) => { setStudentId(e.target.value); setGuardianId(""); }}
-            style={{
-              width: "100%",
-              border: `1px solid ${errors.student_id ? "#EF4444" : "#E5E7EB"}`,
-              borderRadius: 8,
-              padding: "9px 12px",
-              fontSize: 14,
-              color: studentId ? "#374151" : "#9CA3AF",
-              backgroundColor: "white",
-            }}
-          >
-            <option value="">Selecione o aluno</option>
-            {students.map((s) => (
-              <option key={s.id} value={String(s.id)}>
-                {s.name}
-                {s.enrollment_number ? ` — ${s.enrollment_number}` : ""}
-              </option>
-            ))}
-          </select>
-          {errors.student_id && (
-            <Text className="text-xs text-red-500 mt-1">{errors.student_id}</Text>
-          )}
-        </View>
+        <SearchableSelect
+          label="Aluno"
+          required
+          placeholder="Selecione o aluno..."
+          modalTitle="Selecionar Aluno"
+          options={students.map((s) => ({
+            value: String(s.id),
+            label: s.name,
+            sublabel: s.enrollment_number ?? undefined,
+          }))}
+          value={studentId}
+          onChange={(v) => { setStudentId(v); setGuardianId(""); }}
+          error={errors.student_id}
+        />
 
         {/* Responsável financeiro */}
         {guardians.length > 0 && (

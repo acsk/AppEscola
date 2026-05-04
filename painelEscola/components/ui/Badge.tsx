@@ -19,6 +19,11 @@ const SLUG_MAP: Record<string, Variant> = {
   overdue: "error",
   cancelled: "error",
   concluded: "info",
+  published: "success",
+  draft: "default",
+  archived: "info",
+  in_progress: "warning",
+  completed: "success",
 };
 
 type Props = {

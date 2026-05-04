@@ -12,15 +12,19 @@ import { parseApiErrors } from "../../utils/apiErrors";
 import Modal from "../../components/ui/Modal";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
+import DatePickerInput from "../../components/ui/DatePickerInput";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import { isoToDisplay } from "../../utils/masks";
 import { useEnrollmentStatuses, domainToOptions } from "../../hooks/useDomains";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Student = { id: number; name: string };
-type SchoolClass = { id: number; name: string };
+type Student = { id: number; name: string; enrollment_number?: string };
+type SchoolClass = { id: number; name: string; course?: { id: number; name: string } };
+type Guardian = { id: number; name: string };
+type CoursePlan = { id: number; name: string; billing_cycle: string; cycle_label: string; price: string };
 
 type Enrollment = {
   id: number;
@@ -33,6 +37,9 @@ type Enrollment = {
   payment_due_day: number | null;
   student?: Student;
   school_class?: SchoolClass;
+  guardian?: Guardian;
+  course_plan?: CoursePlan;
+  created_at?: string;
 };
 
 type EditForm = {
@@ -100,6 +107,11 @@ export default function EnrollmentsScreen({ navigate }: Props) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // View modal
+  const [viewVisible, setViewVisible] = useState(false);
+  const [viewData, setViewData] = useState<Enrollment | null>(null);
+  const [loadingView, setLoadingView] = useState(false);
+
   const enrollmentStatuses = useEnrollmentStatuses();
   const statusOptions = domainToOptions(enrollmentStatuses).map((o) => ({
     ...o,
@@ -134,14 +146,24 @@ export default function EnrollmentsScreen({ navigate }: Props) {
     } catch {}
   };
 
-  const openEdit = async (row: Enrollment) => {
-    await fetchLookups();
+  const openView = async (id: number) => {
+    setLoadingView(true);
+    setViewVisible(true);
+    setViewData(null);
+    try {
+      const { data } = await api.get(`/enrollments/${id}`);
+      setViewData(data.data ?? data);
+    } catch {}
+    setLoadingView(false);
+  };
+
+  const openEdit = async (row: Enrollment) => {    await fetchLookups();
     setEditId(row.id);
     setEditForm({
       student_id: String(row.student?.id ?? ""),
       school_class_id: String(row.school_class?.id ?? ""),
-      start_date: row.start_date ?? "",
-      end_date: row.end_date ?? "",
+      start_date: isoToDisplay(row.start_date ?? ""),
+      end_date: isoToDisplay(row.end_date ?? ""),
       status: row.status,
       monthly_amount: row.monthly_amount ?? "",
       discount_amount: row.discount_amount ?? "",
@@ -324,7 +346,7 @@ export default function EnrollmentsScreen({ navigate }: Props) {
           >
             Status
           </Text>
-          <View style={{ width: 72 }} />
+          <View style={{ width: 96 }} />
         </View>
 
         {loading ? (
@@ -375,9 +397,15 @@ export default function EnrollmentsScreen({ navigate }: Props) {
                 />
               </View>
               <View
-                style={{ width: 72 }}
+                style={{ width: 96 }}
                 className="flex-row justify-end gap-2"
               >
+                <TouchableOpacity
+                  onPress={() => openView(item.id)}
+                  className="p-1.5 bg-blue-50 rounded-lg"
+                >
+                  <Ionicons name="eye-outline" size={15} color="#3B82F6" />
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => openEdit(item)}
                   className="p-1.5 bg-violet-50 rounded-lg"
@@ -407,6 +435,117 @@ export default function EnrollmentsScreen({ navigate }: Props) {
           </View>
         )}
       </View>
+
+      {/* View Modal */}
+      <Modal
+        visible={viewVisible}
+        title="Detalhes da Matrícula"
+        onClose={() => setViewVisible(false)}
+        size="lg"
+        footer={
+          <>
+            <TouchableOpacity
+              onPress={() => setViewVisible(false)}
+              className="px-5 py-2.5 rounded-xl border border-gray-200"
+            >
+              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+            {viewData && (
+              <TouchableOpacity
+                onPress={() => { setViewVisible(false); openEdit(viewData); }}
+                className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+              >
+                <Ionicons name="pencil-outline" size={14} color="white" />
+                <Text className="text-sm font-bold text-white">Editar</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        }
+      >
+        {loadingView ? (
+          <View className="items-center py-10">
+            <ActivityIndicator size="large" color="#7C3AED" />
+          </View>
+        ) : viewData ? (
+          <View className="gap-5">
+            {/* Número e status */}
+            <View className="flex-row items-center justify-between bg-violet-50 rounded-xl px-4 py-3">
+              <View>
+                <Text className="text-xs text-violet-400 font-medium uppercase tracking-wide mb-0.5">Nº Matrícula</Text>
+                <Text className="text-xl font-bold text-violet-700 tracking-widest">
+                  {viewData.enrollment_number ?? "—"}
+                </Text>
+              </View>
+              <Badge slug={viewData.status} label={STATUS_LABELS[viewData.status] ?? viewData.status} />
+            </View>
+
+            {/* Aluno */}
+            <View className="bg-gray-50 rounded-xl px-4 py-3 gap-1">
+              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Aluno</Text>
+              <Text className="text-sm font-semibold text-gray-800">{viewData.student?.name ?? "—"}</Text>
+              {viewData.student?.enrollment_number && (
+                <Text className="text-xs text-gray-500">Matr.: {viewData.student.enrollment_number}</Text>
+              )}
+              {viewData.guardian && (
+                <Text className="text-xs text-gray-500">Responsável: {viewData.guardian.name}</Text>
+              )}
+            </View>
+
+            {/* Turma e Curso */}
+            <View className="bg-gray-50 rounded-xl px-4 py-3 gap-1">
+              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Turma / Curso</Text>
+              <Text className="text-sm font-semibold text-gray-800">{viewData.school_class?.name ?? "—"}</Text>
+              {viewData.school_class?.course && (
+                <Text className="text-xs text-gray-500">{viewData.school_class.course.name}</Text>
+              )}
+              {viewData.course_plan && (
+                <Text className="text-xs text-gray-500">
+                  Plano: {viewData.course_plan.name} • {viewData.course_plan.cycle_label}
+                </Text>
+              )}
+            </View>
+
+            {/* Datas */}
+            <View className="flex-row gap-3">
+              <View className="flex-1 bg-gray-50 rounded-xl px-4 py-3">
+                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Início</Text>
+                <Text className="text-sm font-semibold text-gray-800">{fmt(viewData.start_date)}</Text>
+              </View>
+              <View className="flex-1 bg-gray-50 rounded-xl px-4 py-3">
+                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Término</Text>
+                <Text className="text-sm font-semibold text-gray-800">{fmt(viewData.end_date ?? null)}</Text>
+              </View>
+            </View>
+
+            {/* Financeiro */}
+            <View className="bg-gray-50 rounded-xl px-4 py-3">
+              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Financeiro</Text>
+              <View className="gap-2">
+                {[
+                  { label: "Mensalidade", value: viewData.monthly_amount ? `R$ ${parseFloat(viewData.monthly_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
+                  { label: "Desconto", value: viewData.discount_amount && parseFloat(viewData.discount_amount) > 0 ? `R$ ${parseFloat(viewData.discount_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
+                  { label: "Dia de vencimento", value: viewData.payment_due_day ? `Dia ${viewData.payment_due_day}` : "—" },
+                ].map((row) => (
+                  <View key={row.label} className="flex-row justify-between items-center">
+                    <Text className="text-sm text-gray-500">{row.label}</Text>
+                    <Text className="text-sm font-semibold text-gray-800">{row.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {viewData.created_at && (
+              <Text className="text-xs text-gray-400 text-right">
+                Criado em {fmt(viewData.created_at.slice(0, 10))}
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View className="items-center py-10">
+            <Text className="text-sm text-gray-400">Não foi possível carregar os dados.</Text>
+          </View>
+        )}
+      </Modal>
 
       {/* Edit Modal */}
       <Modal
@@ -440,22 +579,22 @@ export default function EnrollmentsScreen({ navigate }: Props) {
       >
         <View className="flex-row gap-4">
           <View className="flex-1">
-            <FormInput
+            <DatePickerInput
               label="Data de Início"
               required
               value={editForm.start_date}
-              onChangeText={(v) => setEditForm({ ...editForm, start_date: v })}
+              onChangeText={() => {}}
               error={editErrors.start_date}
-              placeholder="AAAA-MM-DD"
+              disabled
             />
           </View>
           <View className="flex-1">
-            <FormInput
+            <DatePickerInput
               label="Data de Término"
               value={editForm.end_date}
-              onChangeText={(v) => setEditForm({ ...editForm, end_date: v })}
+              onChangeText={() => {}}
               error={editErrors.end_date}
-              placeholder="AAAA-MM-DD"
+              disabled
             />
           </View>
         </View>

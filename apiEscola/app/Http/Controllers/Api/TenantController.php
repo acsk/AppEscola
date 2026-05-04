@@ -54,7 +54,7 @@ class TenantController extends Controller
     {
         $tenant = Tenant::create($request->validated());
 
-        return response()->json(new TenantResource($tenant), 201);
+        return $this->created(new TenantResource($tenant));
     }
 
     #[OA\Get(

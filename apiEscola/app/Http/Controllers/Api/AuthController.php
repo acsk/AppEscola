@@ -97,4 +97,54 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Logout realizado com sucesso.']);
     }
+
+    #[OA\Put(
+        path: '/api/me/password',
+        tags: ['Auth'],
+        summary: 'Alterar senha do usuário autenticado',
+        security: [['sanctum' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['current_password', 'password', 'password_confirmation'],
+                properties: [
+                    new OA\Property(property: 'current_password', type: 'string', format: 'password'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password'),
+                    new OA\Property(property: 'password_confirmation', type: 'string', format: 'password'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Senha alterada com sucesso'),
+            new OA\Response(response: 422, description: 'Dados inválidos'),
+            new OA\Response(response: 401, description: 'Não autenticado'),
+        ]
+    )]
+    public function updatePassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'current_password'      => ['required', 'string'],
+            'password'              => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'current_password.required' => 'A senha atual é obrigatória.',
+            'password.required'         => 'A nova senha é obrigatória.',
+            'password.min'              => 'A nova senha deve ter pelo menos :min caracteres.',
+            'password.confirmed'        => 'A confirmação da nova senha não confere.',
+        ]);
+
+        $user = $request->user();
+
+        if (! Hash::check($request->current_password, $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Senha atual incorreta.'],
+            ]);
+        }
+
+        $user->update([
+            'password'                 => $request->password,
+            'password_change_required' => false,
+        ]);
+
+        return response()->json(['message' => 'Senha alterada com sucesso.']);
+    }
 }

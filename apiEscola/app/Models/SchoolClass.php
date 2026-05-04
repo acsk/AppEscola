@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SchoolClass extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TracksUserActivity;
 
     protected $fillable = [
         'tenant_id',
@@ -19,12 +20,19 @@ class SchoolClass extends Model
         'year',
         'period',
         'capacity',
+        'start_date',
+        'end_date',
         'status',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [
-        'year' => 'integer',
-        'capacity' => 'integer',
+        'year'       => 'integer',
+        'capacity'   => 'integer',
+        'start_date' => 'date',
+        'end_date'   => 'date',
     ];
 
     public function tenant(): BelongsTo

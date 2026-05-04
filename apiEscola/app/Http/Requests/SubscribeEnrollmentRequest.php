@@ -28,10 +28,11 @@ class SubscribeEnrollmentRequest extends FormRequest
                 'exists:school_classes,id',
                 Rule::unique('enrollments', 'school_class_id')
                     ->where('student_id', $this->student_id)
-                    ->whereNotIn('status', ['cancelled']),
+                    ->whereNotIn('status', ['cancelled'])
+                    ->whereNull('deleted_at'),
             ],
             'course_plan_id'  => ['required', 'exists:course_plans,id'],
-            'start_date'      => ['required', 'date'],
+            'start_date'      => ['nullable', 'date'],
             'end_date'        => ['nullable', 'date', 'after_or_equal:start_date'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'payment_due_day' => ['nullable', 'integer', 'min:1', 'max:28'],

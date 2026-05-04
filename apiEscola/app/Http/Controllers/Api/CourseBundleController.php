@@ -90,7 +90,7 @@ class CourseBundleController extends Controller
         $bundle->courses()->sync($data['course_ids']);
         $bundle->load('courses');
 
-        return response()->json(new CourseBundleResource($bundle), 201);
+        return $this->created(new CourseBundleResource($bundle));
     }
 
     #[OA\Get(
@@ -109,7 +109,7 @@ class CourseBundleController extends Controller
         $this->authorizeTenant($request, $courseBundle->tenant_id);
         $courseBundle->load('courses');
 
-        return response()->json(new CourseBundleResource($courseBundle));
+        return $this->success(new CourseBundleResource($courseBundle));
     }
 
     #[OA\Put(
@@ -146,7 +146,7 @@ class CourseBundleController extends Controller
 
         $courseBundle->load('courses');
 
-        return response()->json(new CourseBundleResource($courseBundle));
+        return $this->success(new CourseBundleResource($courseBundle));
     }
 
     #[OA\Delete(

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Student extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TracksUserActivity;
 
     protected $fillable = [
         'tenant_id',
@@ -24,6 +25,9 @@ class Student extends Model
         'phone',
         'is_minor',
         'status',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [

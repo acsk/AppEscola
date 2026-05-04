@@ -137,7 +137,7 @@ class StudentController extends Controller
 
         $student->load('guardians');
 
-        return response()->json(new StudentResource($student), 201);
+        return $this->created(new StudentResource($student));
     }
 
     #[OA\Get(
@@ -157,7 +157,7 @@ class StudentController extends Controller
 
         $student->load('guardians');
 
-        return response()->json(new StudentResource($student));
+        return $this->success(new StudentResource($student));
     }
 
     #[OA\Put(
@@ -188,7 +188,7 @@ class StudentController extends Controller
 
         $student->load('guardians');
 
-        return response()->json(new StudentResource($student));
+        return $this->success(new StudentResource($student));
     }
 
     #[OA\Delete(

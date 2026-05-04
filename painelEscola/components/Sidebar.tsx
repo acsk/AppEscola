@@ -23,6 +23,7 @@ const menuItems: NavItem[] = [
   { id: "turmas", label: "Turmas", icon: "grid-outline" },
   { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
   { id: "cobrancas", label: "Cobranças", icon: "cash-outline" },
+  { id: "simulados", label: "Simulados", icon: "document-text-outline" },
 ];
 
 const otherItems: NavItem[] = [];

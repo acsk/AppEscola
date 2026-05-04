@@ -19,6 +19,8 @@ class SchoolClassResource extends JsonResource
             'year' => $this->year,
             'period' => $this->period,
             'capacity' => $this->capacity,
+            'start_date' => $this->start_date?->toDateString(),
+            'end_date'   => $this->end_date?->toDateString(),
             'status' => $this->status,
             'schedules' => ClassScheduleResource::collection($this->whenLoaded('schedules')),
             'created_at' => $this->created_at?->toISOString(),

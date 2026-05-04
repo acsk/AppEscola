@@ -14,6 +14,8 @@ class SubjectResource extends JsonResource
             'tenant_id' => $this->tenant_id,
             'name' => $this->name,
             'description' => $this->description,
+            'icon' => $this->icon,
+            'color' => $this->color,
             'status' => $this->status,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

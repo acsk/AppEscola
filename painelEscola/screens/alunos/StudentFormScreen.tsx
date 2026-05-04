@@ -12,6 +12,7 @@ import { parseApiErrors } from "../../utils/apiErrors";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import DatePickerInput from "../../components/ui/DatePickerInput";
+import SearchableSelect from "../../components/ui/SearchableSelect";
 import {
   maskPhone,
   maskCPF,
@@ -143,7 +144,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [guardians, setGuardians] = useState<GuardianForm[]>([]);
   const [guardianOptions, setGuardianOptions] = useState<
-    { value: number; label: string }[]
+    { value: string; label: string }[]
   >([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -169,7 +170,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         params: { per_page: 999 },
       });
       setGuardianOptions(
-        (data.data ?? []).map((g: any) => ({ value: g.id, label: g.name }))
+        (data.data ?? []).map((g: any) => ({ value: String(g.id), label: g.name }))
       );
     } catch {}
   }, []);
@@ -547,7 +548,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                         <Text className="text-sm font-semibold text-gray-700">
                           {g.mode === "existing" && g.guardian_id
                             ? guardianOptions.find(
-                                (o) => o.value === g.guardian_id
+                                (o) => o.value === String(g.guardian_id)
                               )?.label ?? "Responsável"
                             : g.name || "Novo Responsável"}
                         </Text>
@@ -618,42 +619,18 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                     <View className="p-4">
                       {g.mode === "existing" ? (
                         <View>
-                          <Text className="text-xs font-medium text-gray-600 mb-1.5">
-                            Responsável *
-                          </Text>
-                          <select
-                            value={g.guardian_id ?? ""}
-                            onChange={(e: any) => {
-                              const id = e.target.value
-                                ? Number(e.target.value)
-                                : null;
-                              updateGuardian(idx, { guardian_id: id });
-                            }}
-                            style={{
-                              width: "100%",
-                              border: "1px solid #E5E7EB",
-                              borderRadius: 8,
-                              padding: "9px 12px",
-                              fontSize: 14,
-                              color: g.guardian_id ? "#374151" : "#9CA3AF",
-                              backgroundColor: "white",
-                              marginBottom: 12,
-                            }}
-                          >
-                            <option value="">
-                              Selecione um responsável...
-                            </option>
-                            {guardianOptions.map((o) => (
-                              <option key={o.value} value={o.value}>
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                          {errors[`guardians.${idx}.guardian_id`] && (
-                            <Text className="text-xs text-red-500 mb-2">
-                              {errors[`guardians.${idx}.guardian_id`]}
-                            </Text>
-                          )}
+                          <SearchableSelect
+                            label="Responsável"
+                            required
+                            placeholder="Selecione um responsável..."
+                            modalTitle="Selecionar Responsável"
+                            options={guardianOptions}
+                            value={g.guardian_id ? String(g.guardian_id) : ""}
+                            onChange={(v) =>
+                              updateGuardian(idx, { guardian_id: v ? Number(v) : null })
+                            }
+                            error={errors[`guardians.${idx}.guardian_id`]}
+                          />
                         </View>
                       ) : (
                         <View>

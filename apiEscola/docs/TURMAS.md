@@ -1,6 +1,6 @@
 # Formação de Turmas — API
 
-> Atualizado em 28/04/2026
+> Atualizado em 29/04/2026
 
 ---
 
@@ -81,6 +81,8 @@ Lista paginada de turmas com curso e horários embutidos.
       "year": 2026,
       "period": "afternoon",
       "capacity": 20,
+      "start_date": "2026-02-01",
+      "end_date": "2026-12-15",
       "status": "active",
       "schedules": [
         {
@@ -104,7 +106,6 @@ Lista paginada de turmas com curso e horários embutidos.
       ],
       "created_at": "2026-04-28T16:32:46.000000Z",
       "updated_at": "2026-04-29T01:00:53.000000Z"
-    }
   ],
   "links": { "first": "...", "last": "...", "prev": null, "next": null },
   "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 4 }
@@ -119,23 +120,29 @@ Lista paginada de turmas com curso e horários embutidos.
 **Body:**
 ```json
 {
-  "course_id": 4,
-  "name":      "TURMA 1",
-  "year":      2026,
-  "period":    "afternoon",
-  "capacity":  20,
-  "status":    "active"
+  "course_id":  4,
+  "name":       "TURMA 1",
+  "start_date": "2026-02-01",
+  "end_date":   "2026-12-15",
+  "year":       2026,
+  "period":     "afternoon",
+  "capacity":   20,
+  "status":     "active"
 }
 ```
 
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
-| `course_id` | integer | Sim | ID do curso |
-| `name` | string | Sim | Nome da turma (max 255) |
-| `year` | integer | Não | Ano letivo (2000–2100). Default: ano atual |
+| `course_id` | integer | **Sim** | ID do curso |
+| `name` | string | **Sim** | Nome da turma (max 255) |
+| `start_date` | date | **Sim** | Data de início da turma (`YYYY-MM-DD`) |
+| `end_date` | date | **Sim** | Data de encerramento da turma (`YYYY-MM-DD`) — deve ser após `start_date` |
+| `year` | integer | Não | Ano letivo (2000–2100) |
 | `period` | string | Não | Slug de `domain_periods` |
 | `capacity` | integer | Não | Capacidade máxima de alunos |
 | `status` | string | Não | Slug de `domain_statuses`. Default: `active` |
+
+> ⚠️ **`start_date` e `end_date` são obrigatórios** e serão herdados automaticamente pelas matrículas feitas nessa turma — não é preciso informar as datas novamente ao matricular.
 
 **Resposta (201):** objeto da turma com `schedules: []` (array vazio até adicionar horários).
 
@@ -151,7 +158,7 @@ Retorna a turma completa com curso e horários.
 ### `PUT /api/school-classes/{id}`
 > Requer autenticação Bearer Token
 
-Body idêntico ao `POST` (todos os campos opcionais no update).
+Body idêntico ao `POST` (`start_date` e `end_date` são opcionais no update; demais campos também).
 
 ---
 
@@ -245,8 +252,15 @@ Body idêntico ao `POST` (todos os campos opcionais no update).
    GET /api/domains/weekdays     → opções de dias da semana
    GET /api/courses              → lista de cursos disponíveis
 
-2. Criar a turma
+2. Criar a turma  ← informar start_date e end_date obrigatoriamente
    POST /api/school-classes
+   Body mínimo:
+   {
+     "course_id":  1,
+     "name":       "Turma Manhã 2026",
+     "start_date": "2026-02-01",
+     "end_date":   "2026-12-15"
+   }
    → recebe turma com schedules: []
 
 3. Adicionar os horários (um por dia)

@@ -67,7 +67,7 @@ class SchoolClassController extends Controller
         $schoolClass = SchoolClass::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
         $schoolClass->load(['course', 'schedules']);
 
-        return response()->json(new SchoolClassResource($schoolClass), 201);
+        return $this->created(new SchoolClassResource($schoolClass));
     }
 
     #[OA\Get(
@@ -87,7 +87,7 @@ class SchoolClassController extends Controller
 
         $schoolClass->load(['course', 'schedules']);
 
-        return response()->json(new SchoolClassResource($schoolClass));
+        return $this->success(new SchoolClassResource($schoolClass));
     }
 
     #[OA\Put(
@@ -109,7 +109,7 @@ class SchoolClassController extends Controller
         $schoolClass->update($request->validated());
         $schoolClass->load(['course', 'schedules']);
 
-        return response()->json(new SchoolClassResource($schoolClass));
+        return $this->success(new SchoolClassResource($schoolClass));
     }
 
     #[OA\Delete(

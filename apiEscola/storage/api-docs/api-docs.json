@@ -28,19 +28,19 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "email",
+                                    "login",
                                     "password"
                                 ],
                                 "properties": {
-                                    "email": {
+                                    "login": {
+                                        "description": "E-mail (admin/staff) ou número de matrícula (aluno)",
                                         "type": "string",
-                                        "format": "email",
-                                        "example": "admin@cursinhoexemplo.com"
+                                        "example": "202600001"
                                     },
                                     "password": {
                                         "type": "string",
                                         "format": "password",
-                                        "example": "123456"
+                                        "example": "15052008"
                                     }
                                 },
                                 "type": "object"
@@ -232,6 +232,202 @@
                 "parameters": [
                     {
                         "name": "classSchedule",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Removido com sucesso"
+                    },
+                    "404": {
+                        "description": "Não encontrado"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/course-bundles": {
+            "get": {
+                "tags": [
+                    "CourseBundles"
+                ],
+                "summary": "Listar pacotes de cursos",
+                "operationId": "14606a0195a377428e469b495580d787",
+                "responses": {
+                    "200": {
+                        "description": "Lista de pacotes"
+                    },
+                    "401": {
+                        "description": "Não autenticado"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "CourseBundles"
+                ],
+                "summary": "Criar pacote de cursos",
+                "operationId": "7191619980c2cc9653e8798a38d5e53e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "billing_cycle",
+                                    "price",
+                                    "course_ids"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "CPM Completo"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "billing_cycle": {
+                                        "type": "string",
+                                        "example": "monthly",
+                                        "enum": [
+                                            "monthly",
+                                            "bimonthly",
+                                            "quadrimestral",
+                                            "semiannual",
+                                            "annual"
+                                        ]
+                                    },
+                                    "price": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 170
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "example": "active"
+                                    },
+                                    "course_ids": {
+                                        "description": "IDs dos cursos que compõem o pacote",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pacote criado"
+                    },
+                    "422": {
+                        "description": "Dados inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/course-bundles/{id}": {
+            "get": {
+                "tags": [
+                    "CourseBundles"
+                ],
+                "summary": "Exibir pacote",
+                "operationId": "87d7e12365fc7a68025ee000c3f2c9a3",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Dados do pacote"
+                    },
+                    "404": {
+                        "description": "Não encontrado"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "CourseBundles"
+                ],
+                "summary": "Atualizar pacote",
+                "operationId": "f67c9a54751ad55119734d20b3b9bd64",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "description": "Campos a atualizar"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pacote atualizado"
+                    },
+                    "422": {
+                        "description": "Dados inválidos"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "CourseBundles"
+                ],
+                "summary": "Remover pacote",
+                "operationId": "4e4796544d12e21e387537ba0aaf2cc8",
+                "parameters": [
+                    {
+                        "name": "id",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -751,6 +947,34 @@
                 }
             }
         },
+        "/api/domains/billing-cycles": {
+            "get": {
+                "tags": [
+                    "Domain"
+                ],
+                "summary": "Ciclos de cobrança (mensal, semestral etc)",
+                "operationId": "a08e2f9148d206be0aa9f49c34ab78d7",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/domains/invoice-types": {
+            "get": {
+                "tags": [
+                    "Domain"
+                ],
+                "summary": "Tipos de cobrança (taxa de matrícula, mensalidade etc)",
+                "operationId": "8620958baace0052b16119053bba5039",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
         "/api/enrollments": {
             "get": {
                 "tags": [
@@ -997,6 +1221,37 @@
                                     "payment_due_day": {
                                         "type": "integer",
                                         "example": 10
+                                    },
+                                    "guardian_id": {
+                                        "description": "Responsável financeiro (opcional, detectado automaticamente)",
+                                        "type": "integer"
+                                    },
+                                    "enrollment_payment": {
+                                        "description": "Pagamento da taxa de matrícula no ato. Omitir deixa a cobrança como pendente.",
+                                        "properties": {
+                                            "payment_method": {
+                                                "type": "string",
+                                                "example": "pix",
+                                                "enum": [
+                                                    "cash",
+                                                    "pix",
+                                                    "credit_card",
+                                                    "debit_card",
+                                                    "bank_slip",
+                                                    "transfer"
+                                                ]
+                                            },
+                                            "paid_at": {
+                                                "type": "string",
+                                                "format": "date",
+                                                "example": "2026-02-01"
+                                            },
+                                            "notes": {
+                                                "type": "string",
+                                                "example": "Pago na recepção"
+                                            }
+                                        },
+                                        "type": "object"
                                     }
                                 },
                                 "type": "object"
@@ -1006,13 +1261,117 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Matrícula criada com dados do aluno, curso e plano"
+                        "description": "Matrícula criada com invoice da taxa de matrícula"
                     },
                     "422": {
                         "description": "Dados inválidos"
                     },
                     "403": {
                         "description": "Plano não pertence ao tenant"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/enrollments/subscribe-bundle": {
+            "post": {
+                "tags": [
+                    "Enrollments"
+                ],
+                "summary": "Matricular aluno em um pacote de cursos",
+                "operationId": "ae9890fa3f7bb29f2c7798157bd326d5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "student_id",
+                                    "bundle_id",
+                                    "school_class_ids",
+                                    "start_date"
+                                ],
+                                "properties": {
+                                    "student_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "bundle_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "school_class_ids": {
+                                        "description": "Um ID de turma por curso do pacote (mesma ordem não importa)",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-02-01"
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "discount_amount": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 0
+                                    },
+                                    "payment_due_day": {
+                                        "type": "integer",
+                                        "example": 10
+                                    },
+                                    "guardian_id": {
+                                        "description": "Responsável financeiro (opcional, detectado automaticamente)",
+                                        "type": "integer"
+                                    },
+                                    "enrollment_payment": {
+                                        "description": "Pagamento da taxa de matrícula do pacote. Uma única cobrança para o pacote inteiro.",
+                                        "properties": {
+                                            "payment_method": {
+                                                "type": "string",
+                                                "example": "pix",
+                                                "enum": [
+                                                    "cash",
+                                                    "pix",
+                                                    "credit_card",
+                                                    "debit_card",
+                                                    "bank_slip",
+                                                    "transfer"
+                                                ]
+                                            },
+                                            "paid_at": {
+                                                "type": "string",
+                                                "format": "date",
+                                                "example": "2026-02-01"
+                                            },
+                                            "notes": {
+                                                "type": "string",
+                                                "example": "Pago na recepção"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Matrículas criadas (uma por curso) + invoice da taxa de matrícula do pacote"
+                    },
+                    "422": {
+                        "description": "Dados inválidos"
                     }
                 },
                 "security": [
@@ -2565,6 +2924,10 @@
         {
             "name": "CoursePlans",
             "description": "Planos de cobrança por ciclo vinculados a cursos"
+        },
+        {
+            "name": "CourseBundles",
+            "description": "Pacotes de cursos com preço diferenciado"
         },
         {
             "name": "Domain",

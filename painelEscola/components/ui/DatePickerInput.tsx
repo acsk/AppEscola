@@ -17,6 +17,7 @@ type Props = {
   onChangeText: (v: string) => void;
   error?: string;
   required?: boolean;
+  disabled?: boolean;
 };
 
 export default function DatePickerInput({
@@ -25,12 +26,13 @@ export default function DatePickerInput({
   onChangeText,
   error,
   required,
+  disabled = false,
 }: Props) {
   // Ref para o input nativo oculto (somente web)
   const hiddenRef = useRef<any>(null);
 
   const openCalendar = () => {
-    if (!hiddenRef.current) return;
+    if (disabled || !hiddenRef.current) return;
     try {
       hiddenRef.current.showPicker?.();
     } catch {
@@ -54,7 +56,9 @@ export default function DatePickerInput({
       </Text>
 
       <View
-        className={`flex-row items-center bg-gray-50 border rounded-xl px-4 ${
+        className={`flex-row items-center border rounded-xl px-4 ${
+          disabled ? "bg-gray-100" : "bg-gray-50"
+        } ${
           error ? "border-red-400" : "border-gray-200"
         }`}
         style={{ height: 44 }}
@@ -64,13 +68,14 @@ export default function DatePickerInput({
           onChangeText={(v) => onChangeText(maskDate(v))}
           placeholder="DD/MM/AAAA"
           placeholderTextColor="#9CA3AF"
-          className="flex-1 text-sm text-gray-800"
+          className={`flex-1 text-sm ${disabled ? "text-gray-400" : "text-gray-800"}`}
           maxLength={10}
           keyboardType="numeric"
+          editable={!disabled}
         />
 
-        <TouchableOpacity onPress={openCalendar} className="pl-2" activeOpacity={0.7}>
-          <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
+        <TouchableOpacity onPress={openCalendar} className="pl-2" activeOpacity={disabled ? 1 : 0.7} disabled={disabled}>
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
         </TouchableOpacity>
 
         {/* Input nativo oculto — usado apenas na web para abrir o seletor do SO */}

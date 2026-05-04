@@ -60,7 +60,7 @@ class CourseController extends Controller
 
         $course = Course::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
 
-        return response()->json(new CourseResource($course), 201);
+        return $this->created(new CourseResource($course));
     }
 
     #[OA\Get(
@@ -78,7 +78,7 @@ class CourseController extends Controller
     {
         $this->authorizeTenant($request, $course->tenant_id);
 
-        return response()->json(new CourseResource($course));
+        return $this->success(new CourseResource($course));
     }
 
     #[OA\Put(
@@ -99,7 +99,7 @@ class CourseController extends Controller
 
         $course->update($request->validated());
 
-        return response()->json(new CourseResource($course));
+        return $this->success(new CourseResource($course));
     }
 
     #[OA\Delete(

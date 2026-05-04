@@ -60,7 +60,7 @@ class SubjectController extends Controller
 
         $subject = Subject::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
 
-        return response()->json(new SubjectResource($subject), 201);
+        return $this->created(new SubjectResource($subject));
     }
 
     #[OA\Get(
@@ -78,7 +78,7 @@ class SubjectController extends Controller
     {
         $this->authorizeTenant($request, $subject->tenant_id);
 
-        return response()->json(new SubjectResource($subject));
+        return $this->success(new SubjectResource($subject));
     }
 
     #[OA\Put(
@@ -99,7 +99,7 @@ class SubjectController extends Controller
 
         $subject->update($request->validated());
 
-        return response()->json(new SubjectResource($subject));
+        return $this->success(new SubjectResource($subject));
     }
 
     #[OA\Delete(

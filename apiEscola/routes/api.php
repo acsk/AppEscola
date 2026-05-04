@@ -13,6 +13,10 @@ use App\Http\Controllers\Api\SchoolClassController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\StudentGuardianController;
 use App\Http\Controllers\Api\SubjectController;
+use App\Http\Controllers\Api\ExamAttemptController;
+use App\Http\Controllers\Api\ExamController;
+use App\Http\Controllers\Api\ExamQuestionController;
+use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +43,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Auth
     Route::get('/me', [AuthController::class, 'me']);
+    Route::match(['post', 'put', 'patch'], '/me/password', [AuthController::class, 'updatePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Tenants (somente super_admin)
@@ -100,4 +105,31 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('tenant-api-tokens', [TenantApiTokenController::class, 'index']);
     Route::post('tenant-api-tokens', [TenantApiTokenController::class, 'store']);
     Route::delete('tenant-api-tokens/{tenantApiToken}', [TenantApiTokenController::class, 'destroy']);
+
+    // Simulados do aluno autenticado (role: aluno)
+    Route::get('aluno/exams',        [StudentExamController::class, 'index']);
+    Route::get('aluno/exams/{exam}', [StudentExamController::class, 'show']);
+
+    // Simulados
+    Route::apiResource('exams', ExamController::class);
+    Route::get('exams/{exam}/stats',   [ExamController::class, 'stats']);
+
+    // Domínios de simulados (lookup tables — read-only)
+    Route::get('exam-statuses', fn () => response()->json(\App\Models\ExamStatus::orderBy('order')->get(['id', 'slug', 'label'])));
+    Route::get('exam-types',    fn () => response()->json(\App\Models\ExamType::get(['id', 'slug', 'label'])));
+
+    // Questões de um simulado (nested)
+    Route::get('exams/{exam}/questions',               [ExamQuestionController::class, 'index']);
+    Route::post('exams/{exam}/questions',              [ExamQuestionController::class, 'store']);
+    Route::get('exams/{exam}/questions/{question}',    [ExamQuestionController::class, 'show']);
+    Route::put('exams/{exam}/questions/{question}',    [ExamQuestionController::class, 'update']);
+    Route::delete('exams/{exam}/questions/{question}', [ExamQuestionController::class, 'destroy']);
+
+    // Tentativas de simulado
+    Route::get('exam-attempts',                    [ExamAttemptController::class, 'index']);
+    Route::post('exams/{exam}/start',              [ExamAttemptController::class, 'start']);
+    Route::post('exam-attempts/{attempt}/answer',  [ExamAttemptController::class, 'answer']);
+    Route::post('exam-attempts/{attempt}/finish',  [ExamAttemptController::class, 'finish']);
+    Route::get('exam-attempts/{attempt}',          [ExamAttemptController::class, 'show']);
+    Route::get('exams/{exam}/ranking',             [ExamAttemptController::class, 'ranking']);
 });

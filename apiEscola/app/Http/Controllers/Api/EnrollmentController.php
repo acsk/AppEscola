@@ -16,6 +16,7 @@ use App\Models\SchoolClass;
 use App\Traits\ScopedByTenant;
 use Carbon\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -75,7 +76,7 @@ class EnrollmentController extends Controller
 
         $data = array_merge($request->validated(), [
             'tenant_id' => $tenantId,
-            'enrollment_number' => $request->input('enrollment_number') ?? strtoupper(Str::random(8)),
+            'enrollment_number' => $request->input('enrollment_number') ?? $this->generateEnrollmentNumber($tenantId),
         ]);
 
         $enrollment = Enrollment::create($data);
@@ -141,6 +142,11 @@ class EnrollmentController extends Controller
     {
         $this->authorizeTenant($request, $enrollment->tenant_id);
 
+        $enrollment->update(['status' => 'cancelled']);
+
+        // Remove todas as cobranças da matrícula (soft delete)
+        $enrollment->invoices()->delete();
+
         $enrollment->delete();
 
         return response()->json(['message' => 'Matrícula removida com sucesso.']);
@@ -187,22 +193,23 @@ class EnrollmentController extends Controller
     {
         $tenantId = $this->getTenantId($request);
 
-        $plan = CoursePlan::with('course')->findOrFail($request->course_plan_id);
+        $plan        = CoursePlan::with('course')->findOrFail($request->course_plan_id);
+        $schoolClass = SchoolClass::findOrFail($request->school_class_id);
         $this->authorizeTenant($request, $plan->tenant_id);
 
-        // Se end_date não informado, calcula a partir do ciclo do plano
-        $startDate = Carbon::parse($request->start_date);
+        // Prioridade de datas:
+        // start_date: request > hoje (data da matrícula — não o início da turma)
+        // end_date:   request > turma > ciclo do plano
+        $startDate = Carbon::parse($request->start_date ?? now());
         $endDate   = $request->end_date
             ? Carbon::parse($request->end_date)
-            : $startDate->copy()->addMonths($plan->monthsInCycle())->subDay();
+            : ($schoolClass->end_date
+                ? Carbon::parse($schoolClass->end_date)
+                : $startDate->copy()->addMonths($plan->monthsInCycle())->subDay());
 
-        // Resolve responsável financeiro: usa o informado ou busca o marcado como financeiro do aluno
-        $guardianId = $request->guardian_id
-            ?? \App\Models\Student::find($request->student_id)
-                ?->guardians()
-                ->wherePivot('is_financial_responsible', true)
-                ->first()
-                ?->id;
+        // Resolve pagador e valida CPF obrigatório
+        $payer      = $this->resolveInvoicePayer($request->student_id);
+        $guardianId = $payer['guardian_id'];
 
         $enrollment = DB::transaction(function () use ($request, $plan, $tenantId, $guardianId, $startDate, $endDate) {
             $dueDay    = $request->payment_due_day ?? 10;
@@ -213,7 +220,7 @@ class EnrollmentController extends Controller
                 'student_id'        => $request->student_id,
                 'school_class_id'   => $request->school_class_id,
                 'course_plan_id'    => $plan->id,
-                'enrollment_number' => strtoupper(Str::random(8)),
+                'enrollment_number' => $this->generateEnrollmentNumber($tenantId ?? $plan->tenant_id),
                 'start_date'        => $startDate->toDateString(),
                 'end_date'          => $endDate->toDateString(),
                 'status'            => 'active',
@@ -271,6 +278,61 @@ class EnrollmentController extends Controller
             (new EnrollmentResource($enrollment))->resolve($request),
             ['financial_guardian_id' => $guardianId]
         ), 201);
+    }
+
+    /**
+     * Determina o pagador das cobranças e valida que o CPF está preenchido.
+     * - Aluno maior de idade (is_minor = false): paga com o próprio CPF (guardian_id = null).
+     * - Aluno menor de idade (is_minor = true): o responsável financeiro é o pagador.
+     * Em ambos os casos, o CPF (document) é obrigatório para emissão das cobranças.
+     */
+    /**
+     * Gera um número de matrícula sequencial e único por tenant.
+     * Formato: MAT-{tenant_id}-{NNNNN} (ex: MAT-3-00042)
+     */
+    private function generateEnrollmentNumber(int $tenantId): string
+    {
+        $next = DB::table('enrollments')
+            ->where('tenant_id', $tenantId)
+            ->whereRaw("enrollment_number LIKE 'MAT-{$tenantId}-%'")
+            ->lockForUpdate()
+            ->count() + 1;
+
+        return sprintf('MAT-%d-%05d', $tenantId, $next);
+    }
+
+    private function resolveInvoicePayer(int $studentId): array
+    {
+        $student = \App\Models\Student::with([
+            'guardians' => fn ($q) => $q->wherePivot('is_financial_responsible', true),
+        ])->findOrFail($studentId);
+
+        if ($student->is_minor) {
+            $guardian = $student->guardians->first();
+
+            if (! $guardian) {
+                throw ValidationException::withMessages([
+                    'student_id' => ['Aluno menor de idade deve ter um responsável financeiro cadastrado.'],
+                ]);
+            }
+
+            if (empty($guardian->document)) {
+                throw ValidationException::withMessages([
+                    'student_id' => ['O responsável financeiro deve ter CPF cadastrado para realizar a matrícula.'],
+                ]);
+            }
+
+            return ['guardian_id' => $guardian->id];
+        }
+
+        // Maior de idade — aluno é o próprio pagador
+        if (empty($student->document)) {
+            throw ValidationException::withMessages([
+                'student_id' => ['O aluno deve ter CPF cadastrado para realizar a matrícula.'],
+            ]);
+        }
+
+        return ['guardian_id' => null];
     }
 
     private function authorizeTenant(Request $request, int $resourceTenantId): void
@@ -337,7 +399,7 @@ class EnrollmentController extends Controller
                     ->where('student_id', $request->input('student_id'))
                     ->whereNotIn('status', ['cancelled']),
             ],
-            'start_date'                         => ['required', 'date'],
+            'start_date'                         => ['nullable', 'date'],
             'end_date'                           => ['nullable', 'date', 'after:start_date'],
             'discount_amount'                    => ['nullable', 'numeric', 'min:0'],
             'payment_due_day'                    => ['nullable', 'integer', 'min:1', 'max:28'],
@@ -353,12 +415,9 @@ class EnrollmentController extends Controller
         $bundle = CourseBundle::with('courses')->findOrFail($data['bundle_id']);
         $this->authorizeTenant($request, $bundle->tenant_id);
 
-        $guardianId = $data['guardian_id']
-            ?? \App\Models\Student::find($data['student_id'])
-                ?->guardians()
-                ->wherePivot('is_financial_responsible', true)
-                ->first()
-                ?->id;
+        // Resolve pagador e valida CPF obrigatório
+        $payer      = $this->resolveInvoicePayer($data['student_id']);
+        $guardianId = $payer['guardian_id'];
 
         // Equivalente mensal do pacote dividido pelo número de cursos
         $courseCount    = $bundle->courses->count();
@@ -369,11 +428,16 @@ class EnrollmentController extends Controller
         // Taxa de matrícula = monthly_equivalent do pacote inteiro (menos desconto)
         $feeAmount = max($bundle->monthlyEquivalent() - ($data['discount_amount'] ?? 0), 0);
 
-        // Se end_date não informado, calcula a partir do ciclo do pacote
-        $startDate = Carbon::parse($data['start_date']);
+        // Prioridade de datas:
+        // start_date: request > hoje (data da matrícula — não o início da turma)
+        // end_date:   request > primeira turma > ciclo do pacote
+        $firstSchoolClass = SchoolClass::find($data['school_class_ids'][0]);
+        $startDate = Carbon::parse($data['start_date'] ?? now());
         $endDate   = isset($data['end_date'])
             ? Carbon::parse($data['end_date'])
-            : $startDate->copy()->addMonths($bundle->monthsInCycle())->subDay();
+            : ($firstSchoolClass?->end_date
+                ? Carbon::parse($firstSchoolClass->end_date)
+                : $startDate->copy()->addMonths($bundle->monthsInCycle())->subDay());
 
         $result = DB::transaction(function () use ($data, $bundle, $tenantId, $monthlyAmount, $guardianId, $feeAmount, $isPaid, $paymentData, $startDate, $endDate) {
             $created         = [];
@@ -387,7 +451,7 @@ class EnrollmentController extends Controller
                     'student_id'        => $data['student_id'],
                     'school_class_id'   => $schoolClassId,
                     'bundle_id'         => $bundle->id,
-                    'enrollment_number' => strtoupper(Str::random(8)),
+                    'enrollment_number' => $this->generateEnrollmentNumber($tenantId ?? $bundle->tenant_id),
                     'start_date'        => $startDate->toDateString(),
                     'end_date'          => $endDate->toDateString(),
                     'status'            => 'active',
