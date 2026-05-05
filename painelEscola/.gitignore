@@ -8,8 +8,8 @@ node_modules/
 web-build/
 expo-env.d.ts
 
-# dist: commitar para deploy, mas ignorar node_modules interno
-dist/assets/node_modules/
+# dist: commitar para deploy, mas ignorar node_modules da raiz do projeto
+# dist/assets/node_modules contém as fontes dos ícones — deve ser commitado
 
 # Native
 .kotlin/
