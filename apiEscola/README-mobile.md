@@ -11,9 +11,10 @@
 2. [Formato padrão de resposta](#2-formato-padrão-de-resposta)
 3. [Simulados — Aluno](#3-simulados--aluno)
 4. [Fluxo de realização de simulado](#4-fluxo-de-realização-de-simulado)
-5. [Troca de senha](#5-troca-de-senha)
-6. [Navegação por perfil (role)](#6-navegação-por-perfil-role)
-7. [Erros comuns](#7-erros-comuns)
+5. [Histórico de tentativas](#5-histórico-de-tentativas)
+6. [Troca de senha](#6-troca-de-senha)
+7. [Navegação por perfil (role)](#7-navegação-por-perfil-role)
+8. [Erros comuns](#8-erros-comuns)
 
 ---
 
@@ -145,7 +146,7 @@ Todas as respostas seguem este envelope:
 > - Matrícula `status: active` dentro do período (start_date ≤ hoje ≤ end_date)
 > - Simulado publicado (`status: published`)
 > - Simulado do curso da matrícula ativa
-> - Prazo não encerrado (`ends_at >= agora` ou sem data)
+> - **Todos os simulados são retornados, incluindo encerrados** — use `can_start` para saber se ainda é possível iniciar
 
 ---
 
@@ -193,7 +194,7 @@ Authorization: Bearer {token}
 
 | Campo | Valores possíveis | Descrição |
 |---|---|---|
-| `attempt_status` | `not_started` \| `in_progress` \| `completed` | Status da tentativa do aluno |
+| `attempt_status` | `not_started` \| `in_progress` \| `pending_review` \| `awaiting_release` \| `completed` | Status da tentativa do aluno |
 | `can_start` | `true` \| `false` | Se está dentro do período permitido para iniciar |
 
 ---
@@ -206,6 +207,8 @@ Authorization: Bearer {token}
 ```
 
 Retorna o simulado com as questões e opções. Não exibe o gabarito.
+Quando existir tentativa do aluno, cada questão incluirá `student_answer`
+com a opção marcada (`option_id`) ou o texto digitado (`text_answer`).
 
 ```json
 {
@@ -232,6 +235,10 @@ Retorna o simulado com as questões e opções. Não exibe o gabarito.
         "points": 1,
         "order": 1,
         "allow_text_answer": false,
+        "student_answer": {
+          "option_id": 2,
+          "text_answer": null
+        },
         "options": [
           { "id": 1, "option_text": "x = 0", "order": 1, "triggers_text_input": false },
           { "id": 2, "option_text": "x = 4", "order": 2, "triggers_text_input": false },
@@ -242,12 +249,29 @@ Retorna o simulado com as questões e opções. Não exibe o gabarito.
         "id": 2,
         "type": "essay",
         "question_text": "Disserte sobre...",
+        "student_answer": {
+          "option_id": null,
+          "text_answer": "Minha resposta discursiva"
+        },
+        "options": []
+      },
+      {
+        "id": 3,
+        "type": "multiple_choice",
+        "question_text": "Questão ainda não respondida",
+        "student_answer": null,
         "options": []
       }
     ]
   }
 }
 ```
+
+| Campo | Descrição |
+|---|---|
+| `student_answer.option_id` | ID da opção marcada pelo aluno (quando aplicável) |
+| `student_answer.text_answer` | Texto digitado pelo aluno (discursiva, justificativa ou opção com entrada livre) |
+| `student_answer` | `null` quando a questão ainda não foi respondida |
 
 ---
 
@@ -336,7 +360,15 @@ POST /api/exam-attempts/{attempt_id}/finish
 Authorization: Bearer {token}
 ```
 
-**Resposta `200`:**
+O `status` retornado determina o que exibir:
+
+| `status` | O que mostrar |
+|---|---|
+| `"completed"` | Resultado imediato: nota, percentual, se passou ou não |
+| `"pending_review"` | Mensagem de aguardo: o professor ainda vai corrigir algumas respostas |
+| `"awaiting_release"` | Simulado entregue e corrigido, mas o resultado ainda está bloqueado até o fim do período |
+
+**Resposta `200` — resultado imediato (`status: "completed"`):**
 
 ```json
 {
@@ -354,18 +386,235 @@ Authorization: Bearer {token}
 }
 ```
 
+**Resposta `200` — aguardando correção (`status: "pending_review"`):**
+
+```json
+{
+  "type": "success",
+  "message": "Operação realizada com sucesso.",
+  "body": {
+    "id": 42,
+    "status": "pending_review",
+    "score": null,
+    "max_score": 10.0,
+    "percentage": null,
+    "pending_answers_count": 2,
+    "passed": null,
+    "finished_at": "2026-05-03T21:30:00.000000Z"
+  }
+}
+```
+
+> Exibir mensagem: *"Seu simulado foi entregue! Algumas respostas serão corrigidas pelo professor. Você será notificado quando o resultado estiver disponível."*
+
 | Campo | Descrição |
 |---|---|
-| `score` | Pontuação obtida |
+| `score` | Pontuação obtida (`null` enquanto `pending_review`) |
 | `max_score` | Pontuação máxima possível |
-| `percentage` | `score / max_score * 100` |
-| `passed` | `true` se `percentage >= passing_score` do simulado |
+| `percentage` | `score / max_score * 100` (`null` enquanto `pending_review` ou `awaiting_release`) |
+| `passed` | `true` se aprovado — só presente quando `status = "completed"` |
+| `pending_answers_count` | Quantas respostas aguardam correção — só presente quando `status = "pending_review"` |
 
-> Questões discursivas (`essay`) ficam com `is_correct: null` e `points_earned: 0` até correção manual.
+> Quando o simulado estiver configurado com `release_results_after_end: true`, o backend pode retornar `status: "awaiting_release"` até `ends_at` ser atingido. Nesse caso, mantenha a UI em modo de aguardo e consulte `GET /api/exam-attempts/{id}` depois.
+
+**Como verificar o resultado depois:**
+Chame `GET /api/exam-attempts/{id}` periodicamente (ou ao abrir o histórico) para checar se o status mudou para `"completed"`.
 
 ---
 
-## 5. Troca de senha
+## 5. Histórico de tentativas
+
+Lista todas as tentativas do aluno autenticado (em andamento, concluídas, etc.).
+
+```
+GET /api/aluno/attempts
+Authorization: Bearer {token}
+```
+
+**Query params (opcionais):**
+
+| Parâmetro | Valores | Descrição |
+|---|---|---|
+| `status` | `in_progress` \| `pending_review` \| `awaiting_release` \| `completed` \| `abandoned` | Filtra por status da tentativa |
+
+**Resposta `200`:**
+
+```json
+{
+  "type": "success",
+  "message": "Operação realizada com sucesso.",
+  "body": {
+    "data": [
+      {
+        "id": 42,
+        "exam_id": 2,
+        "exam": {
+          "id": 2,
+          "title": "Simulado ENEM 2026 – Matemática e Linguagens",
+          "duration_minutes": 90,
+          "passing_score": 60.0,
+          "exam_type": "enem",
+          "exam_type_label": "ENEM",
+          "status": "published",
+          "subject": {
+            "id": 2,
+            "name": "Português",
+            "icon": "book-open",
+            "color": "#10B981"
+          }
+        },
+        "started_at": "2026-05-03T20:00:00.000000Z",
+        "finished_at": "2026-05-03T21:30:00.000000Z",
+        "status": "completed",
+        "score": 8.0,
+        "max_score": 10.0,
+        "percentage": 80.0,
+        "passed": true
+      },
+      {
+        "id": 45,
+        "exam_id": 3,
+        "exam": {
+          "id": 3,
+          "title": "Simulado Fuvest 2026",
+          "subject": {
+            "id": 1,
+            "name": "Matemática",
+            "icon": "calculator",
+            "color": "#3B82F6"
+          }
+        },
+        "started_at": "2026-05-04T10:00:00.000000Z",
+        "finished_at": null,
+        "status": "in_progress",
+        "score": null,
+        "max_score": 10.0,
+        "percentage": null,
+        "passed": null
+      }
+    ],
+    "links": { "...": "paginação" },
+    "meta": { "current_page": 1, "last_page": 1, "total": 2 }
+  }
+}
+```
+
+| Campo | Descrição |
+|---|---|
+| `status` | `in_progress` = em andamento · `pending_review` = aguardando correção manual · `awaiting_release` = aguardando liberação do resultado · `completed` = finalizado |
+| `score` | `null` enquanto `in_progress`, `pending_review` ou `awaiting_release` |
+| `passed` | `null` enquanto `in_progress`, `pending_review`, `awaiting_release` ou simulado sem `passing_score` |
+| `percentage` | `null` enquanto `in_progress`, `pending_review` ou `awaiting_release` |
+
+> Se o aluno tiver uma tentativa `in_progress`, use o `id` dela para continuar via `POST /api/exam-attempts/{id}/answer`.  
+> Se tiver uma tentativa `pending_review` ou `awaiting_release`, exibir aviso de que o resultado ainda não foi liberado.
+
+### Revisão de tentativa (respondido + corrigido)
+
+Use este endpoint para o aluno acompanhar o que respondeu e como foi corrigido por questão.
+
+```
+GET /api/aluno/attempts/{attempt_id}/review
+Authorization: Bearer {token}
+```
+
+Regras:
+- Só o próprio aluno dono da tentativa pode acessar
+- Se a tentativa ainda estiver `in_progress`, retorna `422`
+- Para `pending_review`, o retorno traz correções parciais
+- Para `awaiting_release`, o retorno traz as questões e respostas do aluno, mas sem gabarito, sem nota por questão e sem correção
+- Para `completed`, retorna correção completa, incluindo alternativa correta em questões objetivas
+
+**Resposta `200` (exemplo resumido):**
+
+```json
+{
+  "type": "success",
+  "message": "Tentativa carregada com sucesso.",
+  "body": {
+    "id": 42,
+    "status": "completed",
+    "score": 8.0,
+    "max_score": 10.0,
+    "percentage": 80.0,
+    "passed": true,
+    "exam": {
+      "id": 2,
+      "title": "Simulado ENEM 2026"
+    },
+    "questions": [
+      {
+        "id": 1,
+        "type": "multiple_choice",
+        "question_text": "Qual é o valor de x?",
+        "student_answer": {
+          "option_id": 2,
+          "text_answer": null
+        },
+        "correction": {
+          "is_correct": true,
+          "points_earned": 1.0,
+          "max_points": 1.0,
+          "correct_option_id": 2
+        },
+        "options": [
+          {
+            "id": 2,
+            "option_text": "x = 4",
+            "selected": true,
+            "is_correct": true
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Resposta `200` — aguardando liberação (`status: "awaiting_release"`):**
+
+```json
+{
+  "type": "success",
+  "message": "Tentativa carregada com sucesso.",
+  "body": {
+    "id": 42,
+    "status": "awaiting_release",
+    "score": null,
+    "max_score": 10.0,
+    "percentage": null,
+    "passed": null,
+    "exam": {
+      "id": 2,
+      "title": "Simulado ENEM 2026"
+    },
+    "questions": [
+      {
+        "id": 1,
+        "type": "multiple_choice",
+        "question_text": "Qual é o valor de x?",
+        "student_answer": {
+          "option_id": 2,
+          "text_answer": null
+        },
+        "correction": null,
+        "options": [
+          {
+            "id": 2,
+            "option_text": "x = 4",
+            "selected": true,
+            "is_correct": null
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 6. Troca de senha
 
 ```
 POST /api/me/password
@@ -387,7 +636,7 @@ Content-Type: application/json
 
 ---
 
-## 6. Navegação por perfil (role)
+## 7. Navegação por perfil (role)
 
 Após o login, use `user.role` para definir a navegação:
 
@@ -415,7 +664,7 @@ App inicia
 
 ---
 
-## 7. Erros comuns
+## 8. Erros comuns
 
 | Código | Causa | Ação |
 |---|---|---|

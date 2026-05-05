@@ -96,10 +96,10 @@ class ExamController extends Controller
 
         $exam->load(['questions.subject', 'questions.answers']);
 
-        $totalAttempts    = $exam->attempts()->where('status', 'completed')->count();
-        $avgScore         = $exam->attempts()->where('status', 'completed')->avg('percentage');
+        $totalAttempts    = $exam->attempts()->whereStatus('completed')->count();
+        $avgScore         = $exam->attempts()->whereStatus('completed')->avg('percentage');
         $passCount        = $exam->attempts()
-            ->where('status', 'completed')
+            ->whereStatus('completed')
             ->where('percentage', '>=', $exam->passing_score ?? 0)
             ->count();
 

@@ -52,6 +52,7 @@ type Exam = {
   status_label: string;
   duration_minutes: number | null;
   passing_score: number | null;
+  release_results_after_end?: boolean;
   total_questions: number;
   total_points: number;
   course: { id: number; name: string } | null;
@@ -94,6 +95,19 @@ export default function ExamsScreen({ navigate }: Props) {
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Summary de tentativas
+  type Summary = { in_progress: number; pending_review: number; awaiting_release: number; completed: number; total: number };
+  const [summary, setSummary] = useState<Summary | null>(null);
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const { data } = await api.get("/exam-attempts/summary");
+      setSummary(data.body ?? data);
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   // Preview
   const [previewExam, setPreviewExam] = useState<Exam | null>(null);
@@ -168,29 +182,102 @@ export default function ExamsScreen({ navigate }: Props) {
             Crie e gerencie simulados com questões objetivas e discursivas
           </Text>
         </View>
-        <View className="flex-row gap-3">
+        <TouchableOpacity
+          onPress={() => navigate("simulados-form", { examId: null })}
+          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={18} color="white" />
+          <Text className="text-white font-semibold text-sm ml-1.5">
+            Novo Simulado
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Cards de resumo de tentativas */}
+      {summary !== null && (
+        <View className="flex-row gap-3 mb-5 flex-wrap">
+          <TouchableOpacity
+            onPress={() => navigate("simulados-tentativas", { status: "in_progress" })}
+            className="flex-1 bg-white rounded-2xl p-4 border border-gray-100"
+            style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1, minWidth: 140 }}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row items-center gap-2 mb-2">
+              <Ionicons name="time-outline" size={15} color="#F59E0B" />
+              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Em andamento</Text>
+            </View>
+            <Text className="text-3xl font-bold text-gray-800">{summary.in_progress}</Text>
+            <Text className="text-xs text-gray-400 mt-1">realizando agora</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigate("simulados-tentativas", { status: "pending_review" })}
+            className="flex-1 rounded-2xl p-4 border"
+            style={{
+              shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1, minWidth: 140,
+              backgroundColor: summary.pending_review > 0 ? '#FFFBEB' : 'white',
+              borderColor: summary.pending_review > 0 ? '#FDE68A' : '#FEF3C7',
+            }}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row items-center gap-2 mb-2">
+              <Ionicons name="create-outline" size={15} color="#D97706" />
+              <Text className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Corrigir</Text>
+              {summary.pending_review > 0 && (
+                <View className="bg-amber-500 rounded-full px-1.5" style={{ marginLeft: 'auto' }}>
+                  <Text className="text-white text-xs font-bold">{summary.pending_review}</Text>
+                </View>
+              )}
+            </View>
+            <Text className="text-3xl font-bold" style={{ color: summary.pending_review > 0 ? '#D97706' : '#1F2937' }}>
+              {summary.pending_review}
+            </Text>
+            <Text className="text-xs text-amber-500 mt-1">aguardam correção</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigate("simulados-tentativas", { status: "awaiting_release" })}
+            className="flex-1 bg-white rounded-2xl p-4 border border-cyan-100"
+            style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1, minWidth: 140 }}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row items-center gap-2 mb-2">
+              <Ionicons name="lock-closed-outline" size={15} color="#0891B2" />
+              <Text className="text-xs font-semibold text-cyan-600 uppercase tracking-wide">Aguardando</Text>
+            </View>
+            <Text className="text-3xl font-bold" style={{ color: summary.awaiting_release > 0 ? '#0891B2' : '#1F2937' }}>
+              {summary.awaiting_release}
+            </Text>
+            <Text className="text-xs text-gray-400 mt-1">aguardam liberação</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigate("simulados-tentativas", { status: "completed" })}
+            className="flex-1 bg-white rounded-2xl p-4 border border-green-100"
+            style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1, minWidth: 140 }}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row items-center gap-2 mb-2">
+              <Ionicons name="checkmark-circle-outline" size={15} color="#059669" />
+              <Text className="text-xs font-semibold text-green-600 uppercase tracking-wide">Concluídas</Text>
+            </View>
+            <Text className="text-3xl font-bold text-gray-800">{summary.completed}</Text>
+            <Text className="text-xs text-gray-400 mt-1">finalizadas</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => navigate("simulados-tentativas")}
-            className="flex-row items-center bg-white border border-violet-200 px-4 py-2.5 rounded-xl"
+            className="bg-white rounded-2xl p-4 border border-violet-100"
+            style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1, minWidth: 140, alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={0.85}
           >
-            <Ionicons name="list-outline" size={16} color="#7C3AED" />
-            <Text className="text-violet-600 font-semibold text-sm ml-1.5">
-              Tentativas
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigate("simulados-form", { examId: null })}
-            className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
-            activeOpacity={0.85}
-          >
-            <Ionicons name="add" size={18} color="white" />
-            <Text className="text-white font-semibold text-sm ml-1.5">
-              Novo Simulado
-            </Text>
+            <Ionicons name="list-outline" size={20} color="#7C3AED" />
+            <Text className="text-xs font-semibold text-violet-600 mt-1">Ver todas</Text>
+            <Text className="text-xs text-gray-400">{summary.total} tentativas</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      )}
 
       {/* Filtros */}
       <View className="flex-row gap-3 mb-4 flex-wrap">

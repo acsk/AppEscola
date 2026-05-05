@@ -84,7 +84,13 @@ function hashToNav(hash: string): NavState {
 
   if (seg0 === "simulados") {
     if (!seg1) return { screen: "simulados" };
-    if (seg1 === "tentativas") return { screen: "simulados-tentativas" };
+    if (seg1 === "tentativas") {
+      const [,, seg2] = path.split("/").filter(Boolean);
+      return {
+        screen: "simulados-tentativas",
+        params: seg2 ? { status: seg2 } : undefined,
+      };
+    }
     if (seg1 === "novo") return { screen: "simulados-form", params: { examId: null } };
     const id = parseInt(seg1, 10);
     if (!isNaN(id)) return { screen: "simulados-form", params: { examId: id } };
@@ -113,7 +119,10 @@ function navToHash(nav: NavState): string {
     const id = nav.params?.examId;
     return id != null ? `#/simulados/${id}` : "#/simulados/novo";
   }
-  if (nav.screen === "simulados-tentativas") return "#/simulados/tentativas";
+  if (nav.screen === "simulados-tentativas") {
+    const status = nav.params?.status;
+    return status ? `#/simulados/tentativas/${status}` : "#/simulados/tentativas";
+  }
   if (nav.screen === "turmas-form") {
     const id = nav.params?.classId;
     return id != null ? `#/turmas/${id}` : "#/turmas/nova";
@@ -191,7 +200,7 @@ function AppContent() {
       case "cobrancas": return <InvoicesScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
-      case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} />;
+      case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
       default: return <DashboardScreen />;
     }
   };

@@ -36,11 +36,15 @@ const SIM_STATUS_COLOR: Record<AttemptStatus, string> = {
   not_started: '#10B981',
   in_progress: '#F59E0B',
   completed:   '#4F46E5',
+  pending_review: '#0EA5E9',
+  awaiting_release: '#0891B2',
 };
 const SIM_STATUS_LABEL: Record<AttemptStatus, string> = {
   not_started: 'Disponível',
   in_progress: 'Em andamento',
   completed:   'Concluído',
+  pending_review: 'Aguardando correção',
+  awaiting_release: 'Aguardando liberação',
 };
 
 const CONQUISTAS = [
@@ -329,7 +333,7 @@ export function PerfilScreen() {
                   activeOpacity={0.85}
                   onPress={() => navigation.navigate('Simulados', {
                     screen: 'SimuladoDetalhe',
-                    params: { examId: s.id, examTitle: s.title },
+                    params: { examId: s.id },
                   })}
                 >
                   {/* Ícone + matéria */}

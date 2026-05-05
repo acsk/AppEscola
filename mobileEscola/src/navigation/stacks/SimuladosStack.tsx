@@ -6,8 +6,8 @@ import { SimuladoExamScreen }    from '../../features/simulados/screens/Simulado
 
 export type SimuladosStackParamList = {
   SimuladosList: undefined;
-  SimuladoDetalhe: { examId: number; examTitle?: string };
-  SimuladoExam: { examId: number; attemptId: number; examTitle?: string };
+  SimuladoDetalhe: { examId: number };
+  SimuladoExam: { examId: number; attemptId: number };
 };
 
 const Stack = createNativeStackNavigator<SimuladosStackParamList>();
@@ -23,24 +23,24 @@ export function SimuladosNavigator() {
       <Stack.Screen
         name="SimuladoDetalhe"
         component={SimuladoDetalheScreen}
-        options={({ route }) => ({
-          title: route.params.examTitle ?? 'Simulado',
+        options={{
+          title: 'Simulado',
           headerBackTitle: 'Voltar',
           headerStyle: { backgroundColor: '#4F46E5' },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: { fontWeight: '600' },
-        })}
+        }}
       />
       <Stack.Screen
         name="SimuladoExam"
         component={SimuladoExamScreen}
-        options={({ route }) => ({
-          title: route.params.examTitle ?? 'Simulado',
+        options={{
+          title: 'Simulado',
           headerBackTitle: 'Detalhes',
           headerStyle: { backgroundColor: '#4F46E5' },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: { fontWeight: '600' },
-        })}
+        }}
       />
     </Stack.Navigator>
   );

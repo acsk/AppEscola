@@ -107,8 +107,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::delete('tenant-api-tokens/{tenantApiToken}', [TenantApiTokenController::class, 'destroy']);
 
     // Simulados do aluno autenticado (role: aluno)
-    Route::get('aluno/exams',        [StudentExamController::class, 'index']);
-    Route::get('aluno/exams/{exam}', [StudentExamController::class, 'show']);
+    Route::get('aluno/exams',                    [StudentExamController::class, 'index']);
+    Route::get('aluno/exams/{exam}',             [StudentExamController::class, 'show']);
+    Route::get('aluno/attempts',                 [StudentExamController::class, 'attempts']);
+    Route::get('aluno/attempts/{attempt}/review',[StudentExamController::class, 'reviewAttempt']);
 
     // Simulados
     Route::apiResource('exams', ExamController::class);
@@ -126,10 +128,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::delete('exams/{exam}/questions/{question}', [ExamQuestionController::class, 'destroy']);
 
     // Tentativas de simulado
-    Route::get('exam-attempts',                    [ExamAttemptController::class, 'index']);
-    Route::post('exams/{exam}/start',              [ExamAttemptController::class, 'start']);
-    Route::post('exam-attempts/{attempt}/answer',  [ExamAttemptController::class, 'answer']);
-    Route::post('exam-attempts/{attempt}/finish',  [ExamAttemptController::class, 'finish']);
-    Route::get('exam-attempts/{attempt}',          [ExamAttemptController::class, 'show']);
-    Route::get('exams/{exam}/ranking',             [ExamAttemptController::class, 'ranking']);
+    Route::get('exam-attempts/summary',                                  [ExamAttemptController::class, 'summary']);
+    Route::get('exam-attempts',                                          [ExamAttemptController::class, 'index']);
+    Route::post('exams/{exam}/start',                                    [ExamAttemptController::class, 'start']);
+    Route::post('exam-attempts/{attempt}/answer',                        [ExamAttemptController::class, 'answer']);
+    Route::post('exam-attempts/{attempt}/finish',                        [ExamAttemptController::class, 'finish']);
+    Route::patch('exam-attempts/{attempt}/answers/{answer}/correct',     [ExamAttemptController::class, 'correctAnswer']);
+    Route::get('exam-attempts/{attempt}',                                [ExamAttemptController::class, 'show']);
+    Route::get('exams/{exam}/ranking',                                   [ExamAttemptController::class, 'ranking']);
 });

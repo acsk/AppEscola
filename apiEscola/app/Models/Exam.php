@@ -25,16 +25,24 @@ class Exam extends Model
         'passing_score',
         'starts_at',
         'ends_at',
+        'release_results_after_end',
+        'allow_retake',
+        'max_attempts',
+        'min_score_to_retake',
         'created_by',
         'updated_by',
         'deleted_by',
     ];
 
     protected $casts = [
-        'duration_minutes' => 'integer',
-        'passing_score'    => 'decimal:2',
-        'starts_at'        => 'datetime',
-        'ends_at'          => 'datetime',
+        'duration_minutes'   => 'integer',
+        'passing_score'      => 'decimal:2',
+        'starts_at'          => 'datetime',
+        'ends_at'            => 'datetime',
+        'release_results_after_end' => 'boolean',
+        'allow_retake'       => 'boolean',
+        'max_attempts'       => 'integer',
+        'min_score_to_retake' => 'decimal:2',
     ];
 
     public function tenant(): BelongsTo

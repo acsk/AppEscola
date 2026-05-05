@@ -18,19 +18,43 @@ class ExamAttemptController extends Controller
 {
     use ScopedByTenant;
 
+    /**
+     * Resumo de tentativas agrupadas por status — para o painel administrativo.
+     * Útil para mostrar contadores de ação rápida (pendentes de correção, aguardando liberação etc.).
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $tenantId = $this->getTenantId($request);
+
+        $counts = ExamAttempt::query()
+            ->join('exam_attempt_statuses', 'exam_attempts.attempt_status_id', '=', 'exam_attempt_statuses.id')
+            ->when($tenantId, fn ($q) => $q->where('exam_attempts.tenant_id', $tenantId))
+            ->selectRaw('exam_attempt_statuses.slug as status, COUNT(*) as total')
+            ->groupBy('exam_attempt_statuses.slug')
+            ->pluck('total', 'status');
+
+        return $this->success([
+            'in_progress'      => (int) ($counts['in_progress']      ?? 0),
+            'pending_review'   => (int) ($counts['pending_review']   ?? 0),
+            'awaiting_release' => (int) ($counts['awaiting_release'] ?? 0),
+            'completed'        => (int) ($counts['completed']        ?? 0),
+            'total'            => $counts->sum(),
+        ]);
+    }
+
     /** Lista tentativas (admin vê todas; aluno vê apenas as suas) */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $tenantId = $this->getTenantId($request);
         $user     = $request->user();
 
-        $query = ExamAttempt::with(['exam', 'student'])
+        $query = ExamAttempt::with(['exam', 'student', 'attemptStatus'])
             ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
             ->when($request->query('exam_id'),    fn ($q, $v) => $q->where('exam_id', $v))
             ->when($request->query('student_id'), fn ($q, $v) => $q->where('student_id', $v))
-            ->when($request->query('status'),     fn ($q, $v) => $q->where('status', $v));
+            ->when($request->query('status'),     fn ($q, $v) => $q->whereStatus($v));
 
-        return response()->json(ExamAttemptResource::collection($query->orderByDesc('started_at')->paginate(20)));
+        return ExamAttemptResource::collection($query->orderByDesc('started_at')->paginate(20));
     }
 
     /** Inicia uma nova tentativa */
@@ -77,13 +101,68 @@ class ExamAttemptController extends Controller
         // Impede múltiplas tentativas em andamento
         $inProgress = ExamAttempt::where('exam_id', $exam->id)
             ->where('student_id', $student->id)
-            ->where('status', 'in_progress')
+            ->whereStatus('in_progress')
             ->exists();
 
         if ($inProgress) {
             throw ValidationException::withMessages([
                 'exam_id' => ['Já existe uma tentativa em andamento para este simulado.'],
             ]);
+        }
+
+        // Bloqueia nova tentativa enquanto houver resultado aguardando correção manual
+        $pendingReview = ExamAttempt::where('exam_id', $exam->id)
+            ->where('student_id', $student->id)
+            ->whereStatus('pending_review')
+            ->exists();
+
+        $awaitingRelease = ExamAttempt::where('exam_id', $exam->id)
+            ->where('student_id', $student->id)
+            ->whereStatus('awaiting_release')
+            ->exists();
+
+        if ($pendingReview || $awaitingRelease) {
+            throw ValidationException::withMessages([
+                'exam_id' => ['Este simulado já foi entregue e está aguardando liberação do resultado.'],
+            ]);
+        }
+
+        // Verifica regras de retentativa
+        $completedAttempts = ExamAttempt::where('exam_id', $exam->id)
+            ->where('student_id', $student->id)
+            ->whereStatus('completed')
+            ->orderByDesc('finished_at')
+            ->get(['id', 'score', 'percentage']);
+
+        if ($completedAttempts->isNotEmpty()) {
+            // Simulado já entregue e retentativa não está habilitada
+            if (! $exam->allow_retake) {
+                throw ValidationException::withMessages([
+                    'exam_id' => ['Este simulado já foi entregue e não permite novas tentativas.'],
+                ]);
+            }
+
+            // Limite de tentativas atingido
+            if ($exam->max_attempts !== null && $completedAttempts->count() >= $exam->max_attempts) {
+                throw ValidationException::withMessages([
+                    'exam_id' => ["Número máximo de tentativas ({$exam->max_attempts}) atingido."],
+                ]);
+            }
+
+            // Bloqueia se qualquer tentativa já atingiu a nota mínima (irreversível)
+            $threshold = $exam->min_score_to_retake ?? $exam->passing_score;
+
+            if ($threshold !== null) {
+                $alreadyPassed = $completedAttempts->contains(
+                    fn ($a) => (float) $a->percentage >= (float) $threshold
+                );
+
+                if ($alreadyPassed) {
+                    throw ValidationException::withMessages([
+                        'exam_id' => ['Você já foi aprovado neste simulado. Não é possível realizá-lo novamente.'],
+                    ]);
+                }
+            }
         }
 
         $attempt = ExamAttempt::create([
@@ -95,7 +174,7 @@ class ExamAttemptController extends Controller
         ]);
 
         // Retorna as questões SEM gabarito (options sem is_correct)
-        $attempt->load(['exam.questions.options', 'student']);
+        $attempt->load(['exam.questions.options', 'student', 'attemptStatus']);
 
         return response()->json(new ExamAttemptResource($attempt), 201);
     }
@@ -135,35 +214,108 @@ class ExamAttemptController extends Controller
 
         DB::transaction(function () use ($attempt) {
             $totalScore = 0;
+            $exam = $attempt->exam()->first(['id', 'ends_at', 'release_results_after_end']);
 
-            foreach ($attempt->answers as $answer) {
+            $answers = $attempt->answers()->with('question.options')->get();
+
+            foreach ($answers as $answer) {
                 $question = $answer->question;
 
-                if ($question->type === 'multiple_choice' && $answer->option_id) {
-                    $isCorrect = $question->options()
+                // Verifica se a opção selecionada exige entrada de texto (triggers_text_input)
+                $selectedOption      = $answer->option_id
+                    ? $question->options->firstWhere('id', $answer->option_id)
+                    : null;
+                $selectedTriggersText = (bool) ($selectedOption?->triggers_text_input ?? false);
+
+                // Questões objetivas puras (sem allow_text_answer e sem triggers_text_input):
+                // corrige automaticamente. Qualquer variação com texto exige correção manual.
+                if (
+                    $question->type === 'multiple_choice'
+                    && ! $question->allow_text_answer
+                    && ! $selectedTriggersText
+                    && $answer->option_id
+                ) {
+                    $isCorrect = $question->options
                         ->where('id', $answer->option_id)
                         ->where('is_correct', true)
-                        ->exists();
+                        ->isNotEmpty();
 
                     $earned = $isCorrect ? (float) $question->points : 0;
                     $answer->update(['is_correct' => $isCorrect, 'points_earned' => $earned]);
                     $totalScore += $earned;
                 }
-                // Discursivas ficam com is_correct = null (aguardando correção manual)
+                // Questões discursivas, allow_text_answer ou triggers_text_input ficam is_correct = null
+                // → aguardam correção manual do admin
             }
+
+            // Verifica se há respostas pendentes de correção manual
+            $hasPending = $attempt->answers()->whereNull('is_correct')->exists();
 
             $maxScore   = (float) $attempt->max_score ?: 1;
             $percentage = round(($totalScore / $maxScore) * 100, 2);
 
             $attempt->update([
-                'status'      => 'completed',
+                'status'      => $hasPending ? 'pending_review' : $this->resolveReleasedStatus($exam),
                 'finished_at' => now(),
                 'score'       => $totalScore,
-                'percentage'  => $percentage,
+                'percentage'  => $hasPending ? null : $percentage,
             ]);
         });
 
-        $attempt->load(['exam', 'student', 'answers']);
+        $attempt->load(['exam', 'student', 'answers', 'attemptStatus']);
+
+        return response()->json(new ExamAttemptResource($attempt));
+    }
+
+    /** Corrige manualmente uma resposta de questão discursiva ou allow_text_answer (admin) */
+    public function correctAnswer(Request $request, ExamAttempt $attempt, ExamAnswer $answer): JsonResponse
+    {
+        if ($attempt->status !== 'pending_review') {
+            throw ValidationException::withMessages([
+                'attempt_id' => ['Esta tentativa não está aguardando correção.'],
+            ]);
+        }
+
+        if ($answer->attempt_id !== $attempt->id) {
+            return $this->forbidden('Esta resposta não pertence à tentativa informada.');
+        }
+
+        $question = $answer->question;
+        $maxPoints = (float) $question->points;
+
+        $data = $request->validate([
+            'is_correct'    => ['required', 'boolean'],
+            'points_earned' => ['nullable', 'numeric', 'min:0', 'max:' . $maxPoints],
+        ]);
+
+        $isCorrect    = (bool) $data['is_correct'];
+        $pointsEarned = isset($data['points_earned'])
+            ? (float) $data['points_earned']
+            : ($isCorrect ? $maxPoints : 0.0);
+
+        $answer->update([
+            'is_correct'    => $isCorrect,
+            'points_earned' => $pointsEarned,
+        ]);
+
+        // Verifica se ainda há respostas pendentes
+        $pendingCount = $attempt->answers()->whereNull('is_correct')->count();
+
+        if ($pendingCount === 0) {
+            // Todas corrigidas → recalcula e libera resultado
+            $totalScore = (float) $attempt->answers()->sum('points_earned');
+            $maxScore   = (float) $attempt->max_score ?: 1;
+            $percentage = round(($totalScore / $maxScore) * 100, 2);
+            $exam = $attempt->exam()->first(['id', 'ends_at', 'release_results_after_end']);
+
+            $attempt->update([
+                'status'     => $this->resolveReleasedStatus($exam),
+                'score'      => $totalScore,
+                'percentage' => $percentage,
+            ]);
+        }
+
+        $attempt->load(['exam', 'student', 'answers', 'attemptStatus']);
 
         return response()->json(new ExamAttemptResource($attempt));
     }
@@ -171,7 +323,7 @@ class ExamAttemptController extends Controller
     /** Exibe resultado detalhado de uma tentativa */
     public function show(Request $request, ExamAttempt $attempt): JsonResponse
     {
-        $attempt->load(['exam.questions.options', 'student', 'answers']);
+        $attempt->load(['exam.questions.options', 'student', 'answers', 'attemptStatus']);
 
         return response()->json(new ExamAttemptResource($attempt));
     }
@@ -183,7 +335,7 @@ class ExamAttemptController extends Controller
 
         $attempts = ExamAttempt::with('student:id,name,enrollment_number')
             ->where('exam_id', $exam->id)
-            ->where('status', 'completed')
+            ->whereStatus('completed')
             ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
             ->orderByDesc('percentage')
             ->get(['id', 'student_id', 'score', 'max_score', 'percentage', 'finished_at']);
@@ -201,5 +353,18 @@ class ExamAttemptController extends Controller
                 'finished_at'      => $a->finished_at?->toISOString(),
             ]),
         ]);
+    }
+
+    private function resolveReleasedStatus(?Exam $exam): string
+    {
+        if (
+            $exam?->release_results_after_end
+            && $exam->ends_at
+            && $exam->ends_at->isFuture()
+        ) {
+            return 'awaiting_release';
+        }
+
+        return 'completed';
     }
 }

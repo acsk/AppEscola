@@ -17,8 +17,8 @@ import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useExamStatuses, useExamTypes, domainToOptions } from "../../hooks/useDomains";
-import DatePickerInput from "../../components/ui/DatePickerInput";
-import { displayToISO, isoToDisplay } from "../../utils/masks";
+import DateTimePickerInput from "../../components/ui/DateTimePickerInput";
+import { displayToISO, isoToDisplay, displayDateTimeToISO, isoToDisplayDateTime } from "../../utils/masks";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,10 @@ type ExamForm = {
   passing_score: string;
   starts_at: string;
   ends_at: string;
+  release_results_after_end: string;
+  allow_retake: string;
+  max_attempts: string;
+  min_score_to_retake: string;
 };
 
 type Question = {
@@ -90,6 +94,10 @@ const EMPTY_EXAM: ExamForm = {
   passing_score: "",
   starts_at: "",
   ends_at: "",
+  release_results_after_end: "false",
+  allow_retake: "false",
+  max_attempts: "",
+  min_score_to_retake: "",
 };
 
 const EMPTY_QUESTION: QuestionForm = {
@@ -118,6 +126,25 @@ function validateExam(form: ExamForm): Record<string, string> {
     errs.duration_minutes = "Duração deve ser um número inteiro.";
   if (form.passing_score && isNaN(Number(form.passing_score)))
     errs.passing_score = "Nota mínima deve ser um número.";
+  if (form.passing_score) {
+    const score = Number(form.passing_score);
+    if (score < 0 || score > 100) errs.passing_score = "Nota mínima deve estar entre 0 e 100.";
+  }
+  if (form.release_results_after_end === "true" && !form.ends_at) {
+    errs.ends_at = "Informe a data final para liberar o resultado só após o fechamento do período.";
+  }
+  if (form.allow_retake === "true") {
+    if (form.max_attempts) {
+      const max = Number(form.max_attempts);
+      if (!Number.isInteger(max) || max < 1)
+        errs.max_attempts = "Máximo de tentativas deve ser um inteiro maior que 0.";
+    }
+    if (form.min_score_to_retake) {
+      const minScore = Number(form.min_score_to_retake);
+      if (isNaN(minScore) || minScore < 0 || minScore > 100)
+        errs.min_score_to_retake = "Nota para nova tentativa deve estar entre 0 e 100.";
+    }
+  }
   return errs;
 }
 
@@ -152,6 +179,14 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const examTypes = useExamTypes();
   const examTypeOptions = [{ value: "", label: "Selecione" }, ...domainToOptions(examTypes)];
   const examStatusOptions = domainToOptions(examStatuses);
+  const retakeOptions: SelectOption[] = [
+    { value: "false", label: "Não" },
+    { value: "true", label: "Sim" },
+  ];
+  const releaseOptions: SelectOption[] = [
+    { value: "false", label: "Liberar assim que corrigir" },
+    { value: "true", label: "Liberar só após o fim do período" },
+  ];
 
   // Exam form state
   const [loading, setLoading] = useState(isEdit);
@@ -211,8 +246,13 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
           description: exam.description ?? "",
           duration_minutes: exam.duration_minutes != null ? String(exam.duration_minutes) : "",
           passing_score: exam.passing_score != null ? String(exam.passing_score) : "",
-          starts_at: exam.starts_at ? isoToDisplay(exam.starts_at.substring(0, 10)) : "",
-          ends_at: exam.ends_at ? isoToDisplay(exam.ends_at.substring(0, 10)) : "",
+          starts_at: exam.starts_at ? isoToDisplayDateTime(exam.starts_at) : "",
+          ends_at: exam.ends_at ? isoToDisplayDateTime(exam.ends_at) : "",
+          release_results_after_end: String(Boolean(exam.release_results_after_end)),
+          allow_retake: String(Boolean(exam.allow_retake)),
+          max_attempts: exam.max_attempts != null ? String(exam.max_attempts) : "",
+          min_score_to_retake:
+            exam.min_score_to_retake != null ? String(exam.min_score_to_retake) : "",
         });
         setQuestions(exam.questions ?? []);
       } catch {}
@@ -254,8 +294,18 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         subject_id: form.subject_id ? Number(form.subject_id) : null,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
         passing_score: form.passing_score ? Number(form.passing_score) : null,
-        starts_at: displayToISO(form.starts_at) || null,
-        ends_at: displayToISO(form.ends_at) || null,
+        starts_at: displayDateTimeToISO(form.starts_at) || null,
+        ends_at: displayDateTimeToISO(form.ends_at) || null,
+        release_results_after_end: form.release_results_after_end === "true",
+        allow_retake: form.allow_retake === "true",
+        max_attempts:
+          form.allow_retake === "true" && form.max_attempts
+            ? Number(form.max_attempts)
+            : null,
+        min_score_to_retake:
+          form.allow_retake === "true" && form.min_score_to_retake
+            ? Number(form.min_score_to_retake)
+            : null,
       };
 
       if (isEdit) {
@@ -552,7 +602,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
 
         <View className="flex-row gap-4">
           <View style={{ flex: 1 }}>
-            <DatePickerInput
+            <DateTimePickerInput
               label="Data de início"
               value={form.starts_at}
               onChangeText={(v) => setField("starts_at", v)}
@@ -560,7 +610,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
             />
           </View>
           <View style={{ flex: 1 }}>
-            <DatePickerInput
+            <DateTimePickerInput
               label="Data de encerramento"
               value={form.ends_at}
               onChangeText={(v) => setField("ends_at", v)}
@@ -568,6 +618,68 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
             />
           </View>
         </View>
+
+        <View className="flex-row gap-4">
+          <View style={{ flex: 1 }}>
+            <FormSelect
+              label="Liberação do resultado"
+              value={form.release_results_after_end}
+              options={releaseOptions}
+              onChange={(v) => setField("release_results_after_end", v)}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <FormSelect
+              label="Permitir retentativa"
+              value={form.allow_retake}
+              options={retakeOptions}
+              onChange={(v) =>
+                setForm((prev) => ({
+                  ...prev,
+                  allow_retake: v,
+                  max_attempts: v === "true" ? prev.max_attempts : "",
+                  min_score_to_retake: v === "true" ? prev.min_score_to_retake : "",
+                }))
+              }
+            />
+          </View>
+        </View>
+
+        {form.release_results_after_end === "true" && (
+          <Text className="text-xs text-cyan-700 mb-4 -mt-2">
+            O aluno só verá nota e gabarito depois que a data final do simulado for atingida.
+          </Text>
+        )}
+
+        <View className="flex-row gap-4">
+          <View style={{ flex: 1 }}>
+            <FormInput
+              label="Máximo de tentativas"
+              value={form.max_attempts}
+              onChangeText={(v) => setField("max_attempts", v)}
+              placeholder="Ex.: 3"
+              keyboardType="numeric"
+              editable={form.allow_retake === "true"}
+              error={errors.max_attempts}
+            />
+          </View>
+        </View>
+
+        <FormInput
+          label="Nota mínima para nova tentativa (%)"
+          value={form.min_score_to_retake}
+          onChangeText={(v) => setField("min_score_to_retake", v)}
+          placeholder="Ex.: 70 (vazio usa nota mínima do simulado)"
+          keyboardType="numeric"
+          editable={form.allow_retake === "true"}
+          error={errors.min_score_to_retake}
+        />
+
+        {form.allow_retake !== "true" && (
+          <Text className="text-xs text-gray-400 mb-4 -mt-2">
+            Retentativa desativada: após concluir, o aluno não poderá iniciar nova tentativa.
+          </Text>
+        )}
 
         <View className="mb-4">
           <Text className="text-sm font-semibold text-gray-700 mb-1.5">Descrição</Text>

@@ -3,14 +3,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import { PerfilScreen } from '../../features/perfil/screens/PerfilScreen';
 import { SimuladosNavigator } from './SimuladosStack';
+import type { SimuladosStackParamList } from './SimuladosStack';
 import { FinanceiroScreen } from '../../features/financeiro/screens/FinanceiroScreen';
 import { useAuth } from '../../context/AuthContext';
 
 type AlunoTabParamList = {
   Home: undefined;
-  Simulados: undefined;
+  Simulados: NavigatorScreenParams<SimuladosStackParamList> | undefined;
   Financeiro: undefined;
 };
 
@@ -55,7 +57,17 @@ export function AlunoStack() {
       })}
     >
       <Tab.Screen name="Home"       component={PerfilScreen}        options={{ title: 'Home' }} />
-      <Tab.Screen name="Simulados"  component={SimuladosNavigator}  options={{ title: 'Simulados', headerShown: false }} />
+      <Tab.Screen
+        name="Simulados"
+        component={SimuladosNavigator}
+        options={{ title: 'Simulados', headerShown: false }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('Simulados', { screen: 'SimuladosList' });
+          },
+        })}
+      />
       <Tab.Screen name="Financeiro" component={FinanceiroScreen}    options={{ title: 'Financeiro' }} />
     </Tab.Navigator>
   );

@@ -4,12 +4,28 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 
 ---
 
+## Changelog
+
+| Data | O que mudou |
+|---|---|
+| 2026-05-04 | Status `pending_review`: resultado bloqueado até correção manual de questões discursivas/`allow_text_answer` |
+| 2026-05-04 | Status `awaiting_release` + flag `release_results_after_end` para segurar o resultado até o fim do período |
+| 2026-05-04 | Novo endpoint `PATCH /api/exam-attempts/{attempt}/answers/{answer}/correct` |
+| 2026-05-04 | Campos de retentativa: `allow_retake`, `max_attempts`, `min_score_to_retake` |
+| 2026-05-04 | `subject` nas respostas agora inclui `icon` e `color` |
+| 2026-05-03 | Campos `starts_at` e `ends_at` no simulado |
+| 2026-05-03 | Campo `triggers_text_input` nas opções de questão objetiva |
+| 2026-05-03 | Campo `allow_text_answer` nas questões objetivas |
+
+---
+
 ## Tabelas
 
 | Tabela | Descrição |
 |---|---|
 | `exam_statuses` | Domínio: estados possíveis de um simulado |
 | `exam_types` | Domínio: tipos de simulado (ENEM, vestibular, etc.) |
+| `exam_attempt_statuses` | Domínio: estados possíveis de uma tentativa |
 | `exams` | Cabeçalho do simulado (título, tipo, status, duração, nota mínima) |
 | `exam_questions` | Questões vinculadas ao simulado (objetiva ou discursiva, com pontuação) |
 | `exam_question_options` | Opções de resposta de questões objetivas (uma marcada como correta) |
@@ -39,6 +55,16 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 | 5 | `concurso` | Concurso |
 
 > Novos tipos podem ser inseridos diretamente na tabela `exam_types` sem alteração de código.
+
+### `exam_attempt_statuses`
+
+| id | slug | label | order |
+|---|---|---|---|
+| 1 | `in_progress` | Em andamento | 1 |
+| 2 | `pending_review` | Aguardando correção | 2 |
+| 3 | `awaiting_release` | Aguardando liberação | 3 |
+| 4 | `completed` | Concluído | 4 |
+| 5 | `abandoned` | Abandonado | 5 |
 
 ---
 
@@ -116,10 +142,16 @@ Lista os simulados do tenant com paginação (20 por página).
       "status_label": "Publicado",
       "duration_minutes": 90,
       "passing_score": 60,
+      "starts_at": "2026-06-01T08:00:00.000Z",
+      "ends_at": "2026-06-30T23:59:59.000Z",
+      "release_results_after_end": true,
+      "allow_retake": true,
+      "max_attempts": 3,
+      "min_score_to_retake": 70.0,
       "total_questions": 10,
       "total_points": 10.0,
       "course": { "id": 2, "name": "ENEM" },
-      "subject": { "id": 5, "name": "Matemática" }
+      "subject": { "id": 5, "name": "Matemática", "icon": "calculator", "color": "#3B82F6" }
     }
   ],
   "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 1 }
@@ -141,20 +173,32 @@ Cria um novo simulado.
   "subject_id": 5,
   "description": "Simulado com 10 questões de matemática nível ENEM.",
   "duration_minutes": 90,
-  "passing_score": 60
+  "passing_score": 60,
+  "starts_at": "2026-06-01T08:00:00",
+  "ends_at": "2026-06-30T23:59:59",
+  "release_results_after_end": true,
+  "allow_retake": true,
+  "max_attempts": 3,
+  "min_score_to_retake": 70
 }
 ```
 
-| Campo | Tipo | Obrigatório |
-|---|---|---|
-| `title` | string | ✅ |
-| `exam_type` | slug (ver tabela `exam_types`) | ❌ (default: `custom`) |
-| `status` | slug (ver tabela `exam_statuses`) | ❌ (default: `draft`) |
-| `course_id` | integer | ❌ |
-| `subject_id` | integer | ❌ |
-| `description` | string | ❌ |
-| `duration_minutes` | integer | ❌ |
-| `passing_score` | numeric | ❌ |
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `title` | string | ✅ | |
+| `exam_type` | slug | ❌ (default: `custom`) | Ver tabela `exam_types` |
+| `status` | slug | ❌ (default: `draft`) | Ver tabela `exam_statuses` |
+| `course_id` | integer | ❌ | |
+| `subject_id` | integer | ❌ | |
+| `description` | string | ❌ | |
+| `duration_minutes` | integer | ❌ | |
+| `passing_score` | numeric (0-100) | ❌ | Nota mínima para aprovação |
+| `starts_at` | datetime | ❌ | Início do período de realização |
+| `ends_at` | datetime | ❌ | Fim do período de realização (deve ser após `starts_at`) |
+| `release_results_after_end` | boolean | ❌ (default: `false`) | Quando `true`, a nota/correção só é liberada após `ends_at` |
+| `allow_retake` | boolean | ❌ (default: `false`) | Permite refazer após entregar |
+| `max_attempts` | integer (1-255) | ❌ | Máximo de tentativas (null = ilimitado) |
+| `min_score_to_retake` | numeric (0-100) | ❌ | Aluno pode refazer enquanto não atingiu esta nota. Uma vez aprovado, fica bloqueado permanentemente. `null` = usa `passing_score` |
 
 > A validação usa `exists:exam_types,slug` e `exists:exam_statuses,slug` — valores inválidos retornam erro 422.
 
@@ -456,18 +500,27 @@ Quando o candidato não encontra a resposta entre as opções, pode enviar `text
 ---
 
 #### `POST /api/exam-attempts/{attempt}/finish`
-Finaliza a tentativa, calcula pontuação automática para questões objetivas.  
-Questões discursivas **e questões objetivas híbridas** (`allow_text_answer = true`) têm o texto salvo com `is_correct = null` e `points_earned = 0`, aguardando correção manual. A opção selecionada na parte objetiva ainda é corrigida automaticamente.
+Finaliza a tentativa e calcula a pontuação automática das questões objetivas puras.
 
-**Resposta `200`:** tentativa com `status = completed`, `score`, `percentage` e `passed`.
+**Comportamento por tipo de questão:**
+
+| Tipo | Corrigido em? | `status` resultante |
+|---|---|---|
+| Objetiva pura (`allow_text_answer = false`) | Automaticamente no `finish` | — |
+| Objetiva com `allow_text_answer = true` | Aguarda correção manual | `pending_review` |
+| Discursiva (`essay`) | Aguarda correção manual | `pending_review` |
+
+Se **todas** as respostas foram corrigidas automaticamente:
+- com `release_results_after_end = false` → `status: "completed"`
+- com `release_results_after_end = true` e `ends_at` ainda no futuro → `status: "awaiting_release"`
+
+Se houver **qualquer** resposta pendente de correção → `status: "pending_review"`, `score: null`, `percentage: null`. O resultado **não é liberado** ao aluno até que o admin corrija todas as respostas.
+
+**Resposta `200` — sem pendências (apenas objetivas puras):**
 
 ```json
 {
   "id": 7,
-  "exam_id": 1,
-  "exam": { "id": 1, "title": "Simulado ENEM – Matemática" },
-  "student_id": 4,
-  "student": { "id": 4, "name": "João Silva" },
   "status": "completed",
   "started_at": "2026-05-03T14:00:00.000Z",
   "finished_at": "2026-05-03T14:45:00.000Z",
@@ -476,27 +529,76 @@ Questões discursivas **e questões objetivas híbridas** (`allow_text_answer = 
   "percentage": 85.0,
   "passed": true,
   "answers": [
-    {
-      "question_id": 3,
-      "option_id": 12,
-      "text_answer": null,
-      "is_correct": true,
-      "points_earned": 1.0
-    },
-    {
-      "question_id": 5,
-      "option_id": null,
-      "text_answer": "O teorema de Pitágoras afirma que...",
-      "is_correct": null,
-      "points_earned": 0.0
-    }
-  ],
-  "created_at": "2026-05-03T14:00:00.000Z",
-  "updated_at": "2026-05-03T14:45:00.000Z"
+    { "question_id": 3, "option_id": 12, "text_answer": null, "is_correct": true,  "points_earned": 1.0 },
+    { "question_id": 4, "option_id": 15, "text_answer": null, "is_correct": false, "points_earned": 0.0 }
+  ]
 }
 ```
 
-> Questões discursivas **e objetivas respondidas apenas com `text_answer`** retornam `is_correct: null` e `points_earned: 0` até serem corrigidas manualmente.
+**Resposta `200` — com pendências (discursiva ou `allow_text_answer`):**
+
+```json
+{
+  "id": 7,
+  "status": "pending_review",
+  "started_at": "2026-05-03T14:00:00.000Z",
+  "finished_at": "2026-05-03T14:45:00.000Z",
+  "score": null,
+  "max_score": 10.0,
+  "percentage": null,
+  "pending_answers_count": 2,
+  "passed": null,
+  "answers": [
+    { "question_id": 3, "option_id": 12, "text_answer": null, "is_correct": true,  "points_earned": 1.0 },
+    { "question_id": 5, "option_id": null, "text_answer": "O teorema de Pitágoras afirma que...", "is_correct": null, "points_earned": 0.0 }
+  ]
+}
+```
+
+> O campo `pending_answers_count` só aparece quando `status = "pending_review"`.
+
+---
+
+#### `PATCH /api/exam-attempts/{attempt}/answers/{answer}/correct`
+Corrige manualmente uma resposta discursiva ou de questão com `allow_text_answer`. Exclusivo para admin/professor.
+
+**Body:**
+```json
+{ "is_correct": true, "points_earned": 1.5 }
+```
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `is_correct` | boolean | ✅ | Indica se a resposta está correta |
+| `points_earned` | numeric | ❌ | Pontos atribuídos. Se omitido: usa `question.points` se correto, `0` se incorreto. Limitado a `question.points`. |
+
+**Comportamento:**
+- Salva `is_correct` e `points_earned` na resposta
+- Verifica se ainda há respostas com `is_correct = null` na tentativa
+- Quando **todas** forem corrigidas: recalcula `score` e `percentage`, muda `status` para `"completed"` ou `"awaiting_release"` (conforme a flag do simulado) e libera o resultado ao aluno apenas quando permitido
+
+**Resposta `200` — ainda há pendências:**
+```json
+{
+  "id": 7,
+  "status": "pending_review",
+  "pending_answers_count": 1,
+  "score": null,
+  "percentage": null
+}
+```
+
+**Resposta `200` — última pendência corrigida (resultado liberado):**
+```json
+{
+  "id": 7,
+  "status": "completed",
+  "score": 8.5,
+  "max_score": 10.0,
+  "percentage": 85.0,
+  "passed": true
+}
+```
 
 ---
 
@@ -514,9 +616,11 @@ Lista tentativas com paginação.
 |---|---|---|
 | `exam_id` | integer | Filtra por simulado |
 | `student_id` | integer | Filtra por aluno |
-| `status` | string | `in_progress` \| `completed` |
+| `status` | string | `in_progress` \| `pending_review` \| `awaiting_release` \| `completed` |
 
-> O campo `status` de tentativas é uma string simples (não usa tabela de domínio).
+> `pending_review` indica que o simulado foi entregue mas há respostas aguardando correção manual. `awaiting_release` indica que a correção já terminou, mas o resultado segue bloqueado até o fim do período. Nesse estado, o aluno ainda pode rever o que respondeu, porém sem gabarito, sem nota por questão e sem correção. O resultado completo só é visível quando `status = "completed"`.
+
+> Internamente, `exam_attempts` usa `attempt_status_id` (FK para `exam_attempt_statuses`). Na API, o campo retornado continua sendo `status` (slug), para manter compatibilidade com frontend/mobile.
 
 ---
 
@@ -526,8 +630,57 @@ Lista tentativas com paginação.
 |---|---|---|
 | `total_questions` | `ExamResource` | `questions()->count()` |
 | `total_points` | `ExamResource` | soma de `questions.points` |
-| `passed` | `ExamAttemptResource` | `percentage >= exam.passing_score` |
+| `passed` | `ExamAttemptResource` | `percentage >= exam.passing_score` — só presente quando `status = "completed"` |
+| `pending_answers_count` | `ExamAttemptResource` | nº de respostas ainda sem `is_correct` — só presente quando `status = "pending_review"` |
+| `result_release_pending` | `ExamAttemptResource` | indica que a tentativa está corrigida, mas o resultado segue bloqueado (`status = "awaiting_release"`) |
 | `hit_rate` | `stats.by_question` | `(correct_count / total_attempts) * 100` |
+
+---
+
+## Status de tentativas
+
+| Status | Descrição |
+|---|---|
+| `in_progress` | Aluno ainda está realizando o simulado |
+| `pending_review` | Simulado entregue; há respostas aguardando correção manual do admin. `score`, `percentage` e `passed` ficam `null`. |
+| `awaiting_release` | Simulado já corrigido, mas a nota e o gabarito ficam ocultos ao aluno até `ends_at`. |
+| `completed` | Todas as respostas corrigidas; resultado liberado. |
+
+> **Regra de retentativa:** tentativas `pending_review` e `awaiting_release` bloqueiam o início de uma nova tentativa da mesma forma que `in_progress`. O aluno recebe: *"Este simulado já foi entregue e está aguardando liberação do resultado."*
+
+## Liberação automática de resultado
+
+Quando `release_results_after_end = true`, a tentativa entra em `awaiting_release` assim que toda a correção termina antes do fechamento do período. A liberação automática ocorre pelo comando agendado:
+
+```bash
+php artisan exams:release-pending-results
+```
+
+Esse comando promove tentativas `awaiting_release` para `completed` quando `exam.ends_at <= now()`.
+
+## Campos de retentativa
+
+Controlam se um aluno pode refazer o simulado após entregar. Configurados pelo admin no `POST /api/exams` ou `PUT /api/exams/{exam}`.
+
+| Campo | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `allow_retake` | boolean | `false` | `false` = não pode refazer. `true` = retentativa habilitada. |
+| `max_attempts` | integer \| null | `null` | Limite de tentativas totais (inclui a primeira). `null` = ilimitado. |
+| `min_score_to_retake` | decimal \| null | `null` | Aluno pode refazer enquanto nenhuma tentativa atingiu esta nota. Quando qualquer tentativa atinge o threshold, fica bloqueado **permanentemente**. `null` = usa `passing_score`. |
+
+### Lógica de bloqueio (aplicada no `POST /api/exams/{exam}/start`)
+
+```
+Tentativa em andamento?              → 422 "já existe tentativa em andamento"
+allow_retake = false?               → 422 "não permite novas tentativas"
+max_attempts atingido?              → 422 "limite de N tentativas atingido"
+Qualquer tentativa >= threshold?    → 422 "Você já foi aprovado. Não é possível realizar novamente."
+senão                               → cria nova tentativa ✓
+```
+
+O `threshold` é `min_score_to_retake` quando definido; caso contrário usa `passing_score`.
+
+> **Importante:** a verificação de aprovação é irreversível — verifica **todas** as tentativas concluídas, não só a última. Se o aluno passou em qualquer momento, fica permanentemente bloqueado.
 
 ---
 

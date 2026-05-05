@@ -79,3 +79,40 @@ export function isoToDisplay(iso: string): string {
   if (!year || !month || !day) return iso;
   return `${day}/${month}/${year}`;
 }
+
+// ─── Data e hora ──────────────────────────────────────────────────────────────
+
+// Aplica máscara DD/MM/AAAA HH:MM enquanto o usuário digita
+export function maskDateTime(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 12);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+  if (d.length <= 10) return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)} ${d.slice(8)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)} ${d.slice(8, 10)}:${d.slice(10)}`;
+}
+
+// DD/MM/AAAA HH:MM → YYYY-MM-DDTHH:MM:00 (para enviar à API)
+export function displayDateTimeToISO(display: string): string {
+  if (!display || display.length < 16) return "";
+  const [datePart, timePart] = display.split(" ");
+  if (!datePart || !timePart) return "";
+  const [day, month, year] = datePart.split("/");
+  if (!day || !month || !year || year.length < 4) return "";
+  const [hh, mm] = timePart.split(":");
+  if (!hh || !mm) return "";
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:00`;
+}
+
+// YYYY-MM-DDTHH:MM:SS[.000Z] → DD/MM/AAAA HH:MM (para exibir no formulário)
+export function isoToDisplayDateTime(iso: string): string {
+  if (!iso) return "";
+  // Normaliza: 2026-06-01T08:00:00.000Z ou 2026-06-01T08:00:00
+  const clean = iso.replace("Z", "").split(".")[0]; // "2026-06-01T08:00:00"
+  const [datePart, timePart] = clean.split("T");
+  if (!datePart) return "";
+  const [year, month, day] = datePart.split("-");
+  if (!year || !month || !day) return "";
+  const time = timePart ? timePart.slice(0, 5) : "00:00"; // HH:MM
+  return `${day}/${month}/${year} ${time}`;
+}

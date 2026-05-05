@@ -7,15 +7,16 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ConfirmModal from '../../../components/ConfirmModal';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import {
   detalharSimulado,
   enviarResposta,
   finalizarSimulado,
+  buscarTentativa,
   SimuladoDetail,
   Question,
   AttemptFinish,
@@ -44,7 +45,7 @@ function ItemQuestao({
   onChange: (r: Resposta) => void;
 }) {
   const opcaoSelecionada = questao.options.find((o) => o.id === resposta.optionId);
-  const exibirTexto =
+  const exigeTexto =
     questao.type === 'essay' ||
     opcaoSelecionada?.triggers_text_input ||
     (questao.allow_text_answer && resposta.optionId !== undefined);
@@ -80,7 +81,14 @@ function ItemQuestao({
           <TouchableOpacity
             key={op.id}
             style={[qStyles.opcao, selecionada && qStyles.opcaoSelecionada]}
-            onPress={() => onChange({ ...resposta, optionId: op.id })}
+            onPress={() => {
+              const deveExibirTexto = op.triggers_text_input || questao.allow_text_answer;
+              onChange({
+                ...resposta,
+                optionId: op.id,
+                textAnswer: deveExibirTexto ? resposta.textAnswer : undefined,
+              });
+            }}
             activeOpacity={0.75}
           >
             <View style={[qStyles.radio, selecionada && qStyles.radioSelecionado]}>
@@ -93,7 +101,7 @@ function ItemQuestao({
         );
       })}
 
-      {exibirTexto && (
+      {exigeTexto && (
         <TextInput
           style={qStyles.textInput}
           placeholder={
@@ -166,35 +174,35 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   const [respostas, setRespostas] = useState<Record<number, Resposta>>({});
   const [resultado, setResultado] = useState<AttemptFinish | null>(null);
   const [erroMsg, setErroMsg]     = useState<string>('');
+  const [verificando, setVerificando] = useState(false);
   const scrollRef                 = useRef<ScrollView>(null);
+  const bypassRemoveRef            = useRef(false);
+
+  // Modal de confirmação de saída
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmAction, setConfirmAction]   = useState<(() => void) | null>(null);
+
+  function pedirConfirmacaoSaida(onConfirm: () => void) {
+    setConfirmAction(() => onConfirm);
+    setConfirmVisible(true);
+  }
 
   // Botão voltar customizado: garante que sempre há botão, mesmo via deep link
   useEffect(() => {
+    function doVoltar() {
+      bypassRemoveRef.current = true;
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('SimuladoDetalhe', { examId });
+      }
+    }
+
     function handleVoltar() {
       if (fase === 'realizando' || fase === 'finalizando') {
-        Alert.alert(
-          'Sair do simulado?',
-          'Suas respostas ainda não foram enviadas e serão perdidas.',
-          [
-            { text: 'Continuar respondendo', style: 'cancel' },
-            {
-              text: 'Sair', style: 'destructive',
-              onPress: () => {
-                if (navigation.canGoBack()) {
-                  navigation.goBack();
-                } else {
-                  navigation.navigate('SimuladoDetalhe', { examId });
-                }
-              },
-            },
-          ],
-        );
+        pedirConfirmacaoSaida(doVoltar);
       } else {
-        if (navigation.canGoBack()) {
-          navigation.goBack();
-        } else {
-          navigation.navigate('SimuladoDetalhe', { examId });
-        }
+        doVoltar();
       }
     }
 
@@ -210,16 +218,16 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   // Confirmação ao sair durante o exame (gesto de swipe / botão físico)
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (bypassRemoveRef.current) {
+        bypassRemoveRef.current = false;
+        return;
+      }
       if (fase === 'resultado' || fase === 'carregando' || fase === 'erro') return;
       e.preventDefault();
-      Alert.alert(
-        'Sair do simulado?',
-        'Suas respostas ainda não foram enviadas e serão perdidas.',
-        [
-          { text: 'Continuar respondendo', style: 'cancel' },
-          { text: 'Sair', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
-        ],
-      );
+      pedirConfirmacaoSaida(() => {
+        bypassRemoveRef.current = true;
+        navigation.dispatch(e.data.action);
+      });
     });
     return unsubscribe;
   }, [navigation, fase]);
@@ -241,6 +249,28 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
   async function handleFinalizar() {
     if (!detalhe) return;
+
+    const faltantesTexto: number[] = [];
+    for (const q of detalhe.questions) {
+      const r = respostas[q.id];
+      if (!r) continue;
+
+      if (q.type === 'essay') {
+        if (!r.textAnswer?.trim()) faltantesTexto.push(q.order);
+        continue;
+      }
+
+      if (r.optionId === undefined) continue;
+      const op = q.options.find((o) => o.id === r.optionId);
+      const exigeTexto = q.allow_text_answer || !!op?.triggers_text_input;
+      if (exigeTexto && !r.textAnswer?.trim()) faltantesTexto.push(q.order);
+    }
+
+    if (faltantesTexto.length > 0) {
+      setErroMsg(`Preencha o texto obrigatório na(s) questão(ões): ${faltantesTexto.join(', ')}.`);
+      return;
+    }
+
     setFase('finalizando');
     try {
       for (const questao of detalhe.questions) {
@@ -269,6 +299,31 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
     setRespostas((prev) => ({ ...prev, [questionId]: resp }));
   }
 
+  async function verificarResultadoPendencia() {
+    setVerificando(true);
+    try {
+      const atualizado = await buscarTentativa(attemptId);
+      setResultado(atualizado);
+    } catch {
+      // Mantém na tela de aguardo; o usuário pode tentar novamente depois.
+    } finally {
+      setVerificando(false);
+    }
+  }
+
+  // Enquanto estiver pendente de correção ou aguardando liberação, faz polling periódico do resultado.
+  useEffect(() => {
+    if (fase !== 'resultado' || (resultado?.status !== 'pending_review' && resultado?.status !== 'awaiting_release')) return;
+
+    verificarResultadoPendencia();
+
+    const intervalId = setInterval(() => {
+      verificarResultadoPendencia();
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [fase, resultado?.status, attemptId]);
+
   // ── Carregando ──────────────────────────────────────────────────────────────
   if (fase === 'carregando') {
     return (
@@ -294,6 +349,76 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
   // ── Resultado ───────────────────────────────────────────────────────────────
   if (fase === 'resultado' && resultado) {
+    // Aguardando correção manual ou aguardando liberação automática
+    if (resultado.status === 'pending_review' || resultado.status === 'awaiting_release') {
+      const aguardandoLiberacao = resultado.status === 'awaiting_release';
+      return (
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+          <View style={[styles.resultadoCard, { borderTopColor: aguardandoLiberacao ? '#0891B2' : '#F59E0B' }]}> 
+            <View style={[styles.resultadoIconCircle, { backgroundColor: aguardandoLiberacao ? '#ECFEFF' : '#FFFBEB' }]}>
+              <Ionicons name={aguardandoLiberacao ? 'lock-closed-outline' : 'hourglass-outline'} size={64} color={aguardandoLiberacao ? '#0891B2' : '#F59E0B'} />
+            </View>
+            <Text style={styles.resultadoTitulo}>{aguardandoLiberacao ? 'Aguardando liberação' : 'Aguardando correção'}</Text>
+            {aguardandoLiberacao ? (
+              <Text style={styles.resultadoSub}>
+                Sua tentativa já foi corrigida, mas o resultado ficará visível somente após o encerramento do período do simulado.
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.resultadoSub}>
+                  {resultado.pending_answers_count
+                    ? `${resultado.pending_answers_count} resposta${resultado.pending_answers_count !== 1 ? 's precisam' : ' precisa'} de correção manual pelo professor.`
+                    : 'Suas respostas foram enviadas e aguardam correção manual pelo professor.'}
+                </Text>
+                <Text style={styles.resultadoSub}>
+                  Seu simulado foi entregue! Algumas respostas serão corrigidas pelo professor. Você será notificado quando o resultado estiver disponível.
+                </Text>
+              </>
+            )}
+
+            <View style={styles.resultadoNumeros}>
+              <View style={styles.resultadoItem}>
+                <Text style={styles.resultadoValor}>{resultado.max_score}</Text>
+                <Text style={styles.resultadoLabel}>Pontos totais</Text>
+              </View>
+              <View style={styles.resultadoDivisor} />
+              <View style={styles.resultadoItem}>
+                <Text style={[styles.resultadoValor, { color: aguardandoLiberacao ? '#0891B2' : '#F59E0B' }]}> 
+                  {aguardandoLiberacao ? 'Bloq.' : (resultado.pending_answers_count ?? '—')}
+                </Text>
+                <Text style={styles.resultadoLabel}>{aguardandoLiberacao ? 'Resultado' : 'Pendente(s)'}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.botaoAguardo, aguardandoLiberacao && { backgroundColor: '#ECFEFF', borderColor: '#0891B2' }, verificando && { opacity: 0.6 }]}
+              onPress={verificarResultadoPendencia}
+              disabled={verificando}
+              activeOpacity={0.8}
+            >
+              {verificando ? (
+                <ActivityIndicator size="small" color={aguardandoLiberacao ? '#0891B2' : '#B45309'} style={{ marginRight: 8 }} />
+              ) : (
+                <Ionicons name="refresh-outline" size={18} color={aguardandoLiberacao ? '#0891B2' : '#B45309'} style={{ marginRight: 8 }} />
+              )}
+              <Text style={[styles.botaoAguardoTexto, aguardandoLiberacao && { color: '#0891B2' }]}>
+                {verificando ? 'Verificando…' : 'Verificar resultado'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.botaoVoltar}
+              onPress={() => navigation.navigate('SimuladosList')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="list-outline" size={18} color="#4F46E5" style={{ marginRight: 8 }} />
+              <Text style={styles.botaoVoltarTexto}>Ver todos os simulados</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      );
+    }
+
     const aprovado = resultado.passed;
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -314,12 +439,12 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
           <View style={styles.resultadoNumeros}>
             <View style={styles.resultadoItem}>
-              <Text style={styles.resultadoValor}>{resultado.percentage.toFixed(1)}%</Text>
+              <Text style={styles.resultadoValor}>{resultado.percentage?.toFixed(1) ?? '—'}%</Text>
               <Text style={styles.resultadoLabel}>Aproveitamento</Text>
             </View>
             <View style={styles.resultadoDivisor} />
             <View style={styles.resultadoItem}>
-              <Text style={styles.resultadoValor}>{resultado.score}</Text>
+              <Text style={styles.resultadoValor}>{resultado.score ?? '—'}</Text>
               <Text style={styles.resultadoLabel}>Pontos obtidos</Text>
             </View>
             <View style={styles.resultadoDivisor} />
@@ -328,15 +453,6 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
               <Text style={styles.resultadoLabel}>Pontos totais</Text>
             </View>
           </View>
-
-          {detalhe?.questions.some((q) => q.type === 'essay') && (
-            <View style={styles.avisoDiscursiva}>
-              <Ionicons name="information-circle-outline" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-              <Text style={styles.avisoDiscursivaTexto}>
-                Questões discursivas aguardam correção manual. A nota pode ser atualizada.
-              </Text>
-            </View>
-          )}
 
           <TouchableOpacity
             style={styles.botaoVoltar}
@@ -357,7 +473,10 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
       const r = respostas[q.id];
       if (!r) return false;
       if (q.type === 'essay') return !!r.textAnswer?.trim();
-      return r.optionId !== undefined;
+      if (r.optionId === undefined) return false;
+      const op = q.options.find((o) => o.id === r.optionId);
+      const exigeTexto = q.allow_text_answer || !!op?.triggers_text_input;
+      return exigeTexto ? !!r.textAnswer?.trim() : true;
     }).length;
     const total = detalhe.questions.length;
     const pct   = total > 0 ? (respondidas / total) * 100 : 0;
@@ -414,6 +533,22 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
                 </>}
           </TouchableOpacity>
         </ScrollView>
+
+        <ConfirmModal
+          visible={confirmVisible}
+          title="Sair do simulado?"
+          message="Suas respostas ainda não foram enviadas e serão perdidas."
+          confirmLabel="Sair"
+          cancelLabel="Cancelar"
+          confirmDestructive
+          icon="exit-outline"
+          iconColor="#EF4444"
+          onConfirm={() => {
+            setConfirmVisible(false);
+            confirmAction?.();
+          }}
+          onCancel={() => setConfirmVisible(false)}
+        />
       </View>
     );
   }
@@ -501,4 +636,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 24, marginTop: 4,
   },
   botaoVoltarTexto: { color: '#4F46E5', fontWeight: '600', fontSize: 15 },
+  botaoAguardo: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#F59E0B',
+    borderRadius: 14, paddingVertical: 12, paddingHorizontal: 24, marginTop: 16, marginBottom: 8,
+  },
+  botaoAguardoTexto: { color: '#B45309', fontWeight: '600', fontSize: 15 },
 });
