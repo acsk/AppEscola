@@ -132,6 +132,31 @@ function navToHash(nav: NavState): string {
 
 // ── App ────────────────────────────────────────────────────────────────────────
 
+// ── Diagnóstico de fontes e rede ──────────────────────────────────────────────
+if (typeof window !== "undefined") {
+  const FONT_URL =
+    "/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf";
+
+  fetch(FONT_URL)
+    .then((res) => {
+      const ct = res.headers.get("content-type") ?? "(sem content-type)";
+      console.log(
+        `[DIAG FONTE] status=${res.status} content-type=${ct} url=${FONT_URL}`
+      );
+      if (!ct.includes("font") && !ct.includes("octet")) {
+        console.warn(
+          "[DIAG FONTE] PROBLEMA: servidor retornou content-type errado. " +
+            "O arquivo provavelmente não existe no servidor ou está sendo servido como HTML pelo SPA fallback."
+        );
+        return res.text().then((body) =>
+          console.warn("[DIAG FONTE] Primeiros 200 chars da resposta:", body.slice(0, 200))
+        );
+      }
+      console.info("[DIAG FONTE] OK: fonte parece estar sendo servida corretamente.");
+    })
+    .catch((err) => console.error("[DIAG FONTE] Erro ao buscar fonte:", err));
+}
+
 function AppContent() {
   const { user, isLoading } = useAuth();
 
