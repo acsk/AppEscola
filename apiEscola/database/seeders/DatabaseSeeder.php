@@ -25,8 +25,8 @@ class DatabaseSeeder extends Seeder
         // Super Admin
         User::factory()->superAdmin()->create([
             'name' => 'Super Admin',
-            'email' => 'super@appescola.com',
-            'password' => Hash::make('password'),
+            'email' => 'andrecabrall@gmail.com',
+            'password' => Hash::make('123456'),
         ]);
 
         // Tenant de demonstração

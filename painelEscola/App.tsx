@@ -1,5 +1,6 @@
 import "./global.css";
 import { useState, useEffect } from "react";
+import { loadAsync } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -24,6 +25,23 @@ import InvoicesScreen from "./screens/InvoicesScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
 
 type NavState = { screen: string; params?: Record<string, any> };
+
+let iconFontsPromise: Promise<void> | null = null;
+
+function ensureIconFontsLoaded() {
+  if (typeof window === "undefined") {
+    return Promise.resolve();
+  }
+
+  if (!iconFontsPromise) {
+    iconFontsPromise = loadAsync({
+      ionicons: "/fonts/Ionicons.ttf",
+      feather: "/fonts/Feather.ttf",
+    }).then(() => undefined);
+  }
+
+  return iconFontsPromise;
+}
 
 // ── Hash routing helpers ───────────────────────────────────────────────────────
 
@@ -134,6 +152,7 @@ function navToHash(nav: NavState): string {
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const [fontsReady, setFontsReady] = useState(typeof window === "undefined");
 
   const [nav, setNav] = useState<NavState>(() => {
     if (typeof window !== "undefined" && window.location.hash) {
@@ -158,6 +177,22 @@ function AppContent() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    ensureIconFontsLoaded()
+      .then(() => {
+        if (mounted) setFontsReady(true);
+      })
+      .catch(() => {
+        if (mounted) setFontsReady(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // determina item ativo na sidebar (sem sub-rota)
   const activeItem = nav.screen.startsWith("alunos")
     ? "alunos"
@@ -171,7 +206,7 @@ function AppContent() {
     ? "simulados"
     : nav.screen;
 
-  if (isLoading) {
+  if (isLoading || !fontsReady) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEEFF" }}>
         <ActivityIndicator size="large" color="#7C3AED" />

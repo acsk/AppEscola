@@ -8,12 +8,24 @@ use App\Http\Requests\StoreTenantRequest;
 use App\Http\Requests\UpdateTenantRequest;
 use App\Http\Resources\TenantResource;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class TenantController extends Controller
 {
+    private function ensureSuperAdmin(Request $request): void
+    {
+        $user = $request->user();
+
+        if (! $user || ! $user->isSuperAdmin()) {
+            throw new AccessDeniedHttpException('Acesso permitido apenas para super admin.');
+        }
+    }
+
     #[OA\Get(
         path: '/api/tenants',
         tags: ['Tenants'],
@@ -30,6 +42,8 @@ class TenantController extends Controller
     )]
     public function index(Request $request): AnonymousResourceCollection
     {
+        $this->ensureSuperAdmin($request);
+
         $tenants = Tenant::query()
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
             ->when($request->query('search'), fn ($q, $v) => $q->where('name', 'like', "%{$v}%"))
@@ -52,7 +66,45 @@ class TenantController extends Controller
     )]
     public function store(StoreTenantRequest $request): JsonResponse
     {
-        $tenant = Tenant::create($request->validated());
+        $this->ensureSuperAdmin($request);
+
+        $data = $request->validated();
+
+        $tenantData = [
+            'corporate_name' => $data['corporate_name'],
+            'trade_name'     => $data['trade_name'] ?? null,
+            'name'           => $data['name'],
+            'slug'           => $data['slug'],
+            'cnpj'           => $data['cnpj'] ?? null,
+            'email'          => $data['email'] ?? null,
+            'phone'          => $data['phone'] ?? null,
+            'whatsapp'       => $data['whatsapp'] ?? null,
+            'zip_code'       => $data['zip_code'] ?? null,
+            'street'         => $data['street'] ?? null,
+            'number'         => $data['number'] ?? null,
+            'complement'     => $data['complement'] ?? null,
+            'neighborhood'   => $data['neighborhood'] ?? null,
+            'city'           => $data['city'] ?? null,
+            'state'          => $data['state'] ?? null,
+            'status'         => $data['status'] ?? 'active',
+            'settings'       => $data['settings'] ?? null,
+        ];
+
+        $tenant = DB::transaction(function () use ($tenantData, $data) {
+            $tenant = Tenant::create($tenantData);
+
+            User::create([
+                'tenant_id'                 => $tenant->id,
+                'name'                      => $data['admin_name'],
+                'email'                     => $data['admin_email'],
+                'password'                  => $data['admin_password'],
+                'role'                      => 'admin',
+                'status'                    => 'active',
+                'password_change_required'  => true,
+            ]);
+
+            return $tenant;
+        });
 
         return $this->created(new TenantResource($tenant));
     }
@@ -68,8 +120,10 @@ class TenantController extends Controller
             new OA\Response(response: 404, description: 'Não encontrado'),
         ]
     )]
-    public function show(Tenant $tenant): TenantResource
+    public function show(Request $request, Tenant $tenant): TenantResource
     {
+        $this->ensureSuperAdmin($request);
+
         return new TenantResource($tenant);
     }
 
@@ -87,6 +141,8 @@ class TenantController extends Controller
     )]
     public function update(UpdateTenantRequest $request, Tenant $tenant): TenantResource
     {
+        $this->ensureSuperAdmin($request);
+
         $tenant->update($request->validated());
 
         return new TenantResource($tenant);
@@ -103,8 +159,10 @@ class TenantController extends Controller
             new OA\Response(response: 404, description: 'Não encontrado'),
         ]
     )]
-    public function destroy(Tenant $tenant): JsonResponse
+    public function destroy(Request $request, Tenant $tenant): JsonResponse
     {
+        $this->ensureSuperAdmin($request);
+
         $tenant->delete();
 
         return response()->json(['message' => 'Tenant removido com sucesso.']);

@@ -32,6 +32,11 @@ class StoreTenantRequest extends FormRequest
             'state'          => ['nullable', 'string', 'size:2'],
             'status'         => ['nullable', 'exists:domain_statuses,slug'],
             'settings'       => ['nullable', 'array'],
+
+            // Usuário administrador inicial do tenant
+            'admin_name'     => ['required', 'string', 'max:255'],
+            'admin_email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'admin_password' => ['required', 'string', 'min:6', 'confirmed'],
         ];
     }
 }
