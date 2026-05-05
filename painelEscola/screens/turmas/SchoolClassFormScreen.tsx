@@ -144,7 +144,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
     (async () => {
       setLoading(true);
       try {
-        const { data } = await api.get(`/school-classes/${classId}`);
+        const { data: raw } = await api.get(`/school-classes/${classId}`);
+        const data = raw.body ?? raw;
         setForm({
           course_id: String(data.course_id ?? data.course?.id ?? ""),
           name: data.name ?? "",
@@ -196,7 +197,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
       if (isEdit) {
         await api.put(`/school-classes/${savedClassId}`, payload);
       } else {
-        const { data } = await api.post("/school-classes", payload);
+        const { data: raw } = await api.post("/school-classes", payload);
+        const data = raw.body ?? raw;
         setSavedClassId(data.id);
         setSchedules(data.schedules ?? []);
       }
@@ -247,17 +249,17 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
       let updated: Schedule;
       if (editScheduleId) {
-        const { data } = await api.put(`/class-schedules/${editScheduleId}`, payload);
-        updated = data;
+        const { data: rawPut } = await api.put(`/class-schedules/${editScheduleId}`, payload);
+        updated = rawPut.body ?? rawPut;
         setSchedules((prev) =>
           prev.map((s) => (s.id === editScheduleId ? updated : s))
         );
       } else {
-        const { data } = await api.post(
+        const { data: rawPost } = await api.post(
           `/school-classes/${savedClassId}/schedules`,
           payload
         );
-        updated = data;
+        updated = rawPost.body ?? rawPost;
         setSchedules((prev) =>
           [...prev, updated].sort(
             (a, b) =>
