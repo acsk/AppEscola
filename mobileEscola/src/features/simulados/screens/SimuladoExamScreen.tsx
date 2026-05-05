@@ -31,6 +31,15 @@ interface Resposta {
   textAnswer?: string;
 }
 
+const PRIMARY = '#4F46E5';
+const INK = '#1E1B4B';
+const TEXT = '#312E81';
+const MUTED = '#64748B';
+const SOFT = '#EEF2FF';
+const BORDER = '#DDE3F5';
+const SURFACE = '#FFFFFF';
+const BACKGROUND = '#F6F7FB';
+
 // ── Questão individual ────────────────────────────────────────────────────────
 
 function ItemQuestao({
@@ -111,7 +120,7 @@ function ItemQuestao({
               ? 'Especifique sua resposta…'
               : 'Justifique sua resposta…'
           }
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={MUTED}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
@@ -125,42 +134,43 @@ function ItemQuestao({
 
 const qStyles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,
+    backgroundColor: SURFACE, borderRadius: 16, padding: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: BORDER,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   headerEsq:   { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   numeroBadge: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#EDE9FE', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: SOFT, justifyContent: 'center', alignItems: 'center',
   },
-  numeroTexto:  { fontSize: 14, fontWeight: '700', color: '#7C3AED' },
-  subjectPill:  { backgroundColor: '#F0FDF4', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  subjectTexto: { fontSize: 11, fontWeight: '600', color: '#059669' },
-  tipoPill:     { backgroundColor: '#F9FAFB', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  tipoTexto:    { fontSize: 11, color: '#9CA3AF' },
-  pontos:       { backgroundColor: '#F9FAFB', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  pontosTexto:  { fontSize: 12, color: '#6B7280', fontWeight: '500' },
-  enunciado:    { fontSize: 15, color: '#111827', lineHeight: 22, marginBottom: 14 },
+  numeroTexto:  { fontSize: 14, fontWeight: '700', color: PRIMARY },
+  subjectPill:  { backgroundColor: SOFT, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  subjectTexto: { fontSize: 11, fontWeight: '600', color: PRIMARY },
+  tipoPill:     { backgroundColor: SOFT, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  tipoTexto:    { fontSize: 11, color: MUTED },
+  pontos:       { backgroundColor: SOFT, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  pontosTexto:  { fontSize: 12, color: MUTED, fontWeight: '500' },
+  enunciado:    { fontSize: 15, color: INK, lineHeight: 22, marginBottom: 14 },
   opcao: {
     flexDirection: 'row', alignItems: 'flex-start', padding: 12,
-    borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB',
+    borderRadius: 10, borderWidth: 1, borderColor: BORDER,
     marginBottom: 8, gap: 10,
   },
-  opcaoSelecionada:      { borderColor: '#7C3AED', backgroundColor: '#FAF5FF' },
+  opcaoSelecionada:      { borderColor: PRIMARY, backgroundColor: SOFT },
   radio: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 2,
-    borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center',
+    borderColor: BORDER, justifyContent: 'center', alignItems: 'center',
     marginTop: 1, flexShrink: 0,
   },
-  radioSelecionado:      { borderColor: '#7C3AED' },
-  radioPonto:            { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7C3AED' },
-  opcaoTexto:            { flex: 1, fontSize: 14, color: '#374151', lineHeight: 20 },
-  opcaoTextoSelecionado: { color: '#7C3AED', fontWeight: '500' },
+  radioSelecionado:      { borderColor: PRIMARY },
+  radioPonto:            { width: 10, height: 10, borderRadius: 5, backgroundColor: PRIMARY },
+  opcaoTexto:            { flex: 1, fontSize: 14, color: TEXT, lineHeight: 20 },
+  opcaoTextoSelecionado: { color: PRIMARY, fontWeight: '600' },
   textInput: {
-    marginTop: 10, backgroundColor: '#F9FAFB',
-    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10,
-    padding: 12, fontSize: 14, color: '#111827', minHeight: 100,
+    marginTop: 10, backgroundColor: SOFT,
+    borderWidth: 1, borderColor: BORDER, borderRadius: 10,
+    padding: 12, fontSize: 14, color: INK, minHeight: 100,
   },
 });
 
@@ -328,7 +338,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   if (fase === 'carregando') {
     return (
       <View style={styles.centrado}>
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <ActivityIndicator size="large" color={PRIMARY} />
         <Text style={styles.carregandoTexto}>Carregando questões…</Text>
       </View>
     );
@@ -338,7 +348,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   if (fase === 'erro') {
     return (
       <View style={styles.centrado}>
-        <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
+        <Ionicons name="alert-circle-outline" size={48} color={BORDER} />
         <Text style={styles.erroTexto}>{erroMsg}</Text>
         <TouchableOpacity style={styles.botaoTentar} onPress={carregarQuestoes} activeOpacity={0.8}>
           <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
@@ -411,7 +421,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
               onPress={() => navigation.navigate('SimuladosList')}
               activeOpacity={0.8}
             >
-              <Ionicons name="list-outline" size={18} color="#4F46E5" style={{ marginRight: 8 }} />
+              <Ionicons name="list-outline" size={18} color={PRIMARY} style={{ marginRight: 8 }} />
               <Text style={styles.botaoVoltarTexto}>Ver todos os simulados</Text>
             </TouchableOpacity>
           </View>
@@ -459,7 +469,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
             onPress={() => navigation.navigate('SimuladosList')}
             activeOpacity={0.8}
           >
-            <Ionicons name="list-outline" size={18} color="#4F46E5" style={{ marginRight: 8 }} />
+            <Ionicons name="list-outline" size={18} color={PRIMARY} style={{ marginRight: 8 }} />
             <Text style={styles.botaoVoltarTexto}>Ver todos os simulados</Text>
           </TouchableOpacity>
         </View>
@@ -557,20 +567,20 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { flex: 1, backgroundColor: BACKGROUND },
   content:   { padding: 16 },
 
   centrado: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    padding: 32, backgroundColor: '#F3F4F6',
+    padding: 32, backgroundColor: BACKGROUND,
   },
-  carregandoTexto: { marginTop: 12, fontSize: 14, color: '#6B7280' },
+  carregandoTexto: { marginTop: 12, fontSize: 14, color: MUTED },
   erroTexto: {
-    fontSize: 14, color: '#374151', textAlign: 'center',
+    fontSize: 14, color: TEXT, textAlign: 'center',
     marginTop: 12, lineHeight: 20,
   },
   botaoTentar: {
-    marginTop: 20, backgroundColor: '#4F46E5',
+    marginTop: 20, backgroundColor: PRIMARY,
     borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12,
   },
   botaoTentarTexto: { color: '#fff', fontWeight: '600', fontSize: 15 },
@@ -582,16 +592,16 @@ const styles = StyleSheet.create({
   },
   erroInlineTexto: { flex: 1, fontSize: 13, color: '#DC2626', lineHeight: 18 },
 
-  examContainer:      { flex: 1, backgroundColor: '#F3F4F6' },
+  examContainer:      { flex: 1, backgroundColor: BACKGROUND },
   progressoContainer: {
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    backgroundColor: SURFACE, paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   progressoTexto: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressoLabel: { fontSize: 13, color: '#6B7280' },
-  progressoPct:   { fontSize: 13, fontWeight: '700', color: '#4F46E5' },
-  progressoBar:   { height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden' },
-  progressoFill:  { height: '100%', backgroundColor: '#4F46E5', borderRadius: 3 },
+  progressoLabel: { fontSize: 13, color: MUTED },
+  progressoPct:   { fontSize: 13, fontWeight: '700', color: PRIMARY },
+  progressoBar:   { height: 6, backgroundColor: '#E0E7FF', borderRadius: 3, overflow: 'hidden' },
+  progressoFill:  { height: '100%', backgroundColor: PRIMARY, borderRadius: 3 },
   questoesScroll: { flex: 1 },
   questoesContent:{ padding: 16 },
 
@@ -604,38 +614,39 @@ const styles = StyleSheet.create({
   botaoDisabled:       { opacity: 0.6 },
 
   resultadoCard: {
-    backgroundColor: '#fff', borderRadius: 20,
+    backgroundColor: SURFACE, borderRadius: 20,
     borderTopWidth: 6, padding: 24, alignItems: 'center',
+    borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: BORDER,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
   resultadoIconCircle: {
     width: 100, height: 100, borderRadius: 50,
     justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
-  resultadoTitulo: { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  resultadoTitulo: { fontSize: 24, fontWeight: '800', color: INK, marginBottom: 8 },
   resultadoSub:    {
-    fontSize: 14, color: '#6B7280', textAlign: 'center',
+    fontSize: 14, color: MUTED, textAlign: 'center',
     lineHeight: 20, marginBottom: 24,
   },
   resultadoNumeros: {
     flexDirection: 'row', width: '100%',
-    backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, marginBottom: 16,
+    backgroundColor: SOFT, borderRadius: 16, padding: 16, marginBottom: 16,
   },
   resultadoItem:    { flex: 1, alignItems: 'center' },
-  resultadoValor:   { fontSize: 22, fontWeight: '800', color: '#111827' },
-  resultadoLabel:   { fontSize: 11, color: '#9CA3AF', marginTop: 4, textAlign: 'center' },
-  resultadoDivisor: { width: 1, backgroundColor: '#E5E7EB', marginHorizontal: 8 },
+  resultadoValor:   { fontSize: 22, fontWeight: '800', color: INK },
+  resultadoLabel:   { fontSize: 11, color: MUTED, marginTop: 4, textAlign: 'center' },
+  resultadoDivisor: { width: 1, backgroundColor: BORDER, marginHorizontal: 8 },
   avisoDiscursiva:  {
     flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, marginBottom: 16,
+    backgroundColor: SOFT, borderRadius: 12, padding: 12, marginBottom: 16,
   },
-  avisoDiscursivaTexto: { flex: 1, fontSize: 12, color: '#6B7280', lineHeight: 16 },
+  avisoDiscursivaTexto: { flex: 1, fontSize: 12, color: MUTED, lineHeight: 16 },
   botaoVoltar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#4F46E5', borderRadius: 14,
+    borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 14,
     paddingVertical: 12, paddingHorizontal: 24, marginTop: 4,
   },
-  botaoVoltarTexto: { color: '#4F46E5', fontWeight: '600', fontSize: 15 },
+  botaoVoltarTexto: { color: PRIMARY, fontWeight: '600', fontSize: 15 },
   botaoAguardo: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#F59E0B',

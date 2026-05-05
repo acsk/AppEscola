@@ -11,6 +11,7 @@ export type SimuladosStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<SimuladosStackParamList>();
+const HEADER_BG = '#1E1B4B';
 
 export function SimuladosNavigator() {
   return (
@@ -26,7 +27,7 @@ export function SimuladosNavigator() {
         options={{
           title: 'Simulado',
           headerBackTitle: 'Voltar',
-          headerStyle: { backgroundColor: '#4F46E5' },
+          headerStyle: { backgroundColor: HEADER_BG },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: { fontWeight: '600' },
         }}
@@ -37,7 +38,7 @@ export function SimuladosNavigator() {
         options={{
           title: 'Simulado',
           headerBackTitle: 'Detalhes',
-          headerStyle: { backgroundColor: '#4F46E5' },
+          headerStyle: { backgroundColor: HEADER_BG },
           headerTintColor: '#FFFFFF',
           headerTitleStyle: { fontWeight: '600' },
         }}

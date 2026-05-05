@@ -22,6 +22,15 @@ import {
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoDetalhe'>;
 
+const PRIMARY = '#4F46E5';
+const INK = '#1E1B4B';
+const TEXT = '#312E81';
+const MUTED = '#64748B';
+const SOFT = '#EEF2FF';
+const BORDER = '#DDE3F5';
+const SURFACE = '#FFFFFF';
+const BACKGROUND = '#F6F7FB';
+
 function formatMinutes(min: number): string {
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
@@ -146,7 +155,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   if (carregando) {
     return (
       <View style={styles.centrado}>
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <ActivityIndicator size="large" color={PRIMARY} />
         <Text style={styles.carregandoTexto}>Carregando simulado…</Text>
       </View>
     );
@@ -156,7 +165,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   if (erroMsg || !detalhe) {
     return (
       <View style={styles.centrado}>
-        <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
+        <Ionicons name="alert-circle-outline" size={48} color={BORDER} />
         <Text style={styles.erroTexto}>{erroMsg ?? 'Simulado não encontrado.'}</Text>
         <TouchableOpacity style={styles.botaoTentar} onPress={carregar} activeOpacity={0.8}>
           <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
@@ -165,7 +174,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     );
   }
 
-  const subjectColor  = detalhe.subject?.color ?? '#4F46E5';
+  const subjectColor  = detalhe.subject?.color ?? PRIMARY;
   const statusEfetivo: AttemptStatus = (
     detalhe.attempt_status || (detalhe.can_start ? 'not_started' : 'in_progress')
   ) as AttemptStatus;
@@ -211,7 +220,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           ) : null}
           {concluido ? (
             <View style={styles.statusTopBadge}>
-              <Ionicons name="checkmark-circle" size={15} color="#7C3AED" />
+              <Ionicons name="checkmark-circle" size={15} color={PRIMARY} />
               <Text style={styles.statusTopBadgeTexto}>Simulado concluído</Text>
             </View>
           ) : null}
@@ -221,7 +230,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 
         {detalhe.course && (
           <View style={styles.cursoRow}>
-            <Ionicons name="school-outline" size={17} color="#6B7280" />
+            <Ionicons name="school-outline" size={17} color={MUTED} />
             <Text style={styles.cursoTexto}>{detalhe.course.name}</Text>
           </View>
         )}
@@ -233,22 +242,22 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
         {/* Grade de métricas */}
         <View style={styles.grid}>
           <View style={styles.gridItem}>
-            <Ionicons name="help-circle-outline" size={28} color="#4B5563" />
+            <Ionicons name="help-circle-outline" size={28} color={MUTED} />
             <Text style={styles.gridValor}>{detalhe.total_questions}</Text>
             <Text style={styles.gridLabel}>Questões</Text>
           </View>
           <View style={styles.gridItem}>
-            <Ionicons name="time-outline" size={28} color="#4B5563" />
+            <Ionicons name="time-outline" size={28} color={MUTED} />
             <Text style={styles.gridValor}>{formatMinutes(detalhe.duration_minutes)}</Text>
             <Text style={styles.gridLabel}>Duração</Text>
           </View>
           <View style={styles.gridItem}>
-            <Ionicons name="ribbon-outline" size={28} color="#4B5563" />
+            <Ionicons name="ribbon-outline" size={28} color={MUTED} />
             <Text style={styles.gridValor}>{detalhe.passing_score}%</Text>
             <Text style={styles.gridLabel}>Para passar</Text>
           </View>
           <View style={styles.gridItem}>
-            <Ionicons name="star-outline" size={28} color="#4B5563" />
+            <Ionicons name="star-outline" size={28} color={MUTED} />
             <Text style={styles.gridValor}>{detalhe.total_points}</Text>
             <Text style={styles.gridLabel}>Pontos</Text>
           </View>
@@ -257,20 +266,20 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
         {/* Datas */}
         {dataResumo ? (
           <View style={styles.dataLinha}>
-            <Ionicons name="calendar-outline" size={18} color="#6B7280" />
+            <Ionicons name="calendar-outline" size={18} color={MUTED} />
             <Text style={styles.dataTexto} numberOfLines={1}>{dataResumo}</Text>
           </View>
         ) : null}
 
         {/* Regras de retentativa */}
-        <View style={[styles.banner, { backgroundColor: detalhe.allow_retake ? '#ECFDF5' : '#F3F4F6', marginTop: 10 }]}>
+        <View style={[styles.banner, { backgroundColor: detalhe.allow_retake ? '#ECFDF5' : SOFT, marginTop: 10 }]}>
           <Ionicons
             name={detalhe.allow_retake ? 'refresh-circle-outline' : 'ban-outline'}
             size={18}
-            color={detalhe.allow_retake ? '#059669' : '#6B7280'}
+            color={detalhe.allow_retake ? '#059669' : MUTED}
             style={{ marginRight: 8 }}
           />
-          <Text style={[styles.bannerTexto, { color: detalhe.allow_retake ? '#059669' : '#6B7280', flex: 1 }]}>
+          <Text style={[styles.bannerTexto, { color: detalhe.allow_retake ? '#059669' : MUTED, flex: 1 }]}>
             {detalhe.allow_retake
               ? `Retentativa habilitada${detalhe.max_attempts ? ` · Máx: ${detalhe.max_attempts} tentativa(s)` : ' · Tentativas ilimitadas'} · Limite por nota: ${retakeThreshold ?? 0}%`
               : 'Retentativa desabilitada para este simulado.'}
@@ -313,8 +322,8 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           )
         ) : concluido ? (
           <View style={[styles.banner, { backgroundColor: '#F5F3FF' }]}> 
-            <Ionicons name="checkmark-done-outline" size={18} color="#7C3AED" style={{ marginRight: 8 }} />
-            <Text style={[styles.bannerTexto, { color: '#6D28D9', flex: 1 }]}>Simulado finalizado</Text>
+            <Ionicons name="checkmark-done-outline" size={18} color={PRIMARY} style={{ marginRight: 8 }} />
+            <Text style={[styles.bannerTexto, { color: PRIMARY, flex: 1 }]}>Simulado finalizado</Text>
           </View>
         ) : podeComecar ? (
           <TouchableOpacity
@@ -344,7 +353,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
         {concluidoComVisualizacao && (
           <View style={styles.previewWrap}>
             <View style={styles.previewHeader}>
-              <Ionicons name="document-text-outline" size={18} color="#4F46E5" style={{ marginRight: 8 }} />
+              <Ionicons name="document-text-outline" size={18} color={PRIMARY} style={{ marginRight: 8 }} />
               <Text style={styles.previewTitulo}>Visualização do simulado</Text>
             </View>
             <Text style={styles.previewSubtitulo}>
@@ -352,7 +361,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
             </Text>
 
             {carregandoRevisao ? (
-              <ActivityIndicator size="small" color="#4F46E5" style={{ marginTop: 12 }} />
+              <ActivityIndicator size="small" color={PRIMARY} style={{ marginTop: 12 }} />
             ) : revisao?.questions?.length ? (
               revisao.questions.map((q, index) => {
                 const emCorrecao = !awaitingRelease && (q.correction === null || q.correction.is_correct === null);
@@ -479,26 +488,27 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { flex: 1, backgroundColor: BACKGROUND },
   content:   { padding: 16 },
 
   centrado: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    padding: 32, backgroundColor: '#F3F4F6',
+    padding: 32, backgroundColor: BACKGROUND,
   },
-  carregandoTexto: { marginTop: 12, fontSize: 14, color: '#6B7280' },
+  carregandoTexto: { marginTop: 12, fontSize: 14, color: MUTED },
   erroTexto: {
-    fontSize: 14, color: '#374151', textAlign: 'center',
+    fontSize: 14, color: TEXT, textAlign: 'center',
     marginTop: 12, lineHeight: 20,
   },
   botaoTentar: {
-    marginTop: 20, backgroundColor: '#4F46E5',
+    marginTop: 20, backgroundColor: PRIMARY,
     borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12,
   },
   botaoTentarTexto: { color: '#fff', fontWeight: '600', fontSize: 15 },
 
   card: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 20,
+    backgroundColor: SURFACE, borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: BORDER,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
   },
   statusTopBadge: {
@@ -506,9 +516,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 'auto',
     gap: 6,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: SOFT,
     borderWidth: 1,
-    borderColor: '#C4B5FD',
+    borderColor: BORDER,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -516,7 +526,7 @@ const styles = StyleSheet.create({
   statusTopBadgeTexto: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#6D28D9',
+    color: PRIMARY,
   },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
   chip: {
@@ -524,20 +534,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20,
   },
   chipTexto:     { fontSize: 13, fontWeight: '700' },
-  chipGray:      { backgroundColor: '#F3F4F6', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
-  chipGrayTexto: { fontSize: 13, fontWeight: '600', color: '#4B5563' },
-  titulo:    { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  chipGray:      { backgroundColor: SOFT, paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
+  chipGrayTexto: { fontSize: 13, fontWeight: '600', color: MUTED },
+  titulo:    { fontSize: 20, fontWeight: '800', color: INK, marginBottom: 8 },
   cursoRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  cursoTexto:{ fontSize: 13, color: '#6B7280' },
-  descricao: { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 16 },
+  cursoTexto:{ fontSize: 13, color: MUTED },
+  descricao: { fontSize: 14, color: MUTED, lineHeight: 20, marginBottom: 16 },
 
   grid: {
     flexDirection: 'row', justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC', borderRadius: 16, padding: 16, marginBottom: 14,
+    backgroundColor: SOFT, borderRadius: 16, padding: 16, marginBottom: 14,
   },
   gridItem:  { alignItems: 'center', flex: 1, gap: 6 },
-  gridValor: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  gridLabel: { fontSize: 12, color: '#6B7280', textAlign: 'center' },
+  gridValor: { fontSize: 16, fontWeight: '800', color: INK },
+  gridLabel: { fontSize: 12, color: MUTED, textAlign: 'center' },
 
   dataLinha: {
     flexDirection: 'row',
@@ -545,7 +555,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 4,
   },
-  dataTexto: { flex: 1, fontSize: 14, color: '#4B5563' },
+  dataTexto: { flex: 1, fontSize: 14, color: TEXT },
 
   botaoAcao: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -570,7 +580,7 @@ const styles = StyleSheet.create({
   previewWrap: {
     marginTop: 18,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: BORDER,
     paddingTop: 16,
   },
   previewHeader: {
@@ -581,20 +591,20 @@ const styles = StyleSheet.create({
   previewTitulo: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#111827',
+    color: INK,
   },
   previewSubtitulo: {
     fontSize: 12,
-    color: '#6B7280',
+    color: MUTED,
     marginBottom: 12,
   },
   previewQuestao: {
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: BORDER,
     borderRadius: 14,
     padding: 14,
     marginTop: 10,
-    backgroundColor: '#fff',
+    backgroundColor: SURFACE,
   },
   previewQuestaoCorreta: {
     borderColor: '#86EFAC',
@@ -612,14 +622,14 @@ const styles = StyleSheet.create({
   previewNumero: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#4F46E5',
+    color: PRIMARY,
     marginRight: 8,
     marginTop: 1,
   },
   previewEnunciado: {
     flex: 1,
     fontSize: 15,
-    color: '#111827',
+    color: INK,
     lineHeight: 22,
   },
   previewOpcoes: {
@@ -653,17 +663,17 @@ const styles = StyleSheet.create({
   },
   previewRadioSelecionada: {
     backgroundColor: '#EEF2FF',
-    borderColor: '#4F46E5',
+    borderColor: PRIMARY,
   },
   previewRadioVazia: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#D1D5DB',
+    borderColor: BORDER,
   },
   previewRadioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#4F46E5',
+    backgroundColor: PRIMARY,
   },
   previewOpcaoCorreta: {
     backgroundColor: '#ECFDF5',
@@ -676,7 +686,7 @@ const styles = StyleSheet.create({
   previewOpcaoTexto: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: TEXT,
     lineHeight: 20,
   },
   previewOpcaoTextoCorreta: {
@@ -716,30 +726,30 @@ const styles = StyleSheet.create({
   },
   previewTextoResposta: {
     marginTop: 8,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: SOFT,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   previewTextoLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: MUTED,
     fontWeight: '600',
     marginBottom: 4,
   },
   previewTextoConteudo: {
     fontSize: 14,
-    color: '#374151',
+    color: TEXT,
     lineHeight: 20,
   },
   previewNaoRespondida: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: MUTED,
     marginTop: 6,
     fontStyle: 'italic',
   },
   previewDiscursivaTexto: {
     fontSize: 13,
-    color: '#6B7280',
+    color: MUTED,
   },
 });
