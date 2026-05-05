@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CursinhoHub",
+    "name": "AppCurso",
     "slug": "painelEscola",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,7 +26,7 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
-      "name": "CursinhoHub — Gerência de Cursinho"
+      "name": "AppCurso — Gerência de Cursinho"
     }
   }
 }

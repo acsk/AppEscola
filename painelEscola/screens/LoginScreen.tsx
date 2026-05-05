@@ -57,7 +57,7 @@ export default function LoginScreen() {
           <View className="w-16 h-16 bg-violet-600 rounded-2xl items-center justify-center mb-4">
             <Ionicons name="school" size={32} color="white" />
           </View>
-          <Text className="text-2xl font-bold text-gray-800">CursinhoHub</Text>
+          <Text className="text-2xl font-bold text-gray-800">AppCurso</Text>
           <Text className="text-sm text-gray-400 mt-1">
             Gerência de Cursinho — Painel Admin
           </Text>
