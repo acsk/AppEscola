@@ -25,6 +25,15 @@ import {
 type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'SimuladosList'>;
 type Aba = 'disponiveis' | 'historico';
 
+const PRIMARY = '#4F46E5';
+const INK = '#1E1B4B';
+const TEXT = '#312E81';
+const MUTED = '#64748B';
+const SOFT = '#EEF2FF';
+const BORDER = '#DDE3F5';
+const SURFACE = '#FFFFFF';
+const BACKGROUND = '#F6F7FB';
+
 const STATUS_LABEL: Record<AttemptStatus, string> = {
   not_started:    'Disponível',
   in_progress:    'Em andamento',
@@ -38,7 +47,7 @@ const STATUS_COLOR: Record<AttemptStatus, string> = {
   in_progress:    '#F59E0B',
   pending_review: '#F59E0B',
   awaiting_release: '#0EA5E9',
-  completed:      '#4F46E5',
+  completed:      PRIMARY,
 };
 
 const STATUS_ICON: Record<AttemptStatus, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -53,7 +62,7 @@ const HIST_COLOR: Record<string, string> = {
   in_progress:    '#F59E0B',
   pending_review: '#F59E0B',
   awaiting_release: '#0EA5E9',
-  completed:      '#4F46E5',
+  completed:      PRIMARY,
   abandoned:      '#EF4444',
 };
 const HIST_LABEL: Record<string, string> = {
@@ -171,28 +180,28 @@ export function SimuladosScreen() {
         </View>
         {!item.can_start && item.attempt_status === 'not_started' && (
           <View style={styles.foraPeriodo}>
-            <Ionicons name="lock-closed-outline" size={12} color="#9CA3AF" />
+            <Ionicons name="lock-closed-outline" size={12} color={MUTED} />
             <Text style={styles.foraPeriodoTexto}>Fora do período</Text>
           </View>
         )}
         <Text style={styles.cardTitulo} numberOfLines={2}>{item.title}</Text>
         <View style={styles.cardRodape}>
           <View style={styles.infoItem}>
-            <Ionicons name="help-circle-outline" size={14} color="#6B7280" />
+            <Ionicons name="help-circle-outline" size={14} color={MUTED} />
             <Text style={styles.infoTexto}>{item.total_questions} questões</Text>
           </View>
           <View style={styles.infoItem}>
-            <Ionicons name="time-outline" size={14} color="#6B7280" />
+            <Ionicons name="time-outline" size={14} color={MUTED} />
             <Text style={styles.infoTexto}>{formatMinutes(item.duration_minutes)}</Text>
           </View>
           <View style={styles.infoItem}>
-            <Ionicons name="ribbon-outline" size={14} color="#6B7280" />
+            <Ionicons name="ribbon-outline" size={14} color={MUTED} />
             <Text style={styles.infoTexto}>Mínimo {item.passing_score}%</Text>
           </View>
         </View>
         {item.ends_at && item.attempt_status !== 'completed' && (
           <View style={styles.prazoRow}>
-            <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
+            <Ionicons name="calendar-outline" size={12} color={MUTED} />
             <Text style={styles.prazoTexto}>Prazo: {formatDate(item.ends_at)}</Text>
           </View>
         )}
@@ -208,7 +217,7 @@ export function SimuladosScreen() {
 
   // ── Render: card histórico ─────────────────────────────────────────────────
   function renderTentativa({ item }: { item: AttemptHistoryItem }) {
-    const cor   = HIST_COLOR[item.status] ?? '#6B7280';
+    const cor   = HIST_COLOR[item.status] ?? MUTED;
     const label = HIST_LABEL[item.status] ?? item.status;
     const icon  = HIST_ICON[item.status]  ?? 'ellipse-outline';
     const subj  = item.exam.subject;
@@ -287,7 +296,7 @@ export function SimuladosScreen() {
         )}
 
         <View style={styles.prazoRow}>
-          <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
+          <Ionicons name="calendar-outline" size={12} color={MUTED} />
           <Text style={styles.prazoTexto}>Iniciado: {formatDate(item.started_at)}</Text>
           {item.finished_at && (
             <Text style={[styles.prazoTexto, { marginLeft: 8 }]}>
@@ -329,7 +338,7 @@ export function SimuladosScreen() {
         <View style={styles.container}>
           {header}
           <View style={styles.centrado}>
-            <ActivityIndicator size="large" color="#4F46E5" />
+            <ActivityIndicator size="large" color={PRIMARY} />
             <Text style={styles.carregandoTexto}>Carregando simulados…</Text>
           </View>
         </View>
@@ -340,7 +349,7 @@ export function SimuladosScreen() {
         <View style={styles.container}>
           {header}
           <View style={styles.centrado}>
-            <Ionicons name="cloud-offline-outline" size={48} color="#D1D5DB" />
+            <Ionicons name="cloud-offline-outline" size={48} color={BORDER} />
             <Text style={styles.erroTexto}>{erro}</Text>
             <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarDisponiveis()} activeOpacity={0.8}>
               <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
@@ -360,14 +369,14 @@ export function SimuladosScreen() {
           contentContainerStyle={simulados.length === 0 ? styles.listaVazia : styles.lista}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={atualizando} onRefresh={() => carregarDisponiveis(true)} colors={['#4F46E5']} tintColor="#4F46E5" />
+            <RefreshControl refreshing={atualizando} onRefresh={() => carregarDisponiveis(true)} colors={[PRIMARY]} tintColor={PRIMARY} />
           }
           ListHeaderComponent={simulados.length > 0 ? (
             <Text style={styles.cabecalho}>{simulados.length} simulado{simulados.length !== 1 ? 's' : ''}</Text>
           ) : null}
           ListEmptyComponent={
             <View style={styles.vazio}>
-              <Ionicons name="clipboard-outline" size={56} color="#D1D5DB" />
+              <Ionicons name="clipboard-outline" size={56} color={BORDER} />
               <Text style={styles.vazioTitulo}>Nenhum simulado disponível</Text>
               <Text style={styles.vazioSub}>Verifique sua matrícula ou tente mais tarde.</Text>
             </View>
@@ -383,7 +392,7 @@ export function SimuladosScreen() {
       <View style={styles.container}>
         {header}
         <View style={styles.centrado}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+        <ActivityIndicator size="large" color={PRIMARY} />
           <Text style={styles.carregandoTexto}>Carregando histórico…</Text>
         </View>
       </View>
@@ -394,7 +403,7 @@ export function SimuladosScreen() {
       <View style={styles.container}>
         {header}
         <View style={styles.centrado}>
-          <Ionicons name="cloud-offline-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="cloud-offline-outline" size={48} color={BORDER} />
           <Text style={styles.erroTexto}>{erroHist}</Text>
           <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarHistorico()} activeOpacity={0.8}>
             <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
@@ -414,14 +423,14 @@ export function SimuladosScreen() {
         contentContainerStyle={tentativas.length === 0 ? styles.listaVazia : styles.lista}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={atualizandoHist} onRefresh={() => carregarHistorico(true)} colors={['#4F46E5']} tintColor="#4F46E5" />
+          <RefreshControl refreshing={atualizandoHist} onRefresh={() => carregarHistorico(true)} colors={[PRIMARY]} tintColor={PRIMARY} />
         }
         ListHeaderComponent={tentativas.length > 0 ? (
           <Text style={styles.cabecalho}>{tentativas.length} tentativa{tentativas.length !== 1 ? 's' : ''}</Text>
         ) : null}
         ListEmptyComponent={
           <View style={styles.vazio}>
-            <Ionicons name="time-outline" size={56} color="#D1D5DB" />
+            <Ionicons name="time-outline" size={56} color={BORDER} />
             <Text style={styles.vazioTitulo}>Nenhuma tentativa ainda</Text>
             <Text style={styles.vazioSub}>Seus simulados realizados aparecerão aqui.</Text>
           </View>

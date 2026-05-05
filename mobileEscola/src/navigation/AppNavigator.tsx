@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Alert } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { PerfilScreen } from '../features/perfil/screens/PerfilScreen';
+import { HomeScreen } from '../features/home/screens/HomeScreen';
 import { SimuladosScreen } from '../features/simulados/screens/SimuladosScreen';
 import { FinanceiroScreen } from '../features/financeiro/screens/FinanceiroScreen';
 import { useAuth } from '../context/AuthContext';
@@ -64,7 +64,7 @@ export function AppNavigator() {
         ),
       })}
     >
-      <Tab.Screen name="Home"      component={PerfilScreen}     options={{ title: 'Home' }} />
+      <Tab.Screen name="Home"      component={HomeScreen}       options={{ title: 'Home', headerShown: false }} />
       <Tab.Screen name="Simulados"  component={SimuladosScreen}  options={{ title: 'Simulados' }} />
       <Tab.Screen name="Financeiro" component={FinanceiroScreen} options={{ title: 'Financeiro' }} />
     </Tab.Navigator>

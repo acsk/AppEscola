@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "web:build": "expo export --platform web && cp assets/icon.png dist/icon.png && cp assets/favicon.png dist/favicon.png && cp assets/adaptive-icon.png dist/adaptive-icon.png && cp assets/splash-icon.png dist/splash-icon.png"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

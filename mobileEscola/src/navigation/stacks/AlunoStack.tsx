@@ -4,7 +4,7 @@ import { TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import { PerfilScreen } from '../../features/perfil/screens/PerfilScreen';
+import { HomeScreen } from '../../features/home/screens/HomeScreen';
 import { SimuladosNavigator } from './SimuladosStack';
 import type { SimuladosStackParamList } from './SimuladosStack';
 import { FinanceiroScreen } from '../../features/financeiro/screens/FinanceiroScreen';
@@ -56,7 +56,7 @@ export function AlunoStack() {
         ),
       })}
     >
-      <Tab.Screen name="Home"       component={PerfilScreen}        options={{ title: 'Home' }} />
+      <Tab.Screen name="Home"       component={HomeScreen}          options={{ title: 'Home', headerShown: false }} />
       <Tab.Screen
         name="Simulados"
         component={SimuladosNavigator}

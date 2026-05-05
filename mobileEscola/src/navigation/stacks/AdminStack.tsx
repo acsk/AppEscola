@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { PerfilScreen } from '../../features/perfil/screens/PerfilScreen';
+import { HomeScreen } from '../../features/home/screens/HomeScreen';
 import { SimuladosScreen } from '../../features/simulados/screens/SimuladosScreen';
 
 // ── Tela placeholder — Dashboard Admin ─────────────────────────────────────
@@ -76,7 +76,7 @@ export function AdminStack() {
     >
       <Tab.Screen name="Dashboard" component={AdminDashboardScreen} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="Simulados" component={SimuladosScreen}      options={{ title: 'Simulados' }} />
-      <Tab.Screen name="Home"      component={PerfilScreen}         options={{ title: 'Home' }} />
+      <Tab.Screen name="Home"      component={HomeScreen}           options={{ title: 'Home', headerShown: false }} />
     </Tab.Navigator>
   );
 }

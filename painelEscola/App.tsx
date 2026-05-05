@@ -180,6 +180,9 @@ function AppContent() {
   }
 
   if (!user) {
+    if (typeof window !== "undefined" && window.location.hash !== "#/login") {
+      window.location.hash = "#/login";
+    }
     return <LoginScreen />;
   }
 

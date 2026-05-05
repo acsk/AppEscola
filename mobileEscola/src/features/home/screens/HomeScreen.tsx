@@ -64,7 +64,7 @@ const CONQUISTAS = [
   { id: 5, icon: 'lock-closed-outline',  bg: '#94A3B8', label: 'Em breve',            date: '',           locked: true  },
 ];
 
-export function PerfilScreen() {
+export function HomeScreen() {
   const { user, signOut } = useAuth();
   const navigation = useNavigation<any>();
 
@@ -136,8 +136,30 @@ export function PerfilScreen() {
 
       {/* ── Cabeçalho ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Perfil</Text>
+        <View style={styles.headerProfileRow}>
+          <View style={styles.studentBlock}>
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatarCircle}>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarInitials}>{initials}</Text>
+                )}
+              </View>
+              <View style={styles.avatarEditBtn}>
+                <Ionicons name="pencil" size={12} color={INK} />
+              </View>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName} numberOfLines={2}>{user?.name ?? 'Usuário'}</Text>
+              <Text style={styles.userRole}>{roleLabel}</Text>
+              <View style={styles.levelBadge}>
+                <Ionicons name="star" size={11} color={PRIMARY} />
+                <Text style={styles.levelText} numberOfLines={1}>Nível 7 – Destaque da Turma</Text>
+              </View>
+            </View>
+          </View>
+
           <View style={styles.headerIcons}>
             <TouchableOpacity style={styles.iconBtn}>
               <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
@@ -146,29 +168,13 @@ export function PerfilScreen() {
             <TouchableOpacity style={styles.iconBtn} onPress={() => setPainelAberto(!painelAberto)}>
               <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.avatarRow}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatarCircle}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.avatarInitials}>{initials}</Text>
-              )}
-            </View>
-            <View style={styles.avatarEditBtn}>
-              <Ionicons name="pencil" size={12} color={INK} />
-            </View>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.name ?? 'Usuário'}</Text>
-            <Text style={styles.userRole}>{roleLabel}</Text>
-            <View style={styles.levelBadge}>
-              <Ionicons name="star" size={11} color={PRIMARY} />
-              <Text style={styles.levelText}>Nível 7 – Destaque da Turma</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => { setPainelAberto(true); setConfirmandoSaida(true); }}
+              disabled={saindo}
+            >
+              <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -192,7 +198,7 @@ export function PerfilScreen() {
             onPress={() => { setFormAberto(!formAberto); setSucesso(false); }} activeOpacity={0.7}>
             <Ionicons name="key-outline" size={20} color={MUTED} />
             <Text style={styles.acaoTexto}>Alterar senha</Text>
-            <Ionicons name={formAberto ? 'chevron-up' : 'chevron-down'} size={18} color="#9CA3AF" />
+            <Ionicons name={formAberto ? 'chevron-up' : 'chevron-down'} size={18} color={MUTED} />
           </TouchableOpacity>
 
           {formAberto && (
@@ -205,39 +211,39 @@ export function PerfilScreen() {
               )}
               {/* Senha atual */}
               <View style={[styles.campo, campoErros.current_password ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.current_password ? '#DC2626' : '#6B7280'} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Senha atual" placeholderTextColor="#9CA3AF"
+                <Ionicons name="lock-closed-outline" size={17} color={campoErros.current_password ? '#DC2626' : MUTED} style={styles.icone} />
+                <TextInput style={styles.input} placeholder="Senha atual" placeholderTextColor={MUTED}
                   secureTextEntry={!atualVisivel} value={senhaAtual}
                   onChangeText={(v) => { setSenhaAtual(v); limparErro('current_password'); setSucesso(false); }}
                   autoCapitalize="none" />
                 <TouchableOpacity onPress={() => setAtualVisivel(!atualVisivel)}>
-                  <Ionicons name={atualVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color="#6B7280" />
+                  <Ionicons name={atualVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={MUTED} />
                 </TouchableOpacity>
               </View>
               {campoErros.current_password ? <Text style={styles.erroCampo}>{campoErros.current_password}</Text> : null}
 
               {/* Nova senha */}
               <View style={[styles.campo, campoErros.password ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password ? '#DC2626' : '#6B7280'} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Nova senha" placeholderTextColor="#9CA3AF"
+                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password ? '#DC2626' : MUTED} style={styles.icone} />
+                <TextInput style={styles.input} placeholder="Nova senha" placeholderTextColor={MUTED}
                   secureTextEntry={!novaVisivel} value={novaSenha}
                   onChangeText={(v) => { setNovaSenha(v); limparErro('password'); setSucesso(false); }}
                   autoCapitalize="none" />
                 <TouchableOpacity onPress={() => setNovaVisivel(!novaVisivel)}>
-                  <Ionicons name={novaVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color="#6B7280" />
+                  <Ionicons name={novaVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={MUTED} />
                 </TouchableOpacity>
               </View>
               {campoErros.password ? <Text style={styles.erroCampo}>{campoErros.password}</Text> : null}
 
               {/* Confirmação */}
               <View style={[styles.campo, campoErros.password_confirmation ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password_confirmation ? '#DC2626' : '#6B7280'} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Confirmar nova senha" placeholderTextColor="#9CA3AF"
+                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password_confirmation ? '#DC2626' : MUTED} style={styles.icone} />
+                <TextInput style={styles.input} placeholder="Confirmar nova senha" placeholderTextColor={MUTED}
                   secureTextEntry={!confirmVisivel} value={confirmacao}
                   onChangeText={(v) => { setConfirmacao(v); limparErro('password_confirmation'); setSucesso(false); }}
                   autoCapitalize="none" />
                 <TouchableOpacity onPress={() => setConfirmVisivel(!confirmVisivel)}>
-                  <Ionicons name={confirmVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color="#6B7280" />
+                  <Ionicons name={confirmVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={MUTED} />
                 </TouchableOpacity>
               </View>
               {campoErros.password_confirmation ? <Text style={styles.erroCampo}>{campoErros.password_confirmation}</Text> : null}
@@ -285,11 +291,11 @@ export function PerfilScreen() {
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <Text style={styles.cardTitle}>Resumo de desempenho</Text>
-            <Ionicons name="eye-outline" size={18} color="#9CA3AF" style={{ marginLeft: 8 }} />
+            <Ionicons name="eye-outline" size={18} color={MUTED} style={{ marginLeft: 8 }} />
           </View>
           <View style={styles.periodoPicker}>
             <Text style={styles.periodoTexto}>Este mês</Text>
-            <Ionicons name="chevron-down" size={13} color="#374151" />
+            <Ionicons name="chevron-down" size={13} color={TEXT} />
           </View>
         </View>
 
@@ -323,7 +329,7 @@ export function PerfilScreen() {
             <Text style={{ color: INK, fontWeight: '700' }}>15% acima</Text>
             {' '}da média da turma.
           </Text>
-          <Ionicons name="chevron-forward" size={15} color="#9CA3AF" style={{ flexShrink: 0 }} />
+          <Ionicons name="chevron-forward" size={15} color={MUTED} style={{ flexShrink: 0 }} />
         </View>
       </View>
 
@@ -400,7 +406,7 @@ export function PerfilScreen() {
           <Text style={styles.metaNumeros}>230 / 300</Text>
         </View>
         <Text style={styles.metaPct}>77%</Text>
-        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        <Ionicons name="chevron-forward" size={18} color={MUTED} />
       </TouchableOpacity>
 
       {/* ── Minhas conquistas ─────────────────────────────────────────── */}
@@ -428,12 +434,12 @@ export function PerfilScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F5F7' },
+  container: { flex: 1, backgroundColor: '#F6F7FB' },
   content:   { paddingBottom: 16 },
 
   // Header
   header: {
-    backgroundColor: '#111827',
+    backgroundColor: INK,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 24,
@@ -441,138 +447,143 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 28,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, elevation: 4,
   },
-  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 26 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  headerIcons: { flexDirection: 'row', gap: 8 },
+  headerProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 26,
+    gap: 12,
+  },
+  studentBlock: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  headerIcons: { flexDirection: 'row', gap: 8, flexShrink: 0 },
   iconBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)', position: 'relative',
+    backgroundColor: 'rgba(238,242,255,0.12)', position: 'relative',
   },
   notifDot: {
     position: 'absolute', top: 8, right: 8,
-    width: 8, height: 8, borderRadius: 4, backgroundColor: '#7C3AED',
-    borderWidth: 1, borderColor: '#111827',
+    width: 8, height: 8, borderRadius: 4, backgroundColor: PRIMARY,
+    borderWidth: 1, borderColor: INK,
   },
-  avatarRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 26 },
   avatarWrap:    { position: 'relative', marginRight: 18 },
   avatarCircle:  {
     width: 104, height: 104, borderRadius: 52,
-    backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 4, borderColor: 'rgba(255,255,255,0.14)', overflow: 'hidden',
+    backgroundColor: SOFT, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 4, borderColor: 'rgba(238,242,255,0.18)', overflow: 'hidden',
   },
   avatarImage: { width: '100%', height: '100%' },
-  avatarInitials: { fontSize: 32, fontWeight: '800', color: '#111827' },
+  avatarInitials: { fontSize: 32, fontWeight: '800', color: PRIMARY },
   avatarEditBtn:  {
     position: 'absolute', bottom: 4, right: 4,
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#111827',
+    backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: INK,
   },
-  userInfo:   { flex: 1 },
-  userName:   { fontSize: 23, fontWeight: '800', color: '#FFFFFF', marginBottom: 3 },
-  userRole:   { fontSize: 14, color: '#D1D5DB', marginBottom: 10 },
+  userInfo:   { flex: 1, minWidth: 0 },
+  userName:   { fontSize: 23, fontWeight: '800', color: SURFACE, marginBottom: 3 },
+  userRole:   { fontSize: 14, color: '#CBD5E1', marginBottom: 10 },
   levelBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     alignSelf: 'flex-start',
-    backgroundColor: '#F3E8FF', borderRadius: 20,
+    backgroundColor: SOFT, borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 4,
   },
-  levelText: { fontSize: 12, color: '#7C3AED', fontWeight: '600' },
+  levelText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
 
   statsRow:  {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SURFACE,
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 4,
   },
   statItem:  { flex: 1, alignItems: 'center', gap: 4 },
-  statBorder:{ borderRightWidth: 1, borderRightColor: '#E5E7EB' },
-  statValue: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  statLabel: { fontSize: 11, color: '#9CA3AF', textAlign: 'center', lineHeight: 14 },
+  statBorder:{ borderRightWidth: 1, borderRightColor: BORDER },
+  statValue: { fontSize: 18, fontWeight: '700', color: INK },
+  statLabel: { fontSize: 11, color: MUTED, textAlign: 'center', lineHeight: 14 },
 
   // Card genérico
   card: {
-    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
+    backgroundColor: SURFACE, marginHorizontal: 16, marginTop: 16,
     borderRadius: 18, padding: 18,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   cardHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   cardHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  cardTitle:      { fontSize: 16, fontWeight: '700', color: '#111827' },
+  cardTitle:      { fontSize: 16, fontWeight: '700', color: INK },
   periodoPicker:  {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB',
+    backgroundColor: SOFT, borderWidth: 1, borderColor: BORDER,
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
   },
-  periodoTexto: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  periodoTexto: { fontSize: 13, color: TEXT, fontWeight: '500' },
 
   // Desempenho
-  mediaGrande:  { fontSize: 40, fontWeight: '800', color: '#111827' },
-  mediaDecimal: { fontSize: 24, fontWeight: '600', color: '#111827' },
+  mediaGrande:  { fontSize: 40, fontWeight: '800', color: INK },
+  mediaDecimal: { fontSize: 24, fontWeight: '600', color: INK },
   trendRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 },
-  trendTexto:   { fontSize: 13, color: '#6B7280', fontWeight: '500' },
+  trendTexto:   { fontSize: 13, color: MUTED, fontWeight: '500' },
   acertosErros: { flexDirection: 'row', gap: 16, marginBottom: 14 },
   aeItem:       { flex: 1 },
-  aeLabel:      { fontSize: 12, color: '#9CA3AF', marginBottom: 2 },
-  aeValor:      { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  progressBar:  { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#E5E7EB' },
-  progressFill: { height: '100%', borderRadius: 3, backgroundColor: '#111827' },
+  aeLabel:      { fontSize: 12, color: MUTED, marginBottom: 2 },
+  aeValor:      { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 6 },
+  progressBar:  { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#E0E7FF' },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: PRIMARY },
   insightBox:   {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F3F4F6', borderRadius: 12,
+    backgroundColor: SOFT, borderRadius: 12,
     padding: 12, gap: 4,
   },
-  insightTexto: { flex: 1, fontSize: 13, color: '#374151', lineHeight: 18 },
+  insightTexto: { flex: 1, fontSize: 13, color: TEXT, lineHeight: 18 },
 
   // Section headers
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginTop: 20, marginBottom: 10 },
-  sectionTitle:  { fontSize: 16, fontWeight: '700', color: '#111827' },
-  sectionLink:   { fontSize: 13, color: '#111827', fontWeight: '700' },
+  sectionTitle:  { fontSize: 16, fontWeight: '700', color: INK },
+  sectionLink:   { fontSize: 13, color: PRIMARY, fontWeight: '700' },
   hScroll:       { paddingHorizontal: 16, gap: 12 },
 
   // Simulados
   simCard: {
-    width: 168, minHeight: 180, backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    width: 168, minHeight: 180, backgroundColor: SURFACE, borderRadius: 16, padding: 16,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
     flexDirection: 'column',
   },
   simCardVazio: {
-    width: 220, backgroundColor: '#fff', borderRadius: 18, padding: 20,
+    width: 220, backgroundColor: SURFACE, borderRadius: 18, padding: 20,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
-  simCardVazioTexto: { fontSize: 13, color: '#9CA3AF', textAlign: 'center' },
+  simCardVazioTexto: { fontSize: 13, color: MUTED, textAlign: 'center' },
   simIconWrap: {
-    width: 48, height: 48, borderRadius: 14, backgroundColor: '#F3F4F6',
+    width: 48, height: 48, borderRadius: 14, backgroundColor: SOFT,
     justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
-  simMateria: { fontSize: 11, fontWeight: '700', color: '#6B7280', marginBottom: 8 },
-  simTitulo:  { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 12, lineHeight: 20, flex: 1 },
+  simMateria: { fontSize: 11, fontWeight: '700', color: MUTED, marginBottom: 8 },
+  simTitulo:  { fontSize: 14, fontWeight: '700', color: INK, marginBottom: 12, lineHeight: 20, flex: 1 },
   simRodape:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' as any },
   simBadge:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   simBadgeTexto: { fontSize: 11, fontWeight: '600' },
-  simLink:    { fontSize: 12, fontWeight: '700', color: '#111827' },
+  simLink:    { fontSize: 12, fontWeight: '700', color: PRIMARY },
 
   // Meta
   metaCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 16,
+    backgroundColor: SURFACE, marginHorizontal: 16, marginTop: 16,
     borderRadius: 18, padding: 16, gap: 12,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   metaIconWrap: {
     width: 52, height: 52, borderRadius: 26,
-    backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: SOFT, justifyContent: 'center', alignItems: 'center',
   },
   metaInfo:     { flex: 1 },
-  metaSubtitulo:{ fontSize: 11, color: '#6B7280', fontWeight: '600', marginBottom: 2 },
-  metaTitulo:   { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  metaBar:      { height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
-  metaBarFill:  { height: '100%', backgroundColor: '#111827', borderRadius: 3 },
-  metaNumeros:  { fontSize: 11, color: '#9CA3AF' },
-  metaPct:      { fontSize: 14, fontWeight: '700', color: '#111827' },
+  metaSubtitulo:{ fontSize: 11, color: PRIMARY, fontWeight: '600', marginBottom: 2 },
+  metaTitulo:   { fontSize: 14, fontWeight: '700', color: INK, marginBottom: 8 },
+  metaBar:      { height: 6, backgroundColor: '#E0E7FF', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
+  metaBarFill:  { height: '100%', backgroundColor: PRIMARY, borderRadius: 3 },
+  metaNumeros:  { fontSize: 11, color: MUTED },
+  metaPct:      { fontSize: 14, fontWeight: '700', color: PRIMARY },
 
   // Conquistas
   conquItem:  { alignItems: 'center', width: 80 },
@@ -581,23 +592,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginBottom: 8,
   },
   conquLocked: { opacity: 0.5 },
-  conquLabel:  { fontSize: 11, color: '#374151', textAlign: 'center', lineHeight: 14 },
-  conquDate:   { fontSize: 10, color: '#9CA3AF', textAlign: 'center', marginTop: 2 },
-  conquEmBreve:{ fontSize: 10, color: '#6B7280', fontWeight: '600', textAlign: 'center', marginTop: 2 },
+  conquLabel:  { fontSize: 11, color: TEXT, textAlign: 'center', lineHeight: 14 },
+  conquDate:   { fontSize: 10, color: MUTED, textAlign: 'center', marginTop: 2 },
+  conquEmBreve:{ fontSize: 10, color: MUTED, fontWeight: '600', textAlign: 'center', marginTop: 2 },
 
   // Configurações / alterar senha
   acaoLinha:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  acaoTexto:  { flex: 1, fontSize: 15, fontWeight: '500', color: '#111827' },
-  divisor:    { height: 1, backgroundColor: '#F3F4F6', marginVertical: 14 },
+  acaoTexto:  { flex: 1, fontSize: 15, fontWeight: '500', color: INK },
+  divisor:    { height: 1, backgroundColor: BORDER, marginVertical: 14 },
   formSenha:  { marginTop: 14 },
   campo: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB',
-    borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: SOFT,
+    borderWidth: 1, borderColor: BORDER, borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 12, marginBottom: 4,
   },
   campoErro:  { borderColor: '#DC2626', backgroundColor: '#FFF5F5' },
   icone:      { marginRight: 8 },
-  input:      { flex: 1, fontSize: 14, color: '#111827' },
+  input:      { flex: 1, fontSize: 14, color: INK },
   erroCampo:  { fontSize: 12, color: '#DC2626', marginBottom: 10, marginLeft: 2 },
   erroContainer: {
     flexDirection: 'row', alignItems: 'flex-start',
@@ -611,13 +622,13 @@ const styles = StyleSheet.create({
     borderRadius: 8, padding: 10, marginBottom: 12,
   },
   sucessoTexto:    { fontSize: 13, color: '#059669', fontWeight: '500' },
-  botaoSalvar:     { backgroundColor: '#111827', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
+  botaoSalvar:     { backgroundColor: PRIMARY, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
   botaoDisabled:   { opacity: 0.6 },
   botaoSalvarTexto:{ color: '#fff', fontSize: 15, fontWeight: '600' },
-  confirmTexto:    { fontSize: 14, color: '#374151', marginBottom: 12 },
+  confirmTexto:    { fontSize: 14, color: TEXT, marginBottom: 12 },
   confirmBotoes:   { flexDirection: 'row', gap: 10 },
-  botaoCancelar:   { flex: 1, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
-  botaoCancelarTexto:     { fontSize: 14, color: '#374151', fontWeight: '500' },
+  botaoCancelar:   { flex: 1, borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  botaoCancelarTexto:     { fontSize: 14, color: TEXT, fontWeight: '500' },
   botaoConfirmarSair:     { flex: 1, backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   botaoConfirmarSairTexto:{ fontSize: 14, color: '#fff', fontWeight: '600' },
 });
