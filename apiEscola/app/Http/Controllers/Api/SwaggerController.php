@@ -21,6 +21,7 @@ use OpenApi\Attributes as OA;
 )]
 #[OA\Tag(name: 'Auth', description: 'Autenticação')]
 #[OA\Tag(name: 'Tenants', description: 'Gestão de tenants/escolas (somente super_admin)')]
+#[OA\Tag(name: 'Users', description: 'Gestão de usuários (super_admin e admin do tenant)')]
 #[OA\Tag(name: 'Students', description: 'Alunos')]
 #[OA\Tag(name: 'Guardians', description: 'Responsáveis')]
 #[OA\Tag(name: 'Courses', description: 'Cursos')]

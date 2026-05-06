@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\ExamQuestionController;
 use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 // Autenticação (pública)
@@ -48,6 +49,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Tenants (somente super_admin)
     Route::apiResource('tenants', TenantController::class);
+
+    // Administração de usuários (super_admin e admin)
+    Route::apiResource('users', UserManagementController::class);
 
     // Alunos
     Route::apiResource('students', StudentController::class);

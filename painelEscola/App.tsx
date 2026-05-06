@@ -26,6 +26,7 @@ import InvoicesScreen from "./screens/InvoicesScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
+import { UsersScreen, UserFormScreen } from "./screens/users";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 
 type NavState = { screen: string; params?: Record<string, any> };
@@ -61,6 +62,7 @@ const SCREEN_SLUGS = [
   "simulados",
   "simulados-tentativas",
   "tenants",
+  "users",
 ];
 
 function hashToNav(hash: string): NavState {
@@ -128,6 +130,14 @@ function hashToNav(hash: string): NavState {
     return { screen: "tenants" };
   }
 
+  if (seg0 === "users") {
+    if (!seg1) return { screen: "users" };
+    if (seg1 === "novo") return { screen: "users-form", params: { userId: null } };
+    const id = parseInt(seg1, 10);
+    if (!isNaN(id)) return { screen: "users-form", params: { userId: id } };
+    return { screen: "users" };
+  }
+
   if (seg0 && SCREEN_SLUGS.includes(seg0)) return { screen: seg0 };
   return { screen: "dashboard" };
 }
@@ -161,6 +171,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "tenants-form") {
     const id = nav.params?.tenantId;
     return id != null ? `#/tenants/${id}` : "#/tenants/novo";
+  }
+  if (nav.screen === "users-form") {
+    const id = nav.params?.userId;
+    return id != null ? `#/users/${id}` : "#/users/novo";
   }
   return `#/${nav.screen}`;
 }
@@ -211,6 +225,7 @@ function AppContent() {
   }, []);
 
   const canManageTenants = user?.role === "super_admin";
+  const canManageUsers = user?.role === "super_admin" || user?.role === "admin";
 
   // determina item ativo na sidebar (sem sub-rota)
   const activeItem = nav.screen.startsWith("alunos")
@@ -225,6 +240,8 @@ function AppContent() {
     ? "simulados"
     : nav.screen.startsWith("tenants")
     ? "tenants"
+    : nav.screen.startsWith("users")
+    ? "users"
     : nav.screen;
 
   if (isLoading || !fontsReady) {
@@ -271,6 +288,30 @@ function AppContent() {
       );
     }
 
+    if (!canManageUsers && (nav.screen === "users" || nav.screen === "users-form")) {
+      return (
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="shield-outline" size={18} color="#B45309" />
+              <View style={{ width: 8 }} />
+              <Text className="text-base font-semibold text-amber-800">Acesso negado</Text>
+            </View>
+            <Text className="text-sm text-amber-700 mb-4">
+              Seu perfil não possui permissão para acessar a gestão de usuários.
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigate("dashboard")}
+              className="self-start px-4 py-2 rounded-xl bg-amber-600"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Voltar ao dashboard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
     switch (nav.screen) {
       case "alunos": return <StudentsScreen navigate={navigate} />;
       case "alunos-form": return <StudentFormScreen navigate={navigate} studentId={nav.params?.studentId ?? null} />;
@@ -290,6 +331,8 @@ function AppContent() {
       case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
+      case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
+      case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       default: return <DashboardScreen />;
     }
   };
@@ -301,6 +344,7 @@ function AppContent() {
           activeItem={activeItem}
           onSelectItem={(s) => navigate(s)}
           canManageTenants={canManageTenants}
+          canManageUsers={canManageUsers}
         />
         <View className="flex-1 flex-col overflow-hidden">
           <Header />

@@ -32,18 +32,22 @@ type SidebarProps = {
   activeItem?: string;
   onSelectItem?: (id: string) => void;
   canManageTenants?: boolean;
+  canManageUsers?: boolean;
 };
 
 export default function Sidebar({
   activeItem: externalActive,
   onSelectItem,
   canManageTenants = false,
+  canManageUsers = false,
 }: SidebarProps) {
   const [internalActive, setInternalActive] = useState("dashboard");
   const activeItem = externalActive ?? internalActive;
-  const visibleMenuItems = canManageTenants
-    ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }, ...menuItems]
-    : menuItems;
+  const visibleMenuItems = [
+    ...(canManageTenants ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }] : []),
+    ...(canManageUsers ? [{ id: "users", label: "Usuários", icon: "people-outline" as const }] : []),
+    ...menuItems,
+  ];
 
   const handlePress = (id: string) => {
     setInternalActive(id);

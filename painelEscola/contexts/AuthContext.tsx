@@ -6,7 +6,7 @@ export type AuthUser = {
   name: string;
   email: string;
   role: string;
-  tenant_id: string;
+  tenant_id: number | null;
   password_change_required?: boolean;
 };
 
