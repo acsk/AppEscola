@@ -31,14 +31,19 @@ const otherItems: NavItem[] = [];
 type SidebarProps = {
   activeItem?: string;
   onSelectItem?: (id: string) => void;
+  canManageTenants?: boolean;
 };
 
 export default function Sidebar({
   activeItem: externalActive,
   onSelectItem,
+  canManageTenants = false,
 }: SidebarProps) {
   const [internalActive, setInternalActive] = useState("dashboard");
   const activeItem = externalActive ?? internalActive;
+  const visibleMenuItems = canManageTenants
+    ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }, ...menuItems]
+    : menuItems;
 
   const handlePress = (id: string) => {
     setInternalActive(id);
@@ -99,7 +104,7 @@ export default function Sidebar({
         <Text className="text-xs font-semibold text-gray-400 px-3 mb-2 tracking-widest uppercase">
           Menu
         </Text>
-        {menuItems.map(renderItem)}
+        {visibleMenuItems.map(renderItem)}
 
         {otherItems.length > 0 && (
           <>

@@ -6,8 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
-    "web:build": "expo export --platform web && mkdir -p dist/fonts && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf dist/fonts/Ionicons.ttf && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf dist/fonts/Feather.ttf"
+    "web": "mkdir -p fonts && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf fonts/Ionicons.ttf && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf fonts/Feather.ttf && expo start --web",
+    "web:build": "mkdir -p dist/fonts && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf dist/fonts/Ionicons.ttf && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf dist/fonts/Feather.ttf && expo export --platform web && mkdir -p dist/fonts && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf dist/fonts/Ionicons.ttf && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf dist/fonts/Feather.ttf"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

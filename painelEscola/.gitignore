@@ -10,6 +10,8 @@ expo-env.d.ts
 
 # dist: commitar para deploy, mas ignorar node_modules da raiz do projeto
 # dist/assets/node_modules contém as fontes dos ícones — deve ser commitado
+# fonts/: pasta com fontes de ícones (Ionicons, Feather) — deve ser commitada
+# dist/fonts/: idem, para produção
 
 # Native
 .kotlin/

@@ -1,8 +1,9 @@
 import "./global.css";
 import { useState, useEffect } from "react";
 import { loadAsync } from "expo-font";
+import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, Text, TouchableOpacity } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Sidebar from "./components/Sidebar";
@@ -23,6 +24,8 @@ import EnrollmentsScreen from "./screens/matriculas";
 import EnrollmentFormScreen from "./screens/matriculas/EnrollmentFormScreen";
 import InvoicesScreen from "./screens/InvoicesScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
+import TenantsScreen from "./screens/tenants/TenantsScreen";
+import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 
 type NavState = { screen: string; params?: Record<string, any> };
 
@@ -56,6 +59,7 @@ const SCREEN_SLUGS = [
   "pacotes",
   "simulados",
   "simulados-tentativas",
+  "tenants",
 ];
 
 function hashToNav(hash: string): NavState {
@@ -115,6 +119,14 @@ function hashToNav(hash: string): NavState {
     return { screen: "simulados" };
   }
 
+  if (seg0 === "tenants") {
+    if (!seg1) return { screen: "tenants" };
+    if (seg1 === "novo") return { screen: "tenants-form", params: { tenantId: null } };
+    const id = parseInt(seg1, 10);
+    if (!isNaN(id)) return { screen: "tenants-form", params: { tenantId: id } };
+    return { screen: "tenants" };
+  }
+
   if (seg0 && SCREEN_SLUGS.includes(seg0)) return { screen: seg0 };
   return { screen: "dashboard" };
 }
@@ -144,6 +156,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "turmas-form") {
     const id = nav.params?.classId;
     return id != null ? `#/turmas/${id}` : "#/turmas/nova";
+  }
+  if (nav.screen === "tenants-form") {
+    const id = nav.params?.tenantId;
+    return id != null ? `#/tenants/${id}` : "#/tenants/novo";
   }
   return `#/${nav.screen}`;
 }
@@ -193,6 +209,8 @@ function AppContent() {
     };
   }, []);
 
+  const canManageTenants = user?.role === "super_admin";
+
   // determina item ativo na sidebar (sem sub-rota)
   const activeItem = nav.screen.startsWith("alunos")
     ? "alunos"
@@ -204,6 +222,8 @@ function AppContent() {
     ? "turmas"
     : nav.screen.startsWith("simulados")
     ? "simulados"
+    : nav.screen.startsWith("tenants")
+    ? "tenants"
     : nav.screen;
 
   if (isLoading || !fontsReady) {
@@ -222,6 +242,30 @@ function AppContent() {
   }
 
   const renderScreen = () => {
+    if (!canManageTenants && (nav.screen === "tenants" || nav.screen === "tenants-form")) {
+      return (
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="shield-outline" size={18} color="#B45309" />
+              <View style={{ width: 8 }} />
+              <Text className="text-base font-semibold text-amber-800">Acesso negado</Text>
+            </View>
+            <Text className="text-sm text-amber-700 mb-4">
+              Somente usuários com perfil super admin podem acessar a gestão de tenants.
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigate("dashboard")}
+              className="self-start px-4 py-2 rounded-xl bg-amber-600"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Voltar ao dashboard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
     switch (nav.screen) {
       case "alunos": return <StudentsScreen navigate={navigate} />;
       case "alunos-form": return <StudentFormScreen navigate={navigate} studentId={nav.params?.studentId ?? null} />;
@@ -239,6 +283,8 @@ function AppContent() {
       case "simulados": return <ExamsScreen navigate={navigate} />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
       case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
+      case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
+      case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
       default: return <DashboardScreen />;
     }
   };
@@ -246,7 +292,11 @@ function AppContent() {
   return (
     <SafeAreaProvider>
       <View className="flex-1 flex-row" style={{ backgroundColor: "#EEEEFF" }}>
-        <Sidebar activeItem={activeItem} onSelectItem={(s) => navigate(s)} />
+        <Sidebar
+          activeItem={activeItem}
+          onSelectItem={(s) => navigate(s)}
+          canManageTenants={canManageTenants}
+        />
         <View className="flex-1 flex-col overflow-hidden">
           <Header />
           {renderScreen()}
