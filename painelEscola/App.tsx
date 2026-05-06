@@ -38,8 +38,8 @@ function ensureIconFontsLoaded() {
 
   if (!iconFontsPromise) {
     iconFontsPromise = loadAsync({
-      ionicons: "/fonts/Ionicons.ttf",
-      feather: "/fonts/Feather.ttf",
+      ionicons: require("./assets/fonts/Ionicons.ttf"),
+      feather: require("./assets/fonts/Feather.ttf"),
     }).then(() => undefined);
   }
 
