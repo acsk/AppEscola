@@ -122,11 +122,44 @@ Payload completo (campos opcionais incluídos):
 }
 ```
 
+Payload completo (alternativo com `address` aninhado):
+
+```json
+{
+  "corporate_name": "Escola Exemplo LTDA",
+  "trade_name": "Escola Exemplo",
+  "name": "Escola Exemplo",
+  "slug": "escola-exemplo",
+  "cnpj": "12.345.678/0001-99",
+  "email": "contato@escolaexemplo.com.br",
+  "phone": "(11) 3000-0000",
+  "whatsapp": "(11) 90000-0000",
+  "address": {
+    "zip_code": "01000-000",
+    "street": "Rua A",
+    "number": "100",
+    "complement": "Sala 1",
+    "neighborhood": "Centro",
+    "city": "São Paulo",
+    "state": "SP"
+  },
+  "status": "active",
+  "settings": {
+    "timezone": "America/Sao_Paulo"
+  },
+  "admin_name": "Admin Escola",
+  "admin_email": "admin@escolaexemplo.com.br",
+  "admin_password": "12345678",
+  "admin_password_confirmation": "12345678"
+}
+```
+
 Regras importantes no create:
 
 - `admin_email` deve ser único na tabela de usuários.
 - `admin_password` mínimo de 6 caracteres.
 - `admin_password_confirmation` deve ser idêntico ao `admin_password`.
+- O backend aceita endereço no formato plano (`zip_code`, `street`, etc.) ou em `address` aninhado.
 - A criação é transacional: tenant e usuário admin são criados juntos.
 - O usuário criado automaticamente terá:
   - `role = admin`
@@ -187,6 +220,24 @@ Exemplo:
 {
   "trade_name": "Escola Exemplo Atualizada",
   "phone": "(11) 3333-0000",
+  "status": "active"
+}
+```
+
+Exemplo com `address` aninhado:
+
+```json
+{
+  "trade_name": "Escola Exemplo Atualizada",
+  "address": {
+    "zip_code": "57300-360",
+    "street": "Rua Exemplo",
+    "number": "123",
+    "complement": "Sala 2",
+    "neighborhood": "Centro",
+    "city": "Arapiraca",
+    "state": "AL"
+  },
   "status": "active"
 }
 ```

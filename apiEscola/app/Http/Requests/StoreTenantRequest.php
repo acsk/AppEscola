@@ -7,6 +7,29 @@ use Illuminate\Validation\Rule;
 
 class StoreTenantRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $address = $this->input('address');
+
+        if (! is_array($address)) {
+            return;
+        }
+
+        $fields = ['zip_code', 'street', 'number', 'complement', 'neighborhood', 'city', 'state'];
+        $merge = [];
+
+        foreach ($fields as $field) {
+            // Mantem precedencia para o formato plano quando enviado.
+            if (! $this->exists($field) && array_key_exists($field, $address)) {
+                $merge[$field] = $address[$field];
+            }
+        }
+
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
