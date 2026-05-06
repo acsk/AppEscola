@@ -181,7 +181,7 @@ export default function CoursesScreen({ navigate }: Props) {
           >
             Status
           </Text>
-          <View style={{ width: 104 }} />
+          <View style={{ width: 72 }} />
         </View>
 
         {loading ? (
@@ -223,19 +223,16 @@ export default function CoursesScreen({ navigate }: Props) {
                 />
               </View>
               <View
-                style={{ width: 104 }}
+                style={{ width: 72 }}
                 className="flex-row justify-end gap-2"
               >
                 <TouchableOpacity
                   onPress={() =>
                     navigate("cursos-form", { courseId: item.id })
                   }
-                  className="flex-row items-center px-2.5 py-1.5 bg-violet-50 rounded-lg gap-1"
+                  className="p-1.5 bg-violet-50 rounded-lg"
                 >
-                  <Ionicons name="list-outline" size={14} color="#7C3AED" />
-                  <Text className="text-xs font-semibold text-violet-600">
-                    Planos
-                  </Text>
+                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setDeleteId(item.id)}

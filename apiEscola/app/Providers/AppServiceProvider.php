@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,35 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Model::saving(function (Model $model): void {
+            // Campos técnicos/funcionais que não devem ser forçados para caixa alta.
+            $excluded = [
+                'password',
+                'remember_token',
+                'email',
+                'role',
+                'status',
+                'billing_cycle',
+                'weekday',
+                'period',
+                'slug',
+            ];
+
+            foreach ($model->getAttributes() as $attribute => $value) {
+                if (!is_string($value)) {
+                    continue;
+                }
+
+                if (
+                    in_array($attribute, $excluded, true)
+                    || str_contains($attribute, 'token')
+                    || str_contains($attribute, 'hash')
+                ) {
+                    continue;
+                }
+
+                $model->setAttribute($attribute, mb_strtoupper(trim($value), 'UTF-8'));
+            }
+        });
     }
 }

@@ -36,7 +36,7 @@ class SchoolClassController extends Controller
     )]
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = SchoolClass::query()->with(['course', 'schedules']);
+        $query = SchoolClass::query()->with(['course', 'schedules.subject', 'schedules.teacher', 'schedules.teachers']);
         $this->applyTenantScope($query, $request);
 
         $query
@@ -65,7 +65,7 @@ class SchoolClassController extends Controller
         $tenantId = $this->getTenantId($request);
 
         $schoolClass = SchoolClass::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
-        $schoolClass->load(['course', 'schedules']);
+        $schoolClass->load(['course', 'schedules.subject', 'schedules.teacher', 'schedules.teachers']);
 
         return $this->created(new SchoolClassResource($schoolClass));
     }
@@ -85,7 +85,7 @@ class SchoolClassController extends Controller
     {
         $this->authorizeTenant($request, $schoolClass->tenant_id);
 
-        $schoolClass->load(['course', 'schedules']);
+        $schoolClass->load(['course', 'schedules.subject', 'schedules.teacher', 'schedules.teachers']);
 
         return $this->success(new SchoolClassResource($schoolClass));
     }
@@ -107,7 +107,7 @@ class SchoolClassController extends Controller
         $this->authorizeTenant($request, $schoolClass->tenant_id);
 
         $schoolClass->update($request->validated());
-        $schoolClass->load(['course', 'schedules']);
+        $schoolClass->load(['course', 'schedules.subject', 'schedules.teacher', 'schedules.teachers']);
 
         return $this->success(new SchoolClassResource($schoolClass));
     }

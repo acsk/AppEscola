@@ -23,6 +23,11 @@ type TenantOption = {
   label: string;
 };
 
+type SubjectOption = {
+  id: number;
+  name: string;
+};
+
 type Form = {
   tenant_id: string;
   name: string;
@@ -32,6 +37,7 @@ type Form = {
   password: string;
   password_confirmation: string;
   password_change_required: boolean;
+  subject_ids: number[];
 };
 
 const EMPTY: Form = {
@@ -43,6 +49,7 @@ const EMPTY: Form = {
   password: "",
   password_confirmation: "",
   password_change_required: true,
+  subject_ids: [],
 };
 
 const ROLE_OPTIONS = [
@@ -60,18 +67,19 @@ const STATUS_OPTIONS = [
 
 export default function UserFormScreen({ navigate, userId }: Props) {
   const { user } = useAuth();
-  const isSuperAdmin = user?.role === "super_admin";
+  const isGlobalSuperAdmin = user?.role === "super_admin" && user?.tenant_id == null;
   const isEdit = userId !== null;
 
   const [form, setForm] = useState<Form>(EMPTY);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
-    if (!isSuperAdmin) return;
+    if (!isGlobalSuperAdmin) return;
 
     const loadTenants = async () => {
       try {
@@ -92,11 +100,11 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     };
 
     loadTenants();
-  }, [isSuperAdmin]);
+  }, [isGlobalSuperAdmin]);
 
   useEffect(() => {
     if (!isEdit || !userId) {
-      if (!isSuperAdmin && user?.tenant_id != null) {
+      if (!isGlobalSuperAdmin && user?.tenant_id != null) {
         setForm((prev) => ({ ...prev, tenant_id: String(user.tenant_id) }));
       }
       return;
@@ -120,6 +128,11 @@ export default function UserFormScreen({ navigate, userId }: Props) {
           password_change_required: !!u.password_change_required,
           password: "",
           password_confirmation: "",
+          subject_ids: Array.isArray(u.subjects)
+            ? u.subjects.map((s: any) => s.id ?? s)
+            : Array.isArray(u.subject_ids)
+            ? u.subject_ids
+            : [],
         }));
       } catch (e: any) {
         if (e.response?.status === 403) setForbidden(true);
@@ -129,24 +142,58 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     };
 
     loadUser();
-  }, [isEdit, isSuperAdmin, user?.tenant_id, userId]);
+  }, [isEdit, isGlobalSuperAdmin, user?.tenant_id, userId]);
+
+  useEffect(() => {
+    if (form.role !== "professor") {
+      setSubjects([]);
+      return;
+    }
+
+    const loadSubjects = async () => {
+      try {
+        const { data } = await api.get("/subjects", {
+          params: { per_page: 200, status: "active" },
+        });
+        const list = Array.isArray(data.data) ? data.data : [];
+        setSubjects(list.map((s: any) => ({ id: s.id, name: s.name })));
+      } catch {
+        setSubjects([]);
+      }
+    };
+
+    loadSubjects();
+  }, [form.role]);
 
   const title = useMemo(() => (isEdit ? "Editar Usuario" : "Novo Usuario"), [isEdit]);
 
   const roleOptions = useMemo(
-    () => (isSuperAdmin ? ROLE_OPTIONS : ROLE_OPTIONS.filter((opt) => opt.value !== "super_admin")),
-    [isSuperAdmin]
+    () =>
+      isGlobalSuperAdmin
+        ? ROLE_OPTIONS
+        : ROLE_OPTIONS.filter((opt) => opt.value !== "super_admin"),
+    [isGlobalSuperAdmin]
   );
 
-  const showTenantField = isSuperAdmin && form.role !== "super_admin";
+  const showTenantField = isGlobalSuperAdmin && form.role !== "super_admin";
 
   const onRoleChange = (nextRole: string) => {
     setForm((prev) => ({
       ...prev,
       role: nextRole,
       tenant_id: nextRole === "super_admin" ? "" : prev.tenant_id,
+      subject_ids: nextRole === "professor" ? prev.subject_ids : [],
     }));
     setErrors((prev) => ({ ...prev, role: "", tenant_id: "" }));
+  };
+
+  const toggleSubject = (id: number) => {
+    setForm((prev) => ({
+      ...prev,
+      subject_ids: prev.subject_ids.includes(id)
+        ? prev.subject_ids.filter((s) => s !== id)
+        : [...prev.subject_ids, id],
+    }));
   };
 
   const save = async () => {
@@ -195,12 +242,16 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       password_change_required: form.password_change_required,
     };
 
-    if (isSuperAdmin) {
+    if (isGlobalSuperAdmin) {
       payload.tenant_id = form.role === "super_admin" ? null : Number(form.tenant_id);
     }
 
-    if (!isSuperAdmin && user?.tenant_id != null) {
+    if (!isGlobalSuperAdmin && user?.tenant_id != null) {
       payload.tenant_id = user.tenant_id;
+    }
+
+    if (form.role === "professor") {
+      payload.subject_ids = form.subject_ids;
     }
 
     if (form.password) {
@@ -277,14 +328,6 @@ export default function UserFormScreen({ navigate, userId }: Props) {
           />
         )}
 
-        {!isSuperAdmin && (
-          <FormInput
-            label="Tenant"
-            value={form.tenant_id ? `Tenant #${form.tenant_id}` : "Do usuario autenticado"}
-            editable={false}
-          />
-        )}
-
         <FormInput
           label="Nome"
           value={form.name}
@@ -335,6 +378,35 @@ export default function UserFormScreen({ navigate, userId }: Props) {
           </View>
         </View>
       </View>
+
+      {form.role === "professor" && (
+        <View className="bg-white rounded-2xl p-5 mb-5" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
+          <Text className="text-base font-semibold text-gray-800 mb-1">Disciplinas</Text>
+          <Text className="text-xs text-gray-400 mb-3">Selecione as disciplinas que este professor leciona</Text>
+          {subjects.length === 0 ? (
+            <Text className="text-sm text-gray-400">Nenhuma disciplina disponivel.</Text>
+          ) : (
+            subjects.map((s) => {
+              const selected = form.subject_ids.includes(s.id);
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  className="flex-row items-center py-2"
+                  onPress={() => toggleSubject(s.id)}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons
+                    name={selected ? "checkbox" : "square-outline"}
+                    size={20}
+                    color={selected ? "#7C3AED" : "#9CA3AF"}
+                  />
+                  <Text className="text-sm text-gray-700 ml-2">{s.name}</Text>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+      )}
 
       <View className="bg-white rounded-2xl p-5 mb-5" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
         <Text className="text-base font-semibold text-gray-800 mb-3">Senha</Text>

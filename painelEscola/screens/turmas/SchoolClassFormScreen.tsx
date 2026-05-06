@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
 import { maskTime, isoToDisplay, displayToISO } from "../../utils/masks";
 import FormInput from "../../components/ui/FormInput";
+import SearchableSelect from "../../components/ui/SearchableSelect";
 import DatePickerInput from "../../components/ui/DatePickerInput";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -20,9 +21,17 @@ import { usePeriods, domainToOptions } from "../../hooks/useDomains";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Course = { id: number; name: string };
+type Subject = { id: number; name: string };
+type Teacher = { id: number; name: string };
 
 type Schedule = {
   id: number;
+  subject_id: number | null;
+  teacher_id: number | null;
+  teacher_ids?: number[];
+  subject?: { id: number; name: string } | null;
+  teacher?: { id: number; name: string } | null;
+  teachers?: Array<{ id: number; name: string }>;
   weekday: string;
   start_time: string;
   end_time: string;
@@ -41,6 +50,8 @@ type ClassForm = {
 };
 
 type ScheduleForm = {
+  subject_id: string;
+  teacher_ids: string[];
   weekday: string;
   start_time: string;
   end_time: string;
@@ -61,6 +72,8 @@ const EMPTY_CLASS: ClassForm = {
 };
 
 const EMPTY_SCHEDULE: ScheduleForm = {
+  subject_id: "",
+  teacher_ids: [],
   weekday: "monday",
   start_time: "",
   end_time: "",
@@ -107,8 +120,37 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
   // ── Lookup data ──────────────────────────────────────────────────────────────
   const [courses, setCourses] = useState<Course[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const periods = usePeriods();
   const periodOptions = domainToOptions(periods);
+
+  const courseOptions = useMemo(
+    () => courses.map((c) => ({ value: String(c.id), label: (c.name ?? "").toUpperCase() })),
+    [courses]
+  );
+
+  const subjectOptions = useMemo(
+    () => subjects.map((s) => ({ value: String(s.id), label: (s.name ?? "").toUpperCase() })),
+    [subjects]
+  );
+
+  const teacherOptions = useMemo(
+    () => teachers.map((t) => ({ value: String(t.id), label: (t.name ?? "").toUpperCase() })),
+    [teachers]
+  );
+
+  const subjectNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    subjects.forEach((s) => map.set(s.id, s.name));
+    return map;
+  }, [subjects]);
+
+  const teacherNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    teachers.forEach((t) => map.set(t.id, t.name));
+    return map;
+  }, [teachers]);
 
   // ── Class form ───────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(isEdit);
@@ -131,12 +173,36 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
   // ── Load on mount ─────────────────────────────────────────────────────────────
   useEffect(() => {
+    const extractList = (payload: any): any[] => {
+      const root = payload?.body ?? payload;
+      if (Array.isArray(root?.data)) return root.data;
+      if (Array.isArray(root)) return root;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
+    };
+
     (async () => {
       try {
-        const { data } = await api.get("/courses", {
-          params: { status: "active", per_page: 200 },
-        });
-        setCourses(data.data ?? []);
+        const [{ data: coursesRaw }, { data: subjectsRaw }, { data: teachersRaw }] = await Promise.all([
+          api.get("/courses", { params: { status: "active", per_page: 200 } }),
+          api.get("/subjects", { params: { status: "active", per_page: 200 } }),
+          api.get("/users", {
+            params: { role: "professor", per_page: 200 },
+          }),
+        ]);
+
+        const coursesData = extractList(coursesRaw);
+        const subjectsData = extractList(subjectsRaw);
+        const teachersData = extractList(teachersRaw);
+
+        setCourses(Array.isArray(coursesData) ? coursesData : []);
+        setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
+        setTeachers(
+          (Array.isArray(teachersData) ? teachersData : []).map((t: any) => ({
+            id: t.id,
+            name: t.name,
+          }))
+        );
       } catch {}
     })();
 
@@ -148,7 +214,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         const data = raw.body ?? raw;
         setForm({
           course_id: String(data.course_id ?? data.course?.id ?? ""),
-          name: data.name ?? "",
+          name: (data.name ?? "").toUpperCase(),
           start_date: data.start_date ?? "",
           end_date: data.end_date ?? "",
           year: String(data.year ?? CURRENT_YEAR),
@@ -185,7 +251,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
     try {
       const payload: Record<string, any> = {
         course_id: Number(form.course_id),
-        name: form.name,
+        name: form.name.toUpperCase(),
         start_date: form.start_date,
         end_date: form.end_date,
         status: form.status,
@@ -220,12 +286,23 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   };
 
   const openEditSchedule = (s: Schedule) => {
+    const teacherIds =
+      Array.isArray(s.teacher_ids) && s.teacher_ids.length > 0
+        ? s.teacher_ids.map((id) => String(id))
+        : Array.isArray(s.teachers) && s.teachers.length > 0
+        ? s.teachers.map((t) => String(t.id))
+        : s.teacher_id != null
+        ? [String(s.teacher_id)]
+        : [];
+
     setEditScheduleId(s.id);
     setScheduleForm({
+      subject_id: s.subject_id != null ? String(s.subject_id) : "",
+      teacher_ids: teacherIds,
       weekday: s.weekday,
       start_time: s.start_time.slice(0, 5),
       end_time: s.end_time.slice(0, 5),
-      room: s.room ?? "",
+      room: (s.room ?? "").toUpperCase(),
     });
     setScheduleErrors({});
     setScheduleModal(true);
@@ -233,6 +310,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
   const saveSchedule = async () => {
     const e: Record<string, string> = {};
+    if (!scheduleForm.subject_id) e.subject_id = "Selecione a disciplina.";
+    if (scheduleForm.teacher_ids.length === 0) e.teacher_ids = "Selecione ao menos um professor.";
     if (!scheduleForm.start_time) e.start_time = "Hora de início obrigatória.";
     if (!scheduleForm.end_time) e.end_time = "Hora de término obrigatória.";
     if (Object.keys(e).length > 0) { setScheduleErrors(e); return; }
@@ -240,11 +319,16 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
     setSavingSchedule(true);
     setScheduleErrors({});
     try {
+      const normalizedTeacherIds = scheduleForm.teacher_ids.map((id) => Number(id));
+
       const payload = {
+        subject_id: Number(scheduleForm.subject_id),
+        teacher_ids: normalizedTeacherIds,
+        teacher_id: normalizedTeacherIds[0],
         weekday: scheduleForm.weekday,
         start_time: scheduleForm.start_time,
         end_time: scheduleForm.end_time,
-        room: scheduleForm.room.trim() || undefined,
+        room: scheduleForm.room.trim().toUpperCase() || undefined,
       };
 
       let updated: Schedule;
@@ -288,6 +372,16 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   };
 
   const fmtTime = (t: string) => t.slice(0, 5);
+
+  const toggleScheduleTeacher = (teacherId: string) => {
+    setScheduleForm((prev) => ({
+      ...prev,
+      teacher_ids: prev.teacher_ids.includes(teacherId)
+        ? prev.teacher_ids.filter((id) => id !== teacherId)
+        : [...prev.teacher_ids, teacherId],
+    }));
+    setScheduleErrors((prev) => ({ ...prev, teacher_ids: "" }));
+  };
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -350,45 +444,28 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
             {/* Curso */}
             <View className="mb-3">
-              <Text className="text-xs font-medium text-gray-600 mb-1.5">
-                Curso <Text className="text-red-500">*</Text>
-              </Text>
-              <select
+              <SearchableSelect
+                label="Curso"
+                required
                 value={form.course_id}
-                onChange={(e: any) =>
-                  setForm({ ...form, course_id: e.target.value })
-                }
-                style={{
-                  width: "100%",
-                  border: `1px solid ${errors.course_id ? "#EF4444" : "#E5E7EB"}`,
-                  borderRadius: 8,
-                  padding: "9px 12px",
-                  fontSize: 14,
-                  color: form.course_id ? "#374151" : "#9CA3AF",
-                  backgroundColor: "white",
+                onChange={(value) => {
+                  setForm({ ...form, course_id: value });
+                  setErrors((prev) => ({ ...prev, course_id: "" }));
                 }}
-              >
-                <option value="">Selecione o curso</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              {errors.course_id && (
-                <Text className="text-xs text-red-500 mt-1">
-                  {errors.course_id}
-                </Text>
-              )}
+                options={courseOptions}
+                placeholder="SELECIONE O CURSO"
+                modalTitle="Selecionar Curso"
+                error={errors.course_id}
+              />
             </View>
 
             <FormInput
               label="Nome da Turma"
               required
               value={form.name}
-              onChangeText={(v) => setForm({ ...form, name: v })}
+              onChangeText={(v) => setForm({ ...form, name: v.toUpperCase() })}
               error={errors.name}
-              placeholder="Ex: TURMA 1"
+              placeholder="EX: TURMA 1"
             />
 
             <View className="flex-row gap-4 mt-1">
@@ -593,6 +670,21 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                           {fmtTime(s.start_time)} – {fmtTime(s.end_time)}
                         </Text>
                       </View>
+                      <View className="flex-1">
+                        <Text className="text-xs text-gray-600" numberOfLines={1}>
+                          {s.subject?.name ?? (s.subject_id ? subjectNameById.get(s.subject_id) : null) ?? "Sem disciplina"}
+                        </Text>
+                        <Text className="text-xs text-gray-500" numberOfLines={1}>
+                          {Array.isArray(s.teachers) && s.teachers.length > 0
+                            ? s.teachers.map((t) => t.name).join(", ")
+                            : Array.isArray(s.teacher_ids) && s.teacher_ids.length > 0
+                            ? s.teacher_ids
+                                .map((id) => teacherNameById.get(id))
+                                .filter(Boolean)
+                                .join(", ") || "Sem professor"
+                            : s.teacher?.name ?? (s.teacher_id ? teacherNameById.get(s.teacher_id) : null) ?? "Sem professor"}
+                        </Text>
+                      </View>
                       {s.room && (
                         <View className="flex-row items-center gap-1 flex-1">
                           <Ionicons
@@ -672,6 +764,72 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         }
       >
         <View className="mb-3">
+          <SearchableSelect
+            label="Disciplina"
+            required
+            value={scheduleForm.subject_id}
+            onChange={(value) => {
+              setScheduleForm({ ...scheduleForm, subject_id: value });
+              setScheduleErrors((prev) => ({ ...prev, subject_id: "" }));
+            }}
+            options={subjectOptions}
+            placeholder="SELECIONE A DISCIPLINA"
+            modalTitle="Selecionar Disciplina"
+            error={scheduleErrors.subject_id}
+          />
+        </View>
+
+        <View className="mb-3">
+          <Text className="text-xs font-medium text-gray-600 mb-1.5">
+            Professores <Text className="text-red-500">*</Text>
+          </Text>
+
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: scheduleErrors.teacher_ids ? "#EF4444" : "#E5E7EB",
+              borderRadius: 8,
+              padding: 10,
+              maxHeight: 180,
+              backgroundColor: "white",
+            }}
+          >
+            <ScrollView>
+              {teachers.map((t) => {
+                const value = String(t.id);
+                const selected = scheduleForm.teacher_ids.includes(value);
+
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    className="flex-row items-center py-1.5"
+                    onPress={() => toggleScheduleTeacher(value)}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons
+                      name={selected ? "checkbox" : "square-outline"}
+                      size={18}
+                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                    />
+                    <Text className="text-sm text-gray-700 ml-2">{t.name.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {!!scheduleErrors.teacher_ids && (
+            <Text className="text-xs text-red-500 mt-1">{scheduleErrors.teacher_ids}</Text>
+          )}
+
+          {teachers.length === 0 && (
+            <Text className="text-xs text-amber-600 mt-1">
+              Nenhum professor encontrado. Verifique se há usuários com perfil PROFESSOR.
+            </Text>
+          )}
+        </View>
+
+        <View className="mb-3">
           <Text className="text-xs font-medium text-gray-600 mb-1.5">
             Dia da Semana <Text className="text-red-500">*</Text>
           </Text>
@@ -730,9 +888,9 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         <FormInput
           label="Sala"
           value={scheduleForm.room}
-          onChangeText={(v) => setScheduleForm({ ...scheduleForm, room: v })}
+          onChangeText={(v) => setScheduleForm({ ...scheduleForm, room: v.toUpperCase() })}
           error={scheduleErrors.room}
-          placeholder="Ex: Sala 2"
+          placeholder="EX: SALA 2"
         />
       </Modal>
 

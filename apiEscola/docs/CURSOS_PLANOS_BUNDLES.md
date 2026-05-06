@@ -13,6 +13,7 @@
 3. [Pacotes de Cursos (Bundles)](#3-pacotes-de-cursos-bundles)
 4. [Ciclos de Cobrança](#4-ciclos-de-cobrança)
 5. [Fluxo sugerido para montagem do frontend](#5-fluxo-sugerido-para-montagem-do-frontend)
+6. [Professores no contexto de Cursos](#6-professores-no-contexto-de-cursos)
 
 ---
 
@@ -410,3 +411,67 @@ Mapeamento de campos:
 | Exibir bundle | `GET` | `/course-bundles/{id}` |
 | Atualizar bundle | `PUT` | `/course-bundles/{id}` |
 | Remover bundle | `DELETE` | `/course-bundles/{id}` |
+
+---
+
+## 6. Professores no contexto de Cursos
+
+O professor é um **tipo de usuário** (`role = professor`).
+
+No modelo atual, o vínculo de professor **não é direto no curso**. A associação acontece no horário da turma:
+
+`Course -> SchoolClass -> ClassSchedule (teacher_id + subject_id)`
+
+### Como o frontend deve operar
+
+1. Buscar professores do tenant:
+
+```http
+GET /users?role=professor
+Authorization: Bearer {token}
+```
+
+2. Buscar disciplinas (para o select de matéria):
+
+```http
+GET /subjects
+Authorization: Bearer {token}
+```
+
+3. Criar/editar horário da turma informando o professor:
+
+```http
+POST /school-classes/{schoolClass}/schedules
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+```json
+{
+  "subject_id": 3,
+  "teacher_ids": [7, 9],
+  "weekday": "monday",
+  "start_time": "08:00",
+  "end_time": "09:00",
+  "room": "Sala 1"
+}
+```
+
+```http
+PUT /class-schedules/{classSchedule}
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+```json
+{
+  "teacher_ids": [9, 12]
+}
+```
+
+### Observações importantes para o front
+
+- Para "curso com professores", o frontend deve derivar isso pelas turmas e seus horários.
+- Não existe, por padrão, vínculo direto `course_id -> teacher_id`.
+- `teacher_ids` deve conter apenas usuários com `role=professor`.
+- `teacher_id` segue disponível apenas para compatibilidade legado (um único professor).

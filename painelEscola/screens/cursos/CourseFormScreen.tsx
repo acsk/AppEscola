@@ -102,10 +102,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
       setLoading(true);
       try {
         const { data } = await api.get(`/courses/${courseId}`);
+        const c = data.body ?? data.data ?? data;
         setForm({
-          name: data.name ?? "",
-          description: data.description ?? "",
-          status: data.status ?? "active",
+          name: c.name ?? "",
+          description: c.description ?? "",
+          status: c.status ?? "active",
         });
       } catch {}
       setLoading(false);

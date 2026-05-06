@@ -6,6 +6,7 @@ use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClassSchedule extends Model
@@ -44,5 +45,12 @@ class ClassSchedule extends Model
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_id');
+    }
+
+    public function teachers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'class_schedule_user')
+            ->withTimestamps()
+            ->withPivot('tenant_id');
     }
 }

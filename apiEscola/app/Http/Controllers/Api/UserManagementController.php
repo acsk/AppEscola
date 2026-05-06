@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\Subject;
 use App\Models\User;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
@@ -80,6 +82,8 @@ class UserManagementController extends Controller
             'role'                      => ['required', 'exists:domain_user_roles,slug'],
             'status'                    => ['nullable', 'exists:domain_statuses,slug'],
             'password_change_required'  => ['nullable', 'boolean'],
+            'subject_ids'               => ['nullable', 'array'],
+            'subject_ids.*'             => ['integer', 'exists:subjects,id'],
         ]);
     }
 
@@ -93,7 +97,66 @@ class UserManagementController extends Controller
             'role'                      => ['sometimes', 'exists:domain_user_roles,slug'],
             'status'                    => ['sometimes', 'exists:domain_statuses,slug'],
             'password_change_required'  => ['sometimes', 'boolean'],
+            'subject_ids'               => ['sometimes', 'array'],
+            'subject_ids.*'             => ['integer', 'exists:subjects,id'],
         ]);
+    }
+
+    private function syncProfessorSubjects(User $user, array $data): void
+    {
+        $hasSubjectIds = array_key_exists('subject_ids', $data);
+
+        if ($user->role !== 'professor') {
+            // Garante consistência: apenas professor pode manter vínculos de disciplinas.
+            $user->subjects()->detach();
+
+            if ($hasSubjectIds && ! empty($data['subject_ids'])) {
+                throw ValidationException::withMessages([
+                    'subject_ids' => ['A associação de disciplinas é permitida apenas para usuários com role professor.'],
+                ]);
+            }
+
+            return;
+        }
+
+        if (! $hasSubjectIds) {
+            return;
+        }
+
+        $subjectIds = collect($data['subject_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+
+        if ($subjectIds->isEmpty()) {
+            $user->subjects()->detach();
+
+            return;
+        }
+
+        $tenantId = (int) $user->tenant_id;
+
+        if (! $tenantId) {
+            throw ValidationException::withMessages([
+                'tenant_id' => ['Professor deve estar associado a um tenant para vincular disciplinas.'],
+            ]);
+        }
+
+        $validCount = Subject::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('id', $subjectIds)
+            ->count();
+
+        if ($validCount !== $subjectIds->count()) {
+            throw ValidationException::withMessages([
+                'subject_ids' => ['Uma ou mais disciplinas não pertencem ao tenant do professor.'],
+            ]);
+        }
+
+        $syncData = [];
+
+        foreach ($subjectIds as $subjectId) {
+            $syncData[$subjectId] = ['tenant_id' => $tenantId];
+        }
+
+        $user->subjects()->sync($syncData);
     }
 
     private function normalizeUpdateData(Request $request, User $target, array $data): array
@@ -144,7 +207,7 @@ class UserManagementController extends Controller
     {
         $this->ensureCanManageUsers($request);
 
-        $query = User::query();
+        $query = User::query()->with('subjects:id,name,status');
 
         $this->applyTenantScope($query, $request);
 
@@ -184,17 +247,23 @@ class UserManagementController extends Controller
         $validated = $this->validateStore($request);
         $data = $this->normalizeStoreData($request, $validated);
 
-        $user = User::create([
-            'tenant_id'                => $data['tenant_id'] ?? null,
-            'name'                     => $data['name'],
-            'email'                    => $data['email'],
-            'password'                 => $data['password'],
-            'role'                     => $data['role'],
-            'status'                   => $data['status'] ?? 'active',
-            'password_change_required' => (bool) ($data['password_change_required'] ?? false),
-        ]);
+        $user = DB::transaction(function () use ($data) {
+            $user = User::create([
+                'tenant_id'                => $data['tenant_id'] ?? null,
+                'name'                     => $data['name'],
+                'email'                    => $data['email'],
+                'password'                 => $data['password'],
+                'role'                     => $data['role'],
+                'status'                   => $data['status'] ?? 'active',
+                'password_change_required' => (bool) ($data['password_change_required'] ?? false),
+            ]);
 
-        return $this->created(new UserResource($user));
+            $this->syncProfessorSubjects($user, $data);
+
+            return $user;
+        });
+
+        return $this->created(new UserResource($user->load('subjects:id,name,status')));
     }
 
     #[OA\Get(
@@ -214,7 +283,7 @@ class UserManagementController extends Controller
         $this->ensureCanManageUsers($request);
         $this->ensureCanManageTargetUser($request, $user);
 
-        return $this->success(new UserResource($user));
+        return $this->success(new UserResource($user->load('subjects:id,name,status')));
     }
 
     #[OA\Put(
@@ -238,9 +307,12 @@ class UserManagementController extends Controller
         $validated = $this->validateUpdate($request, $user);
         $data = $this->normalizeUpdateData($request, $user, $validated);
 
-        $user->update($data);
+        DB::transaction(function () use ($user, $data) {
+            $user->update($data);
+            $this->syncProfessorSubjects($user, $data);
+        });
 
-        return $this->success(new UserResource($user->fresh()));
+        return $this->success(new UserResource($user->fresh()->load('subjects:id,name,status')));
     }
 
     #[OA\Delete(

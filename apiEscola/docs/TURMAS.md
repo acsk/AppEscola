@@ -92,7 +92,9 @@ Lista paginada de turmas com curso e horários embutidos.
           "end_time": "15:30:00",
           "room": "Sala 2",
           "subject_id": null,
-          "teacher_id": null
+          "teacher_id": null,
+          "teacher_ids": [],
+          "teachers": []
         },
         {
           "id": 2,
@@ -101,7 +103,9 @@ Lista paginada de turmas com curso e horários embutidos.
           "end_time": "15:30:00",
           "room": "Sala 2",
           "subject_id": null,
-          "teacher_id": null
+          "teacher_id": null,
+          "teacher_ids": [],
+          "teachers": []
         }
       ],
       "created_at": "2026-04-28T16:32:46.000000Z",
@@ -197,7 +201,7 @@ Os horários também vêm embutidos em `schedules[]` na resposta da turma. Use o
   "end_time":   "15:30",
   "room":       "Sala 2",
   "subject_id": null,
-  "teacher_id": null
+  "teacher_ids": [7, 9]
 }
 ```
 
@@ -208,7 +212,8 @@ Os horários também vêm embutidos em `schedules[]` na resposta da turma. Use o
 | `end_time` | string | Sim | Formato `HH:MM`, deve ser após `start_time` |
 | `room` | string | Não | Nome/número da sala (max 100) |
 | `subject_id` | integer | Não | ID da disciplina |
-| `teacher_id` | integer | Não | ID do professor (user) |
+| `teacher_ids` | integer[] | Não | IDs dos professores (users com role `professor`) |
+| `teacher_id` | integer | Não | Compatibilidade legado (1 professor). Se enviado com `teacher_ids`, prevalece `teacher_ids` |
 
 **Resposta (201):**
 ```json
@@ -221,8 +226,13 @@ Os horários também vêm embutidos em `schedules[]` na resposta da turma. Use o
   "room": "Sala 2",
   "subject_id": null,
   "subject": null,
-  "teacher_id": null,
-  "teacher": null
+  "teacher_id": 7,
+  "teacher": { "id": 7, "name": "PROF. ANA" },
+  "teacher_ids": [7, 9],
+  "teachers": [
+    { "id": 7, "name": "PROF. ANA" },
+    { "id": 9, "name": "PROF. BRUNO" }
+  ]
 }
 ```
 
@@ -265,6 +275,7 @@ Body idêntico ao `POST` (todos os campos opcionais no update).
 
 3. Adicionar os horários (um por dia)
    POST /api/school-classes/{id}/schedules   (repete para cada dia)
+  - Para cobertura/substituição, envie mais de um professor em teacher_ids
 
 4. Na listagem, exibir turma com horários já embutidos
    GET /api/school-classes
