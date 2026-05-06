@@ -26,6 +26,7 @@ import InvoicesScreen from "./screens/InvoicesScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
+import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 
 type NavState = { screen: string; params?: Record<string, any> };
 
@@ -167,7 +168,7 @@ function navToHash(nav: NavState): string {
 // ── App ────────────────────────────────────────────────────────────────────────
 
 function AppContent() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, mustChangePassword } = useAuth();
   const [fontsReady, setFontsReady] = useState(typeof window === "undefined");
 
   const [nav, setNav] = useState<NavState>(() => {
@@ -239,6 +240,10 @@ function AppContent() {
       window.location.hash = "#/login";
     }
     return <LoginScreen />;
+  }
+
+  if (mustChangePassword) {
+    return <FirstAccessPasswordScreen />;
   }
 
   const renderScreen = () => {

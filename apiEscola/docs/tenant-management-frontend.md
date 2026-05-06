@@ -211,8 +211,12 @@ Resposta `200`: mesmo formato do item de listagem.
 - Método: `PUT`
 - URL: `/tenants/{id}`
 
-- Campos permitidos: dados do tenant (não atualiza usuário admin por esta rota).
-- Campos de admin (`admin_name`, `admin_email`, `admin_password`) não são aceitos no update.
+- Campos permitidos:
+  - Dados do tenant (trade_name, phone, address, status, etc.).
+  - Campos opcionais para o admin do tenant:
+    - `admin_password`
+    - `admin_password_confirmation` (obrigatório quando enviar `admin_password`)
+    - `admin_password_change_required` (boolean)
 
 Exemplo:
 
@@ -242,7 +246,31 @@ Exemplo com `address` aninhado:
 }
 ```
 
+Exemplo para alterar senha do admin e forçar troca no próximo acesso:
+
+```json
+{
+  "admin_password": "NovaSenha@123",
+  "admin_password_confirmation": "NovaSenha@123",
+  "admin_password_change_required": true
+}
+```
+
+Exemplo para apenas alterar a obrigatoriedade de troca de senha:
+
+```json
+{
+  "admin_password_change_required": false
+}
+```
+
 Resposta `200`: tenant atualizado.
+
+Regras importantes no update:
+
+- Se `admin_password` for enviado, mínimo de 6 caracteres e confirmação obrigatória.
+- `admin_password_change_required` aceita `true` ou `false`.
+- Se o tenant não tiver usuário com `role = admin`, a API retorna `422`.
 
 ### 5) Remover tenant
 
@@ -312,6 +340,32 @@ Admin do Tenant:
 - admin_email (obrigatório)
 - admin_password (obrigatório)
 - admin_password_confirmation (obrigatório)
+
+## Campos sugeridos de formulário (Edit)
+
+Tenant:
+
+- trade_name
+- name
+- slug
+- cnpj
+- email
+- phone
+- whatsapp
+- zip_code
+- street
+- number
+- complement
+- neighborhood
+- city
+- state
+- status
+
+Admin do Tenant (opcional):
+
+- admin_password
+- admin_password_confirmation
+- admin_password_change_required (checkbox: exigir troca de senha no primeiro acesso)
 
 ## Observação para UX
 

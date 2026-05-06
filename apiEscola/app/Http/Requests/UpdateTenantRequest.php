@@ -54,6 +54,10 @@ class UpdateTenantRequest extends FormRequest
             'state'          => ['nullable', 'string', 'size:2'],
             'status'         => ['nullable', 'exists:domain_statuses,slug'],
             'settings'       => ['nullable', 'array'],
+
+            // Atualização opcional do usuário admin do tenant
+            'admin_password'                => ['sometimes', 'string', 'min:6', 'confirmed'],
+            'admin_password_change_required'=> ['sometimes', 'boolean'],
         ];
     }
 }

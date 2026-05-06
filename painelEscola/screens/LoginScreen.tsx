@@ -11,8 +11,13 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("admin@cursinhoexemplo.com");
-  const [password, setPassword] = useState("123456");
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  const [email, setEmail] = useState(
+    isLocalhost ? "admin@cursinhoexemplo.com" : ""
+  );
+  const [password, setPassword] = useState(isLocalhost ? "123456" : "");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -147,14 +152,16 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         {/* Info dev */}
-        <View className="mt-6 bg-violet-50 rounded-xl p-4 border border-violet-100">
-          <Text className="text-xs font-semibold text-violet-700 mb-1">
-            Acesso de demonstração
-          </Text>
-          <Text className="text-xs text-violet-600">
-            admin@cursinhoexemplo.com{"\n"}Senha: 123456
-          </Text>
-        </View>
+        {isLocalhost && (
+          <View className="mt-6 bg-violet-50 rounded-xl p-4 border border-violet-100">
+            <Text className="text-xs font-semibold text-violet-700 mb-1">
+              Acesso de demonstração
+            </Text>
+            <Text className="text-xs text-violet-600">
+              admin@cursinhoexemplo.com{"\n"}Senha: 123456
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );

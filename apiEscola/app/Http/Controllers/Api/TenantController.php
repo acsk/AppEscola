@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class TenantController extends Controller
@@ -143,9 +144,53 @@ class TenantController extends Controller
     {
         $this->ensureSuperAdmin($request);
 
-        $tenant->update($request->validated());
+        $data = $request->validated();
 
-        return new TenantResource($tenant);
+        $tenantData = collect($data)->except([
+            'admin_password',
+            'admin_password_confirmation',
+            'admin_password_change_required',
+        ])->all();
+
+        DB::transaction(function () use ($tenant, $tenantData, $data) {
+            if (! empty($tenantData)) {
+                $tenant->update($tenantData);
+            }
+
+            $updateAdmin = array_key_exists('admin_password', $data)
+                || array_key_exists('admin_password_change_required', $data);
+
+            if (! $updateAdmin) {
+                return;
+            }
+
+            $admin = $tenant->users()
+                ->where('role', 'admin')
+                ->orderBy('id')
+                ->first();
+
+            if (! $admin) {
+                throw ValidationException::withMessages([
+                    'admin_password' => ['Nenhum usuário admin encontrado para este tenant.'],
+                ]);
+            }
+
+            $adminData = [];
+
+            if (array_key_exists('admin_password', $data)) {
+                $adminData['password'] = $data['admin_password'];
+            }
+
+            if (array_key_exists('admin_password_change_required', $data)) {
+                $adminData['password_change_required'] = (bool) $data['admin_password_change_required'];
+            }
+
+            if (! empty($adminData)) {
+                $admin->update($adminData);
+            }
+        });
+
+        return new TenantResource($tenant->fresh());
     }
 
     #[OA\Delete(
