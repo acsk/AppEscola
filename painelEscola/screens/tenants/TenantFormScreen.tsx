@@ -11,7 +11,15 @@ import api from "../../services/api";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import { parseApiErrors } from "../../utils/apiErrors";
-import { maskPhone } from "../../utils/masks";
+import {
+  maskPhone,
+  maskWhatsapp,
+  maskCEP,
+  maskCNPJ,
+  isValidCEP,
+  isValidCNPJ,
+} from "../../utils/masks";
+import { fetchAddressByCEP } from "../../utils/cep";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -66,21 +74,6 @@ const EMPTY: Form = {
   admin_password_confirmation: "",
 };
 
-function maskCNPJ(value: string) {
-  const d = value.replace(/\D/g, "").slice(0, 14);
-  if (d.length <= 2) return d;
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
-  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
-}
-
-function maskZipCode(value: string) {
-  const d = value.replace(/\D/g, "").slice(0, 8);
-  if (d.length <= 5) return d;
-  return `${d.slice(0, 5)}-${d.slice(5)}`;
-}
-
 export default function TenantFormScreen({ navigate, tenantId }: Props) {
   const isEdit = tenantId !== null;
   const [form, setForm] = useState<Form>(EMPTY);
@@ -88,6 +81,8 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [isLookingUpCEP, setIsLookingUpCEP] = useState(false);
+  const [cepLookupMessage, setCepLookupMessage] = useState("");
 
   useEffect(() => {
     if (!isEdit || !tenantId) return;
@@ -169,6 +164,12 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
     setErrors({});
     setForbidden(false);
 
+    if (form.cnpj.trim() && !isValidCNPJ(form.cnpj)) {
+      setErrors({ cnpj: "CNPJ inválido." });
+      setSaving(false);
+      return;
+    }
+
     try {
       if (isEdit && tenantId) {
         const payload = buildTenantPayload();
@@ -198,6 +199,34 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
     }
 
     setSaving(false);
+  };
+
+  const handleCEPBlur = async () => {
+    if (!form.zip_code) return;
+    if (!isValidCEP(form.zip_code)) {
+      setCepLookupMessage("CEP inválido. Digite um CEP com 8 números.");
+      return;
+    }
+
+    setIsLookingUpCEP(true);
+    setCepLookupMessage("");
+
+    try {
+      const address = await fetchAddressByCEP(form.zip_code);
+      setForm((prev) => ({
+        ...prev,
+        zip_code: maskCEP(address.cep || prev.zip_code),
+        street: address.street || prev.street,
+        neighborhood: address.neighborhood || prev.neighborhood,
+        city: address.city || prev.city,
+        state: (address.state || prev.state).toUpperCase().slice(0, 2),
+      }));
+      setCepLookupMessage("Endereço localizado por CEP.");
+    } catch {
+      setCepLookupMessage("Não foi possível localizar o endereço para este CEP.");
+    } finally {
+      setIsLookingUpCEP(false);
+    }
   };
 
   return (
@@ -330,7 +359,7 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                 <FormInput
                   label="WhatsApp"
                   value={form.whatsapp}
-                  onChangeText={(v) => setForm((p) => ({ ...p, whatsapp: maskPhone(v) }))}
+                  onChangeText={(v) => setForm((p) => ({ ...p, whatsapp: maskWhatsapp(v) }))}
                   error={errors.whatsapp}
                 />
               </View>
@@ -349,9 +378,24 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                 <FormInput
                   label="CEP"
                   value={form.zip_code}
-                  onChangeText={(v) => setForm((p) => ({ ...p, zip_code: maskZipCode(v) }))}
+                  onChangeText={(v) => {
+                    setCepLookupMessage("");
+                    setForm((p) => ({ ...p, zip_code: maskCEP(v) }));
+                  }}
+                  onBlur={handleCEPBlur}
                   error={errors.zip_code}
                 />
+                {!!cepLookupMessage && (
+                  <Text
+                    className={`text-xs mt-1 ${
+                      cepLookupMessage.includes("localizado")
+                        ? "text-emerald-600"
+                        : "text-amber-600"
+                    }`}
+                  >
+                    {isLookingUpCEP ? "Buscando CEP..." : cepLookupMessage}
+                  </Text>
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <FormInput

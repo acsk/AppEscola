@@ -1,7 +1,11 @@
 // ─── Telefone ─────────────────────────────────────────────────────────────────
 // (XX) XXXX-XXXX (fixo) ou (XX) XXXXX-XXXX (celular)
+export function onlyDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
 export function maskPhone(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 11);
+  const d = onlyDigits(value).slice(0, 11);
   if (d.length === 0) return "";
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -10,10 +14,64 @@ export function maskPhone(value: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
+// WhatsApp usa a mesma máscara de telefone nacional
+export function maskWhatsapp(value: string): string {
+  return maskPhone(value);
+}
+
+export function isValidPhone(value: string): boolean {
+  const d = onlyDigits(value);
+  return d.length === 10 || d.length === 11;
+}
+
+// ─── CEP ──────────────────────────────────────────────────────────────────────
+// XXXXX-XXX
+export function maskCEP(value: string): string {
+  const d = onlyDigits(value).slice(0, 8);
+  if (d.length <= 5) return d;
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+}
+
+export function isValidCEP(value: string): boolean {
+  return onlyDigits(value).length === 8;
+}
+
+// ─── CNPJ ─────────────────────────────────────────────────────────────────────
+// XX.XXX.XXX/XXXX-XX
+export function maskCNPJ(value: string): string {
+  const d = onlyDigits(value).slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
+export function isValidCNPJ(value: string): boolean {
+  const cnpj = onlyDigits(value);
+  if (cnpj.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cnpj)) return false;
+
+  const calcCheckDigit = (base: string, factors: number[]) => {
+    const sum = base
+      .split("")
+      .reduce((acc, digit, idx) => acc + parseInt(digit, 10) * factors[idx], 0);
+    const mod = sum % 11;
+    return mod < 2 ? 0 : 11 - mod;
+  };
+
+  const base12 = cnpj.slice(0, 12);
+  const d1 = calcCheckDigit(base12, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const base13 = `${base12}${d1}`;
+  const d2 = calcCheckDigit(base13, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+
+  return cnpj === `${base12}${d1}${d2}`;
+}
+
 // ─── CPF ──────────────────────────────────────────────────────────────────────
 // XXX.XXX.XXX-XX
 export function maskCPF(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 11);
+  const d = onlyDigits(value).slice(0, 11);
   if (d.length <= 3) return d;
   if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
   if (d.length <= 9)
@@ -22,7 +80,7 @@ export function maskCPF(value: string): string {
 }
 
 export function isValidCPF(cpf: string): boolean {
-  const d = cpf.replace(/\D/g, "");
+  const d = onlyDigits(cpf);
   if (d.length !== 11) return false;
   // Rejeita sequências iguais (111.111.111-11 etc.)
   if (/^(\d)\1{10}$/.test(d)) return false;
