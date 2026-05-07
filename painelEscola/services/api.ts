@@ -7,7 +7,11 @@ const BASE_URL =
 
 const api = axios.create({
   baseURL: BASE_URL,
-  headers: { Accept: "application/json" },
+  withCredentials: true,
+  headers: {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  },
 });
 
 // Injeta o token em toda requisição autenticada
