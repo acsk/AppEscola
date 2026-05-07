@@ -224,6 +224,17 @@ function AppContent() {
   useEffect(() => {
     let mounted = true;
 
+    if (typeof document !== "undefined") {
+      Array.from(document.body.children).forEach((node) => {
+        const element = node as HTMLElement;
+        if (element.id !== "root") {
+          element.remove();
+        }
+      });
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    }
+
     ensureIconFontsLoaded()
       .then(() => {
         if (mounted) setFontsReady(true);
@@ -236,6 +247,18 @@ function AppContent() {
       mounted = false;
     };
   }, []);
+
+  // Evita overlay escuro preso ao alternar mobile/desktop.
+  useEffect(() => {
+    if (!isMobile && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
+  }, [isMobile, isSidebarOpen]);
+
+  // Garante estado limpo do menu ao trocar autenticação.
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [user?.id]);
 
   const canManageTenants = user?.role === "super_admin";
   const canManageUsers = user?.role === "super_admin" || user?.role === "admin";

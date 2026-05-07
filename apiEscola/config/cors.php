@@ -12,6 +12,8 @@ return [
         'https://api.appcurso.com.br',
         'http://localhost:5173',
         'http://localhost:3000',
+        'http://localhost:4000',
+        'http://localhost:8081',
     ],
 
     'allowed_origins_patterns' => [

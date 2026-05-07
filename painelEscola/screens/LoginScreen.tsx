@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  Clipboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
@@ -36,6 +35,36 @@ export default function LoginScreen() {
 
   useEffect(() => {
     resetForm();
+
+    if (typeof document === "undefined") return;
+
+    const removeOrphanModalPortals = () => {
+      Array.from(document.body.children).forEach((node) => {
+        const element = node as HTMLElement;
+        const isRoot = element.id === "root";
+        const isElementReactPortal =
+          element.tagName === "DIV" &&
+          !isRoot &&
+          element.querySelector('[aria-modal="true"], [role="dialog"]');
+
+        if (isElementReactPortal) {
+          element.remove();
+        }
+      });
+
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
+
+    removeOrphanModalPortals();
+    const cleanupTimer = window.setTimeout(removeOrphanModalPortals, 100);
+    const observer = new MutationObserver(removeOrphanModalPortals);
+    observer.observe(document.body, { childList: true });
+
+    return () => {
+      window.clearTimeout(cleanupTimer);
+      observer.disconnect();
+    };
   }, []);
 
   const handleLogin = async () => {
@@ -54,18 +83,7 @@ export default function LoginScreen() {
         e.response?.data?.message ||
         "Credenciais inválidas. Verifique e tente novamente.";
       setError(msg);
-
-      // ── Debug info ──
-      const pageProtocol =
-        typeof window !== "undefined" ? window.location.protocol : null;
-      const pageOrigin =
-        typeof window !== "undefined" ? window.location.origin : null;
-      const pageHost =
-        typeof window !== "undefined" ? window.location.hostname : null;
-      const online =
-        typeof navigator !== "undefined" ? navigator.onLine : null;
-
-      const info: Record<string, any> = {
+      setDebugInfo({
         timestamp: new Date().toISOString(),
         error_type: e.code ?? (e.response ? "HTTP_ERROR" : "NETWORK_ERROR"),
         message: e.message,
@@ -75,40 +93,50 @@ export default function LoginScreen() {
         method: e.config?.method?.toUpperCase() ?? null,
         base_url: e.config?.baseURL ?? null,
         response_data: e.response?.data ?? null,
-        request_headers: e.config?.headers ?? null,
         timeout: e.config?.timeout ?? null,
-        is_network_error: !e.response,
-        page_origin: pageOrigin,
-        page_host: pageHost,
-        page_protocol: pageProtocol,
-        browser_online: online,
-        browser_user_agent:
-          typeof navigator !== "undefined" ? navigator.userAgent : null,
-        cause_hint: !e.response
-          ? "Falha antes de chegar na API (possivel CORS, DNS, firewall/proxy ou certificado SSL)"
-          : null,
-      };
-      setDebugInfo(info);
+        page_origin: typeof window !== "undefined" ? window.location.origin : null,
+        browser_online: typeof navigator !== "undefined" ? navigator.onLine : null,
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const closeDebug = () => {
+    setDebugInfo(null);
+    setDebugCopied(false);
+  };
+
+  const copyDebugInfo = async () => {
+    if (!debugInfo) return;
+    const text = JSON.stringify(debugInfo, null, 2);
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    }
+
+    setDebugCopied(true);
+    window.setTimeout(() => setDebugCopied(false), 2500);
+  };
+
   return (
-    <>
-      <View
-        className="flex-1 items-center justify-center"
-        style={{ backgroundColor: "#EEEEFF" }}
-      >
+    <ScrollView
+      className="flex-1"
+      keyboardShouldPersistTaps="handled"
+      style={{ backgroundColor: "#EEEEFF" }}
+      contentContainerStyle={{
+        minHeight: "100%",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+      }}
+    >
       {/* Card */}
       <View
         className="bg-white rounded-3xl p-10 w-full"
         style={{
           maxWidth: 420,
-          shadowColor: "#7C3AED",
-          shadowOpacity: 0.12,
-          shadowRadius: 24,
-          elevation: 10,
+          boxShadow: "0 18px 48px rgba(124, 58, 237, 0.12)",
         }}
       >
         {/* Logo */}
@@ -225,62 +253,43 @@ export default function LoginScreen() {
         )}
 
       </View>
-    </View>
 
-    {/* ── Modal de Debug ── */}
-    <Modal
-      visible={!!debugInfo}
-      title="🐛 Debug — Erro de Rede"
-      onClose={() => { setDebugInfo(null); setDebugCopied(false); }}
-      size="md"
-      footer={
-        <>
-          <TouchableOpacity
-            onPress={() => {
-              const txt = JSON.stringify(debugInfo, null, 2);
-              Clipboard.setString(txt);
-              setDebugCopied(true);
-              setTimeout(() => setDebugCopied(false), 2500);
-            }}
-            className="flex-row items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-800"
-          >
-            <Ionicons
-              name={debugCopied ? "checkmark-outline" : "copy-outline"}
-              size={14}
-              color={debugCopied ? "#34D399" : "#D1D5DB"}
-            />
-            <Text className="text-sm font-semibold text-gray-200">
-              {debugCopied ? "Copiado!" : "Copiar JSON"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => { setDebugInfo(null); setDebugCopied(false); }}
-            className="px-5 py-2.5 rounded-xl border border-gray-200"
-          >
-            <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
-          </TouchableOpacity>
-        </>
-      }
-    >
-      <View className="bg-gray-950 rounded-xl p-4">
-        {debugInfo && Object.entries(debugInfo as Record<string, any>).map(([key, val]) => (
-          <View key={key} className="mb-3">
-            <Text className="text-yellow-400 text-xs font-bold mb-0.5">{key}</Text>
-            <Text
-              className="text-gray-300 text-xs leading-relaxed"
-              style={{ fontFamily: "monospace" }}
-              selectable
+      <Modal
+        visible={!!debugInfo}
+        title="Debug da rede"
+        onClose={closeDebug}
+        size="lg"
+        footer={
+          <>
+            <TouchableOpacity
+              onPress={closeDebug}
+              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              activeOpacity={0.75}
             >
-              {val === null
-                ? "null"
-                : typeof val === "object"
-                ? JSON.stringify(val, null, 2)
-                : String(val)}
-            </Text>
-          </View>
-        ))}
-      </View>
-    </Modal>
-    </>
+              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={copyDebugInfo}
+              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              activeOpacity={0.8}
+            >
+              <Text className="text-sm font-bold text-white">
+                {debugCopied ? "Copiado!" : "Copiar JSON"}
+              </Text>
+            </TouchableOpacity>
+          </>
+        }
+      >
+        <View className="bg-gray-950 rounded-xl p-3">
+          <Text
+            selectable
+            className="text-gray-200 text-xs leading-relaxed"
+            style={{ fontFamily: "monospace" }}
+          >
+            {JSON.stringify(debugInfo, null, 2)}
+          </Text>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
