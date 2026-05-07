@@ -7,6 +7,7 @@ return [
 
     'allowed_origins' => [
         'https://appcurso.com.br',
+        'https://www.appcurso.com.br',
         'http://localhost:5173',
         'http://localhost:3000',
     ],
