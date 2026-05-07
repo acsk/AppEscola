@@ -14,10 +14,13 @@ return [
         'http://localhost:3000',
         'http://localhost:4000',
         'http://localhost:8081',
+        'http://localhost:8082',
+        'http://localhost:8083',
     ],
 
     'allowed_origins_patterns' => [
         '#^https://([a-z0-9-]+\.)?appcurso\.com\.br$#',
+        '#^http://localhost:(3000|4000|5173|8081|8082|8083)$#',    
     ],
 
     'allowed_headers' => ['*'],
