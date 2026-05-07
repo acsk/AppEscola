@@ -156,10 +156,16 @@ export default function StudentsScreen({ navigate }: Props) {
       </View>
 
       {/* Tabela */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={isMobile}
+        style={{ width: "100%" }}
+        contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
+      >
       <View
         className="bg-white rounded-2xl overflow-hidden"
         style={{
+          width: "100%",
           minWidth: tableMinWidth,
           shadowColor: "#000",
           shadowOpacity: 0.05,

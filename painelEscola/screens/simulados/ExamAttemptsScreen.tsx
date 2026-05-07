@@ -279,10 +279,15 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       </View>
 
       {/* Tabela */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={isMobile}
+        style={{ width: "100%" }}
+        contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
+      >
       <View
         className="bg-white rounded-2xl overflow-hidden"
-        style={{ minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
       >
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>
