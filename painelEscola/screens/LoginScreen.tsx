@@ -5,6 +5,8 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
+  Clipboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
@@ -19,12 +21,16 @@ export default function LoginScreen() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [debugInfo, setDebugInfo] = useState<Record<string, any> | null>(null);
+  const [debugCopied, setDebugCopied] = useState(false);
 
   const resetForm = () => {
     setEmail("");
     setPassword("");
     setShowPass(false);
     setError("");
+    setDebugInfo(null);
+    setDebugCopied(false);
   };
 
   useEffect(() => {
@@ -38,6 +44,8 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError("");
+    setDebugInfo(null);
+    setDebugCopied(false);
     try {
       await login(email, password);
     } catch (e: any) {
@@ -45,6 +53,23 @@ export default function LoginScreen() {
         e.response?.data?.message ||
         "Credenciais inválidas. Verifique e tente novamente.";
       setError(msg);
+
+      // ── Debug info ──
+      const info: Record<string, any> = {
+        timestamp: new Date().toISOString(),
+        error_type: e.code ?? (e.response ? "HTTP_ERROR" : "NETWORK_ERROR"),
+        message: e.message,
+        status: e.response?.status ?? null,
+        status_text: e.response?.statusText ?? null,
+        url: e.config?.url ?? e.request?.responseURL ?? null,
+        method: e.config?.method?.toUpperCase() ?? null,
+        base_url: e.config?.baseURL ?? null,
+        response_data: e.response?.data ?? null,
+        request_headers: e.config?.headers ?? null,
+        timeout: e.config?.timeout ?? null,
+        is_network_error: !e.response,
+      };
+      setDebugInfo(info);
     } finally {
       setLoading(false);
     }
@@ -176,6 +201,68 @@ export default function LoginScreen() {
             <Text className="text-xs text-violet-600">
               admin@cursinhoexemplo.com{"\n"}Senha: 123456
             </Text>
+          </View>
+        )}
+
+        {/* ── Painel de Debug ── */}
+        {!!debugInfo && (
+          <View className="mt-5 bg-gray-900 rounded-xl p-4 border border-gray-700">
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="bug-outline" size={15} color="#F87171" />
+                <Text className="text-xs font-bold text-red-400 uppercase tracking-wide">
+                  Debug — Erro de Rede
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  const txt = JSON.stringify(debugInfo, null, 2);
+                  Clipboard.setString(txt);
+                  setDebugCopied(true);
+                  setTimeout(() => setDebugCopied(false), 2500);
+                }}
+                className="flex-row items-center gap-1 bg-gray-700 px-2 py-1 rounded-lg"
+              >
+                <Ionicons
+                  name={debugCopied ? "checkmark-outline" : "copy-outline"}
+                  size={12}
+                  color={debugCopied ? "#34D399" : "#D1D5DB"}
+                />
+                <Text className="text-xs text-gray-300">
+                  {debugCopied ? "Copiado!" : "Copiar"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ maxHeight: 220 }}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+            >
+              {Object.entries(debugInfo).map(([key, val]) => (
+                <View key={key} className="mb-1">
+                  <Text className="text-yellow-400 text-xs font-semibold">{key}:</Text>
+                  <Text
+                    className="text-gray-300 text-xs"
+                    style={{ fontFamily: "monospace" }}
+                    selectable
+                  >
+                    {val === null
+                      ? "null"
+                      : typeof val === "object"
+                      ? JSON.stringify(val, null, 2)
+                      : String(val)}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setDebugInfo(null)}
+              className="mt-3 items-center py-1.5 rounded-lg bg-gray-700"
+            >
+              <Text className="text-xs text-gray-400">Fechar debug</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
