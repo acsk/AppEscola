@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
+import Modal from "../components/ui/Modal";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -76,10 +77,11 @@ export default function LoginScreen() {
   };
 
   return (
-    <View
-      className="flex-1 items-center justify-center"
-      style={{ backgroundColor: "#EEEEFF" }}
-    >
+    <>
+      <View
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: "#EEEEFF" }}
+      >
       {/* Card */}
       <View
         className="bg-white rounded-3xl p-10 w-full"
@@ -204,68 +206,63 @@ export default function LoginScreen() {
           </View>
         )}
 
-        {/* ── Painel de Debug ── */}
-        {!!debugInfo && (
-          <View className="mt-5 bg-gray-900 rounded-xl p-4 border border-gray-700">
-            <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-row items-center gap-2">
-                <Ionicons name="bug-outline" size={15} color="#F87171" />
-                <Text className="text-xs font-bold text-red-400 uppercase tracking-wide">
-                  Debug — Erro de Rede
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  const txt = JSON.stringify(debugInfo, null, 2);
-                  Clipboard.setString(txt);
-                  setDebugCopied(true);
-                  setTimeout(() => setDebugCopied(false), 2500);
-                }}
-                className="flex-row items-center gap-1 bg-gray-700 px-2 py-1 rounded-lg"
-              >
-                <Ionicons
-                  name={debugCopied ? "checkmark-outline" : "copy-outline"}
-                  size={12}
-                  color={debugCopied ? "#34D399" : "#D1D5DB"}
-                />
-                <Text className="text-xs text-gray-300">
-                  {debugCopied ? "Copiado!" : "Copiar"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={{ maxHeight: 220 }}
-              nestedScrollEnabled
-              showsVerticalScrollIndicator
-            >
-              {Object.entries(debugInfo).map(([key, val]) => (
-                <View key={key} className="mb-1">
-                  <Text className="text-yellow-400 text-xs font-semibold">{key}:</Text>
-                  <Text
-                    className="text-gray-300 text-xs"
-                    style={{ fontFamily: "monospace" }}
-                    selectable
-                  >
-                    {val === null
-                      ? "null"
-                      : typeof val === "object"
-                      ? JSON.stringify(val, null, 2)
-                      : String(val)}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity
-              onPress={() => setDebugInfo(null)}
-              className="mt-3 items-center py-1.5 rounded-lg bg-gray-700"
-            >
-              <Text className="text-xs text-gray-400">Fechar debug</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </View>
+
+    {/* ── Modal de Debug ── */}
+    <Modal
+      visible={!!debugInfo}
+      title="🐛 Debug — Erro de Rede"
+      onClose={() => { setDebugInfo(null); setDebugCopied(false); }}
+      size="md"
+      footer={
+        <>
+          <TouchableOpacity
+            onPress={() => {
+              const txt = JSON.stringify(debugInfo, null, 2);
+              Clipboard.setString(txt);
+              setDebugCopied(true);
+              setTimeout(() => setDebugCopied(false), 2500);
+            }}
+            className="flex-row items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-800"
+          >
+            <Ionicons
+              name={debugCopied ? "checkmark-outline" : "copy-outline"}
+              size={14}
+              color={debugCopied ? "#34D399" : "#D1D5DB"}
+            />
+            <Text className="text-sm font-semibold text-gray-200">
+              {debugCopied ? "Copiado!" : "Copiar JSON"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { setDebugInfo(null); setDebugCopied(false); }}
+            className="px-5 py-2.5 rounded-xl border border-gray-200"
+          >
+            <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+          </TouchableOpacity>
+        </>
+      }
+    >
+      <View className="bg-gray-950 rounded-xl p-4">
+        {debugInfo && Object.entries(debugInfo as Record<string, any>).map(([key, val]) => (
+          <View key={key} className="mb-3">
+            <Text className="text-yellow-400 text-xs font-bold mb-0.5">{key}</Text>
+            <Text
+              className="text-gray-300 text-xs leading-relaxed"
+              style={{ fontFamily: "monospace" }}
+              selectable
+            >
+              {val === null
+                ? "null"
+                : typeof val === "object"
+                ? JSON.stringify(val, null, 2)
+                : String(val)}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </Modal>
+    </>
   );
 }
