@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,13 +14,22 @@ export default function LoginScreen() {
   const isLocalhost =
     typeof window !== "undefined" &&
     ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-  const [email, setEmail] = useState(
-    isLocalhost ? "admin@cursinhoexemplo.com" : ""
-  );
-  const [password, setPassword] = useState(isLocalhost ? "123456" : "");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const resetForm = () => {
+    setEmail("");
+    setPassword("");
+    setShowPass(false);
+    setError("");
+  };
+
+  useEffect(() => {
+    resetForm();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -87,7 +96,10 @@ export default function LoginScreen() {
               }}
               keyboardType="email-address"
               autoCapitalize="none"
-              autoComplete="email"
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              autoCorrect={false}
               placeholder="seu@email.com ou matrícula"
               placeholderTextColor="#9CA3AF"
               className="flex-1 ml-2 py-3 text-sm text-gray-800"
@@ -113,6 +125,10 @@ export default function LoginScreen() {
                 setError("");
               }}
               secureTextEntry={!showPass}
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              autoCorrect={false}
               placeholder="••••••••"
               placeholderTextColor="#9CA3AF"
               className="flex-1 ml-2 py-3 text-sm text-gray-800"
