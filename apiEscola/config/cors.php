@@ -8,12 +8,15 @@ return [
     'allowed_origins' => [
         'https://appcurso.com.br',
         'https://www.appcurso.com.br',
+        'https://painel.appcurso.com.br',
         'https://api.appcurso.com.br',
         'http://localhost:5173',
         'http://localhost:3000',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https://([a-z0-9-]+\.)?appcurso\.com\.br$#',
+    ],
 
     'allowed_headers' => ['*'],
 
