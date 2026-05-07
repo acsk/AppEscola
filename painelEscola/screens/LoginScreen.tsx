@@ -56,6 +56,15 @@ export default function LoginScreen() {
       setError(msg);
 
       // ── Debug info ──
+      const pageProtocol =
+        typeof window !== "undefined" ? window.location.protocol : null;
+      const pageOrigin =
+        typeof window !== "undefined" ? window.location.origin : null;
+      const pageHost =
+        typeof window !== "undefined" ? window.location.hostname : null;
+      const online =
+        typeof navigator !== "undefined" ? navigator.onLine : null;
+
       const info: Record<string, any> = {
         timestamp: new Date().toISOString(),
         error_type: e.code ?? (e.response ? "HTTP_ERROR" : "NETWORK_ERROR"),
@@ -69,6 +78,15 @@ export default function LoginScreen() {
         request_headers: e.config?.headers ?? null,
         timeout: e.config?.timeout ?? null,
         is_network_error: !e.response,
+        page_origin: pageOrigin,
+        page_host: pageHost,
+        page_protocol: pageProtocol,
+        browser_online: online,
+        browser_user_agent:
+          typeof navigator !== "undefined" ? navigator.userAgent : null,
+        cause_hint: !e.response
+          ? "Falha antes de chegar na API (possivel CORS, DNS, firewall/proxy ou certificado SSL)"
+          : null,
       };
       setDebugInfo(info);
     } finally {
