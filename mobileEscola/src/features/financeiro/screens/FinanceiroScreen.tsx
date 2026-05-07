@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '../../../theme';
 
 interface Transacao {
   id: string;
@@ -19,22 +21,13 @@ const TRANSACOES: Transacao[] = [
   { id: '5', descricao: 'Taxa de laboratório', valor: 80.0, data: '20/03/2026', tipo: 'debito', icone: 'flask-outline' },
 ];
 
-const PRIMARY = '#4F46E5';
-const INK = '#1E1B4B';
-const TEXT = '#312E81';
-const MUTED = '#64748B';
-const SOFT = '#EEF2FF';
-const BORDER = '#DDE3F5';
-const SURFACE = '#FFFFFF';
-const BACKGROUND = '#F6F7FB';
-const DEBIT = '#EF4444';
-const CREDIT = '#10B981';
-
 function formatarMoeda(valor: number) {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export function FinanceiroScreen() {
+  const insets = useSafeAreaInsets();
+
   const totalDebito = TRANSACOES
     .filter((t) => t.tipo === 'debito')
     .reduce((acc, t) => acc + t.valor, 0);
@@ -46,118 +39,103 @@ export function FinanceiroScreen() {
   const saldo = totalCredito - totalDebito;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerEyebrow}>Financeiro</Text>
-          <Text style={styles.headerTitle}>Saldo e cobranças</Text>
-        </View>
-        <View style={styles.headerIcon}>
-          <Ionicons name="wallet-outline" size={24} color={PRIMARY} />
-        </View>
+    <View style={styles.container}>
+      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+        <Text style={styles.headerTitulo}>Financeiro</Text>
       </View>
 
-      <View style={styles.saldoCard}>
-        <Text style={styles.saldoLabel}>Saldo devedor</Text>
-        <Text style={styles.saldoValor}>{formatarMoeda(Math.abs(saldo))}</Text>
-        <View style={styles.saldoMeta}>
-          <Ionicons name="calendar-outline" size={14} color="#CBD5E1" />
-          <Text style={styles.saldoMetaTexto}>Atualizado em maio/2026</Text>
-        </View>
-      </View>
-
-      <View style={styles.resumo}>
-        <View style={styles.resumoItem}>
-          <View style={[styles.resumoIcone, { backgroundColor: '#FEF2F2' }]}>
-            <Ionicons name="arrow-down-outline" size={18} color={DEBIT} />
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.saldoCard}>
+          <Text style={styles.saldoLabel}>Saldo devedor</Text>
+          <Text style={styles.saldoValor}>{formatarMoeda(Math.abs(saldo))}</Text>
+          <View style={styles.saldoMeta}>
+            <Ionicons name="calendar-outline" size={14} color="#CBD5E1" />
+            <Text style={styles.saldoMetaTexto}>Atualizado em maio/2026</Text>
           </View>
-          <Text style={styles.resumoLabel}>Total a pagar</Text>
-          <Text style={[styles.resumoValor, { color: DEBIT }]}>{formatarMoeda(totalDebito)}</Text>
         </View>
-        <View style={styles.divisor} />
-        <View style={styles.resumoItem}>
-          <View style={[styles.resumoIcone, { backgroundColor: '#ECFDF5' }]}>
-            <Ionicons name="arrow-up-outline" size={18} color={CREDIT} />
+
+        <View style={styles.resumo}>
+          <View style={styles.resumoItem}>
+            <View style={[styles.resumoIcone, { backgroundColor: '#FEF2F2' }]}>
+              <Ionicons name="arrow-down-outline" size={18} color={colors.debit} />
+            </View>
+            <Text style={styles.resumoLabel}>Total a pagar</Text>
+            <Text style={[styles.resumoValor, { color: colors.debit }]}>{formatarMoeda(totalDebito)}</Text>
           </View>
-          <Text style={styles.resumoLabel}>Benefícios</Text>
-          <Text style={[styles.resumoValor, { color: CREDIT }]}>{formatarMoeda(totalCredito)}</Text>
+          <View style={styles.divisor} />
+          <View style={styles.resumoItem}>
+            <View style={[styles.resumoIcone, { backgroundColor: '#ECFDF5' }]}>
+              <Ionicons name="arrow-up-outline" size={18} color={colors.credit} />
+            </View>
+            <Text style={styles.resumoLabel}>Benefícios</Text>
+            <Text style={[styles.resumoValor, { color: colors.credit }]}>{formatarMoeda(totalCredito)}</Text>
+          </View>
         </View>
-      </View>
 
-      {/* Extrato */}
-      <View style={styles.secaoHeader}>
-        <Text style={styles.secaoTitulo}>Extrato</Text>
-        <Text style={styles.secaoContador}>{TRANSACOES.length} lançamentos</Text>
-      </View>
-
-      {TRANSACOES.map((transacao) => (
-        <View key={transacao.id} style={styles.transacaoCard}>
-          <View style={[
-            styles.transacaoIcone,
-            { backgroundColor: transacao.tipo === 'debito' ? '#FEF2F2' : '#ECFDF5' }
-          ]}>
-            <Ionicons
-              name={transacao.icone as any}
-              size={20}
-              color={transacao.tipo === 'debito' ? DEBIT : CREDIT}
-            />
-          </View>
-          <View style={styles.transacaoInfo}>
-            <Text style={styles.transacaoDescricao}>{transacao.descricao}</Text>
-            <Text style={styles.transacaoData}>{transacao.data}</Text>
-          </View>
-          <Text style={[
-            styles.transacaoValor,
-            { color: transacao.tipo === 'debito' ? DEBIT : CREDIT }
-          ]}>
-            {transacao.tipo === 'debito' ? '-' : '+'}{formatarMoeda(transacao.valor)}
-          </Text>
+        {/* Extrato */}
+        <View style={styles.secaoHeader}>
+          <Text style={styles.secaoTitulo}>Extrato</Text>
+          <Text style={styles.secaoContador}>{TRANSACOES.length} lançamentos</Text>
         </View>
-      ))}
 
-      <TouchableOpacity style={styles.botaoBoleto} activeOpacity={0.8}>
-        <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.botaoBoletoTexto}>Gerar 2ª via do boleto</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {TRANSACOES.map((transacao) => (
+          <View key={transacao.id} style={styles.transacaoCard}>
+            <View style={[
+              styles.transacaoIcone,
+              { backgroundColor: transacao.tipo === 'debito' ? '#FEF2F2' : '#ECFDF5' }
+            ]}>
+              <Ionicons
+                name={transacao.icone as any}
+                size={20}
+                color={transacao.tipo === 'debito' ? colors.debit : colors.credit}
+              />
+            </View>
+            <View style={styles.transacaoInfo}>
+              <Text style={styles.transacaoDescricao}>{transacao.descricao}</Text>
+              <Text style={styles.transacaoData}>{transacao.data}</Text>
+            </View>
+            <Text style={[
+              styles.transacaoValor,
+              { color: transacao.tipo === 'debito' ? colors.debit : colors.credit }
+            ]}>
+              {transacao.tipo === 'debito' ? '-' : '+'}{formatarMoeda(transacao.valor)}
+            </Text>
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.botaoBoleto} activeOpacity={0.8}>
+          <Ionicons name="document-text-outline" size={20} color={colors.surface} />
+          <Text style={styles.botaoBoletoTexto}>Gerar 2ª via do boleto</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BACKGROUND },
-  content: { padding: 16, paddingBottom: 40 },
-  header: {
-    backgroundColor: INK,
-    borderRadius: 22,
-    padding: 20,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 16, paddingTop: 12, paddingBottom: 40 },
+  headerWrap: {
+    backgroundColor: colors.ink,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     shadowColor: '#000',
     shadowOpacity: 0.12,
     shadowRadius: 14,
     elevation: 4,
   },
-  headerEyebrow: { fontSize: 13, color: '#CBD5E1', fontWeight: '700', marginBottom: 6 },
-  headerTitle: { fontSize: 22, color: SURFACE, fontWeight: '800' },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: SURFACE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  headerTitulo: { fontSize: 22, fontWeight: '800', color: colors.surface, paddingTop: 18, paddingBottom: 14 },
   saldoCard: {
-    backgroundColor: INK,
+    backgroundColor: colors.ink,
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
     marginBottom: 12,
   },
   saldoLabel: { fontSize: 13, color: '#CBD5E1', marginBottom: 6, fontWeight: '700' },
-  saldoValor: { fontSize: 31, fontWeight: '800', color: SURFACE },
+  saldoValor: { fontSize: 31, fontWeight: '800', color: colors.surface },
   saldoMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -170,7 +148,7 @@ const styles = StyleSheet.create({
   },
   saldoMetaTexto: { fontSize: 12, color: '#CBD5E1', fontWeight: '600' },
   resumo: {
-    backgroundColor: SURFACE,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     padding: 20,
     flexDirection: 'row',
@@ -178,7 +156,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -193,9 +171,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  resumoLabel: { fontSize: 12, color: MUTED, marginBottom: 4, fontWeight: '600' },
+  resumoLabel: { fontSize: 12, color: colors.muted, marginBottom: 4, fontWeight: '600' },
   resumoValor: { fontSize: 16, fontWeight: '800' },
-  divisor: { width: 1, height: 72, backgroundColor: BORDER },
+  divisor: { width: 1, height: 72, backgroundColor: colors.border },
   secaoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -205,20 +183,20 @@ const styles = StyleSheet.create({
   secaoTitulo: {
     fontSize: 12,
     fontWeight: '800',
-    color: MUTED,
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  secaoContador: { fontSize: 12, color: MUTED, fontWeight: '600' },
+  secaoContador: { fontSize: 12, color: colors.muted, fontWeight: '600' },
   transacaoCard: {
-    backgroundColor: SURFACE,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.03,
     shadowRadius: 4,
@@ -233,11 +211,11 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   transacaoInfo: { flex: 1 },
-  transacaoDescricao: { fontSize: 14, fontWeight: '700', color: INK },
-  transacaoData: { fontSize: 12, color: MUTED, marginTop: 3 },
+  transacaoDescricao: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  transacaoData: { fontSize: 12, color: colors.muted, marginTop: 3 },
   transacaoValor: { fontSize: 15, fontWeight: '800' },
   botaoBoleto: {
-    backgroundColor: PRIMARY,
+    backgroundColor: colors.primary,
     borderRadius: 14,
     paddingVertical: 16,
     flexDirection: 'row',
@@ -246,5 +224,5 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 16,
   },
-  botaoBoletoTexto: { color: SURFACE, fontSize: 15, fontWeight: '800' },
+  botaoBoletoTexto: { color: colors.surface, fontSize: 15, fontWeight: '800' },
 });

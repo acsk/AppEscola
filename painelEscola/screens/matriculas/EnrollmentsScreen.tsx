@@ -18,6 +18,7 @@ import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { isoToDisplay } from "../../utils/masks";
 import { useEnrollmentStatuses, domainToOptions } from "../../hooks/useDomains";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function EnrollmentsScreen({ navigate }: Props) {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -224,11 +226,11 @@ export default function EnrollmentsScreen({ navigate }: Props) {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Header */}
-      <View className="flex-row items-center justify-between mb-6">
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
           <Text className="text-2xl font-bold text-gray-800">Matrículas</Text>
           <Text className="text-sm text-gray-500">
@@ -248,8 +250,8 @@ export default function EnrollmentsScreen({ navigate }: Props) {
       </View>
 
       {/* Filters */}
-      <View className="flex-row gap-3 mb-4">
-        <View className="flex-1 max-w-xs">
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
+        <View style={{ flex: 1, maxWidth: isMobile ? undefined : 320 }}>
           <View
             className="flex-row items-center bg-white rounded-xl border border-gray-200 px-3"
             style={{ height: 44 }}
@@ -288,7 +290,7 @@ export default function EnrollmentsScreen({ navigate }: Props) {
             color: "#374151",
             backgroundColor: "white",
             height: 44,
-            minWidth: 180,
+            minWidth: isMobile ? "100%" : 180,
           }}
         >
           {statusFilterOptions.map((o) => (
@@ -300,9 +302,11 @@ export default function EnrollmentsScreen({ navigate }: Props) {
       </View>
 
       {/* Table */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
       <View
         className="bg-white rounded-2xl overflow-hidden"
         style={{
+          minWidth: tableMinWidth,
           shadowColor: "#000",
           shadowOpacity: 0.05,
           shadowRadius: 10,
@@ -435,6 +439,7 @@ export default function EnrollmentsScreen({ navigate }: Props) {
           </View>
         )}
       </View>
+      </ScrollView>
 
       {/* View Modal */}
       <Modal

@@ -18,6 +18,7 @@ import {
 } from "../../hooks/useDomains";
 import { displayToISO, isoToDisplay } from "../../utils/masks";
 import SearchableSelect from "../../components/ui/SearchableSelect";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 const WEEKDAY_SHORT: Record<string, string> = {
   monday: "Seg",
@@ -101,6 +102,7 @@ interface Props {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function EnrollmentFormScreen({ navigate }: Props) {
+  const { contentPadding } = useResponsiveLayout();
   const scrollRef = useRef<ScrollView>(null);
 
   // ── Mode ────────────────────────────────────────────────────────────────────
@@ -354,7 +356,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
     return (
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
+        contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
       >
         <View className="items-center py-8">
           <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-4">
@@ -476,7 +478,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Breadcrumb */}

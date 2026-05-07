@@ -12,6 +12,7 @@ import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import { parseApiErrors } from "../../utils/apiErrors";
 import { useAuth } from "../../contexts/AuthContext";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -67,6 +68,7 @@ const STATUS_OPTIONS = [
 
 export default function UserFormScreen({ navigate, userId }: Props) {
   const { user } = useAuth();
+  const { contentPadding } = useResponsiveLayout();
   const isGlobalSuperAdmin = user?.role === "super_admin" && user?.tenant_id == null;
   const isEdit = userId !== null;
 
@@ -281,7 +283,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   };
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}>
       <View className="flex-row items-center gap-2 mb-6">
         <TouchableOpacity onPress={() => navigate("users")} className="flex-row items-center gap-1.5" activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={18} color="#7C3AED" />

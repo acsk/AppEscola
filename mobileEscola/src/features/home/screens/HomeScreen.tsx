@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
 import { listarSimulados, SimuladoListItem, AttemptStatus, subjectIconName } from '../../../services/simulados.service';
+import { colors } from '../../../theme';
 
 function getInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
@@ -25,14 +26,6 @@ const ROLE_LABELS: Record<string, string> = {
   admin:       'Administrador',
   super_admin: 'Super Admin',
 };
-
-const PRIMARY = '#4F46E5';
-const INK = '#1E1B4B';
-const TEXT = '#312E81';
-const MUTED = '#64748B';
-const SOFT = '#EEF2FF';
-const BORDER = '#DDE3F5';
-const SURFACE = '#FFFFFF';
 
 const STATS = [
   { icon: 'book-outline',        value: '230', label: 'Simulados\nrealizados' },
@@ -57,10 +50,10 @@ const SIM_STATUS_LABEL: Record<AttemptStatus, string> = {
 };
 
 const CONQUISTAS = [
-  { id: 1, icon: 'rocket-outline',       bg: PRIMARY,   label: 'Primeiro\nSimulado',  date: '10/01/2024', locked: false },
+  { id: 1, icon: 'rocket-outline',       bg: colors.primary,   label: 'Primeiro\nSimulado',  date: '10/01/2024', locked: false },
   { id: 2, icon: 'calculator-outline',   bg: '#4338CA', label: 'Nota\nPerfeita',      date: '25/01/2024', locked: false },
   { id: 3, icon: 'trophy-outline',       bg: '#6366F1', label: 'Foco no\nObjetivo',   date: '05/02/2024', locked: false },
-  { id: 4, icon: 'star-outline',         bg: '#312E81', label: 'Dedicação\nTotal',    date: '20/02/2024', locked: false },
+  { id: 4, icon: 'star-outline',         bg: colors.text, label: 'Dedicação\nTotal',    date: '20/02/2024', locked: false },
   { id: 5, icon: 'lock-closed-outline',  bg: '#94A3B8', label: 'Em breve',            date: '',           locked: true  },
 ];
 
@@ -174,14 +167,14 @@ export function HomeScreen() {
                 )}
               </View>
               <View style={styles.avatarEditBtn}>
-                <Ionicons name="pencil" size={12} color={INK} />
+                <Ionicons name="pencil" size={12} color={colors.ink} />
               </View>
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName} numberOfLines={2}>{user?.name ?? 'Usuário'}</Text>
               <Text style={styles.userRole}>{roleLabel}</Text>
               <View style={styles.levelBadge}>
-                <Ionicons name="star" size={11} color={PRIMARY} />
+                <Ionicons name="star" size={11} color={colors.primary} />
                 <Text style={styles.levelText} numberOfLines={1}>Nível 7 – Destaque da Turma</Text>
               </View>
             </View>
@@ -189,18 +182,18 @@ export function HomeScreen() {
 
           <View style={styles.headerIcons}>
             <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+              <Ionicons name="notifications-outline" size={22} color={colors.surface} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn} onPress={() => setPainelAberto(!painelAberto)}>
-              <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+              <Ionicons name="settings-outline" size={22} color={colors.surface} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={() => { setPainelAberto(true); setConfirmandoSaida(true); }}
               disabled={saindo}
             >
-              <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+              <Ionicons name="log-out-outline" size={22} color={colors.surface} />
             </TouchableOpacity>
           </View>
         </View>
@@ -208,7 +201,7 @@ export function HomeScreen() {
         <View style={styles.statsRow}>
           {STATS.map((s, i) => (
             <View key={i} style={[styles.statItem, i < STATS.length - 1 && styles.statBorder]}>
-              <Ionicons name={s.icon as any} size={19} color={MUTED} />
+              <Ionicons name={s.icon as any} size={19} color={colors.muted} />
               <Text style={styles.statValue}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
             </View>
@@ -223,9 +216,9 @@ export function HomeScreen() {
 
           <TouchableOpacity style={styles.acaoLinha}
             onPress={() => { setFormAberto(!formAberto); setSucesso(false); }} activeOpacity={0.7}>
-            <Ionicons name="key-outline" size={20} color={MUTED} />
+            <Ionicons name="key-outline" size={20} color={colors.muted} />
             <Text style={styles.acaoTexto}>Alterar senha</Text>
-            <Ionicons name={formAberto ? 'chevron-up' : 'chevron-down'} size={18} color={MUTED} />
+            <Ionicons name={formAberto ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
           </TouchableOpacity>
 
           {formAberto && (
@@ -238,39 +231,39 @@ export function HomeScreen() {
               )}
               {/* Senha atual */}
               <View style={[styles.campo, campoErros.current_password ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.current_password ? '#DC2626' : MUTED} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Senha atual" placeholderTextColor={MUTED}
+                <Ionicons name="lock-closed-outline" size={17} color={campoErros.current_password ? '#DC2626' : colors.muted} style={styles.icone} />
+                <TextInput style={styles.input} placeholder="Senha atual" placeholderTextColor={colors.muted}
                   secureTextEntry={!atualVisivel} value={senhaAtual}
                   onChangeText={(v) => { setSenhaAtual(v); limparErro('current_password'); setSucesso(false); }}
                   autoCapitalize="none" />
                 <TouchableOpacity onPress={() => setAtualVisivel(!atualVisivel)}>
-                  <Ionicons name={atualVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={MUTED} />
+                  <Ionicons name={atualVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
                 </TouchableOpacity>
               </View>
               {campoErros.current_password ? <Text style={styles.erroCampo}>{campoErros.current_password}</Text> : null}
 
               {/* Nova senha */}
               <View style={[styles.campo, campoErros.password ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password ? '#DC2626' : MUTED} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Nova senha" placeholderTextColor={MUTED}
+                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password ? '#DC2626' : colors.muted} style={styles.icone} />
+                <TextInput style={styles.input} placeholder="Nova senha" placeholderTextColor={colors.muted}
                   secureTextEntry={!novaVisivel} value={novaSenha}
                   onChangeText={(v) => { setNovaSenha(v); limparErro('password'); setSucesso(false); }}
                   autoCapitalize="none" />
                 <TouchableOpacity onPress={() => setNovaVisivel(!novaVisivel)}>
-                  <Ionicons name={novaVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={MUTED} />
+                  <Ionicons name={novaVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
                 </TouchableOpacity>
               </View>
               {campoErros.password ? <Text style={styles.erroCampo}>{campoErros.password}</Text> : null}
 
               {/* Confirmação */}
               <View style={[styles.campo, campoErros.password_confirmation ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password_confirmation ? '#DC2626' : MUTED} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Confirmar nova senha" placeholderTextColor={MUTED}
+                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password_confirmation ? '#DC2626' : colors.muted} style={styles.icone} />
+                <TextInput style={styles.input} placeholder="Confirmar nova senha" placeholderTextColor={colors.muted}
                   secureTextEntry={!confirmVisivel} value={confirmacao}
                   onChangeText={(v) => { setConfirmacao(v); limparErro('password_confirmation'); setSucesso(false); }}
                   autoCapitalize="none" />
                 <TouchableOpacity onPress={() => setConfirmVisivel(!confirmVisivel)}>
-                  <Ionicons name={confirmVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={MUTED} />
+                  <Ionicons name={confirmVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
                 </TouchableOpacity>
               </View>
               {campoErros.password_confirmation ? <Text style={styles.erroCampo}>{campoErros.password_confirmation}</Text> : null}
@@ -284,7 +277,7 @@ export function HomeScreen() {
 
               <TouchableOpacity style={[styles.botaoSalvar, salvando && styles.botaoDisabled]}
                 onPress={handleAlterarSenha} disabled={salvando} activeOpacity={0.8}>
-                {salvando ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.botaoSalvarTexto}>Salvar nova senha</Text>}
+                {salvando ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.botaoSalvarTexto}>Salvar nova senha</Text>}
               </TouchableOpacity>
             </View>
           )}
@@ -293,8 +286,8 @@ export function HomeScreen() {
 
           {!confirmandoSaida ? (
             <TouchableOpacity style={styles.acaoLinha} onPress={() => setConfirmandoSaida(true)} activeOpacity={0.7}>
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-              <Text style={[styles.acaoTexto, { color: '#EF4444' }]}>Sair</Text>
+              <Ionicons name="log-out-outline" size={20} color={colors.debit} />
+              <Text style={[styles.acaoTexto, { color: colors.debit }]}>Sair</Text>
             </TouchableOpacity>
           ) : (
             <View>
@@ -305,7 +298,7 @@ export function HomeScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.botaoConfirmarSair, saindo && styles.botaoDisabled]}
                   onPress={handleSair} disabled={saindo} activeOpacity={0.8}>
-                  {saindo ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.botaoConfirmarSairTexto}>Confirmar saída</Text>}
+                  {saindo ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.botaoConfirmarSairTexto}>Confirmar saída</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -318,17 +311,17 @@ export function HomeScreen() {
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <Text style={styles.cardTitle}>Resumo de desempenho</Text>
-            <Ionicons name="eye-outline" size={18} color={MUTED} style={{ marginLeft: 8 }} />
+            <Ionicons name="eye-outline" size={18} color={colors.muted} style={{ marginLeft: 8 }} />
           </View>
           <View style={styles.periodoPicker}>
             <Text style={styles.periodoTexto}>Este mês</Text>
-            <Ionicons name="chevron-down" size={13} color={TEXT} />
+            <Ionicons name="chevron-down" size={13} color={colors.text} />
           </View>
         </View>
 
         <Text style={styles.mediaGrande}>87<Text style={styles.mediaDecimal}>,3%</Text></Text>
         <View style={styles.trendRow}>
-          <Ionicons name="arrow-up" size={12} color={MUTED} />
+          <Ionicons name="arrow-up" size={12} color={colors.muted} />
           <Text style={styles.trendTexto}>5,2% vs mês anterior</Text>
         </View>
 
@@ -350,13 +343,13 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.insightBox}>
-          <Ionicons name="bulb-outline" size={17} color={MUTED} style={{ marginRight: 8, flexShrink: 0 }} />
+          <Ionicons name="bulb-outline" size={17} color={colors.muted} style={{ marginRight: 8, flexShrink: 0 }} />
           <Text style={styles.insightTexto}>
             Você está indo muito bem! Seu desempenho está{' '}
-            <Text style={{ color: INK, fontWeight: '700' }}>15% acima</Text>
+            <Text style={{ color: colors.ink, fontWeight: '700' }}>15% acima</Text>
             {' '}da média da turma.
           </Text>
-          <Ionicons name="chevron-forward" size={15} color={MUTED} style={{ flexShrink: 0 }} />
+          <Ionicons name="chevron-forward" size={15} color={colors.muted} style={{ flexShrink: 0 }} />
         </View>
       </View>
 
@@ -392,7 +385,7 @@ export function HomeScreen() {
                     <Ionicons
                       name={subjectIconName(s.subject?.icon ?? '') as any}
                       size={24}
-                      color={PRIMARY}
+                      color={colors.primary}
                     />
                   </View>
                   {s.subject && (
@@ -420,7 +413,7 @@ export function HomeScreen() {
                     </View>
                     <View style={styles.simOpenButton}>
                       <Text style={styles.simLink}>Abrir</Text>
-                      <Ionicons name="arrow-forward" size={13} color={SURFACE} />
+                      <Ionicons name="arrow-forward" size={13} color={colors.surface} />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -433,7 +426,7 @@ export function HomeScreen() {
       {/* ── Meta em andamento ─────────────────────────────────────────── */}
       <TouchableOpacity style={styles.metaCard} activeOpacity={0.85}>
         <View style={styles.metaIconWrap}>
-          <Ionicons name="trophy-outline" size={24} color={INK} />
+          <Ionicons name="trophy-outline" size={24} color={colors.ink} />
         </View>
         <View style={styles.metaInfo}>
           <Text style={styles.metaSubtitulo}>Meta em andamento</Text>
@@ -444,7 +437,7 @@ export function HomeScreen() {
           <Text style={styles.metaNumeros}>230 / 300</Text>
         </View>
         <Text style={styles.metaPct}>77%</Text>
-        <Ionicons name="chevron-forward" size={18} color={MUTED} />
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </TouchableOpacity>
 
       {/* ── Minhas conquistas ─────────────────────────────────────────── */}
@@ -456,7 +449,7 @@ export function HomeScreen() {
         {CONQUISTAS.map((c) => (
           <View key={c.id} style={styles.conquItem}>
             <View style={[styles.conquBadge, { backgroundColor: c.bg }, c.locked && styles.conquLocked]}>
-              <Ionicons name={c.icon as any} size={26} color="#fff" />
+              <Ionicons name={c.icon as any} size={26} color={colors.surface} />
             </View>
             <Text style={styles.conquLabel}>{c.label}</Text>
             {c.date
@@ -472,12 +465,12 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F7FB' },
+  container: { flex: 1, backgroundColor: colors.background },
   content:   { paddingBottom: 16 },
 
   // Header
   header: {
-    backgroundColor: INK,
+    backgroundColor: colors.ink,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 24,
@@ -501,104 +494,104 @@ const styles = StyleSheet.create({
   },
   notifDot: {
     position: 'absolute', top: 8, right: 8,
-    width: 8, height: 8, borderRadius: 4, backgroundColor: PRIMARY,
-    borderWidth: 1, borderColor: INK,
+    width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary,
+    borderWidth: 1, borderColor: colors.ink,
   },
   avatarWrap:    { position: 'relative', marginRight: 18 },
   avatarCircle:  {
     width: 104, height: 104, borderRadius: 52,
-    backgroundColor: SOFT, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center',
     borderWidth: 4, borderColor: 'rgba(238,242,255,0.18)', overflow: 'hidden',
   },
   avatarImage: { width: '100%', height: '100%' },
-  avatarInitials: { fontSize: 32, fontWeight: '800', color: PRIMARY },
+  avatarInitials: { fontSize: 32, fontWeight: '800', color: colors.primary },
   avatarEditBtn:  {
     position: 'absolute', bottom: 4, right: 4,
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: SURFACE, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: INK,
+    backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: colors.ink,
   },
   userInfo:   { flex: 1, minWidth: 0 },
-  userName:   { fontSize: 23, fontWeight: '800', color: SURFACE, marginBottom: 3 },
+  userName:   { fontSize: 23, fontWeight: '800', color: colors.surface, marginBottom: 3 },
   userRole:   { fontSize: 14, color: '#CBD5E1', marginBottom: 10 },
   levelBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     alignSelf: 'flex-start',
-    backgroundColor: SOFT, borderRadius: 20,
+    backgroundColor: colors.soft, borderRadius: 20,
     paddingHorizontal: 10, paddingVertical: 4,
   },
-  levelText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
+  levelText: { fontSize: 12, color: colors.primary, fontWeight: '600' },
 
   statsRow:  {
     flexDirection: 'row',
-    backgroundColor: SURFACE,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 4,
   },
   statItem:  { flex: 1, alignItems: 'center', gap: 4 },
-  statBorder:{ borderRightWidth: 1, borderRightColor: BORDER },
-  statValue: { fontSize: 18, fontWeight: '700', color: INK },
-  statLabel: { fontSize: 11, color: MUTED, textAlign: 'center', lineHeight: 14 },
+  statBorder:{ borderRightWidth: 1, borderRightColor: colors.border },
+  statValue: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  statLabel: { fontSize: 11, color: colors.muted, textAlign: 'center', lineHeight: 14 },
 
   // Card genérico
   card: {
-    backgroundColor: SURFACE, marginHorizontal: 16, marginTop: 16,
+    backgroundColor: colors.surface, marginHorizontal: 16, marginTop: 16,
     borderRadius: 18, padding: 18,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   cardHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   cardHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  cardTitle:      { fontSize: 16, fontWeight: '700', color: INK },
+  cardTitle:      { fontSize: 16, fontWeight: '700', color: colors.ink },
   periodoPicker:  {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: SOFT, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.soft, borderWidth: 1, borderColor: colors.border,
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
   },
-  periodoTexto: { fontSize: 13, color: TEXT, fontWeight: '500' },
+  periodoTexto: { fontSize: 13, color: colors.text, fontWeight: '500' },
 
   // Desempenho
-  mediaGrande:  { fontSize: 40, fontWeight: '800', color: INK },
-  mediaDecimal: { fontSize: 24, fontWeight: '600', color: INK },
+  mediaGrande:  { fontSize: 40, fontWeight: '800', color: colors.ink },
+  mediaDecimal: { fontSize: 24, fontWeight: '600', color: colors.ink },
   trendRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 },
-  trendTexto:   { fontSize: 13, color: MUTED, fontWeight: '500' },
+  trendTexto:   { fontSize: 13, color: colors.muted, fontWeight: '500' },
   acertosErros: { flexDirection: 'row', gap: 16, marginBottom: 14 },
   aeItem:       { flex: 1 },
-  aeLabel:      { fontSize: 12, color: MUTED, marginBottom: 2 },
-  aeValor:      { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 6 },
+  aeLabel:      { fontSize: 12, color: colors.muted, marginBottom: 2 },
+  aeValor:      { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 6 },
   progressBar:  { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#E0E7FF' },
-  progressFill: { height: '100%', borderRadius: 3, backgroundColor: PRIMARY },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.primary },
   insightBox:   {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: SOFT, borderRadius: 12,
+    backgroundColor: colors.soft, borderRadius: 12,
     padding: 12, gap: 4,
   },
-  insightTexto: { flex: 1, fontSize: 13, color: TEXT, lineHeight: 18 },
+  insightTexto: { flex: 1, fontSize: 13, color: colors.text, lineHeight: 18 },
 
   // Section headers
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginTop: 20, marginBottom: 10 },
-  sectionTitle:  { fontSize: 16, fontWeight: '700', color: INK },
-  sectionLink:   { fontSize: 13, color: PRIMARY, fontWeight: '700' },
+  sectionTitle:  { fontSize: 16, fontWeight: '700', color: colors.ink },
+  sectionLink:   { fontSize: 13, color: colors.primary, fontWeight: '700' },
   hScroll:       { paddingHorizontal: 16, gap: 12 },
 
   // Simulados
   simCard: {
-    width: 184, minHeight: 214, backgroundColor: INK, borderRadius: 16, padding: 16,
+    width: 184, minHeight: 214, backgroundColor: colors.ink, borderRadius: 16, padding: 16,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, elevation: 3,
     flexDirection: 'column',
   },
   simCardVazio: {
-    width: 220, backgroundColor: SURFACE, borderRadius: 18, padding: 20,
+    width: 220, backgroundColor: colors.surface, borderRadius: 18, padding: 20,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
-  simCardVazioTexto: { fontSize: 13, color: MUTED, textAlign: 'center' },
+  simCardVazioTexto: { fontSize: 13, color: colors.muted, textAlign: 'center' },
   simIconWrap: {
-    width: 48, height: 48, borderRadius: 14, backgroundColor: SURFACE,
+    width: 48, height: 48, borderRadius: 14, backgroundColor: colors.surface,
     justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
   simMateria: { fontSize: 11, fontWeight: '700', color: '#CBD5E1', marginBottom: 8 },
-  simTitulo:  { fontSize: 14, fontWeight: '800', color: SURFACE, marginBottom: 10, lineHeight: 20, flex: 1 },
+  simTitulo:  { fontSize: 14, fontWeight: '800', color: colors.surface, marginBottom: 10, lineHeight: 20, flex: 1 },
   simDaysPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -614,7 +607,7 @@ const styles = StyleSheet.create({
   simDaysText: { fontSize: 10, fontWeight: '800', color: '#CBD5E1' },
   simRodape:  { gap: 8, marginTop: 'auto' as any },
   simBadge:   { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  simBadgeTexto: { fontSize: 10, fontWeight: '800', color: SURFACE },
+  simBadgeTexto: { fontSize: 10, fontWeight: '800', color: colors.surface },
   simOpenButton: {
     height: 30,
     borderRadius: 15,
@@ -624,26 +617,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
-  simLink:    { fontSize: 12, fontWeight: '800', color: SURFACE },
+  simLink:    { fontSize: 12, fontWeight: '800', color: colors.surface },
 
   // Meta
   metaCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: SURFACE, marginHorizontal: 16, marginTop: 16,
+    backgroundColor: colors.surface, marginHorizontal: 16, marginTop: 16,
     borderRadius: 18, padding: 16, gap: 12,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   metaIconWrap: {
     width: 52, height: 52, borderRadius: 26,
-    backgroundColor: SOFT, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center',
   },
   metaInfo:     { flex: 1 },
-  metaSubtitulo:{ fontSize: 11, color: PRIMARY, fontWeight: '600', marginBottom: 2 },
-  metaTitulo:   { fontSize: 14, fontWeight: '700', color: INK, marginBottom: 8 },
+  metaSubtitulo:{ fontSize: 11, color: colors.primary, fontWeight: '600', marginBottom: 2 },
+  metaTitulo:   { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 8 },
   metaBar:      { height: 6, backgroundColor: '#E0E7FF', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
-  metaBarFill:  { height: '100%', backgroundColor: PRIMARY, borderRadius: 3 },
-  metaNumeros:  { fontSize: 11, color: MUTED },
-  metaPct:      { fontSize: 14, fontWeight: '700', color: PRIMARY },
+  metaBarFill:  { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
+  metaNumeros:  { fontSize: 11, color: colors.muted },
+  metaPct:      { fontSize: 14, fontWeight: '700', color: colors.primary },
 
   // Conquistas
   conquItem:  { alignItems: 'center', width: 80 },
@@ -652,23 +645,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginBottom: 8,
   },
   conquLocked: { opacity: 0.5 },
-  conquLabel:  { fontSize: 11, color: TEXT, textAlign: 'center', lineHeight: 14 },
-  conquDate:   { fontSize: 10, color: MUTED, textAlign: 'center', marginTop: 2 },
-  conquEmBreve:{ fontSize: 10, color: MUTED, fontWeight: '600', textAlign: 'center', marginTop: 2 },
+  conquLabel:  { fontSize: 11, color: colors.text, textAlign: 'center', lineHeight: 14 },
+  conquDate:   { fontSize: 10, color: colors.muted, textAlign: 'center', marginTop: 2 },
+  conquEmBreve:{ fontSize: 10, color: colors.muted, fontWeight: '600', textAlign: 'center', marginTop: 2 },
 
   // Configurações / alterar senha
   acaoLinha:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  acaoTexto:  { flex: 1, fontSize: 15, fontWeight: '500', color: INK },
-  divisor:    { height: 1, backgroundColor: BORDER, marginVertical: 14 },
+  acaoTexto:  { flex: 1, fontSize: 15, fontWeight: '500', color: colors.ink },
+  divisor:    { height: 1, backgroundColor: colors.border, marginVertical: 14 },
   formSenha:  { marginTop: 14 },
   campo: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: SOFT,
-    borderWidth: 1, borderColor: BORDER, borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.soft,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 12, marginBottom: 4,
   },
   campoErro:  { borderColor: '#DC2626', backgroundColor: '#FFF5F5' },
   icone:      { marginRight: 8 },
-  input:      { flex: 1, fontSize: 14, color: INK },
+  input:      { flex: 1, fontSize: 14, color: colors.ink },
   erroCampo:  { fontSize: 12, color: '#DC2626', marginBottom: 10, marginLeft: 2 },
   erroContainer: {
     flexDirection: 'row', alignItems: 'flex-start',
@@ -682,13 +675,13 @@ const styles = StyleSheet.create({
     borderRadius: 8, padding: 10, marginBottom: 12,
   },
   sucessoTexto:    { fontSize: 13, color: '#059669', fontWeight: '500' },
-  botaoSalvar:     { backgroundColor: PRIMARY, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
+  botaoSalvar:     { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 8 },
   botaoDisabled:   { opacity: 0.6 },
-  botaoSalvarTexto:{ color: '#fff', fontSize: 15, fontWeight: '600' },
-  confirmTexto:    { fontSize: 14, color: TEXT, marginBottom: 12 },
+  botaoSalvarTexto:{ color: colors.surface, fontSize: 15, fontWeight: '600' },
+  confirmTexto:    { fontSize: 14, color: colors.text, marginBottom: 12 },
   confirmBotoes:   { flexDirection: 'row', gap: 10 },
-  botaoCancelar:   { flex: 1, borderWidth: 1, borderColor: BORDER, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
-  botaoCancelarTexto:     { fontSize: 14, color: TEXT, fontWeight: '500' },
-  botaoConfirmarSair:     { flex: 1, backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
-  botaoConfirmarSairTexto:{ fontSize: 14, color: '#fff', fontWeight: '600' },
+  botaoCancelar:   { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  botaoCancelarTexto:     { fontSize: 14, color: colors.text, fontWeight: '500' },
+  botaoConfirmarSair:     { flex: 1, backgroundColor: colors.debit, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  botaoConfirmarSairTexto:{ fontSize: 14, color: colors.surface, fontWeight: '600' },
 });

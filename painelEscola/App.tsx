@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { loadAsync } from "expo-font";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator, Text, TouchableOpacity } from "react-native";
+import { View, ActivityIndicator, Text, TouchableOpacity, useWindowDimensions } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Sidebar from "./components/Sidebar";
@@ -192,7 +192,10 @@ function navToHash(nav: NavState): string {
 
 function AppContent() {
   const { user, isLoading, mustChangePassword } = useAuth();
+  const { width } = useWindowDimensions();
   const [fontsReady, setFontsReady] = useState(typeof window === "undefined");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const isMobile = width < 768;
 
   const [nav, setNav] = useState<NavState>(() => {
     if (typeof window !== "undefined" && window.location.hash) {
@@ -204,6 +207,7 @@ function AppContent() {
   const navigate = (screen: string, params?: Record<string, any>) => {
     const next: NavState = { screen, params };
     setNav(next);
+    setIsSidebarOpen(false);
     if (typeof window !== "undefined") {
       window.location.hash = navToHash(next);
     }
@@ -350,14 +354,36 @@ function AppContent() {
   return (
     <SafeAreaProvider>
       <View className="flex-1 flex-row" style={{ backgroundColor: "#EEEEFF" }}>
-        <Sidebar
-          activeItem={activeItem}
-          onSelectItem={(s) => navigate(s)}
-          canManageTenants={canManageTenants}
-          canManageUsers={canManageUsers}
-        />
+        {!isMobile && (
+          <Sidebar
+            activeItem={activeItem}
+            onSelectItem={(s) => navigate(s)}
+            canManageTenants={canManageTenants}
+            canManageUsers={canManageUsers}
+          />
+        )}
+        {isMobile && isSidebarOpen && (
+          <View
+            className="absolute inset-0"
+            style={{ zIndex: 30, backgroundColor: "rgba(17, 24, 39, 0.42)" }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setIsSidebarOpen(false)}
+              className="absolute inset-0"
+            />
+            <Sidebar
+              activeItem={activeItem}
+              onSelectItem={(s) => navigate(s)}
+              canManageTenants={canManageTenants}
+              canManageUsers={canManageUsers}
+              isMobile
+              onClose={() => setIsSidebarOpen(false)}
+            />
+          </View>
+        )}
         <View className="flex-1 flex-col overflow-hidden">
-          <Header />
+          <Header onOpenMenu={isMobile ? () => setIsSidebarOpen(true) : undefined} isMobile={isMobile} />
           {renderScreen()}
         </View>
       </View>

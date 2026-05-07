@@ -5,6 +5,7 @@ import StatCard from "../components/StatCard";
 import DonutChart from "../components/DonutChart";
 import AttendanceChart from "../components/AttendanceChart";
 import CalendarWidget from "../components/CalendarWidget";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 const attendanceData = [
   { day: "Seg", present: 70, absent: 30 },
@@ -75,10 +76,12 @@ const messages = [
 ];
 
 export default function DashboardScreen() {
+  const { isMobile, contentPadding } = useResponsiveLayout();
+
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Page Title */}
@@ -90,7 +93,10 @@ export default function DashboardScreen() {
       </View>
 
       {/* Stat Cards */}
-      <View className="flex-row mb-6 -mx-1.5">
+      <View
+        className="mb-6"
+        style={{ flexDirection: isMobile ? "column" : "row", marginHorizontal: isMobile ? 0 : -6, gap: isMobile ? 12 : 0 }}
+      >
         <StatCard
           title="Alunos"
           value="1.248"
@@ -118,7 +124,7 @@ export default function DashboardScreen() {
       </View>
 
       {/* Main Two-column Content */}
-      <View className="flex-row gap-5">
+      <View style={{ flexDirection: isMobile ? "column" : "row", gap: 20 }}>
         {/* LEFT COLUMN */}
         <View style={{ flex: 2 }}>
           {/* Students Card */}

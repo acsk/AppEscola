@@ -19,6 +19,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useExamStatuses, useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import DateTimePickerInput from "../../components/ui/DateTimePickerInput";
 import { displayToISO, isoToDisplay, displayDateTimeToISO, isoToDisplayDateTime } from "../../utils/masks";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,7 @@ interface Props {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ExamFormScreen({ examId, navigate }: Props) {
+  const { contentPadding } = useResponsiveLayout();
   const isEdit = examId !== null;
   const scrollRef = useRef<ScrollView>(null);
 
@@ -490,7 +492,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 60 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Cabeçalho */}

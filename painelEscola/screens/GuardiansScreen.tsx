@@ -19,6 +19,7 @@ import {
   useGuardianRelationships,
   domainToOptions,
 } from "../hooks/useDomains";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 type Guardian = {
   id: number;
@@ -46,6 +47,7 @@ const EMPTY: Form = {
 };
 
 export default function GuardiansScreen() {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Guardian[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -147,9 +149,9 @@ export default function GuardiansScreen() {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
     >
-      <View className="flex-row items-center justify-between mb-6">
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
           <Text className="text-2xl font-bold text-gray-800">Responsáveis</Text>
           <Text className="text-sm text-gray-500">
@@ -171,7 +173,7 @@ export default function GuardiansScreen() {
       <View className="mb-4">
         <View
           className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
-          style={{ height: 44, maxWidth: 360 }}
+          style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
           <Ionicons name="search-outline" size={16} color="#9CA3AF" />
           <TextInput
@@ -192,9 +194,10 @@ export default function GuardiansScreen() {
         </View>
       </View>
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
       <View
         className="bg-white rounded-2xl overflow-hidden"
-        style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        style={{ minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
       >
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>
@@ -280,6 +283,7 @@ export default function GuardiansScreen() {
           </View>
         )}
       </View>
+      </ScrollView>
 
       <Modal
         visible={modalVisible}

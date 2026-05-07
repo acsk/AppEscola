@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -33,6 +34,8 @@ type SidebarProps = {
   onSelectItem?: (id: string) => void;
   canManageTenants?: boolean;
   canManageUsers?: boolean;
+  isMobile?: boolean;
+  onClose?: () => void;
 };
 
 export default function Sidebar({
@@ -40,7 +43,10 @@ export default function Sidebar({
   onSelectItem,
   canManageTenants = false,
   canManageUsers = false,
+  isMobile = false,
+  onClose,
 }: SidebarProps) {
+  const { width } = useWindowDimensions();
   const [internalActive, setInternalActive] = useState("dashboard");
   const activeItem = externalActive ?? internalActive;
   const visibleMenuItems = [
@@ -87,21 +93,39 @@ export default function Sidebar({
   return (
     <View
       className="bg-white pt-6 px-3 border-r border-gray-100"
-      style={{ width: 220, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}
+      style={{
+        width: isMobile ? Math.min(300, width * 0.84) : 220,
+        height: "100%",
+        shadowColor: "#000",
+        shadowOpacity: isMobile ? 0.16 : 0.04,
+        shadowRadius: isMobile ? 18 : 8,
+        elevation: 8,
+      }}
     >
       {/* Logo */}
-      <View className="flex-row items-center px-3 mb-8">
-        <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
-          <Ionicons name="school" size={20} color="white" />
+      <View className="flex-row items-center justify-between px-3 mb-8">
+        <View className="flex-row items-center">
+          <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
+            <Ionicons name="school" size={20} color="white" />
+          </View>
+          <View>
+            <Text className="text-base font-bold text-gray-800 leading-tight">
+              Cursinho
+            </Text>
+            <Text className="text-xs text-violet-500 font-semibold leading-tight">
+              Hub
+            </Text>
+          </View>
         </View>
-        <View>
-          <Text className="text-base font-bold text-gray-800 leading-tight">
-            Cursinho
-          </Text>
-          <Text className="text-xs text-violet-500 font-semibold leading-tight">
-            Hub
-          </Text>
-        </View>
+        {isMobile && (
+          <TouchableOpacity
+            onPress={onClose}
+            className="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 items-center justify-center"
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={18} color="#6B7280" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">

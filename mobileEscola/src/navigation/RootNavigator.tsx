@@ -7,6 +7,7 @@ import { AlunoStack } from './stacks/AlunoStack';
 import { AdminStack } from './stacks/AdminStack';
 import { ProfessorStack } from './stacks/ProfessorStack';
 import { ChangePasswordScreen } from '../features/auth/screens/ChangePasswordScreen';
+import { colors } from '../theme';
 
 import * as Linking from 'expo-linking';
 
@@ -50,7 +51,7 @@ export function RootNavigator() {
   if (isLoading) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -88,4 +89,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
 });
-

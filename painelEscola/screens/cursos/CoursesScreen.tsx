@@ -12,6 +12,7 @@ import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Course = {
   id: number;
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function CoursesScreen({ navigate }: Props) {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -71,18 +73,21 @@ export default function CoursesScreen({ navigate }: Props) {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Cabeçalho */}
-      <View className="flex-row items-center justify-between mb-6">
+      <View
+        className="mb-6"
+        style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}
+      >
         <View>
           <Text className="text-2xl font-bold text-gray-800">Cursos</Text>
           <Text className="text-sm text-gray-500">
             Cursos oferecidos pelo cursinho
           </Text>
         </View>
-        <View className="flex-row gap-3">
+        <View style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
           <TouchableOpacity
             onPress={() => navigate("pacotes")}
             className="flex-row items-center bg-white border border-violet-200 px-4 py-2.5 rounded-xl"
@@ -107,10 +112,10 @@ export default function CoursesScreen({ navigate }: Props) {
       </View>
 
       {/* Filtros */}
-      <View className="flex-row gap-3 mb-4">
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
         <View
           className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
-          style={{ height: 44, maxWidth: 360 }}
+          style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
           <Ionicons name="search-outline" size={16} color="#9CA3AF" />
           <TextInput
@@ -143,7 +148,7 @@ export default function CoursesScreen({ navigate }: Props) {
             color: "#374151",
             backgroundColor: "white",
             height: 44,
-            minWidth: 160,
+            minWidth: isMobile ? "100%" : 160,
           }}
         >
           <option value="">Todos os status</option>
@@ -153,9 +158,11 @@ export default function CoursesScreen({ navigate }: Props) {
       </View>
 
       {/* Tabela */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
       <View
         className="bg-white rounded-2xl overflow-hidden"
         style={{
+          minWidth: tableMinWidth,
           shadowColor: "#000",
           shadowOpacity: 0.05,
           shadowRadius: 10,
@@ -257,6 +264,7 @@ export default function CoursesScreen({ navigate }: Props) {
           </View>
         )}
       </View>
+      </ScrollView>
 
       <ConfirmModal
         visible={!!deleteId}

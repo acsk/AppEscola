@@ -21,18 +21,10 @@ import {
   AttemptStatus,
   subjectIconName,
 } from '../../../services/simulados.service';
+import { colors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'SimuladosList'>;
 type Aba = 'disponiveis' | 'historico';
-
-const PRIMARY = '#4F46E5';
-const INK = '#1E1B4B';
-const TEXT = '#312E81';
-const MUTED = '#64748B';
-const SOFT = '#EEF2FF';
-const BORDER = '#DDE3F5';
-const SURFACE = '#FFFFFF';
-const BACKGROUND = '#F6F7FB';
 
 const STATUS_LABEL: Record<AttemptStatus, string> = {
   not_started:    'Disponível',
@@ -63,7 +55,7 @@ const HIST_COLOR: Record<string, string> = {
   pending_review: '#F97316',
   awaiting_release: '#F97316',
   completed:      '#22C55E',
-  abandoned:      '#EF4444',
+  abandoned:      colors.debit,
 };
 const HIST_LABEL: Record<string, string> = {
   in_progress:    'Em andamento',
@@ -95,7 +87,7 @@ function formatDate(iso: string): string {
 }
 
 function statusColor(status: AttemptStatus | string): string {
-  return STATUS_COLOR[status as AttemptStatus] ?? HIST_COLOR[status] ?? MUTED;
+  return STATUS_COLOR[status as AttemptStatus] ?? HIST_COLOR[status] ?? colors.muted;
 }
 
 export function SimuladosScreen() {
@@ -178,34 +170,34 @@ export function SimuladosScreen() {
             ) : null}
           </View>
           <View style={[styles.badge, { backgroundColor: cor }]}>
-            <Ionicons name={icon} size={13} color={SURFACE} style={{ marginRight: 4 }} />
+            <Ionicons name={icon} size={13} color={colors.surface} style={{ marginRight: 4 }} />
             <Text style={styles.badgeTexto}>{label}</Text>
           </View>
         </View>
         {!item.can_start && item.attempt_status === 'not_started' && (
           <View style={styles.foraPeriodo}>
-            <Ionicons name="lock-closed-outline" size={12} color={MUTED} />
+            <Ionicons name="lock-closed-outline" size={12} color={colors.muted} />
             <Text style={styles.foraPeriodoTexto}>Fora do período</Text>
           </View>
         )}
         <Text style={styles.cardTitulo} numberOfLines={2}>{item.title}</Text>
         <View style={styles.cardRodape}>
           <View style={styles.infoItem}>
-            <Ionicons name="help-circle-outline" size={14} color={MUTED} />
+            <Ionicons name="help-circle-outline" size={14} color={colors.muted} />
             <Text style={styles.infoTexto}>{item.total_questions} questões</Text>
           </View>
           <View style={styles.infoItem}>
-            <Ionicons name="time-outline" size={14} color={MUTED} />
+            <Ionicons name="time-outline" size={14} color={colors.muted} />
             <Text style={styles.infoTexto}>{formatMinutes(item.duration_minutes)}</Text>
           </View>
           <View style={styles.infoItem}>
-            <Ionicons name="ribbon-outline" size={14} color={MUTED} />
+            <Ionicons name="ribbon-outline" size={14} color={colors.muted} />
             <Text style={styles.infoTexto}>Mínimo {item.passing_score}%</Text>
           </View>
         </View>
         {item.ends_at && item.attempt_status !== 'completed' && (
           <View style={styles.prazoRow}>
-            <Ionicons name="calendar-outline" size={12} color={MUTED} />
+            <Ionicons name="calendar-outline" size={12} color={colors.muted} />
             <Text style={styles.prazoTexto}>Prazo: {formatDate(item.ends_at)}</Text>
           </View>
         )}
@@ -247,7 +239,7 @@ export function SimuladosScreen() {
             ) : null}
           </View>
           <View style={[styles.badge, { backgroundColor: cor }]}>
-            <Ionicons name={icon} size={13} color={SURFACE} style={{ marginRight: 4 }} />
+            <Ionicons name={icon} size={13} color={colors.surface} style={{ marginRight: 4 }} />
             <Text style={styles.badgeTexto}>{label}</Text>
           </View>
         </View>
@@ -258,7 +250,7 @@ export function SimuladosScreen() {
         {item.status === 'completed' && item.percentage !== null && (
           <View style={styles.histMetricas}>
             <View style={styles.histMetricaItem}>
-              <Text style={[styles.histMetricaValor, { color: item.passed ? '#10B981' : '#EF4444' }]}>
+              <Text style={[styles.histMetricaValor, { color: item.passed ? colors.credit : colors.debit }]}>
                 {item.percentage.toFixed(1)}%
               </Text>
               <Text style={styles.histMetricaLabel}>Aproveit.</Text>
@@ -278,9 +270,9 @@ export function SimuladosScreen() {
               <Ionicons
                 name={item.passed ? 'checkmark-circle' : 'close-circle'}
                 size={20}
-                color={item.passed ? '#10B981' : '#EF4444'}
+                color={item.passed ? colors.credit : colors.debit}
               />
-              <Text style={[styles.histMetricaLabel, { color: item.passed ? '#10B981' : '#EF4444' }]}>
+              <Text style={[styles.histMetricaLabel, { color: item.passed ? colors.credit : colors.debit }]}>
                 {item.passed ? 'Aprovado' : 'Reprovado'}
               </Text>
             </View>
@@ -300,7 +292,7 @@ export function SimuladosScreen() {
         )}
 
         <View style={styles.prazoRow}>
-          <Ionicons name="calendar-outline" size={12} color={MUTED} />
+          <Ionicons name="calendar-outline" size={12} color={colors.muted} />
           <Text style={styles.prazoTexto}>Iniciado: {formatDate(item.started_at)}</Text>
           {item.finished_at && (
             <Text style={[styles.prazoTexto, { marginLeft: 8 }]}>
@@ -342,7 +334,7 @@ export function SimuladosScreen() {
         <View style={styles.container}>
           {header}
           <View style={styles.centrado}>
-            <ActivityIndicator size="large" color={PRIMARY} />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.carregandoTexto}>Carregando simulados…</Text>
           </View>
         </View>
@@ -353,7 +345,7 @@ export function SimuladosScreen() {
         <View style={styles.container}>
           {header}
           <View style={styles.centrado}>
-            <Ionicons name="cloud-offline-outline" size={48} color={BORDER} />
+            <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
             <Text style={styles.erroTexto}>{erro}</Text>
             <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarDisponiveis()} activeOpacity={0.8}>
               <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
@@ -373,14 +365,14 @@ export function SimuladosScreen() {
           contentContainerStyle={simulados.length === 0 ? styles.listaVazia : styles.lista}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={atualizando} onRefresh={() => carregarDisponiveis(true)} colors={[PRIMARY]} tintColor={PRIMARY} />
+            <RefreshControl refreshing={atualizando} onRefresh={() => carregarDisponiveis(true)} colors={[colors.primary]} tintColor={colors.primary} />
           }
           ListHeaderComponent={simulados.length > 0 ? (
             <Text style={styles.cabecalho}>{simulados.length} simulado{simulados.length !== 1 ? 's' : ''}</Text>
           ) : null}
           ListEmptyComponent={
             <View style={styles.vazio}>
-              <Ionicons name="clipboard-outline" size={56} color={BORDER} />
+              <Ionicons name="clipboard-outline" size={56} color={colors.border} />
               <Text style={styles.vazioTitulo}>Nenhum simulado disponível</Text>
               <Text style={styles.vazioSub}>Verifique sua matrícula ou tente mais tarde.</Text>
             </View>
@@ -396,7 +388,7 @@ export function SimuladosScreen() {
       <View style={styles.container}>
         {header}
         <View style={styles.centrado}>
-        <ActivityIndicator size="large" color={PRIMARY} />
+        <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.carregandoTexto}>Carregando histórico…</Text>
         </View>
       </View>
@@ -407,7 +399,7 @@ export function SimuladosScreen() {
       <View style={styles.container}>
         {header}
         <View style={styles.centrado}>
-          <Ionicons name="cloud-offline-outline" size={48} color={BORDER} />
+          <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
           <Text style={styles.erroTexto}>{erroHist}</Text>
           <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarHistorico()} activeOpacity={0.8}>
             <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
@@ -427,14 +419,14 @@ export function SimuladosScreen() {
         contentContainerStyle={tentativas.length === 0 ? styles.listaVazia : styles.lista}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={atualizandoHist} onRefresh={() => carregarHistorico(true)} colors={[PRIMARY]} tintColor={PRIMARY} />
+          <RefreshControl refreshing={atualizandoHist} onRefresh={() => carregarHistorico(true)} colors={[colors.primary]} tintColor={colors.primary} />
         }
         ListHeaderComponent={tentativas.length > 0 ? (
           <Text style={styles.cabecalho}>{tentativas.length} tentativa{tentativas.length !== 1 ? 's' : ''}</Text>
         ) : null}
         ListEmptyComponent={
           <View style={styles.vazio}>
-            <Ionicons name="time-outline" size={56} color={BORDER} />
+            <Ionicons name="time-outline" size={56} color={colors.border} />
             <Text style={styles.vazioTitulo}>Nenhuma tentativa ainda</Text>
             <Text style={styles.vazioSub}>Seus simulados realizados aparecerão aqui.</Text>
           </View>
@@ -445,34 +437,34 @@ export function SimuladosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BACKGROUND },
+  container: { flex: 1, backgroundColor: colors.background },
 
   // Header + tabs
   headerWrap: {
-    backgroundColor: INK,
+    backgroundColor: colors.ink,
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, elevation: 4,
   },
-  headerTitulo: { fontSize: 22, fontWeight: '800', color: SURFACE, paddingTop: 18, paddingBottom: 14 },
+  headerTitulo: { fontSize: 22, fontWeight: '800', color: colors.surface, paddingTop: 18, paddingBottom: 14 },
   tabs: { flexDirection: 'row', gap: 8 },
   tab: {
     flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center',
     backgroundColor: 'rgba(238,242,255,0.12)',
   },
-  tabAtiva: { backgroundColor: SURFACE },
+  tabAtiva: { backgroundColor: colors.surface },
   tabTexto: { fontSize: 14, fontWeight: '700', color: '#CBD5E1' },
-  tabTextoAtivo: { color: PRIMARY },
+  tabTextoAtivo: { color: colors.primary },
 
   lista:      { padding: 16, paddingTop: 12 },
   listaVazia: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  cabecalho:  { fontSize: 13, color: MUTED, marginBottom: 12 },
+  cabecalho:  { fontSize: 13, color: colors.muted, marginBottom: 12 },
 
   card: {
-    backgroundColor: SURFACE, borderRadius: 18, padding: 16, paddingLeft: 20,
-    marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.surface, borderRadius: 18, padding: 16, paddingLeft: 20,
+    marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
   cardAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
@@ -480,8 +472,8 @@ const styles = StyleSheet.create({
   cardTopoEsq: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   subjectChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   subjectNome: { fontSize: 11, fontWeight: '600' },
-  tipoChip: { backgroundColor: SOFT, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
-  tipoTexto: { fontSize: 11, color: MUTED, fontWeight: '600' },
+  tipoChip: { backgroundColor: colors.soft, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+  tipoTexto: { fontSize: 11, color: colors.muted, fontWeight: '600' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -493,33 +485,33 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
-  badgeTexto: { fontSize: 12, fontWeight: '800', color: SURFACE },
+  badgeTexto: { fontSize: 12, fontWeight: '800', color: colors.surface },
   foraPeriodo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  foraPeriodoTexto: { fontSize: 11, color: MUTED },
-  cardTitulo: { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 12, lineHeight: 22 },
+  foraPeriodoTexto: { fontSize: 11, color: colors.muted },
+  cardTitulo: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 12, lineHeight: 22 },
   cardRodape: { flexDirection: 'row', gap: 14, flexWrap: 'wrap' },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  infoTexto: { fontSize: 12, color: MUTED },
+  infoTexto: { fontSize: 12, color: colors.muted },
   prazoRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
-  prazoTexto: { fontSize: 11, color: MUTED },
+  prazoTexto: { fontSize: 11, color: colors.muted },
 
   // Histórico
   histMetricas: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: SOFT, borderRadius: 12, padding: 12,
+    backgroundColor: colors.soft, borderRadius: 12, padding: 12,
     marginBottom: 10, gap: 0,
   },
   histMetricaItem: { flex: 1, alignItems: 'center' },
-  histMetricaValor: { fontSize: 15, fontWeight: '700', color: INK },
-  histMetricaLabel: { fontSize: 10, color: MUTED, marginTop: 2 },
-  histMetricaSep: { width: 1, height: 32, backgroundColor: BORDER },
+  histMetricaValor: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  histMetricaLabel: { fontSize: 10, color: colors.muted, marginTop: 2 },
+  histMetricaSep: { width: 1, height: 32, backgroundColor: colors.border },
 
-  centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: BACKGROUND },
-  carregandoTexto: { marginTop: 12, fontSize: 14, color: MUTED },
-  erroTexto: { fontSize: 14, color: TEXT, textAlign: 'center', marginTop: 12, lineHeight: 20 },
-  botaoTentar: { marginTop: 20, backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
-  botaoTentarTexto: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: colors.background },
+  carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
+  erroTexto: { fontSize: 14, color: colors.text, textAlign: 'center', marginTop: 12, lineHeight: 20 },
+  botaoTentar: { marginTop: 20, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  botaoTentarTexto: { color: colors.surface, fontWeight: '600', fontSize: 15 },
   vazio: { alignItems: 'center', padding: 32 },
-  vazioTitulo: { fontSize: 16, fontWeight: '700', color: INK, marginTop: 16, textAlign: 'center' },
-  vazioSub: { fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 8, lineHeight: 18 },
+  vazioTitulo: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 16, textAlign: 'center' },
+  vazioSub: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 18 },
 });

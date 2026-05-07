@@ -24,6 +24,7 @@ import {
   useGuardianRelationships,
   domainToOptions,
 } from "../../hooks/useDomains";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,7 @@ interface Props {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function StudentFormScreen({ studentId, navigate }: Props) {
+  const { contentPadding } = useResponsiveLayout();
   const isEdit = studentId !== null;
   const scrollRef = useRef<ScrollView>(null);
 
@@ -302,7 +304,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Breadcrumb / Header */}

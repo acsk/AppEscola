@@ -14,6 +14,7 @@ import FormInput from "../../components/ui/FormInput";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ interface Props {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function CourseFormScreen({ courseId, navigate }: Props) {
+  const { contentPadding } = useResponsiveLayout();
   const isEdit = courseId !== null;
   const scrollRef = useRef<ScrollView>(null);
 
@@ -152,8 +154,9 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
         navigate("cursos-form", { courseId });
       } else {
         const { data } = await api.post("/courses", payload);
+        const created = data.body ?? data.data ?? data;
         // Redirect to edit mode so user can add plans
-        navigate("cursos-form", { courseId: data.id });
+        navigate("cursos-form", { courseId: created.id });
       }
     } catch (e: any) {
       if (e.response?.status === 422) {
@@ -248,7 +251,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Breadcrumb */}

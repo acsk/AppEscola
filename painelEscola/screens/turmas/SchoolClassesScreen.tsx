@@ -12,6 +12,7 @@ import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { usePeriods, domainToOptions } from "../../hooks/useDomains";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function SchoolClassesScreen({ navigate }: Props) {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<SchoolClass[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -152,11 +154,11 @@ export default function SchoolClassesScreen({ navigate }: Props) {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Header */}
-      <View className="flex-row items-center justify-between mb-6">
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
           <Text className="text-2xl font-bold text-gray-800">Turmas</Text>
           <Text className="text-sm text-gray-500">
@@ -189,7 +191,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
         <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
           <View
             className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3"
-            style={{ height: 44, minWidth: 220, flexGrow: 1 }}
+            style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
             <Ionicons name="search-outline" size={16} color="#9CA3AF" />
             <input
@@ -230,7 +232,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               color: "#374151",
               backgroundColor: "#F9FAFB",
               height: 44,
-              minWidth: 200,
+              minWidth: isMobile ? "100%" : 200,
             }}
           >
             <option value="">Curso</option>
@@ -255,7 +257,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               color: "#374151",
               backgroundColor: "#F9FAFB",
               height: 44,
-              minWidth: 120,
+              minWidth: isMobile ? "100%" : 120,
             }}
           >
             <option value="">Ano</option>
@@ -280,7 +282,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               color: "#374151",
               backgroundColor: "#F9FAFB",
               height: 44,
-              minWidth: 150,
+              minWidth: isMobile ? "100%" : 150,
             }}
           >
             <option value="">Período</option>
@@ -305,7 +307,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               color: "#374151",
               backgroundColor: "#F9FAFB",
               height: 44,
-              minWidth: 140,
+              minWidth: isMobile ? "100%" : 140,
             }}
           >
             <option value="">Status</option>
@@ -316,9 +318,11 @@ export default function SchoolClassesScreen({ navigate }: Props) {
       </View>
 
       {/* Table */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
       <View
         className="bg-white rounded-2xl overflow-hidden"
         style={{
+          minWidth: tableMinWidth,
           shadowColor: "#000",
           shadowOpacity: 0.05,
           shadowRadius: 10,
@@ -470,6 +474,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
           </View>
         )}
       </View>
+      </ScrollView>
 
       <ConfirmModal
         visible={!!deleteId}

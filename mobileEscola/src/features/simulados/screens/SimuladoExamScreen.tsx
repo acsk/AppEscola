@@ -21,6 +21,7 @@ import {
   Question,
   AttemptFinish,
 } from '../../../services/simulados.service';
+import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoExam'>;
 
@@ -30,15 +31,6 @@ interface Resposta {
   optionId?: number;
   textAnswer?: string;
 }
-
-const PRIMARY = '#4F46E5';
-const INK = '#1E1B4B';
-const TEXT = '#312E81';
-const MUTED = '#64748B';
-const SOFT = '#EEF2FF';
-const BORDER = '#DDE3F5';
-const SURFACE = '#FFFFFF';
-const BACKGROUND = '#F6F7FB';
 
 // ── Questão individual ────────────────────────────────────────────────────────
 
@@ -120,7 +112,7 @@ function ItemQuestao({
               ? 'Especifique sua resposta…'
               : 'Justifique sua resposta…'
           }
-          placeholderTextColor={MUTED}
+          placeholderTextColor={colors.muted}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
@@ -134,43 +126,43 @@ function ItemQuestao({
 
 const qStyles = StyleSheet.create({
   container: {
-    backgroundColor: SURFACE, borderRadius: 16, padding: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: colors.border,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   headerEsq:   { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   numeroBadge: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: SOFT, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center',
   },
-  numeroTexto:  { fontSize: 14, fontWeight: '700', color: PRIMARY },
-  subjectPill:  { backgroundColor: SOFT, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  subjectTexto: { fontSize: 11, fontWeight: '600', color: PRIMARY },
-  tipoPill:     { backgroundColor: SOFT, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  tipoTexto:    { fontSize: 11, color: MUTED },
-  pontos:       { backgroundColor: SOFT, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  pontosTexto:  { fontSize: 12, color: MUTED, fontWeight: '500' },
-  enunciado:    { fontSize: 15, color: INK, lineHeight: 22, marginBottom: 14 },
+  numeroTexto:  { fontSize: 14, fontWeight: '700', color: colors.primary },
+  subjectPill:  { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  subjectTexto: { fontSize: 11, fontWeight: '600', color: colors.primary },
+  tipoPill:     { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  tipoTexto:    { fontSize: 11, color: colors.muted },
+  pontos:       { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  pontosTexto:  { fontSize: 12, color: colors.muted, fontWeight: '500' },
+  enunciado:    { fontSize: 15, color: colors.ink, lineHeight: 22, marginBottom: 14 },
   opcao: {
     flexDirection: 'row', alignItems: 'flex-start', padding: 12,
-    borderRadius: 10, borderWidth: 1, borderColor: BORDER,
+    borderRadius: 10, borderWidth: 1, borderColor: colors.border,
     marginBottom: 8, gap: 10,
   },
-  opcaoSelecionada:      { borderColor: PRIMARY, backgroundColor: SOFT },
+  opcaoSelecionada:      { borderColor: colors.primary, backgroundColor: colors.soft },
   radio: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 2,
-    borderColor: BORDER, justifyContent: 'center', alignItems: 'center',
+    borderColor: colors.border, justifyContent: 'center', alignItems: 'center',
     marginTop: 1, flexShrink: 0,
   },
-  radioSelecionado:      { borderColor: PRIMARY },
-  radioPonto:            { width: 10, height: 10, borderRadius: 5, backgroundColor: PRIMARY },
-  opcaoTexto:            { flex: 1, fontSize: 14, color: TEXT, lineHeight: 20 },
-  opcaoTextoSelecionado: { color: PRIMARY, fontWeight: '600' },
+  radioSelecionado:      { borderColor: colors.primary },
+  radioPonto:            { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+  opcaoTexto:            { flex: 1, fontSize: 14, color: colors.text, lineHeight: 20 },
+  opcaoTextoSelecionado: { color: colors.primary, fontWeight: '600' },
   textInput: {
-    marginTop: 10, backgroundColor: SOFT,
-    borderWidth: 1, borderColor: BORDER, borderRadius: 10,
-    padding: 12, fontSize: 14, color: INK, minHeight: 100,
+    marginTop: 10, backgroundColor: colors.soft,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 10,
+    padding: 12, fontSize: 14, color: colors.ink, minHeight: 100,
   },
 });
 
@@ -219,7 +211,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerLeft: () => (
         <TouchableOpacity onPress={handleVoltar} style={{ paddingRight: 8 }}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={24} color={colors.surface} />
         </TouchableOpacity>
       ),
     });
@@ -338,7 +330,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   if (fase === 'carregando') {
     return (
       <View style={styles.centrado}>
-        <ActivityIndicator size="large" color={PRIMARY} />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.carregandoTexto}>Carregando questões…</Text>
       </View>
     );
@@ -348,7 +340,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   if (fase === 'erro') {
     return (
       <View style={styles.centrado}>
-        <Ionicons name="alert-circle-outline" size={48} color={BORDER} />
+        <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
         <Text style={styles.erroTexto}>{erroMsg}</Text>
         <TouchableOpacity style={styles.botaoTentar} onPress={carregarQuestoes} activeOpacity={0.8}>
           <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
@@ -421,7 +413,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
               onPress={() => navigation.navigate('SimuladosList')}
               activeOpacity={0.8}
             >
-              <Ionicons name="list-outline" size={18} color={PRIMARY} style={{ marginRight: 8 }} />
+              <Ionicons name="list-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
               <Text style={styles.botaoVoltarTexto}>Ver todos os simulados</Text>
             </TouchableOpacity>
           </View>
@@ -432,12 +424,12 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
     const aprovado = resultado.passed;
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={[styles.resultadoCard, { borderTopColor: aprovado ? '#10B981' : '#EF4444' }]}>
+        <View style={[styles.resultadoCard, { borderTopColor: aprovado ? colors.credit : colors.debit }]}>
           <View style={[styles.resultadoIconCircle, { backgroundColor: aprovado ? '#ECFDF5' : '#FEF2F2' }]}>
             <Ionicons
               name={aprovado ? 'checkmark-circle' : 'close-circle'}
               size={64}
-              color={aprovado ? '#10B981' : '#EF4444'}
+              color={aprovado ? colors.credit : colors.debit}
             />
           </View>
           <Text style={styles.resultadoTitulo}>{aprovado ? 'Parabéns!' : 'Não foi desta vez'}</Text>
@@ -469,7 +461,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
             onPress={() => navigation.navigate('SimuladosList')}
             activeOpacity={0.8}
           >
-            <Ionicons name="list-outline" size={18} color={PRIMARY} style={{ marginRight: 8 }} />
+            <Ionicons name="list-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
             <Text style={styles.botaoVoltarTexto}>Ver todos os simulados</Text>
           </TouchableOpacity>
         </View>
@@ -536,9 +528,9 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
             activeOpacity={0.8}
           >
             {fase === 'finalizando'
-              ? <ActivityIndicator color="#fff" size="small" />
+              ? <ActivityIndicator color={colors.surface} size="small" />
               : <>
-                  <Ionicons name="checkmark-done" size={18} color="#fff" style={{ marginRight: 8 }} />
+                  <Ionicons name="checkmark-done" size={18} color={colors.surface} style={{ marginRight: 8 }} />
                   <Text style={styles.botaoFinalizarTexto}>Finalizar simulado</Text>
                 </>}
           </TouchableOpacity>
@@ -552,7 +544,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
           cancelLabel="Cancelar"
           confirmDestructive
           icon="exit-outline"
-          iconColor="#EF4444"
+          iconColor={colors.debit}
           onConfirm={() => {
             setConfirmVisible(false);
             confirmAction?.();
@@ -567,23 +559,23 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BACKGROUND },
+  container: { flex: 1, backgroundColor: colors.background },
   content:   { padding: 16 },
 
   centrado: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    padding: 32, backgroundColor: BACKGROUND,
+    padding: 32, backgroundColor: colors.background,
   },
-  carregandoTexto: { marginTop: 12, fontSize: 14, color: MUTED },
+  carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
   erroTexto: {
-    fontSize: 14, color: TEXT, textAlign: 'center',
+    fontSize: 14, color: colors.text, textAlign: 'center',
     marginTop: 12, lineHeight: 20,
   },
   botaoTentar: {
-    marginTop: 20, backgroundColor: PRIMARY,
+    marginTop: 20, backgroundColor: colors.primary,
     borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12,
   },
-  botaoTentarTexto: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  botaoTentarTexto: { color: colors.surface, fontWeight: '600', fontSize: 15 },
 
   erroInline: {
     flexDirection: 'row', alignItems: 'flex-start',
@@ -592,61 +584,61 @@ const styles = StyleSheet.create({
   },
   erroInlineTexto: { flex: 1, fontSize: 13, color: '#DC2626', lineHeight: 18 },
 
-  examContainer:      { flex: 1, backgroundColor: BACKGROUND },
+  examContainer:      { flex: 1, backgroundColor: colors.background },
   progressoContainer: {
-    backgroundColor: SURFACE, paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
+    backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   progressoTexto: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressoLabel: { fontSize: 13, color: MUTED },
-  progressoPct:   { fontSize: 13, fontWeight: '700', color: PRIMARY },
+  progressoLabel: { fontSize: 13, color: colors.muted },
+  progressoPct:   { fontSize: 13, fontWeight: '700', color: colors.primary },
   progressoBar:   { height: 6, backgroundColor: '#E0E7FF', borderRadius: 3, overflow: 'hidden' },
-  progressoFill:  { height: '100%', backgroundColor: PRIMARY, borderRadius: 3 },
+  progressoFill:  { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
   questoesScroll: { flex: 1 },
   questoesContent:{ padding: 16 },
 
   botaoFinalizar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#10B981', borderRadius: 14,
+    backgroundColor: colors.credit, borderRadius: 14,
     paddingVertical: 14, marginTop: 8, marginBottom: 16,
   },
-  botaoFinalizarTexto: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  botaoFinalizarTexto: { color: colors.surface, fontWeight: '700', fontSize: 16 },
   botaoDisabled:       { opacity: 0.6 },
 
   resultadoCard: {
-    backgroundColor: SURFACE, borderRadius: 20,
+    backgroundColor: colors.surface, borderRadius: 20,
     borderTopWidth: 6, padding: 24, alignItems: 'center',
-    borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: BORDER,
+    borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
   resultadoIconCircle: {
     width: 100, height: 100, borderRadius: 50,
     justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
-  resultadoTitulo: { fontSize: 24, fontWeight: '800', color: INK, marginBottom: 8 },
+  resultadoTitulo: { fontSize: 24, fontWeight: '800', color: colors.ink, marginBottom: 8 },
   resultadoSub:    {
-    fontSize: 14, color: MUTED, textAlign: 'center',
+    fontSize: 14, color: colors.muted, textAlign: 'center',
     lineHeight: 20, marginBottom: 24,
   },
   resultadoNumeros: {
     flexDirection: 'row', width: '100%',
-    backgroundColor: SOFT, borderRadius: 16, padding: 16, marginBottom: 16,
+    backgroundColor: colors.soft, borderRadius: 16, padding: 16, marginBottom: 16,
   },
   resultadoItem:    { flex: 1, alignItems: 'center' },
-  resultadoValor:   { fontSize: 22, fontWeight: '800', color: INK },
-  resultadoLabel:   { fontSize: 11, color: MUTED, marginTop: 4, textAlign: 'center' },
-  resultadoDivisor: { width: 1, backgroundColor: BORDER, marginHorizontal: 8 },
+  resultadoValor:   { fontSize: 22, fontWeight: '800', color: colors.ink },
+  resultadoLabel:   { fontSize: 11, color: colors.muted, marginTop: 4, textAlign: 'center' },
+  resultadoDivisor: { width: 1, backgroundColor: colors.border, marginHorizontal: 8 },
   avisoDiscursiva:  {
     flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: SOFT, borderRadius: 12, padding: 12, marginBottom: 16,
+    backgroundColor: colors.soft, borderRadius: 12, padding: 12, marginBottom: 16,
   },
-  avisoDiscursivaTexto: { flex: 1, fontSize: 12, color: MUTED, lineHeight: 16 },
+  avisoDiscursivaTexto: { flex: 1, fontSize: 12, color: colors.muted, lineHeight: 16 },
   botaoVoltar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 14,
+    borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14,
     paddingVertical: 12, paddingHorizontal: 24, marginTop: 4,
   },
-  botaoVoltarTexto: { color: PRIMARY, fontWeight: '600', fontSize: 15 },
+  botaoVoltarTexto: { color: colors.primary, fontWeight: '600', fontSize: 15 },
   botaoAguardo: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#FFFBEB', borderWidth: 1.5, borderColor: '#F59E0B',

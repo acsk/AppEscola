@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
+import { colors } from '../../../theme';
 
 export function ChangePasswordScreen() {
   const { clearPasswordChangeFlag } = useAuth();
@@ -82,7 +83,7 @@ export function ChangePasswordScreen() {
     >
       <View style={styles.inner}>
         <View style={styles.iconContainer}>
-          <Ionicons name="lock-closed" size={40} color="#4F46E5" />
+          <Ionicons name="lock-closed" size={40} color={colors.primary} />
         </View>
 
         <Text style={styles.titulo}>Troca de senha obrigatória</Text>
@@ -161,7 +162,7 @@ export function ChangePasswordScreen() {
           activeOpacity={0.8}
         >
           {carregando ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.surface} />
           ) : (
             <Text style={styles.botaoTexto}>Alterar senha e continuar</Text>
           )}
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.soft,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
@@ -189,7 +190,7 @@ const styles = StyleSheet.create({
   campo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
@@ -210,14 +211,14 @@ const styles = StyleSheet.create({
   icone: { marginRight: 10 },
   input: { flex: 1, fontSize: 15, color: '#111827' },
   botao: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
   },
   botaoDesabilitado: { opacity: 0.6 },
-  botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  botaoTexto: { color: colors.surface, fontSize: 16, fontWeight: '600' },
   erroContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',

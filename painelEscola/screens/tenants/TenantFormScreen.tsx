@@ -20,6 +20,7 @@ import {
   isValidCNPJ,
 } from "../../utils/masks";
 import { fetchAddressByCEP } from "../../utils/cep";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -75,6 +76,7 @@ const EMPTY: Form = {
 };
 
 export default function TenantFormScreen({ navigate, tenantId }: Props) {
+  const { contentPadding } = useResponsiveLayout();
   const isEdit = tenantId !== null;
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -230,7 +232,7 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   };
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}>
       <View className="flex-row items-center gap-2 mb-6">
         <TouchableOpacity
           onPress={() => navigate("tenants")}

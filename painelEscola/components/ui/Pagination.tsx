@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -17,11 +17,16 @@ export default function Pagination({
   perPage,
   onPageChange,
 }: Props) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 520;
   const start = (currentPage - 1) * perPage + 1;
   const end = Math.min(currentPage * perPage, total);
 
   return (
-    <View className="flex-row items-center justify-between py-3">
+    <View
+      className="items-center justify-between py-3"
+      style={{ flexDirection: isMobile ? "column" : "row", gap: isMobile ? 10 : 0 }}
+    >
       <Text className="text-sm text-gray-500">
         Exibindo{" "}
         <Text className="font-semibold text-gray-700">

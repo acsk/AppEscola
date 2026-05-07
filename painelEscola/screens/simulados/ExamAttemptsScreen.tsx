@@ -11,6 +11,7 @@ import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import Modal from "../../components/ui/Modal";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ function fmtPct(v: number | null) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" }: Props) {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Attempt[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
@@ -188,18 +190,18 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     color: "#374151",
     backgroundColor: "white",
     height: 44,
-    minWidth: 160,
+    minWidth: isMobile ? "100%" : 160,
   };
 
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Cabeçalho */}
-      <View className="flex-row items-center justify-between mb-6">
-        <View className="flex-row items-center gap-3">
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
+        <View className="flex-row items-center gap-3" style={{ flex: 1 }}>
           <TouchableOpacity
             onPress={() => navigate("simulados")}
             className="p-2 rounded-xl bg-white border border-gray-200"
@@ -262,7 +264,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       </View>
 
       {/* Filtros */}
-      <View className="flex-row gap-3 mb-4">
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
         <select
           value={statusFilter}
           onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -277,9 +279,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       </View>
 
       {/* Tabela */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
       <View
         className="bg-white rounded-2xl overflow-hidden"
-        style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        style={{ minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
       >
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>
@@ -376,6 +379,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
           ))
         )}
       </View>
+      </ScrollView>
 
       {/* Paginação */}
       {meta.last_page > 1 && (

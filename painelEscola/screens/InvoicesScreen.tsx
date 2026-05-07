@@ -20,6 +20,7 @@ import {
   usePaymentMethods,
   domainToOptions,
 } from "../hooks/useDomains";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 type Student = { id: number; name: string };
 type Guardian = { id: number; name: string };
@@ -78,6 +79,7 @@ const METHOD_LABELS: Record<string, string> = {
 };
 
 export default function InvoicesScreen() {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
@@ -223,8 +225,8 @@ export default function InvoicesScreen() {
   const fmt = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-      <View className="flex-row items-center justify-between mb-6">
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
           <Text className="text-2xl font-bold text-gray-800">Cobranças</Text>
           <Text className="text-sm text-gray-500">Faturas e mensalidades</Text>
@@ -235,13 +237,14 @@ export default function InvoicesScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="flex-row gap-3 mb-4">
-        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: "0 14px", fontSize: 14, color: "#374151", backgroundColor: "white", height: 44, minWidth: 180 }}>
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
+        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: "0 14px", fontSize: 14, color: "#374151", backgroundColor: "white", height: 44, minWidth: isMobile ? "100%" : 180 }}>
           {allStatusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </View>
 
-      <View className="bg-white rounded-2xl overflow-hidden" style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
+      <View className="bg-white rounded-2xl overflow-hidden" style={{ minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>Aluno</Text>
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>Descrição</Text>
@@ -302,6 +305,7 @@ export default function InvoicesScreen() {
           </View>
         )}
       </View>
+      </ScrollView>
 
       <Modal visible={modalVisible} title={editId ? "Editar Cobrança" : "Nova Cobrança"} onClose={() => setModalVisible(false)} size="lg"
         footer={

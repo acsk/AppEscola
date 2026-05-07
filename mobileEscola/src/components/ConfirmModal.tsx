@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -71,7 +72,7 @@ export default function ConfirmModal({
               onPress={onConfirm}
               activeOpacity={0.75}
             >
-              <Text style={[s.btnText, { color: '#fff' }]}>{confirmLabel}</Text>
+              <Text style={[s.btnText, { color: colors.surface }]}>{confirmLabel}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -94,7 +95,7 @@ const s = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',
@@ -141,10 +142,10 @@ const s = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   btnPrimary: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: colors.primary,
   },
   btnDanger: {
-    backgroundColor: '#EF4444',
+    backgroundColor: colors.debit,
   },
   btnCancelText: {
     fontSize: 15,

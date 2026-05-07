@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { HomeScreen } from '../../features/home/screens/HomeScreen';
 import { SimuladosScreen } from '../../features/simulados/screens/SimuladosScreen';
+import { colors } from '../../theme';
 
 // ── Tela placeholder — Dashboard Admin ─────────────────────────────────────
 function AdminDashboardScreen() {
@@ -13,10 +14,10 @@ function AdminDashboardScreen() {
       <Text style={styles.titulo}>Dashboard</Text>
       <View style={styles.grid}>
         {[
-          { label: 'Alunos',      icone: 'people-outline',   cor: '#4F46E5' },
-          { label: 'Professores', icone: 'school-outline',   cor: '#10B981' },
+          { label: 'Alunos',      icone: 'people-outline',   cor: colors.primary },
+          { label: 'Professores', icone: 'school-outline',   cor: colors.credit },
           { label: 'Turmas',      icone: 'albums-outline',   cor: '#F59E0B' },
-          { label: 'Relatórios',  icone: 'bar-chart-outline', cor: '#EF4444' },
+          { label: 'Relatórios',  icone: 'bar-chart-outline', cor: colors.debit },
         ].map((item) => (
           <View key={item.label} style={[styles.card, { borderLeftColor: item.cor }]}>
             <Ionicons name={item.icone as any} size={28} color={item.cor} />
@@ -57,19 +58,19 @@ export function AdminStack() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerStyle: { backgroundColor: '#1E1B4B' },
-        headerTintColor: '#FFFFFF',
+        headerStyle: { backgroundColor: colors.ink },
+        headerTintColor: colors.surface,
         headerTitleStyle: { fontWeight: '600' },
-        tabBarActiveTintColor: '#4F46E5',
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: { backgroundColor: '#FFFFFF', borderTopColor: '#F3F4F6', height: 60, paddingBottom: 4 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: '#F3F4F6', height: 60, paddingBottom: 4 },
         tabBarIcon: ({ focused, color, size }) => {
           const icons = ICONS[route.name];
           return <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={color} />;
         },
         headerRight: () => (
           <TouchableOpacity onPress={confirmarSair} style={{ marginRight: 16 }}>
-            <Ionicons name="log-out-outline" size={24} color="#FFFFFF" />
+            <Ionicons name="log-out-outline" size={24} color={colors.surface} />
           </TouchableOpacity>
         ),
       })}
@@ -87,7 +88,7 @@ const styles = StyleSheet.create({
   titulo: { fontSize: 22, fontWeight: '700', color: '#111827', marginBottom: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     width: '47%',

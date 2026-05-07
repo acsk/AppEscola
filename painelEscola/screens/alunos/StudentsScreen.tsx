@@ -13,6 +13,7 @@ import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { maskPhone, maskCPF, isoToDisplay } from "../../utils/masks";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Student = {
   id: number;
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function StudentsScreen({ navigate }: Props) {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -79,10 +81,13 @@ export default function StudentsScreen({ navigate }: Props) {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
     >
       {/* Cabeçalho */}
-      <View className="flex-row items-center justify-between mb-6">
+      <View
+        className="mb-6"
+        style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}
+      >
         <View>
           <Text className="text-2xl font-bold text-gray-800">Alunos</Text>
           <Text className="text-sm text-gray-500">
@@ -102,10 +107,13 @@ export default function StudentsScreen({ navigate }: Props) {
       </View>
 
       {/* Filtros */}
-      <View className="flex-row gap-3 mb-4">
+      <View
+        className="mb-4"
+        style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}
+      >
         <View
           className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
-          style={{ height: 44, maxWidth: 360 }}
+          style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
           <Ionicons name="search-outline" size={16} color="#9CA3AF" />
           <TextInput
@@ -138,7 +146,7 @@ export default function StudentsScreen({ navigate }: Props) {
             color: "#374151",
             backgroundColor: "white",
             height: 44,
-            minWidth: 160,
+            minWidth: isMobile ? "100%" : 160,
           }}
         >
           <option value="">Todos os status</option>
@@ -148,9 +156,11 @@ export default function StudentsScreen({ navigate }: Props) {
       </View>
 
       {/* Tabela */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
       <View
         className="bg-white rounded-2xl overflow-hidden"
         style={{
+          minWidth: tableMinWidth,
           shadowColor: "#000",
           shadowOpacity: 0.05,
           shadowRadius: 10,
@@ -279,6 +289,7 @@ export default function StudentsScreen({ navigate }: Props) {
           </View>
         )}
       </View>
+      </ScrollView>
 
       <ConfirmModal
         visible={!!deleteId}

@@ -9,6 +9,7 @@ import { SimuladosNavigator } from './SimuladosStack';
 import type { SimuladosStackParamList } from './SimuladosStack';
 import { FinanceiroScreen } from '../../features/financeiro/screens/FinanceiroScreen';
 import { useAuth } from '../../context/AuthContext';
+import { colors } from '../../theme';
 
 type AlunoTabParamList = {
   Home: undefined;
@@ -39,19 +40,19 @@ export function AlunoStack() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerStyle: { backgroundColor: '#4F46E5' },
-        headerTintColor: '#FFFFFF',
+        headerStyle: { backgroundColor: colors.primary },
+        headerTintColor: colors.surface,
         headerTitleStyle: { fontWeight: '600' },
-        tabBarActiveTintColor: '#4F46E5',
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: { backgroundColor: '#FFFFFF', borderTopColor: '#F3F4F6', height: 60, paddingBottom: 4 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: '#F3F4F6', height: 60, paddingBottom: 4 },
         tabBarIcon: ({ focused, color, size }) => {
           const icons = ICONS[route.name];
           return <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={color} />;
         },
         headerRight: () => (
           <TouchableOpacity onPress={confirmarSair} style={{ marginRight: 16 }}>
-            <Ionicons name="log-out-outline" size={24} color="#FFFFFF" />
+            <Ionicons name="log-out-outline" size={24} color={colors.surface} />
           </TouchableOpacity>
         ),
       })}

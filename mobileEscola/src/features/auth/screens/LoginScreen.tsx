@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../context/AuthContext';
 import { ApiError } from '../../../services/auth.service';
 import { AxiosError } from 'axios';
+import { colors } from '../../../theme';
 
 export function LoginScreen() {
   const { signIn } = useAuth();
@@ -63,7 +64,7 @@ export function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
-        <Ionicons name="school-outline" size={72} color="#4F46E5" style={styles.logo} />
+        <Ionicons name="school-outline" size={72} color={colors.primary} style={styles.logo} />
 
         <Text style={styles.titulo}>App Escola</Text>
         <Text style={styles.subtitulo}>Faça login para continuar</Text>
@@ -130,7 +131,7 @@ export function LoginScreen() {
           activeOpacity={0.8}
         >
           {carregando ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.surface} />
           ) : (
             <Text style={styles.botaoTexto}>Entrar</Text>
           )}
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
   campo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
@@ -167,13 +168,13 @@ const styles = StyleSheet.create({
     marginTop: -8,
   },
   botao: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
   botaoDesabilitado: { opacity: 0.6 },
-  botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  botaoTexto: { color: colors.surface, fontSize: 16, fontWeight: '600' },
   erroContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -186,4 +187,3 @@ const styles = StyleSheet.create({
   },
   erroTexto: { flex: 1, fontSize: 13, color: '#DC2626', lineHeight: 18 },
 });
-

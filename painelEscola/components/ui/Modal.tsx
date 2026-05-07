@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -27,6 +28,9 @@ export default function Modal({
   footer,
   size = "md",
 }: Props) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+
   return (
     <RNModal
       visible={visible}
@@ -36,11 +40,11 @@ export default function Modal({
     >
       <View
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+        style={{ backgroundColor: "rgba(0,0,0,0.45)", padding: isMobile ? 12 : 24 }}
       >
         <View
           className="bg-white rounded-2xl"
-          style={{ width: widths[size], maxHeight: "88%" }}
+          style={{ width: "100%", maxWidth: widths[size], maxHeight: "88%" }}
         >
           {/* Header */}
           <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -64,7 +68,10 @@ export default function Modal({
 
           {/* Footer */}
           {footer && (
-            <View className="flex-row justify-end gap-3 px-6 py-4 border-t border-gray-100">
+            <View
+              className="justify-end px-6 py-4 border-t border-gray-100"
+              style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}
+            >
               {footer}
             </View>
           )}

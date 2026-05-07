@@ -12,6 +12,7 @@ import api from "../../services/api";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import Pagination from "../../components/ui/Pagination";
 import Badge from "../../components/ui/Badge";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Tenant = {
   id: number;
@@ -46,6 +47,7 @@ function statusLabel(status: string) {
 }
 
 export default function TenantsScreen({ navigate, flashMessage }: Props) {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Tenant[]>([]);
   const [successMessage, setSuccessMessage] = useState(flashMessage ?? "");
   const [loading, setLoading] = useState(false);
@@ -120,8 +122,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
   };
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-      <View className="flex-row items-center justify-between mb-6">
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
           <Text className="text-2xl font-bold text-gray-800">Tenants</Text>
           <Text className="text-sm text-gray-500">Gestão de clientes e dados institucionais</Text>
@@ -157,8 +159,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
         </View>
       )}
 
-      <View className="flex-row gap-3 mb-4">
-        <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4" style={{ height: 44, maxWidth: 380 }}>
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
+        <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 380 }}>
           <Ionicons name="search-outline" size={16} color="#9CA3AF" />
           <TextInput
             value={search}
@@ -191,7 +193,7 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
             color: "#374151",
             backgroundColor: "white",
             height: 44,
-            minWidth: 160,
+            minWidth: isMobile ? "100%" : 160,
           }}
         >
           <option value="">Todos os status</option>
@@ -200,7 +202,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
         </select>
       </View>
 
-      <View className="bg-white rounded-2xl overflow-hidden" style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
+      <View className="bg-white rounded-2xl overflow-hidden" style={{ minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2.2 }}>Tenant</Text>
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1.5 }}>Slug</Text>
@@ -260,6 +263,7 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
           ))
         )}
       </View>
+      </ScrollView>
 
       <Pagination
         currentPage={meta.current_page}

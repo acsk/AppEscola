@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import AttendanceDateBar from "../../components/ui/AttendanceDateBar";
 import FormInput from "../../components/ui/FormInput";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Props = {
   classId: number | null;
@@ -120,6 +121,7 @@ const getWeekdaySlug = (isoDate: string) => {
 };
 
 export default function SchoolClassAttendanceScreen({ classId, navigate }: Props) {
+  const { contentPadding } = useResponsiveLayout();
   const scrollRef = useRef<ScrollView>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -450,7 +452,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
+        contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
       >
       <View className="flex-row items-center gap-2 mb-6">

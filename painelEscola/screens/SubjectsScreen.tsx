@@ -22,6 +22,7 @@ import FormSelect from "../components/ui/FormSelect";
 import Badge from "../components/ui/Badge";
 import Pagination from "../components/ui/Pagination";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 // ── Icon registry ────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SubjectsScreen() {
+  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -175,8 +177,8 @@ export default function SubjectsScreen() {
   };
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-      <View className="flex-row items-center justify-between mb-6">
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
           <Text className="text-2xl font-bold text-gray-800">Disciplinas</Text>
           <Text className="text-sm text-gray-500">Matérias lecionadas no cursinho</Text>
@@ -187,20 +189,21 @@ export default function SubjectsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="flex-row gap-3 mb-4">
-        <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4" style={{ height: 44, maxWidth: 360 }}>
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
+        <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}>
           <Ionicons name="search-outline" size={16} color="#9CA3AF" />
           <TextInput value={search} onChangeText={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar disciplina..." placeholderTextColor="#9CA3AF" className="flex-1 ml-2 text-sm text-gray-800" />
           {!!search && <TouchableOpacity onPress={() => setSearch("")}><Ionicons name="close-circle" size={16} color="#9CA3AF" /></TouchableOpacity>}
         </View>
-        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: "0 14px", fontSize: 14, color: "#374151", backgroundColor: "white", height: 44, minWidth: 160 }}>
+        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: "0 14px", fontSize: 14, color: "#374151", backgroundColor: "white", height: 44, minWidth: isMobile ? "100%" : 160 }}>
           <option value="">Todos</option>
           <option value="active">Ativo</option>
           <option value="inactive">Inativo</option>
         </select>
       </View>
 
-      <View className="bg-white rounded-2xl overflow-hidden" style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
+      <View className="bg-white rounded-2xl overflow-hidden" style={{ minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 3 }}>Nome</Text>
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 3 }}>Descrição</Text>
@@ -244,6 +247,7 @@ export default function SubjectsScreen() {
           </View>
         )}
       </View>
+      </ScrollView>
 
       <Modal visible={modalVisible} title={editId ? "Editar Disciplina" : "Nova Disciplina"} onClose={() => setModalVisible(false)} size="sm"
         footer={

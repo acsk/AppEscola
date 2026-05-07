@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -25,6 +26,9 @@ export default function ConfirmModal({
   onCancel,
   loading,
 }: Props) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 520;
+
   return (
     <RNModal
       visible={visible}
@@ -34,11 +38,11 @@ export default function ConfirmModal({
     >
       <View
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+        style={{ backgroundColor: "rgba(0,0,0,0.45)", padding: isMobile ? 16 : 24 }}
       >
         <View
           className="bg-white rounded-2xl p-6"
-          style={{ width: 380 }}
+          style={{ width: "100%", maxWidth: 380 }}
         >
           <View className="items-center mb-5">
             <View className="w-14 h-14 bg-red-100 rounded-full items-center justify-center mb-3">
@@ -52,7 +56,7 @@ export default function ConfirmModal({
             </Text>
           </View>
 
-          <View className="flex-row gap-3">
+          <View style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
             <TouchableOpacity
               onPress={onCancel}
               disabled={loading}

@@ -12,6 +12,7 @@ import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 const fmtBRL = (v: string | number) =>
   Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export default function BundlesScreen({ navigate }: Props) {
+  const { isMobile, contentPadding } = useResponsiveLayout();
   const [rows, setRows] = useState<Bundle[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -81,12 +83,12 @@ export default function BundlesScreen({ navigate }: Props) {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
       {/* Cabeçalho */}
-      <View className="flex-row items-center justify-between mb-6">
-        <View className="flex-row items-center gap-3">
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
+        <View className="flex-row items-center gap-3" style={{ flex: 1 }}>
           <TouchableOpacity
             onPress={() => navigate("cursos")}
             className="flex-row items-center gap-1.5"
@@ -116,10 +118,10 @@ export default function BundlesScreen({ navigate }: Props) {
       </View>
 
       {/* Filtros */}
-      <View className="flex-row gap-3 mb-4">
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
         <View
           className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
-          style={{ height: 44, maxWidth: 360 }}
+          style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
           <Ionicons name="search-outline" size={16} color="#9CA3AF" />
           <TextInput
@@ -152,7 +154,7 @@ export default function BundlesScreen({ navigate }: Props) {
             color: "#374151",
             backgroundColor: "white",
             height: 44,
-            minWidth: 160,
+            minWidth: isMobile ? "100%" : 160,
           }}
         >
           <option value="">Todos os status</option>
@@ -189,8 +191,8 @@ export default function BundlesScreen({ navigate }: Props) {
                 elevation: 2,
               }}
             >
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1 mr-4">
+              <View style={{ flexDirection: isMobile ? "column" : "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+                <View style={{ flex: 1, marginRight: isMobile ? 0 : 16, alignSelf: "stretch" }}>
                   <View className="flex-row items-center gap-2 mb-1">
                     <Text className="text-base font-bold text-gray-800">
                       {bundle.name}
@@ -242,7 +244,7 @@ export default function BundlesScreen({ navigate }: Props) {
                 </View>
 
                 {/* Ações */}
-                <View className="flex-col gap-2">
+                <View style={{ flexDirection: isMobile ? "row" : "column", gap: 8 }}>
                   <TouchableOpacity
                     onPress={() =>
                       navigate("pacotes-form", { bundleId: bundle.id })
