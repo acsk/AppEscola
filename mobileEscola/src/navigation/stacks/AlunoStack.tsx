@@ -68,7 +68,7 @@ export function AlunoStack() {
           },
         })}
       />
-      <Tab.Screen name="Financeiro" component={FinanceiroScreen}    options={{ title: 'Financeiro' }} />
+      <Tab.Screen name="Financeiro" component={FinanceiroScreen}    options={{ title: 'Financeiro', headerShown: false }} />
     </Tab.Navigator>
   );
 }

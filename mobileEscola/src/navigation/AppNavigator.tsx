@@ -66,7 +66,7 @@ export function AppNavigator() {
     >
       <Tab.Screen name="Home"      component={HomeScreen}       options={{ title: 'Home', headerShown: false }} />
       <Tab.Screen name="Simulados"  component={SimuladosScreen}  options={{ title: 'Simulados' }} />
-      <Tab.Screen name="Financeiro" component={FinanceiroScreen} options={{ title: 'Financeiro' }} />
+      <Tab.Screen name="Financeiro" component={FinanceiroScreen} options={{ title: 'Financeiro', headerShown: false }} />
     </Tab.Navigator>
   );
 }

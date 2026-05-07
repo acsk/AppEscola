@@ -20,6 +20,7 @@ import BundleFormScreen from "./screens/cursos/BundleFormScreen";
 import SubjectsScreen from "./screens/SubjectsScreen";
 import SchoolClassesScreen from "./screens/turmas";
 import SchoolClassFormScreen from "./screens/turmas/SchoolClassFormScreen";
+import SchoolClassAttendanceScreen from "./screens/turmas/SchoolClassAttendanceScreen";
 import EnrollmentsScreen from "./screens/matriculas";
 import EnrollmentFormScreen from "./screens/matriculas/EnrollmentFormScreen";
 import InvoicesScreen from "./screens/InvoicesScreen";
@@ -103,7 +104,11 @@ function hashToNav(hash: string): NavState {
     if (!seg1) return { screen: "turmas" };
     if (seg1 === "nova") return { screen: "turmas-form", params: { classId: null } };
     const id = parseInt(seg1, 10);
-    if (!isNaN(id)) return { screen: "turmas-form", params: { classId: id } };
+    if (!isNaN(id)) {
+      const [,, seg2] = path.split("/").filter(Boolean);
+      if (seg2 === "frequencia") return { screen: "turmas-frequencia", params: { classId: id } };
+      return { screen: "turmas-form", params: { classId: id } };
+    }
     return { screen: "turmas" };
   }
 
@@ -167,6 +172,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "turmas-form") {
     const id = nav.params?.classId;
     return id != null ? `#/turmas/${id}` : "#/turmas/nova";
+  }
+  if (nav.screen === "turmas-frequencia") {
+    const id = nav.params?.classId;
+    return id != null ? `#/turmas/${id}/frequencia` : "#/turmas";
   }
   if (nav.screen === "tenants-form") {
     const id = nav.params?.tenantId;
@@ -323,6 +332,7 @@ function AppContent() {
       case "disciplinas": return <SubjectsScreen />;
       case "turmas": return <SchoolClassesScreen navigate={navigate} />;
       case "turmas-form": return <SchoolClassFormScreen navigate={navigate} classId={nav.params?.classId ?? null} />;
+      case "turmas-frequencia": return <SchoolClassAttendanceScreen navigate={navigate} classId={nav.params?.classId ?? null} />;
       case "matriculas": return <EnrollmentsScreen navigate={navigate} />;
       case "matriculas-form": return <EnrollmentFormScreen navigate={navigate} />;
       case "cobrancas": return <InvoicesScreen />;

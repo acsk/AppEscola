@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\GuardianController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\SchoolClassController;
 use App\Http\Controllers\Api\StudentController;
+use App\Http\Controllers\Api\StudentAttendanceController;
 use App\Http\Controllers\Api\StudentGuardianController;
 use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\ExamAttemptController;
@@ -89,6 +90,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::prefix('school-classes/{schoolClass}/schedules')->group(function () {
         Route::get('/', [ClassScheduleController::class, 'index']);
         Route::post('/', [ClassScheduleController::class, 'store']);
+    });
+
+    // Frequencia de alunos por turma e dia (lancamento em lote)
+    Route::prefix('school-classes/{schoolClass}/attendances')->group(function () {
+        Route::get('/', [StudentAttendanceController::class, 'index']);
+        Route::post('/', [StudentAttendanceController::class, 'store']);
     });
 
     // Horários (update/delete direto)

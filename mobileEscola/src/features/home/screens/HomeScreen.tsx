@@ -42,11 +42,11 @@ const STATS = [
 ];
 
 const SIM_STATUS_COLOR: Record<AttemptStatus, string> = {
-  not_started: '#10B981',
-  in_progress: '#F59E0B',
-  completed:   PRIMARY,
-  pending_review: '#0EA5E9',
-  awaiting_release: '#0891B2',
+  not_started: '#22C55E',
+  in_progress: '#F97316',
+  completed:   '#22C55E',
+  pending_review: '#F97316',
+  awaiting_release: '#F97316',
 };
 const SIM_STATUS_LABEL: Record<AttemptStatus, string> = {
   not_started: 'Disponível',
@@ -63,6 +63,33 @@ const CONQUISTAS = [
   { id: 4, icon: 'star-outline',         bg: '#312E81', label: 'Dedicação\nTotal',    date: '20/02/2024', locked: false },
   { id: 5, icon: 'lock-closed-outline',  bg: '#94A3B8', label: 'Em breve',            date: '',           locked: true  },
 ];
+
+function diffCalendarDays(from: Date, to: Date): number {
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
+  return Math.ceil((end - start) / 86400000);
+}
+
+function getSimuladoDayCounter(simulado: SimuladoListItem): string | null {
+  const hoje = new Date();
+  const inicio = simulado.starts_at ? new Date(simulado.starts_at) : null;
+  const fim = simulado.ends_at ? new Date(simulado.ends_at) : null;
+
+  if (inicio && hoje < inicio) {
+    const dias = Math.max(0, diffCalendarDays(hoje, inicio));
+    if (dias === 0) return 'Começa hoje';
+    return `Começa em ${dias} dia${dias !== 1 ? 's' : ''}`;
+  }
+
+  if (fim) {
+    if (hoje > fim) return 'Encerrado';
+    const dias = Math.max(0, diffCalendarDays(hoje, fim));
+    if (dias === 0) return 'Encerra hoje';
+    return `${dias} dia${dias !== 1 ? 's' : ''} restante${dias !== 1 ? 's' : ''}`;
+  }
+
+  return null;
+}
 
 export function HomeScreen() {
   const { user, signOut } = useAuth();
@@ -349,6 +376,7 @@ export function HomeScreen() {
               </View>
             ) : simuladosRecentes.map((s) => {
               const cor = SIM_STATUS_COLOR[s.attempt_status];
+              const contadorDias = getSimuladoDayCounter(s);
               return (
                 <TouchableOpacity
                   key={s.id}
@@ -364,7 +392,7 @@ export function HomeScreen() {
                     <Ionicons
                       name={subjectIconName(s.subject?.icon ?? '') as any}
                       size={24}
-                      color={MUTED}
+                      color={PRIMARY}
                     />
                   </View>
                   {s.subject && (
@@ -376,14 +404,24 @@ export function HomeScreen() {
                   {/* Título */}
                   <Text style={styles.simTitulo} numberOfLines={2}>{s.title}</Text>
 
+                  {contadorDias ? (
+                    <View style={styles.simDaysPill}>
+                      <Ionicons name="calendar-outline" size={12} color="#CBD5E1" />
+                      <Text style={styles.simDaysText} numberOfLines={1}>{contadorDias}</Text>
+                    </View>
+                  ) : null}
+
                   {/* Rodapé: status + link */}
                   <View style={styles.simRodape}>
-                    <View style={[styles.simBadge, { backgroundColor: cor + '18' }]}>
-                      <Text style={[styles.simBadgeTexto, { color: cor }]}>
+                    <View style={[styles.simBadge, { backgroundColor: cor }]}>
+                      <Text style={styles.simBadgeTexto}>
                         {SIM_STATUS_LABEL[s.attempt_status]}
                       </Text>
                     </View>
-                    <Text style={styles.simLink}>Abrir →</Text>
+                    <View style={styles.simOpenButton}>
+                      <Text style={styles.simLink}>Abrir</Text>
+                      <Ionicons name="arrow-forward" size={13} color={SURFACE} />
+                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -545,8 +583,8 @@ const styles = StyleSheet.create({
 
   // Simulados
   simCard: {
-    width: 168, minHeight: 180, backgroundColor: SURFACE, borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
+    width: 184, minHeight: 214, backgroundColor: INK, borderRadius: 16, padding: 16,
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, elevation: 3,
     flexDirection: 'column',
   },
   simCardVazio: {
@@ -556,15 +594,37 @@ const styles = StyleSheet.create({
   },
   simCardVazioTexto: { fontSize: 13, color: MUTED, textAlign: 'center' },
   simIconWrap: {
-    width: 48, height: 48, borderRadius: 14, backgroundColor: SOFT,
+    width: 48, height: 48, borderRadius: 14, backgroundColor: SURFACE,
     justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
-  simMateria: { fontSize: 11, fontWeight: '700', color: MUTED, marginBottom: 8 },
-  simTitulo:  { fontSize: 14, fontWeight: '700', color: INK, marginBottom: 12, lineHeight: 20, flex: 1 },
-  simRodape:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' as any },
-  simBadge:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  simBadgeTexto: { fontSize: 11, fontWeight: '600' },
-  simLink:    { fontSize: 12, fontWeight: '700', color: PRIMARY },
+  simMateria: { fontSize: 11, fontWeight: '700', color: '#CBD5E1', marginBottom: 8 },
+  simTitulo:  { fontSize: 14, fontWeight: '800', color: SURFACE, marginBottom: 10, lineHeight: 20, flex: 1 },
+  simDaysPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    maxWidth: '100%',
+    backgroundColor: 'rgba(238,242,255,0.12)',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  simDaysText: { fontSize: 10, fontWeight: '800', color: '#CBD5E1' },
+  simRodape:  { gap: 8, marginTop: 'auto' as any },
+  simBadge:   { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  simBadgeTexto: { fontSize: 10, fontWeight: '800', color: SURFACE },
+  simOpenButton: {
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  simLink:    { fontSize: 12, fontWeight: '800', color: SURFACE },
 
   // Meta
   metaCard: {

@@ -43,11 +43,11 @@ const STATUS_LABEL: Record<AttemptStatus, string> = {
 };
 
 const STATUS_COLOR: Record<AttemptStatus, string> = {
-  not_started:    '#10B981',
-  in_progress:    '#F59E0B',
-  pending_review: '#F59E0B',
-  awaiting_release: '#0EA5E9',
-  completed:      PRIMARY,
+  not_started:    '#22C55E',
+  in_progress:    '#F97316',
+  pending_review: '#F97316',
+  awaiting_release: '#F97316',
+  completed:      '#22C55E',
 };
 
 const STATUS_ICON: Record<AttemptStatus, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -59,10 +59,10 @@ const STATUS_ICON: Record<AttemptStatus, React.ComponentProps<typeof Ionicons>['
 };
 
 const HIST_COLOR: Record<string, string> = {
-  in_progress:    '#F59E0B',
-  pending_review: '#F59E0B',
-  awaiting_release: '#0EA5E9',
-  completed:      PRIMARY,
+  in_progress:    '#F97316',
+  pending_review: '#F97316',
+  awaiting_release: '#F97316',
+  completed:      '#22C55E',
   abandoned:      '#EF4444',
 };
 const HIST_LABEL: Record<string, string> = {
@@ -92,6 +92,10 @@ function formatDate(iso: string): string {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+function statusColor(status: AttemptStatus | string): string {
+  return STATUS_COLOR[status as AttemptStatus] ?? HIST_COLOR[status] ?? MUTED;
 }
 
 export function SimuladosScreen() {
@@ -147,7 +151,7 @@ export function SimuladosScreen() {
 
   // ── Render: card disponível ────────────────────────────────────────────────
   function renderDisponivel({ item }: { item: SimuladoListItem }) {
-    const cor   = STATUS_COLOR[item.attempt_status];
+    const cor   = statusColor(item.attempt_status);
     const label = STATUS_LABEL[item.attempt_status];
     const icon  = STATUS_ICON[item.attempt_status];
     return (
@@ -173,9 +177,9 @@ export function SimuladosScreen() {
               </View>
             ) : null}
           </View>
-          <View style={[styles.badge, { backgroundColor: cor + '20' }]}>
-            <Ionicons name={icon} size={13} color={cor} style={{ marginRight: 4 }} />
-            <Text style={[styles.badgeTexto, { color: cor }]}>{label}</Text>
+          <View style={[styles.badge, { backgroundColor: cor }]}>
+            <Ionicons name={icon} size={13} color={SURFACE} style={{ marginRight: 4 }} />
+            <Text style={styles.badgeTexto}>{label}</Text>
           </View>
         </View>
         {!item.can_start && item.attempt_status === 'not_started' && (
@@ -217,7 +221,7 @@ export function SimuladosScreen() {
 
   // ── Render: card histórico ─────────────────────────────────────────────────
   function renderTentativa({ item }: { item: AttemptHistoryItem }) {
-    const cor   = HIST_COLOR[item.status] ?? MUTED;
+    const cor   = statusColor(item.status);
     const label = HIST_LABEL[item.status] ?? item.status;
     const icon  = HIST_ICON[item.status]  ?? 'ellipse-outline';
     const subj  = item.exam.subject;
@@ -242,9 +246,9 @@ export function SimuladosScreen() {
               </View>
             ) : null}
           </View>
-          <View style={[styles.badge, { backgroundColor: cor + '20' }]}>
-            <Ionicons name={icon} size={13} color={cor} style={{ marginRight: 4 }} />
-            <Text style={[styles.badgeTexto, { color: cor }]}>{label}</Text>
+          <View style={[styles.badge, { backgroundColor: cor }]}>
+            <Ionicons name={icon} size={13} color={SURFACE} style={{ marginRight: 4 }} />
+            <Text style={styles.badgeTexto}>{label}</Text>
           </View>
         </View>
 
@@ -478,8 +482,18 @@ const styles = StyleSheet.create({
   subjectNome: { fontSize: 11, fontWeight: '600' },
   tipoChip: { backgroundColor: SOFT, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
   tipoTexto: { fontSize: 11, color: MUTED, fontWeight: '600' },
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  badgeTexto: { fontSize: 12, fontWeight: '600' },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  badgeTexto: { fontSize: 12, fontWeight: '800', color: SURFACE },
   foraPeriodo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   foraPeriodoTexto: { fontSize: 11, color: MUTED },
   cardTitulo: { fontSize: 16, fontWeight: '700', color: INK, marginBottom: 12, lineHeight: 22 },

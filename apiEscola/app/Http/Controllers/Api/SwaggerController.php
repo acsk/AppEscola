@@ -28,6 +28,7 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Subjects', description: 'Disciplinas')]
 #[OA\Tag(name: 'SchoolClasses', description: 'Turmas')]
 #[OA\Tag(name: 'ClassSchedules', description: 'Horários de aulas')]
+#[OA\Tag(name: 'StudentAttendances', description: 'Frequencia de alunos por turma e dia')]
 #[OA\Tag(name: 'Enrollments', description: 'Matrículas')]
 #[OA\Tag(name: 'Invoices', description: 'Cobranças')]
 #[OA\Tag(name: 'TenantApiTokens', description: 'Tokens de API por tenant')]

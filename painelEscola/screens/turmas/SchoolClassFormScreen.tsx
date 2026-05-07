@@ -373,6 +373,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
   const fmtTime = (t: string) => t.slice(0, 5);
 
+
   const toggleScheduleTeacher = (teacherId: string) => {
     setScheduleForm((prev) => ({
       ...prev,
@@ -416,6 +417,21 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           Dados da turma e horários de aula
         </Text>
       </View>
+
+      {!!savedClassId && (
+        <View className="flex-row gap-3 mb-5">
+          <View className="px-4 py-2.5 rounded-xl bg-violet-600">
+            <Text className="text-sm font-semibold text-white">Dados e Horários</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigate("turmas-frequencia", { classId: savedClassId })}
+            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+            activeOpacity={0.8}
+          >
+            <Text className="text-sm font-semibold text-gray-700">Frequência</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {loading ? (
         <View className="items-center justify-center py-24">
@@ -601,15 +617,16 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
           {/* ── Card: Horários ── */}
           {savedClassId ? (
-            <View
-              className="bg-white rounded-2xl p-6"
-              style={{
-                shadowColor: "#000",
-                shadowOpacity: 0.04,
-                shadowRadius: 8,
-                elevation: 1,
-              }}
-            >
+            <>
+              <View
+                className="bg-white rounded-2xl p-6 mb-5"
+                style={{
+                  shadowColor: "#000",
+                  shadowOpacity: 0.04,
+                  shadowRadius: 8,
+                  elevation: 1,
+                }}
+              >
               <View className="flex-row items-center justify-between mb-4">
                 <View className="flex-row items-center gap-2">
                   <View className="w-8 h-8 bg-amber-100 rounded-lg items-center justify-center">
@@ -721,7 +738,9 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                   ))}
                 </View>
               )}
-            </View>
+              </View>
+
+            </>
           ) : (
             <View className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex-row items-center gap-3">
               <Ionicons name="information-circle-outline" size={20} color="#3B82F6" />

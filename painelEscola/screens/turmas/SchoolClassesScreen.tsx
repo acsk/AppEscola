@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -58,6 +58,9 @@ export default function SchoolClassesScreen({ navigate }: Props) {
   const [rows, setRows] = useState<SchoolClass[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [courseFilter, setCourseFilter] = useState("");
+  const [yearFilter, setYearFilter] = useState("");
+  const [periodFilter, setPeriodFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({
@@ -69,28 +72,65 @@ export default function SchoolClassesScreen({ navigate }: Props) {
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [courses, setCourses] = useState<Array<{ id: number; name: string }>>([]);
 
   const periods = usePeriods();
   const periodMap = Object.fromEntries(
     domainToOptions(periods).map((o) => [o.value, o.label])
   );
+  const periodOptions = domainToOptions(periods);
+
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 10 }, (_, i) => String(currentYear + 1 - i));
+  }, []);
+
+  const fetchCourses = useCallback(async () => {
+    try {
+      const { data } = await api.get("/courses", { params: { per_page: 500 } });
+      const list = Array.isArray(data?.data) ? data.data : [];
+      setCourses(
+        list
+          .filter((item: any) => item?.id && item?.name)
+          .map((item: any) => ({ id: Number(item.id), name: item.name }))
+      );
+    } catch {
+      setCourses([]);
+    }
+  }, []);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, any> = { page };
       if (search.trim()) params.search = search.trim();
+      if (courseFilter) params.course_id = Number(courseFilter);
+      if (yearFilter) params.year = Number(yearFilter);
+      if (periodFilter) params.period = periodFilter;
       if (statusFilter) params.status = statusFilter;
       const { data } = await api.get("/school-classes", { params });
       setRows(data.data);
       setMeta(data.meta);
     } catch {}
     setLoading(false);
-  }, [page, search, statusFilter]);
+  }, [page, search, courseFilter, yearFilter, periodFilter, statusFilter]);
 
   useEffect(() => {
     fetchRows();
   }, [fetchRows]);
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setCourseFilter("");
+    setYearFilter("");
+    setPeriodFilter("");
+    setStatusFilter("");
+    setPage(1);
+  };
 
   const remove = async () => {
     if (!deleteId) return;
@@ -136,51 +176,143 @@ export default function SchoolClassesScreen({ navigate }: Props) {
       </View>
 
       {/* Filters */}
-      <View className="flex-row gap-3 mb-4">
-        <View
-          className="flex-1 max-w-xs flex-row items-center bg-white border border-gray-200 rounded-xl px-3"
-          style={{ height: 44 }}
-        >
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
-          <input
-            placeholder="Buscar turma..."
-            value={search}
+      <View className="bg-white border border-gray-200 rounded-2xl p-3 mb-4">
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Filtros
+          </Text>
+          <TouchableOpacity onPress={clearFilters} className="px-2 py-1 rounded-lg bg-gray-100" activeOpacity={0.8}>
+            <Text className="text-xs font-semibold text-gray-600">Limpar</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
+          <View
+            className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3"
+            style={{ height: 44, minWidth: 220, flexGrow: 1 }}
+          >
+            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <input
+              placeholder="Turma"
+              value={search}
+              onChange={(e: any) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontSize: 14,
+                color: "#374151",
+                marginLeft: 8,
+                backgroundColor: "transparent",
+              }}
+            />
+            {!!search && (
+              <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
+                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <select
+            value={courseFilter}
             onChange={(e: any) => {
-              setSearch(e.target.value);
+              setCourseFilter(e.target.value);
               setPage(1);
             }}
             style={{
-              flex: 1,
-              border: "none",
-              outline: "none",
+              border: "1px solid #E5E7EB",
+              borderRadius: 12,
+              padding: "0 14px",
               fontSize: 14,
               color: "#374151",
-              marginLeft: 8,
-              backgroundColor: "transparent",
+              backgroundColor: "#F9FAFB",
+              height: 44,
+              minWidth: 200,
             }}
-          />
+          >
+            <option value="">Curso</option>
+            {courses.map((course) => (
+              <option key={course.id} value={String(course.id)}>
+                {course.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={yearFilter}
+            onChange={(e: any) => {
+              setYearFilter(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              border: "1px solid #E5E7EB",
+              borderRadius: 12,
+              padding: "0 14px",
+              fontSize: 14,
+              color: "#374151",
+              backgroundColor: "#F9FAFB",
+              height: 44,
+              minWidth: 120,
+            }}
+          >
+            <option value="">Ano</option>
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={periodFilter}
+            onChange={(e: any) => {
+              setPeriodFilter(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              border: "1px solid #E5E7EB",
+              borderRadius: 12,
+              padding: "0 14px",
+              fontSize: 14,
+              color: "#374151",
+              backgroundColor: "#F9FAFB",
+              height: 44,
+              minWidth: 150,
+            }}
+          >
+            <option value="">Período</option>
+            {periodOptions.map((period) => (
+              <option key={period.value} value={period.value}>
+                {period.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e: any) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              border: "1px solid #E5E7EB",
+              borderRadius: 12,
+              padding: "0 14px",
+              fontSize: 14,
+              color: "#374151",
+              backgroundColor: "#F9FAFB",
+              height: 44,
+              minWidth: 140,
+            }}
+          >
+            <option value="">Status</option>
+            <option value="active">Ativo</option>
+            <option value="inactive">Inativo</option>
+          </select>
         </View>
-        <select
-          value={statusFilter}
-          onChange={(e: any) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
-            padding: "0 14px",
-            fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
-            height: 44,
-            minWidth: 160,
-          }}
-        >
-          <option value="">Todos os status</option>
-          <option value="active">Ativo</option>
-          <option value="inactive">Inativo</option>
-        </select>
       </View>
 
       {/* Table */}
@@ -224,7 +356,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
           >
             Status
           </Text>
-          <View style={{ width: 80 }} />
+          <View style={{ width: 176 }} />
         </View>
 
         {loading ? (
@@ -295,9 +427,18 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                 />
               </View>
               <View
-                style={{ width: 80 }}
+                style={{ width: 176 }}
                 className="flex-row justify-end gap-2"
               >
+                <TouchableOpacity
+                  onPress={() => navigate("turmas-frequencia", { classId: item.id })}
+                  className="flex-row items-center px-2.5 py-1.5 bg-emerald-50 rounded-lg gap-1"
+                >
+                  <Ionicons name="checkmark-done-outline" size={15} color="#059669" />
+                  <Text className="text-xs font-semibold text-emerald-700">
+                    Frequência
+                  </Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() =>
                     navigate("turmas-form", { classId: item.id })

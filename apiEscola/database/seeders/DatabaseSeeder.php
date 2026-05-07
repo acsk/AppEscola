@@ -92,5 +92,8 @@ class DatabaseSeeder extends Seeder
 
         // Simulado de demonstração
         $this->call(ExamSeeder::class);
+
+        // Alunos adicionais matriculados na turma 1 (id 5)
+        $this->call(TurmaUmStudentsSeeder::class);
     }
 }

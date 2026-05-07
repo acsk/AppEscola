@@ -254,6 +254,51 @@ Body idêntico ao `POST` (todos os campos opcionais no update).
 
 ---
 
+## Frequencia de Alunos (por Turma e Dia)
+
+### `GET /api/school-classes/{id}/attendances`
+> Requer autenticação Bearer Token
+
+**Query params opcionais:**
+
+| Param | Tipo | Descrição |
+|---|---|---|
+| `attendance_date` | date | Filtra por dia (`YYYY-MM-DD`) |
+| `student_id` | integer | Filtra por aluno |
+
+> A lista de frequência só retorna dados quando a data informada estiver dentro do período da turma e cair em um dia com horário cadastrado para ela. Fora disso, a listagem retorna vazia.
+
+### `POST /api/school-classes/{id}/attendances`
+> Requer autenticação Bearer Token
+
+Lançamento em lote da frequência da turma para um dia.
+
+**Body:**
+```json
+{
+  "attendance_date": "2026-05-06",
+  "records": [
+    { "student_id": 10, "status": "present", "notes": null },
+    { "student_id": 11, "status": "absent", "notes": "Consulta medica" },
+    { "student_id": 12, "status": "late", "notes": "Chegou 15 min atrasado" }
+  ]
+}
+```
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `attendance_date` | date | Sim | Dia da frequência (`YYYY-MM-DD`) |
+| `records` | array | Sim | Lista de alunos e status |
+| `records[].student_id` | integer | Sim | Aluno da turma |
+| `records[].status` | string | Sim | `present`, `absent`, `late`, `excused` |
+| `records[].notes` | string | Não | Observação do lançamento |
+
+> Se já existir frequência para o mesmo aluno no mesmo dia/turma, o registro é atualizado automaticamente.
+>
+> O lançamento/atualização só é permitido após o início da primeira aula cadastrada para a turma naquele dia.
+
+---
+
 ## Fluxo Frontend — Criar Turma com Horários
 
 ```
