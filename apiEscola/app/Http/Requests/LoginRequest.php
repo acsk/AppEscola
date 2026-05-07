@@ -11,6 +11,13 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('login')) {
+            $this->merge(['login' => trim($this->input('login'))]);
+        }
+    }
+
     public function rules(): array
     {
         return [

@@ -11,6 +11,8 @@ class ExamAttemptResource extends JsonResource
     {
         $visibleStatus = $this->visibleStatusFor($request->user()?->role);
         $studentAwaitingRelease = $visibleStatus === 'awaiting_release';
+        $score = $studentAwaitingRelease ? null : ($this->score !== null ? (float) $this->score : null);
+        $maxScore = $this->max_score !== null ? (float) $this->max_score : null;
 
         return [
             'id'          => $this->id,
@@ -39,8 +41,9 @@ class ExamAttemptResource extends JsonResource
             'started_at'  => $this->started_at?->toISOString(),
             'finished_at' => $this->finished_at?->toISOString(),
             'status'               => $visibleStatus,
-            'score'                => $studentAwaitingRelease ? null : ($this->score !== null ? (float) $this->score : null),
-            'max_score'            => $this->max_score !== null ? (float) $this->max_score : null,
+            'score'                => $score,
+            'max_score'            => $maxScore,
+            'score_display'        => $this->formatScoreFraction($score, $maxScore),
             'percentage'           => $studentAwaitingRelease ? null : ($this->percentage !== null ? (float) $this->percentage : null),
             'pending_answers_count'=> $this->when(
                 $visibleStatus === 'pending_review',
@@ -77,5 +80,19 @@ class ExamAttemptResource extends JsonResource
             'created_at'  => $this->created_at?->toISOString(),
             'updated_at'  => $this->updated_at?->toISOString(),
         ];
+    }
+
+    private function formatScoreFraction(?float $score, ?float $maxScore): ?string
+    {
+        if ($score === null || $maxScore === null) {
+            return null;
+        }
+
+        return $this->formatScoreNumber($score) . '/' . $this->formatScoreNumber($maxScore);
+    }
+
+    private function formatScoreNumber(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
     }
 }

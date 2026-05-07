@@ -296,14 +296,17 @@ class StudentExamController extends Controller
             });
 
         $passingScore = $attempt->exam->passing_score;
+        $score = $awaitingRelease ? null : ($attempt->score !== null ? (float) $attempt->score : null);
+        $maxScore = $attempt->max_score !== null ? (float) $attempt->max_score : null;
 
         return $this->success([
             'id'                    => $attempt->id,
             'status'                => $visibleStatus,
             'started_at'            => $attempt->started_at?->toISOString(),
             'finished_at'           => $attempt->finished_at?->toISOString(),
-            'score'                 => $awaitingRelease ? null : ($attempt->score !== null ? (float) $attempt->score : null),
-            'max_score'             => $attempt->max_score !== null ? (float) $attempt->max_score : null,
+            'score'                 => $score,
+            'max_score'             => $maxScore,
+            'score_display'         => $this->formatScoreFraction($score, $maxScore),
             'percentage'            => $awaitingRelease ? null : ($attempt->percentage !== null ? (float) $attempt->percentage : null),
             'pending_answers_count' => $visibleStatus === 'pending_review'
                 ? $attempt->answers->whereNull('is_correct')->count()
@@ -329,6 +332,20 @@ class StudentExamController extends Controller
             ],
             'questions'             => $questions,
         ], 'Tentativa carregada com sucesso.');
+    }
+
+    private function formatScoreFraction(?float $score, ?float $maxScore): ?string
+    {
+        if ($score === null || $maxScore === null) {
+            return null;
+        }
+
+        return $this->formatScoreNumber($score) . '/' . $this->formatScoreNumber($maxScore);
+    }
+
+    private function formatScoreNumber(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
     }
 
     /**
