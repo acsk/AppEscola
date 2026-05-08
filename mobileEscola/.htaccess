@@ -3,6 +3,10 @@ Options -Indexes
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
+  # Fallback para fontes hashadas do Expo Vector Icons
+  # Ex.: /assets/node_modules/.../Fonts/Ionicons.<hash>.ttf -> /dist/fonts/Ionicons.ttf
+  RewriteRule ^assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/([A-Za-z0-9_]+)\.[A-Fa-f0-9]+\.(ttf|otf)$ dist/fonts/$1.$2 [L,NC]
+
   # Se a requisição já está dentro de /dist, não redireciona
   RewriteCond %{REQUEST_URI} ^/dist/ [NC]
   RewriteRule ^ - [L]

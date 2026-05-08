@@ -7,8 +7,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "web:build": "expo export --platform web && npm run copy-icons",
+    "web:build": "EXPO_PUBLIC_API_URL=http://api.appcurso.com.br expo export --platform web && npm run copy-icons && npm run copy-icons:dist",
     "copy-icons": "node scripts/copy-icons.js",
+    "copy-icons:dist": "node scripts/copy-icons.js dist/fonts",
     "build:android": "expo build:android && npm run copy-icons",
     "build:ios": "expo build:ios && npm run copy-icons",
     "postbuild": "npm run copy-icons"
