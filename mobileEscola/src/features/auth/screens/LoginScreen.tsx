@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../context/AuthContext';
 import { ApiError } from '../../../services/auth.service';
+import { BASE_URL } from '../../../services/api';
 import { AxiosError } from 'axios';
 import { colors } from '../../../theme';
 
@@ -51,7 +52,7 @@ export function LoginScreen() {
         setErro(axiosErr.response?.data?.message ?? 'Usuário inativo. Contate o administrador.');
       } else if (axiosErr.code === 'ECONNREFUSED' || axiosErr.code === 'ERR_NETWORK' || !axiosErr.response) {
         setErro(
-          `Não foi possível alcançar o servidor (${process.env.EXPO_PUBLIC_API_URL ?? 'URL não configurada'}). ` +
+          `Não foi possível alcançar o servidor (${BASE_URL || 'URL não configurada'}). ` +
           `Verifique se o backend está rodando.`,
         );
       } else {

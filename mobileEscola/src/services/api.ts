@@ -3,7 +3,21 @@ import { storage, STORAGE_KEYS } from './storage';
 
 export { STORAGE_KEYS };
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.suaescola.com.br';
+const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+const productionBaseUrl = process.env.EXPO_PUBLIC_API_URL_PROD?.trim();
+const isWebProductionHost =
+  typeof window !== 'undefined' &&
+  Boolean(window.location?.hostname) &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1';
+
+// Se o app web estiver em domínio real, não permite loopback como base da API.
+const BASE_URL =
+  isWebProductionHost && configuredBaseUrl && /localhost|127\.0\.0\.1/.test(configuredBaseUrl)
+    ? productionBaseUrl ?? configuredBaseUrl
+    : configuredBaseUrl ?? productionBaseUrl ?? 'https://api.appcurso.com.br';
+
+export { BASE_URL };
 
 export const api = axios.create({
   baseURL: BASE_URL,
