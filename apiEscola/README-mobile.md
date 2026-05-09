@@ -707,83 +707,108 @@ switch (material.file_type) {
 }
 ```
 
-### Exemplo de componente (React Native)
+### Tipos TypeScript (DTO)
+
+```ts
+export type SupportMaterialType = 'link' | 'file';
+export type SupportMaterialFileType = 'pdf' | 'image' | 'video' | 'document' | null;
+
+export interface SupportMaterial {
+  id: number;
+  exam_id: number;
+  title: string;
+  description: string | null;
+  type: SupportMaterialType;
+  content: string;
+  file_type: SupportMaterialFileType;
+  file_size: number | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ApiSuccess<T> {
+  type: 'success';
+  message: string;
+  body: T;
+}
+```
+
+### Service de API (React Native)
+
+```ts
+import api from './api';
+import { ApiSuccess, SupportMaterial } from '../types/support-material';
+
+export async function getExamSupportMaterials(examId: number): Promise<SupportMaterial[]> {
+  const { data } = await api.get<ApiSuccess<SupportMaterial[]>>(`/exams/${examId}/support-materials`);
+  return data.body ?? [];
+}
+```
+
+### Exemplo de tela pronta (React Native)
 
 ```tsx
-import { FlatList, Linking, View, Text, TouchableOpacity, Image } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FlatList, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Video } from 'expo-av';
+import { WebView } from 'react-native-webview';
+import * as Sharing from 'expo-sharing';
+import { getExamSupportMaterials } from '../services/support-material.service';
+import { SupportMaterial } from '../types/support-material';
 
-const SupportMaterialsScreen = ({ examId }) => {
-  const [materials, setMaterials] = useState([]);
+type Props = { examId: number };
+
+export default function SupportMaterialsScreen({ examId }: Props) {
+  const [materials, setMaterials] = useState<SupportMaterial[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchMaterials();
-  }, [examId]);
-
-  const fetchMaterials = async () => {
+  const fetchMaterials = useCallback(async () => {
     try {
-      const response = await fetch(
-        `/api/exams/${examId}/support-materials`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-      const json = await response.json();
-      setMaterials(json.body || []);
+      setLoading(true);
+      const list = await getExamSupportMaterials(examId);
+      setMaterials(list);
     } finally {
       setLoading(false);
     }
-  };
+  }, [examId]);
 
-  const renderMaterial = ({ item }) => (
+  useEffect(() => {
+    fetchMaterials();
+  }, [fetchMaterials]);
+
+  const renderMaterial = ({ item }: { item: SupportMaterial }) => (
     <View style={styles.card}>
       <Text style={styles.title}>{item.title}</Text>
-      {item.description && (
-        <Text style={styles.description}>{item.description}</Text>
-      )}
+      {!!item.description && <Text style={styles.description}>{item.description}</Text>}
 
       {item.type === 'link' ? (
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => Linking.openURL(item.content)}
-        >
-          <Text style={styles.buttonText}>🔗 Abrir Link</Text>
+        <TouchableOpacity style={styles.button} onPress={() => Linking.openURL(item.content)}>
+          <Text style={styles.buttonText}>Abrir link</Text>
         </TouchableOpacity>
       ) : (
         <View>
           {item.file_type === 'video' && (
             <Video
               source={{ uri: item.content }}
-              rate={1.0}
-              volume={1.0}
-              isMuted={false}
               resizeMode="contain"
               useNativeControls
               style={styles.video}
             />
           )}
-          {item.file_type === 'pdf' && (
-            <WebView
-              source={{ uri: item.content }}
-              style={styles.pdf}
-            />
-          )}
-          {item.file_type === 'image' && (
-            <Image
-              source={{ uri: item.content }}
-              style={styles.image}
-            />
-          )}
+
+          {item.file_type === 'pdf' && <WebView source={{ uri: item.content }} style={styles.pdf} />}
+
+          {item.file_type === 'image' && <Image source={{ uri: item.content }} style={styles.image} />}
+
           {item.file_type === 'document' && (
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => Sharing.shareAsync(item.content)}
-            >
-              <Text style={styles.buttonText}>📄 Baixar Arquivo</Text>
+            <TouchableOpacity style={styles.button} onPress={() => Sharing.shareAsync(item.content)}>
+              <Text style={styles.buttonText}>Baixar arquivo</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.fileInfo}>
-            {(item.file_size / 1024 / 1024).toFixed(2)} MB
-          </Text>
+
+          {item.file_size !== null && (
+            <Text style={styles.fileInfo}>{(item.file_size / 1024 / 1024).toFixed(2)} MB</Text>
+          )}
         </View>
       )}
     </View>
@@ -792,31 +817,27 @@ const SupportMaterialsScreen = ({ examId }) => {
   return (
     <FlatList
       data={materials}
-      keyExtractor={(item) => item.id.toString()}
+      keyExtractor={(item) => String(item.id)}
       renderItem={renderMaterial}
-      onRefresh={fetchMaterials}
       refreshing={loading}
-      ListEmptyComponent={
-        <Text style={styles.empty}>Sem materiais de apoio para este simulado.</Text>
-      }
+      onRefresh={fetchMaterials}
+      ListEmptyComponent={<Text style={styles.empty}>Sem materiais de apoio para este simulado.</Text>}
     />
   );
-};
+}
 
 const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', padding: 12, marginVertical: 8, borderRadius: 8 },
-  title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  title: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
   description: { fontSize: 14, color: '#666', marginBottom: 8 },
   button: { backgroundColor: '#3B82F6', padding: 10, borderRadius: 6, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: 'bold' },
-  video: { height: 250, marginVertical: 8, borderRadius: 6 },
-  pdf: { height: 300, borderRadius: 6 },
-  image: { height: 200, borderRadius: 6, marginVertical: 8 },
+  buttonText: { color: '#fff', fontWeight: '700' },
+  video: { height: 240, marginVertical: 8, borderRadius: 6 },
+  pdf: { height: 320, borderRadius: 6 },
+  image: { height: 220, borderRadius: 6, marginVertical: 8 },
   fileInfo: { fontSize: 12, color: '#999', marginTop: 4 },
   empty: { textAlign: 'center', color: '#999', marginTop: 20 },
 });
-
-export default SupportMaterialsScreen;
 ```
 
 ---

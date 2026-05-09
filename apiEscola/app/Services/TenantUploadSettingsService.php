@@ -7,7 +7,8 @@ use App\Models\Tenant;
 class TenantUploadSettingsService
 {
     private const DEFAULT_DISK = 'public';
-    private const DEFAULT_BASE_PATH = 'exam-questions';
+    private const DEFAULT_BASE_PATH = 'uploads';
+    private const LEGACY_BASE_PATH = 'exam-questions';
 
     public function getForTenant(Tenant $tenant): array
     {
@@ -16,6 +17,11 @@ class TenantUploadSettingsService
 
         $disk = (string) ($uploads['disk'] ?? self::DEFAULT_DISK);
         $basePath = $this->normalizeBasePath((string) ($uploads['base_path'] ?? self::DEFAULT_BASE_PATH));
+
+        // Converte automaticamente o path legado para o novo padrão lógico.
+        if ($basePath === self::LEGACY_BASE_PATH) {
+            $basePath = self::DEFAULT_BASE_PATH;
+        }
 
         return [
             'disk' => $disk,
@@ -30,7 +36,7 @@ class TenantUploadSettingsService
         return [
             'disk' => $config['disk'],
             'directory' => $this->normalizePath(
-                $config['base_path'] . '/' . $tenant->id . '/' . $examId . '/' . $questionSegment
+                $config['base_path'] . '/exams/' . $tenant->id . '/' . $examId . '/questions/' . $questionSegment
             ),
         ];
     }
@@ -42,7 +48,7 @@ class TenantUploadSettingsService
         return [
             'disk' => $config['disk'],
             'directory' => $this->normalizePath(
-                $config['base_path'] . '/' . $tenant->id . '/students/' . $studentId
+                $config['base_path'] . '/students/' . $tenant->id . '/' . $studentId
             ),
         ];
     }
@@ -54,7 +60,7 @@ class TenantUploadSettingsService
         return [
             'disk' => $config['disk'],
             'directory' => $this->normalizePath(
-                $config['base_path'] . '/' . $tenant->id . '/tenant'
+                $config['base_path'] . '/tenants/' . $tenant->id
             ),
         ];
     }
@@ -67,7 +73,7 @@ class TenantUploadSettingsService
         return [
             'disk' => $config['disk'],
             'directory' => $this->normalizePath(
-                $config['base_path'] . '/' . $tenantId . '/support-materials/' . $examId
+                $config['base_path'] . '/exams/' . $tenantId . '/' . $examId . '/support-materials'
             ),
         ];
     }

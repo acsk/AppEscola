@@ -155,13 +155,6 @@ function QuestionImage({ uri, maxWidth }: QuestionImageProps) {
   );
 }
 
-function formatFileSize(bytes: number | null): string | null {
-  if (!bytes || bytes <= 0) return null;
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
 function materialIconName(material: SupportMaterial): string {
   if (material.type === 'link') return 'link-outline';
   switch (material.file_type) {
@@ -170,16 +163,6 @@ function materialIconName(material: SupportMaterial): string {
     case 'video':    return 'videocam-outline';
     case 'document': return 'document-attach-outline';
     default:         return 'document-outline';
-  }
-}
-
-function materialActionLabel(material: SupportMaterial): string {
-  if (material.type === 'link') return 'Abrir link';
-  switch (material.file_type) {
-    case 'pdf':      return 'Abrir PDF';
-    case 'video':    return 'Abrir vídeo';
-    case 'document': return 'Baixar arquivo';
-    default:         return 'Abrir arquivo';
   }
 }
 
@@ -225,54 +208,27 @@ function SupportMaterialsSection({ materiais, carregando, accentColor }: Support
         <Ionicons name="library-outline" size={18} color={accentColor} style={{ marginRight: 8 }} />
         <Text style={styles.materiaisTitulo}>Materiais de apoio</Text>
       </View>
-      <Text style={styles.materiaisSubtitulo}>
-        Recursos disponibilizados pelo professor para estudo e consulta.
-      </Text>
 
-      {materiais.map((m) => {
-        const tamanho = formatFileSize(m.file_size);
-        const isImage = m.type === 'file' && m.file_type === 'image';
-        return (
-          <View key={m.id} style={styles.materialCard}>
-            <View style={styles.materialHeader}>
-              <View style={[styles.materialIconWrap, { backgroundColor: accentColor + '18' }]}>
-                <Ionicons name={materialIconName(m) as any} size={18} color={accentColor} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.materialTitulo} numberOfLines={2}>{m.title}</Text>
-                {m.description ? (
-                  <Text style={styles.materialDescricao} numberOfLines={3}>{m.description}</Text>
-                ) : null}
-                {tamanho ? (
-                  <Text style={styles.materialMeta}>{tamanho}</Text>
-                ) : null}
-              </View>
-            </View>
-
-            {isImage ? (
-              <Image
-                source={{ uri: m.content }}
-                style={styles.materialImage}
-                resizeMode="cover"
-              />
-            ) : null}
-
-            <TouchableOpacity
-              style={[styles.materialBotao, { backgroundColor: accentColor }]}
-              onPress={() => abrirMaterial(m.content)}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name={m.type === 'link' ? 'open-outline' : 'cloud-download-outline'}
-                size={15}
-                color={colors.surface}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.materialBotaoTexto}>{materialActionLabel(m)}</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      })}
+      <View style={styles.materiaisLista}>
+        {materiais.map((m) => (
+          <TouchableOpacity
+            key={m.id}
+            style={[styles.materialChip, { borderColor: accentColor }]}
+            onPress={() => abrirMaterial(m.content)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={materialIconName(m) as any}
+              size={16}
+              color={accentColor}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={[styles.materialChipTexto, { color: accentColor }]} numberOfLines={1}>
+              {m.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
@@ -1188,68 +1144,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
   },
-  materiaisSubtitulo: {
-    marginTop: 4,
-    fontSize: 12,
-    color: colors.muted,
-  },
-  materialCard: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  materialHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  materialIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  materialTitulo: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  materialDescricao: {
-    marginTop: 4,
-    fontSize: 12,
-    color: colors.muted,
-    lineHeight: 17,
-  },
-  materialMeta: {
-    marginTop: 6,
-    fontSize: 11,
-    color: colors.muted,
-    fontWeight: '600',
-  },
-  materialImage: {
-    width: '100%',
-    height: 160,
-    borderRadius: 10,
+  materiaisLista: {
     marginTop: 10,
-    backgroundColor: colors.border,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  materialBotao: {
-    marginTop: 12,
+  materialChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    backgroundColor: colors.surface,
+    maxWidth: '100%',
   },
-  materialBotaoTexto: {
-    color: colors.surface,
+  materialChipTexto: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
+    flexShrink: 1,
   },
 
   // ── PDF ──

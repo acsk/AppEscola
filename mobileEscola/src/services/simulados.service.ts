@@ -311,10 +311,11 @@ export interface SupportMaterial {
 }
 
 export async function listarMateriaisApoio(examId: number): Promise<SupportMaterial[]> {
-  const { data } = await api.get<SupportMaterial[] | ApiEnvelope<SupportMaterial[]>>(
-    `/api/exams/${examId}/support-materials`,
-  );
-  const parsed = unwrapBody<SupportMaterial[]>(data);
-  return Array.isArray(parsed) ? parsed : [];
+  const { data } = await api.get<any>(`/api/exams/${examId}/support-materials`);
+  // Suporta { body: [...] }, { body: { data: [...] } } ou [...] direto
+  const body = data?.body ?? data;
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body?.data)) return body.data;
+  return [];
 }
 
