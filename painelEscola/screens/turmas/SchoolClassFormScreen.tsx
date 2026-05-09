@@ -169,6 +169,29 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   // Saved class id (after create)
   const [savedClassId, setSavedClassId] = useState<number | null>(classId);
 
+  const normalizeTeacher = (raw: any): Teacher => ({
+    id: raw.id,
+    name: raw.name,
+  });
+
+  const extractSubjectIdsFromUser = (raw: any): number[] => {
+    if (Array.isArray(raw?.subject_ids)) {
+      return raw.subject_ids
+        .map((item: any) =>
+          typeof item === "number" ? item : Number(item?.id ?? item)
+        )
+        .filter((id: number) => Number.isFinite(id));
+    }
+
+    if (Array.isArray(raw?.subjects)) {
+      return raw.subjects
+        .map((item: any) => Number(item?.id ?? item))
+        .filter((id: number) => Number.isFinite(id));
+    }
+
+    return [];
+  };
+
   // ── Load on mount ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const extractList = (payload: any): any[] => {
@@ -181,25 +204,35 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
     (async () => {
       try {
-        const [{ data: coursesRaw }, { data: subjectsRaw }, { data: teachersRaw }] = await Promise.all([
+        const [
+          { data: coursesRaw },
+          { data: subjectsRaw },
+          { data: teachersProfessorRaw },
+          { data: teachersAdminRaw },
+        ] = await Promise.all([
           api.get("/courses", { params: { status: "active", per_page: 200 } }),
           api.get("/subjects", { params: { status: "active", per_page: 200 } }),
           api.get("/users", {
             params: { role: "professor", per_page: 200 },
           }),
+          api.get("/users", {
+            params: { role: "admin", per_page: 200 },
+          }),
         ]);
 
         const coursesData = extractList(coursesRaw);
         const subjectsData = extractList(subjectsRaw);
-        const teachersData = extractList(teachersRaw);
+        const teachersData = [
+          ...extractList(teachersProfessorRaw),
+          ...extractList(teachersAdminRaw),
+        ];
 
         setCourses(Array.isArray(coursesData) ? coursesData : []);
         setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
         const normalizedTeachers =
-          (Array.isArray(teachersData) ? teachersData : []).map((t: any) => ({
-            id: t.id,
-            name: t.name,
-          }));
+          (Array.isArray(teachersData) ? teachersData : [])
+            .map(normalizeTeacher)
+            .filter((t, index, arr) => arr.findIndex((x) => x.id === t.id) === index);
 
         setAllTeachers(normalizedTeachers);
         setScheduleTeachers([]);
@@ -251,22 +284,50 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
       }
 
       try {
-        const { data: teachersRaw } = await api.get("/users", {
-          params: {
-            role: "professor",
-            subject_id: Number(scheduleForm.subject_id),
-            per_page: 200,
-          },
-        });
+        const [{ data: teachersProfessorRaw }, { data: teachersAdminRaw }] = await Promise.all([
+          api.get("/users", {
+            params: {
+              role: "professor",
+              subject_id: Number(scheduleForm.subject_id),
+              per_page: 200,
+            },
+          }),
+          api.get("/users", {
+            params: {
+              role: "admin",
+              subject_id: Number(scheduleForm.subject_id),
+              per_page: 200,
+            },
+          }),
+        ]);
 
-        const teachersData = extractList(teachersRaw);
+        const teachersData = [
+          ...extractList(teachersProfessorRaw),
+          ...extractList(teachersAdminRaw),
+        ];
+
+        const selectedSubjectId = Number(scheduleForm.subject_id);
+        const hasSubjectRelationData = teachersData.some(
+          (t: any) => Array.isArray(t?.subject_ids) || Array.isArray(t?.subjects)
+        );
+        const subjectFilteredTeachers = hasSubjectRelationData
+          ? teachersData.filter((t: any) =>
+              extractSubjectIdsFromUser(t).includes(selectedSubjectId)
+            )
+          : teachersData;
+
         const normalizedTeachers =
-          (Array.isArray(teachersData) ? teachersData : []).map((t: any) => ({
-            id: t.id,
-            name: t.name,
-          }));
+          (Array.isArray(subjectFilteredTeachers) ? subjectFilteredTeachers : [])
+            .map(normalizeTeacher)
+            .filter((t, index, arr) => arr.findIndex((x) => x.id === t.id) === index);
 
         setScheduleTeachers(normalizedTeachers);
+        setScheduleForm((prev) => ({
+          ...prev,
+          teacher_ids: prev.teacher_ids.filter((id) =>
+            normalizedTeachers.some((t) => String(t.id) === id)
+          ),
+        }));
       } catch {
         setScheduleTeachers([]);
       }
@@ -328,19 +389,18 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   };
 
   const openEditSchedule = (s: Schedule) => {
-    const teacherIds =
-      Array.isArray(s.teacher_ids) && s.teacher_ids.length > 0
-        ? s.teacher_ids.map((id) => String(id))
-        : Array.isArray(s.teachers) && s.teachers.length > 0
-        ? s.teachers.map((t) => String(t.id))
-        : s.teacher_id != null
-        ? [String(s.teacher_id)]
-        : [];
+    let teacherId = "";
+    
+    if (Array.isArray(s.teacher_ids) && s.teacher_ids.length > 0) {
+      teacherId = String(s.teacher_ids[s.teacher_ids.length - 1]);
+    } else if (s.teacher_id != null) {
+      teacherId = String(s.teacher_id);
+    }
 
     setEditScheduleId(s.id);
     setScheduleForm({
       subject_id: s.subject_id != null ? String(s.subject_id) : "",
-      teacher_ids: teacherIds,
+      teacher_ids: teacherId ? [teacherId] : [],
       weekday: s.weekday,
       start_time: s.start_time.slice(0, 5),
       end_time: s.end_time.slice(0, 5),
@@ -353,7 +413,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   const saveSchedule = async () => {
     const e: Record<string, string> = {};
     if (!scheduleForm.subject_id) e.subject_id = "Selecione a disciplina.";
-    if (scheduleForm.teacher_ids.length === 0) e.teacher_ids = "Selecione ao menos um professor.";
+    if (scheduleForm.teacher_ids.length !== 1) e.teacher_ids = "Selecione exatamente um professor.";
     if (!scheduleForm.start_time) e.start_time = "Hora de início obrigatória.";
     if (!scheduleForm.end_time) e.end_time = "Hora de término obrigatória.";
     if (Object.keys(e).length > 0) { setScheduleErrors(e); return; }
@@ -419,9 +479,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   const toggleScheduleTeacher = (teacherId: string) => {
     setScheduleForm((prev) => ({
       ...prev,
-      teacher_ids: prev.teacher_ids.includes(teacherId)
-        ? prev.teacher_ids.filter((id) => id !== teacherId)
-        : [...prev.teacher_ids, teacherId],
+      teacher_ids: prev.teacher_ids.includes(teacherId) ? [] : [teacherId],
     }));
     setScheduleErrors((prev) => ({ ...prev, teacher_ids: "" }));
   };
@@ -734,13 +792,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                           {s.subject?.name ?? (s.subject_id ? subjectNameById.get(s.subject_id) : null) ?? "Sem disciplina"}
                         </Text>
                         <Text className="text-xs text-gray-500" numberOfLines={1}>
-                          {Array.isArray(s.teachers) && s.teachers.length > 0
-                            ? s.teachers.map((t) => t.name).join(", ")
-                            : Array.isArray(s.teacher_ids) && s.teacher_ids.length > 0
-                            ? s.teacher_ids
-                                .map((id) => teacherNameById.get(id))
-                                .filter(Boolean)
-                                .join(", ") || "Sem professor"
+                          {Array.isArray(s.teacher_ids) && s.teacher_ids.length > 0
+                            ? teacherNameById.get(s.teacher_ids[s.teacher_ids.length - 1]) || "Sem professor"
                             : s.teacher?.name ?? (s.teacher_id ? teacherNameById.get(s.teacher_id) : null) ?? "Sem professor"}
                         </Text>
                       </View>
@@ -846,7 +899,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
         <View className="mb-3">
           <Text className="text-xs font-medium text-gray-600 mb-1.5">
-            Professores <Text className="text-red-500">*</Text>
+            Professor <Text className="text-red-500">*</Text>
           </Text>
 
           <View
@@ -872,7 +925,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                     activeOpacity={0.75}
                   >
                     <Ionicons
-                      name={selected ? "checkbox" : "square-outline"}
+                      name={selected ? "radio-button-on" : "radio-button-off"}
                       size={18}
                       color={selected ? "#7C3AED" : "#9CA3AF"}
                     />

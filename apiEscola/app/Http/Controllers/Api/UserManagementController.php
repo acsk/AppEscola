@@ -123,13 +123,13 @@ class UserManagementController extends Controller
     {
         $hasSubjectIds = array_key_exists('subject_ids', $data);
 
-        if ($user->role !== 'professor') {
-            // Garante consistência: apenas professor pode manter vínculos de disciplinas.
+        // Apenas super_admin (sem tenant) não pode ter disciplinas vinculadas.
+        if ($user->tenant_id === null) {
             $user->subjects()->detach();
 
             if ($hasSubjectIds && ! empty($data['subject_ids'])) {
                 throw ValidationException::withMessages([
-                    'subject_ids' => ['A associação de disciplinas é permitida apenas para usuários com role professor.'],
+                    'subject_ids' => ['Usuários sem tenant não podem ter disciplinas vinculadas.'],
                 ]);
             }
 
@@ -152,7 +152,7 @@ class UserManagementController extends Controller
 
         if (! $tenantId) {
             throw ValidationException::withMessages([
-                'tenant_id' => ['Professor deve estar associado a um tenant para vincular disciplinas.'],
+                'tenant_id' => ['O usuário deve estar associado a um tenant para vincular disciplinas.'],
             ]);
         }
 

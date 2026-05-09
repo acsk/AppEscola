@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
 import api from "../../services/api";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
+import ToastBanner from "../../components/ui/ToastBanner";
 import { parseApiErrors } from "../../utils/apiErrors";
 import { useAuth } from "../../contexts/AuthContext";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
@@ -163,7 +164,40 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "error",
+    message: "",
+  });
   const isEditingOwnUser = isEdit && !!userId && user?.id === userId;
+  const canTeach = form.role === "professor" || form.role === "admin";
+
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
+
+  const getApiErrorMessage = (responseData: any): string => {
+    const errors = responseData?.errors;
+
+    if (errors && typeof errors === "object") {
+      const firstField = Object.keys(errors)[0];
+      const firstValue = firstField ? errors[firstField] : undefined;
+
+      if (Array.isArray(firstValue) && firstValue[0]) {
+        return String(firstValue[0]);
+      }
+
+      if (typeof firstValue === "string" && firstValue) {
+        return firstValue;
+      }
+    }
+
+    return responseData?.message || "Nao foi possivel salvar este usuario.";
+  };
 
   useEffect(() => {
     if (!isGlobalSuperAdmin) return;
@@ -259,7 +293,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   }, [isEdit, isGlobalSuperAdmin, user?.tenant_id, userId]);
 
   useEffect(() => {
-    if (form.role !== "professor") {
+    if (!canTeach) {
       setSubjects([]);
       return;
     }
@@ -284,7 +318,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     };
 
     loadSubjects();
-  }, [form.role]);
+  }, [canTeach]);
 
   const title = useMemo(() => (isEdit ? "Editar Usuario" : "Novo Usuario"), [isEdit]);
 
@@ -298,7 +332,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       ...prev,
       role: nextRole,
       tenant_id: nextRole === "super_admin" ? "" : prev.tenant_id,
-      subject_ids: nextRole === "professor" ? prev.subject_ids : [],
+      subject_ids: nextRole === "professor" || nextRole === "admin" ? prev.subject_ids : [],
     }));
     setErrors((prev) => ({ ...prev, role: "", tenant_id: "" }));
   };
@@ -371,7 +405,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       payload.tenant_id = user.tenant_id;
     }
 
-    if (form.role === "professor") {
+    if (canTeach) {
       payload.subject_ids = form.subject_ids;
     }
 
@@ -390,19 +424,29 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       }
     } catch (e: any) {
       if (e.response?.status === 422) {
+        const apiMessage = getApiErrorMessage(e.response?.data);
         const fieldErrors = parseApiErrors(e.response.data?.errors ?? {});
         if (Object.keys(fieldErrors).length > 0) {
           setErrors(fieldErrors);
         } else {
           setErrors({
             general:
-              e.response?.data?.message || "Nao foi possivel salvar este usuario.",
+              apiMessage,
           });
         }
+
+        setToast({ visible: true, type: "error", message: apiMessage });
       } else if (e.response?.status === 403) {
         setForbidden(true);
+        setToast({
+          visible: true,
+          type: "error",
+          message: e.response?.data?.message || "Seu perfil nao possui permissao para esta operacao.",
+        });
       } else {
-        setErrors({ general: e.response?.data?.message || "Nao foi possivel salvar este usuario." });
+        const fallbackMessage = e.response?.data?.message || "Nao foi possivel salvar este usuario.";
+        setErrors({ general: fallbackMessage });
+        setToast({ visible: true, type: "error", message: fallbackMessage });
       }
     }
 
@@ -410,6 +454,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   };
 
   return (
+    <View className="flex-1">
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}>
       <View className="flex-row items-center gap-2 mb-6">
         <TouchableOpacity onPress={() => navigate("users")} className="flex-row items-center gap-1.5" activeOpacity={0.7}>
@@ -519,10 +564,10 @@ export default function UserFormScreen({ navigate, userId }: Props) {
         </View>
       </View>
 
-      {form.role === "professor" && (
+      {canTeach && (
         <View className="bg-white rounded-2xl p-5 mb-5" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
           <Text className="text-base font-semibold text-gray-800 mb-1">Disciplinas</Text>
-          <Text className="text-xs text-gray-400 mb-3">Selecione as disciplinas que este professor leciona</Text>
+          <Text className="text-xs text-gray-400 mb-3">Selecione as disciplinas que este usuario leciona</Text>
           {subjects.length === 0 ? (
             <Text className="text-sm text-gray-400">Nenhuma disciplina disponivel.</Text>
           ) : (
@@ -626,5 +671,13 @@ export default function UserFormScreen({ navigate, userId }: Props) {
         </View>
       )}
     </ScrollView>
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
+    </View>
   );
 }

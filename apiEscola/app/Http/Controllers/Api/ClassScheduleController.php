@@ -187,15 +187,15 @@ class ClassScheduleController extends Controller
             return;
         }
 
+        // Aceita qualquer usuário ativo do tenant (professor ou admin que também leciona).
         $validCount = User::query()
             ->where('tenant_id', $tenantId)
-            ->where('role', 'professor')
             ->whereIn('id', $teacherIds)
             ->count();
 
         if ($validCount !== count($teacherIds)) {
             throw ValidationException::withMessages([
-                'teacher_ids' => 'Um ou mais professores sao invalidos para este tenant.',
+                'teacher_ids' => 'Um ou mais professores são inválidos para este tenant.',
             ]);
         }
 
@@ -203,10 +203,9 @@ class ClassScheduleController extends Controller
             return;
         }
 
-        // Verifica se todos os professores têm a disciplina vinculada.
+        // Verifica se todos os usuários têm a disciplina vinculada (independente de role).
         $withSubjectCount = User::query()
             ->where('tenant_id', $tenantId)
-            ->where('role', 'professor')
             ->whereIn('id', $teacherIds)
             ->whereHas('subjects', fn ($q) => $q->where('subjects.id', $subjectId))
             ->count();
