@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -44,5 +45,39 @@ class SubscribeEnrollmentRequest extends FormRequest
             'enrollment_payment.paid_at'         => ['nullable', 'date'],
             'enrollment_payment.notes'           => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $payment = $this->input('enrollment_payment');
+
+        if (is_array($payment)) {
+            $payment['paid_at'] = $this->normalizeDate($payment['paid_at'] ?? null);
+        }
+
+        $this->merge([
+            'start_date' => $this->normalizeDate($this->input('start_date')),
+            'end_date' => $this->normalizeDate($this->input('end_date')),
+            'enrollment_payment' => $payment,
+        ]);
+    }
+
+    private function normalizeDate(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $value)) {
+            return Carbon::createFromFormat('d/m/Y', $value)->format('Y-m-d');
+        }
+
+        return $value;
     }
 }
