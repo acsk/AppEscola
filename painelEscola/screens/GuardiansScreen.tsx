@@ -15,6 +15,7 @@ import FormInput from "../components/ui/FormInput";
 import FormSelect from "../components/ui/FormSelect";
 import Pagination from "../components/ui/Pagination";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import ToastBanner from "../components/ui/ToastBanner";
 import {
   useGuardianRelationships,
   domainToOptions,
@@ -68,12 +69,24 @@ export default function GuardiansScreen() {
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
 
   const relationships = useGuardianRelationships();
   const relOptions = [
     { value: "", label: "Não informado" },
     ...domainToOptions(relationships),
   ];
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -142,8 +155,22 @@ export default function GuardiansScreen() {
     try {
       await api.delete(`/guardians/${deleteId}`);
       setDeleteId(null);
+      setToast({
+        visible: true,
+        type: "success",
+        message: "Responsável excluído com sucesso.",
+      });
       fetch();
-    } catch {}
+    } catch (e: any) {
+      setDeleteId(null);
+      setToast({
+        visible: true,
+        type: "error",
+        message:
+          e?.response?.data?.message ||
+          "Não foi possível excluir o responsável.",
+      });
+    }
     setDeleting(false);
   };
 
@@ -431,6 +458,13 @@ export default function GuardiansScreen() {
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}
         loading={deleting}
+      />
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
       />
     </ScrollView>
   );

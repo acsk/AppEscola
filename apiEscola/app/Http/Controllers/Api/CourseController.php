@@ -110,12 +110,23 @@ class CourseController extends Controller
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [
             new OA\Response(response: 200, description: 'Removido com sucesso'),
+            new OA\Response(response: 422, description: 'Curso com turmas vigentes não pode ser removido'),
             new OA\Response(response: 404, description: 'Não encontrado'),
         ]
     )]
     public function destroy(Request $request, Course $course): JsonResponse
     {
         $this->authorizeTenant($request, $course->tenant_id);
+
+        $hasActiveClasses = $course->schoolClasses()
+            ->where('status', 'active')
+            ->exists();
+
+        if ($hasActiveClasses) {
+            return response()->json([
+                'message' => 'Não é possível excluir curso com turmas vigentes.',
+            ], 422);
+        }
 
         $course->delete();
 

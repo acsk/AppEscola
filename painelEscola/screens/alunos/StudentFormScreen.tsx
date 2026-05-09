@@ -13,6 +13,7 @@ import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import DatePickerInput from "../../components/ui/DatePickerInput";
 import SearchableSelect from "../../components/ui/SearchableSelect";
+import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import {
   maskPhone,
@@ -155,6 +156,9 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   const [guardians, setGuardians] = useState<GuardianForm[]>([]);
   const [guardianOptions, setGuardianOptions] = useState<GuardianOption[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [deleteGuardianIndex, setDeleteGuardianIndex] = useState<number | null>(
+    null
+  );
   const [toast, setToast] = useState<{
     visible: boolean;
     type: "success" | "error";
@@ -388,6 +392,12 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         };
       })
     );
+  };
+
+  const confirmDeleteGuardian = () => {
+    if (deleteGuardianIndex === null) return;
+    setGuardians((prev) => prev.filter((_, i) => i !== deleteGuardianIndex));
+    setDeleteGuardianIndex(null);
   };
 
   const save = async () => {
@@ -822,11 +832,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                           </TouchableOpacity>
                         </View>
                         <TouchableOpacity
-                          onPress={() =>
-                            setGuardians((prev) =>
-                              prev.filter((_, i) => i !== idx)
-                            )
-                          }
+                          onPress={() => setDeleteGuardianIndex(idx)}
                           className="p-1.5 bg-red-50 rounded-lg"
                         >
                           <Ionicons
@@ -1017,6 +1023,15 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         </View>
       )}
       </ScrollView>
+
+      <ConfirmModal
+        visible={deleteGuardianIndex !== null}
+        title="Remover Responsável"
+        message="Deseja remover este responsável da lista?"
+        onConfirm={confirmDeleteGuardian}
+        onCancel={() => setDeleteGuardianIndex(null)}
+        loading={false}
+      />
 
       <ToastBanner
         visible={toast.visible}

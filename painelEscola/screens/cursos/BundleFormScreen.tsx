@@ -103,13 +103,14 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
       setLoading(true);
       try {
         const { data } = await api.get(`/course-bundles/${bundleId}`);
+        const bundle = data.body ?? data.data ?? data;
         setForm({
-          name: data.name ?? "",
-          description: data.description ?? "",
-          billing_cycle: data.billing_cycle ?? "monthly",
-          price: data.price ?? "",
-          status: data.status ?? "active",
-          course_ids: (data.courses ?? []).map((c: CourseOption) => c.id),
+          name: bundle.name ?? "",
+          description: bundle.description ?? "",
+          billing_cycle: bundle.billing_cycle ?? "monthly",
+          price: bundle.price ?? "",
+          status: bundle.status ?? "active",
+          course_ids: (bundle.courses ?? []).map((c: CourseOption) => c.id),
         });
       } catch {}
       setLoading(false);
@@ -177,9 +178,19 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
           type: "success",
           message: data?.message || "Operacao realizada com sucesso.",
         });
+        setTimeout(() => {
+          navigate("pacotes");
+        }, 1800);
       } else {
-        await api.post("/course-bundles", payload);
-        navigate("pacotes");
+        const { data } = await api.post("/course-bundles", payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Pacote criado com sucesso.",
+        });
+        setTimeout(() => {
+          navigate("pacotes");
+        }, 1800);
       }
     } catch (e: any) {
       if (e.response?.status === 422) {

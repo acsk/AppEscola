@@ -131,7 +131,8 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
     setLoadingPlans(true);
     try {
       const { data } = await api.get(`/courses/${courseId}/plans`);
-      setPlans(data.data ?? data);
+      const plansData = data.body ?? data.data ?? data;
+      setPlans(Array.isArray(plansData) ? plansData : Array.isArray(plansData?.data) ? plansData.data : []);
     } catch {}
     setLoadingPlans(false);
   }, [courseId, isEdit]);
