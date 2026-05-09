@@ -78,7 +78,7 @@ export function LoginScreen() {
             <View style={styles.logoBadge}>
               <Ionicons name="school" size={38} color={colors.surface} />
             </View>
-            <Text style={styles.heroTitle}>App Escola</Text>
+            <Text style={styles.heroTitle}>App Curso</Text>
             <Text style={styles.heroText}>
               Acesse sua rotina escolar com uma experiência mais simples, clara e segura.
             </Text>

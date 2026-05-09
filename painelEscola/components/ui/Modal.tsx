@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Modal as RNModal,
   View,
   Text,
   TouchableOpacity,
@@ -17,7 +18,7 @@ type Props = {
   size?: "sm" | "md" | "lg";
 };
 
-const widths = { sm: 400, md: 560, lg: 760 };
+const widths = { sm: 560, md: 760, lg: 980 };
 
 export default function Modal({
   visible,
@@ -29,54 +30,64 @@ export default function Modal({
 }: Props) {
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
+  const horizontalPadding = isMobile ? 12 : width < 1024 ? 24 : 40;
 
   if (!visible) return null;
 
   return (
-    <View
-      className="items-center justify-center"
-      style={{
-        position: "fixed" as any,
-        inset: 0,
-        zIndex: 1000,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        padding: isMobile ? 12 : 24,
-      }}
+    <RNModal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
     >
       <View
-        className="bg-white rounded-2xl"
-        style={{ width: "100%", maxWidth: widths[size], maxHeight: "88%" }}
+        className="items-center justify-center"
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.45)",
+          padding: horizontalPadding,
+        }}
       >
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
-          <Text className="text-base font-bold text-gray-800">{title}</Text>
-          <TouchableOpacity
-            onPress={onClose}
-            className="p-1 rounded-lg bg-gray-100"
-            activeOpacity={0.7}
-          >
-            <Ionicons name="close" size={18} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Body */}
-        <ScrollView
-          className="px-6 py-5"
-          showsVerticalScrollIndicator={false}
+        <View
+          className="bg-white rounded-2xl"
+          style={{
+            width: "100%",
+            maxWidth: Math.min(width - horizontalPadding * 2, widths[size]),
+            maxHeight: "88%",
+          }}
         >
-          {children}
-        </ScrollView>
-
-        {/* Footer */}
-        {footer && (
-          <View
-            className="justify-end px-6 py-4 border-t border-gray-100"
-            style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}
-          >
-            {footer}
+          {/* Header */}
+          <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
+            <Text className="text-base font-bold text-gray-800">{title}</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              className="p-1 rounded-lg bg-gray-100"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="#6B7280" />
+            </TouchableOpacity>
           </View>
-        )}
+
+          {/* Body */}
+          <ScrollView
+            className="px-6 py-5"
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+
+          {/* Footer */}
+          {footer && (
+            <View
+              className="justify-end px-6 py-4 border-t border-gray-100"
+              style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}
+            >
+              {footer}
+            </View>
+          )}
+        </View>
       </View>
-    </View>
+    </RNModal>
   );
 }

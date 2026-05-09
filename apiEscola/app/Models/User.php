@@ -17,6 +17,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         'tenant_id',
+        'is_tenant_owner',
         'name',
         'email',
         'password',
@@ -35,6 +36,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at'        => 'datetime',
+            'is_tenant_owner'          => 'boolean',
             'password'                 => 'hashed',
             'password_change_required' => 'boolean',
         ];

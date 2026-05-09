@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
+  Modal as RNModal,
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -49,6 +51,27 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: stri
 };
 
 const ICON_OPTIONS = Object.keys(ICON_MAP);
+const ICON_LABELS: Record<string, string> = {
+  calculator: "Calculadora",
+  "book-open": "Livro aberto",
+  "flask-conical": "Frasco",
+  landmark: "Colunas",
+  globe: "Globo",
+  dumbbell: "Halter",
+  languages: "Idiomas",
+  atom: "Atomo",
+  music: "Musica",
+  palette: "Paleta",
+  code2: "Codigo",
+  brain: "Cerebro",
+  "book-marked": "Livro marcado",
+  "graduation-cap": "Capelo",
+  microscope: "Microscopio",
+  earth: "Terra",
+  lightbulb: "Lampada",
+  "pen-line": "Caneta",
+  sigma: "Sigma",
+};
 
 const COLOR_PRESETS = [
   "#3B82F6", "#10B981", "#EF4444", "#F97316",
@@ -87,6 +110,299 @@ function SubjectIcon({
   );
 }
 
+function PickerField({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text className="text-sm font-semibold text-gray-700 mb-2">{label}</Text>
+      <View className="border border-gray-200 rounded-2xl bg-white relative">
+        {children}
+      </View>
+      {error && <Text className="text-xs text-red-500 mt-1">{error}</Text>}
+    </View>
+  );
+}
+
+function DropdownTrigger({
+  open,
+  onPress,
+  triggerRef,
+  children,
+}: {
+  open: boolean;
+  onPress: () => void;
+  triggerRef: React.RefObject<View | null>;
+  children: React.ReactNode;
+}) {
+  return (
+    <TouchableOpacity
+      ref={triggerRef as any}
+      onPress={onPress}
+      activeOpacity={0.8}
+      className="flex-row items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100"
+    >
+      <View style={{ flex: 1 }}>{children}</View>
+      <Ionicons
+        name={open ? "chevron-up" : "chevron-down"}
+        size={18}
+        color="#6B7280"
+      />
+    </TouchableOpacity>
+  );
+}
+
+function IconDropdownPicker({
+  value,
+  color,
+  onChange,
+}: {
+  value: string;
+  color: string;
+  onChange: (next: string) => void;
+}) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const triggerRef = React.useRef<View | null>(null);
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState({ x: 0, y: 0, w: 0, h: 0 });
+
+  const measureTrigger = () => {
+    triggerRef.current?.measureInWindow((x, y, w, h) => {
+      setAnchor({ x, y, w, h });
+    });
+  };
+
+  const handleSelect = (next: string) => {
+    onChange(next);
+    setOpen(false);
+  };
+
+  const menuHeight = 220 + 54;
+  const openUp = anchor.y + anchor.h + menuHeight > screenHeight - 12;
+  const top = openUp ? Math.max(12, anchor.y - menuHeight - 6) : anchor.y + anchor.h + 6;
+  const left = Math.max(12, Math.min(anchor.x, screenWidth - anchor.w - 12));
+
+  return (
+    <>
+      <DropdownTrigger
+        open={open}
+        onPress={() => {
+          if (!open) measureTrigger();
+          setOpen((prev) => !prev);
+        }}
+        triggerRef={triggerRef}
+      >
+        <View className="flex-row items-center gap-3">
+          <SubjectIcon icon={value || null} color={color || null} size={18} />
+          <View>
+            <Text className="text-sm font-medium text-gray-800">
+              {value ? ICON_LABELS[value] ?? value : "Sem ícone selecionado"}
+            </Text>
+            <Text className="text-xs text-gray-500">Selecione um ícone</Text>
+          </View>
+        </View>
+      </DropdownTrigger>
+
+      {open && (
+        <RNModal visible transparent animationType="none" onRequestClose={() => setOpen(false)}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setOpen(false)}
+            style={{ flex: 1, backgroundColor: "transparent" }}
+          >
+            <View
+              style={{
+                position: "absolute",
+                top,
+                left,
+                width: Math.max(260, anchor.w),
+                zIndex: 9999,
+                elevation: 30,
+                backgroundColor: "white",
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                borderRadius: 16,
+                overflow: "hidden",
+                shadowColor: "#000",
+                shadowOpacity: 0.16,
+                shadowRadius: 18,
+              }}
+            >
+              <ScrollView
+                style={{ maxHeight: 220 }}
+                showsVerticalScrollIndicator
+                persistentScrollbar
+              >
+                <TouchableOpacity
+                  onPress={() => handleSelect("")}
+                  activeOpacity={0.7}
+                  className="flex-row items-center gap-3 px-4 py-3 border-b border-gray-50"
+                  style={{ backgroundColor: !value ? "#F5F3FF" : "white" }}
+                >
+                  <View className="w-9 h-9 rounded-xl items-center justify-center bg-gray-100">
+                    <Ionicons name="close-outline" size={18} color="#9CA3AF" />
+                  </View>
+                  <Text className="text-sm font-medium text-gray-700">Sem ícone</Text>
+                </TouchableOpacity>
+                {ICON_OPTIONS.map((key) => {
+                  const selected = value === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      onPress={() => handleSelect(key)}
+                      activeOpacity={0.7}
+                      className="flex-row items-center gap-3 px-4 py-3 border-b border-gray-50"
+                      style={{ backgroundColor: selected ? "#F5F3FF" : "white" }}
+                    >
+                      <SubjectIcon icon={key} color={color} size={18} />
+                      <Text
+                        className="text-sm"
+                        style={{ color: selected ? "#5B21B6" : "#374151", fontWeight: selected ? "600" : "500" }}
+                      >
+                        {ICON_LABELS[key] ?? key}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </RNModal>
+      )}
+    </>
+  );
+}
+
+function ColorDropdownPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const triggerRef = React.useRef<View | null>(null);
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState({ x: 0, y: 0, w: 0, h: 0 });
+
+  const measureTrigger = () => {
+    triggerRef.current?.measureInWindow((x, y, w, h) => {
+      setAnchor({ x, y, w, h });
+    });
+  };
+
+  const handleSelect = (next: string) => {
+    onChange(next);
+    setOpen(false);
+  };
+
+  const menuHeight = 220 + 54;
+  const openUp = anchor.y + anchor.h + menuHeight > screenHeight - 12;
+  const top = openUp ? Math.max(12, anchor.y - menuHeight - 6) : anchor.y + anchor.h + 6;
+  const left = Math.max(12, Math.min(anchor.x, screenWidth - anchor.w - 12));
+
+  return (
+    <>
+      <DropdownTrigger
+        open={open}
+        onPress={() => {
+          if (!open) measureTrigger();
+          setOpen((prev) => !prev);
+        }}
+        triggerRef={triggerRef}
+      >
+        <View className="flex-row items-center gap-3">
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              backgroundColor: value || "#8B5CF6",
+              borderWidth: 1,
+              borderColor: "#E5E7EB",
+            }}
+          />
+          <View>
+            <Text className="text-sm font-medium text-gray-800">{value}</Text>
+            <Text className="text-xs text-gray-500">Selecione uma cor</Text>
+          </View>
+        </View>
+      </DropdownTrigger>
+
+      {open && (
+        <RNModal visible transparent animationType="none" onRequestClose={() => setOpen(false)}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setOpen(false)}
+            style={{ flex: 1, backgroundColor: "transparent" }}
+          >
+            <View
+              style={{
+                position: "absolute",
+                top,
+                left,
+                width: Math.max(260, anchor.w),
+                zIndex: 9999,
+                elevation: 30,
+                backgroundColor: "white",
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                borderRadius: 16,
+                overflow: "hidden",
+                shadowColor: "#000",
+                shadowOpacity: 0.16,
+                shadowRadius: 18,
+              }}
+            >
+              <ScrollView
+                style={{ maxHeight: 220 }}
+                showsVerticalScrollIndicator
+                persistentScrollbar
+              >
+                {COLOR_PRESETS.map((colorOption) => {
+                  const selected = value === colorOption;
+                  return (
+                    <TouchableOpacity
+                      key={colorOption}
+                      onPress={() => handleSelect(colorOption)}
+                      activeOpacity={0.7}
+                      className="flex-row items-center gap-3 px-4 py-3 border-b border-gray-50"
+                      style={{ backgroundColor: selected ? "#F5F3FF" : "white" }}
+                    >
+                      <View
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 10,
+                          backgroundColor: colorOption,
+                          borderWidth: 2,
+                          borderColor: selected ? "#1F2937" : "#E5E7EB",
+                        }}
+                      />
+                      <Text
+                        className="text-sm"
+                        style={{ color: selected ? "#5B21B6" : "#374151", fontWeight: selected ? "600" : "500" }}
+                      >
+                        {colorOption}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </RNModal>
+      )}
+    </>
+  );
+}
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 type Subject = {
@@ -104,7 +420,6 @@ const STATUS_OPTIONS = [
   { value: "active", label: "Ativo" },
   { value: "inactive", label: "Inativo" },
 ];
-
 export default function SubjectsScreen() {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Subject[]>([]);
@@ -254,7 +569,7 @@ export default function SubjectsScreen() {
       </View>
       </ScrollView>
 
-      <Modal visible={modalVisible} title={editId ? "Editar Disciplina" : "Nova Disciplina"} onClose={() => setModalVisible(false)} size="sm"
+      <Modal visible={modalVisible} title={editId ? "Editar Disciplina" : "Nova Disciplina"} onClose={() => setModalVisible(false)} size="lg"
         footer={
           <>
             <TouchableOpacity onPress={() => setModalVisible(false)} className="px-5 py-2.5 rounded-xl border border-gray-200">
@@ -269,83 +584,21 @@ export default function SubjectsScreen() {
         <FormInput label="Nome" required value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} error={errors.name} placeholder="Ex: Matemática" />
         <FormInput label="Descrição" value={form.description} onChangeText={(v) => setForm({ ...form, description: v })} error={errors.description} placeholder="Descrição da disciplina" />
 
-        {/* Ícone */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Ícone</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {ICON_OPTIONS.map((key) => {
-              const IconComp = ICON_MAP[key];
-              const active = form.icon === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => setForm({ ...form, icon: active ? "" : key })}
-                  activeOpacity={0.7}
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 10,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: active ? (form.color || "#8B5CF6") + "22" : "#F3F4F6",
-                    borderWidth: 2,
-                    borderColor: active ? (form.color || "#8B5CF6") : "transparent",
-                  }}
-                >
-                  <IconComp
-                    size={20}
-                    color={active ? (form.color || "#8B5CF6") : "#9CA3AF"}
-                    strokeWidth={2}
-                  />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {errors.icon && <Text className="text-xs text-red-500 mt-1">{errors.icon}</Text>}
-        </View>
+        <View className="flex-row gap-4 mb-4">
+          <PickerField label="Ícone" error={errors.icon}>
+            <IconDropdownPicker
+              value={form.icon}
+              color={form.color}
+              onChange={(next: string) => setForm({ ...form, icon: next })}
+            />
+          </PickerField>
 
-        {/* Cor */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">Cor</Text>
-          <View className="flex-row flex-wrap gap-2 mb-2">
-            {COLOR_PRESETS.map((c) => (
-              <TouchableOpacity
-                key={c}
-                onPress={() => setForm({ ...form, color: c })}
-                activeOpacity={0.8}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  backgroundColor: c,
-                  borderWidth: 3,
-                  borderColor: form.color === c ? "#1F2937" : "transparent",
-                }}
-              />
-            ))}
-          </View>
-          <View className="flex-row items-center gap-2">
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                backgroundColor: form.color || "#8B5CF6",
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-              }}
-            />
-            <TextInput
+          <PickerField label="Cor" error={errors.color}>
+            <ColorDropdownPicker
               value={form.color}
-              onChangeText={(v) => setForm({ ...form, color: v })}
-              placeholder="#RRGGBB"
-              placeholderTextColor="#9CA3AF"
-              maxLength={9}
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 bg-gray-50"
-              style={{ width: 110 }}
+              onChange={(next: string) => setForm({ ...form, color: next })}
             />
-          </View>
-          {errors.color && <Text className="text-xs text-red-500 mt-1">{errors.color}</Text>}
+          </PickerField>
         </View>
 
         <FormSelect label="Status" value={form.status} options={STATUS_OPTIONS} onChange={(v) => setForm({ ...form, status: v })} error={errors.status} />

@@ -96,6 +96,7 @@ class TenantController extends Controller
 
             User::create([
                 'tenant_id'                 => $tenant->id,
+                'is_tenant_owner'           => true,
                 'name'                      => $data['admin_name'],
                 'email'                     => $data['admin_email'],
                 'password'                  => $data['admin_password'],

@@ -163,6 +163,16 @@ class UserManagementController extends Controller
     {
         $actor = $request->user();
 
+        if (
+            (bool) $target->is_tenant_owner
+            && array_key_exists('role', $data)
+            && $data['role'] !== $target->role
+        ) {
+            throw ValidationException::withMessages([
+                'role' => ['O usuário administrador inicial do tenant não pode ter o perfil alterado.'],
+            ]);
+        }
+
         if (! $actor->isSuperAdmin()) {
             unset($data['tenant_id']);
 
@@ -335,6 +345,12 @@ class UserManagementController extends Controller
         if ((int) $request->user()->id === (int) $user->id) {
             throw ValidationException::withMessages([
                 'user' => ['Não é permitido remover o próprio usuário autenticado.'],
+            ]);
+        }
+
+        if ((bool) $user->is_tenant_owner) {
+            throw ValidationException::withMessages([
+                'user' => ['O usuário administrador inicial do tenant não pode ser removido.'],
             ]);
         }
 

@@ -193,6 +193,7 @@ Regras:
 
 - `admin` não pode alterar `tenant_id` e não pode promover para `super_admin`.
 - `super_admin` pode mover usuário de tenant alterando `tenant_id`.
+- Usuário administrador inicial criado junto com o tenant não pode ter `role` alterada (`422`).
 - Se o usuário ficar com role diferente de `super_admin`, o `tenant_id` não pode ficar nulo.
 - `subject_ids` substitui a lista completa de disciplinas do professor.
 - Para limpar todas as disciplinas de um professor, enviar `subject_ids: []`.
@@ -207,6 +208,7 @@ Resposta `200`: usuário atualizado.
 Regras:
 
 - Não é permitido remover o próprio usuário autenticado (`422`).
+- Usuário administrador inicial criado junto com o tenant não pode ser removido (`422`).
 - `admin` só remove usuários do próprio tenant.
 
 Resposta `200`:

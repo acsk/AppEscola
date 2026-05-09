@@ -3,12 +3,14 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SimuladosScreen }       from '../../features/simulados/screens/SimuladosScreen';
 import { SimuladoDetalheScreen } from '../../features/simulados/screens/SimuladoDetalheScreen';
 import { SimuladoExamScreen }    from '../../features/simulados/screens/SimuladoExamScreen';
+import { SimuladoResultScreen }  from '../../features/simulados/screens/SimuladoResultScreen';
 import { colors } from '../../theme';
 
 export type SimuladosStackParamList = {
   SimuladosList: undefined;
   SimuladoDetalhe: { examId: number };
   SimuladoExam: { examId: number; attemptId: number };
+  SimuladoResult: { attemptId: number };
 };
 
 const Stack = createNativeStackNavigator<SimuladosStackParamList>();
@@ -38,6 +40,17 @@ export function SimuladosNavigator() {
         options={{
           title: 'Simulado',
           headerBackTitle: 'Detalhes',
+          headerStyle: { backgroundColor: colors.ink },
+          headerTintColor: colors.surface,
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      />
+      <Stack.Screen
+        name="SimuladoResult"
+        component={SimuladoResultScreen}
+        options={{
+          title: 'Resultado',
+          headerBackTitle: 'Voltar',
           headerStyle: { backgroundColor: colors.ink },
           headerTintColor: colors.surface,
           headerTitleStyle: { fontWeight: '600' },

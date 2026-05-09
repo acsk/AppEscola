@@ -7,12 +7,94 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  Calculator, BookOpen, FlaskConical, Landmark, Globe,
+  Dumbbell, Languages, Atom, Music, Palette, Code2,
+  Brain, BookMarked, GraduationCap, Microscope, Earth,
+  Lightbulb, PenLine, Sigma,
+} from "lucide-react-native";
 import api from "../../services/api";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import { parseApiErrors } from "../../utils/apiErrors";
 import { useAuth } from "../../contexts/AuthContext";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
+  calculator: Calculator,
+  "book-open": BookOpen,
+  "flask-conical": FlaskConical,
+  landmark: Landmark,
+  globe: Globe,
+  dumbbell: Dumbbell,
+  languages: Languages,
+  atom: Atom,
+  music: Music,
+  palette: Palette,
+  code2: Code2,
+  brain: Brain,
+  "book-marked": BookMarked,
+  "graduation-cap": GraduationCap,
+  microscope: Microscope,
+  earth: Earth,
+  lightbulb: Lightbulb,
+  "pen-line": PenLine,
+  sigma: Sigma,
+};
+
+const ICON_LABELS: Record<string, string> = {
+  calculator: "Calculadora",
+  "book-open": "Livro aberto",
+  "flask-conical": "Frasco",
+  landmark: "Colunas",
+  globe: "Globo",
+  dumbbell: "Halter",
+  languages: "Idiomas",
+  atom: "Atomo",
+  music: "Musica",
+  palette: "Paleta",
+  code2: "Codigo",
+  brain: "Cerebro",
+  "book-marked": "Livro marcado",
+  "graduation-cap": "Capelo",
+  microscope: "Microscopio",
+  earth: "Terra",
+  lightbulb: "Lampada",
+  "pen-line": "Caneta",
+  sigma: "Sigma",
+};
+
+function SubjectIcon({
+  icon,
+  color,
+  size = 18,
+}: {
+  icon?: string | null;
+  color?: string | null;
+  size?: number;
+}) {
+  const bg = color ?? "#7C3AED";
+  const IconComp = icon ? ICON_MAP[icon] : null;
+
+  return (
+    <View
+      style={{
+        width: size + 16,
+        height: size + 16,
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: bg + "22",
+      }}
+    >
+      {IconComp ? (
+        <IconComp size={size} color={bg} strokeWidth={2} />
+      ) : (
+        <Ionicons name="book-outline" size={size} color={bg} />
+      )}
+    </View>
+  );
+}
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -27,6 +109,13 @@ type TenantOption = {
 type SubjectOption = {
   id: number;
   name: string;
+  icon?: string | null;
+  color?: string | null;
+};
+
+type RoleOption = {
+  value: string;
+  label: string;
 };
 
 type Form = {
@@ -53,14 +142,6 @@ const EMPTY: Form = {
   subject_ids: [],
 };
 
-const ROLE_OPTIONS = [
-  { value: "super_admin", label: "Super Admin" },
-  { value: "admin", label: "Admin" },
-  { value: "secretaria", label: "Secretaria" },
-  { value: "professor", label: "Professor" },
-  { value: "financeiro", label: "Financeiro" },
-];
-
 const STATUS_OPTIONS = [
   { value: "active", label: "Ativo" },
   { value: "inactive", label: "Inativo" },
@@ -75,6 +156,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -102,6 +184,29 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     };
 
     loadTenants();
+  }, [isGlobalSuperAdmin]);
+
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const { data } = await api.get("/domains/user-roles");
+        const list = Array.isArray(data) ? data : [];
+        const nextRoles = list.map((role: any) => ({
+          value: String(role.slug ?? role.value ?? role.name ?? ""),
+          label: String(role.name ?? role.label ?? role.slug ?? role.value ?? ""),
+        }));
+
+        setRoles(
+          isGlobalSuperAdmin
+            ? nextRoles
+            : nextRoles.filter((opt) => opt.value !== "super_admin")
+        );
+      } catch {
+        setRoles([]);
+      }
+    };
+
+    loadRoles();
   }, [isGlobalSuperAdmin]);
 
   useEffect(() => {
@@ -158,7 +263,14 @@ export default function UserFormScreen({ navigate, userId }: Props) {
           params: { per_page: 200, status: "active" },
         });
         const list = Array.isArray(data.data) ? data.data : [];
-        setSubjects(list.map((s: any) => ({ id: s.id, name: s.name })));
+        setSubjects(
+          list.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            icon: s.icon ?? null,
+            color: s.color ?? null,
+          }))
+        );
       } catch {
         setSubjects([]);
       }
@@ -168,14 +280,6 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   }, [form.role]);
 
   const title = useMemo(() => (isEdit ? "Editar Usuario" : "Novo Usuario"), [isEdit]);
-
-  const roleOptions = useMemo(
-    () =>
-      isGlobalSuperAdmin
-        ? ROLE_OPTIONS
-        : ROLE_OPTIONS.filter((opt) => opt.value !== "super_admin"),
-    [isGlobalSuperAdmin]
-  );
 
   const showTenantField = isGlobalSuperAdmin && form.role !== "super_admin";
 
@@ -362,7 +466,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
               label="Perfil"
               value={form.role}
               onChange={onRoleChange}
-              options={roleOptions}
+              options={roles}
               error={errors.role}
               required
             />
@@ -402,7 +506,12 @@ export default function UserFormScreen({ navigate, userId }: Props) {
                     size={20}
                     color={selected ? "#7C3AED" : "#9CA3AF"}
                   />
-                  <Text className="text-sm text-gray-700 ml-2">{s.name}</Text>
+                  <View className="flex-row items-center gap-2 ml-2" style={{ flex: 1 }}>
+                    <SubjectIcon icon={s.icon} color={s.color} size={16} />
+                    <Text className="text-sm text-gray-700" style={{ flex: 1 }}>
+                      {s.name}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             })

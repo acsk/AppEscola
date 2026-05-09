@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
 import FormInput from "../../components/ui/FormInput";
+import ToastBanner from "../../components/ui/ToastBanner";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -71,6 +72,18 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
   const [form, setForm] = useState<BundleForm>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [courseOptions, setCourseOptions] = useState<CourseOption[]>([]);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   // Load active courses for multi-select
   const fetchCourses = useCallback(async () => {
@@ -149,15 +162,36 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
       if (form.description.trim()) payload.description = form.description;
 
       if (isEdit) {
-        await api.put(`/course-bundles/${bundleId}`, payload);
+        const { data } = await api.put(`/course-bundles/${bundleId}`, payload);
+        const bundle = data.body ?? data.data ?? data;
+        setForm({
+          name: bundle.name ?? form.name,
+          description: bundle.description ?? "",
+          billing_cycle: bundle.billing_cycle ?? form.billing_cycle,
+          price: bundle.price != null ? String(bundle.price) : form.price,
+          status: bundle.status ?? form.status,
+          course_ids: (bundle.courses ?? []).map((c: CourseOption) => c.id),
+        });
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Operacao realizada com sucesso.",
+        });
       } else {
         await api.post("/course-bundles", payload);
+        navigate("pacotes");
       }
-      navigate("pacotes");
     } catch (e: any) {
       if (e.response?.status === 422) {
         setErrors(parseApiErrors(e.response.data.errors ?? {}));
         scrollRef.current?.scrollTo({ y: 0, animated: true });
+      } else {
+        setToast({
+          visible: true,
+          type: "error",
+          message:
+            e?.response?.data?.message || "Nao foi possivel salvar o pacote.",
+        });
       }
     }
     setSaving(false);
@@ -168,12 +202,13 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      className="flex-1"
-      contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View className="flex-1">
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1"
+        contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Breadcrumb */}
       <View className="flex-row items-center gap-2 mb-6">
         <TouchableOpacity
@@ -425,6 +460,14 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
           </View>
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
+    </View>
   );
 }

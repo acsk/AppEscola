@@ -27,12 +27,38 @@ const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Super Admin',
 };
 
-const STATS = [
-  { icon: 'book-outline',        value: '230', label: 'Simulados\nrealizados' },
-  { icon: 'trending-up-outline', value: '87%', label: 'Precisão\nmédia' },
-  { icon: 'flame-outline',       value: '12',  label: 'Dias de\nstreak' },
-  { icon: 'ribbon-outline',      value: '15',  label: 'Conquistas' },
-];
+type DashboardPeriod = 'month' | 'all';
+
+interface AlunoDashboardSummary {
+  accuracy: number;
+  correct: number;
+  wrong: number;
+  accuracy_change: number | null;
+}
+
+interface AlunoDashboardMetrics {
+  total_exams: number;
+  avg_accuracy: number;
+  current_streak_days: number;
+  period: DashboardPeriod;
+  summary: AlunoDashboardSummary;
+}
+
+interface DashboardEnvelope {
+  type?: string;
+  message?: string;
+  body?: AlunoDashboardMetrics;
+  data?: AlunoDashboardMetrics;
+}
+
+const META_TARGET = 300;
+
+function formatPct(value: number, fractionDigits = 1): string {
+  return `${value.toLocaleString('pt-BR', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })}%`;
+}
 
 const SIM_STATUS_COLOR: Record<AttemptStatus, string> = {
   not_started: '#22C55E',
@@ -89,12 +115,48 @@ export function HomeScreen() {
   const navigation = useNavigation<any>();
 
   const [simuladosRecentes, setSimuladosRecentes] = useState<SimuladoListItem[]>([]);
+  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('month');
+  const [dashboard, setDashboard] = useState<AlunoDashboardMetrics | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
 
   useEffect(() => {
     if (user?.role === 'aluno') {
       listarSimulados().then((lista) => setSimuladosRecentes(lista.slice(0, 3))).catch(() => {});
     }
   }, [user?.role]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function carregarDashboard() {
+      if (user?.role !== 'aluno') return;
+      try {
+        setDashboardLoading(true);
+        const { data } = await api.get<AlunoDashboardMetrics | DashboardEnvelope>('/api/aluno/dashboard', {
+          params: { period: dashboardPeriod },
+        });
+        const envelope = data as DashboardEnvelope;
+        const payload = envelope.body ?? envelope.data ?? (data as AlunoDashboardMetrics);
+        if (active) {
+          setDashboard(payload);
+        }
+      } catch {
+        if (active) {
+          setDashboard(null);
+        }
+      } finally {
+        if (active) {
+          setDashboardLoading(false);
+        }
+      }
+    }
+
+    carregarDashboard();
+
+    return () => {
+      active = false;
+    };
+  }, [dashboardPeriod, user?.role]);
 
   const [painelAberto, setPainelAberto]         = useState(false);
   const [formAberto, setFormAberto]             = useState(false);
@@ -151,6 +213,30 @@ export function HomeScreen() {
   const roleLabel = ROLE_LABELS[user?.role ?? ''] ?? user?.role ?? '-';
   const avatarUrl = (user as any)?.avatar_url ?? (user as any)?.avatar ?? (user as any)?.photo_url;
 
+  const totalExams = dashboard?.total_exams ?? 0;
+  const avgAccuracy = dashboard?.avg_accuracy ?? 0;
+  const currentStreakDays = dashboard?.current_streak_days ?? 0;
+  const summaryAccuracy = dashboard?.summary?.accuracy ?? avgAccuracy;
+  const summaryCorrect = dashboard?.summary?.correct ?? 0;
+  const summaryWrong = dashboard?.summary?.wrong ?? 0;
+  const summaryAccuracyChange = dashboard?.summary?.accuracy_change ?? 0;
+  const unlockedConquistas = CONQUISTAS.filter((c) => !c.locked).length;
+
+  const stats = [
+    { icon: 'book-outline', value: String(totalExams), label: 'Simulados\nrealizados' },
+    { icon: 'trending-up-outline', value: formatPct(avgAccuracy, 1), label: 'Precisão\nmédia' },
+    { icon: 'flame-outline', value: String(currentStreakDays), label: 'Dias de\nstreak' },
+    { icon: 'ribbon-outline', value: String(unlockedConquistas), label: 'Conquistas' },
+  ];
+
+  const totalRespostas = Math.max(1, summaryCorrect + summaryWrong);
+  const acertosPct = Math.max(0, Math.min(100, (summaryCorrect / totalRespostas) * 100));
+  const errosPct = Math.max(0, Math.min(100, (summaryWrong / totalRespostas) * 100));
+  const metaPct = Math.max(0, Math.min(100, (totalExams / META_TARGET) * 100));
+  const trendPositivo = summaryAccuracyChange >= 0;
+  const periodoLabel = dashboardPeriod === 'month' ? 'Este mês' : 'Período geral';
+  const comparativoLabel = dashboardPeriod === 'month' ? 'mês anterior' : 'período anterior';
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
@@ -199,8 +285,8 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.statsRow}>
-          {STATS.map((s, i) => (
-            <View key={i} style={[styles.statItem, i < STATS.length - 1 && styles.statBorder]}>
+          {stats.map((s, i) => (
+            <View key={i} style={[styles.statItem, i < stats.length - 1 && styles.statBorder]}>
               <Ionicons name={s.icon as any} size={19} color={colors.muted} />
               <Text style={styles.statValue}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -313,31 +399,43 @@ export function HomeScreen() {
             <Text style={styles.cardTitle}>Resumo de desempenho</Text>
             <Ionicons name="eye-outline" size={18} color={colors.muted} style={{ marginLeft: 8 }} />
           </View>
-          <View style={styles.periodoPicker}>
-            <Text style={styles.periodoTexto}>Este mês</Text>
+          <TouchableOpacity
+            style={styles.periodoPicker}
+            activeOpacity={0.8}
+            onPress={() => setDashboardPeriod((prev) => (prev === 'month' ? 'all' : 'month'))}
+          >
+            <Text style={styles.periodoTexto}>{periodoLabel}</Text>
+            {dashboardLoading ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : null}
             <Ionicons name="chevron-down" size={13} color={colors.text} />
-          </View>
+          </TouchableOpacity>
         </View>
 
-        <Text style={styles.mediaGrande}>87<Text style={styles.mediaDecimal}>,3%</Text></Text>
+        <Text style={styles.mediaGrande}>
+          {summaryAccuracy.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+          <Text style={styles.mediaDecimal}>%</Text>
+        </Text>
         <View style={styles.trendRow}>
-          <Ionicons name="arrow-up" size={12} color={colors.muted} />
-          <Text style={styles.trendTexto}>5,2% vs mês anterior</Text>
+          <Ionicons name={trendPositivo ? 'arrow-up' : 'arrow-down'} size={12} color={colors.muted} />
+          <Text style={styles.trendTexto}>
+            {formatPct(Math.abs(summaryAccuracyChange), 1)} vs {comparativoLabel}
+          </Text>
         </View>
 
         <View style={styles.acertosErros}>
           <View style={styles.aeItem}>
             <Text style={styles.aeLabel}>Acertos</Text>
-            <Text style={styles.aeValor}>213</Text>
+            <Text style={styles.aeValor}>{summaryCorrect}</Text>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '87%' }]} />
+              <View style={[styles.progressFill, { width: `${acertosPct}%` }]} />
             </View>
           </View>
           <View style={styles.aeItem}>
             <Text style={styles.aeLabel}>Erros</Text>
-            <Text style={styles.aeValor}>17</Text>
+            <Text style={styles.aeValor}>{summaryWrong}</Text>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '13%' }]} />
+              <View style={[styles.progressFill, { width: `${errosPct}%` }]} />
             </View>
           </View>
         </View>
@@ -345,9 +443,11 @@ export function HomeScreen() {
         <View style={styles.insightBox}>
           <Ionicons name="bulb-outline" size={17} color={colors.muted} style={{ marginRight: 8, flexShrink: 0 }} />
           <Text style={styles.insightTexto}>
-            Você está indo muito bem! Seu desempenho está{' '}
-            <Text style={{ color: colors.ink, fontWeight: '700' }}>15% acima</Text>
-            {' '}da média da turma.
+            Seu desempenho no período está em{' '}
+            <Text style={{ color: colors.ink, fontWeight: '700' }}>{formatPct(summaryAccuracy, 1)}</Text>
+            {' '}com variação de{' '}
+            <Text style={{ color: colors.ink, fontWeight: '700' }}>{formatPct(summaryAccuracyChange, 1)}</Text>
+            {' '}em relação ao {comparativoLabel}.
           </Text>
           <Ionicons name="chevron-forward" size={15} color={colors.muted} style={{ flexShrink: 0 }} />
         </View>
@@ -430,13 +530,13 @@ export function HomeScreen() {
         </View>
         <View style={styles.metaInfo}>
           <Text style={styles.metaSubtitulo}>Meta em andamento</Text>
-          <Text style={styles.metaTitulo}>Concluir 300 simulados</Text>
+          <Text style={styles.metaTitulo}>Concluir {META_TARGET} simulados</Text>
           <View style={styles.metaBar}>
-            <View style={[styles.metaBarFill, { width: '77%' }]} />
+            <View style={[styles.metaBarFill, { width: `${metaPct}%` }]} />
           </View>
-          <Text style={styles.metaNumeros}>230 / 300</Text>
+          <Text style={styles.metaNumeros}>{totalExams} / {META_TARGET}</Text>
         </View>
-        <Text style={styles.metaPct}>77%</Text>
+        <Text style={styles.metaPct}>{Math.round(metaPct)}%</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </TouchableOpacity>
 

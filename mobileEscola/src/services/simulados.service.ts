@@ -136,9 +136,12 @@ interface ApiEnvelope<T> {
 
 function unwrapBody<T>(payload: T | ApiEnvelope<T>): T {
   const maybeEnvelope = payload as ApiEnvelope<T>;
+  console.log('🔍 unwrapBody - payload keys:', Object.keys(payload as any));
   if (maybeEnvelope && typeof maybeEnvelope === 'object' && 'body' in maybeEnvelope) {
+    console.log('✅ Found envelope body');
     return (maybeEnvelope.body ?? ({} as T)) as T;
   }
+  console.log('⚠️ No envelope, returning payload as-is');
   return payload as T;
 }
 
@@ -221,12 +224,17 @@ export interface ReviewOption {
   order?: number;
   selected: boolean;
   is_correct: boolean | null;
+  triggers_text_input?: boolean;
 }
 
 export interface ReviewQuestion {
   id: number;
   type: 'multiple_choice' | 'essay';
   question_text: string;
+  points?: number;
+  order?: number;
+  allow_text_answer?: boolean;
+  subject?: { id: number; name: string };
   student_answer: { option_id: number | null; text_answer: string | null } | null;
   correction: {
     is_correct: boolean | null;
@@ -242,16 +250,36 @@ export interface AttemptReview {
   status: AttemptStatus | 'abandoned';
   score: number | null;
   max_score: number;
+  score_display?: string;
   percentage: number | null;
   passed: boolean | null;
+  started_at?: string;
+  finished_at?: string;
+  pending_answers_count?: number | null;
   result_release_pending?: boolean;
-  exam: { id: number; title: string };
+  exam: {
+    id: number;
+    title: string;
+    duration_minutes?: number;
+    passing_score?: number;
+    exam_type?: string;
+    exam_type_label?: string;
+    status?: string;
+    subject?: SimuladoSubject | null;
+  };
   questions: ReviewQuestion[] | null;
 }
 
 export async function buscarRevisao(attemptId: number): Promise<AttemptReview> {
   const { data } = await api.get<AttemptReview | ApiEnvelope<AttemptReview>>(
     `/api/aluno/attempts/${attemptId}/review`,
+  );
+  return unwrapBody<AttemptReview>(data);
+}
+
+export async function buscarTentativaDetalhada(attemptId: number): Promise<AttemptReview> {
+  const { data } = await api.get<AttemptReview | ApiEnvelope<AttemptReview>>(
+    `/api/aluno/attempts/${attemptId}`,
   );
   return unwrapBody<AttemptReview>(data);
 }

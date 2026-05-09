@@ -14,6 +14,7 @@ import FormInput from "../../components/ui/FormInput";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import ToastBanner from "../../components/ui/ToastBanner";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -85,6 +86,15 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CourseForm>(EMPTY_COURSE);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
 
   // Plans state
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -130,6 +140,10 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
     fetchPlans();
   }, [fetchPlans]);
 
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
+
   // Save course
   const save = async () => {
     const localErrors: Record<string, string> = {};
@@ -150,8 +164,18 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
       if (form.description.trim()) payload.description = form.description;
 
       if (isEdit) {
-        await api.put(`/courses/${courseId}`, payload);
-        navigate("cursos-form", { courseId });
+        const { data } = await api.put(`/courses/${courseId}`, payload);
+        const updated = data.body ?? data.data ?? data;
+        setForm({
+          name: updated.name ?? form.name,
+          description: updated.description ?? "",
+          status: updated.status ?? form.status,
+        });
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Operacao realizada com sucesso.",
+        });
       } else {
         const { data } = await api.post("/courses", payload);
         const created = data.body ?? data.data ?? data;
@@ -162,6 +186,13 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
       if (e.response?.status === 422) {
         setErrors(parseApiErrors(e.response.data.errors ?? {}));
         scrollRef.current?.scrollTo({ y: 0, animated: true });
+      } else {
+        setToast({
+          visible: true,
+          type: "error",
+          message:
+            e?.response?.data?.message || "Nao foi possivel salvar o curso.",
+        });
       }
     }
     setSaving(false);
@@ -218,15 +249,32 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
         status: planForm.status,
       };
       if (editPlanId) {
-        await api.put(`/course-plans/${editPlanId}`, payload);
+        const { data } = await api.put(`/course-plans/${editPlanId}`, payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Operacao realizada com sucesso.",
+        });
       } else {
-        await api.post(`/courses/${courseId}/plans`, payload);
+        const { data } = await api.post(`/courses/${courseId}/plans`, payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Operacao realizada com sucesso.",
+        });
       }
       setPlanModal(false);
       fetchPlans();
     } catch (e: any) {
       if (e.response?.status === 422) {
         setPlanErrors(parseApiErrors(e.response.data.errors ?? {}));
+      } else {
+        setToast({
+          visible: true,
+          type: "error",
+          message:
+            e?.response?.data?.message || "Nao foi possivel salvar o plano.",
+        });
       }
     }
     setSavingPlan(false);
@@ -248,12 +296,13 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      className="flex-1"
-      contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View className="flex-1">
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1"
+        contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Breadcrumb */}
       <View className="flex-row items-center gap-2 mb-6">
         <TouchableOpacity
@@ -596,14 +645,22 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
         </View>
       </Modal>
 
-      <ConfirmModal
-        visible={!!deletePlanId}
-        title="Excluir Plano"
-        message="Este plano será removido permanentemente."
-        onConfirm={removePlan}
-        onCancel={() => setDeletePlanId(null)}
-        loading={deletingPlan}
+        <ConfirmModal
+          visible={!!deletePlanId}
+          title="Excluir Plano"
+          message="Este plano será removido permanentemente."
+          onConfirm={removePlan}
+          onCancel={() => setDeletePlanId(null)}
+          loading={deletingPlan}
+        />
+      </ScrollView>
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
       />
-    </ScrollView>
+    </View>
   );
 }

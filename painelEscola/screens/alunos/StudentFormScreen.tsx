@@ -13,6 +13,7 @@ import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import DatePickerInput from "../../components/ui/DatePickerInput";
 import SearchableSelect from "../../components/ui/SearchableSelect";
+import ToastBanner from "../../components/ui/ToastBanner";
 import {
   maskPhone,
   maskCPF,
@@ -149,9 +150,21 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
     { value: string; label: string }[]
   >([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
 
   const relationships = useGuardianRelationships();
   const relationshipOptions = domainToOptions(relationships);
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   // Auto-compute is_minor from birth_date
   useEffect(() => {
@@ -185,18 +198,19 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
       setLoading(true);
       try {
         const { data } = await api.get(`/students/${studentId}`);
-        setEnrollmentNumber(data.enrollment_number ?? null);
+        const student = data.body ?? data.data ?? data;
+        setEnrollmentNumber(student.enrollment_number ?? null);
         setForm({
-          name: data.name ?? "",
-          birth_date: isoToDisplay(data.birth_date ?? ""),
-          document: maskCPF(data.document ?? ""),
-          email: data.email ?? "",
-          phone: maskPhone(data.phone ?? ""),
-          is_minor: data.is_minor ? "true" : "false",
-          status: data.status,
+          name: student.name ?? "",
+          birth_date: isoToDisplay(student.birth_date ?? ""),
+          document: maskCPF(student.document ?? ""),
+          email: student.email ?? "",
+          phone: maskPhone(student.phone ?? ""),
+          is_minor: student.is_minor ? "true" : "false",
+          status: student.status ?? "active",
         });
         setGuardians(
-          (data.guardians ?? []).map((g: any) => ({
+          (student.guardians ?? []).map((g: any) => ({
             mode: "existing" as const,
             guardian_id: g.id,
             name: g.name ?? "",
@@ -285,14 +299,52 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
       }
 
       if (isEdit) {
-        await api.put(`/students/${studentId}`, payload);
+        const { data } = await api.put(`/students/${studentId}`, payload);
+        const student = data.body ?? data.data ?? data;
+        setEnrollmentNumber(student.enrollment_number ?? enrollmentNumber);
+        setForm({
+          name: student.name ?? form.name,
+          birth_date: isoToDisplay(student.birth_date ?? displayToISO(form.birth_date)),
+          document: maskCPF(student.document ?? form.document),
+          email: student.email ?? form.email,
+          phone: maskPhone(student.phone ?? form.phone),
+          is_minor: student.is_minor ? "true" : "false",
+          status: student.status ?? form.status,
+        });
+        setGuardians(
+          (student.guardians ?? []).map((g: any) => ({
+            mode: "existing" as const,
+            guardian_id: g.id,
+            name: g.name ?? "",
+            document: maskCPF(g.document ?? ""),
+            email: g.email ?? "",
+            phone: maskPhone(g.phone ?? ""),
+            relationship: g.relationship ?? "",
+            is_financial_responsible: g.pivot?.is_financial_responsible ?? false,
+            is_pedagogical_responsible:
+              g.pivot?.is_pedagogical_responsible ?? false,
+            can_access_portal: g.pivot?.can_access_portal ?? true,
+          }))
+        );
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Operacao realizada com sucesso.",
+        });
       } else {
         await api.post("/students", payload);
+        navigate("alunos");
       }
-      navigate("alunos");
     } catch (e: any) {
       if (e.response?.status === 422) {
         setErrors(parseApiErrors(e.response.data.errors ?? {}));
+      } else {
+        setToast({
+          visible: true,
+          type: "error",
+          message:
+            e?.response?.data?.message || "Nao foi possivel salvar o aluno.",
+        });
       }
     }
     setSaving(false);
@@ -301,12 +353,13 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      className="flex-1"
-      contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View className="flex-1">
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1"
+        contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Breadcrumb / Header */}
       <View className="flex-row items-center gap-2 mb-6">
         <TouchableOpacity
@@ -793,6 +846,14 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
           </View>
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
+    </View>
   );
 }

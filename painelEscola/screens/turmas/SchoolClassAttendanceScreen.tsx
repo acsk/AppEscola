@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import AttendanceDateBar from "../../components/ui/AttendanceDateBar";
 import FormInput from "../../components/ui/FormInput";
+import ToastBanner from "../../components/ui/ToastBanner";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Props = {
@@ -135,10 +134,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
     type: "success",
     message: "",
   });
-  const [isToastMounted, setIsToastMounted] = useState(false);
-  const toastOpacity = useRef(new Animated.Value(0)).current;
-  const toastTranslateY = useRef(new Animated.Value(-18)).current;
-  const toastScale = useRef(new Animated.Value(0.96)).current;
+  const closeToast = () => setToast((prev) => ({ ...prev, visible: false }));
 
   const presentCount = useMemo(
     () => Object.values(rows).filter((row) => row.status === "present").length,
@@ -374,71 +370,6 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
     setSaving(false);
   };
 
-  useEffect(() => {
-    if (!toast.visible) return;
-
-    const timer = setTimeout(() => {
-      setToast((prev) => ({ ...prev, visible: false }));
-    }, 4200);
-
-    return () => clearTimeout(timer);
-  }, [toast.visible]);
-
-  useEffect(() => {
-    if (toast.visible) {
-      setIsToastMounted(true);
-      toastOpacity.setValue(0);
-      toastTranslateY.setValue(-18);
-      toastScale.setValue(0.96);
-
-      Animated.parallel([
-        Animated.timing(toastOpacity, {
-          toValue: 1,
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(toastTranslateY, {
-          toValue: 0,
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(toastScale, {
-          toValue: 1,
-          duration: 280,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      return;
-    }
-
-    if (!isToastMounted) return;
-
-    Animated.parallel([
-      Animated.timing(toastOpacity, {
-        toValue: 0,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(toastTranslateY, {
-        toValue: -10,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(toastScale, {
-        toValue: 0.98,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(() => setIsToastMounted(false));
-  }, [isToastMounted, toast.visible, toastOpacity, toastScale, toastTranslateY]);
-
   if (!classId) {
     return (
       <View className="flex-1 items-center justify-center px-6">
@@ -603,59 +534,12 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
       </View>
       </ScrollView>
 
-      {isToastMounted && (
-        <Animated.View
-          style={{
-            position: "absolute",
-            top: 18,
-            left: 16,
-            right: 16,
-            alignSelf: "center",
-            width: "100%",
-            maxWidth: 560,
-            minHeight: 72,
-            paddingHorizontal: 18,
-            paddingVertical: 14,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: toast.type === "success" ? "#A7F3D0" : "#FECACA",
-            backgroundColor: toast.type === "success" ? "#ECFDF5" : "#FEF2F2",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            shadowColor: "#000",
-            shadowOpacity: 0.16,
-            shadowRadius: 14,
-            elevation: 8,
-            zIndex: 999,
-            opacity: toastOpacity,
-            transform: [{ translateY: toastTranslateY }, { scale: toastScale }],
-          }}
-        >
-          <Ionicons
-            name={toast.type === "success" ? "checkmark-circle" : "alert-circle"}
-            size={22}
-            color={toast.type === "success" ? "#047857" : "#B91C1C"}
-          />
-          <Text
-            style={{
-              flex: 1,
-              fontSize: 15,
-              fontWeight: "600",
-              color: toast.type === "success" ? "#065F46" : "#991B1B",
-            }}
-          >
-            {toast.message}
-          </Text>
-          <TouchableOpacity onPress={() => setToast((prev) => ({ ...prev, visible: false }))}>
-            <Ionicons
-              name="close"
-              size={20}
-              color={toast.type === "success" ? "#047857" : "#B91C1C"}
-            />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
     </View>
   );
 }

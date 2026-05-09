@@ -457,6 +457,15 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
           </View>
 
           <TouchableOpacity
+            style={styles.botaoRevisar}
+            onPress={() => navigation.replace('SimuladoResult', { attemptId })}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="document-text-outline" size={18} color={colors.surface} style={{ marginRight: 8 }} />
+            <Text style={styles.botaoRevisarTexto}>Revisar simulado</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.botaoVoltar}
             onPress={() => navigation.navigate('SimuladosList')}
             activeOpacity={0.8}
@@ -633,6 +642,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.soft, borderRadius: 12, padding: 12, marginBottom: 16,
   },
   avisoDiscursivaTexto: { flex: 1, fontSize: 12, color: colors.muted, lineHeight: 16 },
+  botaoRevisar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.primary, borderRadius: 14,
+    paddingVertical: 12, paddingHorizontal: 24, marginTop: 16, marginBottom: 8,
+  },
+  botaoRevisarTexto: { color: colors.surface, fontWeight: '600', fontSize: 15 },
   botaoVoltar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: colors.primary, borderRadius: 14,

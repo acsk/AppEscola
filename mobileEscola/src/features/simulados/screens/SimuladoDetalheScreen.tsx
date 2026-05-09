@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -54,8 +55,61 @@ function parseStartErrorMessage(e: any): string {
   return e?.response?.data?.message ?? 'Não foi possível iniciar o simulado.';
 }
 
+function statusInfo(status: AttemptStatus, awaitingRelease: boolean) {
+  if (awaitingRelease) {
+    return {
+      icon: 'lock-closed-outline',
+      label: 'Resultado bloqueado',
+      text: 'O resultado ficará disponível após o encerramento do período.',
+      bg: '#ECFEFF',
+      color: '#0891B2',
+    };
+  }
+
+  const map: Record<AttemptStatus, { icon: string; label: string; text: string; bg: string; color: string }> = {
+    not_started: {
+      icon: 'play-circle-outline',
+      label: 'Disponível para iniciar',
+      text: 'Confira as regras e inicie quando estiver pronto.',
+      bg: '#EEF2FF',
+      color: colors.primary,
+    },
+    in_progress: {
+      icon: 'time-outline',
+      label: 'Em andamento',
+      text: 'Você já iniciou este simulado. Continue de onde parou.',
+      bg: '#EFF6FF',
+      color: '#2563EB',
+    },
+    pending_review: {
+      icon: 'hourglass-outline',
+      label: 'Aguardando correção',
+      text: 'Há respostas aguardando correção manual.',
+      bg: '#FFFBEB',
+      color: '#B45309',
+    },
+    awaiting_release: {
+      icon: 'lock-closed-outline',
+      label: 'Resultado bloqueado',
+      text: 'O resultado será liberado após o prazo final.',
+      bg: '#ECFEFF',
+      color: '#0891B2',
+    },
+    completed: {
+      icon: 'checkmark-done-outline',
+      label: 'Simulado finalizado',
+      text: 'Sua tentativa foi concluída e está disponível para consulta.',
+      bg: '#ECFDF5',
+      color: '#059669',
+    },
+  };
+
+  return map[status];
+}
+
 export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const { examId } = route.params;
+  const { width } = useWindowDimensions();
 
   const [detalhe, setDetalhe]         = useState<SimuladoDetail | null>(null);
   const [carregando, setCarregando]   = useState(true);
@@ -87,6 +141,14 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 
   useEffect(() => { carregar(); }, [examId]);
 
+  useEffect(() => {
+    if (revisao?.questions?.length) {
+      console.log('🎯 Renderizando', revisao.questions.length, 'questões');
+    } else if (revisao && !revisao.questions?.length) {
+      console.log('⚠️ Nenhuma questão para exibir. Revisão:', revisao);
+    }
+  }, [revisao]);
+
   async function carregar() {
     setCarregando(true);
     setErroMsg(null);
@@ -94,18 +156,26 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
       const d = await detalharSimulado(examId);
       setDetalhe(d);
       navigation.setOptions({ title: d.title });
+      console.log('📋 Simulado carregado:', d.title, 'Attempt ID:', d.attempt_id, 'Status:', d.attempt_status);
 
       const efetivo = (d.attempt_status || (d.can_start ? 'not_started' : '')) as AttemptStatus;
       const precisaRevisao =
         efetivo === 'completed' ||
         efetivo === 'pending_review' ||
         efetivo === 'awaiting_release';
+
+      console.log('✅ Efetivo status:', efetivo, 'Precisa revisão:', precisaRevisao);
+
       if (precisaRevisao && d.attempt_id) {
         setCarregandoRevisao(true);
         try {
+          console.log('🔄 Carregando revisão para attemptId:', d.attempt_id);
           const rev = await buscarRevisao(d.attempt_id);
+          console.log('📊 Revisão carregada:', rev);
+          console.log('❓ Questões na revisão:', rev.questions?.length ?? 0);
           setRevisao(rev);
-        } catch {
+        } catch (e: any) {
+          console.log('❌ Erro ao carregar revisão:', e);
           // falha silenciosa — visualização ficará sem dados de correção
         } finally {
           setCarregandoRevisao(false);
@@ -187,95 +257,97 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     detalhe.starts_at ? `Início: ${formatDate(detalhe.starts_at)}` : null,
     detalhe.ends_at ? `Prazo: ${formatDate(detalhe.ends_at)}` : null,
   ].filter(Boolean).join('  •  ');
+  const statusAtual = statusInfo(statusEfetivo, awaitingRelease);
+  const metricWidth = width < 390 ? '48%' : '23%';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={[styles.card, { borderTopWidth: 4, borderTopColor: subjectColor }]}>
-
-        {/* Chips: disciplina + tipo + status */}
-        <View style={styles.chipsRow}>
-          {detalhe.subject && (
-            <View style={[styles.chip, { backgroundColor: subjectColor + '18' }]}> 
-              <Ionicons name={subjectIconName(detalhe.subject.icon) as any} size={16} color={subjectColor} />
-              <Text style={[styles.chipTexto, { color: subjectColor }]}>{detalhe.subject.name}</Text>
-            </View>
-          )}
-          {detalhe.exam_type_label ? (
-            <View style={styles.chipGray}>
-              <Text style={styles.chipGrayTexto}>{detalhe.exam_type_label}</Text>
-            </View>
-          ) : null}
-          {detalhe.status_label ? (
-            <View style={styles.chipGray}>
-              <Text style={styles.chipGrayTexto}>{detalhe.status_label}</Text>
-            </View>
-          ) : null}
-          {concluido ? (
-            <View style={styles.statusTopBadge}>
-              <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
-              <Text style={styles.statusTopBadgeTexto}>Simulado concluído</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <Text style={styles.titulo}>{detalhe.title}</Text>
-
-        {detalhe.course && (
-          <View style={styles.cursoRow}>
-            <Ionicons name="school-outline" size={17} color={colors.muted} />
-            <Text style={styles.cursoTexto}>{detalhe.course.name}</Text>
+      <View style={[styles.card, { borderTopColor: subjectColor }]}>
+        <View style={styles.headerBlock}>
+          <View style={styles.titleGroup}>
+            {detalhe.subject ? (
+              <View style={[styles.subjectBadge, { backgroundColor: subjectColor + '18' }]}>
+                <Ionicons name={subjectIconName(detalhe.subject.icon) as any} size={15} color={subjectColor} />
+                <Text style={[styles.subjectBadgeText, { color: subjectColor }]}>{detalhe.subject.name}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.titulo}>{detalhe.title}</Text>
           </View>
-        )}
+          <View style={[styles.statusBadge, { backgroundColor: statusAtual.bg }]}>
+            <Ionicons name={statusAtual.icon as any} size={15} color={statusAtual.color} />
+            <Text style={[styles.statusBadgeText, { color: statusAtual.color }]}>{statusAtual.label}</Text>
+          </View>
+        </View>
 
         {detalhe.description ? (
           <Text style={styles.descricao}>{detalhe.description}</Text>
         ) : null}
 
-        {/* Grade de métricas */}
+        <View style={styles.metaBox}>
+          {detalhe.course ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="school-outline" size={16} color={colors.muted} />
+              <Text style={styles.metaLabel}>Curso</Text>
+              <Text style={styles.metaValue}>{detalhe.course.name}</Text>
+            </View>
+          ) : null}
+          {detalhe.exam_type_label ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="layers-outline" size={16} color={colors.muted} />
+              <Text style={styles.metaLabel}>Tipo</Text>
+              <Text style={styles.metaValue}>{detalhe.exam_type_label}</Text>
+            </View>
+          ) : null}
+          {dataResumo ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="calendar-outline" size={16} color={colors.muted} />
+              <Text style={styles.metaLabel}>Período</Text>
+              <Text style={styles.metaValue}>{dataResumo}</Text>
+            </View>
+          ) : null}
+        </View>
+
         <View style={styles.grid}>
-          <View style={styles.gridItem}>
-            <Ionicons name="help-circle-outline" size={28} color={colors.muted} />
+          <View style={[styles.gridItem, { width: metricWidth }]}>
+            <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
             <Text style={styles.gridValor}>{detalhe.total_questions}</Text>
-            <Text style={styles.gridLabel}>Questões</Text>
+            <Text style={styles.gridLabel}>questões</Text>
           </View>
-          <View style={styles.gridItem}>
-            <Ionicons name="time-outline" size={28} color={colors.muted} />
+          <View style={[styles.gridItem, { width: metricWidth }]}>
+            <Ionicons name="time-outline" size={22} color={colors.primary} />
             <Text style={styles.gridValor}>{formatMinutes(detalhe.duration_minutes)}</Text>
-            <Text style={styles.gridLabel}>Duração</Text>
+            <Text style={styles.gridLabel}>duração</Text>
           </View>
-          <View style={styles.gridItem}>
-            <Ionicons name="ribbon-outline" size={28} color={colors.muted} />
+          <View style={[styles.gridItem, { width: metricWidth }]}>
+            <Ionicons name="ribbon-outline" size={22} color={colors.primary} />
             <Text style={styles.gridValor}>{detalhe.passing_score}%</Text>
-            <Text style={styles.gridLabel}>Para passar</Text>
+            <Text style={styles.gridLabel}>mínimo</Text>
           </View>
-          <View style={styles.gridItem}>
-            <Ionicons name="star-outline" size={28} color={colors.muted} />
+          <View style={[styles.gridItem, { width: metricWidth }]}>
+            <Ionicons name="star-outline" size={22} color={colors.primary} />
             <Text style={styles.gridValor}>{detalhe.total_points}</Text>
-            <Text style={styles.gridLabel}>Pontos</Text>
+            <Text style={styles.gridLabel}>pontos</Text>
           </View>
         </View>
 
-        {/* Datas */}
-        {dataResumo ? (
-          <View style={styles.dataLinha}>
-            <Ionicons name="calendar-outline" size={18} color={colors.muted} />
-            <Text style={styles.dataTexto} numberOfLines={1}>{dataResumo}</Text>
+        <View style={styles.rulesBox}>
+          <View style={[styles.statusNotice, { backgroundColor: statusAtual.bg }]}>
+            <Ionicons name={statusAtual.icon as any} size={18} color={statusAtual.color} />
+            <Text style={[styles.statusNoticeText, { color: statusAtual.color }]}>{statusAtual.text}</Text>
           </View>
-        ) : null}
 
-        {/* Regras de retentativa */}
-        <View style={[styles.banner, { backgroundColor: detalhe.allow_retake ? '#ECFDF5' : colors.soft, marginTop: 10 }]}>
-          <Ionicons
-            name={detalhe.allow_retake ? 'refresh-circle-outline' : 'ban-outline'}
-            size={18}
-            color={detalhe.allow_retake ? '#059669' : colors.muted}
-            style={{ marginRight: 8 }}
-          />
-          <Text style={[styles.bannerTexto, { color: detalhe.allow_retake ? '#059669' : colors.muted, flex: 1 }]}>
-            {detalhe.allow_retake
-              ? `Retentativa habilitada${detalhe.max_attempts ? ` · Máx: ${detalhe.max_attempts} tentativa(s)` : ' · Tentativas ilimitadas'} · Limite por nota: ${retakeThreshold ?? 0}%`
-              : 'Retentativa desabilitada para este simulado.'}
-          </Text>
+          <View style={styles.ruleRow}>
+            <Ionicons
+              name={detalhe.allow_retake ? 'refresh-circle-outline' : 'ban-outline'}
+              size={18}
+              color={detalhe.allow_retake ? '#059669' : colors.muted}
+            />
+            <Text style={styles.ruleText}>
+              {detalhe.allow_retake
+                ? `Retentativa: ${detalhe.max_attempts ? `até ${detalhe.max_attempts} tentativa(s)` : 'tentativas ilimitadas'} com limite por nota de ${retakeThreshold ?? 0}%.`
+                : 'Retentativa indisponível neste simulado.'}
+            </Text>
+          </View>
         </View>
 
         {/* Erro de ação (ex: iniciar falhou) */}
@@ -287,36 +359,15 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
         ) : null}
 
         {/* Ação principal */}
-        {(emAndamento || pendingReview || awaitingRelease) ? (
-          pendingReview ? (
-            <View style={[styles.banner, { backgroundColor: '#FFFBEB' }]}>
-              <Ionicons name="hourglass-outline" size={18} color="#B45309" style={{ marginRight: 8 }} />
-              <Text style={[styles.bannerTexto, { color: '#B45309', flex: 1 }]}>
-                Aguardando correção manual. O resultado será liberado em breve.
-              </Text>
-            </View>
-          ) : awaitingRelease ? (
-            <View style={[styles.banner, { backgroundColor: '#ECFEFF' }]}>
-              <Ionicons name="lock-closed-outline" size={18} color="#0891B2" style={{ marginRight: 8 }} />
-              <Text style={[styles.bannerTexto, { color: '#0891B2', flex: 1 }]}> 
-                Correção concluída. O resultado ficará disponível após o encerramento do período do simulado.
-              </Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.botaoAcao, { backgroundColor: subjectColor }]}
-              onPress={handleContinuar}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="play-forward" size={18} color={colors.surface} style={{ marginRight: 8 }} />
-              <Text style={styles.botaoAcaoTexto}>Continuar simulado</Text>
-            </TouchableOpacity>
-          )
-        ) : concluido ? (
-          <View style={[styles.banner, { backgroundColor: '#F5F3FF' }]}> 
-            <Ionicons name="checkmark-done-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
-            <Text style={[styles.bannerTexto, { color: colors.primary, flex: 1 }]}>Simulado finalizado</Text>
-          </View>
+        {emAndamento ? (
+          <TouchableOpacity
+            style={[styles.botaoAcao, { backgroundColor: subjectColor }]}
+            onPress={handleContinuar}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="play-forward" size={18} color={colors.surface} style={{ marginRight: 8 }} />
+            <Text style={styles.botaoAcaoTexto}>Continuar simulado</Text>
+          </TouchableOpacity>
         ) : podeComecar ? (
           <TouchableOpacity
             style={[styles.botaoAcao, { backgroundColor: subjectColor }, iniciando && styles.botaoDisabled]}
@@ -335,12 +386,12 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                   <Text style={styles.botaoAcaoTexto}>Iniciar simulado</Text>
                 </>}
           </TouchableOpacity>
-        ) : (
+        ) : (!concluido && !pendingReview && !awaitingRelease) ? (
           <View style={[styles.banner, { backgroundColor: '#FEF9C3' }]}>
             <Ionicons name="lock-closed-outline" size={18} color="#B45309" style={{ marginRight: 8 }} />
             <Text style={[styles.bannerTexto, { color: '#B45309' }]}>Fora do período permitido</Text>
           </View>
-        )}
+        ) : null}
 
         {concluidoComVisualizacao && (
           <View style={styles.previewWrap}>
@@ -352,6 +403,28 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
               Conteúdo em modo leitura, apenas para consulta.
             </Text>
 
+            {/* Score Card */}
+            {revisao && revisao.score_display && (
+              <View style={[styles.scoreCard, { backgroundColor: revisao.passed ? '#D1FAE5' : '#FEE2E2' }]}>
+                <View style={styles.scoreCardContent}>
+                  <View>
+                    <Text style={styles.scoreCardLabel}>Sua pontuação</Text>
+                    <Text style={[styles.scoreCardValue, { color: revisao.passed ? '#059669' : '#DC2626' }]}>
+                      {revisao.score_display}
+                    </Text>
+                  </View>
+                  {revisao.percentage != null && (
+                    <View>
+                      <Text style={styles.scoreCardLabel}>Aproveitamento</Text>
+                      <Text style={[styles.scoreCardPercentage, { color: revisao.passed ? '#059669' : '#DC2626' }]}>
+                        {revisao.percentage.toFixed(1)}%
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
             {carregandoRevisao ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 12 }} />
             ) : revisao?.questions?.length ? (
@@ -359,6 +432,15 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                 const emCorrecao = !awaitingRelease && (q.correction === null || q.correction.is_correct === null);
                 const isCorreta  = !awaitingRelease && q.correction?.is_correct === true;
                 const isErrada   = !awaitingRelease && q.correction?.is_correct === false;
+                const questionStatus = emCorrecao
+                  ? { label: 'Em correção', icon: 'hourglass-outline', color: '#B45309', bg: '#FEF3C7' }
+                  : awaitingRelease
+                    ? { label: 'Resultado bloqueado', icon: 'lock-closed-outline', color: '#0E7490', bg: '#CFFAFE' }
+                    : isCorreta
+                      ? { label: 'Correta', icon: 'checkmark-circle', color: '#15803D', bg: '#DCFCE7' }
+                      : isErrada
+                        ? { label: 'Incorreta', icon: 'close-circle', color: '#DC2626', bg: '#FEE2E2' }
+                        : null;
                 return (
                 <View key={q.id} style={[
                   styles.previewQuestao,
@@ -369,21 +451,15 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                   <View style={styles.previewQuestaoTopo}>
                     <Text style={styles.previewNumero}>{index + 1}.</Text>
                     <Text style={styles.previewEnunciado}>{q.question_text}</Text>
+                    {questionStatus ? (
+                      <View style={[styles.questionStatusBadge, { backgroundColor: questionStatus.bg }]}>
+                        <Ionicons name={questionStatus.icon as any} size={13} color={questionStatus.color} />
+                        <Text style={[styles.questionStatusText, { color: questionStatus.color }]}>
+                          {questionStatus.label}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
-
-                  {/* Indicador "Em correção" */}
-                  {emCorrecao && (
-                    <View style={styles.emCorrecaoBadge}>
-                      <Ionicons name="hourglass-outline" size={13} color="#B45309" style={{ marginRight: 4 }} />
-                      <Text style={styles.emCorrecaoBadgeTexto}>Em correção</Text>
-                    </View>
-                  )}
-                  {awaitingRelease && (
-                    <View style={[styles.emCorrecaoBadge, { backgroundColor: '#CFFAFE' }]}>
-                      <Ionicons name="lock-closed-outline" size={13} color="#0E7490" style={{ marginRight: 4 }} />
-                      <Text style={[styles.emCorrecaoBadgeTexto, { color: '#0E7490' }]}>Resultado bloqueado</Text>
-                    </View>
-                  )}
 
                   {q.type === 'multiple_choice' ? (
                     <View style={styles.previewOpcoes}>
@@ -501,45 +577,125 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface, borderRadius: 20, padding: 20,
     borderWidth: 1, borderColor: colors.border,
+    borderTopWidth: 4,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
   },
-  statusTopBadge: {
+  headerBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  titleGroup: { flex: 1, minWidth: 220 },
+  subjectBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 'auto',
-    gap: 6,
-    backgroundColor: colors.soft,
-    borderWidth: 1,
-    borderColor: colors.border,
+    alignSelf: 'flex-start',
+    gap: 5,
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
+    marginBottom: 10,
   },
-  statusTopBadgeTexto: {
+  subjectBadgeText: { fontSize: 12, fontWeight: '800' },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  statusBadgeText: {
     fontSize: 13,
     fontWeight: '800',
-    color: colors.primary,
   },
-  chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20,
-  },
-  chipTexto:     { fontSize: 13, fontWeight: '700' },
-  chipGray:      { backgroundColor: colors.soft, paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
-  chipGrayTexto: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  titulo:    { fontSize: 20, fontWeight: '800', color: colors.ink, marginBottom: 8 },
-  cursoRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  cursoTexto:{ fontSize: 13, color: colors.muted },
+  titulo:    { fontSize: 22, fontWeight: '800', color: colors.ink, lineHeight: 28 },
   descricao: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 16 },
 
-  grid: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    backgroundColor: colors.soft, borderRadius: 16, padding: 16, marginBottom: 14,
+  metaBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+    marginBottom: 14,
   },
-  gridItem:  { alignItems: 'center', flex: 1, gap: 6 },
-  gridValor: { fontSize: 16, fontWeight: '800', color: colors.ink },
-  gridLabel: { fontSize: 12, color: colors.muted, textAlign: 'center' },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  metaLabel: {
+    width: 58,
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.muted,
+    textTransform: 'uppercase',
+  },
+  metaValue: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 14,
+  },
+  gridItem:  {
+    alignItems: 'flex-start',
+    gap: 4,
+    backgroundColor: colors.soft,
+    borderRadius: 14,
+    padding: 12,
+    minHeight: 94,
+  },
+  gridValor: { fontSize: 17, fontWeight: '800', color: colors.ink, marginTop: 4 },
+  gridLabel: { fontSize: 12, color: colors.muted, textTransform: 'uppercase', fontWeight: '700' },
+
+  rulesBox: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  statusNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+  },
+  statusNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  ruleText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.muted,
+    lineHeight: 18,
+  },
 
   dataLinha: {
     flexDirection: 'row',
@@ -591,7 +747,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   previewQuestao: {
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderLeftWidth: 4,
     borderColor: colors.border,
     borderRadius: 14,
     padding: 14,
@@ -599,23 +756,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   previewQuestaoCorreta: {
-    borderColor: '#86EFAC',
-    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+    borderLeftColor: '#22C55E',
+    backgroundColor: colors.surface,
   },
   previewQuestaoErrada: {
     borderColor: '#FECACA',
-    backgroundColor: '#FFF5F5',
+    borderLeftColor: '#EF4444',
+    backgroundColor: colors.surface,
   },
   previewQuestaoTopo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 10,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   previewNumero: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.primary,
-    marginRight: 8,
     marginTop: 1,
   },
   previewEnunciado: {
@@ -623,6 +783,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
     lineHeight: 22,
+    minWidth: 180,
+  },
+  questionStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  questionStatusText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   previewOpcoes: {
     gap: 7,
@@ -691,22 +864,8 @@ const styles = StyleSheet.create({
   },
   previewQuestaoEmCorrecao: {
     borderColor: '#FCD34D',
-    backgroundColor: '#FFFBEB',
-  },
-  emCorrecaoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginBottom: 10,
-  },
-  emCorrecaoBadgeTexto: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#B45309',
+    borderLeftColor: '#F59E0B',
+    backgroundColor: colors.surface,
   },
   previewOpcaoSelecionadaPendente: {
     backgroundColor: colors.soft,
@@ -743,5 +902,32 @@ const styles = StyleSheet.create({
   previewDiscursivaTexto: {
     fontSize: 13,
     color: colors.muted,
+  },
+
+  scoreCard: {
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  scoreCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  scoreCardLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.muted,
+    marginBottom: 4,
+  },
+  scoreCardValue: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  scoreCardPercentage: {
+    fontSize: 24,
+    fontWeight: '700',
   },
 });

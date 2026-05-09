@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\ExamAttemptController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ExamQuestionController;
+use App\Http\Controllers\Api\StudentDashboardController;
 use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantController;
@@ -118,6 +119,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::delete('tenant-api-tokens/{tenantApiToken}', [TenantApiTokenController::class, 'destroy']);
 
     // Simulados do aluno autenticado (role: aluno)
+    Route::get('aluno/dashboard',                [StudentDashboardController::class, 'index']);
     Route::get('aluno/exams',                    [StudentExamController::class, 'index']);
     Route::get('aluno/exams/{exam}',             [StudentExamController::class, 'show']);
     Route::get('aluno/attempts',                 [StudentExamController::class, 'attempts']);

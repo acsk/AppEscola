@@ -32,6 +32,11 @@ type TenantOption = {
   name: string;
 };
 
+type RoleOption = {
+  value: string;
+  label: string;
+};
+
 type Meta = {
   current_page: number;
   last_page: number;
@@ -50,6 +55,7 @@ function roleLabel(role: string) {
   if (role === "secretaria") return "Secretaria";
   if (role === "professor") return "Professor";
   if (role === "financeiro") return "Financeiro";
+  if (role === "aluno") return "Aluno";
   return role;
 }
 
@@ -66,6 +72,7 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
 
   const [rows, setRows] = useState<UserRow[]>([]);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [successMessage, setSuccessMessage] = useState(flashMessage ?? "");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -165,6 +172,29 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
     };
 
     loadTenants();
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const { data } = await api.get("/domains/user-roles");
+        const list = Array.isArray(data) ? data : [];
+        const nextRoles = list.map((role: any) => ({
+          value: String(role.slug ?? role.value ?? role.name ?? ""),
+          label: String(role.name ?? role.label ?? role.slug ?? role.value ?? ""),
+        }));
+
+        setRoles(
+          isSuperAdmin
+            ? nextRoles
+            : nextRoles.filter((opt) => opt.value !== "super_admin")
+        );
+      } catch {
+        setRoles([]);
+      }
+    };
+
+    loadRoles();
   }, [isSuperAdmin]);
 
   const remove = async () => {
@@ -300,11 +330,11 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
           }}
         >
           <option value="">Todos os perfis</option>
-          {isSuperAdmin && <option value="super_admin">Super Admin</option>}
-          <option value="admin">Admin</option>
-          <option value="secretaria">Secretaria</option>
-          <option value="professor">Professor</option>
-          <option value="financeiro">Financeiro</option>
+          {roles.map((role) => (
+            <option key={role.value} value={role.value}>
+              {role.label}
+            </option>
+          ))}
         </select>
 
         <select
