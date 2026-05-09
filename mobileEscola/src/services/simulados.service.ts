@@ -231,6 +231,7 @@ export interface ReviewQuestion {
   id: number;
   type: 'multiple_choice' | 'essay';
   question_text: string;
+  image_url?: string | null;
   points?: number;
   order?: number;
   allow_text_answer?: boolean;
@@ -291,3 +292,29 @@ export async function listarTentativas(status?: string): Promise<AttemptHistoryI
   const body = data?.body ?? data;
   return Array.isArray(body) ? body : (body?.data ?? []);
 }
+
+// ── Materiais de Apoio ────────────────────────────────────────────────────────
+
+export type SupportMaterialType = 'link' | 'file';
+export type SupportMaterialFileType = 'pdf' | 'image' | 'video' | 'document' | null;
+
+export interface SupportMaterial {
+  id: number;
+  exam_id: number;
+  title: string;
+  description: string | null;
+  type: SupportMaterialType;
+  content: string;
+  file_type: SupportMaterialFileType;
+  file_size: number | null;
+  created_at: string;
+}
+
+export async function listarMateriaisApoio(examId: number): Promise<SupportMaterial[]> {
+  const { data } = await api.get<SupportMaterial[] | ApiEnvelope<SupportMaterial[]>>(
+    `/api/exams/${examId}/support-materials`,
+  );
+  const parsed = unwrapBody<SupportMaterial[]>(data);
+  return Array.isArray(parsed) ? parsed : [];
+}
+

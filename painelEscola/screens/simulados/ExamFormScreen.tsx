@@ -85,6 +85,26 @@ type OptionForm = {
 
 type SelectOption = { value: string | number; label: string };
 
+type SupportMaterial = {
+  id: number;
+  exam_id: number;
+  title: string;
+  description: string | null;
+  type: "link" | "file";
+  content: string;
+  file_type: string | null;
+  file_size: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupportMaterialForm = {
+  title: string;
+  description: string;
+  type: "link" | "file";
+  content: string;
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const EMPTY_EXAM: ExamForm = {
@@ -119,6 +139,13 @@ const EMPTY_QUESTION: QuestionForm = {
     { option_text: "", is_correct: false, order: 3, triggers_text_input: false },
     { option_text: "", is_correct: false, order: 4, triggers_text_input: false },
   ],
+};
+
+const EMPTY_SUPPORT_MATERIAL: SupportMaterialForm = {
+  title: "",
+  description: "",
+  type: "link",
+  content: "",
 };
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -183,6 +210,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const isEdit = examId !== null;
   const scrollRef = useRef<ScrollView>(null);
   const questionImageInputRef = useRef<HTMLInputElement | null>(null);
+  const supportMaterialFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Domain hooks
   const examStatuses = useExamStatuses();
@@ -219,8 +247,23 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
-  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
   const [questionImageRatios, setQuestionImageRatios] = useState<Record<string, number>>({});
+
+  // Support materials state
+  const [supportMaterials, setSupportMaterials] = useState<SupportMaterial[]>([]);
+  const [loadingSupportMaterials, setLoadingSupportMaterials] = useState(false);
+  const [supportMaterialModal, setSupportMaterialModal] = useState(false);
+  const [supportMaterialForm, setSupportMaterialForm] = useState<SupportMaterialForm>(
+    EMPTY_SUPPORT_MATERIAL
+  );
+  const [supportMaterialErrors, setSupportMaterialErrors] = useState<Record<string, string>>({});
+  const [savingSupportMaterial, setSavingSupportMaterial] = useState(false);
+  const [editSupportMaterialId, setEditSupportMaterialId] = useState<number | null>(null);
+  const [deleteSupportMaterialId, setDeleteSupportMaterialId] = useState<number | null>(null);
+  const [deletingSupportMaterial, setDeletingSupportMaterial] = useState(false);
+  const [supportMaterialFile, setSupportMaterialFile] = useState<File | null>(null);
+  const [uploadingSupportMaterialFile, setUploadingSupportMaterialFile] = useState(false);
   const [toast, setToast] = useState<{
     visible: boolean;
     type: "success" | "error";
@@ -316,6 +359,19 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setLoadingQuestions(false);
   }, [examId, isEdit]);
 
+  const fetchSupportMaterials = useCallback(async () => {
+    if (!isEdit || !examId) return;
+    setLoadingSupportMaterials(true);
+    try {
+      const { data } = await api.get(`/exams/${examId}/support-materials`);
+      const rows = data?.body ?? data?.data ?? data;
+      setSupportMaterials(Array.isArray(rows) ? rows : Array.isArray(rows?.data) ? rows.data : []);
+    } catch {
+      setSupportMaterials([]);
+    }
+    setLoadingSupportMaterials(false);
+  }, [examId, isEdit]);
+
   // ── Exam Save ────────────────────────────────────────────────────────────────
 
   const setField = (k: keyof ExamForm, v: string) =>
@@ -356,20 +412,20 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
 
       if (isEdit) {
         const { data } = await api.put(`/exams/${examId}`, payload);
+        const response = data?.body ?? data?.data ?? data;
         setToast({
           visible: true,
           type: "success",
-          message: data?.message || "Simulado atualizado com sucesso.",
+          message: data?.message || response?.message || "Operação realizada com sucesso.",
         });
       } else {
         const { data } = await api.post("/exams", payload);
+        const response = data?.body ?? data?.data ?? data;
         setToast({
           visible: true,
           type: "success",
-          message: data?.message || "Simulado criado com sucesso.",
+          message: data?.message || response?.message || "Operação realizada com sucesso.",
         });
-        navigate("simulados-form", { examId: (data.body ?? data).id });
-        return;
       }
       setErrors({});
     } catch (err: any) {
@@ -576,6 +632,145 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setDeletingQuestion(false);
   };
 
+  const setSupportMaterialField = (key: keyof SupportMaterialForm, value: string) => {
+    setSupportMaterialForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const openNewSupportMaterial = () => {
+    setEditSupportMaterialId(null);
+    setSupportMaterialForm(EMPTY_SUPPORT_MATERIAL);
+    setSupportMaterialErrors({});
+    setSupportMaterialFile(null);
+    setSupportMaterialModal(true);
+  };
+
+  const openEditSupportMaterial = (material: SupportMaterial) => {
+    setEditSupportMaterialId(material.id);
+    setSupportMaterialForm({
+      title: material.title ?? "",
+      description: material.description ?? "",
+      type: material.type,
+      content: material.content ?? "",
+    });
+    setSupportMaterialErrors({});
+    setSupportMaterialFile(null);
+    setSupportMaterialModal(true);
+  };
+
+  const saveSupportMaterial = async () => {
+    if (!examId) return;
+
+    const errs: Record<string, string> = {};
+    if (!supportMaterialForm.title.trim()) errs.title = "Título é obrigatório.";
+
+    if (supportMaterialForm.type === "link") {
+      if (!supportMaterialForm.content.trim()) {
+        errs.content = "URL é obrigatória para material do tipo link.";
+      } else if (!/^https?:\/\//i.test(supportMaterialForm.content.trim())) {
+        errs.content = "Informe uma URL válida começando com http:// ou https://";
+      }
+    } else if (!editSupportMaterialId && !supportMaterialFile) {
+      errs.file = "Selecione um arquivo para enviar.";
+    }
+
+    setSupportMaterialErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setSavingSupportMaterial(true);
+    try {
+      if (supportMaterialForm.type === "file" && !editSupportMaterialId) {
+        setUploadingSupportMaterialFile(true);
+        const formData = new FormData();
+        formData.append("title", supportMaterialForm.title.trim());
+        if (supportMaterialForm.description.trim()) {
+          formData.append("description", supportMaterialForm.description.trim());
+        }
+        formData.append("file", supportMaterialFile as File);
+        const { data } = await api.post(
+          `/exams/${examId}/support-materials/upload`,
+          formData
+        );
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Material de apoio enviado com sucesso.",
+        });
+      } else {
+        const payload: Record<string, any> = {
+          title: supportMaterialForm.title.trim(),
+          description: supportMaterialForm.description.trim() || null,
+        };
+
+        if (supportMaterialForm.type === "link") {
+          payload.type = "link";
+          payload.content = supportMaterialForm.content.trim();
+        } else if (!editSupportMaterialId) {
+          payload.type = "file";
+        }
+
+        if (editSupportMaterialId) {
+          const { data } = await api.put(
+            `/exams/${examId}/support-materials/${editSupportMaterialId}`,
+            payload
+          );
+          setToast({
+            visible: true,
+            type: "success",
+            message: data?.message || "Material de apoio atualizado com sucesso.",
+          });
+        } else {
+          const { data } = await api.post(`/exams/${examId}/support-materials`, payload);
+          setToast({
+            visible: true,
+            type: "success",
+            message: data?.message || "Material de apoio criado com sucesso.",
+          });
+        }
+      }
+
+      setSupportMaterialModal(false);
+      setSupportMaterialForm(EMPTY_SUPPORT_MATERIAL);
+      setSupportMaterialFile(null);
+      fetchSupportMaterials();
+    } catch (err: any) {
+      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
+      setSupportMaterialErrors(apiErrs);
+      setToast({
+        visible: true,
+        type: "error",
+        message: err?.response?.data?.message || "Não foi possível salvar o material de apoio.",
+      });
+    } finally {
+      setSavingSupportMaterial(false);
+      setUploadingSupportMaterialFile(false);
+    }
+  };
+
+  const deleteSupportMaterial = async () => {
+    if (!examId || !deleteSupportMaterialId) return;
+    setDeletingSupportMaterial(true);
+    try {
+      const { data } = await api.delete(
+        `/exams/${examId}/support-materials/${deleteSupportMaterialId}`
+      );
+      setToast({
+        visible: true,
+        type: "success",
+        message: data?.message || "Material removido com sucesso.",
+      });
+      setDeleteSupportMaterialId(null);
+      fetchSupportMaterials();
+    } catch (err: any) {
+      setToast({
+        visible: true,
+        type: "error",
+        message: err?.response?.data?.message || "Não foi possível remover o material.",
+      });
+    } finally {
+      setDeletingSupportMaterial(false);
+    }
+  };
+
   useEffect(() => {
     setActiveStep(1);
   }, [examId]);
@@ -585,6 +780,10 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
       if (question.image_url) ensureQuestionImageRatio(question.image_url);
     });
   }, [questions, ensureQuestionImageRatio]);
+
+  useEffect(() => {
+    fetchSupportMaterials();
+  }, [fetchSupportMaterials]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -610,11 +809,20 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   };
 
   const totalPoints = questions.reduce((acc, q) => acc + q.points, 0);
+
+  const formatFileSize = (sizeInBytes: number | null) => {
+    if (!sizeInBytes || sizeInBytes <= 0) return "-";
+    if (sizeInBytes < 1024) return `${sizeInBytes} B`;
+    if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(1)} KB`;
+    return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const stepItems = isEdit
     ? [
         { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
         { id: 2 as const, title: "Questões", description: "Cadastro, edição e organização das questões" },
-        { id: 3 as const, title: "Pré-visualização", description: "Como o aluno verá o simulado" },
+        { id: 3 as const, title: "Materiais", description: "Links e arquivos de apoio" },
+        { id: 4 as const, title: "Pré-visualização", description: "Como o aluno verá o simulado" },
       ]
     : [
         { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
@@ -1017,7 +1225,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-violet-700">Ver preview</Text>
+              <Text className="text-sm font-semibold text-violet-700">Materiais de apoio</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={openNewQuestion}
@@ -1031,6 +1239,126 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
       )}
 
       {isEdit && activeStep === 3 && (
+        <View
+          className="bg-white rounded-2xl overflow-hidden mb-6"
+          style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        >
+          <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
+            <View>
+              <Text className="text-base font-bold text-gray-800">Materiais de apoio</Text>
+              <Text className="text-xs text-gray-400">
+                Links e arquivos para auxiliar os alunos antes ou durante o simulado
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={openNewSupportMaterial}
+              className="flex-row items-center bg-violet-600 px-4 py-2 rounded-xl"
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={16} color="white" />
+              <Text className="text-white text-sm font-semibold ml-1">Novo Material</Text>
+            </TouchableOpacity>
+          </View>
+
+          {loadingSupportMaterials ? (
+            <View className="py-12 items-center">
+              <ActivityIndicator color="#7C3AED" />
+            </View>
+          ) : supportMaterials.length === 0 ? (
+            <View className="py-12 items-center gap-2">
+              <Ionicons name="library-outline" size={30} color="#D1D5DB" />
+              <Text className="text-sm text-gray-400">Nenhum material de apoio cadastrado.</Text>
+              <TouchableOpacity onPress={openNewSupportMaterial} activeOpacity={0.7}>
+                <Text className="text-sm text-violet-600 font-semibold">Adicionar primeiro material</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            supportMaterials.map((material, idx) => (
+              <View
+                key={material.id}
+                className={`px-6 py-4 ${idx < supportMaterials.length - 1 ? "border-b border-gray-50" : ""}`}
+              >
+                <View className="flex-row items-start gap-3">
+                  <View
+                    className={`w-9 h-9 rounded-xl items-center justify-center ${
+                      material.type === "link" ? "bg-sky-50" : "bg-emerald-50"
+                    }`}
+                  >
+                    <Ionicons
+                      name={material.type === "link" ? "link-outline" : "document-attach-outline"}
+                      size={17}
+                      color={material.type === "link" ? "#0369A1" : "#047857"}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <View className="flex-row items-center gap-2 mb-1">
+                      <Text className="text-sm font-semibold text-gray-800">{material.title}</Text>
+                      <Badge
+                        label={material.type === "link" ? "Link" : "Arquivo"}
+                        slug={material.type === "link" ? "active" : "published"}
+                      />
+                    </View>
+                    {!!material.description && (
+                      <Text className="text-xs text-gray-500 mb-1">{material.description}</Text>
+                    )}
+                    <Text className="text-xs text-violet-700" numberOfLines={1}>
+                      {material.content}
+                    </Text>
+                    {material.type === "file" && (
+                      <Text className="text-xs text-gray-400 mt-1">
+                        {material.file_type ? `Tipo: ${material.file_type.toUpperCase()} · ` : ""}
+                        Tamanho: {formatFileSize(material.file_size)}
+                      </Text>
+                    )}
+                  </View>
+                  <View className="flex-row gap-1">
+                    <TouchableOpacity
+                      onPress={() => openEditSupportMaterial(material)}
+                      className="p-2 rounded-lg bg-violet-50"
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="pencil-outline" size={14} color="#7C3AED" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setDeleteSupportMaterialId(material.id)}
+                      className="p-2 rounded-lg bg-red-50"
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
+
+          <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
+            <TouchableOpacity
+              onPress={() => setActiveStep(2)}
+              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-gray-700">Voltar para questões</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveStep(4)}
+              className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-violet-700">Ir para preview</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={openNewSupportMaterial}
+              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Novo Material</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {isEdit && activeStep === 4 && (
         <View
           className="bg-white rounded-2xl overflow-hidden"
           style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
@@ -1136,11 +1464,11 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
 
           <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
             <TouchableOpacity
-              onPress={() => setActiveStep(2)}
+              onPress={() => setActiveStep(3)}
               className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-gray-700">Voltar para questões</Text>
+              <Text className="text-sm font-semibold text-gray-700">Voltar para materiais</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigate("simulados")}
@@ -1417,6 +1745,146 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         )}
       </Modal>
 
+      {/* Modal de Material de Apoio */}
+      <Modal
+        visible={supportMaterialModal}
+        title={editSupportMaterialId ? "Editar Material de Apoio" : "Novo Material de Apoio"}
+        onClose={() => setSupportMaterialModal(false)}
+        size="lg"
+        footer={
+          <View className="flex-row gap-3 px-6 py-4 border-t border-gray-100">
+            <TouchableOpacity
+              onPress={() => setSupportMaterialModal(false)}
+              className="flex-1 border border-gray-200 py-2.5 rounded-xl items-center"
+              activeOpacity={0.7}
+            >
+              <Text className="text-sm font-semibold text-gray-600">Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={saveSupportMaterial}
+              disabled={savingSupportMaterial}
+              className="flex-1 bg-violet-600 py-2.5 rounded-xl items-center"
+              activeOpacity={0.85}
+            >
+              {savingSupportMaterial ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text className="text-sm font-semibold text-white">
+                  {editSupportMaterialId ? "Salvar" : "Adicionar"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        }
+      >
+        <FormInput
+          label="Título"
+          required
+          value={supportMaterialForm.title}
+          onChangeText={(v) => setSupportMaterialField("title", v)}
+          error={supportMaterialErrors.title}
+          placeholder="Ex.: Lista de exercícios"
+        />
+
+        <View className="mb-4">
+          <Text className="text-sm font-semibold text-gray-700 mb-1.5">Descrição (opcional)</Text>
+          <textarea
+            value={supportMaterialForm.description}
+            onChange={(e: any) => setSupportMaterialField("description", e.target.value)}
+            placeholder="Observações sobre este material..."
+            style={inputStyle}
+            rows={2}
+          />
+        </View>
+
+        <View className="mb-3">
+          <FormSelect
+            label="Tipo"
+            value={supportMaterialForm.type}
+            options={[
+              { value: "link", label: "Link" },
+              { value: "file", label: "Arquivo" },
+            ]}
+            onChange={(v) =>
+              setSupportMaterialForm((prev) => ({
+                ...prev,
+                type: v as "link" | "file",
+                content: v === "file" && !editSupportMaterialId ? "" : prev.content,
+              }))
+            }
+          />
+        </View>
+
+        {supportMaterialForm.type === "link" ? (
+          <FormInput
+            label="URL do material"
+            required
+            value={supportMaterialForm.content}
+            onChangeText={(v) => setSupportMaterialField("content", v)}
+            placeholder="https://..."
+            keyboardType="url"
+            error={supportMaterialErrors.content}
+          />
+        ) : (
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+              Arquivo (PDF, imagem ou vídeo)
+            </Text>
+            {!editSupportMaterialId ? (
+              <>
+                <View className="flex-row items-center gap-3 flex-wrap">
+                  <TouchableOpacity
+                    onPress={() => supportMaterialFileInputRef.current?.click()}
+                    disabled={uploadingSupportMaterialFile}
+                    className="px-4 py-2.5 rounded-xl bg-violet-600"
+                    activeOpacity={0.85}
+                  >
+                    <Text className="text-sm font-semibold text-white">
+                      {supportMaterialFile ? "Trocar arquivo" : "Selecionar arquivo"}
+                    </Text>
+                  </TouchableOpacity>
+                  {supportMaterialFile ? (
+                    <View className="px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 min-w-[220px]">
+                      <Text className="text-xs font-semibold text-violet-700" numberOfLines={1}>
+                        {supportMaterialFile.name}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text className="text-xs text-gray-400">Nenhum arquivo selecionado</Text>
+                  )}
+                </View>
+                <Text className="text-xs text-gray-400 mt-2">
+                  Tipos aceitos: PDF, JPG, PNG, WEBP, MP4, MOV, AVI, MKV. Máximo: 50 MB.
+                </Text>
+                <input
+                  ref={supportMaterialFileInputRef}
+                  type="file"
+                  accept=".pdf,image/*,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska"
+                  style={{ display: "none" }}
+                  onChange={(e: any) => {
+                    const file = e.target.files?.[0];
+                    if (file) setSupportMaterialFile(file);
+                    e.target.value = "";
+                  }}
+                />
+                {supportMaterialErrors.file && (
+                  <Text className="text-xs text-red-500 mt-1">{supportMaterialErrors.file}</Text>
+                )}
+              </>
+            ) : (
+              <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <Text className="text-xs text-gray-500">
+                  Para alterar o arquivo, remova este material e crie um novo upload.
+                </Text>
+                <Text className="text-xs text-violet-600 mt-1" numberOfLines={1}>
+                  {supportMaterialForm.content}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+      </Modal>
+
       {/* Confirm delete question */}
       <ConfirmModal
         visible={deleteQuestionId !== null}
@@ -1425,6 +1893,15 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         loading={deletingQuestion}
         onConfirm={deleteQuestion}
         onCancel={() => setDeleteQuestionId(null)}
+      />
+
+      <ConfirmModal
+        visible={deleteSupportMaterialId !== null}
+        title="Remover material de apoio"
+        message="Tem certeza que deseja remover este material?"
+        loading={deletingSupportMaterial}
+        onConfirm={deleteSupportMaterial}
+        onCancel={() => setDeleteSupportMaterialId(null)}
       />
 
       <ToastBanner

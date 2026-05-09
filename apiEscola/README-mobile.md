@@ -12,9 +12,10 @@
 3. [Simulados — Aluno](#3-simulados--aluno)
 4. [Fluxo de realização de simulado](#4-fluxo-de-realização-de-simulado)
 5. [Histórico de tentativas](#5-histórico-de-tentativas)
-6. [Troca de senha](#6-troca-de-senha)
-7. [Navegação por perfil (role)](#7-navegação-por-perfil-role)
-8. [Erros comuns](#8-erros-comuns)
+6. [Materiais de Apoio — Simulados](#6-materiais-de-apoio--simulados)
+7. [Troca de senha](#7-troca-de-senha)
+8. [Navegação por perfil (role)](#8-navegação-por-perfil-role)
+9. [Erros comuns](#9-erros-comuns)
 
 ---
 
@@ -614,7 +615,213 @@ Regras:
 
 ---
 
-## 6. Troca de senha
+## 6. Materiais de Apoio — Simulados
+
+Recursos (links, PDFs, imagens, vídeos) associados a um simulado para que o aluno possa estudar ou consultar durante a realização.
+
+### Listar materiais de um simulado
+
+```
+GET /api/exams/{exam_id}/support-materials
+Authorization: Bearer {token}
+```
+
+**Resposta `200`:**
+
+```json
+{
+  "type": "success",
+  "message": "Materiais carregados com sucesso.",
+  "body": [
+    {
+      "id": 1,
+      "exam_id": 2,
+      "title": "Vídeo de Introdução",
+      "description": "Explicação completa do conteúdo",
+      "type": "link",
+      "content": "https://youtube.com/watch?v=dQw4w9WgXcQ",
+      "file_type": null,
+      "file_size": null,
+      "created_at": "2026-05-09T15:30:00Z"
+    },
+    {
+      "id": 2,
+      "exam_id": 2,
+      "title": "Resumo em PDF",
+      "description": "Conteúdo resumido",
+      "type": "file",
+      "content": "https://app.localhost/storage/tenant_id/support-materials/2/resumo.pdf",
+      "file_type": "pdf",
+      "file_size": 2048576,
+      "created_at": "2026-05-09T15:35:00Z"
+    },
+    {
+      "id": 3,
+      "exam_id": 2,
+      "title": "Vídeo Complementar",
+      "description": null,
+      "type": "file",
+      "content": "https://app.localhost/storage/tenant_id/support-materials/2/video.mp4",
+      "file_type": "video",
+      "file_size": 104857600,
+      "created_at": "2026-05-09T16:00:00Z"
+    }
+  ]
+}
+```
+
+| Campo | Descrição |
+|---|---|
+| `type` | `"link"` = URL externa · `"file"` = arquivo do servidor |
+| `content` | URL completa (para links) ou caminho de acesso (para arquivos) |
+| `file_type` | `"pdf"` · `"image"` · `"video"` · `"document"` — `null` para links |
+| `file_size` | Tamanho em bytes — `null` para links |
+
+### Renderização no mobile
+
+**Para `type: "link"`:**
+```tsx
+// Abrir link em navegador/webview
+if (material.type === 'link') {
+  Linking.openURL(material.content);
+}
+```
+
+**Para `type: "file"`:**
+```tsx
+// Renderizar player ou visualizador conforme file_type
+switch (material.file_type) {
+  case 'pdf':
+    // → renderizar com WebView ou PDFView
+    // → usar WebView se não há biblioteca nativa
+    break;
+  case 'image':
+    // → renderizar com Image
+    break;
+  case 'video':
+    // → renderizar com Video player (expo-av, react-native-video, etc.)
+    break;
+  case 'document':
+    // → abrir com app nativo (Sharing.shareAsync)
+    break;
+}
+```
+
+### Exemplo de componente (React Native)
+
+```tsx
+import { FlatList, Linking, View, Text, TouchableOpacity, Image } from 'react-native';
+import { Video } from 'expo-av';
+
+const SupportMaterialsScreen = ({ examId }) => {
+  const [materials, setMaterials] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMaterials();
+  }, [examId]);
+
+  const fetchMaterials = async () => {
+    try {
+      const response = await fetch(
+        `/api/exams/${examId}/support-materials`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      const json = await response.json();
+      setMaterials(json.body || []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderMaterial = ({ item }) => (
+    <View style={styles.card}>
+      <Text style={styles.title}>{item.title}</Text>
+      {item.description && (
+        <Text style={styles.description}>{item.description}</Text>
+      )}
+
+      {item.type === 'link' ? (
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => Linking.openURL(item.content)}
+        >
+          <Text style={styles.buttonText}>🔗 Abrir Link</Text>
+        </TouchableOpacity>
+      ) : (
+        <View>
+          {item.file_type === 'video' && (
+            <Video
+              source={{ uri: item.content }}
+              rate={1.0}
+              volume={1.0}
+              isMuted={false}
+              resizeMode="contain"
+              useNativeControls
+              style={styles.video}
+            />
+          )}
+          {item.file_type === 'pdf' && (
+            <WebView
+              source={{ uri: item.content }}
+              style={styles.pdf}
+            />
+          )}
+          {item.file_type === 'image' && (
+            <Image
+              source={{ uri: item.content }}
+              style={styles.image}
+            />
+          )}
+          {item.file_type === 'document' && (
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => Sharing.shareAsync(item.content)}
+            >
+              <Text style={styles.buttonText}>📄 Baixar Arquivo</Text>
+            </TouchableOpacity>
+          )}
+          <Text style={styles.fileInfo}>
+            {(item.file_size / 1024 / 1024).toFixed(2)} MB
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  return (
+    <FlatList
+      data={materials}
+      keyExtractor={(item) => item.id.toString()}
+      renderItem={renderMaterial}
+      onRefresh={fetchMaterials}
+      refreshing={loading}
+      ListEmptyComponent={
+        <Text style={styles.empty}>Sem materiais de apoio para este simulado.</Text>
+      }
+    />
+  );
+};
+
+const styles = StyleSheet.create({
+  card: { backgroundColor: '#fff', padding: 12, marginVertical: 8, borderRadius: 8 },
+  title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  description: { fontSize: 14, color: '#666', marginBottom: 8 },
+  button: { backgroundColor: '#3B82F6', padding: 10, borderRadius: 6, alignItems: 'center' },
+  buttonText: { color: '#fff', fontWeight: 'bold' },
+  video: { height: 250, marginVertical: 8, borderRadius: 6 },
+  pdf: { height: 300, borderRadius: 6 },
+  image: { height: 200, borderRadius: 6, marginVertical: 8 },
+  fileInfo: { fontSize: 12, color: '#999', marginTop: 4 },
+  empty: { textAlign: 'center', color: '#999', marginTop: 20 },
+});
+
+export default SupportMaterialsScreen;
+```
+
+---
+
+## 7. Troca de senha
 
 ```
 POST /api/me/password
@@ -636,7 +843,7 @@ Content-Type: application/json
 
 ---
 
-## 7. Navegação por perfil (role)
+## 8. Navegação por perfil (role)
 
 Após o login, use `user.role` para definir a navegação:
 
@@ -664,7 +871,7 @@ App inicia
 
 ---
 
-## 8. Erros comuns
+## 9. Erros comuns
 
 | Código | Causa | Ação |
 |---|---|---|

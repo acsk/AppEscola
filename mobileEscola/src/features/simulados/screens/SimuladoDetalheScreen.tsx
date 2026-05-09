@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   useWindowDimensions,
+  Linking,
+  Image,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -15,11 +18,14 @@ import {
   detalharSimulado,
   iniciarSimulado,
   buscarRevisao,
+  listarMateriaisApoio,
   AttemptStatus,
   SimuladoDetail,
   AttemptReview,
+  SupportMaterial,
   subjectIconName,
 } from '../../../services/simulados.service';
+import { gerarPdfSimulado } from '../../../services/pdf-simulado.service';
 import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoDetalhe'>;
@@ -107,6 +113,170 @@ function statusInfo(status: AttemptStatus, awaitingRelease: boolean) {
   return map[status];
 }
 
+interface QuestionImageProps {
+  uri: string;
+  maxWidth: number;
+}
+
+function QuestionImage({ uri, maxWidth }: QuestionImageProps) {
+  const [altura, setAltura] = useState(180);
+  const [erro, setErro] = useState(false);
+
+  useEffect(() => {
+    setErro(false);
+    Image.getSize(
+      uri,
+      (w, h) => {
+        if (w > 0 && maxWidth > 0) {
+          setAltura((maxWidth * h) / w);
+        }
+      },
+      () => setErro(true),
+    );
+  }, [uri, maxWidth]);
+
+  if (erro) return null;
+
+  return (
+    <Image
+      source={{ uri }}
+      style={{
+        width: '100%',
+        height: altura,
+        borderRadius: 10,
+        marginTop: 8,
+        marginBottom: 10,
+        backgroundColor: '#F1F5F9',
+      }}
+      resizeMode="contain"
+      onError={() => setErro(true)}
+      accessibilityLabel="Imagem da questão"
+    />
+  );
+}
+
+function formatFileSize(bytes: number | null): string | null {
+  if (!bytes || bytes <= 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function materialIconName(material: SupportMaterial): string {
+  if (material.type === 'link') return 'link-outline';
+  switch (material.file_type) {
+    case 'pdf':      return 'document-text-outline';
+    case 'image':    return 'image-outline';
+    case 'video':    return 'videocam-outline';
+    case 'document': return 'document-attach-outline';
+    default:         return 'document-outline';
+  }
+}
+
+function materialActionLabel(material: SupportMaterial): string {
+  if (material.type === 'link') return 'Abrir link';
+  switch (material.file_type) {
+    case 'pdf':      return 'Abrir PDF';
+    case 'video':    return 'Abrir vídeo';
+    case 'document': return 'Baixar arquivo';
+    default:         return 'Abrir arquivo';
+  }
+}
+
+async function abrirMaterial(url: string) {
+  try {
+    if (Platform.OS === 'web') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    }
+  } catch (e) {
+    console.warn('[SupportMaterial] não foi possível abrir', url, e);
+  }
+}
+
+interface SupportMaterialsSectionProps {
+  materiais: SupportMaterial[];
+  carregando: boolean;
+  accentColor: string;
+}
+
+function SupportMaterialsSection({ materiais, carregando, accentColor }: SupportMaterialsSectionProps) {
+  if (carregando) {
+    return (
+      <View style={styles.materiaisWrap}>
+        <View style={styles.materiaisHeader}>
+          <Ionicons name="library-outline" size={18} color={accentColor} style={{ marginRight: 8 }} />
+          <Text style={styles.materiaisTitulo}>Materiais de apoio</Text>
+        </View>
+        <ActivityIndicator size="small" color={accentColor} style={{ marginTop: 8 }} />
+      </View>
+    );
+  }
+
+  if (!materiais.length) return null;
+
+  return (
+    <View style={styles.materiaisWrap}>
+      <View style={styles.materiaisHeader}>
+        <Ionicons name="library-outline" size={18} color={accentColor} style={{ marginRight: 8 }} />
+        <Text style={styles.materiaisTitulo}>Materiais de apoio</Text>
+      </View>
+      <Text style={styles.materiaisSubtitulo}>
+        Recursos disponibilizados pelo professor para estudo e consulta.
+      </Text>
+
+      {materiais.map((m) => {
+        const tamanho = formatFileSize(m.file_size);
+        const isImage = m.type === 'file' && m.file_type === 'image';
+        return (
+          <View key={m.id} style={styles.materialCard}>
+            <View style={styles.materialHeader}>
+              <View style={[styles.materialIconWrap, { backgroundColor: accentColor + '18' }]}>
+                <Ionicons name={materialIconName(m) as any} size={18} color={accentColor} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.materialTitulo} numberOfLines={2}>{m.title}</Text>
+                {m.description ? (
+                  <Text style={styles.materialDescricao} numberOfLines={3}>{m.description}</Text>
+                ) : null}
+                {tamanho ? (
+                  <Text style={styles.materialMeta}>{tamanho}</Text>
+                ) : null}
+              </View>
+            </View>
+
+            {isImage ? (
+              <Image
+                source={{ uri: m.content }}
+                style={styles.materialImage}
+                resizeMode="cover"
+              />
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.materialBotao, { backgroundColor: accentColor }]}
+              onPress={() => abrirMaterial(m.content)}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={m.type === 'link' ? 'open-outline' : 'cloud-download-outline'}
+                size={15}
+                color={colors.surface}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.materialBotaoTexto}>{materialActionLabel(m)}</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const { examId } = route.params;
   const { width } = useWindowDimensions();
@@ -118,6 +288,10 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const [erroAcao, setErroAcao]       = useState<string | null>(null);
   const [revisao, setRevisao]         = useState<AttemptReview | null>(null);
   const [carregandoRevisao, setCarregandoRevisao] = useState(false);
+  const [materiais, setMateriais] = useState<SupportMaterial[]>([]);
+  const [carregandoMateriais, setCarregandoMateriais] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [erroPdf, setErroPdf] = useState<string | null>(null);
 
   useEffect(() => {
     navigation.setOptions({
@@ -141,6 +315,16 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   }, [navigation]);
 
   useEffect(() => { carregar(); }, [examId]);
+
+  useEffect(() => {
+    let active = true;
+    setCarregandoMateriais(true);
+    listarMateriaisApoio(examId)
+      .then((lista) => { if (active) setMateriais(lista); })
+      .catch(() => { if (active) setMateriais([]); })
+      .finally(() => { if (active) setCarregandoMateriais(false); });
+    return () => { active = false; };
+  }, [examId]);
 
   useEffect(() => {
     if (revisao?.questions?.length) {
@@ -212,6 +396,20 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
       examId: detalhe.id,
       attemptId: detalhe.attempt_id,
     });
+  }
+
+  async function handleGerarPdf() {
+    if (!detalhe || gerandoPdf) return;
+    setErroPdf(null);
+    setGerandoPdf(true);
+    try {
+      await gerarPdfSimulado(detalhe);
+    } catch (e: any) {
+      console.warn('[PDF] erro ao gerar', e);
+      setErroPdf('Não foi possível gerar o PDF. Tente novamente.');
+    } finally {
+      setGerandoPdf(false);
+    }
   }
 
   // ── Carregando ──────────────────────────────────────────────────────────────
@@ -351,6 +549,39 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           </View>
         </View>
 
+        {/* Materiais de apoio */}
+        <SupportMaterialsSection
+          materiais={materiais}
+          carregando={carregandoMateriais}
+          accentColor={subjectColor}
+        />
+
+        {/* Gerar PDF para impressão */}
+        <View style={styles.pdfWrap}>
+          <TouchableOpacity
+            style={[styles.pdfBotao, gerandoPdf && styles.botaoDisabled]}
+            onPress={handleGerarPdf}
+            disabled={gerandoPdf}
+            activeOpacity={0.85}
+          >
+            {gerandoPdf ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="print-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.pdfBotaoTexto}>Gerar PDF para impressão</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {erroPdf ? (
+            <Text style={styles.pdfErro}>{erroPdf}</Text>
+          ) : (
+            <Text style={styles.pdfHint}>
+              Gere uma versão imprimível do simulado com folha de respostas.
+            </Text>
+          )}
+        </View>
+
         {/* Erro de ação (ex: iniciar falhou) */}
         {erroAcao ? (
           <View style={styles.erroInline}>
@@ -461,6 +692,10 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                       </View>
                     ) : null}
                   </View>
+
+                  {q.image_url ? (
+                    <QuestionImage uri={q.image_url} maxWidth={Math.max(0, Math.min(width, 720) - 64)} />
+                  ) : null}
 
                   {q.type === 'multiple_choice' ? (
                     <View style={styles.previewOpcoes}>
@@ -935,5 +1170,121 @@ const styles = StyleSheet.create({
   scoreCardPercentage: {
     fontSize: 24,
     fontWeight: '700',
+  },
+
+  // ── Materiais de apoio ──
+  materiaisWrap: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  materiaisHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  materiaisTitulo: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  materiaisSubtitulo: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.muted,
+  },
+  materialCard: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  materialHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  materialIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  materialTitulo: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  materialDescricao: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.muted,
+    lineHeight: 17,
+  },
+  materialMeta: {
+    marginTop: 6,
+    fontSize: 11,
+    color: colors.muted,
+    fontWeight: '600',
+  },
+  materialImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    marginTop: 10,
+    backgroundColor: colors.border,
+  },
+  materialBotao: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  materialBotaoTexto: {
+    color: colors.surface,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ── PDF ──
+  pdfWrap: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  pdfBotao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  pdfBotaoTexto: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pdfHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: colors.muted,
+    textAlign: 'center',
+  },
+  pdfErro: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#DC2626',
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });

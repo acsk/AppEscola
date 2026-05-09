@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Image,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmModal from '../../../components/ConfirmModal';
@@ -51,6 +53,26 @@ function ItemQuestao({
     opcaoSelecionada?.triggers_text_input ||
     (questao.allow_text_answer && resposta.optionId !== undefined);
 
+  const { width } = useWindowDimensions();
+  // largura disponível dentro do card (descontando paddings horizontais de 16)
+  const imagemLargura = Math.max(0, Math.min(width, 720) - 64);
+  const [imagemAltura, setImagemAltura] = useState<number>(220);
+  const [imagemErro, setImagemErro] = useState(false);
+
+  useEffect(() => {
+    if (!questao.image_url) return;
+    setImagemErro(false);
+    Image.getSize(
+      questao.image_url,
+      (w, h) => {
+        if (w > 0 && imagemLargura > 0) {
+          setImagemAltura((imagemLargura * h) / w);
+        }
+      },
+      () => setImagemErro(true),
+    );
+  }, [questao.image_url, imagemLargura]);
+
   return (
     <View style={qStyles.container}>
       <View style={qStyles.header}>
@@ -75,6 +97,16 @@ function ItemQuestao({
       </View>
 
       <Text style={qStyles.enunciado}>{questao.question_text}</Text>
+
+      {questao.image_url && !imagemErro ? (
+        <Image
+          source={{ uri: questao.image_url }}
+          style={[qStyles.imagem, { height: imagemAltura }]}
+          resizeMode="contain"
+          accessibilityLabel="Imagem da questão"
+          onError={() => setImagemErro(true)}
+        />
+      ) : null}
 
       {questao.type === 'multiple_choice' && questao.options.map((op) => {
         const selecionada = resposta.optionId === op.id;
@@ -144,6 +176,12 @@ const qStyles = StyleSheet.create({
   pontos:       { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
   pontosTexto:  { fontSize: 12, color: colors.muted, fontWeight: '500' },
   enunciado:    { fontSize: 15, color: colors.ink, lineHeight: 22, marginBottom: 14 },
+  imagem: {
+    width: '100%',
+    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: '#F1F5F9',
+  },
   opcao: {
     flexDirection: 'row', alignItems: 'flex-start', padding: 12,
     borderRadius: 10, borderWidth: 1, borderColor: colors.border,

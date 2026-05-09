@@ -51,7 +51,8 @@ class StudentExamController extends Controller
         $today = now()->toDateString();
 
         $courseIds = DB::table('enrollments')
-            ->join('course_plans', 'enrollments.course_plan_id', '=', 'course_plans.id')
+            ->leftJoin('course_plans', 'enrollments.course_plan_id', '=', 'course_plans.id')
+            ->leftJoin('school_classes', 'enrollments.school_class_id', '=', 'school_classes.id')
             ->where('enrollments.student_id', $student->id)
             ->where('enrollments.status', 'active')
             ->where('enrollments.start_date', '<=', $today)
@@ -60,7 +61,9 @@ class StudentExamController extends Controller
                   ->orWhere('enrollments.end_date', '>=', $today);
             })
             ->whereNull('enrollments.deleted_at')
-            ->pluck('course_plans.course_id')
+            ->selectRaw('COALESCE(course_plans.course_id, school_classes.course_id) as course_id')
+            ->whereNotNull(DB::raw('COALESCE(course_plans.course_id, school_classes.course_id)'))
+            ->pluck('course_id')
             ->unique()
             ->values();
 
@@ -82,15 +85,35 @@ class StudentExamController extends Controller
             ->get(['exam_id', 'attempt_status_id'])
             ->keyBy('exam_id');
 
-        $result = $exams->map(function (Exam $exam) use ($attemptStatuses) {
+        $statusPriority = [
+            'in_progress'     => 0,
+            'not_started'     => 1,
+            'pending_review'  => 2,
+            'awaiting_release'=> 3,
+            'completed'       => 4,
+        ];
+
+        $result = $exams->map(function (Exam $exam) use ($attemptStatuses, $statusPriority) {
             $resource = (new ExamResource($exam))->resolve(request());
             $attempt  = $attemptStatuses->get($exam->id);
 
-            $resource['attempt_status'] = $attempt?->status ?? 'not_started';
-            $resource['can_start']      = $this->canStart($exam);
+            $resource['attempt_status']   = $attempt?->status ?? 'not_started';
+            $resource['can_start']        = $this->canStart($exam);
+            $resource['_sort_can_start']  = $resource['can_start'] ? 1 : 0;
+            $resource['_sort_status_rank'] = $statusPriority[$resource['attempt_status']] ?? 99;
 
             return $resource;
-        });
+        })
+            ->sortBy([
+                ['_sort_can_start', 'desc'],
+                ['_sort_status_rank', 'asc'],
+                ['starts_at', 'asc'],
+            ])
+            ->values()
+            ->map(function (array $item) {
+                unset($item['_sort_can_start'], $item['_sort_status_rank']);
+                return $item;
+            });
 
         return $this->success($result, 'Simulados disponíveis.');
     }
@@ -127,9 +150,13 @@ class StudentExamController extends Controller
         $today = now()->toDateString();
 
         $hasEnrollment = DB::table('enrollments')
-            ->join('course_plans', 'enrollments.course_plan_id', '=', 'course_plans.id')
+            ->leftJoin('course_plans', 'enrollments.course_plan_id', '=', 'course_plans.id')
+            ->leftJoin('school_classes', 'enrollments.school_class_id', '=', 'school_classes.id')
             ->where('enrollments.student_id', $student->id)
-            ->where('course_plans.course_id', $exam->course_id)
+            ->where(function ($q) use ($exam) {
+                $q->where('course_plans.course_id', $exam->course_id)
+                  ->orWhere('school_classes.course_id', $exam->course_id);
+            })
             ->where('enrollments.status', 'active')
             ->where('enrollments.start_date', '<=', $today)
             ->where(function ($q) use ($today) {
@@ -163,8 +190,20 @@ class StudentExamController extends Controller
 
         // Injetar student_answer em cada questão
         if (! empty($resource['questions'])) {
-            $resource['questions'] = collect($resource['questions'])->map(function ($q) use ($answers) {
+            $resource['questions'] = collect($resource['questions'])->map(function ($q) use ($answers, $request) {
+                if ($q instanceof \Illuminate\Http\Resources\Json\JsonResource) {
+                    $q = $q->resolve($request);
+                } elseif (! is_array($q)) {
+                    $q = (array) $q;
+                }
+
                 $answer = $answers->get($q['id']);
+
+                // Garante URL pública absoluta quando a imagem vier como path relativo.
+                if (array_key_exists('image_url', $q)) {
+                    $q['image_url'] = $this->normalizePublicMediaUrl($q['image_url']);
+                }
+
                 $q['student_answer'] = $answer
                     ? ['option_id' => $answer->option_id, 'text_answer' => $answer->text_answer]
                     : null;
@@ -173,6 +212,27 @@ class StudentExamController extends Controller
         }
 
         return $this->success($resource);
+    }
+
+    private function normalizePublicMediaUrl(?string $url): ?string
+    {
+        if ($url === null || trim($url) === '') {
+            return null;
+        }
+
+        $value = trim($url);
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
+        }
+
+        $normalized = ltrim($value, '/');
+
+        if (str_starts_with($normalized, 'storage/')) {
+            return asset($normalized);
+        }
+
+        return asset('storage/' . $normalized);
     }
 
     /**
