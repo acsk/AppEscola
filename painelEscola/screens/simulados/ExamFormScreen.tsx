@@ -17,6 +17,7 @@ import SearchableSelect, { SearchableOption } from "../../components/ui/Searchab
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import ToastBanner from "../../components/ui/ToastBanner";
 import { useExamStatuses, useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import DateTimePickerInput from "../../components/ui/DateTimePickerInput";
 import { displayToISO, isoToDisplay, displayDateTimeToISO, isoToDisplayDateTime } from "../../utils/masks";
@@ -219,6 +220,19 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
+
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   // ── Loaders ─────────────────────────────────────────────────────────────────
 
@@ -320,19 +334,35 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
       };
 
       if (isEdit) {
-        await api.put(`/exams/${examId}`, payload);
+        const { data } = await api.put(`/exams/${examId}`, payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Simulado atualizado com sucesso.",
+        });
       } else {
         const { data } = await api.post("/exams", payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Simulado criado com sucesso.",
+        });
         navigate("simulados-form", { examId: (data.body ?? data).id });
         return;
       }
       setErrors({});
     } catch (err: any) {
-      const apiErrs = parseApiErrors(err);
+      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
       setErrors(apiErrs);
+      setToast({
+        visible: true,
+        type: "error",
+        message: err?.response?.data?.message || "Não foi possível salvar o simulado.",
+      });
       scrollRef.current?.scrollTo({ y: 0, animated: true });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   // ── Question Modal ────────────────────────────────────────────────────────────
@@ -390,7 +420,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         setQErrors((prev) => ({ ...prev, image_url: "" }));
       }
     } catch (err: any) {
-      const apiErrs = parseApiErrors(err);
+      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
       setQErrors((prev) => ({
         ...prev,
         image_url:
@@ -399,8 +429,14 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
           apiErrs.file ||
           "Não foi possível enviar a imagem.",
       }));
+      setToast({
+        visible: true,
+        type: "error",
+        message: err?.response?.data?.message || "Não foi possível enviar a imagem.",
+      });
+    } finally {
+      setUploadingQuestionImage(false);
     }
-    setUploadingQuestionImage(false);
   };
 
   const setOptionField = (idx: number, k: keyof OptionForm, v: any) => {
@@ -479,17 +515,33 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
       }
 
       if (editQuestionId) {
-        await api.put(`/exams/${examId}/questions/${editQuestionId}`, payload);
+        const { data } = await api.put(`/exams/${examId}/questions/${editQuestionId}`, payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Questão atualizada com sucesso.",
+        });
       } else {
-        await api.post(`/exams/${examId}/questions`, payload);
+        const { data } = await api.post(`/exams/${examId}/questions`, payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Questão adicionada com sucesso.",
+        });
       }
       setQuestionModal(false);
       fetchQuestions();
     } catch (err: any) {
-      const apiErrs = parseApiErrors(err);
+      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
       setQErrors(apiErrs);
+      setToast({
+        visible: true,
+        type: "error",
+        message: err?.response?.data?.message || "Não foi possível salvar a questão.",
+      });
+    } finally {
+      setSavingQuestion(false);
     }
-    setSavingQuestion(false);
   };
 
   const deleteQuestion = async () => {
@@ -1342,6 +1394,13 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         loading={deletingQuestion}
         onConfirm={deleteQuestion}
         onCancel={() => setDeleteQuestionId(null)}
+      />
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
       />
     </ScrollView>
   );

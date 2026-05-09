@@ -14,7 +14,7 @@ class UpdateExamQuestionRequest extends FormRequest
         return [
             'subject_id'    => ['sometimes', 'nullable', 'exists:subjects,id'],
             'type'          => ['sometimes', 'in:multiple_choice,essay'],
-            'question_text' => ['sometimes', 'string'],
+            'question_text' => ['sometimes', 'nullable', 'string'],
             'image_url'     => ['sometimes', 'nullable', 'url', 'max:500'],
             'video_url'     => ['sometimes', 'nullable', 'url', 'max:500'],
             'points'        => ['sometimes', 'numeric', 'min:0.01'],
