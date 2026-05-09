@@ -1,15 +1,18 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
+import ToastBanner from "../../components/ui/ToastBanner";
 import { parseApiErrors } from "../../utils/apiErrors";
 import {
   maskPhone,
@@ -21,6 +24,7 @@ import {
 } from "../../utils/masks";
 import { fetchAddressByCEP } from "../../utils/cep";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import { prepareImageForUpload } from "../../utils/imageCompression";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -82,9 +86,23 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [isLookingUpCEP, setIsLookingUpCEP] = useState(false);
   const [cepLookupMessage, setCepLookupMessage] = useState("");
+  const [tenantPhotoUrl, setTenantPhotoUrl] = useState<string | null>(null);
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [pendingLogoPreview, setPendingLogoPreview] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
+  const logoInputRef = useRef<any>(null);
 
   useEffect(() => {
     if (!isEdit || !tenantId) return;
@@ -116,6 +134,7 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
           status: t.status ?? "active",
           timezone: t.settings?.timezone ?? "America/Sao_Paulo",
         }));
+        setTenantPhotoUrl(t.photo_url ?? null);
       } catch (e: any) {
         if (e.response?.status === 403) setForbidden(true);
       }
@@ -126,6 +145,63 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   }, [isEdit, tenantId]);
 
   const title = useMemo(() => (isEdit ? "Editar Tenant" : "Novo Tenant"), [isEdit]);
+
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
+
+  const uploadTenantLogo = useCallback(async (targetTenantId: number, file: File) => {
+    setUploadingLogo(true);
+    try {
+      const compressed = await prepareImageForUpload(file, 100);
+      const formData = new FormData();
+      formData.append("photo", compressed);
+      const { data } = await api.post(`/tenants/${targetTenantId}/upload-photo`, formData);
+      const body = data?.body ?? data?.data ?? data;
+      setTenantPhotoUrl(body?.photo_url ?? null);
+      setPendingLogoFile(null);
+      setPendingLogoPreview(null);
+      setToast({
+        visible: true,
+        type: "success",
+        message: data?.message || "Logo enviada com sucesso.",
+      });
+      return true;
+    } catch (e: any) {
+      const apiErrs = parseApiErrors(e?.response?.data?.errors ?? {});
+      setErrors((prev) => ({ ...prev, photo: apiErrs.photo || prev.photo }));
+      setToast({
+        visible: true,
+        type: "error",
+        message: e?.response?.data?.message || apiErrs.photo || "Não foi possível enviar a logo.",
+      });
+      return false;
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  }, []);
+
+  const handleLogoSelect = useCallback(
+    async (e: any) => {
+      const file: File | undefined = e?.target?.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const result = ev.target?.result as string;
+        setPendingLogoPreview(result);
+      };
+      reader.readAsDataURL(file);
+
+      if (isEdit && tenantId) {
+        await uploadTenantLogo(tenantId, file);
+      } else {
+        setPendingLogoFile(file);
+      }
+    },
+    [isEdit, tenantId, uploadTenantLogo]
+  );
 
   const buildTenantPayload = () => {
     const payload: Record<string, any> = {
@@ -176,6 +252,9 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
       if (isEdit && tenantId) {
         const payload = buildTenantPayload();
         await api.put(`/tenants/${tenantId}`, payload);
+        if (pendingLogoFile) {
+          await uploadTenantLogo(tenantId, pendingLogoFile);
+        }
         navigate("tenants");
       } else {
         const payload = {
@@ -186,7 +265,14 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
           admin_password_confirmation: form.admin_password_confirmation,
         };
 
-        await api.post("/tenants", payload);
+        const { data } = await api.post("/tenants", payload);
+        const created = data?.data ?? data?.body ?? data;
+        const createdId = Number(created?.id);
+
+        if (createdId && pendingLogoFile) {
+          await uploadTenantLogo(createdId, pendingLogoFile);
+        }
+
         navigate("tenants", {
           success:
             "Tenant criado com sucesso. O admin inicial foi criado com obrigatoriedade de troca de senha no primeiro acesso.",
@@ -273,6 +359,96 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
             <View className="flex-row items-center gap-2 mb-3">
               <Ionicons name="business-outline" size={16} color="#7C3AED" />
               <Text className="text-sm font-bold text-gray-800">Dados do tenant</Text>
+            </View>
+
+            <View className="flex-row items-start gap-5 mb-4">
+              <View className="items-center gap-2">
+                <View
+                  className="rounded-2xl overflow-hidden border-2 border-violet-100"
+                  style={{ width: 112, height: 112, backgroundColor: "#F5F3FF" }}
+                >
+                  {pendingLogoPreview || tenantPhotoUrl ? (
+                    <Image
+                      source={{ uri: (pendingLogoPreview ?? tenantPhotoUrl)! }}
+                      style={{ width: 112, height: 112 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View className="flex-1 items-center justify-center">
+                      <Ionicons name="school-outline" size={42} color="#C4B5FD" />
+                    </View>
+                  )}
+                  {uploadingLogo && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        backgroundColor: "rgba(0,0,0,0.45)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ActivityIndicator color="white" size="small" />
+                    </View>
+                  )}
+                </View>
+
+                {Platform.OS === "web" ? (
+                  <label
+                    style={{
+                      cursor: uploadingLogo ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      border: "1px solid #DDD6FE",
+                      borderRadius: 8,
+                      padding: "4px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#7C3AED",
+                      opacity: uploadingLogo ? 0.5 : 1,
+                    }}
+                  >
+                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
+                    <span style={{ marginLeft: 2 }}>
+                      {tenantPhotoUrl || pendingLogoPreview ? "Alterar logo" : "Adicionar logo"}
+                    </span>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: "none" }}
+                      disabled={uploadingLogo}
+                      onChange={handleLogoSelect}
+                    />
+                  </label>
+                ) : (
+                  <TouchableOpacity
+                    disabled
+                    className="flex-row items-center gap-1 border border-violet-200 rounded-lg px-2.5 py-1"
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
+                    <Text className="text-xs font-semibold text-violet-700">Adicionar logo</Text>
+                  </TouchableOpacity>
+                )}
+
+                {pendingLogoPreview && !isEdit && (
+                  <Text className="text-xs text-amber-600 text-center" style={{ maxWidth: 112 }}>
+                    A logo será enviada ao criar
+                  </Text>
+                )}
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text className="text-xs text-gray-400 leading-relaxed">
+                  Logo da escola (opcional).{"\n"}
+                  Formatos: JPG, PNG, WEBP. Tamanho máximo: 5 MB.
+                </Text>
+                {errors.photo ? (
+                  <Text className="text-xs text-red-500 mt-2">{errors.photo}</Text>
+                ) : null}
+              </View>
             </View>
 
             <FormInput
@@ -543,6 +719,13 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
           </View>
         </>
       )}
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+      />
     </ScrollView>
   );
 }
