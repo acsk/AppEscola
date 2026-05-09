@@ -67,7 +67,7 @@ class ExamAttempt extends Model
 
     public function isResultReleasePending(): bool
     {
-        if (! in_array($this->status, ['completed', 'awaiting_release'], true)) {
+        if ($this->status !== 'awaiting_release') {
             return false;
         }
 

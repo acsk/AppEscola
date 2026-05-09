@@ -5,6 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
@@ -27,6 +29,7 @@ import {
   domainToOptions,
 } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import { prepareImageForUpload } from "../../utils/imageCompression";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -151,6 +154,12 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [enrollmentNumber, setEnrollmentNumber] = useState<string | null>(null);
+
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
+  const photoInputRef = useRef<any>(null);
 
   const [form, setForm] = useState<Form>(EMPTY);
   const [guardians, setGuardians] = useState<GuardianForm[]>([]);
@@ -353,10 +362,59 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
           status: student.status ?? "active",
         });
         setGuardians(mapApiGuardiansToForm(student.guardians ?? []));
+        setPhotoUrl(student.photo_url ?? null);
       } catch {}
       setLoading(false);
     })();
   }, [studentId, fetchGuardianOptions, isEdit, mapApiGuardiansToForm]);
+
+  const handlePhotoSelect = useCallback(
+    async (e: any) => {
+      const file: File | undefined = e?.target?.files?.[0];
+      if (!file) return;
+
+      // Mostrar preview imediato
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const result = ev.target?.result as string;
+        setPendingPhotoPreview(result);
+      };
+      reader.readAsDataURL(file);
+
+      if (!isEdit || !studentId) {
+        // Modo criação: guarda arquivo para upload após salvar
+        setPendingPhotoFile(file);
+        return;
+      }
+
+      // Modo edição: upload imediato
+      setPhotoUploading(true);
+      try {
+        const compressed = await prepareImageForUpload(file, 100);
+        const formData = new FormData();
+        formData.append("photo", compressed);
+        const { data } = await api.post(
+          `/students/${studentId}/upload-photo`,
+          formData
+        );
+        const body = data?.body ?? data?.data ?? data;
+        setPhotoUrl(body?.photo_url ?? null);
+        setPendingPhotoPreview(null);
+        setPendingPhotoFile(null);
+        setToast({ visible: true, type: "success", message: "Foto atualizada com sucesso." });
+      } catch (err: any) {
+        setToast({
+          visible: true,
+          type: "error",
+          message: err?.response?.data?.message ?? "Não foi possível enviar a foto.",
+        });
+      } finally {
+        setPhotoUploading(false);
+        if (photoInputRef.current) photoInputRef.current.value = "";
+      }
+    },
+    [isEdit, studentId]
+  );
 
   const updateGuardian = (idx: number, partial: Partial<GuardianForm>) => {
     setGuardians((prev) =>
@@ -503,6 +561,21 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         if (createdId) {
           await syncStudentGuardians(createdId);
           await fetchGuardianOptions();
+          if (pendingPhotoFile) {
+            try {
+              const compressed = await prepareImageForUpload(pendingPhotoFile, 100);
+              const formData = new FormData();
+              formData.append("photo", compressed);
+              const { data: photoData } = await api.post(
+                `/students/${createdId}/upload-photo`,
+                formData
+              );
+              const photoBody = photoData?.body ?? photoData?.data ?? photoData;
+              setPhotoUrl(photoBody?.photo_url ?? null);
+            } catch {}
+            setPendingPhotoFile(null);
+            setPendingPhotoPreview(null);
+          }
         }
         setToast({
           visible: true,
@@ -600,17 +673,106 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
               </Text>
             </View>
 
-            {enrollmentNumber && (
-              <View className="flex-row items-center gap-3 bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 mb-4">
-                <Ionicons name="id-card-outline" size={18} color="#7C3AED" />
-                <View>
-                  <Text className="text-xs text-violet-500 font-medium">Número de Matrícula (login)</Text>
-                  <Text className="text-base font-bold text-violet-700 font-mono tracking-widest">
-                    {enrollmentNumber}
-                  </Text>
+            {/* Foto do aluno */}
+            <View className="flex-row items-start gap-5 mb-5">
+              <View className="items-center gap-2">
+                <View
+                  className="rounded-2xl overflow-hidden border-2 border-violet-100"
+                  style={{ width: 128, height: 128, backgroundColor: "#F5F3FF" }}
+                >
+                  {pendingPhotoPreview || photoUrl ? (
+                    <Image
+                      source={{ uri: (pendingPhotoPreview ?? photoUrl)! }}
+                      style={{ width: 128, height: 128 }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View className="flex-1 items-center justify-center">
+                      <Ionicons name="person" size={52} color="#C4B5FD" />
+                    </View>
+                  )}
+                  {photoUploading && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        backgroundColor: "rgba(0,0,0,0.45)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ActivityIndicator color="white" size="small" />
+                    </View>
+                  )}
                 </View>
+
+                {Platform.OS === "web" ? (
+                  <label
+                    style={{
+                      cursor: photoUploading ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      background: "transparent",
+                      border: "1px solid #DDD6FE",
+                      borderRadius: 8,
+                      padding: "4px 10px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#7C3AED",
+                      opacity: photoUploading ? 0.5 : 1,
+                    }}
+                  >
+                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
+                    <span style={{ marginLeft: 2 }}>
+                      {photoUrl || pendingPhotoPreview ? "Alterar" : "Adicionar foto"}
+                    </span>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: "none" }}
+                      disabled={photoUploading}
+                      onChange={handlePhotoSelect}
+                    />
+                  </label>
+                ) : (
+                  <TouchableOpacity
+                    disabled={photoUploading}
+                    className="flex-row items-center gap-1 border border-violet-200 rounded-lg px-2.5 py-1"
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
+                    <Text className="text-xs font-semibold text-violet-700">
+                      {photoUrl || pendingPhotoPreview ? "Alterar" : "Adicionar foto"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {pendingPhotoPreview && !isEdit && (
+                  <Text className="text-xs text-amber-600 text-center" style={{ maxWidth: 128 }}>
+                    Será enviada ao salvar
+                  </Text>
+                )}
               </View>
-            )}
+
+              <View className="flex-1">
+                {enrollmentNumber && (
+                  <View className="flex-row items-center gap-3 bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 mb-3">
+                    <Ionicons name="id-card-outline" size={18} color="#7C3AED" />
+                    <View>
+                      <Text className="text-xs text-violet-500 font-medium">Número de Matrícula (login)</Text>
+                      <Text className="text-base font-bold text-violet-700 font-mono tracking-widest">
+                        {enrollmentNumber}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                <Text className="text-xs text-gray-400 leading-relaxed">
+                  Formatos aceitos: JPG, PNG, WEBP.{"\n"}Tamanho máximo: 5 MB (será comprimida automaticamente).
+                </Text>
+              </View>
+            </View>
 
             <FormInput
               label="Nome completo"

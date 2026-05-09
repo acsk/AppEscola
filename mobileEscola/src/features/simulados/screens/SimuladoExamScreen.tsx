@@ -210,8 +210,13 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
     navigation.setOptions({
       headerLeft: () => (
-        <TouchableOpacity onPress={handleVoltar} style={{ paddingRight: 8 }}>
-          <Ionicons name="chevron-back" size={24} color={colors.surface} />
+        <TouchableOpacity
+          onPress={handleVoltar}
+          style={styles.headerBackButton}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.surface} />
         </TouchableOpacity>
       ),
     });
@@ -568,6 +573,11 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  headerBackButton: {
+    marginLeft: -6,
+    paddingRight: 12,
+    paddingVertical: 8,
+  },
   container: { flex: 1, backgroundColor: colors.background },
   content:   { padding: 16 },
 

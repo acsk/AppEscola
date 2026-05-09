@@ -26,6 +26,8 @@ class UserResource extends JsonResource
             'role' => $this->role,
             'status' => $this->status,
             'password_change_required' => (bool) $this->password_change_required,
+            'student_id' => $this->role === 'aluno' ? optional($this->student)->id : null,
+            'photo_url' => $this->role === 'aluno' ? optional($this->student)->photo_url : null,
             'subject_ids' => $this->whenLoaded('subjects', fn () => $this->subjects->pluck('id')->values()),
             'subjects' => $subjects,
             'email_verified_at' => $this->email_verified_at?->toISOString(),

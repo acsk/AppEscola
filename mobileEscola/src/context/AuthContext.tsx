@@ -17,6 +17,7 @@ interface AuthContextData {
   signIn: (login: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearPasswordChangeFlag: () => void;
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -112,9 +113,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRequirePasswordChange(false);
   }
 
+  async function refreshUserProfile() {
+    const me = await getMeApi();
+    await Promise.all([
+      storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(me)),
+      storage.setItem(STORAGE_KEYS.ROLE, me.role),
+    ]);
+    setUser(me);
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, requirePasswordChange, signIn, signOut, clearPasswordChangeFlag }}
+      value={{
+        user,
+        isLoading,
+        requirePasswordChange,
+        signIn,
+        signOut,
+        clearPasswordChangeFlag,
+        refreshUserProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>

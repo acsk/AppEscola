@@ -17,7 +17,14 @@ const Stack = createNativeStackNavigator<SimuladosStackParamList>();
 
 export function SimuladosNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        animation: 'slide_from_right',
+        animationTypeForReplace: 'push',
+        gestureDirection: 'horizontal',
+        fullScreenGestureEnabled: true,
+      }}
+    >
       <Stack.Screen
         name="SimuladosList"
         component={SimuladosScreen}

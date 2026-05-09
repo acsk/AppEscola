@@ -5,6 +5,7 @@ export type UserRole = 'admin' | 'super_admin' | 'professor' | 'aluno';
 export interface AuthUser {
   id: number;
   student_id: number | null;
+  photo_url: string | null;
   tenant_id: number;
   name: string;
   email: string | null;

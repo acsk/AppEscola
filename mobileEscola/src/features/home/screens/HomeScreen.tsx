@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,17 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
+import { compressImageToMaxSize } from '../../../services/image-compression.service';
 import { listarSimulados, SimuladoListItem, AttemptStatus, subjectIconName } from '../../../services/simulados.service';
+import { uploadStudentPhoto } from '../../../services/student-photo.service';
 import { colors } from '../../../theme';
 
 function getInitials(name: string): string {
@@ -75,14 +80,6 @@ const SIM_STATUS_LABEL: Record<AttemptStatus, string> = {
   awaiting_release: 'Aguardando liberação',
 };
 
-const CONQUISTAS = [
-  { id: 1, icon: 'rocket-outline',       bg: colors.primary,   label: 'Primeiro\nSimulado',  date: '10/01/2024', locked: false },
-  { id: 2, icon: 'calculator-outline',   bg: '#4338CA', label: 'Nota\nPerfeita',      date: '25/01/2024', locked: false },
-  { id: 3, icon: 'trophy-outline',       bg: '#6366F1', label: 'Foco no\nObjetivo',   date: '05/02/2024', locked: false },
-  { id: 4, icon: 'star-outline',         bg: colors.text, label: 'Dedicação\nTotal',    date: '20/02/2024', locked: false },
-  { id: 5, icon: 'lock-closed-outline',  bg: '#94A3B8', label: 'Em breve',            date: '',           locked: true  },
-];
-
 function diffCalendarDays(from: Date, to: Date): number {
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
@@ -111,7 +108,7 @@ function getSimuladoDayCounter(simulado: SimuladoListItem): string | null {
 }
 
 export function HomeScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUserProfile } = useAuth();
   const navigation = useNavigation<any>();
 
   const [simuladosRecentes, setSimuladosRecentes] = useState<SimuladoListItem[]>([]);
@@ -172,6 +169,14 @@ export function HomeScreen() {
   const [sucesso, setSucesso]                   = useState(false);
   const [confirmandoSaida, setConfirmandoSaida] = useState(false);
   const [saindo, setSaindo]                     = useState(false);
+  const [avatarUploading, setAvatarUploading]   = useState(false);
+  const [avatarFeedback, setAvatarFeedback]     = useState<string | null>(null);
+  const [avatarOverrideUrl, setAvatarOverrideUrl] = useState<string | null>(null);
+  const photoInputRef = useRef<any>(null);
+
+  useEffect(() => {
+    setAvatarFeedback(null);
+  }, [user?.id]);
 
   function limparErro(campo: string) {
     setCampoErros((prev) => { const next = { ...prev }; delete next[campo]; return next; });
@@ -209,9 +214,136 @@ export function HomeScreen() {
 
   async function handleSair() { setSaindo(true); await signOut(); }
 
+  async function processarUploadFoto(uri: string, fileName: string, mimeType: string) {
+    console.log('[Foto] processarUploadFoto', { uri, fileName, mimeType, student_id: user?.student_id });
+    if (!user?.student_id) {
+      console.warn('[Foto] sem student_id, abortando');
+      return;
+    }
+
+    setAvatarUploading(true);
+    setAvatarFeedback('Comprimindo imagem...');
+
+    try {
+      console.log('[Foto] iniciando compressão');
+      const compressed = await compressImageToMaxSize(uri, { maxSizeKb: 50 });
+      console.log('[Foto] compressão ok', compressed);
+
+      setAvatarFeedback('Enviando foto...');
+
+      console.log('[Foto] iniciando upload');
+      const response = await uploadStudentPhoto({
+        studentId: user.student_id,
+        uri: compressed.uri,
+        fileName: compressed.fileName || fileName,
+        mimeType: compressed.mimeType || mimeType,
+      });
+
+      const uploadedUrl = response.body?.photo_url;
+      if (uploadedUrl) {
+        setAvatarOverrideUrl(`${uploadedUrl}${uploadedUrl.includes('?') ? '&' : '?'}v=${Date.now()}`);
+      }
+
+      await refreshUserProfile();
+
+      const finalKb = compressed.sizeBytes ? Math.round(compressed.sizeBytes / 1024) : null;
+      setAvatarFeedback(finalKb ? `Foto atualizada (${finalKb}kb).` : 'Foto atualizada com sucesso.');
+    } catch (error: any) {
+      console.error('[Upload foto]', error?.message, error?.response?.status, error?.response?.data);
+      const apiMessage =
+        error?.response?.data?.errors
+          ? Object.values(error.response.data.errors as Record<string, string[]>).flat().join(' ')
+          : error?.response?.data?.message ?? error?.message;
+      const errorDetail = error?.response?.status ? ` (HTTP ${error.response.status})` : '';
+      const displayMessage = apiMessage
+        ? `${apiMessage}${errorDetail}`
+        : `Não foi possível enviar sua foto agora.${errorDetail}`;
+      setAvatarFeedback(displayMessage);
+      Alert.alert('Falha no upload', displayMessage);
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  function handleSelecionarFoto() {
+    console.log('[Foto] handleSelecionarFoto disparado', {
+      role: user?.role,
+      student_id: user?.student_id,
+      platform: Platform.OS,
+      hasRef: !!photoInputRef.current,
+      refTag: (photoInputRef.current as any)?.tagName,
+    });
+    console.log('[Foto] user completo:', JSON.stringify(user, null, 2));
+
+    if (user?.role !== 'aluno' || !user?.student_id) {
+      Alert.alert('Ação indisponível', 'Somente alunos podem alterar a foto do perfil.');
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      const inputEl = photoInputRef.current as HTMLInputElement | null;
+      console.log('[Foto] tentando abrir input file no web', inputEl);
+      if (!inputEl) {
+        console.warn('[Foto] photoInputRef está nulo!');
+        return;
+      }
+      try {
+        inputEl.click();
+        console.log('[Foto] inputEl.click() executado');
+      } catch (e) {
+        console.error('[Foto] erro ao chamar click()', e);
+      }
+      return;
+    }
+
+    (async () => {
+      try {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permissão necessária', 'Permita acesso à galeria para enviar sua foto.');
+          return;
+        }
+
+        const picked = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        });
+
+        if (picked.canceled || !picked.assets?.length) return;
+
+        const asset = picked.assets[0];
+        await processarUploadFoto(
+          asset.uri,
+          asset.fileName ?? `student-${user.student_id}.jpg`,
+          asset.mimeType ?? 'image/jpeg'
+        );
+      } catch (err) {
+        console.error('[Picker]', err);
+      }
+    })();
+  }
+
+  function handleWebFileChange(event: any) {
+    console.log('[Foto] handleWebFileChange disparado', event?.target?.files);
+    const file: File | undefined = event?.target?.files?.[0];
+    if (!file) {
+      console.warn('[Foto] nenhum arquivo selecionado');
+      return;
+    }
+    console.log('[Foto] arquivo escolhido', { name: file.name, type: file.type, size: file.size });
+
+    const objectUrl = URL.createObjectURL(file);
+    console.log('[Foto] objectUrl criado', objectUrl);
+    processarUploadFoto(objectUrl, file.name, file.type || 'image/jpeg').finally(() => {
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    });
+  }
+
   const initials  = getInitials(user?.name ?? 'U');
   const roleLabel = ROLE_LABELS[user?.role ?? ''] ?? user?.role ?? '-';
-  const avatarUrl = (user as any)?.avatar_url ?? (user as any)?.avatar ?? (user as any)?.photo_url;
+  const avatarUrl = avatarOverrideUrl ?? (user as any)?.photo_url ?? (user as any)?.avatar_url ?? (user as any)?.avatar;
 
   const totalExams = dashboard?.total_exams ?? 0;
   const avgAccuracy = dashboard?.avg_accuracy ?? 0;
@@ -220,13 +352,11 @@ export function HomeScreen() {
   const summaryCorrect = dashboard?.summary?.correct ?? 0;
   const summaryWrong = dashboard?.summary?.wrong ?? 0;
   const summaryAccuracyChange = dashboard?.summary?.accuracy_change ?? 0;
-  const unlockedConquistas = CONQUISTAS.filter((c) => !c.locked).length;
 
   const stats = [
     { icon: 'book-outline', value: String(totalExams), label: 'Simulados\nrealizados' },
     { icon: 'trending-up-outline', value: formatPct(avgAccuracy, 1), label: 'Precisão\nmédia' },
     { icon: 'flame-outline', value: String(currentStreakDays), label: 'Dias de\nstreak' },
-    { icon: 'ribbon-outline', value: String(unlockedConquistas), label: 'Conquistas' },
   ];
 
   const totalRespostas = Math.max(1, summaryCorrect + summaryWrong);
@@ -244,7 +374,12 @@ export function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerProfileRow}>
           <View style={styles.studentBlock}>
-            <View style={styles.avatarWrap}>
+            <TouchableOpacity
+              style={styles.avatarWrap}
+              onPress={handleSelecionarFoto}
+              activeOpacity={0.85}
+              disabled={avatarUploading}
+            >
               <View style={styles.avatarCircle}>
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
@@ -253,16 +388,31 @@ export function HomeScreen() {
                 )}
               </View>
               <View style={styles.avatarEditBtn}>
-                <Ionicons name="pencil" size={12} color={colors.ink} />
+                {avatarUploading ? (
+                  <ActivityIndicator size="small" color={colors.ink} />
+                ) : (
+                  <Ionicons name="pencil" size={12} color={colors.ink} />
+                )}
               </View>
-            </View>
+              {Platform.OS === 'web' ? (
+                // @ts-ignore - input HTML válido apenas no react-native-web
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleWebFileChange}
+                />
+              ) : null}
+            </TouchableOpacity>
             <View style={styles.userInfo}>
               <Text style={styles.userName} numberOfLines={2}>{user?.name ?? 'Usuário'}</Text>
               <Text style={styles.userRole}>{roleLabel}</Text>
-              <View style={styles.levelBadge}>
-                <Ionicons name="star" size={11} color={colors.primary} />
-                <Text style={styles.levelText} numberOfLines={1}>Nível 7 – Destaque da Turma</Text>
-              </View>
+              {avatarFeedback ? <Text style={styles.avatarFeedback}>{avatarFeedback}</Text> : null}
+                {/* <View style={styles.levelBadge}>
+                  <Ionicons name="star" size={11} color={colors.primary} />
+                  <Text style={styles.levelText} numberOfLines={1}>Nível 7 – Destaque da Turma</Text>
+                </View> */}
             </View>
           </View>
 
@@ -523,41 +673,7 @@ export function HomeScreen() {
         </>
       )}
 
-      {/* ── Meta em andamento ─────────────────────────────────────────── */}
-      <TouchableOpacity style={styles.metaCard} activeOpacity={0.85}>
-        <View style={styles.metaIconWrap}>
-          <Ionicons name="trophy-outline" size={24} color={colors.ink} />
-        </View>
-        <View style={styles.metaInfo}>
-          <Text style={styles.metaSubtitulo}>Meta em andamento</Text>
-          <Text style={styles.metaTitulo}>Concluir {META_TARGET} simulados</Text>
-          <View style={styles.metaBar}>
-            <View style={[styles.metaBarFill, { width: `${metaPct}%` }]} />
-          </View>
-          <Text style={styles.metaNumeros}>{totalExams} / {META_TARGET}</Text>
-        </View>
-        <Text style={styles.metaPct}>{Math.round(metaPct)}%</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-      </TouchableOpacity>
-
-      {/* ── Minhas conquistas ─────────────────────────────────────────── */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Minhas conquistas</Text>
-        <TouchableOpacity><Text style={styles.sectionLink}>Ver todas</Text></TouchableOpacity>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
-        {CONQUISTAS.map((c) => (
-          <View key={c.id} style={styles.conquItem}>
-            <View style={[styles.conquBadge, { backgroundColor: c.bg }, c.locked && styles.conquLocked]}>
-              <Ionicons name={c.icon as any} size={26} color={colors.surface} />
-            </View>
-            <Text style={styles.conquLabel}>{c.label}</Text>
-            {c.date
-              ? <Text style={styles.conquDate}>{c.date}</Text>
-              : <Text style={styles.conquEmBreve}>Em breve</Text>}
-          </View>
-        ))}
-      </ScrollView>
+ 
 
       <View style={{ height: 24 }} />
     </ScrollView>
@@ -614,6 +730,7 @@ const styles = StyleSheet.create({
   userInfo:   { flex: 1, minWidth: 0 },
   userName:   { fontSize: 23, fontWeight: '800', color: colors.surface, marginBottom: 3 },
   userRole:   { fontSize: 14, color: '#CBD5E1', marginBottom: 10 },
+  avatarFeedback: { fontSize: 12, color: '#E2E8F0', marginBottom: 8 },
   levelBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     alignSelf: 'flex-start',
@@ -737,17 +854,6 @@ const styles = StyleSheet.create({
   metaBarFill:  { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
   metaNumeros:  { fontSize: 11, color: colors.muted },
   metaPct:      { fontSize: 14, fontWeight: '700', color: colors.primary },
-
-  // Conquistas
-  conquItem:  { alignItems: 'center', width: 80 },
-  conquBadge: {
-    width: 64, height: 64, borderRadius: 20,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
-  },
-  conquLocked: { opacity: 0.5 },
-  conquLabel:  { fontSize: 11, color: colors.text, textAlign: 'center', lineHeight: 14 },
-  conquDate:   { fontSize: 10, color: colors.muted, textAlign: 'center', marginTop: 2 },
-  conquEmBreve:{ fontSize: 10, color: colors.muted, fontWeight: '600', textAlign: 'center', marginTop: 2 },
 
   // Configurações / alterar senha
   acaoLinha:  { flexDirection: 'row', alignItems: 'center', gap: 12 },

@@ -2,31 +2,34 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ExamAttempt;
+use App\Jobs\ReleasePendingExamResultsJob;
 use Illuminate\Console\Command;
 
 class ReleaseExamResultsCommand extends Command
 {
-    protected $signature = 'exams:release-pending-results';
+    protected $signature = 'exams:release-pending-results
+                            {--exam_id= : Libera apenas tentativas do simulado informado}
+                            {--force : Libera mesmo antes de ends_at}
+                            {--queued : Enfileira o job ao inves de executar agora}';
 
     protected $description = 'Libera automaticamente resultados de simulados cujo período já foi encerrado';
 
     public function handle(): int
     {
-        $released = 0;
+        $examId = $this->option('exam_id');
+        $force = (bool) $this->option('force');
+        $queued = (bool) $this->option('queued');
+        $parsedExamId = is_numeric($examId) ? (int) $examId : null;
 
-        ExamAttempt::query()
-            ->with('exam:id,ends_at')
-            ->whereStatus('awaiting_release')
-            ->whereHas('exam', fn ($query) => $query
-                ->whereNotNull('ends_at')
-                ->where('ends_at', '<=', now()))
-            ->chunkById(100, function ($attempts) use (&$released) {
-                foreach ($attempts as $attempt) {
-                    $attempt->update(['status' => 'completed']);
-                    $released++;
-                }
-            });
+        if ($queued) {
+            dispatch(new ReleasePendingExamResultsJob($parsedExamId, $force));
+
+            $this->info('Job de liberação enfileirado com sucesso.');
+
+            return self::SUCCESS;
+        }
+
+        $released = (new ReleasePendingExamResultsJob($parsedExamId, $force))->handle();
 
         $this->info("{$released} resultado(s) liberado(s).");
 
