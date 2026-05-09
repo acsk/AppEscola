@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreExamQuestionRequest extends FormRequest
 {
@@ -13,7 +14,7 @@ class StoreExamQuestionRequest extends FormRequest
         return [
             'subject_id'    => ['nullable', 'exists:subjects,id'],
             'type'          => ['required', 'in:multiple_choice,essay'],
-            'question_text' => ['required', 'string'],
+            'question_text' => ['nullable', 'string'],
             'image_url'     => ['nullable', 'url', 'max:500'],
             'video_url'     => ['nullable', 'url', 'max:500'],
             'points'        => ['nullable', 'numeric', 'min:0.01'],
@@ -35,5 +36,17 @@ class StoreExamQuestionRequest extends FormRequest
         return [
             'options.required_if' => 'Questões objetivas devem ter pelo menos 2 opções de resposta.',
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $questionText = trim((string) $this->input('question_text', ''));
+            $imageUrl = trim((string) $this->input('image_url', ''));
+
+            if ($questionText === '' && $imageUrl === '') {
+                $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
+            }
+        });
     }
 }

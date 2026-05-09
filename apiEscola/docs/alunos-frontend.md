@@ -13,6 +13,7 @@
 | `POST` | `/api/students` | Criar aluno + responsáveis |
 | `GET` | `/api/students/{id}` | Exibir aluno |
 | `PUT` | `/api/students/{id}` | Atualizar aluno + responsáveis |
+| `POST` | `/api/students/{id}/upload-photo` | Upload da foto do aluno |
 | `DELETE` | `/api/students/{id}` | Remover aluno |
 
 ---
@@ -52,6 +53,7 @@ Content-Type: application/json
   "document": "123.456.789-00",
   "email": "joao@email.com",
   "phone": "(11) 99999-0000",
+  "photo_url": null,
   "is_minor": true,
   "status": "active",
   "guardians": [
@@ -221,6 +223,44 @@ Content-Type: application/json
   ]
 }
 ```
+
+---
+
+## Upload da foto do aluno
+
+Use o mesmo endpoint para painel web e app mobile.
+
+```http
+POST /api/students/{id}/upload-photo
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+
+photo: (arquivo)
+```
+
+### Regras
+
+| Campo | Regra |
+|---|---|
+| `photo` | obrigatório |
+| Tipo | imagem (`jpg`, `jpeg`, `png`, `webp`) |
+| Tamanho máximo | 5 MB |
+
+### Resposta 200
+
+```json
+{
+  "type": "success",
+  "message": "Foto enviada com sucesso.",
+  "body": {
+    "student_id": 12,
+    "photo_url": "http://localhost:4000/storage/exam-questions/1/students/12/foto.png",
+    "path": "exam-questions/1/students/12/foto.png"
+  }
+}
+```
+
+Depois do upload, o `GET /api/students/{id}` e o `GET /api/students` passam a retornar o campo `photo_url` preenchido.
 
 ---
 

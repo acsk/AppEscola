@@ -14,6 +14,9 @@ const api = axios.create({
   },
 });
 
+const isFormDataPayload = (value: unknown): value is FormData =>
+  typeof FormData !== "undefined" && value instanceof FormData;
+
 // Injeta o token em toda requisição autenticada
 api.interceptors.request.use((config) => {
   const token =
@@ -24,7 +27,11 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   if (["post", "put", "patch"].includes(config.method ?? "")) {
-    config.headers["Content-Type"] = "application/json";
+    if (isFormDataPayload(config.data)) {
+      delete config.headers["Content-Type"];
+    } else {
+      config.headers["Content-Type"] = "application/json";
+    }
   }
   return config;
 });

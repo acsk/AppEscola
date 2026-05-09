@@ -19,6 +19,7 @@ class StudentResource extends JsonResource
             'document' => $this->document,
             'email' => $this->email,
             'phone' => $this->phone,
+            'photo_url' => $this->photo_url,
             'is_minor' => $this->is_minor,
             'status' => $this->status,
             'guardians' => GuardianResource::collection($this->whenLoaded('guardians')),

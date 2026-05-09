@@ -8,6 +8,7 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 
 | Data | O que mudou |
 |---|---|
+| 2026-05-09 | Regra do enunciado da questão: pode ter somente texto, somente imagem ou ambos; mínimo obrigatório: 1 entre `question_text` e `image_url` |
 | 2026-05-04 | Status `pending_review`: resultado bloqueado até correção manual de questões discursivas/`allow_text_answer` |
 | 2026-05-04 | Status `awaiting_release` + flag `release_results_after_end` para segurar o resultado até o fim do período |
 | 2026-05-04 | Novo endpoint `PATCH /api/exam-attempts/{attempt}/answers/{answer}/correct` |
@@ -324,19 +325,16 @@ Faz upload da imagem do enunciado para o servidor da API (storage local/public).
 
 | Campo | Tipo | Obrigatório | Regras |
 |---|---|---|---|
-| `question_id` | integer | ❌ | Informe quando a questão já existir, para salvar a imagem em uma pasta específica da questão |
 | `image` | file | ✅ | `jpg`, `jpeg`, `png`, `webp`, `gif`, máximo 5MB |
 
 **Resposta `201`:**
 ```json
 {
   "message": "Imagem enviada com sucesso.",
-  "image_url": "http://localhost:4000/storage/exam-questions/1/3/12/arquivo.png",
-  "path": "exam-questions/1/3/12/arquivo.png"
+  "image_url": "http://localhost:4000/storage/exam-questions/1/3/arquivo.png",
+  "path": "exam-questions/1/3/arquivo.png"
 }
 ```
-
-Quando `question_id` ainda não existir, o arquivo é salvo em `exam-questions/{tenant}/{exam}/draft/...`.
 
 Use a `image_url` retornada para preencher o campo `image_url` no cadastro/edição da questão.
 
@@ -409,11 +407,11 @@ Adicione uma opção com `triggers_text_input: true`. Quando o candidato selecio
 | Campo | Tipo | Obrigatório |
 |---|---|---|
 | `type` | `multiple_choice` \| `essay` | ✅ |
-| `question_text` | string | ✅* |
+| `question_text` | string \| null | ✅* |
 | `subject_id` | integer | ❌ |
 | `points` | numeric | ❌ (default: `1.0`) |
 | `order` | integer | ❌ (auto-incremento) |
-| `image_url` | url | ✅* |
+| `image_url` | url \| null | ✅* |
 | `video_url` | url | ❌ |
 | `explanation` | string | ❌ |
 | `options` | array | ✅ se `type = multiple_choice` |
@@ -487,7 +485,7 @@ Remove a questão (soft-delete). Opções são excluídas em cascata.
 #### `POST /api/exams/{exam}/start`
 Inicia uma tentativa para um aluno. O simulado precisa estar `published`.
 
-> As questões **não** são retornadas neste endpoint — busque-as via `GET /api/exams/{exam}/questions`. As opções retornadas por esse endpoint **não expõem `is_correct`**, protegendo o gabarito.
+> As questões **não** são retornadas neste endpoint — busque-as via `GET /api/exams/{exam}/questions`. As opções retornadas por esse endpoint **não expõem `is_correct`**, protegendo o gabarito durante a realização.
 
 **Body:**
 ```json
@@ -571,7 +569,7 @@ Se **todas** as respostas foram corrigidas automaticamente:
 - com `release_results_after_end = false` → `status: "completed"`
 - com `release_results_after_end = true` e `ends_at` ainda no futuro → `status: "awaiting_release"`
 
-Se houver **qualquer** resposta pendente de correção → `status: "pending_review"`, `score: null`, `percentage: null`. O resultado **não é liberado** ao aluno até que o admin corrija todas as respostas.
+Se houver **qualquer** resposta pendente de correção → `status: "pending_review"`, `score: null`, `percentage: null`. O resultado **não** é liberado ao aluno até que o admin corrija todas as respostas.
 
 **Resposta `200` — sem pendências (apenas objetivas puras):**
 

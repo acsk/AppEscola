@@ -1,0 +1,59 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: appEscola_php
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      # NÃO monta o código-fonte (está dentro da imagem)
+      # Apenas o storage é persistido entre deploys
+      - storage_data:/var/www/storage/app/public
+    networks:
+      - appescola
+    depends_on:
+      - db
+    env_file:
+      - .env.production
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: appEscola_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Serve os arquivos do storage diretamente via Nginx
+      - storage_data:/var/www/public/storage:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - appescola
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.0
+    container_name: appEscola_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - appescola_mysql_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - appescola
+
+networks:
+  appescola:
+    driver: bridge
+
+volumes:
+  appescola_mysql_data:
+    driver: local
+  storage_data:
+    driver: local

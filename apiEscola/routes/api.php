@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\StudentDashboardController;
 use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,12 +52,15 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Tenants (somente super_admin)
     Route::apiResource('tenants', TenantController::class);
+    Route::get('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'show']);
+    Route::put('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'update']);
 
     // Administração de usuários (super_admin e admin)
     Route::apiResource('users', UserManagementController::class);
 
     // Alunos
     Route::apiResource('students', StudentController::class);
+    Route::post('students/{student}/upload-photo', [StudentController::class, 'uploadPhoto']);
 
     // Responsáveis de um aluno (nested)
     Route::prefix('students/{student}/guardians')->group(function () {
@@ -135,6 +139,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Questões de um simulado (nested)
     Route::get('exams/{exam}/questions',               [ExamQuestionController::class, 'index']);
+    Route::post('exams/{exam}/questions/upload-image', [ExamQuestionController::class, 'uploadImage']);
     Route::post('exams/{exam}/questions',              [ExamQuestionController::class, 'store']);
     Route::get('exams/{exam}/questions/{question}',    [ExamQuestionController::class, 'show']);
     Route::put('exams/{exam}/questions/{question}',    [ExamQuestionController::class, 'update']);

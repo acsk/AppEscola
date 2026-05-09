@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use OpenApi\Attributes as OA;
 use App\Http\Requests\StoreExamQuestionRequest;
 use App\Http\Requests\UpdateExamQuestionRequest;
 use App\Http\Resources\ExamQuestionResource;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
+use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ExamQuestionController extends Controller
 {
@@ -29,6 +32,101 @@ class ExamQuestionController extends Controller
     }
 
     /** Adiciona uma questão ao simulado */
+    #[OA\Post(
+        path: '/api/exams/{exam}/questions/upload-image',
+        tags: ['ExamQuestions'],
+        summary: 'Upload de imagem do enunciado da questão',
+        security: [['sanctum' => []]],
+        parameters: [
+            new OA\Parameter(name: 'exam', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    required: ['image'],
+                    properties: [
+                        new OA\Property(property: 'question_id', type: 'integer', nullable: true, description: 'ID da questão quando o upload for feito para uma questão já existente.'),
+                        new OA\Property(property: 'image', type: 'string', format: 'binary'),
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Imagem enviada com sucesso'),
+            new OA\Response(response: 422, description: 'Arquivo inválido'),
+        ]
+    )]
+    public function uploadImage(Request $request, Exam $exam, TenantUploadSettingsService $uploadSettings): JsonResponse
+    {
+        $this->authorizeTenant($request, $exam->tenant_id);
+
+        $request->validate([
+            'question_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('exam_questions', 'id')->where(fn ($query) => $query->where('exam_id', $exam->id)),
+            ],
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120'],
+        ]);
+
+        $tenant = $exam->tenant()->firstOrFail();
+        $questionSegment = $request->integer('question_id') ?: 'draft';
+        $directoryConfig = $uploadSettings->buildExamQuestionDirectory($tenant, $exam->id, $questionSegment);
+        $path = $request->file('image')->store($directoryConfig['directory'], $directoryConfig['disk']);
+
+        return response()->json([
+            'message' => 'Imagem enviada com sucesso.',
+            'image_url' => $uploadSettings->url($directoryConfig['disk'], $path),
+            'path' => $path,
+        ], 201);
+    }
+
+    #[OA\Post(
+        path: '/api/exams/{exam}/questions',
+        tags: ['ExamQuestions'],
+        summary: 'Adicionar questão ao simulado',
+        security: [['sanctum' => []]],
+        parameters: [
+            new OA\Parameter(name: 'exam', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['type'],
+                properties: [
+                    new OA\Property(property: 'subject_id', type: 'integer', nullable: true),
+                    new OA\Property(property: 'type', type: 'string', enum: ['multiple_choice', 'essay']),
+                    new OA\Property(property: 'question_text', type: 'string', nullable: true, description: 'Enunciado em texto (opcional quando image_url for informado).'),
+                    new OA\Property(property: 'image_url', type: 'string', nullable: true, format: 'uri', description: 'Imagem do enunciado (opcional quando question_text for informado).'),
+                    new OA\Property(property: 'video_url', type: 'string', nullable: true, format: 'uri'),
+                    new OA\Property(property: 'points', type: 'number', format: 'float', example: 1),
+                    new OA\Property(property: 'order', type: 'integer', example: 1),
+                    new OA\Property(property: 'explanation', type: 'string', nullable: true),
+                    new OA\Property(property: 'allow_text_answer', type: 'boolean', example: false),
+                    new OA\Property(
+                        property: 'options',
+                        type: 'array',
+                        nullable: true,
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'option_text', type: 'string'),
+                                new OA\Property(property: 'is_correct', type: 'boolean'),
+                                new OA\Property(property: 'triggers_text_input', type: 'boolean', nullable: true),
+                                new OA\Property(property: 'order', type: 'integer', nullable: true),
+                            ]
+                        )
+                    ),
+                ],
+                description: 'Regra do enunciado: informe question_text, image_url ou ambos.'
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Questão criada'),
+            new OA\Response(response: 422, description: 'Dados inválidos (ex.: sem texto e sem imagem)'),
+        ]
+    )]
     public function store(StoreExamQuestionRequest $request, Exam $exam): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
@@ -82,6 +180,37 @@ class ExamQuestionController extends Controller
     }
 
     /** Atualiza questão e recria as opções se enviadas */
+    #[OA\Put(
+        path: '/api/exams/{exam}/questions/{question}',
+        tags: ['ExamQuestions'],
+        summary: 'Atualizar questão do simulado',
+        security: [['sanctum' => []]],
+        parameters: [
+            new OA\Parameter(name: 'exam', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'question', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'subject_id', type: 'integer', nullable: true),
+                    new OA\Property(property: 'type', type: 'string', enum: ['multiple_choice', 'essay']),
+                    new OA\Property(property: 'question_text', type: 'string', nullable: true, description: 'Enunciado em texto (opcional quando image_url for informado).'),
+                    new OA\Property(property: 'image_url', type: 'string', nullable: true, format: 'uri', description: 'Imagem do enunciado (opcional quando question_text for informado).'),
+                    new OA\Property(property: 'video_url', type: 'string', nullable: true, format: 'uri'),
+                    new OA\Property(property: 'points', type: 'number', format: 'float', example: 1),
+                    new OA\Property(property: 'order', type: 'integer', example: 1),
+                    new OA\Property(property: 'explanation', type: 'string', nullable: true),
+                    new OA\Property(property: 'allow_text_answer', type: 'boolean', example: false),
+                ],
+                description: 'Regra do enunciado: ao final da atualização, a questão precisa manter question_text, image_url ou ambos.'
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Questão atualizada'),
+            new OA\Response(response: 422, description: 'Dados inválidos (ex.: sem texto e sem imagem)'),
+        ]
+    )]
     public function update(UpdateExamQuestionRequest $request, Exam $exam, ExamQuestion $question): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);

@@ -23,6 +23,7 @@ class Student extends Model
         'document',
         'email',
         'phone',
+        'photo_url',
         'is_minor',
         'status',
         'created_by',

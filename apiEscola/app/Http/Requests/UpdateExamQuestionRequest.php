@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateExamQuestionRequest extends FormRequest
 {
@@ -28,5 +29,27 @@ class UpdateExamQuestionRequest extends FormRequest
             'options.*.triggers_text_input' => ['nullable', 'boolean'],
             'options.*.order'               => ['nullable', 'integer', 'min:1'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $question = $this->route('question');
+
+            $currentQuestionText = is_object($question) ? (string) ($question->question_text ?? '') : '';
+            $currentImageUrl = is_object($question) ? (string) ($question->image_url ?? '') : '';
+
+            $questionText = $this->has('question_text')
+                ? trim((string) $this->input('question_text', ''))
+                : trim($currentQuestionText);
+
+            $imageUrl = $this->has('image_url')
+                ? trim((string) $this->input('image_url', ''))
+                : trim($currentImageUrl);
+
+            if ($questionText === '' && $imageUrl === '') {
+                $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
+            }
+        });
     }
 }

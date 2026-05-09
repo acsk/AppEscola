@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
@@ -19,6 +20,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useExamStatuses, useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import DateTimePickerInput from "../../components/ui/DateTimePickerInput";
 import { displayToISO, isoToDisplay, displayDateTimeToISO, isoToDisplayDateTime } from "../../utils/masks";
+import { prepareImageForUpload } from "../../utils/imageCompression";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -43,7 +45,7 @@ type ExamForm = {
 type Question = {
   id: number;
   type: "multiple_choice" | "essay";
-  question_text: string;
+  question_text: string | null;
   points: number;
   order: number;
   image_url: string | null;
@@ -151,7 +153,11 @@ function validateExam(form: ExamForm): Record<string, string> {
 
 function validateQuestion(form: QuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
-  if (!form.question_text.trim()) errs.question_text = "Enunciado é obrigatório.";
+  if (!form.question_text.trim() && !form.image_url.trim()) {
+    const message = "Informe o texto do enunciado, a imagem, ou ambos.";
+    errs.question_text = message;
+    errs.image_url = message;
+  }
   if (form.points && isNaN(Number(form.points))) errs.points = "Pontuação deve ser um número.";
   if (form.type === "multiple_choice") {
     const filled = form.options.filter((o) => o.option_text.trim());
@@ -175,6 +181,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const { contentPadding } = useResponsiveLayout();
   const isEdit = examId !== null;
   const scrollRef = useRef<ScrollView>(null);
+  const questionImageInputRef = useRef<HTMLInputElement | null>(null);
 
   // Domain hooks
   const examStatuses = useExamStatuses();
@@ -208,8 +215,10 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const [qForm, setQForm] = useState<QuestionForm>(EMPTY_QUESTION);
   const [qErrors, setQErrors] = useState<Record<string, string>>({});
   const [savingQuestion, setSavingQuestion] = useState(false);
+  const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
 
   // ── Loaders ─────────────────────────────────────────────────────────────────
 
@@ -339,7 +348,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setEditQuestionId(q.id);
     setQForm({
       type: q.type,
-      question_text: q.question_text,
+      question_text: q.question_text ?? "",
       subject_id: q.subject?.id ? String(q.subject.id) : "",
       points: String(q.points),
       order: String(q.order),
@@ -362,6 +371,37 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
 
   const setQField = (k: keyof QuestionForm, v: any) =>
     setQForm((prev) => ({ ...prev, [k]: v }));
+
+  const uploadQuestionImage = async (file: File) => {
+    if (!examId) return;
+    setUploadingQuestionImage(true);
+    try {
+      const compressed = await prepareImageForUpload(file, 100);
+      const formData = new FormData();
+      formData.append("image", compressed);
+      const { data } = await api.post(`/exams/${examId}/questions/upload-image`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const response = data.body ?? data.data ?? data;
+      if (response?.image_url) {
+        setQField("image_url", response.image_url);
+      }
+      if (response?.image_url) {
+        setQErrors((prev) => ({ ...prev, image_url: "" }));
+      }
+    } catch (err: any) {
+      const apiErrs = parseApiErrors(err);
+      setQErrors((prev) => ({
+        ...prev,
+        image_url:
+          apiErrs.image ||
+          apiErrs.image_url ||
+          apiErrs.file ||
+          "Não foi possível enviar a imagem.",
+      }));
+    }
+    setUploadingQuestionImage(false);
+  };
 
   const setOptionField = (idx: number, k: keyof OptionForm, v: any) => {
     setQForm((prev) => {
@@ -419,7 +459,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     try {
       const payload: Record<string, any> = {
         type: qForm.type,
-        question_text: qForm.question_text.trim(),
+        question_text: qForm.question_text.trim() || null,
         subject_id: qForm.subject_id ? Number(qForm.subject_id) : null,
         points: qForm.points ? Number(qForm.points) : 1.0,
         order: qForm.order ? Number(qForm.order) : undefined,
@@ -463,6 +503,10 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setDeletingQuestion(false);
   };
 
+  useEffect(() => {
+    setActiveStep(1);
+  }, [examId]);
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -487,6 +531,15 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   };
 
   const totalPoints = questions.reduce((acc, q) => acc + q.points, 0);
+  const stepItems = isEdit
+    ? [
+        { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
+        { id: 2 as const, title: "Questões", description: "Cadastro, edição e organização das questões" },
+        { id: 3 as const, title: "Pré-visualização", description: "Como o aluno verá o simulado" },
+      ]
+    : [
+        { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
+      ];
 
   return (
     <ScrollView
@@ -522,24 +575,61 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         )}
       </View>
 
+      {isEdit && (
+        <View className="flex-row gap-3 mb-6">
+          {stepItems.map((step) => {
+            const active = activeStep === step.id;
+            return (
+              <TouchableOpacity
+                key={step.id}
+                onPress={() => setActiveStep(step.id)}
+                className={`flex-1 rounded-2xl border px-4 py-3 ${
+                  active ? "border-violet-500 bg-violet-50" : "border-gray-200 bg-white"
+                }`}
+                activeOpacity={0.85}
+              >
+                <View className="flex-row items-center gap-3">
+                  <View
+                    className="items-center justify-center rounded-full"
+                    style={{ width: 28, height: 28, backgroundColor: active ? "#7C3AED" : "#E5E7EB" }}
+                  >
+                    <Text className={`text-xs font-bold ${active ? "text-white" : "text-gray-600"}`}>
+                      {step.id}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text className={`text-sm font-semibold ${active ? "text-violet-700" : "text-gray-700"}`}>
+                      {step.title}
+                    </Text>
+                    <Text className="text-xs text-gray-400">{step.description}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       {/* Formulário principal */}
-      <View
-        className="bg-white rounded-2xl p-6 mb-6"
-        style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
-      >
+      {(activeStep === 1 || !isEdit) && (
+        <View
+          className="bg-white rounded-2xl p-6 mb-6"
+          style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        >
         <Text className="text-base font-bold text-gray-800 mb-4">Informações do Simulado</Text>
 
-        <FormInput
-          label="Título"
-          required
-          value={form.title}
-          onChangeText={(v) => setField("title", v)}
-          placeholder="Ex.: Simulado ENEM – Matemática"
-          error={errors.title}
-        />
-
-        <View className="flex-row gap-4">
-          <View style={{ flex: 1 }}>
+        <View className="flex-row gap-4 flex-wrap">
+          <View style={{ flex: 2, minWidth: 280 }}>
+            <FormInput
+              label="Título"
+              required
+              value={form.title}
+              onChangeText={(v) => setField("title", v)}
+              placeholder="Ex.: Simulado ENEM – Matemática"
+              error={errors.title}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 180 }}>
             <FormSelect
               label="Tipo"
               value={form.exam_type}
@@ -547,7 +637,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               onChange={(v) => setField("exam_type", v)}
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 180 }}>
             <FormSelect
               label="Status"
               value={form.status}
@@ -557,8 +647,8 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
           </View>
         </View>
 
-        <View className="flex-row gap-4">
-          <View style={{ flex: 1 }}>
+        <View className="flex-row gap-4 flex-wrap">
+          <View style={{ flex: 1.2, minWidth: 220 }}>
             <FormSelect
               label="Curso"
               value={form.course_id}
@@ -567,7 +657,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               placeholder="Selecione um curso"
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1.2, minWidth: 240 }}>
             <SearchableSelect
               label="Matéria"
               value={form.subject_id}
@@ -577,10 +667,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               modalTitle="Selecionar matéria"
             />
           </View>
-        </View>
-
-        <View className="flex-row gap-4">
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 180 }}>
             <FormInput
               label="Duração (minutos)"
               value={form.duration_minutes}
@@ -590,7 +677,10 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               error={errors.duration_minutes}
             />
           </View>
-          <View style={{ flex: 1 }}>
+        </View>
+
+        <View className="flex-row gap-4 flex-wrap">
+          <View style={{ flex: 1, minWidth: 180 }}>
             <FormInput
               label="Nota mínima (%)"
               value={form.passing_score}
@@ -600,10 +690,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               error={errors.passing_score}
             />
           </View>
-        </View>
-
-        <View className="flex-row gap-4">
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 220 }}>
             <DateTimePickerInput
               label="Data de início"
               value={form.starts_at}
@@ -611,7 +698,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               error={errors.starts_at}
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 220 }}>
             <DateTimePickerInput
               label="Data de encerramento"
               value={form.ends_at}
@@ -621,8 +708,8 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
           </View>
         </View>
 
-        <View className="flex-row gap-4">
-          <View style={{ flex: 1 }}>
+        <View className="flex-row gap-4 flex-wrap">
+          <View style={{ flex: 1, minWidth: 220 }}>
             <FormSelect
               label="Liberação do resultado"
               value={form.release_results_after_end}
@@ -630,7 +717,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               onChange={(v) => setField("release_results_after_end", v)}
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 220 }}>
             <FormSelect
               label="Permitir retentativa"
               value={form.allow_retake}
@@ -645,16 +732,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               }
             />
           </View>
-        </View>
-
-        {form.release_results_after_end === "true" && (
-          <Text className="text-xs text-cyan-700 mb-4 -mt-2">
-            O aluno só verá nota e gabarito depois que a data final do simulado for atingida.
-          </Text>
-        )}
-
-        <View className="flex-row gap-4">
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 180 }}>
             <FormInput
               label="Máximo de tentativas"
               value={form.max_attempts}
@@ -667,32 +745,43 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
           </View>
         </View>
 
-        <FormInput
-          label="Nota mínima para nova tentativa (%)"
-          value={form.min_score_to_retake}
-          onChangeText={(v) => setField("min_score_to_retake", v)}
-          placeholder="Ex.: 70 (vazio usa nota mínima do simulado)"
-          keyboardType="numeric"
-          editable={form.allow_retake === "true"}
-          error={errors.min_score_to_retake}
-        />
+        {form.release_results_after_end === "true" && (
+          <Text className="text-xs text-cyan-700 mb-4 -mt-2">
+            O aluno só verá nota e gabarito depois que a data final do simulado for atingida.
+          </Text>
+        )}
+
+        <View className="flex-row gap-4 flex-wrap">
+          <View style={{ flex: 1, minWidth: 240 }}>
+            <FormInput
+              label="Nota mínima para nova tentativa (%)"
+              value={form.min_score_to_retake}
+              onChangeText={(v) => setField("min_score_to_retake", v)}
+              placeholder="Ex.: 70 (vazio usa nota mínima do simulado)"
+              keyboardType="numeric"
+              editable={form.allow_retake === "true"}
+              error={errors.min_score_to_retake}
+            />
+          </View>
+          <View style={{ flex: 1.4, minWidth: 280 }}>
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 mb-1.5">Descrição</Text>
+              <textarea
+                value={form.description}
+                onChange={(e: any) => setField("description", e.target.value)}
+                placeholder="Descrição opcional do simulado..."
+                style={inputStyle}
+                rows={3}
+              />
+            </View>
+          </View>
+        </View>
 
         {form.allow_retake !== "true" && (
           <Text className="text-xs text-gray-400 mb-4 -mt-2">
             Retentativa desativada: após concluir, o aluno não poderá iniciar nova tentativa.
           </Text>
         )}
-
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">Descrição</Text>
-          <textarea
-            value={form.description}
-            onChange={(e: any) => setField("description", e.target.value)}
-            placeholder="Descrição opcional do simulado..."
-            style={inputStyle}
-            rows={3}
-          />
-        </View>
 
         <View className="flex-row gap-3 mt-2">
           <TouchableOpacity
@@ -717,10 +806,22 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
             )}
           </TouchableOpacity>
         </View>
+        {isEdit && (
+          <View className="flex-row justify-end mt-4">
+            <TouchableOpacity
+              onPress={() => setActiveStep(2)}
+              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Ir para questões</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
+      )}
 
       {/* Seção de Questões – só exibe quando o simulado já existe */}
-      {isEdit && (
+      {isEdit && activeStep === 2 && (
         <View
           className="bg-white rounded-2xl overflow-hidden"
           style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
@@ -771,7 +872,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
                   </View>
                   <View className="flex-1">
                     <Text className="text-sm text-gray-800 font-medium" numberOfLines={2}>
-                      {q.question_text}
+                      {q.question_text || "Questão sem texto"}
                     </Text>
                     <View className="flex-row gap-3 mt-1.5 flex-wrap">
                       <View className="flex-row items-center gap-1">
@@ -823,6 +924,149 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               </View>
             ))
           )}
+
+          <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
+            <TouchableOpacity
+              onPress={() => setActiveStep(1)}
+              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-gray-700">Voltar para dados</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveStep(3)}
+              className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-violet-700">Ver preview</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={openNewQuestion}
+              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Nova Questão</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {isEdit && activeStep === 3 && (
+        <View
+          className="bg-white rounded-2xl overflow-hidden"
+          style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        >
+          <View className="px-6 py-4 border-b border-gray-100 flex-row items-center justify-between">
+            <View>
+              <Text className="text-base font-bold text-gray-800">Pré-visualização do aluno</Text>
+              <Text className="text-xs text-gray-400">
+                Simulação de como o simulado aparece durante a realização
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
+              <Ionicons name="eye-outline" size={16} color="#6B7280" />
+              <Text className="text-xs font-semibold text-gray-600">
+                {questions.length} questões · {totalPoints.toFixed(1)} pontos
+              </Text>
+            </View>
+          </View>
+
+          <View className="px-6 py-5 bg-violet-50 border-b border-violet-100">
+            <Text className="text-lg font-bold text-violet-900">{form.title || "Título do simulado"}</Text>
+            <Text className="text-sm text-violet-700 mt-1">
+              {examTypeOptions.find((o) => o.value === form.exam_type)?.label ?? form.exam_type}
+              {form.subject_id ? ` · ${subjectOptions.find((o) => o.value === form.subject_id)?.label ?? "Matéria"}` : ""}
+            </Text>
+            <Text className="text-xs text-violet-600 mt-2">
+              Duração: {form.duration_minutes || "--"} min · Nota mínima: {form.passing_score || "--"}%
+            </Text>
+          </View>
+
+          {questions.length === 0 ? (
+            <View className="py-12 items-center gap-2">
+              <Ionicons name="eye-off-outline" size={32} color="#D1D5DB" />
+              <Text className="text-sm text-gray-400">Adicione questões para visualizar o simulado.</Text>
+            </View>
+          ) : (
+            questions.map((q, index) => (
+              <View key={q.id} className={`px-6 py-5 ${index < questions.length - 1 ? "border-b border-gray-50" : ""}`}>
+                <View className="flex-row items-start gap-3 mb-3">
+                  <View className="w-8 h-8 rounded-full bg-violet-100 items-center justify-center">
+                    <Text className="text-xs font-bold text-violet-700">{index + 1}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text className="text-sm font-semibold text-gray-800">
+                      {q.question_text || "Questão sem texto"}
+                    </Text>
+                    <Text className="text-xs text-gray-400 mt-1">
+                      {q.type === "essay" ? "Discursiva" : q.options.some((o) => o.triggers_text_input) ? 'Objetiva c/ "Outro"' : "Objetiva"}
+                      {q.points ? ` · ${q.points} pontos` : ""}
+                    </Text>
+                  </View>
+                </View>
+
+                {q.image_url && (
+                  <View className="mb-4 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                    <Image
+                      source={{ uri: q.image_url }}
+                      style={{ width: "100%", height: 220, backgroundColor: "#F3F4F6" }}
+                      resizeMode="contain"
+                    />
+                    <View className="px-3 py-2 border-t border-gray-200">
+                      <Text className="text-xs text-gray-500" numberOfLines={1}>
+                        {q.image_url}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {q.type === "essay" ? (
+                  <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 min-h-[96px]">
+                    <Text className="text-xs text-gray-400">Resposta do aluno</Text>
+                    <Text className="text-sm text-gray-500 mt-2">Espaço para resposta discursiva...</Text>
+                  </View>
+                ) : (
+                  <View className="gap-2">
+                    {q.options.map((opt) => (
+                      <View
+                        key={opt.id ?? `${q.id}-${opt.order}`}
+                        className={`flex-row items-center gap-3 rounded-xl border px-4 py-3 ${
+                          opt.triggers_text_input ? "border-amber-200 bg-amber-50" : "border-gray-200 bg-white"
+                        }`}
+                      >
+                        <View className="w-5 h-5 rounded-full border-2 border-gray-300 items-center justify-center">
+                          <View className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+                        </View>
+                        <Text className="text-sm flex-1 text-gray-700">{opt.option_text || `Opção ${opt.order}`}</Text>
+                        {opt.triggers_text_input && (
+                          <View className="px-2 py-1 rounded-full bg-amber-100 border border-amber-200">
+                            <Text className="text-[11px] font-semibold text-amber-700">Exige texto</Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))
+          )}
+
+          <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
+            <TouchableOpacity
+              onPress={() => setActiveStep(2)}
+              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-gray-700">Voltar para questões</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigate("simulados")}
+              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Finalizar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -890,12 +1134,12 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         {/* Enunciado */}
         <View className="mb-4">
           <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-            Enunciado <Text className="text-red-500">*</Text>
+            Enunciado textual (opcional)
           </Text>
           <textarea
             value={qForm.question_text}
             onChange={(e: any) => setQField("question_text", e.target.value)}
-            placeholder="Digite o enunciado da questão..."
+            placeholder="Digite o texto do enunciado ou deixe vazio se usar apenas imagem..."
             style={{
               ...inputStyle,
               borderColor: qErrors.question_text ? "#FCA5A5" : "#E5E7EB",
@@ -905,6 +1149,9 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
           {qErrors.question_text && (
             <Text className="text-xs text-red-500 mt-1">{qErrors.question_text}</Text>
           )}
+          <Text className="text-xs text-gray-400 mt-1">
+            A questão pode ter somente texto, somente imagem ou os dois.
+          </Text>
         </View>
 
         {/* Matéria e pontuação */}
@@ -941,12 +1188,63 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
         </View>
 
         {/* URLs opcionais */}
+        <View className="mb-4">
+          <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+            Imagem do enunciado (opcional)
+          </Text>
+          <View className="flex-row items-center gap-3 flex-wrap">
+            <TouchableOpacity
+              onPress={() => questionImageInputRef.current?.click()}
+              disabled={uploadingQuestionImage}
+              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              activeOpacity={0.85}
+            >
+              {uploadingQuestionImage ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text className="text-sm font-semibold text-white">
+                  Enviar imagem
+                </Text>
+              )}
+            </TouchableOpacity>
+            {qForm.image_url ? (
+              <View className="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-violet-200 bg-violet-50">
+                <Text className="text-xs font-semibold text-violet-700" numberOfLines={1}>
+                  {qForm.image_url}
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-xs text-gray-400">
+                Se preferir, envie apenas imagem sem texto.
+              </Text>
+            )}
+          </View>
+          <Text className="text-xs text-gray-400 mt-2">
+            A imagem será comprimida automaticamente antes do envio para tentar ficar abaixo de 100 KB.
+          </Text>
+          <input
+            ref={questionImageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e: any) => {
+              const file = e.target.files?.[0];
+              if (file) uploadQuestionImage(file);
+              e.target.value = "";
+            }}
+          />
+          {qErrors.image_url && (
+            <Text className="text-xs text-red-500 mt-1">{qErrors.image_url}</Text>
+          )}
+        </View>
+
         <FormInput
           label="URL da Imagem (opcional)"
           value={qForm.image_url}
           onChangeText={(v) => setQField("image_url", v)}
           placeholder="https://..."
           keyboardType="url"
+          error={qErrors.image_url}
         />
         <FormInput
           label="URL do Vídeo (opcional)"

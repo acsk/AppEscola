@@ -10,6 +10,7 @@ use App\Http\Resources\StudentResource;
 use App\Models\Guardian;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -209,6 +210,55 @@ class StudentController extends Controller
         $student->delete();
 
         return response()->json(['message' => 'Aluno removido com sucesso.']);
+    }
+
+    #[OA\Post(
+        path: '/api/students/{student}/upload-photo',
+        tags: ['Students'],
+        summary: 'Upload da foto do aluno',
+        security: [['sanctum' => []]],
+        parameters: [
+            new OA\Parameter(name: 'student', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    required: ['photo'],
+                    properties: [
+                        new OA\Property(property: 'photo', type: 'string', format: 'binary'),
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Foto enviada com sucesso'),
+            new OA\Response(response: 422, description: 'Arquivo inválido'),
+        ]
+    )]
+    public function uploadPhoto(Request $request, Student $student, TenantUploadSettingsService $uploadSettings): JsonResponse
+    {
+        $this->authorizeTenant($request, $student->tenant_id);
+
+        $request->validate([
+            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $tenant = $student->tenant()->firstOrFail();
+        $directoryConfig = $uploadSettings->buildStudentPhotoDirectory($tenant, $student->id);
+        $path = $request->file('photo')->store($directoryConfig['directory'], $directoryConfig['disk']);
+        $photoUrl = $uploadSettings->url($directoryConfig['disk'], $path);
+
+        $student->update([
+            'photo_url' => $photoUrl,
+        ]);
+
+        return $this->success([
+            'student_id' => $student->id,
+            'photo_url' => $photoUrl,
+            'path' => $path,
+        ], 'Foto enviada com sucesso.');
     }
 
     private function authorizeTenant(Request $request, int $resourceTenantId): void

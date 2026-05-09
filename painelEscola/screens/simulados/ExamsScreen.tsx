@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -117,11 +118,13 @@ export default function ExamsScreen({ navigate }: Props) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewSelected, setPreviewSelected] = useState<Record<number, number | null>>({});
   const [previewTexts, setPreviewTexts] = useState<Record<number, string>>({});
+  const [previewBrokenImages, setPreviewBrokenImages] = useState<Record<number, boolean>>({});
 
   const openPreview = async (exam: Exam) => {
     setPreviewExam(exam);
     setPreviewSelected({});
     setPreviewTexts({});
+    setPreviewBrokenImages({});
     setPreviewLoading(true);
     try {
       const { data } = await api.get(`/exams/${exam.id}/questions`);
@@ -581,11 +584,27 @@ export default function ExamsScreen({ navigate }: Props) {
                       {/* Imagem opcional */}
                       {q.image_url && (
                         <View
-                          className="mb-4 rounded-xl overflow-hidden items-center justify-center"
-                          style={{ backgroundColor: "#F3F4F6", height: 160 }}
+                          className="mb-4 rounded-xl overflow-hidden border border-gray-200 bg-gray-50"
+                          style={{ minHeight: 180 }}
                         >
-                          <Ionicons name="image-outline" size={28} color="#9CA3AF" />
-                          <Text className="text-xs text-gray-400 mt-1 px-4 text-center" numberOfLines={1}>
+                          {!previewBrokenImages[q.id] ? (
+                            <Image
+                              source={{ uri: q.image_url }}
+                              style={{ width: "100%", height: 220, backgroundColor: "#F3F4F6" }}
+                              resizeMode="contain"
+                              onError={() =>
+                                setPreviewBrokenImages((prev) => ({ ...prev, [q.id]: true }))
+                              }
+                            />
+                          ) : (
+                            <View className="h-[220px] items-center justify-center bg-gray-100 px-4">
+                              <Ionicons name="image-outline" size={28} color="#9CA3AF" />
+                              <Text className="text-xs text-gray-400 mt-2 text-center">
+                                Não foi possível carregar a imagem.
+                              </Text>
+                            </View>
+                          )}
+                          <Text className="text-xs text-gray-400 px-3 py-2 border-t border-gray-200" numberOfLines={1}>
                             {q.image_url}
                           </Text>
                         </View>
