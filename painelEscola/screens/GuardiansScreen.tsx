@@ -20,6 +20,7 @@ import {
   domainToOptions,
 } from "../hooks/useDomains";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import { maskCPF, maskPhone } from "../utils/masks";
 
 type Guardian = {
   id: number;
@@ -101,9 +102,9 @@ export default function GuardiansScreen() {
     setEditId(g.id);
     setForm({
       name: g.name ?? "",
-      document: g.document ?? "",
+      document: maskCPF(g.document ?? ""),
       email: g.email ?? "",
-      phone: g.phone ?? "",
+      phone: maskPhone(g.phone ?? ""),
       relationship: g.relationship ?? "",
     });
     setErrors({});
@@ -115,9 +116,9 @@ export default function GuardiansScreen() {
     setErrors({});
     try {
       const payload: Record<string, any> = { name: form.name };
-      if (form.document) payload.document = form.document;
+      if (form.document) payload.document = form.document.replace(/\D/g, "");
       if (form.email) payload.email = form.email;
-      if (form.phone) payload.phone = form.phone;
+      if (form.phone) payload.phone = form.phone.replace(/\D/g, "");
       if (form.relationship) payload.relationship = form.relationship;
 
       if (editId) {
@@ -195,16 +196,23 @@ export default function GuardiansScreen() {
       </View>
 
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={isMobile}
+        horizontal={!isMobile}
+        showsHorizontalScrollIndicator={!isMobile}
         style={{ width: "100%" }}
-        contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
+        contentContainerStyle={{ width: "100%" }}
       >
       <View
-        className="bg-white rounded-2xl overflow-hidden"
-        style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        className={isMobile ? "gap-3" : "bg-white rounded-2xl overflow-hidden"}
+        style={{
+          width: "100%",
+          minWidth: isMobile ? undefined : tableMinWidth,
+          shadowColor: isMobile ? undefined : "#000",
+          shadowOpacity: isMobile ? undefined : 0.05,
+          shadowRadius: isMobile ? undefined : 10,
+          elevation: isMobile ? undefined : 2,
+        }}
       >
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
+        {!isMobile && <View className="flex-row bg-gray-50 border-b border-gray-100 px-3 py-2">
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>
             Nome
           </Text>
@@ -218,7 +226,7 @@ export default function GuardiansScreen() {
             Parentesco
           </Text>
           <View style={{ width: 72 }} />
-        </View>
+        </View>}
 
         {loading ? (
           <View className="items-center justify-center py-20">
@@ -235,25 +243,65 @@ export default function GuardiansScreen() {
           rows.map((item, i) => (
             <View
               key={item.id}
-              className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${
-                i % 2 === 1 ? "bg-gray-50/40" : ""
-              }`}
+              className={
+                isMobile
+                  ? "bg-white border border-gray-200 rounded-xl p-3"
+                  : `flex-row items-center px-3 py-2 border-b border-gray-50 ${
+                      i % 2 === 1 ? "bg-gray-50/40" : ""
+                    }`
+              }
+              style={{
+                shadowColor: isMobile ? "#000" : undefined,
+                shadowOpacity: isMobile ? 0.04 : undefined,
+                shadowRadius: isMobile ? 8 : undefined,
+                elevation: isMobile ? 1 : undefined,
+              }}
             >
+              {isMobile ? (
+                <>
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View style={{ flex: 1 }}>
+                      <Text className="text-sm font-semibold text-gray-800">{item.name}</Text>
+                      {item.document && (
+                        <Text className="text-xs text-gray-400 mt-0.5">{maskCPF(item.document)}</Text>
+                      )}
+                    </View>
+                    <View className="flex-row gap-2">
+                      <TouchableOpacity onPress={() => openEdit(item)} className="p-1.5 bg-violet-50 rounded-lg">
+                        <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
+                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
+                    <Text className="text-xs text-gray-500">E-mail: {item.email ?? "—"}</Text>
+                    <Text className="text-xs text-gray-500">Telefone: {item.phone ? maskPhone(item.phone) : "—"}</Text>
+                    <Text className="text-xs text-gray-500">
+                      Parentesco: {item.relationship
+                        ? relOptions.find((o) => o.value === item.relationship)?.label ?? item.relationship
+                        : "—"}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
               <View style={{ flex: 2 }}>
-                <Text className="text-sm font-medium text-gray-800">
+                <Text className="text-xs font-medium text-gray-800">
                   {item.name}
                 </Text>
                 {item.document && (
-                  <Text className="text-xs text-gray-400">{item.document}</Text>
+                  <Text className="text-[11px] text-gray-400">{maskCPF(item.document)}</Text>
                 )}
               </View>
-              <Text className="text-sm text-gray-600" style={{ flex: 2 }}>
+              <Text className="text-xs text-gray-600" style={{ flex: 2 }}>
                 {item.email ?? "—"}
               </Text>
-              <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
-                {item.phone ?? "—"}
+              <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
+                {item.phone ? maskPhone(item.phone) : "—"}
               </Text>
-              <Text className="text-sm text-gray-600 capitalize" style={{ flex: 1 }}>
+              <Text className="text-xs text-gray-600 capitalize" style={{ flex: 1 }}>
                 {item.relationship
                   ? relOptions.find((o) => o.value === item.relationship)?.label ?? item.relationship
                   : "—"}
@@ -272,6 +320,8 @@ export default function GuardiansScreen() {
                   <Ionicons name="trash-outline" size={15} color="#EF4444" />
                 </TouchableOpacity>
               </View>
+                </>
+              )}
             </View>
           ))
         )}
@@ -342,9 +392,11 @@ export default function GuardiansScreen() {
             <FormInput
               label="Telefone"
               value={form.phone}
-              onChangeText={(v) => setForm({ ...form, phone: v })}
+              onChangeText={(v) => setForm({ ...form, phone: maskPhone(v) })}
               error={errors.phone}
               placeholder="(11) 99999-0000"
+              keyboardType="phone-pad"
+              maxLength={16}
             />
           </View>
         </View>
@@ -353,9 +405,11 @@ export default function GuardiansScreen() {
             <FormInput
               label="Documento (CPF/RG)"
               value={form.document}
-              onChangeText={(v) => setForm({ ...form, document: v })}
+              onChangeText={(v) => setForm({ ...form, document: maskCPF(v) })}
               error={errors.document}
               placeholder="000.000.000-00"
+              keyboardType="numeric"
+              maxLength={14}
             />
           </View>
           <View className="flex-1">

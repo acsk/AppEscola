@@ -319,23 +319,23 @@ export default function SchoolClassesScreen({ navigate }: Props) {
 
       {/* Table */}
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={isMobile}
+        horizontal={!isMobile}
+        showsHorizontalScrollIndicator={!isMobile}
         style={{ width: "100%" }}
-        contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
+        contentContainerStyle={{ width: "100%" }}
       >
       <View
-        className="bg-white rounded-2xl overflow-hidden"
+        className={isMobile ? "gap-3" : "bg-white rounded-2xl overflow-hidden"}
         style={{
           width: "100%",
-          minWidth: tableMinWidth,
-          shadowColor: "#000",
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 2,
+          minWidth: isMobile ? undefined : tableMinWidth,
+          shadowColor: isMobile ? undefined : "#000",
+          shadowOpacity: isMobile ? undefined : 0.05,
+          shadowRadius: isMobile ? undefined : 10,
+          elevation: isMobile ? undefined : 2,
         }}
       >
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
+        {!isMobile && <View className="flex-row bg-gray-50 border-b border-gray-100 px-3 py-2">
           <Text
             className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
             style={{ flex: 2 }}
@@ -367,7 +367,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
             Status
           </Text>
           <View style={{ width: 176 }} />
-        </View>
+        </View>}
 
         {loading ? (
           <View className="items-center justify-center py-20">
@@ -384,29 +384,86 @@ export default function SchoolClassesScreen({ navigate }: Props) {
           rows.map((item, i) => (
             <View
               key={item.id}
-              className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${
-                i % 2 === 1 ? "bg-gray-50/40" : ""
-              }`}
+              className={
+                isMobile
+                  ? "bg-white border border-gray-200 rounded-xl p-3"
+                  : `flex-row items-center px-3 py-2 border-b border-gray-50 ${
+                      i % 2 === 1 ? "bg-gray-50/40" : ""
+                    }`
+              }
+              style={{
+                shadowColor: isMobile ? "#000" : undefined,
+                shadowOpacity: isMobile ? 0.04 : undefined,
+                shadowRadius: isMobile ? 8 : undefined,
+                elevation: isMobile ? 1 : undefined,
+              }}
             >
+              {isMobile ? (
+                <>
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View style={{ flex: 1 }}>
+                      <Text className="text-sm font-semibold text-gray-800">{item.name}</Text>
+                      <Text className="text-xs text-gray-500 mt-0.5">{item.course?.name ?? "Sem curso"}</Text>
+                    </View>
+                    <View className="flex-row gap-2">
+                      <TouchableOpacity onPress={() => navigate("turmas-frequencia", { classId: item.id })} className="p-1.5 bg-emerald-50 rounded-lg">
+                        <Ionicons name="checkmark-done-outline" size={15} color="#059669" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => navigate("turmas-form", { classId: item.id })} className="p-1.5 bg-violet-50 rounded-lg">
+                        <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
+                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
+                    <Text className="text-xs text-gray-500">Ano: {item.year ?? "—"}</Text>
+                    <Text className="text-xs text-gray-500">Período: {item.period ? periodMap[item.period] ?? item.period : "—"}</Text>
+                    {(item.start_date || item.end_date) && (
+                      <Text className="text-xs text-gray-500">
+                        Datas: {fmtDate(item.start_date) ?? "?"} - {fmtDate(item.end_date) ?? "?"}
+                      </Text>
+                    )}
+                  </View>
+                  <View className="flex-row flex-wrap gap-1 mt-2">
+                    {(item.schedules ?? []).length === 0 ? (
+                      <Text className="text-xs text-gray-400 italic">Sem horários</Text>
+                    ) : (
+                      (item.schedules ?? []).map((s) => (
+                        <View key={s.id} className="bg-violet-50 rounded-md px-1.5 py-0.5">
+                          <Text className="text-xs text-violet-600 font-medium">
+                            {WEEKDAY_SHORT[s.weekday] ?? s.weekday} {fmtTime(s.start_time)}-{fmtTime(s.end_time)}
+                          </Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                  <View className="mt-2 self-start">
+                    <Badge slug={item.status} label={item.status === "active" ? "Ativo" : "Inativo"} />
+                  </View>
+                </>
+              ) : (
+                <>
               <View style={{ flex: 2 }}>
-                <Text className="text-sm font-medium text-gray-800">
+                <Text className="text-xs font-medium text-gray-800">
                   {item.name}
                 </Text>
                 {(item.start_date || item.end_date) && (
-                  <Text className="text-xs text-gray-400 mt-0.5">
-                    {fmtDate(item.start_date) ?? "?"} – {fmtDate(item.end_date) ?? "?"}
+                  <Text className="text-[11px] text-gray-400 mt-0.5">
+                    {fmtDate(item.start_date) ?? "?"} - {fmtDate(item.end_date) ?? "?"}
                   </Text>
                 )}
               </View>
-              <Text className="text-sm text-gray-600" style={{ flex: 2 }}>
+              <Text className="text-xs text-gray-600" style={{ flex: 2 }}>
                 {item.course?.name ?? "—"}
               </Text>
               <View style={{ flex: 1 }}>
-                <Text className="text-sm text-gray-700 font-medium">
+                <Text className="text-xs text-gray-700 font-medium">
                   {item.year ?? "—"}
                 </Text>
                 {item.period && (
-                  <Text className="text-xs text-gray-400">
+                  <Text className="text-[11px] text-gray-400">
                     {periodMap[item.period] ?? item.period}
                   </Text>
                 )}
@@ -424,7 +481,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                     >
                       <Text className="text-xs text-violet-600 font-medium">
                         {WEEKDAY_SHORT[s.weekday] ?? s.weekday}{" "}
-                        {fmtTime(s.start_time)}–{fmtTime(s.end_time)}
+                        {fmtTime(s.start_time)}-{fmtTime(s.end_time)}
                       </Text>
                     </View>
                   ))
@@ -464,6 +521,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                   <Ionicons name="trash-outline" size={15} color="#EF4444" />
                 </TouchableOpacity>
               </View>
+                </>
+              )}
             </View>
           ))
         )}

@@ -53,4 +53,11 @@ class Guardian extends Model
     {
         return $this->hasMany(Invoice::class);
     }
+
+    public function setNameAttribute($value): void
+    {
+        $this->attributes['name'] = is_string($value)
+            ? mb_strtoupper(trim($value), 'UTF-8')
+            : $value;
+    }
 }

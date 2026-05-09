@@ -24,6 +24,11 @@ class Course extends Model
         'deleted_by',
     ];
 
+    public function setNameAttribute(string $value): void
+    {
+        $this->attributes['name'] = mb_strtoupper(trim($value), 'UTF-8');
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

@@ -29,8 +29,15 @@ class StoreStudentRequest extends FormRequest
             'guardians'                             => ['nullable', 'array'],
             'guardians.*.guardian_id'               => ['nullable', 'exists:guardians,id'],
             'guardians.*.name'                      => ['required_without:guardians.*.guardian_id', 'nullable', 'string', 'max:255'],
-            'guardians.*.document'                  => ['nullable', 'string', 'max:20'],
-            'guardians.*.email'                     => ['nullable', 'email', 'max:255'],
+            'guardians.*.document'                  => [
+                'required_without:guardians.*.guardian_id',
+                'nullable',
+                'string',
+                'max:20',
+                'distinct',
+                Rule::unique('guardians', 'document')->where('tenant_id', $this->user()->tenant_id),
+            ],
+            'guardians.*.email'                     => ['required_without:guardians.*.guardian_id', 'nullable', 'email', 'max:255'],
             'guardians.*.phone'                     => ['nullable', 'string', 'max:20'],
             'guardians.*.relationship'              => ['nullable', 'exists:domain_guardian_relationships,slug'],
             'guardians.*.is_financial_responsible'  => ['nullable', 'boolean'],
@@ -51,7 +58,29 @@ class StoreStudentRequest extends FormRequest
                 if ($financialCount > 1) {
                     $validator->errors()->add('guardians', 'Apenas um responsável financeiro pode ser definido.');
                 }
+
+                if ($this->boolean('is_minor') && !empty($guardians) && $financialCount === 0) {
+                    $validator->errors()->add('guardians', 'Aluno menor deve ter pelo menos um responsável financeiro.');
+                }
             },
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'guardians.*.document.required_without' => 'Informe o CPF do responsável quando ele não estiver previamente cadastrado.',
+            'guardians.*.document.distinct' => 'Não repita o mesmo CPF entre os responsáveis informados.',
+            'guardians.*.document.unique' => 'Já existe um responsável com este CPF.',
+            'guardians.*.email.required_without' => 'Informe o e-mail do responsável quando ele não estiver previamente cadastrado.',
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'guardians.*.document' => 'CPF do responsável',
+            'guardians.*.email' => 'e-mail do responsável',
         ];
     }
 }

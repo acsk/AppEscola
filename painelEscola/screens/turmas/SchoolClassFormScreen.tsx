@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import DatePickerInput from "../../components/ui/DatePickerInput";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import ToastBanner from "../../components/ui/ToastBanner";
 import { usePeriods, domainToOptions } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
@@ -168,6 +169,20 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
   // Saved class id (after create)
   const [savedClassId, setSavedClassId] = useState<number | null>(classId);
+
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
+
+  const closeToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const normalizeTeacher = (raw: any): Teacher => ({
     id: raw.id,
@@ -365,16 +380,43 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
       if (isEdit) {
         await api.put(`/school-classes/${savedClassId}`, payload);
+        setToast({
+          visible: true,
+          type: "success",
+          message: "Turma atualizada com sucesso.",
+        });
       } else {
         const { data: raw } = await api.post("/school-classes", payload);
         const data = raw.body ?? raw;
         setSavedClassId(data.id);
         setSchedules(data.schedules ?? []);
+        setToast({
+          visible: true,
+          type: "success",
+          message: "Turma criada com sucesso.",
+        });
       }
+
+      setTimeout(() => {
+        navigate("turmas");
+      }, 1800);
     } catch (e: any) {
       if (e.response?.status === 422) {
-        setErrors(parseApiErrors(e.response.data.errors ?? {}));
+        const fieldErrors = parseApiErrors(e.response.data?.errors ?? {});
+        setErrors(fieldErrors);
+        setToast({
+          visible: true,
+          type: "error",
+          message: e.response?.data?.message || "Nao foi possivel salvar a turma.",
+        });
         scrollRef.current?.scrollTo({ y: 0, animated: true });
+      } else {
+        const errorMessage = e.response?.data?.message || "Nao foi possivel salvar a turma.";
+        setToast({
+          visible: true,
+          type: "error",
+          message: errorMessage,
+        });
       }
     }
     setSaving(false);
@@ -487,6 +529,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
+    <View className="flex-1">
     <ScrollView
       ref={scrollRef}
       className="flex-1"
@@ -1023,5 +1066,13 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         loading={deletingSchedule}
       />
     </ScrollView>
+
+    <ToastBanner
+      visible={toast.visible}
+      type={toast.type}
+      message={toast.message}
+      onClose={closeToast}
+    />
+    </View>
   );
 }

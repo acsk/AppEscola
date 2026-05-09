@@ -52,6 +52,13 @@ type GuardianForm = {
   can_access_portal: boolean;
 };
 
+type GuardianOption = {
+  value: string;
+  label: string;
+  document?: string;
+  email?: string;
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const EMPTY: Form = {
@@ -146,9 +153,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
 
   const [form, setForm] = useState<Form>(EMPTY);
   const [guardians, setGuardians] = useState<GuardianForm[]>([]);
-  const [guardianOptions, setGuardianOptions] = useState<
-    { value: string; label: string }[]
-  >([]);
+  const [guardianOptions, setGuardianOptions] = useState<GuardianOption[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{
     visible: boolean;
@@ -165,6 +170,129 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
   }, []);
+
+  const onlyDigits = (value: string) => value.replace(/\D/g, "");
+  const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+  const mapApiGuardiansToForm = useCallback((items: any[]): GuardianForm[] => {
+    const seen = new Set<number>();
+    return (items ?? [])
+      .filter((g: any) => {
+        if (!g?.id || seen.has(g.id)) return false;
+        seen.add(g.id);
+        return true;
+      })
+      .map((g: any) => ({
+        mode: "existing" as const,
+        guardian_id: g.id,
+        name: g.name ?? "",
+        document: maskCPF(g.document ?? ""),
+        email: g.email ?? "",
+        phone: maskPhone(g.phone ?? ""),
+        relationship: g.relationship ?? "",
+        is_financial_responsible: g.pivot?.is_financial_responsible ?? false,
+        is_pedagogical_responsible: g.pivot?.is_pedagogical_responsible ?? false,
+        can_access_portal: g.pivot?.can_access_portal ?? true,
+      }));
+  }, []);
+
+  const resolveGuardianIdByIdentity = useCallback(
+    (g: GuardianForm) => {
+      const doc = onlyDigits(g.document);
+      const email = normalizeEmail(g.email);
+      if (!doc && !email) return null;
+      const match = guardianOptions.find((opt) => {
+        const optDoc = onlyDigits(opt.document ?? "");
+        const optEmail = normalizeEmail(opt.email ?? "");
+        const byDoc = !!doc && !!optDoc && doc === optDoc;
+        const byEmail = !!email && !!optEmail && email === optEmail;
+        return byDoc || byEmail;
+      });
+      return match ? Number(match.value) : null;
+    },
+    [guardianOptions]
+  );
+
+  const syncStudentGuardians = useCallback(
+    async (targetStudentId: number) => {
+      const desired: Array<{
+        guardian_id: number;
+        is_financial_responsible: boolean;
+        is_pedagogical_responsible: boolean;
+        can_access_portal: boolean;
+      }> = [];
+
+      for (const g of guardians) {
+        let guardianId = g.mode === "existing" ? g.guardian_id : null;
+
+        if (!guardianId && g.mode === "new") {
+          guardianId = resolveGuardianIdByIdentity(g);
+        }
+
+        if (!guardianId && g.mode === "new") {
+          const createPayload: Record<string, any> = {
+            name: g.name.trim(),
+            document: onlyDigits(g.document),
+            email: g.email.trim(),
+          };
+          if (g.phone.trim()) createPayload.phone = onlyDigits(g.phone);
+          if (g.relationship) createPayload.relationship = g.relationship;
+          const { data: createdRaw } = await api.post("/guardians", createPayload);
+          const created = createdRaw?.body ?? createdRaw?.data ?? createdRaw;
+          guardianId = created?.id ?? null;
+        }
+
+        if (!guardianId) continue;
+
+        desired.push({
+          guardian_id: guardianId,
+          is_financial_responsible: g.is_financial_responsible,
+          is_pedagogical_responsible: g.is_pedagogical_responsible,
+          can_access_portal: g.can_access_portal,
+        });
+      }
+
+      const desiredUniqueMap = new Map<number, (typeof desired)[number]>();
+      for (const item of desired) desiredUniqueMap.set(item.guardian_id, item);
+      const desiredUnique = Array.from(desiredUniqueMap.values());
+
+      const { data: currentRaw } = await api.get(`/students/${targetStudentId}/guardians`);
+      const currentData = currentRaw?.body ?? currentRaw?.data ?? currentRaw;
+      const currentList = Array.isArray(currentData)
+        ? currentData
+        : Array.isArray(currentData?.data)
+        ? currentData.data
+        : [];
+      const currentIds = new Set<number>((currentList ?? []).map((g: any) => Number(g.id)));
+
+      // Deleta responsáveis não desejados
+      for (const currentId of currentIds) {
+        if (!desiredUniqueMap.has(currentId)) {
+          await api.delete(`/students/${targetStudentId}/guardians/${currentId}`);
+        }
+      }
+
+      // Atualiza ou cria responsáveis desejados (só DELETE+POST se mudou flags)
+      for (const item of desiredUnique) {
+        const currentGuardian = currentList.find((c: any) => Number(c.id) === item.guardian_id);
+        const flagsChanged = !currentGuardian || 
+          currentGuardian.pivot?.is_financial_responsible !== item.is_financial_responsible ||
+          currentGuardian.pivot?.is_pedagogical_responsible !== item.is_pedagogical_responsible ||
+          currentGuardian.pivot?.can_access_portal !== item.can_access_portal;
+
+        if (flagsChanged && currentGuardian) {
+          // Só faz DELETE+POST se as flags realmente mudaram
+          await api.delete(`/students/${targetStudentId}/guardians/${item.guardian_id}`);
+          await api.post(`/students/${targetStudentId}/guardians`, item);
+        } else if (!currentGuardian) {
+          // Se é novo responsável, só faz POST
+          await api.post(`/students/${targetStudentId}/guardians`, item);
+        }
+        // Se não mudou nada, não faz nada
+      }
+    },
+    [guardians, resolveGuardianIdByIdentity]
+  );
 
   // Auto-compute is_minor from birth_date
   useEffect(() => {
@@ -184,8 +312,19 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
       const { data } = await api.get("/guardians", {
         params: { per_page: 999 },
       });
+      const guardiansData = data.body ?? data.data ?? data;
+      const rows = Array.isArray(guardiansData)
+        ? guardiansData
+        : Array.isArray(guardiansData?.data)
+        ? guardiansData.data
+        : [];
       setGuardianOptions(
-        (data.data ?? []).map((g: any) => ({ value: String(g.id), label: g.name }))
+        rows.map((g: any) => ({
+          value: String(g.id),
+          label: g.name,
+          document: g.document ?? "",
+          email: g.email ?? "",
+        }))
       );
     } catch {}
   }, []);
@@ -209,29 +348,45 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
           is_minor: student.is_minor ? "true" : "false",
           status: student.status ?? "active",
         });
-        setGuardians(
-          (student.guardians ?? []).map((g: any) => ({
-            mode: "existing" as const,
-            guardian_id: g.id,
-            name: g.name ?? "",
-            document: maskCPF(g.document ?? ""),
-            email: g.email ?? "",
-            phone: maskPhone(g.phone ?? ""),
-            relationship: g.relationship ?? "",
-            is_financial_responsible: g.pivot?.is_financial_responsible ?? false,
-            is_pedagogical_responsible:
-              g.pivot?.is_pedagogical_responsible ?? false,
-            can_access_portal: g.pivot?.can_access_portal ?? true,
-          }))
-        );
+        setGuardians(mapApiGuardiansToForm(student.guardians ?? []));
       } catch {}
       setLoading(false);
     })();
-  }, [studentId]);
+  }, [studentId, fetchGuardianOptions, isEdit, mapApiGuardiansToForm]);
 
   const updateGuardian = (idx: number, partial: Partial<GuardianForm>) => {
     setGuardians((prev) =>
       prev.map((g, i) => (i === idx ? { ...g, ...partial } : g))
+    );
+  };
+
+  const switchGuardianMode = (idx: number, mode: "new" | "existing") => {
+    setGuardians((prev) =>
+      prev.map((g, i) => {
+        if (i !== idx) return g;
+        if (mode === "new") {
+          return {
+            ...g,
+            mode: "new",
+            guardian_id: null,
+            name: "",
+            document: "",
+            email: "",
+            phone: "",
+            relationship: "",
+          };
+        }
+        return {
+          ...g,
+          mode: "existing",
+          guardian_id: null,
+          name: "",
+          document: "",
+          email: "",
+          phone: "",
+          relationship: "",
+        };
+      })
     );
   };
 
@@ -245,13 +400,39 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
       localErrors.guardians =
         "Apenas um responsável financeiro pode ser definido.";
     }
+    const existingSelected = new Set<number>();
+    const newIdentitySelected = new Set<string>();
+
     guardians.forEach((g, i) => {
       if (g.mode === "new" && !g.name.trim()) {
         localErrors[`guardians.${i}.name`] =
           "Nome do responsável é obrigatório.";
       }
+      if (g.mode === "new" && !g.document.trim()) {
+        localErrors[`guardians.${i}.document`] = "CPF é obrigatório.";
+      }
+      if (g.mode === "new" && !g.email.trim()) {
+        localErrors[`guardians.${i}.email`] = "E-mail é obrigatório.";
+      }
       if (g.mode === "existing" && !g.guardian_id) {
         localErrors[`guardians.${i}.guardian_id`] = "Selecione o responsável.";
+      }
+
+      if (g.mode === "existing" && g.guardian_id) {
+        if (existingSelected.has(g.guardian_id)) {
+          localErrors[`guardians.${i}.guardian_id`] =
+            "Responsável já selecionado na lista.";
+        }
+        existingSelected.add(g.guardian_id);
+      }
+
+      if (g.mode === "new") {
+        const identity = `${onlyDigits(g.document)}|${normalizeEmail(g.email)}`;
+        if (identity !== "|" && newIdentitySelected.has(identity)) {
+          localErrors[`guardians.${i}.email`] =
+            "Este responsável já foi informado na lista.";
+        }
+        newIdentitySelected.add(identity);
       }
     });
 
@@ -274,32 +455,16 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         status: form.status,
       };
 
-      if (guardians.length > 0) {
-        payload.guardians = guardians.map((g) => {
-          if (g.mode === "existing" && g.guardian_id) {
-            return {
-              guardian_id: g.guardian_id,
-              is_financial_responsible: g.is_financial_responsible,
-              is_pedagogical_responsible: g.is_pedagogical_responsible,
-              can_access_portal: g.can_access_portal,
-            };
-          }
-          const item: Record<string, any> = {
-            name: g.name,
-            is_financial_responsible: g.is_financial_responsible,
-            is_pedagogical_responsible: g.is_pedagogical_responsible,
-            can_access_portal: g.can_access_portal,
-          };
-          if (g.document.trim()) item.document = g.document.replace(/\D/g, "");
-          if (g.email.trim()) item.email = g.email;
-          if (g.phone.trim()) item.phone = g.phone.replace(/\D/g, "");
-          if (g.relationship) item.relationship = g.relationship;
-          return item;
-        });
-      }
-
       if (isEdit) {
         const { data } = await api.put(`/students/${studentId}`, payload);
+        await syncStudentGuardians(Number(studentId));
+        const { data: guardiansRaw } = await api.get(`/students/${studentId}/guardians`);
+        const guardiansData = guardiansRaw?.body ?? guardiansRaw?.data ?? guardiansRaw;
+        const guardiansList = Array.isArray(guardiansData)
+          ? guardiansData
+          : Array.isArray(guardiansData?.data)
+          ? guardiansData.data
+          : [];
         const student = data.body ?? data.data ?? data;
         setEnrollmentNumber(student.enrollment_number ?? enrollmentNumber);
         setForm({
@@ -311,33 +476,43 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
           is_minor: student.is_minor ? "true" : "false",
           status: student.status ?? form.status,
         });
-        setGuardians(
-          (student.guardians ?? []).map((g: any) => ({
-            mode: "existing" as const,
-            guardian_id: g.id,
-            name: g.name ?? "",
-            document: maskCPF(g.document ?? ""),
-            email: g.email ?? "",
-            phone: maskPhone(g.phone ?? ""),
-            relationship: g.relationship ?? "",
-            is_financial_responsible: g.pivot?.is_financial_responsible ?? false,
-            is_pedagogical_responsible:
-              g.pivot?.is_pedagogical_responsible ?? false,
-            can_access_portal: g.pivot?.can_access_portal ?? true,
-          }))
-        );
+        setGuardians(mapApiGuardiansToForm(guardiansList));
+        await fetchGuardianOptions();
         setToast({
           visible: true,
           type: "success",
           message: data?.message || "Operacao realizada com sucesso.",
         });
+        setTimeout(() => {
+          navigate("alunos");
+        }, 1800);
       } else {
-        await api.post("/students", payload);
-        navigate("alunos");
+        const { data: rawCreate } = await api.post("/students", payload);
+        const created = rawCreate?.body ?? rawCreate?.data ?? rawCreate;
+        const createdId = Number(created?.id);
+        if (createdId) {
+          await syncStudentGuardians(createdId);
+          await fetchGuardianOptions();
+        }
+        setToast({
+          visible: true,
+          type: "success",
+          message: rawCreate?.message || "Aluno criado com sucesso.",
+        });
+        setTimeout(() => {
+          navigate("alunos");
+        }, 1800);
       }
     } catch (e: any) {
       if (e.response?.status === 422) {
-        setErrors(parseApiErrors(e.response.data.errors ?? {}));
+        const fieldErrors = parseApiErrors(e.response.data.errors ?? {});
+        setErrors(fieldErrors);
+        setToast({
+          visible: true,
+          type: "error",
+          message: e.response?.data?.message || "Dados inválidos.",
+        });
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
       } else {
         setToast({
           visible: true,
@@ -612,12 +787,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                         {/* Mode toggle */}
                         <View className="flex-row border border-gray-200 rounded-lg overflow-hidden">
                           <TouchableOpacity
-                            onPress={() =>
-                              updateGuardian(idx, {
-                                mode: "new",
-                                guardian_id: null,
-                              })
-                            }
+                            onPress={() => switchGuardianMode(idx, "new")}
                             className={`px-3 py-1 ${
                               g.mode === "new" ? "bg-violet-600" : "bg-white"
                             }`}
@@ -633,9 +803,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                             </Text>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            onPress={() =>
-                              updateGuardian(idx, { mode: "existing" })
-                            }
+                            onPress={() => switchGuardianMode(idx, "existing")}
                             className={`px-3 py-1 ${
                               g.mode === "existing"
                                 ? "bg-violet-600"
@@ -744,6 +912,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                                 placeholder="email@exemplo.com"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
+                                error={errors[`guardians.${idx}.email`]}
                               />
                             </View>
                             <View className="flex-1">
@@ -770,6 +939,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                               placeholder="000.000.000-00"
                               keyboardType="numeric"
                               maxLength={14}
+                              error={errors[`guardians.${idx}.document`]}
                             />
                           </View>
                         </View>
