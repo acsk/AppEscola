@@ -236,8 +236,7 @@ function SupportMaterialsSection({ materiais, carregando, accentColor }: Support
 export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const { examId } = route.params;
   const { width } = useWindowDimensions();
-
-  const [detalhe, setDetalhe]         = useState<SimuladoDetail | null>(null);
+ setDetalhe]         = useState<SimuladoDetail | null>(null);
   const [carregando, setCarregando]   = useState(true);
   const [erroMsg, setErroMsg]         = useState<string | null>(null);
   const [iniciando, setIniciando]     = useState(false);

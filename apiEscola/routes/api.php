@@ -129,6 +129,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('aluno/exams',                    [StudentExamController::class, 'index']);
     Route::get('aluno/exams/{exam}',             [StudentExamController::class, 'show']);
     Route::get('aluno/attempts',                 [StudentExamController::class, 'attempts']);
+    Route::get('aluno/attempts/{attempt}',       [StudentExamController::class, 'reviewAttempt']);
     Route::get('aluno/attempts/{attempt}/review',[StudentExamController::class, 'reviewAttempt']);
 
     // Simulados
