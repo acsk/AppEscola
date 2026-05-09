@@ -28,6 +28,7 @@ class Tenant extends Model
         'city',
         'state',
         'status',
+        'photo_url',
         'settings',
     ];
 

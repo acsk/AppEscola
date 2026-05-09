@@ -177,11 +177,19 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           type: "success",
           message: data?.message || "Operacao realizada com sucesso.",
         });
+        setTimeout(() => {
+          navigate("cursos");
+        }, 1800);
       } else {
         const { data } = await api.post("/courses", payload);
-        const created = data.body ?? data.data ?? data;
-        // Redirect to edit mode so user can add plans
-        navigate("cursos-form", { courseId: created.id });
+        setToast({
+          visible: true,
+          type: "success",
+          message: data?.message || "Curso criado com sucesso.",
+        });
+        setTimeout(() => {
+          navigate("cursos");
+        }, 1800);
       }
     } catch (e: any) {
       if (e.response?.status === 422) {

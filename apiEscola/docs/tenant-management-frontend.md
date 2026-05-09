@@ -374,3 +374,82 @@ Admin do Tenant (opcional):
   - Usuário administrador inicial
 - Mostrar aviso após sucesso:
   - "Tenant criado com sucesso. O admin inicial foi criado com obrigatoriedade de troca de senha no primeiro acesso."
+
+## Upload de foto do tenant
+
+### Endpoint: Upload de foto
+
+- Método: `POST`
+- URL: `/tenants/{tenant}/upload-photo`
+- Content-Type: `multipart/form-data`
+- Requer: `role = super_admin`
+
+**Campos do formulário:**
+
+- `photo` (obrigatório): arquivo de imagem
+  - Formatos aceitos: `jpg`, `jpeg`, `png`, `webp`
+  - Tamanho máximo: 5 MB
+
+**Exemplo (JavaScript/Fetch):**
+
+```javascript
+const formData = new FormData();
+formData.append('photo', document.getElementById('photoInput').files[0]);
+
+const response = await fetch('/api/tenants/123/upload-photo', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ' + token,
+    'Accept': 'application/json'
+  },
+  body: formData
+});
+
+const data = await response.json();
+console.log(data.photo_url); // URL da imagem
+```
+
+**Resposta `200`:**
+
+```json
+{
+  "tenant_id": 123,
+  "photo_url": "https://api.appcurso.com.br/storage/exam-questions/123/tenant/photo_2026_05_09_180000.jpg",
+  "path": "exam-questions/123/tenant/photo_2026_05_09_180000.jpg",
+  "message": "Foto enviada com sucesso."
+}
+```
+
+**Erros possíveis:**
+
+- `401`: Token inválido/ausente
+- `403`: Não tem permissão `super_admin`
+- `422`: Arquivo inválido ou muito grande
+  ```json
+  {
+    "message": "Dados inválidos.",
+    "errors": {
+      "photo": ["Arquivo deve ser uma imagem válida, máx 5 MB."]
+    }
+  }
+  ```
+
+### Resposta do GET/List tenants com photo_url
+
+Após upload, a foto aparece em listagens e detalhes:
+
+```json
+{
+  "id": 123,
+  "corporate_name": "Escola Exemplo LTDA",
+  "trade_name": "Escola Exemplo",
+  "name": "Escola Exemplo",
+  "slug": "escola-exemplo",
+  "photo_url": "https://api.appcurso.com.br/storage/exam-questions/123/tenant/photo.jpg",
+  "status": "active",
+  "created_at": "2026-05-05T23:00:00.000000Z",
+  "updated_at": "2026-05-09T18:00:00.000000Z"
+}
+```
+
+Se nenhuma foto foi enviada, `photo_url` será `null`.

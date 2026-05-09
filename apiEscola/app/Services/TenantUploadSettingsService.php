@@ -47,6 +47,18 @@ class TenantUploadSettingsService
         ];
     }
 
+    public function buildTenantPhotoDirectory(Tenant $tenant): array
+    {
+        $config = $this->getForTenant($tenant);
+
+        return [
+            'disk' => $config['disk'],
+            'directory' => $this->normalizePath(
+                $config['base_path'] . '/' . $tenant->id . '/tenant'
+            ),
+        ];
+    }
+
     public function url(string $disk, string $path): string
     {
         $normalizedPath = ltrim($path, '/');

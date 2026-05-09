@@ -213,4 +213,56 @@ class TenantController extends Controller
 
         return response()->json(['message' => 'Tenant removido com sucesso.']);
     }
+
+    #[OA\Post(
+        path: '/api/tenants/{tenant}/upload-photo',
+        tags: ['Tenants'],
+        summary: 'Upload de foto do tenant',
+        security: [['sanctum' => []]],
+        parameters: [new OA\Parameter(name: 'tenant', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    required: ['photo'],
+                    properties: [
+                        new OA\Property(
+                            property: 'photo',
+                            type: 'string',
+                            format: 'binary',
+                            description: 'Arquivo de imagem (jpg, jpeg, png, webp) - máx 5MB'
+                        ),
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Foto enviada com sucesso'),
+            new OA\Response(response: 422, description: 'Arquivo inválido'),
+        ]
+    )]
+    public function uploadPhoto(Request $request, Tenant $tenant, \App\Services\TenantUploadSettingsService $uploadSettings): JsonResponse
+    {
+        $this->ensureSuperAdmin($request);
+
+        $request->validate([
+            'photo' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $directoryConfig = $uploadSettings->buildTenantPhotoDirectory($tenant);
+        $path = $request->file('photo')->store($directoryConfig['directory'], $directoryConfig['disk']);
+        $photoUrl = $uploadSettings->url($directoryConfig['disk'], $path);
+
+        $tenant->update([
+            'photo_url' => $photoUrl,
+        ]);
+
+        return response()->json([
+            'tenant_id' => $tenant->id,
+            'photo_url' => $photoUrl,
+            'path' => $path,
+            'message' => 'Foto enviada com sucesso.',
+        ], 200);
+    }
 }

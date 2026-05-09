@@ -54,6 +54,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::apiResource('tenants', TenantController::class);
     Route::get('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'show']);
     Route::put('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'update']);
+    Route::post('tenants/{tenant}/upload-photo', [TenantController::class, 'uploadPhoto']);
 
     // Administração de usuários (super_admin e admin)
     Route::apiResource('users', UserManagementController::class);
