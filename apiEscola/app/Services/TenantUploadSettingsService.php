@@ -59,6 +59,19 @@ class TenantUploadSettingsService
         ];
     }
 
+    public function buildSupportMaterialDirectory(int $tenantId, int $examId): array
+    {
+        $tenant = Tenant::findOrFail($tenantId);
+        $config = $this->getForTenant($tenant);
+
+        return [
+            'disk' => $config['disk'],
+            'directory' => $this->normalizePath(
+                $config['base_path'] . '/' . $tenantId . '/support-materials/' . $examId
+            ),
+        ];
+    }
+
     public function url(string $disk, string $path): string
     {
         $normalizedPath = ltrim($path, '/');

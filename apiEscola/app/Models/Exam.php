@@ -85,6 +85,11 @@ class Exam extends Model
         return $this->hasMany(ExamAttempt::class);
     }
 
+    public function supportMaterials(): HasMany
+    {
+        return $this->hasMany(SupportMaterial::class);
+    }
+
     /** Soma total de pontos do simulado */
     public function totalPoints(): float
     {

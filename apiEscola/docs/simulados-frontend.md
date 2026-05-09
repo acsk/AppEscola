@@ -651,6 +651,262 @@ Ao chamar este endpoint a API:
 
 ---
 
+## Materiais de Apoio (Suporte)
+
+### Visão geral
+
+Os materiais de apoio são recursos (links de vídeo, PDFs, imagens, etc.) associados a um simulado. Permitem que o admin/professor disponibilize conteúdo complementar para os alunos estudarem antes ou durante a realização do simulado.
+
+**Tipos de material:**
+- **`link`**: URL externa (YouTube, vídeos, sites, artigos)
+- **`file`**: Arquivo enviado (PDF, imagens, vídeos em servidor local)
+
+### Listar materiais de apoio de um simulado
+
+```
+GET /api/exams/{exam}/support-materials
+Authorization: Bearer {token}
+```
+
+**Resposta:**
+```json
+[
+  {
+    "id": 1,
+    "exam_id": 123,
+    "title": "Vídeo de Introdução",
+    "description": "Explicação completa do conteúdo",
+    "type": "link",
+    "content": "https://youtube.com/watch?v=dQw4w9WgXcQ",
+    "file_type": null,
+    "file_size": null,
+    "created_by": 5,
+    "updated_by": null,
+    "created_at": "2026-05-09T15:30:00Z",
+    "updated_at": "2026-05-09T15:30:00Z"
+  },
+  {
+    "id": 2,
+    "exam_id": 123,
+    "title": "Material em PDF",
+    "description": "Resumo das matérias",
+    "type": "file",
+    "content": "https://app.localhost/storage/tenant_id/support-materials/123/file.pdf",
+    "file_type": "pdf",
+    "file_size": 2048576,
+    "created_by": 5,
+    "updated_by": null,
+    "created_at": "2026-05-09T15:35:00Z",
+    "updated_at": "2026-05-09T15:35:00Z"
+  }
+]
+```
+
+### Criar material de apoio (link)
+
+```
+POST /api/exams/{exam}/support-materials
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "title": "Vídeo de Introdução",
+  "description": "Explicação completa do conteúdo",
+  "type": "link",
+  "content": "https://youtube.com/watch?v=dQw4w9WgXcQ"
+}
+```
+
+**Resposta (201):**
+```json
+{
+  "id": 1,
+  "exam_id": 123,
+  "title": "Vídeo de Introdução",
+  "description": "Explicação completa do conteúdo",
+  "type": "link",
+  "content": "https://youtube.com/watch?v=dQw4w9WgXcQ",
+  "file_type": null,
+  "file_size": null,
+  "created_by": 5,
+  "updated_by": null,
+  "created_at": "2026-05-09T15:30:00Z",
+  "updated_at": "2026-05-09T15:30:00Z"
+}
+```
+
+**JavaScript:**
+```javascript
+const addLink = async (examId, title, url) => {
+  const response = await fetch(
+    `/api/exams/${examId}/support-materials`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title,
+        type: 'link',
+        content: url
+      })
+    }
+  );
+  return response.json();
+};
+```
+
+### Upload de arquivo como material de apoio
+
+```
+POST /api/exams/{exam}/support-materials/upload
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+```
+
+**Campos:**
+- **`title`** (string, obrigatório): Título do material
+- **`description`** (string, opcional): Descrição adicional
+- **`file`** (file, obrigatório): Arquivo PDF, imagem (jpg/png/webp) ou vídeo (mp4/mov/avi/mkv) — máx 50MB
+
+**Resposta (201):**
+```json
+{
+  "id": 2,
+  "exam_id": 123,
+  "title": "Material em PDF",
+  "description": "Resumo das matérias",
+  "type": "file",
+  "content": "https://app.localhost/storage/tenant_id/support-materials/123/file.pdf",
+  "file_type": "pdf",
+  "file_size": 2048576,
+  "created_by": 5,
+  "updated_by": null,
+  "created_at": "2026-05-09T15:35:00Z",
+  "updated_at": "2026-05-09T15:35:00Z"
+}
+```
+
+**JavaScript:**
+```javascript
+const uploadMaterial = async (examId, title, file, description = '') => {
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('description', description);
+  formData.append('file', file);
+
+  const response = await fetch(
+    `/api/exams/${examId}/support-materials/upload`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+        // NÃO incluir Content-Type — o navegador define automaticamente com boundary
+      },
+      body: formData
+    }
+  );
+  return response.json();
+};
+
+// Uso com input de arquivo:
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const material = await uploadMaterial(123, 'Meu PDF', file, 'Descrição opcional');
+  console.log('Material criado:', material);
+});
+```
+
+### Visualizar um material de apoio
+
+```
+GET /api/exams/{exam}/support-materials/{material}
+Authorization: Bearer {token}
+```
+
+**Resposta (200):**
+```json
+{
+  "id": 1,
+  "exam_id": 123,
+  "title": "Vídeo de Introdução",
+  "description": "Explicação completa",
+  "type": "link",
+  "content": "https://youtube.com/watch?v=dQw4w9WgXcQ",
+  "file_type": null,
+  "file_size": null,
+  "created_by": 5,
+  "updated_by": null,
+  "created_at": "2026-05-09T15:30:00Z",
+  "updated_at": "2026-05-09T15:30:00Z"
+}
+```
+
+### Atualizar material de apoio
+
+```
+PUT /api/exams/{exam}/support-materials/{material}
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body (todos os campos são opcionais):**
+```json
+{
+  "title": "Novo título",
+  "description": "Nova descrição",
+  "type": "link",
+  "content": "https://novo-url.com"
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "id": 1,
+  "exam_id": 123,
+  "title": "Novo título",
+  "description": "Nova descrição",
+  "type": "link",
+  "content": "https://novo-url.com",
+  "file_type": null,
+  "file_size": null,
+  "created_by": 5,
+  "updated_by": 5,
+  "created_at": "2026-05-09T15:30:00Z",
+  "updated_at": "2026-05-09T15:35:00Z"
+}
+```
+
+### Remover material de apoio
+
+```
+DELETE /api/exams/{exam}/support-materials/{material}
+Authorization: Bearer {token}
+```
+
+**Resposta (200):**
+```json
+{
+  "message": "Material removido com sucesso."
+}
+```
+
+### Tratamento de erros
+
+| Código HTTP | Motivo | Solução |
+|---|---|---|
+| `404` | Simulado ou material não encontrado | Verificar IDs na URL |
+| `422` | Dados inválidos (arquivo muito grande, tipo inválido) | Validar arquivo e campos obrigatórios |
+| `403` | Acesso negado (tenant diferente) | Verificar se o simulado pertence ao tenant correto |
+| `401` | Token expirado ou ausente | Fazer login novamente |
+
+---
+
 ## Lógica de renderização (resumo para implementação)
 
 ```

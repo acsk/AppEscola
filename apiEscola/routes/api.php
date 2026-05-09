@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\SubjectController;
 use App\Http\Controllers\Api\ExamAttemptController;
 use App\Http\Controllers\Api\ExamController;
 use App\Http\Controllers\Api\ExamQuestionController;
+use App\Http\Controllers\Api\SupportMaterialController;
 use App\Http\Controllers\Api\StudentDashboardController;
 use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
@@ -145,6 +146,14 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('exams/{exam}/questions/{question}',    [ExamQuestionController::class, 'show']);
     Route::put('exams/{exam}/questions/{question}',    [ExamQuestionController::class, 'update']);
     Route::delete('exams/{exam}/questions/{question}', [ExamQuestionController::class, 'destroy']);
+
+    // Materiais de apoio de um simulado (nested)
+    Route::get('exams/{exam}/support-materials',                 [SupportMaterialController::class, 'index']);
+    Route::post('exams/{exam}/support-materials',                [SupportMaterialController::class, 'store']);
+    Route::post('exams/{exam}/support-materials/upload',         [SupportMaterialController::class, 'uploadFile']);
+    Route::get('exams/{exam}/support-materials/{material}',      [SupportMaterialController::class, 'show']);
+    Route::put('exams/{exam}/support-materials/{material}',      [SupportMaterialController::class, 'update']);
+    Route::delete('exams/{exam}/support-materials/{material}',   [SupportMaterialController::class, 'destroy']);
 
     // Tentativas de simulado
     Route::get('exam-attempts/summary',                                  [ExamAttemptController::class, 'summary']);
