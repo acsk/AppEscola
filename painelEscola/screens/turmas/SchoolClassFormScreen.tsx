@@ -123,7 +123,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
   // ── Lookup data ──────────────────────────────────────────────────────────────
   const [courses, setCourses] = useState<Course[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [allTeachers, setAllTeachers] = useState<Teacher[]>([]);
+  const [scheduleTeachers, setScheduleTeachers] = useState<Teacher[]>([]);
   const periods = usePeriods();
   const periodOptions = domainToOptions(periods);
 
@@ -137,11 +138,6 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
     [subjects]
   );
 
-  const teacherOptions = useMemo(
-    () => teachers.map((t) => ({ value: String(t.id), label: (t.name ?? "").toUpperCase() })),
-    [teachers]
-  );
-
   const subjectNameById = useMemo(() => {
     const map = new Map<number, string>();
     subjects.forEach((s) => map.set(s.id, s.name));
@@ -150,9 +146,9 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
   const teacherNameById = useMemo(() => {
     const map = new Map<number, string>();
-    teachers.forEach((t) => map.set(t.id, t.name));
+    allTeachers.forEach((t) => map.set(t.id, t.name));
     return map;
-  }, [teachers]);
+  }, [allTeachers]);
 
   // ── Class form ───────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(isEdit);
@@ -199,12 +195,14 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
         setCourses(Array.isArray(coursesData) ? coursesData : []);
         setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
-        setTeachers(
+        const normalizedTeachers =
           (Array.isArray(teachersData) ? teachersData : []).map((t: any) => ({
             id: t.id,
             name: t.name,
-          }))
-        );
+          }));
+
+        setAllTeachers(normalizedTeachers);
+        setScheduleTeachers([]);
       } catch {}
     })();
 
@@ -234,6 +232,48 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
       setLoading(false);
     })();
   }, [classId]);
+
+  useEffect(() => {
+    if (!scheduleModal) return;
+
+    const extractList = (payload: any): any[] => {
+      const root = payload?.body ?? payload;
+      if (Array.isArray(root?.data)) return root.data;
+      if (Array.isArray(root)) return root;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
+    };
+
+    const loadTeachersForSubject = async () => {
+      if (!scheduleForm.subject_id) {
+        setScheduleTeachers([]);
+        return;
+      }
+
+      try {
+        const { data: teachersRaw } = await api.get("/users", {
+          params: {
+            role: "professor",
+            subject_id: Number(scheduleForm.subject_id),
+            per_page: 200,
+          },
+        });
+
+        const teachersData = extractList(teachersRaw);
+        const normalizedTeachers =
+          (Array.isArray(teachersData) ? teachersData : []).map((t: any) => ({
+            id: t.id,
+            name: t.name,
+          }));
+
+        setScheduleTeachers(normalizedTeachers);
+      } catch {
+        setScheduleTeachers([]);
+      }
+    };
+
+    loadTeachersForSubject();
+  }, [allTeachers, scheduleForm.subject_id, scheduleModal]);
 
   // ── Save class ────────────────────────────────────────────────────────────────
   const saveClass = async () => {
@@ -790,8 +830,12 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             required
             value={scheduleForm.subject_id}
             onChange={(value) => {
-              setScheduleForm({ ...scheduleForm, subject_id: value });
-              setScheduleErrors((prev) => ({ ...prev, subject_id: "" }));
+              setScheduleForm({
+                ...scheduleForm,
+                subject_id: value,
+                teacher_ids: [],
+              });
+              setScheduleErrors((prev) => ({ ...prev, subject_id: "", teacher_ids: "" }));
             }}
             options={subjectOptions}
             placeholder="SELECIONE A DISCIPLINA"
@@ -816,7 +860,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             }}
           >
             <ScrollView>
-              {teachers.map((t) => {
+              {scheduleTeachers.map((t) => {
                 const value = String(t.id);
                 const selected = scheduleForm.teacher_ids.includes(value);
 
@@ -843,9 +887,11 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             <Text className="text-xs text-red-500 mt-1">{scheduleErrors.teacher_ids}</Text>
           )}
 
-          {teachers.length === 0 && (
+          {scheduleTeachers.length === 0 && (
             <Text className="text-xs text-amber-600 mt-1">
-              Nenhum professor encontrado. Verifique se há usuários com perfil PROFESSOR.
+              {!scheduleForm.subject_id
+                ? "Selecione uma disciplina para listar os professores disponíveis."
+                : "Nenhum professor encontrado para esta disciplina."}
             </Text>
           )}
         </View>

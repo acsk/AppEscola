@@ -11,6 +11,7 @@ type Props = {
   error?: string;
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
 };
 
 export default function FormSelect({
@@ -21,6 +22,7 @@ export default function FormSelect({
   error,
   placeholder,
   required,
+  disabled = false,
 }: Props) {
   return (
     <View className="mb-4">
@@ -32,16 +34,19 @@ export default function FormSelect({
       <select
         value={value as string}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
         style={{
           border: `1px solid ${error ? "#FCA5A5" : "#E5E7EB"}`,
           borderRadius: 12,
           padding: "10px 14px",
           fontSize: 14,
-          color: value ? "#1F2937" : "#9CA3AF",
-          backgroundColor: "#F9FAFB",
+          color: disabled ? "#9CA3AF" : value ? "#1F2937" : "#9CA3AF",
+          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
           outline: "none",
           width: "100%",
           height: 42,
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.8 : 1,
         }}
       >
         {placeholder && (

@@ -157,10 +157,13 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [isTenantOwner, setIsTenantOwner] = useState(false);
+  const [originalRole, setOriginalRole] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const isEditingOwnUser = isEdit && !!userId && user?.id === userId;
 
   useEffect(() => {
     if (!isGlobalSuperAdmin) return;
@@ -211,6 +214,8 @@ export default function UserFormScreen({ navigate, userId }: Props) {
 
   useEffect(() => {
     if (!isEdit || !userId) {
+      setIsTenantOwner(false);
+      setOriginalRole(null);
       if (!isGlobalSuperAdmin && user?.tenant_id != null) {
         setForm((prev) => ({ ...prev, tenant_id: String(user.tenant_id) }));
       }
@@ -224,6 +229,8 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       try {
         const { data } = await api.get(`/users/${userId}`);
         const u = data.body ?? data.data ?? data;
+        setIsTenantOwner(!!u.is_tenant_owner);
+        setOriginalRole(u.role ?? "secretaria");
 
         setForm((prev) => ({
           ...prev,
@@ -282,8 +289,11 @@ export default function UserFormScreen({ navigate, userId }: Props) {
   const title = useMemo(() => (isEdit ? "Editar Usuario" : "Novo Usuario"), [isEdit]);
 
   const showTenantField = isGlobalSuperAdmin && form.role !== "super_admin";
+  const isRoleLocked = isEdit && (isTenantOwner || isEditingOwnUser);
 
   const onRoleChange = (nextRole: string) => {
+    if (isRoleLocked) return;
+
     setForm((prev) => ({
       ...prev,
       role: nextRole,
@@ -348,6 +358,11 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       password_change_required: form.password_change_required,
     };
 
+    // Regra de seguranca do front: owner inicial e usuario logado nao podem alterar o proprio perfil.
+    if (isRoleLocked && originalRole) {
+      payload.role = originalRole;
+    }
+
     if (isGlobalSuperAdmin) {
       payload.tenant_id = form.role === "super_admin" ? null : Number(form.tenant_id);
     }
@@ -375,7 +390,15 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       }
     } catch (e: any) {
       if (e.response?.status === 422) {
-        setErrors(parseApiErrors(e.response.data?.errors ?? {}));
+        const fieldErrors = parseApiErrors(e.response.data?.errors ?? {});
+        if (Object.keys(fieldErrors).length > 0) {
+          setErrors(fieldErrors);
+        } else {
+          setErrors({
+            general:
+              e.response?.data?.message || "Nao foi possivel salvar este usuario.",
+          });
+        }
       } else if (e.response?.status === 403) {
         setForbidden(true);
       } else {
@@ -469,7 +492,18 @@ export default function UserFormScreen({ navigate, userId }: Props) {
               options={roles}
               error={errors.role}
               required
+              disabled={isRoleLocked}
             />
+            {isEdit && isTenantOwner && (
+              <Text className="text-xs text-amber-600 mt-1">
+                O usuario administrador inicial do tenant nao pode ter o perfil alterado.
+              </Text>
+            )}
+            {isEditingOwnUser && (
+              <Text className="text-xs text-amber-600 mt-1">
+                Voce nao pode alterar o seu proprio perfil de acesso.
+              </Text>
+            )}
           </View>
 
           <View style={{ minWidth: 180, flexGrow: 1 }}>

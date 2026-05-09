@@ -19,6 +19,23 @@ class UserManagementController extends Controller
 {
     use ScopedByTenant;
 
+    private function isTenantInitialUser(User $user): bool
+    {
+        if ($user->tenant_id === null) {
+            return false;
+        }
+
+        if ((bool) $user->is_tenant_owner) {
+            return true;
+        }
+
+        // Fallback para bases antigas: considera o primeiro usuário do tenant como admin inicial.
+        return ! User::query()
+            ->where('tenant_id', $user->tenant_id)
+            ->where('id', '<', $user->id)
+            ->exists();
+    }
+
     private function ensureCanManageUsers(Request $request): void
     {
         $user = $request->user();
@@ -164,7 +181,7 @@ class UserManagementController extends Controller
         $actor = $request->user();
 
         if (
-            (bool) $target->is_tenant_owner
+            $this->isTenantInitialUser($target)
             && array_key_exists('role', $data)
             && $data['role'] !== $target->role
         ) {
@@ -348,7 +365,7 @@ class UserManagementController extends Controller
             ]);
         }
 
-        if ((bool) $user->is_tenant_owner) {
+        if ($this->isTenantInitialUser($user)) {
             throw ValidationException::withMessages([
                 'user' => ['O usuário administrador inicial do tenant não pode ser removido.'],
             ]);

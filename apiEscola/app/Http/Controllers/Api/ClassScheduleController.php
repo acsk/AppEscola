@@ -69,9 +69,10 @@ class ClassScheduleController extends Controller
 
         $validated = $request->validated();
         $teacherIds = $this->resolveTeacherIdsFromPayload($validated);
+        $subjectId = isset($validated['subject_id']) ? (int) $validated['subject_id'] : null;
 
         if ($teacherIds !== null) {
-            $this->validateTeacherIds($teacherIds, $schoolClass->tenant_id);
+            $this->validateTeacherIds($teacherIds, $schoolClass->tenant_id, $subjectId);
             $validated['teacher_id'] = $teacherIds[0] ?? null;
         }
 
@@ -109,9 +110,12 @@ class ClassScheduleController extends Controller
 
         $validated = $request->validated();
         $teacherIds = $this->resolveTeacherIdsFromPayload($validated);
+        $subjectId = isset($validated['subject_id'])
+            ? (int) $validated['subject_id']
+            : (int) $classSchedule->subject_id;
 
         if ($teacherIds !== null) {
-            $this->validateTeacherIds($teacherIds, $classSchedule->tenant_id);
+            $this->validateTeacherIds($teacherIds, $classSchedule->tenant_id, $subjectId);
             $validated['teacher_id'] = $teacherIds[0] ?? null;
         }
 
@@ -177,7 +181,7 @@ class ClassScheduleController extends Controller
         return null;
     }
 
-    private function validateTeacherIds(array $teacherIds, int $tenantId): void
+    private function validateTeacherIds(array $teacherIds, int $tenantId, ?int $subjectId = null): void
     {
         if ($teacherIds === []) {
             return;
@@ -192,6 +196,24 @@ class ClassScheduleController extends Controller
         if ($validCount !== count($teacherIds)) {
             throw ValidationException::withMessages([
                 'teacher_ids' => 'Um ou mais professores sao invalidos para este tenant.',
+            ]);
+        }
+
+        if ($subjectId === null) {
+            return;
+        }
+
+        // Verifica se todos os professores têm a disciplina vinculada.
+        $withSubjectCount = User::query()
+            ->where('tenant_id', $tenantId)
+            ->where('role', 'professor')
+            ->whereIn('id', $teacherIds)
+            ->whereHas('subjects', fn ($q) => $q->where('subjects.id', $subjectId))
+            ->count();
+
+        if ($withSubjectCount !== count($teacherIds)) {
+            throw ValidationException::withMessages([
+                'teacher_ids' => 'Um ou mais professores não lecionam a disciplina selecionada.',
             ]);
         }
     }

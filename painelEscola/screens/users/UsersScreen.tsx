@@ -18,6 +18,7 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 type UserRow = {
   id: number;
   tenant_id: number | null;
+  is_tenant_owner: boolean;
   name: string;
   email: string;
   role: string;
@@ -423,9 +424,11 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
                 <TouchableOpacity onPress={() => navigate("users-form", { userId: row.id })} className="p-2" activeOpacity={0.7}>
                   <Ionicons name="create-outline" size={18} color="#6366F1" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setDeleteId(row.id)} className="p-2" activeOpacity={0.7}>
-                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                </TouchableOpacity>
+                {!row.is_tenant_owner && (
+                  <TouchableOpacity onPress={() => setDeleteId(row.id)} className="p-2" activeOpacity={0.7}>
+                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))
