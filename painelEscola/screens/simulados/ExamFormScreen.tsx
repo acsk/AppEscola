@@ -220,6 +220,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  const [questionImageRatios, setQuestionImageRatios] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{
     visible: boolean;
     type: "success" | "error";
@@ -233,6 +234,26 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
   }, []);
+
+  const ensureQuestionImageRatio = useCallback((imageUrl: string) => {
+    if (!imageUrl || questionImageRatios[imageUrl]) return;
+    Image.getSize(
+      imageUrl,
+      (width, height) => {
+        if (!width || !height) return;
+        setQuestionImageRatios((prev) => {
+          if (prev[imageUrl]) return prev;
+          return { ...prev, [imageUrl]: width / height };
+        });
+      },
+      () => {
+        setQuestionImageRatios((prev) => {
+          if (prev[imageUrl]) return prev;
+          return { ...prev, [imageUrl]: 1.4 };
+        });
+      }
+    );
+  }, [questionImageRatios]);
 
   // ── Loaders ─────────────────────────────────────────────────────────────────
 
@@ -558,6 +579,12 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   useEffect(() => {
     setActiveStep(1);
   }, [examId]);
+
+  useEffect(() => {
+    questions.forEach((question) => {
+      if (question.image_url) ensureQuestionImageRatio(question.image_url);
+    });
+  }, [questions, ensureQuestionImageRatio]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -1061,7 +1088,11 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
                   <View className="mb-4 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
                     <Image
                       source={{ uri: q.image_url }}
-                      style={{ width: "100%", height: 220, backgroundColor: "#F3F4F6" }}
+                      style={{
+                        width: "100%",
+                        aspectRatio: questionImageRatios[q.image_url] || 1.4,
+                        backgroundColor: "#F3F4F6",
+                      }}
                       resizeMode="contain"
                     />
                     <View className="px-3 py-2 border-t border-gray-200">
