@@ -18,6 +18,7 @@ const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
 const STORAGE_API_VERSION_KEY = "api_version_seen";
 const STORAGE_PANEL_RELOAD_ATTEMPT_KEY = "panel_reload_attempt_version";
+const CHECKLIST_STEP_DELAY_MS = 500;
 
 type ChecklistStatus = "idle" | "pending" | "success" | "error";
 
@@ -127,6 +128,9 @@ export default function LoginScreen() {
   ) => {
     setLoginChecklist((prev) => ({ ...prev, [step]: status }));
   };
+
+  const waitChecklistStep = () =>
+    new Promise((resolve) => window.setTimeout(resolve, CHECKLIST_STEP_DELAY_MS));
 
   const fetchMetaInfo = async () => {
     const metaUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/meta`;
@@ -306,6 +310,8 @@ export default function LoginScreen() {
       loginAuthorized: "idle",
     });
 
+    await waitChecklistStep();
+
     const browserIsOnline =
       typeof navigator === "undefined" ? true : navigator.onLine;
     if (!browserIsOnline) {
@@ -317,6 +323,7 @@ export default function LoginScreen() {
     updateChecklistStep("internet", "success");
 
     updateChecklistStep("apiUpdated", "pending");
+  await waitChecklistStep();
 
     let latestApiVersion = "-";
     let latestContractVersion = "-";
@@ -372,6 +379,7 @@ export default function LoginScreen() {
     }
 
     updateChecklistStep("appUpdated", "pending");
+  await waitChecklistStep();
     const requiresReload = await checkPanelBuildAndReload();
     if (requiresReload) {
       updateChecklistStep("appUpdated", "error");
@@ -411,6 +419,7 @@ export default function LoginScreen() {
     setDebugInfo(null);
     setDebugCopied(false);
     updateChecklistStep("loginAuthorized", "pending");
+    await waitChecklistStep();
     try {
       const tenantIdValue = tenantId.trim();
       const parsedTenantId = tenantIdValue ? Number(tenantIdValue) : null;
@@ -469,15 +478,15 @@ export default function LoginScreen() {
 
   const renderChecklistIcon = (status: ChecklistStatus) => {
     if (status === "success") {
-      return <Ionicons name="checkmark-circle" size={18} color="#16A34A" />;
+      return <Ionicons name="checkmark-circle" size={24} color="#16A34A" />;
     }
     if (status === "error") {
-      return <Ionicons name="close-circle" size={18} color="#DC2626" />;
+      return <Ionicons name="close-circle" size={24} color="#DC2626" />;
     }
     if (status === "pending") {
-      return <ActivityIndicator size="small" color="#7C3AED" />;
+      return <ActivityIndicator size={22} color="#7C3AED" />;
     }
-    return <Ionicons name="ellipse-outline" size={16} color="#9CA3AF" />;
+    return <Ionicons name="ellipse-outline" size={22} color="#9CA3AF" />;
   };
 
   return (

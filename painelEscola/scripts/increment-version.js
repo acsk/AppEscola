@@ -54,36 +54,38 @@ const postJson = (url, payload) =>
     req.end();
   });
 
-const buildEndpointCandidates = () => {
-  const configuredBase =
-    process.env.APP_VERSION_API_URL ||
-    process.env.API_BASE_URL ||
-    process.env.EXPO_PUBLIC_API_URL ||
-    '';
+const toEndpointVariants = (base) => {
+  const cleaned = String(base || '').replace(/\/$/, '');
+  if (!cleaned) return [];
 
-  const baseCandidates = configuredBase
-    ? [configuredBase]
-    : [DEFAULT_LOCAL_API_BASE, DEFAULT_REMOTE_API_BASE];
-
-  const endpoints = [];
-
-  for (const base of baseCandidates) {
-    const cleaned = String(base || '').replace(/\/$/, '');
-    if (!cleaned) continue;
-
-    if (/\/version\/panel$/i.test(cleaned)) {
-      endpoints.push(cleaned);
-      continue;
-    }
-
-    endpoints.push(`${cleaned}/version/panel`);
-
-    if (!/\/api$/i.test(cleaned)) {
-      endpoints.push(`${cleaned}/api/version/panel`);
-    }
+  if (/\/version\/panel$/i.test(cleaned)) {
+    return [cleaned];
   }
 
-  return [...new Set(endpoints)];
+  const variants = [`${cleaned}/version/panel`];
+  if (!/\/api$/i.test(cleaned)) {
+    variants.push(`${cleaned}/api/version/panel`);
+  }
+
+  return [...new Set(variants)];
+};
+
+const buildPublishTargets = () => {
+  const rawList = process.env.APP_VERSION_API_URLS || '';
+
+  // Permite sobrescrever com múltiplas bases: APP_VERSION_API_URLS="http://localhost:4000/api,https://api.appcurso.com.br/api"
+  if (rawList.trim()) {
+    return rawList
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((base) => ({ base, endpoints: toEndpointVariants(base) }));
+  }
+
+  return [
+    { base: DEFAULT_LOCAL_API_BASE, endpoints: toEndpointVariants(DEFAULT_LOCAL_API_BASE) },
+    { base: DEFAULT_REMOTE_API_BASE, endpoints: toEndpointVariants(DEFAULT_REMOTE_API_BASE) },
+  ];
 };
 
 const run = async () => {
@@ -116,16 +118,16 @@ const run = async () => {
   console.log(`✅ Build incrementado: ${buildVersion}`);
   console.log(`📅 Build gerado: ${buildInfo.buildDate}`);
 
-  const endpoints = buildEndpointCandidates();
-  if (endpoints.length === 0) {
+  const targets = buildPublishTargets().filter((target) => target.endpoints.length > 0);
+  if (targets.length === 0) {
     console.warn(
       '⚠️ Publicação da versão no backend ignorada: endpoint inválido.'
     );
     return;
   }
 
-  if (!process.env.APP_VERSION_API_URL && !process.env.API_BASE_URL && !process.env.EXPO_PUBLIC_API_URL) {
-    console.log(`ℹ️ APP_VERSION_API_URL não definido. Tentando endpoints padrão: ${endpoints.join(' | ')}`);
+  if (!process.env.APP_VERSION_API_URLS) {
+    console.log('ℹ️ Publicando versão nos dois destinos padrão: local e produção.');
   }
 
   const payload = {
@@ -134,36 +136,35 @@ const run = async () => {
     release_date: buildDateIso.slice(0, 10),
   };
 
-  let published = false;
-  let lastError = null;
+  const failures = [];
 
-  for (const endpoint of endpoints) {
-    try {
-      await postJson(endpoint, payload);
-      console.log(`☁️ Versão publicada no backend com sucesso: ${endpoint}`);
-      published = true;
-      break;
-    } catch (error) {
-      lastError = error;
-      console.warn(`⚠️ Falha ao publicar em ${endpoint}: ${error.message}`);
+  for (const target of targets) {
+    let publishedInTarget = false;
+    let lastError = null;
+
+    for (const endpoint of target.endpoints) {
+      try {
+        await postJson(endpoint, payload);
+        console.log(`☁️ Versão publicada com sucesso em ${target.base}: ${endpoint}`);
+        publishedInTarget = true;
+        break;
+      } catch (error) {
+        lastError = error;
+        console.warn(`⚠️ Falha ao publicar em ${endpoint}: ${error.message}`);
+      }
+    }
+
+    if (!publishedInTarget) {
+      failures.push({ base: target.base, message: lastError?.message || 'erro desconhecido' });
     }
   }
 
-  if (!published) {
-    const hasExplicitEndpointConfig =
-      !!process.env.APP_VERSION_API_URL ||
-      !!process.env.API_BASE_URL ||
-      !!process.env.EXPO_PUBLIC_API_URL;
-
-    if (hasExplicitEndpointConfig) {
-      console.error(`❌ Não foi possível publicar versão no backend: ${lastError?.message || 'erro desconhecido'}`);
-      process.exitCode = 1;
-      return;
-    }
-
-    console.warn(
-      `⚠️ Publicação da versão não concluída em ambiente local (${lastError?.message || 'erro desconhecido'}). Build continuará normalmente.`
-    );
+  if (failures.length > 0) {
+    console.error('❌ Não foi possível publicar versão em todos os destinos.');
+    failures.forEach((failure) => {
+      console.error(`   - ${failure.base}: ${failure.message}`);
+    });
+    process.exitCode = 1;
   }
 };
 
