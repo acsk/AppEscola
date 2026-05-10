@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const appJsonPath = path.join(__dirname, '../app.json');
+const buildInfoPath = path.join(__dirname, '../buildInfo.json');
 const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
 
 const currentVersion = appJson.expo.version;
@@ -33,4 +34,13 @@ appJson.expo.version = newVersion;
 
 fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n');
 
+// Gera buildInfo.json com timestamp
+const buildInfo = {
+  version: newVersion,
+  buildDate: new Date().toISOString(),
+};
+
+fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2) + '\n');
+
 console.log(`✅ Versão incrementada: ${currentVersion} → ${newVersion}`);
+console.log(`📅 Build gerado: ${buildInfo.buildDate}`);

@@ -12,6 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
 import Modal from "../components/ui/Modal";
 import api from "../services/api";
 import appJson from "../app.json";
+import buildInfo from "../buildInfo.json";
 
 const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
 const STORAGE_API_VERSION_KEY = "api_version_seen";
@@ -38,6 +39,20 @@ const formatDateToPtBr = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+const formatBuildDateTime = (isoDate: string): string => {
+  try {
+    const date = new Date(isoDate);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  } catch {
+    return isoDate;
+  }
+};
+
 export default function LoginScreen() {
   const { login } = useAuth();
   const isLocalhost =
@@ -51,6 +66,7 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [debugInfo, setDebugInfo] = useState<Record<string, any> | null>(null);
   const [debugCopied, setDebugCopied] = useState(false);
+  const [versionCopied, setVersionCopied] = useState(false);
   const lastLoginAttemptRef = useRef(0);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState("");
@@ -274,6 +290,17 @@ export default function LoginScreen() {
     window.setTimeout(() => setDebugCopied(false), 2500);
   };
 
+  const copyVersionInfo = async () => {
+    const versionText = `API v${apiVersion} • Contrato ${formatDateToPtBr(contractVersion)}\nAppPainel v${APP_VERSION}\nBuild: ${formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}`;
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(versionText);
+    }
+
+    setVersionCopied(true);
+    window.setTimeout(() => setVersionCopied(false), 2500);
+  };
+
   return (
     <ScrollView
       className="flex-1"
@@ -473,10 +500,39 @@ export default function LoginScreen() {
           </View>
         )}
 
-        <View className="mt-6 pt-4 border-t border-gray-100 items-center">
-          <Text className="text-xs text-gray-500">API v{apiVersion} • Contrato {formatDateToPtBr(contractVersion)}</Text>
-          <Text className="text-[11px] text-gray-400 mt-1">AppPainel v{APP_VERSION}</Text>
-        </View>
+        {/* Version Info */}
+        <TouchableOpacity
+          onPress={copyVersionInfo}
+          activeOpacity={0.7}
+          className="mt-6 pt-4 border-t border-gray-100"
+        >
+          <View className="flex-row items-center justify-center gap-2">
+            <View className="flex-1 items-center">
+              <Text className="text-xs font-medium text-gray-700">
+                API v{apiVersion}
+              </Text>
+              <Text className="text-[11px] text-gray-500 mt-1">
+                Contrato {formatDateToPtBr(contractVersion)}
+              </Text>
+              <Text className="text-[11px] text-gray-500 mt-0.5">
+                App v{APP_VERSION}
+              </Text>
+              <Text className="text-[10px] text-gray-400 mt-0.5">
+                Build: {formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}
+              </Text>
+            </View>
+            <View className="items-center justify-center px-3 py-2">
+              <Ionicons
+                name={versionCopied ? "checkmark" : "copy"}
+                size={16}
+                color={versionCopied ? "#10B981" : "#9CA3AF"}
+              />
+              <Text className="text-[10px] text-gray-400 mt-1">
+                {versionCopied ? "Copiado" : "Copiar"}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
 
       </View>
 
