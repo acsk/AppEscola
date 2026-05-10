@@ -8,6 +8,10 @@ trait ScopedByTenant
 {
     protected function getTenantId(Request $request): ?int
     {
+        if ($request->filled('_tenant_id')) {
+            return (int) $request->input('_tenant_id');
+        }
+
         $user = $request->user();
 
         if ($user->isSuperAdmin()) {

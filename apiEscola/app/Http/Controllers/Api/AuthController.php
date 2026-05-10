@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Student;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,11 +58,32 @@ class AuthController extends Controller
             return response()->json(['message' => 'Usuário inativo.'], 403);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $selectedTenantId = null;
+        $abilities = ['*'];
+
+        if ($user->isSuperAdmin() && $request->filled('tenant_id')) {
+            $selectedTenantId = (int) $request->input('tenant_id');
+
+            $tenantExists = Tenant::query()
+                ->where('id', $selectedTenantId)
+                ->where('status', 'active')
+                ->exists();
+
+            if (! $tenantExists) {
+                throw ValidationException::withMessages([
+                    'tenant_id' => ['Tenant inválido ou inativo.'],
+                ]);
+            }
+
+            $abilities = ["tenant:{$selectedTenantId}"];
+        }
+
+        $token = $user->createToken('api-token', $abilities)->plainTextToken;
 
         return response()->json([
             'user'                     => new UserResource($user),
             'token'                    => $token,
+            'selected_tenant_id'       => $selectedTenantId,
             'password_change_required' => (bool) $user->password_change_required,
         ]);
     }

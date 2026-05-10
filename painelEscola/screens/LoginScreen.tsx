@@ -18,6 +18,7 @@ export default function LoginScreen() {
     ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [tenantId, setTenantId] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,6 +28,7 @@ export default function LoginScreen() {
   const resetForm = () => {
     setEmail("");
     setPassword("");
+    setTenantId("");
     setShowPass(false);
     setError("");
     setDebugInfo(null);
@@ -77,7 +79,14 @@ export default function LoginScreen() {
     setDebugInfo(null);
     setDebugCopied(false);
     try {
-      await login(email, password);
+      const tenantIdValue = tenantId.trim();
+      const parsedTenantId = tenantIdValue ? Number(tenantIdValue) : null;
+      if (tenantIdValue && (!Number.isInteger(Number(tenantIdValue)) || Number(tenantIdValue) <= 0)) {
+        setError("Tenant ID deve ser um número inteiro válido.");
+        setLoading(false);
+        return;
+      }
+      await login(email, password, parsedTenantId);
     } catch (e: any) {
       const msg =
         e.response?.data?.message ||
@@ -215,6 +224,39 @@ export default function LoginScreen() {
               />
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Tenant opcional */}
+        <View className="mb-6">
+          <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+            Tenant ID (opcional)
+          </Text>
+          <View
+            className={`flex-row items-center border rounded-xl px-4 bg-gray-50 ${
+              error ? "border-red-300" : "border-gray-200"
+            }`}
+          >
+            <Ionicons name="business-outline" size={18} color="#9CA3AF" />
+            <TextInput
+              value={tenantId}
+              onChangeText={(v) => {
+                setTenantId(v.replace(/\D/g, ""));
+                setError("");
+              }}
+              keyboardType="numeric"
+              autoCapitalize="none"
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              autoCorrect={false}
+              placeholder="Ex.: 2 (apenas super admin)"
+              placeholderTextColor="#9CA3AF"
+              className="flex-1 ml-2 py-3 text-sm text-gray-800"
+            />
+          </View>
+          <Text className="text-xs text-gray-400 mt-1">
+            Se preenchido, o login será feito no tenant informado.
+          </Text>
         </View>
 
         {/* Erro */}

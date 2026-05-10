@@ -32,6 +32,7 @@ Content-Type: application/json
 |---|---|---|
 | `login` | string | E-mail (admin/professor) ou número de matrícula (aluno) |
 | `password` | string | Senha |
+| `tenant_id` | integer (opcional) | Apenas para `super_admin`: define o tenant de atuação após login |
 
 **Exemplos de body:**
 
@@ -41,6 +42,9 @@ Content-Type: application/json
 
 // Aluno
 { "login": "MAT-1-00001", "password": "suasenha" }
+
+// Super Admin atuando no tenant 2
+{ "login": "superadmin@escola.com.br", "password": "suasenha", "tenant_id": 2 }
 ```
 
 **Resposta `200`:**
@@ -51,6 +55,7 @@ Content-Type: application/json
   "message": "Operação realizada com sucesso.",
   "body": {
     "token": "1|abc123...",
+    "selected_tenant_id": 2,
     "password_change_required": false,
     "user": {
       "id": 2,
@@ -64,6 +69,8 @@ Content-Type: application/json
   }
 }
 ```
+
+> Para `super_admin`, quando `tenant_id` é enviado no login, o token já nasce escopado nesse tenant. Isso permite testar o comportamento do sistema como se estivesse operando dentro do tenant escolhido.
 
 > **Atenção:** se `password_change_required: true`, redirecione imediatamente para a tela de troca de senha antes de liberar o app.
 

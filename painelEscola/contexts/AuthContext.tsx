@@ -14,7 +14,7 @@ type AuthContextType = {
   user: AuthUser | null;
   isLoading: boolean;
   mustChangePassword: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, tenantId?: number | null) => Promise<void>;
   completeFirstAccess: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -57,14 +57,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { data } = await api.post("/login", { login: email, password });
-    const authUser: AuthUser = data.user;
-    const mustReset = !!(data.password_change_required || authUser?.password_change_required);
+  const login = async (email: string, password: string, tenantId?: number | null) => {
+    const payload: Record<string, any> = { login: email, password };
+    if (tenantId != null) payload.tenant_id = tenantId;
 
-    localStorage.setItem("auth_token", data.token);
+    const { data } = await api.post("/login", payload);
+    const body = data?.body ?? data;
+    const authUser: AuthUser = body?.user;
+    const mustReset = !!(body?.password_change_required || authUser?.password_change_required);
+
+    localStorage.setItem("auth_token", body?.token);
     localStorage.setItem("auth_user", JSON.stringify(authUser));
-    api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+    api.defaults.headers.common["Authorization"] = `Bearer ${body?.token}`;
     setUser(authUser);
     setMustChangePassword(mustReset);
   };
