@@ -51,7 +51,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (error) => {
-    if (error.response?.status === 401) {
+    const requestUrl = String(error?.config?.url ?? "");
+    const isLoginRequest = /\/login\/?$/i.test(requestUrl);
+    const hasStoredToken =
+      typeof localStorage !== "undefined" && !!localStorage.getItem("auth_token");
+
+    if (error.response?.status === 401 && !isLoginRequest && hasStoredToken) {
       const message =
         error?.response?.data?.message ||
         "Sua sessão expirou. Faça login novamente.";

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [debugInfo, setDebugInfo] = useState<Record<string, any> | null>(null);
   const [debugCopied, setDebugCopied] = useState(false);
+  const lastLoginAttemptRef = useRef(0);
 
   const resetForm = () => {
     setEmail("");
@@ -37,43 +38,20 @@ export default function LoginScreen() {
 
   useEffect(() => {
     resetForm();
-
-    if (typeof document === "undefined") return;
-
-    const removeOrphanModalPortals = () => {
-      Array.from(document.body.children).forEach((node) => {
-        const element = node as HTMLElement;
-        const isRoot = element.id === "root";
-        const isElementReactPortal =
-          element.tagName === "DIV" &&
-          !isRoot &&
-          element.querySelector('[aria-modal="true"], [role="dialog"]');
-
-        if (isElementReactPortal) {
-          element.remove();
-        }
-      });
-
-      document.body.style.overflow = "";
-      document.documentElement.style.overflow = "";
-    };
-
-    removeOrphanModalPortals();
-    const cleanupTimer = window.setTimeout(removeOrphanModalPortals, 100);
-    const observer = new MutationObserver(removeOrphanModalPortals);
-    observer.observe(document.body, { childList: true });
-
-    return () => {
-      window.clearTimeout(cleanupTimer);
-      observer.disconnect();
-    };
   }, []);
 
   const handleLogin = async () => {
+    if (loading) return;
+
     if (!email || !password) {
       setError("Preencha o e-mail e a senha.");
       return;
     }
+
+    const now = Date.now();
+    if (now - lastLoginAttemptRef.current < 300) return;
+    lastLoginAttemptRef.current = now;
+
     setLoading(true);
     setError("");
     setDebugInfo(null);
