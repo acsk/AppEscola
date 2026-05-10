@@ -17,6 +17,17 @@ const api = axios.create({
 const isFormDataPayload = (value: unknown): value is FormData =>
   typeof FormData !== "undefined" && value instanceof FormData;
 
+let lastNetworkIssueEventAt = 0;
+const NETWORK_ISSUE_EVENT_DEBOUNCE_MS = 4000;
+
+const dispatchNetworkIssue = (message: string) => {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (now - lastNetworkIssueEventAt < NETWORK_ISSUE_EVENT_DEBOUNCE_MS) return;
+  lastNetworkIssueEventAt = now;
+  window.dispatchEvent(new CustomEvent("api:network-issue", { detail: { message } }));
+};
+
 // Injeta o token em toda requisição autenticada
 api.interceptors.request.use((config) => {
   const token =
@@ -41,13 +52,21 @@ api.interceptors.response.use(
   (r) => r,
   (error) => {
     if (error.response?.status === 401) {
+      const message =
+        error?.response?.data?.message ||
+        "Sua sessão expirou. Faça login novamente.";
       if (typeof localStorage !== "undefined") {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
       }
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("auth:expired"));
+        window.dispatchEvent(new CustomEvent("auth:expired", { detail: { message } }));
       }
+    } else if (!error.response) {
+      const message =
+        error?.message ||
+        "Sem comunicação com o servidor no momento. Verifique sua conexão e tente novamente.";
+      dispatchNetworkIssue(message);
     }
     return Promise.reject(error);
   }

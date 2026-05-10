@@ -195,6 +195,20 @@ function AppContent() {
   const { width } = useWindowDimensions();
   const [fontsReady, setFontsReady] = useState(typeof window === "undefined");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sessionExpiredDialog, setSessionExpiredDialog] = useState<{
+    visible: boolean;
+    message: string;
+  }>({
+    visible: false,
+    message: "Sua sessão expirou. Faça login novamente.",
+  });
+  const [networkIssueDialog, setNetworkIssueDialog] = useState<{
+    visible: boolean;
+    message: string;
+  }>({
+    visible: false,
+    message: "Sem comunicação com o servidor no momento.",
+  });
   const isMobile = width < 768;
 
   const [nav, setNav] = useState<NavState>(() => {
@@ -260,6 +274,125 @@ function AppContent() {
     setIsSidebarOpen(false);
   }, [user?.id]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onAuthExpired = (event: Event) => {
+      const custom = event as CustomEvent<{ message?: string }>;
+      const message =
+        custom?.detail?.message ||
+        "Sua sessão expirou ou a comunicação com o servidor foi perdida. Faça login novamente.";
+
+      setSessionExpiredDialog({
+        visible: true,
+        message,
+      });
+    };
+
+    window.addEventListener("auth:expired", onAuthExpired as EventListener);
+    return () => window.removeEventListener("auth:expired", onAuthExpired as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onNetworkIssue = (event: Event) => {
+      const custom = event as CustomEvent<{ message?: string }>;
+      const message =
+        custom?.detail?.message ||
+        "Sem comunicação com o servidor no momento. Verifique sua conexão e tente novamente.";
+
+      setNetworkIssueDialog({ visible: true, message });
+    };
+
+    window.addEventListener("api:network-issue", onNetworkIssue as EventListener);
+    return () =>
+      window.removeEventListener("api:network-issue", onNetworkIssue as EventListener);
+  }, []);
+
+  const forceBackToLogin = () => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+    }
+    setSessionExpiredDialog((prev) => ({ ...prev, visible: false }));
+    if (typeof window !== "undefined") {
+      window.location.hash = "#/login";
+    }
+  };
+
+  const closeNetworkIssueDialog = () => {
+    setNetworkIssueDialog((prev) => ({ ...prev, visible: false }));
+  };
+
+  const retryNetworkConnection = () => {
+    setNetworkIssueDialog((prev) => ({ ...prev, visible: false }));
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  };
+
+  const renderGlobalDialogs = () => {
+    if (sessionExpiredDialog.visible) {
+      return (
+        <View
+          className="absolute inset-0 items-center justify-center px-4"
+          style={{ backgroundColor: "rgba(17, 24, 39, 0.55)", zIndex: 9999 }}
+        >
+          <View className="w-full max-w-md rounded-2xl bg-white px-6 py-5 border border-gray-100">
+            <View className="flex-row items-center gap-2 mb-3">
+              <Ionicons name="warning-outline" size={18} color="#B45309" />
+              <Text className="text-base font-bold text-gray-800">Sessão encerrada</Text>
+            </View>
+            <Text className="text-sm text-gray-600 mb-5">{sessionExpiredDialog.message}</Text>
+            <TouchableOpacity
+              onPress={forceBackToLogin}
+              className="w-full rounded-xl bg-violet-600 py-3 items-center"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Ir para login</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (networkIssueDialog.visible) {
+      return (
+        <View
+          className="absolute inset-0 items-center justify-center px-4"
+          style={{ backgroundColor: "rgba(17, 24, 39, 0.45)", zIndex: 9998 }}
+        >
+          <View className="w-full max-w-md rounded-2xl bg-white px-6 py-5 border border-gray-100">
+            <View className="flex-row items-center gap-2 mb-3">
+              <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
+              <Text className="text-base font-bold text-gray-800">Falha de comunicação</Text>
+            </View>
+            <Text className="text-sm text-gray-600 mb-5">{networkIssueDialog.message}</Text>
+            <View className="flex-row gap-2">
+              <TouchableOpacity
+                onPress={closeNetworkIssueDialog}
+                className="flex-1 rounded-xl border border-gray-200 py-3 items-center"
+                activeOpacity={0.85}
+              >
+                <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={retryNetworkConnection}
+                className="flex-1 rounded-xl bg-violet-600 py-3 items-center"
+                activeOpacity={0.85}
+              >
+                <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
   const canManageTenants = user?.role === "super_admin";
   const canManageUsers = user?.role === "super_admin" || user?.role === "admin";
 
@@ -292,11 +425,21 @@ function AppContent() {
     if (typeof window !== "undefined" && window.location.hash !== "#/login") {
       window.location.hash = "#/login";
     }
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen />
+        {renderGlobalDialogs()}
+      </>
+    );
   }
 
   if (mustChangePassword) {
-    return <FirstAccessPasswordScreen />;
+    return (
+      <>
+        <FirstAccessPasswordScreen />
+        {renderGlobalDialogs()}
+      </>
+    );
   }
 
   const renderScreen = () => {
@@ -410,6 +553,7 @@ function AppContent() {
           {renderScreen()}
         </View>
       </View>
+      {renderGlobalDialogs()}
       <StatusBar style="dark" />
     </SafeAreaProvider>
   );

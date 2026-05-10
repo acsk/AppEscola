@@ -47,6 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
 
     const handleExpiry = () => {
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+      }
       setUser(null);
       setMustChangePassword(false);
       delete api.defaults.headers.common["Authorization"];

@@ -46,18 +46,31 @@ api.interceptors.request.use(async (config) => {
 // ── Response: 401 global → limpa sessão e sinaliza expiração ──────────────
 // O callback de logout é registrado pelo AuthContext para evitar
 // dependência circular entre api.ts e o contexto React.
-type LogoutCallback = () => void;
+export type SessionLostReason = 'unauthorized' | 'forbidden';
+type LogoutCallback = (reason: SessionLostReason) => void;
 let _onUnauthorized: LogoutCallback | null = null;
+let _notified = false;
 
 export function registerUnauthorizedHandler(cb: LogoutCallback) {
   _onUnauthorized = cb;
 }
 
+export function resetUnauthorizedNotice() {
+  _notified = false;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && _onUnauthorized) {
-      _onUnauthorized();
+    const status = error.response?.status;
+    const url: string = error.config?.url ?? '';
+
+    // Ignora a própria rota de login: 401 ali significa credenciais erradas, não sessão expirada
+    const isLoginCall = /\/login(\b|\/)/.test(url);
+
+    if (!isLoginCall && (status === 401 || status === 419) && _onUnauthorized && !_notified) {
+      _notified = true;
+      _onUnauthorized(status === 401 ? 'unauthorized' : 'forbidden');
     }
     return Promise.reject(error);
   }
