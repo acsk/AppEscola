@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\IdentifyTenant;
+use App\Http\Middleware\AddApiVersionHeaders;
 use App\Http\Middleware\TrustProxies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->use([
             HandleCors::class,
             TrustProxies::class,
+            AddApiVersionHeaders::class,
         ]);
 
         $middleware->alias([

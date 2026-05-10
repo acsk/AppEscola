@@ -10,6 +10,24 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import Modal from "../components/ui/Modal";
+import api from "../services/api";
+import appJson from "../app.json";
+
+const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
+
+const compareVersions = (left: string, right: string) => {
+  const leftParts = left.split(".").map((p) => Number.parseInt(p, 10) || 0);
+  const rightParts = right.split(".").map((p) => Number.parseInt(p, 10) || 0);
+  const max = Math.max(leftParts.length, rightParts.length);
+
+  for (let i = 0; i < max; i++) {
+    const a = leftParts[i] ?? 0;
+    const b = rightParts[i] ?? 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
+};
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -25,6 +43,14 @@ export default function LoginScreen() {
   const [debugInfo, setDebugInfo] = useState<Record<string, any> | null>(null);
   const [debugCopied, setDebugCopied] = useState(false);
   const lastLoginAttemptRef = useRef(0);
+  const [metaLoading, setMetaLoading] = useState(true);
+  const [metaError, setMetaError] = useState("");
+  const [apiVersion, setApiVersion] = useState<string>("-");
+  const [contractVersion, setContractVersion] = useState<string>("-");
+  const [minSupportedVersion, setMinSupportedVersion] = useState<string>("");
+  const [recommendedVersion, setRecommendedVersion] = useState<string>("");
+  const [mustUpdate, setMustUpdate] = useState(false);
+  const [shouldRecommendUpdate, setShouldRecommendUpdate] = useState(false);
 
   const resetForm = () => {
     setEmail("");
@@ -38,10 +64,80 @@ export default function LoginScreen() {
 
   useEffect(() => {
     resetForm();
+
+    let active = true;
+    const loadMeta = async () => {
+      setMetaLoading(true);
+      setMetaError("");
+      try {
+        const metaUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/meta`;
+        const response = await fetch(metaUrl, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        const rawData = await response.json().catch(() => ({}));
+        const body = rawData?.body ?? rawData ?? {};
+
+        const nextApiVersion =
+          body?.api_version ?? response.headers.get("x-api-version") ?? "-";
+        const nextContractVersion =
+          body?.contract_version ?? response.headers.get("x-api-contract-version") ?? "-";
+        const nextMinSupportedVersion =
+          body?.min_supported_app_version ??
+          response.headers.get("x-min-supported-app-version") ??
+          "";
+        const nextRecommendedVersion =
+          body?.recommended_app_version ??
+          response.headers.get("x-recommended-app-version") ??
+          "";
+
+        if (!active) return;
+
+        setApiVersion(String(nextApiVersion));
+        setContractVersion(String(nextContractVersion));
+        setMinSupportedVersion(String(nextMinSupportedVersion || ""));
+        setRecommendedVersion(String(nextRecommendedVersion || ""));
+
+        const requireUpdate =
+          !!nextMinSupportedVersion &&
+          compareVersions(APP_VERSION, String(nextMinSupportedVersion)) < 0;
+        const recommendUpdate =
+          !!nextRecommendedVersion &&
+          compareVersions(APP_VERSION, String(nextRecommendedVersion)) < 0;
+
+        setMustUpdate(requireUpdate);
+        setShouldRecommendUpdate(!requireUpdate && recommendUpdate);
+      } catch {
+        if (!active) return;
+        setMetaError("Não foi possível validar versão da API agora. Você pode tentar o login.");
+      } finally {
+        if (active) setMetaLoading(false);
+      }
+    };
+
+    loadMeta();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleLogin = async () => {
     if (loading) return;
+
+    if (metaLoading) {
+      setError("Aguarde a validação de versão antes de entrar.");
+      return;
+    }
+
+    if (mustUpdate) {
+      setError(
+        `Atualização obrigatória: versão mínima suportada ${minSupportedVersion}. Versão atual ${APP_VERSION}.`
+      );
+      return;
+    }
 
     if (!email || !password) {
       setError("Preencha o e-mail e a senha.");
@@ -136,6 +232,37 @@ export default function LoginScreen() {
             Gerência de Cursinho — Painel Admin
           </Text>
         </View>
+
+        {metaLoading && (
+          <View className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex-row items-center gap-2">
+            <ActivityIndicator size="small" color="#2563EB" />
+            <Text className="text-sm text-blue-700">Validando versão da API...</Text>
+          </View>
+        )}
+
+        {!metaLoading && mustUpdate && (
+          <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <Text className="text-sm font-semibold text-red-700">Atualização obrigatória</Text>
+            <Text className="text-xs text-red-600 mt-1">
+              Versão mínima: {minSupportedVersion}. Atual: {APP_VERSION}. Atualize o app para continuar.
+            </Text>
+          </View>
+        )}
+
+        {!metaLoading && shouldRecommendUpdate && (
+          <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <Text className="text-sm font-semibold text-amber-700">Atualização recomendada</Text>
+            <Text className="text-xs text-amber-600 mt-1">
+              Recomendado: {recommendedVersion}. Atual: {APP_VERSION}.
+            </Text>
+          </View>
+        )}
+
+        {!metaLoading && !!metaError && (
+          <View className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <Text className="text-xs text-gray-600">{metaError}</Text>
+          </View>
+        )}
 
         {/* Email */}
         <View className="mb-4">
@@ -248,15 +375,17 @@ export default function LoginScreen() {
         {/* Botão */}
         <TouchableOpacity
           onPress={handleLogin}
-          disabled={loading}
+          disabled={loading || metaLoading || mustUpdate}
           className="bg-violet-600 rounded-xl py-3.5 items-center"
           activeOpacity={0.85}
-          style={{ opacity: loading ? 0.75 : 1 }}
+          style={{ opacity: loading || metaLoading || mustUpdate ? 0.75 : 1 }}
         >
-          {loading ? (
+          {loading || metaLoading ? (
             <ActivityIndicator color="white" size="small" />
           ) : (
-            <Text className="text-white font-bold text-sm">Entrar</Text>
+            <Text className="text-white font-bold text-sm">
+              {mustUpdate ? "Atualização obrigatória" : "Entrar"}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -271,6 +400,11 @@ export default function LoginScreen() {
             </Text>
           </View>
         )}
+
+        <View className="mt-6 pt-4 border-t border-gray-100 items-center">
+          <Text className="text-xs text-gray-500">API v{apiVersion} • Contrato {contractVersion}</Text>
+          <Text className="text-[11px] text-gray-400 mt-1">App v{APP_VERSION}</Text>
+        </View>
 
       </View>
 

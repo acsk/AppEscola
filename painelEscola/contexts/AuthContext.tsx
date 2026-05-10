@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import api from "../services/api";
+import appJson from "../app.json";
+
+const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
+const STORAGE_APP_VERSION_KEY = "app_version";
 
 export type AuthUser = {
   id: number;
@@ -29,6 +33,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const lastKnownUserRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (typeof localStorage !== "undefined") {
+      const storedAppVersion = localStorage.getItem(STORAGE_APP_VERSION_KEY);
+      if (storedAppVersion && storedAppVersion !== APP_VERSION) {
+        localStorage.clear();
+        localStorage.setItem(STORAGE_APP_VERSION_KEY, APP_VERSION);
+        if (typeof window !== "undefined") {
+          window.location.reload();
+          return;
+        }
+      }
+      localStorage.setItem(STORAGE_APP_VERSION_KEY, APP_VERSION);
+    }
+
     const storedToken =
       typeof localStorage !== "undefined"
         ? localStorage.getItem("auth_token")
@@ -123,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("auth_token", body?.token);
     const serializedUser = JSON.stringify(authUser);
     localStorage.setItem("auth_user", serializedUser);
+    localStorage.setItem(STORAGE_APP_VERSION_KEY, APP_VERSION);
     lastKnownTokenRef.current = body?.token ?? null;
     lastKnownUserRef.current = serializedUser;
     api.defaults.headers.common["Authorization"] = `Bearer ${body?.token}`;

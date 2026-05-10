@@ -29,6 +29,23 @@ use Illuminate\Support\Facades\Route;
 // Autenticação (pública)
 Route::post('/login', [AuthController::class, 'login']);
 
+// Metadados da API (público)
+Route::get('/meta', function () {
+    return response()->json([
+        'type' => 'success',
+        'message' => 'Metadados da API carregados com sucesso.',
+        'body' => [
+            'api_version' => (string) config('api_meta.version', '1.0.0'),
+            'contract_version' => (string) config('api_meta.contract_version', date('Y-m-d')),
+            'has_breaking_changes' => (bool) config('api_meta.has_breaking_changes', false),
+            'min_supported_app_version' => (string) config('api_meta.min_supported_app_version', '1.0.0'),
+            'recommended_app_version' => (string) config('api_meta.recommended_app_version', '1.0.0'),
+            'changelog_url' => (string) config('api_meta.changelog_url', ''),
+            'server_time' => now()->toISOString(),
+        ],
+    ]);
+});
+
 // Domínios / lookups (públicos — usados para popular dropdowns no frontend)
 Route::prefix('domains')->group(function () {
     Route::get('statuses',               [DomainController::class, 'statuses']);
