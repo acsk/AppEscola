@@ -7,7 +7,13 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "mkdir -p assets/fonts && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf assets/fonts/Ionicons.ttf && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf assets/fonts/Feather.ttf && expo start --web",
-    "web:build": "mkdir -p assets/fonts dist/fonts && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf assets/fonts/Ionicons.ttf && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf assets/fonts/Feather.ttf && cp assets/fonts/Ionicons.ttf dist/fonts/Ionicons.ttf && cp assets/fonts/Feather.ttf dist/fonts/Feather.ttf && expo export --platform web"
+    "web:build": "mkdir -p assets/fonts dist/fonts && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf assets/fonts/Ionicons.ttf && cp node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf assets/fonts/Feather.ttf && cp assets/fonts/Ionicons.ttf dist/fonts/Ionicons.ttf && cp assets/fonts/Feather.ttf dist/fonts/Feather.ttf && expo export --platform web",
+    "preandroid": "node scripts/increment-version.js patch",
+    "preios": "node scripts/increment-version.js patch",
+    "preweb:build": "node scripts/increment-version.js patch",
+    "bump:patch": "node scripts/increment-version.js patch",
+    "bump:minor": "node scripts/increment-version.js minor",
+    "bump:major": "node scripts/increment-version.js major"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

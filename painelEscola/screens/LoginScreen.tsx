@@ -30,6 +30,14 @@ const compareVersions = (left: string, right: string) => {
   return 0;
 };
 
+const formatDateToPtBr = (dateStr: string): string => {
+  if (!dateStr || dateStr === "-") return dateStr;
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return dateStr;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+};
+
 export default function LoginScreen() {
   const { login } = useAuth();
   const isLocalhost =
@@ -466,8 +474,8 @@ export default function LoginScreen() {
         )}
 
         <View className="mt-6 pt-4 border-t border-gray-100 items-center">
-          <Text className="text-xs text-gray-500">API v{apiVersion} • Contrato {contractVersion}</Text>
-          <Text className="text-[11px] text-gray-400 mt-1">App v{APP_VERSION}</Text>
+          <Text className="text-xs text-gray-500">API v{apiVersion} • Contrato {formatDateToPtBr(contractVersion)}</Text>
+          <Text className="text-[11px] text-gray-400 mt-1">AppPainel v{APP_VERSION}</Text>
         </View>
 
       </View>
