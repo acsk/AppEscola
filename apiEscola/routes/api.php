@@ -23,11 +23,18 @@ use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
+use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 // Autenticação (pública)
 Route::post('/login', [AuthController::class, 'login']);
+
+// Versões dos apps (público — atualizado a cada build)
+Route::get('/version/panel',   [AppVersionController::class, 'panel']);
+Route::get('/version/mobile',  [AppVersionController::class, 'mobile']);
+Route::post('/version/panel',  [AppVersionController::class, 'updatePanel']);
+Route::post('/version/mobile', [AppVersionController::class, 'updateMobile']);
 
 // Metadados da API (público)
 Route::get('/meta', function () {

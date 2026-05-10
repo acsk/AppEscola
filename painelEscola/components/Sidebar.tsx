@@ -7,6 +7,21 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import buildInfo from "../buildInfo.json";
+
+const formatBuildDateTime = (isoDate: string): string => {
+  try {
+    const date = new Date(isoDate);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  } catch {
+    return isoDate;
+  }
+};
 
 type NavItem = {
   id: string;
@@ -36,6 +51,7 @@ type SidebarProps = {
   canManageUsers?: boolean;
   isMobile?: boolean;
   onClose?: () => void;
+  apiVersion?: string;
 };
 
 export default function Sidebar({
@@ -45,9 +61,11 @@ export default function Sidebar({
   canManageUsers = false,
   isMobile = false,
   onClose,
+  apiVersion = "-",
 }: SidebarProps) {
   const { width } = useWindowDimensions();
   const [internalActive, setInternalActive] = useState("dashboard");
+  const [versionCopied, setVersionCopied] = useState(false);
   const activeItem = externalActive ?? internalActive;
   const visibleMenuItems = [
     ...(canManageTenants ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }] : []),
@@ -58,6 +76,20 @@ export default function Sidebar({
   const handlePress = (id: string) => {
     setInternalActive(id);
     onSelectItem?.(id);
+  };
+
+  const copyVersionInfo = async () => {
+    const versionText = [
+      `API v${apiVersion}`,
+      `App ${(buildInfo as any)?.version ?? "-"}`,
+      `Build: ${(buildInfo as any)?.version ?? "-"} • ${formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}`,
+    ].join("\n");
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(versionText);
+      setVersionCopied(true);
+      window.setTimeout(() => setVersionCopied(false), 2500);
+    }
   };
 
   const renderItem = (item: NavItem) => {
@@ -103,19 +135,43 @@ export default function Sidebar({
       }}
     >
       {/* Logo */}
-      <View className="flex-row items-center justify-between px-3 mb-8">
-        <View className="flex-row items-center">
-          <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
-            <Ionicons name="school" size={20} color="white" />
+      <View className="flex-row items-center justify-between px-3 mb-6">
+        <View className="flex-1">
+          <View className="flex-row items-center">
+            <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
+              <Ionicons name="school" size={20} color="white" />
+            </View>
+            <View>
+              <Text className="text-base font-bold text-gray-800 leading-tight">
+                Cursinho
+              </Text>
+              <Text className="text-xs text-violet-500 font-semibold leading-tight">
+                Hub
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text className="text-base font-bold text-gray-800 leading-tight">
-              Cursinho
+          <TouchableOpacity
+            onPress={copyVersionInfo}
+            activeOpacity={0.7}
+            className="mt-3 ml-0"
+          >
+            <Text className="text-[10px] font-medium text-violet-600">
+              API v{apiVersion}
             </Text>
-            <Text className="text-xs text-violet-500 font-semibold leading-tight">
-              Hub
+            <Text className="text-[10px] font-medium text-violet-600 mt-0.5">
+              App {(buildInfo as any)?.version ?? "-"}
             </Text>
-          </View>
+            <View className="flex-row items-center mt-0.5">
+              <Text className="text-[9px] text-gray-400 flex-1">
+                Build: {(buildInfo as any)?.version ?? "-"} • {formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}
+              </Text>
+              <Ionicons
+                name={versionCopied ? "checkmark" : "copy-outline"}
+                size={12}
+                color={versionCopied ? "#10B981" : "#9CA3AF"}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
         {isMobile && (
           <TouchableOpacity
@@ -143,16 +199,6 @@ export default function Sidebar({
           </>
         )}
       </ScrollView>
-
-      {/* Version tag */}
-      <View className="px-3 py-4">
-        <View className="bg-amber-50 rounded-xl p-3 items-center border border-amber-100">
-          <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text className="text-xs text-amber-700 font-semibold mt-1">
-            v 1.0
-          </Text>
-        </View>
-      </View>
     </View>
   );
 }

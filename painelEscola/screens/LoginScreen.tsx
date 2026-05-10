@@ -15,7 +15,25 @@ import appJson from "../app.json";
 import buildInfo from "../buildInfo.json";
 
 const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
+const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
 const STORAGE_API_VERSION_KEY = "api_version_seen";
+const STORAGE_PANEL_RELOAD_ATTEMPT_KEY = "panel_reload_attempt_version";
+
+type ChecklistStatus = "idle" | "pending" | "success" | "error";
+
+type LoginChecklistState = {
+  internet: ChecklistStatus;
+  apiUpdated: ChecklistStatus;
+  appUpdated: ChecklistStatus;
+  loginAuthorized: ChecklistStatus;
+};
+
+const INITIAL_LOGIN_CHECKLIST_STATE: LoginChecklistState = {
+  internet: "idle",
+  apiUpdated: "idle",
+  appUpdated: "idle",
+  loginAuthorized: "idle",
+};
 
 const compareVersions = (left: string, right: string) => {
   const leftParts = left.split(".").map((p) => Number.parseInt(p, 10) || 0);
@@ -28,6 +46,28 @@ const compareVersions = (left: string, right: string) => {
     if (a > b) return 1;
     if (a < b) return -1;
   }
+  return 0;
+};
+
+const compareBuildVersions = (left: string, right: string) => {
+  const normalize = (value: string) =>
+    String(value || "")
+      .trim()
+      .replace(/^v/i, "")
+      .split(".")
+      .map((part) => Number.parseInt(part, 10) || 0);
+
+  const leftParts = normalize(left);
+  const rightParts = normalize(right);
+  const max = Math.max(leftParts.length, rightParts.length);
+
+  for (let i = 0; i < max; i++) {
+    const a = leftParts[i] ?? 0;
+    const b = rightParts[i] ?? 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+
   return 0;
 };
 
@@ -66,7 +106,6 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [debugInfo, setDebugInfo] = useState<Record<string, any> | null>(null);
   const [debugCopied, setDebugCopied] = useState(false);
-  const [versionCopied, setVersionCopied] = useState(false);
   const lastLoginAttemptRef = useRef(0);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState("");
@@ -76,6 +115,18 @@ export default function LoginScreen() {
   const [recommendedVersion, setRecommendedVersion] = useState<string>("");
   const [mustUpdate, setMustUpdate] = useState(false);
   const [shouldRecommendUpdate, setShouldRecommendUpdate] = useState(false);
+  const [loginChecklistVisible, setLoginChecklistVisible] = useState(false);
+  const [loginChecklist, setLoginChecklist] = useState<LoginChecklistState>(
+    INITIAL_LOGIN_CHECKLIST_STATE
+  );
+  const [loginChecklistMessage, setLoginChecklistMessage] = useState("");
+
+  const updateChecklistStep = (
+    step: keyof LoginChecklistState,
+    status: ChecklistStatus
+  ) => {
+    setLoginChecklist((prev) => ({ ...prev, [step]: status }));
+  };
 
   const fetchMetaInfo = async () => {
     const metaUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/meta`;
@@ -110,6 +161,77 @@ export default function LoginScreen() {
     };
   };
 
+  const fetchPanelVersion = async () => {
+    const panelVersionUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/version/panel`;
+    const response = await fetch(panelVersionUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const rawData = await response.json().catch(() => ({}));
+    const body = rawData?.body ?? rawData ?? {};
+
+    return {
+      version: String(body?.version ?? "-"),
+      releaseDate: String(body?.release_date ?? "-"),
+    };
+  };
+
+  const checkPanelBuildAndReload = async () => {
+    try {
+      const panel = await fetchPanelVersion();
+      if (!panel.version || panel.version === "-") return false;
+
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("panel_version_latest", panel.version);
+      }
+
+      const versionDiff = compareBuildVersions(panel.version, CURRENT_BUILD_VERSION);
+      if (versionDiff > 0) {
+        const alreadyAttemptedVersion =
+          typeof localStorage !== "undefined"
+            ? localStorage.getItem(STORAGE_PANEL_RELOAD_ATTEMPT_KEY)
+            : null;
+
+        if (alreadyAttemptedVersion !== panel.version) {
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem(STORAGE_PANEL_RELOAD_ATTEMPT_KEY, panel.version);
+          }
+          setError(
+            `Nova versão do painel detectada (${panel.version}). Versão atual no navegador: ${CURRENT_BUILD_VERSION}. Recarregando...`
+          );
+          window.setTimeout(() => {
+            if (typeof window !== "undefined") window.location.reload();
+          }, 1600);
+          return true;
+        }
+
+        setError(
+          `Versão nova detectada (${panel.version}), mas o navegador manteve a versão antiga (${CURRENT_BUILD_VERSION}). Faça recarga forçada (Ctrl+F5) para atualizar.`
+        );
+        return false;
+      }
+
+      // Se a versão remota for igual ou menor, não há atualização pendente.
+      if (versionDiff <= 0) {
+        if (typeof localStorage !== "undefined") {
+          localStorage.removeItem(STORAGE_PANEL_RELOAD_ATTEMPT_KEY);
+        }
+        return false;
+      }
+
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(STORAGE_PANEL_RELOAD_ATTEMPT_KEY);
+      }
+    } catch {
+      // Se falhar leitura da versão do painel, mantém fluxo normal de login.
+    }
+
+    return false;
+  };
+
   const resetForm = () => {
     setEmail("");
     setPassword("");
@@ -128,6 +250,9 @@ export default function LoginScreen() {
       setMetaLoading(true);
       setMetaError("");
       try {
+        const requiresReload = await checkPanelBuildAndReload();
+        if (requiresReload || !active) return;
+
         const {
           apiVersion: nextApiVersion,
           contractVersion: nextContractVersion,
@@ -172,13 +297,38 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (loading) return;
 
+    setLoginChecklistVisible(true);
+    setLoginChecklistMessage("");
+    setLoginChecklist({
+      internet: "pending",
+      apiUpdated: "idle",
+      appUpdated: "idle",
+      loginAuthorized: "idle",
+    });
+
+    const browserIsOnline =
+      typeof navigator === "undefined" ? true : navigator.onLine;
+    if (!browserIsOnline) {
+      updateChecklistStep("internet", "error");
+      setLoginChecklistMessage("Sem conexão com a internet.");
+      setError("Sem conexão com a internet.");
+      return;
+    }
+    updateChecklistStep("internet", "success");
+
+    updateChecklistStep("apiUpdated", "pending");
+
+    let latestApiVersion = "-";
+    let latestContractVersion = "-";
+    let latestMinSupportedVersion = "";
+    let latestRecommendedVersion = "";
+
     try {
-      const {
-        apiVersion: latestApiVersion,
-        contractVersion: latestContractVersion,
-        minSupportedVersion: latestMinSupportedVersion,
-        recommendedVersion: latestRecommendedVersion,
-      } = await fetchMetaInfo();
+      const latestMeta = await fetchMetaInfo();
+      latestApiVersion = latestMeta.apiVersion;
+      latestContractVersion = latestMeta.contractVersion;
+      latestMinSupportedVersion = latestMeta.minSupportedVersion;
+      latestRecommendedVersion = latestMeta.recommendedVersion;
 
       setApiVersion(latestApiVersion);
       setContractVersion(latestContractVersion);
@@ -194,10 +344,13 @@ export default function LoginScreen() {
 
       setMustUpdate(requireUpdate);
       setShouldRecommendUpdate(!requireUpdate && recommendUpdate);
+      updateChecklistStep("apiUpdated", "success");
 
       if (typeof localStorage !== "undefined") {
         const previousApiVersion = localStorage.getItem(STORAGE_API_VERSION_KEY);
         if (previousApiVersion && previousApiVersion !== latestApiVersion) {
+          updateChecklistStep("apiUpdated", "error");
+          setLoginChecklistMessage("Versão da API mudou. O painel será recarregado.");
           setError(
             `Nova versão da API detectada: v${latestApiVersion}. A página será reiniciada para atualizar.`
           );
@@ -212,15 +365,30 @@ export default function LoginScreen() {
         localStorage.setItem(STORAGE_API_VERSION_KEY, latestApiVersion);
       }
     } catch {
-      // fallback: mantém o fluxo de login atual mesmo sem leitura de /meta na tentativa
+      updateChecklistStep("apiUpdated", "error");
+      setLoginChecklistMessage("Não foi possível validar atualização da API.");
+      setError("Não foi possível validar atualização da API.");
+      return;
     }
+
+    updateChecklistStep("appUpdated", "pending");
+    const requiresReload = await checkPanelBuildAndReload();
+    if (requiresReload) {
+      updateChecklistStep("appUpdated", "error");
+      setLoginChecklistMessage("Nova versão do app detectada. Recarregando...");
+      return;
+    }
+    updateChecklistStep("appUpdated", "success");
 
     if (metaLoading) {
       setError("Aguarde a validação de versão antes de entrar.");
+      setLoginChecklistMessage("Validação de versão ainda em andamento.");
       return;
     }
 
     if (mustUpdate) {
+      updateChecklistStep("appUpdated", "error");
+      setLoginChecklistMessage("App desatualizado para esta versão da API.");
       setError(
         `Atualização obrigatória: versão mínima suportada ${minSupportedVersion}. Versão atual ${APP_VERSION}.`
       );
@@ -228,6 +396,8 @@ export default function LoginScreen() {
     }
 
     if (!email || !password) {
+      updateChecklistStep("loginAuthorized", "error");
+      setLoginChecklistMessage("Preencha as credenciais para continuar.");
       setError("Preencha o e-mail e a senha.");
       return;
     }
@@ -240,16 +410,23 @@ export default function LoginScreen() {
     setError("");
     setDebugInfo(null);
     setDebugCopied(false);
+    updateChecklistStep("loginAuthorized", "pending");
     try {
       const tenantIdValue = tenantId.trim();
       const parsedTenantId = tenantIdValue ? Number(tenantIdValue) : null;
       if (tenantIdValue && (!Number.isInteger(Number(tenantIdValue)) || Number(tenantIdValue) <= 0)) {
+        updateChecklistStep("loginAuthorized", "error");
+        setLoginChecklistMessage("Tenant ID inválido.");
         setError("Tenant ID deve ser um número inteiro válido.");
         setLoading(false);
         return;
       }
       await login(email, password, parsedTenantId);
+      updateChecklistStep("loginAuthorized", "success");
+      setLoginChecklistMessage("Login autorizado com sucesso.");
     } catch (e: any) {
+      updateChecklistStep("loginAuthorized", "error");
+      setLoginChecklistMessage("Login não autorizado. Verifique as credenciais.");
       const msg =
         e.response?.data?.message ||
         "Credenciais inválidas. Verifique e tente novamente.";
@@ -290,15 +467,17 @@ export default function LoginScreen() {
     window.setTimeout(() => setDebugCopied(false), 2500);
   };
 
-  const copyVersionInfo = async () => {
-    const versionText = `API v${apiVersion} • Contrato ${formatDateToPtBr(contractVersion)}\nAppPainel v${APP_VERSION}\nBuild: ${formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}`;
-
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(versionText);
+  const renderChecklistIcon = (status: ChecklistStatus) => {
+    if (status === "success") {
+      return <Ionicons name="checkmark-circle" size={18} color="#16A34A" />;
     }
-
-    setVersionCopied(true);
-    window.setTimeout(() => setVersionCopied(false), 2500);
+    if (status === "error") {
+      return <Ionicons name="close-circle" size={18} color="#DC2626" />;
+    }
+    if (status === "pending") {
+      return <ActivityIndicator size="small" color="#7C3AED" />;
+    }
+    return <Ionicons name="ellipse-outline" size={16} color="#9CA3AF" />;
   };
 
   return (
@@ -330,6 +509,17 @@ export default function LoginScreen() {
           <Text className="text-sm text-gray-400 mt-1">
             Gerência de Cursinho — Painel Admin
           </Text>
+          <View className="mt-3 items-center">
+            <Text className="text-[11px] font-semibold text-violet-600">
+              API v{apiVersion} • App {(buildInfo as any)?.version ?? "-"}
+            </Text>
+            <Text className="text-[10px] text-gray-400 mt-0.5">
+              Contrato {formatDateToPtBr(contractVersion)}
+            </Text>
+            <Text className="text-[10px] text-gray-400">
+              Build: {(buildInfo as any)?.version ?? "-"} • {formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}
+            </Text>
+          </View>
         </View>
 
         {metaLoading && (
@@ -500,41 +690,48 @@ export default function LoginScreen() {
           </View>
         )}
 
-        {/* Version Info */}
-        <TouchableOpacity
-          onPress={copyVersionInfo}
-          activeOpacity={0.7}
-          className="mt-6 pt-4 border-t border-gray-100"
-        >
-          <View className="flex-row items-center justify-center gap-2">
-            <View className="flex-1 items-center">
-              <Text className="text-xs font-medium text-gray-700">
-                API v{apiVersion}
-              </Text>
-              <Text className="text-[11px] text-gray-500 mt-1">
-                Contrato {formatDateToPtBr(contractVersion)}
-              </Text>
-              <Text className="text-[11px] text-gray-500 mt-0.5">
-                App v{APP_VERSION}
-              </Text>
-              <Text className="text-[10px] text-gray-400 mt-0.5">
-                Build: {formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}
-              </Text>
-            </View>
-            <View className="items-center justify-center px-3 py-2">
-              <Ionicons
-                name={versionCopied ? "checkmark" : "copy"}
-                size={16}
-                color={versionCopied ? "#10B981" : "#9CA3AF"}
-              />
-              <Text className="text-[10px] text-gray-400 mt-1">
-                {versionCopied ? "Copiado" : "Copiar"}
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
       </View>
+
+      <Modal
+        visible={loginChecklistVisible}
+        title="Checklist de validação do login"
+        onClose={() => setLoginChecklistVisible(false)}
+        size="sm"
+        footer={
+          <TouchableOpacity
+            onPress={() => setLoginChecklistVisible(false)}
+            className="px-5 py-2.5 rounded-xl bg-violet-600"
+            activeOpacity={0.8}
+          >
+            <Text className="text-sm font-bold text-white">Fechar</Text>
+          </TouchableOpacity>
+        }
+      >
+        <View className="gap-3">
+          <View className="flex-row items-center gap-3">
+            {renderChecklistIcon(loginChecklist.internet)}
+            <Text className="text-sm text-gray-700">Conexão com a internet</Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            {renderChecklistIcon(loginChecklist.apiUpdated)}
+            <Text className="text-sm text-gray-700">API atualizada</Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            {renderChecklistIcon(loginChecklist.appUpdated)}
+            <Text className="text-sm text-gray-700">App atualizado</Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            {renderChecklistIcon(loginChecklist.loginAuthorized)}
+            <Text className="text-sm text-gray-700">Login autorizado</Text>
+          </View>
+
+          {!!loginChecklistMessage && (
+            <View className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+              <Text className="text-xs text-gray-600">{loginChecklistMessage}</Text>
+            </View>
+          )}
+        </View>
+      </Modal>
 
       <Modal
         visible={!!debugInfo}

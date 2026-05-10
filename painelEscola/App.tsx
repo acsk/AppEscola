@@ -8,6 +8,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
+import api from "./services/api";
+import buildInfo from "./buildInfo.json";
 import LoginScreen from "./screens/LoginScreen";
 import DashboardScreen from "./screens/DashboardScreen";
 import StudentsScreen from "./screens/alunos";
@@ -31,6 +33,30 @@ import { UsersScreen, UserFormScreen } from "./screens/users";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 
 type NavState = { screen: string; params?: Record<string, any> };
+
+const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
+
+const compareBuildVersions = (left: string, right: string) => {
+  const normalize = (value: string) =>
+    String(value || "")
+      .trim()
+      .replace(/^v/i, "")
+      .split(".")
+      .map((part) => Number.parseInt(part, 10) || 0);
+
+  const leftParts = normalize(left);
+  const rightParts = normalize(right);
+  const max = Math.max(leftParts.length, rightParts.length);
+
+  for (let i = 0; i < max; i++) {
+    const a = leftParts[i] ?? 0;
+    const b = rightParts[i] ?? 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+
+  return 0;
+};
 
 let iconFontsPromise: Promise<void> | null = null;
 
@@ -193,6 +219,14 @@ function navToHash(nav: NavState): string {
 function AppContent() {
   const { user, isLoading, mustChangePassword } = useAuth();
   const { width } = useWindowDimensions();
+  const [apiVersion, setApiVersion] = useState<string>("-");
+  const [reloadRequiredDialog, setReloadRequiredDialog] = useState<{
+    visible: boolean;
+    message: string;
+  }>({
+    visible: false,
+    message: "Uma nova versão do painel está disponível. Recarregue para continuar.",
+  });
   const [fontsReady, setFontsReady] = useState(typeof window === "undefined");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sessionExpiredDialog, setSessionExpiredDialog] = useState<{
@@ -234,6 +268,79 @@ function AppContent() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const cachedApiVersion = localStorage.getItem("api_version_seen");
+    if (cachedApiVersion) {
+      setApiVersion(cachedApiVersion);
+    }
+
+    let active = true;
+    const loadApiMeta = async () => {
+      try {
+        const metaUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/meta`;
+        const response = await fetch(metaUrl, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+
+        const rawData = await response.json().catch(() => ({}));
+        const body = rawData?.body ?? rawData ?? {};
+        const nextApiVersion =
+          body?.api_version ?? response.headers.get("x-api-version") ?? "-";
+
+        if (!active) return;
+        setApiVersion(String(nextApiVersion));
+        localStorage.setItem("api_version_seen", String(nextApiVersion));
+      } catch {
+        // mantém valor em cache quando falhar
+      }
+    };
+
+    loadApiMeta();
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let active = true;
+    const checkPanelBuildVersion = async () => {
+      try {
+        const panelVersionUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/version/panel`;
+        const response = await fetch(panelVersionUrl, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+
+        const rawData = await response.json().catch(() => ({}));
+        const body = rawData?.body ?? rawData ?? {};
+        const latestVersion = String(body?.version ?? "-");
+
+        if (!active || !latestVersion || latestVersion === "-") return;
+
+        localStorage.setItem("panel_version_latest", latestVersion);
+
+        if (compareBuildVersions(latestVersion, CURRENT_BUILD_VERSION) > 0) {
+          setReloadRequiredDialog({
+            visible: true,
+            message: `Nova versão do painel detectada (${latestVersion}). Versão atual no navegador: ${CURRENT_BUILD_VERSION}. Recarregue para atualizar.`,
+          });
+        }
+      } catch {
+        // Sem bloquear a experiência se não conseguir consultar versão remota.
+      }
+    };
+
+    checkPanelBuildVersion();
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -332,6 +439,17 @@ function AppContent() {
     }
   };
 
+  const closeReloadRequiredDialog = () => {
+    setReloadRequiredDialog((prev) => ({ ...prev, visible: false }));
+  };
+
+  const reloadAppNow = () => {
+    setReloadRequiredDialog((prev) => ({ ...prev, visible: false }));
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  };
+
   const renderGlobalDialogs = () => {
     if (sessionExpiredDialog.visible) {
       return (
@@ -383,6 +501,39 @@ function AppContent() {
                 activeOpacity={0.85}
               >
                 <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (reloadRequiredDialog.visible) {
+      return (
+        <View
+          className="absolute inset-0 items-center justify-center px-4"
+          style={{ backgroundColor: "rgba(17, 24, 39, 0.45)", zIndex: 9997 }}
+        >
+          <View className="w-full max-w-md rounded-2xl bg-white px-6 py-5 border border-gray-100">
+            <View className="flex-row items-center gap-2 mb-3">
+              <Ionicons name="refresh-outline" size={18} color="#7C3AED" />
+              <Text className="text-base font-bold text-gray-800">Atualização disponível</Text>
+            </View>
+            <Text className="text-sm text-gray-600 mb-5">{reloadRequiredDialog.message}</Text>
+            <View className="flex-row gap-2">
+              <TouchableOpacity
+                onPress={closeReloadRequiredDialog}
+                className="flex-1 rounded-xl border border-gray-200 py-3 items-center"
+                activeOpacity={0.85}
+              >
+                <Text className="text-sm font-semibold text-gray-700">Depois</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={reloadAppNow}
+                className="flex-1 rounded-xl bg-violet-600 py-3 items-center"
+                activeOpacity={0.85}
+              >
+                <Text className="text-sm font-semibold text-white">Recarregar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -526,6 +677,7 @@ function AppContent() {
             onSelectItem={(s) => navigate(s)}
             canManageTenants={canManageTenants}
             canManageUsers={canManageUsers}
+            apiVersion={apiVersion}
           />
         )}
         {isMobile && isSidebarOpen && (
@@ -543,6 +695,7 @@ function AppContent() {
               onSelectItem={(s) => navigate(s)}
               canManageTenants={canManageTenants}
               canManageUsers={canManageUsers}
+              apiVersion={apiVersion}
               isMobile
               onClose={() => setIsSidebarOpen(false)}
             />
