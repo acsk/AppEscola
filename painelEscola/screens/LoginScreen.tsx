@@ -14,6 +14,7 @@ import api from "../services/api";
 import appJson from "../app.json";
 
 const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
+const STORAGE_API_VERSION_KEY = "api_version_seen";
 
 const compareVersions = (left: string, right: string) => {
   const leftParts = left.split(".").map((p) => Number.parseInt(p, 10) || 0);
@@ -52,6 +53,39 @@ export default function LoginScreen() {
   const [mustUpdate, setMustUpdate] = useState(false);
   const [shouldRecommendUpdate, setShouldRecommendUpdate] = useState(false);
 
+  const fetchMetaInfo = async () => {
+    const metaUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/meta`;
+    const response = await fetch(metaUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const rawData = await response.json().catch(() => ({}));
+    const body = rawData?.body ?? rawData ?? {};
+
+    const nextApiVersion =
+      body?.api_version ?? response.headers.get("x-api-version") ?? "-";
+    const nextContractVersion =
+      body?.contract_version ?? response.headers.get("x-api-contract-version") ?? "-";
+    const nextMinSupportedVersion =
+      body?.min_supported_app_version ??
+      response.headers.get("x-min-supported-app-version") ??
+      "";
+    const nextRecommendedVersion =
+      body?.recommended_app_version ??
+      response.headers.get("x-recommended-app-version") ??
+      "";
+
+    return {
+      apiVersion: String(nextApiVersion),
+      contractVersion: String(nextContractVersion),
+      minSupportedVersion: String(nextMinSupportedVersion || ""),
+      recommendedVersion: String(nextRecommendedVersion || ""),
+    };
+  };
+
   const resetForm = () => {
     setEmail("");
     setPassword("");
@@ -70,43 +104,30 @@ export default function LoginScreen() {
       setMetaLoading(true);
       setMetaError("");
       try {
-        const metaUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/meta`;
-        const response = await fetch(metaUrl, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        const rawData = await response.json().catch(() => ({}));
-        const body = rawData?.body ?? rawData ?? {};
-
-        const nextApiVersion =
-          body?.api_version ?? response.headers.get("x-api-version") ?? "-";
-        const nextContractVersion =
-          body?.contract_version ?? response.headers.get("x-api-contract-version") ?? "-";
-        const nextMinSupportedVersion =
-          body?.min_supported_app_version ??
-          response.headers.get("x-min-supported-app-version") ??
-          "";
-        const nextRecommendedVersion =
-          body?.recommended_app_version ??
-          response.headers.get("x-recommended-app-version") ??
-          "";
+        const {
+          apiVersion: nextApiVersion,
+          contractVersion: nextContractVersion,
+          minSupportedVersion: nextMinSupportedVersion,
+          recommendedVersion: nextRecommendedVersion,
+        } = await fetchMetaInfo();
 
         if (!active) return;
 
-        setApiVersion(String(nextApiVersion));
-        setContractVersion(String(nextContractVersion));
-        setMinSupportedVersion(String(nextMinSupportedVersion || ""));
-        setRecommendedVersion(String(nextRecommendedVersion || ""));
+        setApiVersion(nextApiVersion);
+        setContractVersion(nextContractVersion);
+        setMinSupportedVersion(nextMinSupportedVersion);
+        setRecommendedVersion(nextRecommendedVersion);
+
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(STORAGE_API_VERSION_KEY, nextApiVersion);
+        }
 
         const requireUpdate =
           !!nextMinSupportedVersion &&
-          compareVersions(APP_VERSION, String(nextMinSupportedVersion)) < 0;
+          compareVersions(APP_VERSION, nextMinSupportedVersion) < 0;
         const recommendUpdate =
           !!nextRecommendedVersion &&
-          compareVersions(APP_VERSION, String(nextRecommendedVersion)) < 0;
+          compareVersions(APP_VERSION, nextRecommendedVersion) < 0;
 
         setMustUpdate(requireUpdate);
         setShouldRecommendUpdate(!requireUpdate && recommendUpdate);
@@ -126,6 +147,49 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (loading) return;
+
+    try {
+      const {
+        apiVersion: latestApiVersion,
+        contractVersion: latestContractVersion,
+        minSupportedVersion: latestMinSupportedVersion,
+        recommendedVersion: latestRecommendedVersion,
+      } = await fetchMetaInfo();
+
+      setApiVersion(latestApiVersion);
+      setContractVersion(latestContractVersion);
+      setMinSupportedVersion(latestMinSupportedVersion);
+      setRecommendedVersion(latestRecommendedVersion);
+
+      const requireUpdate =
+        !!latestMinSupportedVersion &&
+        compareVersions(APP_VERSION, latestMinSupportedVersion) < 0;
+      const recommendUpdate =
+        !!latestRecommendedVersion &&
+        compareVersions(APP_VERSION, latestRecommendedVersion) < 0;
+
+      setMustUpdate(requireUpdate);
+      setShouldRecommendUpdate(!requireUpdate && recommendUpdate);
+
+      if (typeof localStorage !== "undefined") {
+        const previousApiVersion = localStorage.getItem(STORAGE_API_VERSION_KEY);
+        if (previousApiVersion && previousApiVersion !== latestApiVersion) {
+          setError(
+            `Nova versão da API detectada: v${latestApiVersion}. A página será reiniciada para atualizar.`
+          );
+          localStorage.clear();
+          localStorage.setItem("app_version", APP_VERSION);
+          localStorage.setItem(STORAGE_API_VERSION_KEY, latestApiVersion);
+          window.setTimeout(() => {
+            if (typeof window !== "undefined") window.location.reload();
+          }, 1400);
+          return;
+        }
+        localStorage.setItem(STORAGE_API_VERSION_KEY, latestApiVersion);
+      }
+    } catch {
+      // fallback: mantém o fluxo de login atual mesmo sem leitura de /meta na tentativa
+    }
 
     if (metaLoading) {
       setError("Aguarde a validação de versão antes de entrar.");
