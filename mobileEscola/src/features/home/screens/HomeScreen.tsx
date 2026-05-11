@@ -112,7 +112,9 @@ export function HomeScreen() {
   const { user, signOut, refreshUserProfile } = useAuth();
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
-  const simCardWidth = Math.max(150, (width - 32 - 24) / 3);
+  const isCompact = width < 390;
+  const simColumns = width >= 600 ? 3 : 2;
+  const simCardWidth = (width - 32 - 12 * (simColumns - 1)) / simColumns;
 
   const [simuladosRecentes, setSimuladosRecentes] = useState<SimuladoListItem[]>([]);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('month');
@@ -374,27 +376,27 @@ export function HomeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
       {/* ── Cabeçalho ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <View style={styles.headerProfileRow}>
-          <View style={styles.studentBlock}>
+      <View style={[styles.header, isCompact && styles.headerCompact]}>
+        <View style={[styles.headerProfileRow, isCompact && styles.headerProfileRowCompact]}>
+          <View style={[styles.studentBlock, isCompact && styles.studentBlockCompact]}>
             <TouchableOpacity
-              style={styles.avatarWrap}
+              style={[styles.avatarWrap, isCompact && styles.avatarWrapCompact]}
               onPress={handleSelecionarFoto}
               activeOpacity={0.85}
               disabled={avatarUploading}
             >
-              <View style={styles.avatarCircle}>
+              <View style={[styles.avatarCircle, isCompact && styles.avatarCircleCompact]}>
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
                 ) : (
-                  <Text style={styles.avatarInitials}>{initials}</Text>
+                  <Text style={[styles.avatarInitials, isCompact && styles.avatarInitialsCompact]}>{initials}</Text>
                 )}
               </View>
-              <View style={styles.avatarEditBtn}>
+              <View style={[styles.avatarEditBtn, isCompact && styles.avatarEditBtnCompact]}>
                 {avatarUploading ? (
                   <ActivityIndicator size="small" color={colors.ink} />
                 ) : (
-                  <Ionicons name="pencil" size={12} color={colors.ink} />
+                  <Ionicons name="pencil" size={isCompact ? 11 : 12} color={colors.ink} />
                 )}
               </View>
               {Platform.OS === 'web' ? (
@@ -409,8 +411,8 @@ export function HomeScreen() {
               ) : null}
             </TouchableOpacity>
             <View style={styles.userInfo}>
-              <Text style={styles.userName} numberOfLines={2}>{user?.name ?? 'Usuário'}</Text>
-              <Text style={styles.userRole}>{roleLabel}</Text>
+              <Text style={[styles.userName, isCompact && styles.userNameCompact]} numberOfLines={2}>{user?.name ?? 'Usuário'}</Text>
+              <Text style={[styles.userRole, isCompact && styles.userRoleCompact]}>{roleLabel}</Text>
               {avatarFeedback ? <Text style={styles.avatarFeedback}>{avatarFeedback}</Text> : null}
                 {/* <View style={styles.levelBadge}>
                   <Ionicons name="star" size={11} color={colors.primary} />
@@ -419,30 +421,30 @@ export function HomeScreen() {
             </View>
           </View>
 
-          <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="notifications-outline" size={22} color={colors.surface} />
+          <View style={[styles.headerIcons, isCompact && styles.headerIconsCompact]}>
+            <TouchableOpacity style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}>
+              <Ionicons name="notifications-outline" size={isCompact ? 20 : 22} color={colors.surface} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => setPainelAberto(!painelAberto)}>
-              <Ionicons name="settings-outline" size={22} color={colors.surface} />
+            <TouchableOpacity style={[styles.iconBtn, isCompact && styles.iconBtnCompact]} onPress={() => setPainelAberto(!painelAberto)}>
+              <Ionicons name="settings-outline" size={isCompact ? 20 : 22} color={colors.surface} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.iconBtn}
+              style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}
               onPress={() => { setPainelAberto(true); setConfirmandoSaida(true); }}
               disabled={saindo}
             >
-              <Ionicons name="log-out-outline" size={22} color={colors.surface} />
+              <Ionicons name="log-out-outline" size={isCompact ? 20 : 22} color={colors.surface} />
             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, isCompact && styles.statsRowCompact]}>
           {stats.map((s, i) => (
             <View key={i} style={[styles.statItem, i < stats.length - 1 && styles.statBorder]}>
-              <Ionicons name={s.icon as any} size={19} color={colors.muted} />
-              <Text style={styles.statValue}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
+              <Ionicons name={s.icon as any} size={isCompact ? 18 : 19} color={colors.muted} />
+              <Text style={[styles.statValue, isCompact && styles.statValueCompact]}>{s.value}</Text>
+              <Text style={[styles.statLabel, isCompact && styles.statLabelCompact]}>{s.label}</Text>
             </View>
           ))}
         </View>
@@ -546,11 +548,11 @@ export function HomeScreen() {
       )}
 
       {/* ── Resumo de desempenho ───────────────────────────────────────── */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
+      <View style={[styles.card, isCompact && styles.cardCompact]}>
+        <View style={[styles.cardHeader, isCompact && styles.cardHeaderCompact]}>
           <View style={styles.cardHeaderLeft}>
-            <Text style={styles.cardTitle}>Resumo de desempenho</Text>
-            <Ionicons name="eye-outline" size={18} color={colors.muted} style={{ marginLeft: 8 }} />
+            <Text style={styles.cardTitle} numberOfLines={1}>Resumo de desempenho</Text>
+            <Ionicons name="eye-outline" size={16} color={colors.muted} style={{ marginLeft: 6 }} />
           </View>
           <TouchableOpacity
             style={styles.periodoPicker}
@@ -565,7 +567,7 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.mediaGrande}>
+        <Text style={[styles.mediaGrande, isCompact && styles.mediaGrandeCompact]}>
           {summaryAccuracy.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
           <Text style={styles.mediaDecimal}>%</Text>
         </Text>
@@ -576,7 +578,7 @@ export function HomeScreen() {
           </Text>
         </View>
 
-        <View style={styles.acertosErros}>
+        <View style={[styles.acertosErros, isCompact && styles.acertosErrosCompact]}>
           <View style={styles.aeItem}>
             <Text style={styles.aeLabel}>Acertos</Text>
             <Text style={styles.aeValor}>{summaryCorrect}</Text>
@@ -593,7 +595,7 @@ export function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.insightBox}>
+        <View style={[styles.insightBox, isCompact && styles.insightBoxCompact]}>
           <Ionicons name="bulb-outline" size={17} color={colors.muted} style={{ marginRight: 8, flexShrink: 0 }} />
           <Text style={styles.insightTexto}>
             Seu desempenho no período está em{' '}
@@ -651,7 +653,7 @@ export function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={s.id}
-                  style={[styles.simCard, { width: simCardWidth }]}
+                  style={[styles.simCard, isCompact && styles.simCardCompact, { width: simCardWidth }]}
                   activeOpacity={0.85}
                   onPress={() => navigation.navigate('Simulados', {
                     screen: 'SimuladoDetalhe',
@@ -781,6 +783,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 28,
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, elevation: 4,
   },
+  headerCompact: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 22,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
   headerProfileRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -788,12 +797,29 @@ const styles = StyleSheet.create({
     marginBottom: 26,
     gap: 12,
   },
+  headerProfileRowCompact: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 0,
+    marginBottom: 18,
+  },
   studentBlock: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  studentBlockCompact: { width: '100%', alignItems: 'center' },
   headerIcons: { flexDirection: 'row', gap: 8, flexShrink: 0 },
+  headerIconsCompact: {
+    alignSelf: 'flex-end',
+    gap: 6,
+    marginTop: 10,
+  },
   iconBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(238,242,255,0.12)', position: 'relative',
+  },
+  iconBtnCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   notifDot: {
     position: 'absolute', top: 8, right: 8,
@@ -801,22 +827,39 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.ink,
   },
   avatarWrap:    { position: 'relative', marginRight: 18 },
+  avatarWrapCompact: { marginRight: 12 },
   avatarCircle:  {
     width: 104, height: 104, borderRadius: 52,
     backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center',
     borderWidth: 4, borderColor: 'rgba(238,242,255,0.18)', overflow: 'hidden',
   },
+  avatarCircleCompact: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    borderWidth: 3,
+  },
   avatarImage: { width: '100%', height: '100%' },
   avatarInitials: { fontSize: 32, fontWeight: '800', color: colors.primary },
+  avatarInitialsCompact: { fontSize: 26 },
   avatarEditBtn:  {
     position: 'absolute', bottom: 4, right: 4,
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center',
     borderWidth: 2, borderColor: colors.ink,
   },
+  avatarEditBtnCompact: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    bottom: 2,
+    right: 2,
+  },
   userInfo:   { flex: 1, minWidth: 0 },
   userName:   { fontSize: 23, fontWeight: '800', color: colors.surface, marginBottom: 3 },
+  userNameCompact: { fontSize: 22, lineHeight: 24 },
   userRole:   { fontSize: 14, color: '#CBD5E1', marginBottom: 10 },
+  userRoleCompact: { fontSize: 13, marginBottom: 6 },
   avatarFeedback: { fontSize: 12, color: '#E2E8F0', marginBottom: 8 },
   levelBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -833,10 +876,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 4,
   },
+  statsRowCompact: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 2,
+  },
   statItem:  { flex: 1, alignItems: 'center', gap: 4 },
   statBorder:{ borderRightWidth: 1, borderRightColor: colors.border },
   statValue: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  statValueCompact: { fontSize: 17 },
   statLabel: { fontSize: 11, color: colors.muted, textAlign: 'center', lineHeight: 14 },
+  statLabelCompact: { fontSize: 10, lineHeight: 13 },
 
   // Card genérico
   card: {
@@ -844,22 +894,32 @@ const styles = StyleSheet.create({
     borderRadius: 18, padding: 18,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
+  cardCompact: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 16,
+    padding: 16,
+  },
   cardHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
+  cardHeaderCompact: { gap: 10 },
+  cardHeaderLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
   cardTitle:      { fontSize: 16, fontWeight: '700', color: colors.ink },
   periodoPicker:  {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: colors.soft, borderWidth: 1, borderColor: colors.border,
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+    flexShrink: 0,
   },
   periodoTexto: { fontSize: 13, color: colors.text, fontWeight: '500' },
 
   // Desempenho
   mediaGrande:  { fontSize: 40, fontWeight: '800', color: colors.ink },
+  mediaGrandeCompact: { fontSize: 38 },
   mediaDecimal: { fontSize: 24, fontWeight: '600', color: colors.ink },
   trendRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 16 },
   trendTexto:   { fontSize: 13, color: colors.muted, fontWeight: '500' },
   acertosErros: { flexDirection: 'row', gap: 16, marginBottom: 14 },
+  acertosErrosCompact: { gap: 14 },
   aeItem:       { flex: 1 },
   aeLabel:      { fontSize: 12, color: colors.muted, marginBottom: 2 },
   aeValor:      { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 6 },
@@ -870,6 +930,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.soft, borderRadius: 12,
     padding: 12, gap: 4,
   },
+  insightBoxCompact: { padding: 11 },
   insightTexto: { flex: 1, fontSize: 13, color: colors.text, lineHeight: 18 },
 
   // Section headers
@@ -880,10 +941,14 @@ const styles = StyleSheet.create({
 
   // Simulados
   simCard: {
-    minHeight: 246, backgroundColor: colors.surface, borderRadius: 16, padding: 16,
+    minHeight: 246, backgroundColor: colors.surface, borderRadius: 16, padding: 14,
     borderWidth: 1, borderColor: colors.border,
     shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
     flexDirection: 'column',
+  },
+  simCardCompact: {
+    minHeight: 250,
+    padding: 13,
   },
   simCardVazio: {
     width: 220, backgroundColor: colors.surface, borderRadius: 18, padding: 20,
@@ -894,11 +959,11 @@ const styles = StyleSheet.create({
   simTopo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     marginBottom: 12,
   },
   simIconWrap: {
-    width: 46, height: 46, borderRadius: 14, backgroundColor: colors.soft,
+    width: 44, height: 44, borderRadius: 13, backgroundColor: colors.soft,
     justifyContent: 'center', alignItems: 'center',
   },
   simTopoInfo: {
@@ -956,12 +1021,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
-  simAproveitamentoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
+  simAproveitamentoHeader: { gap: 4 },
   simAproveitamentoLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -969,7 +1029,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   simAproveitamentoLabel: { fontSize: 10, fontWeight: '800', color: colors.muted },
-  simAproveitamentoValor: { fontSize: 18, fontWeight: '900', color: '#0284C7' },
+  simAproveitamentoValor: { fontSize: 20, fontWeight: '900', color: '#0284C7', lineHeight: 24 },
   simAproveitamentoValorOk: { color: '#22C55E' },
   simAproveitamentoValorFail: { color: '#EF4444' },
   simAproveitamentoBar: {
