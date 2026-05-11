@@ -24,8 +24,12 @@ use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
+
+// Health check (público)
+Route::get('/health', [HealthController::class, 'check']);
 
 // Autenticação (pública)
 Route::post('/login', [AuthController::class, 'login']);

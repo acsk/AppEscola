@@ -121,6 +121,8 @@ export default function LoginScreen() {
     INITIAL_LOGIN_CHECKLIST_STATE
   );
   const [loginChecklistMessage, setLoginChecklistMessage] = useState("");
+  const [reloadConfirmationVisible, setReloadConfirmationVisible] = useState(false);
+  const [reloadConfirmationMessage, setReloadConfirmationMessage] = useState("");
 
   const updateChecklistStep = (
     step: keyof LoginChecklistState,
@@ -131,6 +133,55 @@ export default function LoginScreen() {
 
   const waitChecklistStep = () =>
     new Promise((resolve) => window.setTimeout(resolve, CHECKLIST_STEP_DELAY_MS));
+
+  const testInternetConnection = async () => {
+    try {
+      const baseUrl = String(api.defaults.baseURL ?? "").replace(/\/$/, "");
+      console.log("🌐 Iniciando teste de conexão com internet...");
+      console.log("📍 Base URL:", baseUrl);
+      
+      if (!baseUrl) {
+        console.error("❌ Base URL está vazia!");
+        return false;
+      }
+
+      const healthUrl = `${baseUrl}/health`;
+      console.log("🔗 Tentando conectar em:", healthUrl);
+      
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => {
+        console.warn("⏱️ Timeout! Abortando requisição após 6 segundos");
+        controller.abort();
+      }, 6000);
+
+      const startTime = performance.now();
+      const response = await fetch(healthUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+        cache: "no-cache",
+        credentials: "include",
+      });
+
+      const endTime = performance.now();
+      window.clearTimeout(timeoutId);
+      
+      console.log(`✅ Resposta recebida: ${response.status} ${response.statusText}`);
+      console.log(`⏱️ Tempo de resposta: ${(endTime - startTime).toFixed(0)}ms`);
+      
+      return response.ok;
+    } catch (error: any) {
+      console.error("❌ Erro ao testar conexão com internet:", error);
+      console.error("📋 Detalhes:", {
+        name: error?.name,
+        message: error?.message,
+        type: error?.type,
+      });
+      return false;
+    }
+  };
 
   const fetchMetaInfo = async () => {
     const metaUrl = `${String(api.defaults.baseURL ?? "").replace(/\/$/, "")}/meta`;
@@ -204,11 +255,8 @@ export default function LoginScreen() {
             localStorage.setItem(STORAGE_PANEL_RELOAD_ATTEMPT_KEY, panel.version);
           }
           setError(
-            `Nova versão do painel detectada (${panel.version}). Versão atual no navegador: ${CURRENT_BUILD_VERSION}. Recarregando...`
+            `Nova versão do painel detectada (${panel.version}). Versão atual no navegador: ${CURRENT_BUILD_VERSION}.`
           );
-          window.setTimeout(() => {
-            if (typeof window !== "undefined") window.location.reload();
-          }, 1600);
           return true;
         }
 
@@ -312,15 +360,22 @@ export default function LoginScreen() {
 
     await waitChecklistStep();
 
-    const browserIsOnline =
-      typeof navigator === "undefined" ? true : navigator.onLine;
-    if (!browserIsOnline) {
+    console.log("🔍 Etapa 1: Verificando conexão com internet...");
+    const isConnected = await testInternetConnection();
+    
+    if (!isConnected) {
+      console.error("🛑 Falha na conexão com a API!");
       updateChecklistStep("internet", "error");
-      setLoginChecklistMessage("Sem conexão com a internet.");
-      setError("Sem conexão com a internet.");
+      setLoginChecklistMessage("Falha ao conectar com a API. Verifique sua conexão.");
+      setError("Não foi possível conectar com a API. Verifique se tem conexão com a internet e tente novamente.");
       return;
     }
+    
+    console.log("✅ Conexão com internet estabelecida!");
     updateChecklistStep("internet", "success");
+    setLoginChecklistMessage("Conexão com a internet estabelecida com sucesso.");
+    await waitChecklistStep();
+    setLoginChecklistMessage("");
 
     updateChecklistStep("apiUpdated", "pending");
   await waitChecklistStep();
@@ -357,16 +412,17 @@ export default function LoginScreen() {
         const previousApiVersion = localStorage.getItem(STORAGE_API_VERSION_KEY);
         if (previousApiVersion && previousApiVersion !== latestApiVersion) {
           updateChecklistStep("apiUpdated", "error");
-          setLoginChecklistMessage("Versão da API mudou. O painel será recarregado.");
+          setLoginChecklistMessage("Versão da API mudou. Aguardando confirmação...");
           setError(
-            `Nova versão da API detectada: v${latestApiVersion}. A página será reiniciada para atualizar.`
+            `Nova versão da API detectada: v${latestApiVersion}. Será necessário recarregar.`
           );
           localStorage.clear();
           localStorage.setItem("app_version", APP_VERSION);
           localStorage.setItem(STORAGE_API_VERSION_KEY, latestApiVersion);
-          window.setTimeout(() => {
-            if (typeof window !== "undefined") window.location.reload();
-          }, 1400);
+          setReloadConfirmationMessage(
+            "Uma nova versão da API foi detectada. O painel será recarregado para atualizar."
+          );
+          setReloadConfirmationVisible(true);
           return;
         }
         localStorage.setItem(STORAGE_API_VERSION_KEY, latestApiVersion);
@@ -383,7 +439,11 @@ export default function LoginScreen() {
     const requiresReload = await checkPanelBuildAndReload();
     if (requiresReload) {
       updateChecklistStep("appUpdated", "error");
-      setLoginChecklistMessage("Nova versão do app detectada. Recarregando...");
+      setLoginChecklistMessage("Nova versão do app detectada. Aguardando confirmação...");
+      setReloadConfirmationMessage(
+        "Uma nova versão do painel foi detectada. O painel será recarregado para atualizar."
+      );
+      setReloadConfirmationVisible(true);
       return;
     }
     updateChecklistStep("appUpdated", "success");
@@ -452,7 +512,6 @@ export default function LoginScreen() {
         response_data: e.response?.data ?? null,
         timeout: e.config?.timeout ?? null,
         page_origin: typeof window !== "undefined" ? window.location.origin : null,
-        browser_online: typeof navigator !== "undefined" ? navigator.onLine : null,
       });
     } finally {
       setLoading(false);
@@ -474,6 +533,17 @@ export default function LoginScreen() {
 
     setDebugCopied(true);
     window.setTimeout(() => setDebugCopied(false), 2500);
+  };
+
+  const confirmReloadAndRefresh = () => {
+    setReloadConfirmationVisible(false);
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  };
+
+  const closeReloadConfirmation = () => {
+    setReloadConfirmationVisible(false);
   };
 
   const renderChecklistIcon = (status: ChecklistStatus) => {
@@ -775,6 +845,38 @@ export default function LoginScreen() {
             style={{ fontFamily: "monospace" }}
           >
             {JSON.stringify(debugInfo, null, 2)}
+          </Text>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={reloadConfirmationVisible}
+        title="Atualizar painel"
+        onClose={closeReloadConfirmation}
+        size="sm"
+        footer={
+          <>
+            <TouchableOpacity
+              onPress={closeReloadConfirmation}
+              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              activeOpacity={0.75}
+            >
+              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={confirmReloadAndRefresh}
+              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              activeOpacity={0.8}
+            >
+              <Text className="text-sm font-bold text-white">OK, Recarregar</Text>
+            </TouchableOpacity>
+          </>
+        }
+      >
+        <View className="items-center gap-3">
+          <Ionicons name="refresh-outline" size={32} color="#7C3AED" />
+          <Text className="text-sm text-gray-700 text-center leading-relaxed">
+            {reloadConfirmationMessage}
           </Text>
         </View>
       </Modal>
