@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { storage, STORAGE_KEYS } from '../services/storage';
 import {
@@ -13,7 +13,15 @@ import {
   getMeApi,
   AuthUser,
 } from '../services/auth.service';
+import {
+  fetchMobileVersion,
+  compareBuildVersions,
+} from '../services/version.service';
 import { colors } from '../theme';
+import buildInfo from '../../buildInfo.json';
+
+const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? '-');
+const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
 interface AuthContextData {
   user: AuthUser | null;
@@ -32,6 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading]                 = useState(true);
   const [requirePasswordChange, setRequirePasswordChange] = useState(false);
   const [sessionExpired, setSessionExpired]       = useState(false);
+  const [updateAvailable, setUpdateAvailable]     = useState<{
+    visible: boolean;
+    latest: string;
+  }>({ visible: false, latest: '' });
 
   // ── Limpeza interna de sessão (sem chamar a API) ───────────────────────
   const clearSession = useCallback(async () => {
@@ -58,6 +70,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     registerUnauthorizedHandler(handleSessionLost);
   }, [handleSessionLost]);
+
+  // ── Checagem periódica de nova versão do app ─────────────────────────
+  useEffect(() => {
+    let active = true;
+
+    const checkVersion = async () => {
+      const remote = await fetchMobileVersion();
+      if (!active || !remote?.version) return;
+      if (compareBuildVersions(remote.version, CURRENT_BUILD_VERSION) > 0) {
+        setUpdateAvailable({ visible: true, latest: remote.version });
+      }
+    };
+
+    checkVersion();
+    const intervalId = setInterval(checkVersion, VERSION_CHECK_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, []);
 
   // ── Valida token salvo ao iniciar o app ───────────────────────────────
   useEffect(() => {
@@ -183,6 +216,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             >
               <Text style={modalStyles.buttonText}>Ir para o login</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={updateAvailable.visible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {}}
+      >
+        <View style={modalStyles.backdrop}>
+          <View style={modalStyles.card}>
+            <View style={[modalStyles.iconCircle, { backgroundColor: '#EDE9FE' }]}>
+              <Ionicons name="refresh-outline" size={32} color="#7C3AED" />
+            </View>
+            <Text style={modalStyles.title}>Atualização disponível</Text>
+            <Text style={modalStyles.message}>
+              Uma nova versão do app está disponível ({updateAvailable.latest}).
+              {'\n'}Versão atual: {CURRENT_BUILD_VERSION}.
+              {'\n\n'}
+              {Platform.OS === 'web'
+                ? 'Recarregue a página para atualizar.'
+                : 'Atualize o app na loja para continuar com a versão mais recente.'}
+            </Text>
+            {Platform.OS === 'web' ? (
+              <TouchableOpacity
+                style={modalStyles.button}
+                onPress={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.reload();
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={modalStyles.buttonText}>Recarregar agora</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={modalStyles.button}
+                onPress={() => setUpdateAvailable({ visible: false, latest: '' })}
+                activeOpacity={0.85}
+              >
+                <Text style={modalStyles.buttonText}>Entendi</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>

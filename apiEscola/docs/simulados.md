@@ -8,6 +8,7 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 
 | Data | O que mudou |
 |---|---|
+| 2026-05-10 | Endpoint `GET /api/aluno/exams` passou a retornar `nota`, `score_display` e `aproveitamento` da tentativa mais recente (quando visível) |
 | 2026-05-04 | Status `pending_review`: resultado bloqueado até correção manual de questões discursivas/`allow_text_answer` |
 | 2026-05-04 | Status `awaiting_release` + flag `release_results_after_end` para segurar o resultado até o fim do período |
 | 2026-05-04 | Novo endpoint `PATCH /api/exam-attempts/{attempt}/answers/{answer}/correct` |
@@ -479,6 +480,51 @@ Na atualização parcial, também vale a mesma regra: após salvar, a questão d
 
 #### `DELETE /api/exams/{exam}/questions/{question}`
 Remove a questão (soft-delete). Opções são excluídas em cascata.
+
+---
+
+### Endpoints do aluno
+
+#### `GET /api/aluno/exams`
+Lista os simulados disponíveis para o aluno autenticado, incluindo simulados encerrados.
+
+Critérios aplicados:
+- usuário com `role = aluno`
+- aluno ativo
+- matrícula ativa e vigente
+- simulado publicado
+- curso do simulado compatível com a matrícula ativa
+
+**Resposta `200` (resumo):**
+```json
+{
+  "type": "success",
+  "message": "Simulados disponíveis.",
+  "body": [
+    {
+      "id": 9,
+      "title": "Simulado – Português",
+      "attempt_status": "completed",
+      "nota": 8,
+      "score_display": "8/10",
+      "aproveitamento": 80,
+      "can_start": true
+    }
+  ]
+}
+```
+
+Campos adicionais desta listagem:
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `attempt_status` | string | `not_started` \| `in_progress` \| `pending_review` \| `awaiting_release` \| `completed` |
+| `nota` | number \| null | Nota da tentativa mais recente por simulado |
+| `score_display` | string \| null | Nota formatada como `x/y` |
+| `aproveitamento` | number \| null | Percentual da tentativa mais recente |
+| `can_start` | boolean | Indica se ainda está dentro da janela para iniciar tentativa |
+
+> Quando o status visível para o aluno for `awaiting_release`, os campos `nota`, `score_display` e `aproveitamento` retornam `null`.
 
 ---
 

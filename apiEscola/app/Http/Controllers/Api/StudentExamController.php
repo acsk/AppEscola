@@ -78,11 +78,13 @@ class StudentExamController extends Controller
             ->orderBy('starts_at')
             ->get();
 
-        // Enriquecer com status da tentativa do aluno
-        $attemptStatuses = ExamAttempt::with('attemptStatus:id,slug')
+        // Enriquecer com status e nota da tentativa mais recente do aluno por simulado
+        $attemptStatuses = ExamAttempt::with(['attemptStatus:id,slug', 'exam:id,release_results_after_end,ends_at'])
             ->where('student_id', $student->id)
             ->whereIn('exam_id', $exams->pluck('id'))
-            ->get(['exam_id', 'attempt_status_id'])
+            ->orderByDesc('started_at')
+            ->get(['id', 'exam_id', 'attempt_status_id', 'score', 'max_score', 'percentage', 'started_at'])
+            ->unique('exam_id')
             ->keyBy('exam_id');
 
         $statusPriority = [
@@ -93,11 +95,22 @@ class StudentExamController extends Controller
             'completed'       => 4,
         ];
 
-        $result = $exams->map(function (Exam $exam) use ($attemptStatuses, $statusPriority) {
+        $result = $exams->map(function (Exam $exam) use ($attemptStatuses, $statusPriority, $user) {
             $resource = (new ExamResource($exam))->resolve(request());
             $attempt  = $attemptStatuses->get($exam->id);
+            $visibleStatus = $attempt?->visibleStatusFor($user->role) ?? 'not_started';
+            $score = ($visibleStatus === 'awaiting_release')
+                ? null
+                : ($attempt?->score !== null ? (float) $attempt->score : null);
+            $maxScore = $attempt?->max_score !== null ? (float) $attempt->max_score : null;
+            $percentage = ($visibleStatus === 'awaiting_release')
+                ? null
+                : ($attempt?->percentage !== null ? (float) $attempt->percentage : null);
 
-            $resource['attempt_status']   = $attempt?->status ?? 'not_started';
+            $resource['attempt_status']   = $visibleStatus;
+            $resource['nota']             = $score;
+            $resource['score_display']    = $this->formatScoreFraction($score, $maxScore);
+            $resource['aproveitamento']   = $percentage;
             $resource['can_start']        = $this->canStart($exam);
             $resource['_sort_can_start']  = $resource['can_start'] ? 1 : 0;
             $resource['_sort_status_rank'] = $statusPriority[$resource['attempt_status']] ?? 99;

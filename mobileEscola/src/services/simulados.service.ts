@@ -48,6 +48,9 @@ export interface SimuladoListItem {
   total_points: number;
   attempt_status: AttemptStatus;
   can_start: boolean;
+  nota?: number | null;
+  score_display?: string | null;
+  aproveitamento?: number | null;
   release_results_after_end?: boolean;
   allow_retake?: boolean;
   max_attempts?: number | null;

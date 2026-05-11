@@ -10,6 +10,7 @@ import {
   Image,
   Alert,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -110,6 +111,8 @@ function getSimuladoDayCounter(simulado: SimuladoListItem): string | null {
 export function HomeScreen() {
   const { user, signOut, refreshUserProfile } = useAuth();
   const navigation = useNavigation<any>();
+  const { width } = useWindowDimensions();
+  const simCardWidth = Math.max(150, (width - 32 - 24) / 3);
 
   const [simuladosRecentes, setSimuladosRecentes] = useState<SimuladoListItem[]>([]);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('month');
@@ -118,7 +121,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     if (user?.role === 'aluno') {
-      listarSimulados().then((lista) => setSimuladosRecentes(lista.slice(0, 3))).catch(() => {});
+      listarSimulados().then(setSimuladosRecentes).catch(() => {});
     }
   }, [user?.role]);
 
@@ -608,7 +611,13 @@ export function HomeScreen() {
         <>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Meus simulados</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Simulados')}>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('Simulados', {
+                  screen: 'SimuladosList',
+                })
+              }
+            >
               <Text style={styles.sectionLink}>Ver todos</Text>
             </TouchableOpacity>
           </View>
@@ -620,47 +629,125 @@ export function HomeScreen() {
             ) : simuladosRecentes.map((s) => {
               const cor = SIM_STATUS_COLOR[s.attempt_status];
               const contadorDias = getSimuladoDayCounter(s);
+              const notaDisplay =
+                s.score_display ??
+                (s.nota != null
+                  ? s.nota.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 1,
+                    })
+                  : null);
+              const aproveitamentoDisplay =
+                s.aproveitamento != null
+                  ? `${s.aproveitamento.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 1,
+                    })}%`
+                  : null;
+              const aproveitamentoAprovado =
+                s.aproveitamento != null && s.passing_score != null
+                  ? s.aproveitamento >= s.passing_score
+                  : null;
               return (
                 <TouchableOpacity
                   key={s.id}
-                  style={styles.simCard}
+                  style={[styles.simCard, { width: simCardWidth }]}
                   activeOpacity={0.85}
                   onPress={() => navigation.navigate('Simulados', {
                     screen: 'SimuladoDetalhe',
                     params: { examId: s.id },
                   })}
                 >
-                  {/* Ícone + matéria */}
-                  <View style={styles.simIconWrap}>
-                    <Ionicons
-                      name={subjectIconName(s.subject?.icon ?? '') as any}
-                      size={24}
-                      color={colors.primary}
-                    />
+                  <View style={styles.simTopo}>
+                    <View style={styles.simIconWrap}>
+                      <Ionicons
+                        name={subjectIconName(s.subject?.icon ?? '') as any}
+                        size={22}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <View style={styles.simTopoInfo}>
+                      {s.subject && (
+                        <Text style={styles.simMateria} numberOfLines={1}>
+                          {s.subject.name}
+                        </Text>
+                      )}
+                      {contadorDias ? (
+                        <View style={styles.simDaysPill}>
+                          <Ionicons name="calendar-outline" size={11} color={colors.muted} />
+                          <Text style={styles.simDaysText} numberOfLines={1}>{contadorDias}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                  {s.subject && (
-                    <Text style={styles.simMateria}>
-                      {s.subject.name}
-                    </Text>
-                  )}
 
-                  {/* Título */}
                   <Text style={styles.simTitulo} numberOfLines={2}>{s.title}</Text>
 
-                  {contadorDias ? (
-                    <View style={styles.simDaysPill}>
-                      <Ionicons name="calendar-outline" size={12} color="#CBD5E1" />
-                      <Text style={styles.simDaysText} numberOfLines={1}>{contadorDias}</Text>
-                    </View>
-                  ) : null}
-
-                  {/* Rodapé: status + link */}
-                  <View style={styles.simRodape}>
+                  <View style={styles.simMetaRow}>
                     <View style={[styles.simBadge, { backgroundColor: cor }]}>
                       <Text style={styles.simBadgeTexto}>
                         {SIM_STATUS_LABEL[s.attempt_status]}
                       </Text>
                     </View>
+                    {notaDisplay ? (
+                      <View style={styles.simNotaPill}>
+                        <Ionicons name="trophy-outline" size={11} color="#A16207" />
+                        <Text style={styles.simNotaText} numberOfLines={1}>
+                          {notaDisplay}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <View
+                    style={[
+                      styles.simAproveitamentoBox,
+                      aproveitamentoAprovado === true && styles.simAproveitamentoBoxOk,
+                      aproveitamentoAprovado === false && styles.simAproveitamentoBoxFail,
+                    ]}
+                  >
+                    <View style={styles.simAproveitamentoHeader}>
+                      <View style={styles.simAproveitamentoLabelRow}>
+                        <Ionicons
+                          name="stats-chart-outline"
+                          size={12}
+                          color={
+                            aproveitamentoAprovado === true
+                              ? '#22C55E'
+                              : aproveitamentoAprovado === false
+                              ? '#EF4444'
+                              : '#0284C7'
+                          }
+                        />
+                        <Text style={styles.simAproveitamentoLabel}>Aproveitamento</Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.simAproveitamentoValor,
+                          aproveitamentoAprovado === true && styles.simAproveitamentoValorOk,
+                          aproveitamentoAprovado === false && styles.simAproveitamentoValorFail,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {aproveitamentoDisplay ?? '--'}
+                      </Text>
+                    </View>
+                    <View style={styles.simAproveitamentoBar}>
+                      <View
+                        style={[
+                          styles.simAproveitamentoFill,
+                          { width: `${Math.min(Math.max(s.aproveitamento ?? 0, 0), 100)}%` },
+                          aproveitamentoAprovado === true && styles.simAproveitamentoFillOk,
+                          aproveitamentoAprovado === false && styles.simAproveitamentoFillFail,
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.simAproveitamentoMinimo} numberOfLines={1}>
+                      Mínimo: {s.passing_score ?? 0}%
+                    </Text>
+                  </View>
+
+                  <View style={styles.simRodape}>
                     <View style={styles.simOpenButton}>
                       <Text style={styles.simLink}>Abrir</Text>
                       <Ionicons name="arrow-forward" size={13} color={colors.surface} />
@@ -793,8 +880,9 @@ const styles = StyleSheet.create({
 
   // Simulados
   simCard: {
-    width: 184, minHeight: 214, backgroundColor: colors.ink, borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, elevation: 3,
+    minHeight: 246, backgroundColor: colors.surface, borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: colors.border,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
     flexDirection: 'column',
   },
   simCardVazio: {
@@ -803,32 +891,110 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
   },
   simCardVazioTexto: { fontSize: 13, color: colors.muted, textAlign: 'center' },
-  simIconWrap: {
-    width: 48, height: 48, borderRadius: 14, backgroundColor: colors.surface,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
+  simTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
   },
-  simMateria: { fontSize: 11, fontWeight: '700', color: '#CBD5E1', marginBottom: 8 },
-  simTitulo:  { fontSize: 14, fontWeight: '800', color: colors.surface, marginBottom: 10, lineHeight: 20, flex: 1 },
+  simIconWrap: {
+    width: 46, height: 46, borderRadius: 14, backgroundColor: colors.soft,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  simTopoInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
+  },
+  simMateria: { fontSize: 11, fontWeight: '800', color: colors.muted },
+  simTitulo:  { fontSize: 14, fontWeight: '800', color: colors.ink, marginBottom: 12, lineHeight: 19, minHeight: 38 },
   simDaysPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 5,
     maxWidth: '100%',
-    backgroundColor: 'rgba(238,242,255,0.12)',
+    backgroundColor: colors.soft,
+    borderRadius: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  simDaysText: { fontSize: 10, fontWeight: '800', color: colors.muted },
+  simMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  simRodape:  { marginTop: 'auto' as any },
+  simBadge:   { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  simBadgeTexto: { fontSize: 10, fontWeight: '800', color: colors.surface },
+  simNotaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    marginBottom: 10,
   },
-  simDaysText: { fontSize: 10, fontWeight: '800', color: '#CBD5E1' },
-  simRodape:  { gap: 8, marginTop: 'auto' as any },
-  simBadge:   { alignSelf: 'flex-start', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  simBadgeTexto: { fontSize: 10, fontWeight: '800', color: colors.surface },
+  simNotaText: { fontSize: 10, fontWeight: '800', color: '#A16207' },
+  simAproveitamentoBox: {
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+  },
+  simAproveitamentoBoxOk: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#BBF7D0',
+  },
+  simAproveitamentoBoxFail: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  simAproveitamentoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  simAproveitamentoLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+  },
+  simAproveitamentoLabel: { fontSize: 10, fontWeight: '800', color: colors.muted },
+  simAproveitamentoValor: { fontSize: 18, fontWeight: '900', color: '#0284C7' },
+  simAproveitamentoValorOk: { color: '#22C55E' },
+  simAproveitamentoValorFail: { color: '#EF4444' },
+  simAproveitamentoBar: {
+    height: 5,
+    borderRadius: 5,
+    backgroundColor: '#E0F2FE',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  simAproveitamentoFill: {
+    height: '100%',
+    borderRadius: 5,
+    backgroundColor: '#0284C7',
+  },
+  simAproveitamentoFillOk: {
+    backgroundColor: '#22C55E',
+  },
+  simAproveitamentoFillFail: {
+    backgroundColor: '#EF4444',
+  },
+  simAproveitamentoMinimo: { marginTop: 6, fontSize: 9, fontWeight: '700', color: colors.muted },
   simOpenButton: {
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

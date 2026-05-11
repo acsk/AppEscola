@@ -194,6 +194,9 @@ Authorization: Bearer {token}
       "starts_at": "2026-05-03T00:00:00.000000Z",
       "ends_at": "2026-05-09T00:00:00.000000Z",
       "attempt_status": "not_started",
+      "nota": null,
+      "score_display": null,
+      "aproveitamento": null,
       "can_start": true
     }
   ]
@@ -203,6 +206,9 @@ Authorization: Bearer {token}
 | Campo | Valores possíveis | Descrição |
 |---|---|---|
 | `attempt_status` | `not_started` \| `in_progress` \| `pending_review` \| `awaiting_release` \| `completed` | Status da tentativa do aluno |
+| `nota` | número \| `null` | Nota da tentativa mais recente; `null` se não iniciou ou se resultado estiver aguardando liberação |
+| `score_display` | string (`x/y`) \| `null` | Formatação amigável da nota (ex.: `8/10`) |
+| `aproveitamento` | número \| `null` | Percentual da tentativa mais recente (ex.: `80.0`); `null` se não iniciou ou se resultado estiver aguardando liberação |
 | `can_start` | `true` \| `false` | Se está dentro do período permitido para iniciar |
 
 ---

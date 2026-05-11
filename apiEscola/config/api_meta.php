@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => env('API_VERSION', '1.0.5'),
+    'version' => env('API_VERSION', '1.0.7'),
     'contract_version' => env('API_CONTRACT_VERSION', date('Y-m-d')),
     'has_breaking_changes' => (bool) env('API_HAS_BREAKING_CHANGES', false),
     'min_supported_app_version' => env('API_MIN_SUPPORTED_APP_VERSION', '1.0.0'),
