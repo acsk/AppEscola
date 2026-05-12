@@ -19,6 +19,8 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import {
   maskPhone,
+  maskCPF,
+  isValidCPF,
   onlyDigits,
   displayToISO,
   isoToDisplay,
@@ -116,8 +118,8 @@ function validateForm(form: Form): Record<string, string> {
       }
     }
   }
-  if (form.document.trim() && form.document.trim().length > 20)
-    errs.document = "Documento muito longo.";
+  if (form.document.trim() && !isValidCPF(form.document))
+    errs.document = "CPF inválido.";
   return errs;
 }
 
@@ -211,7 +213,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         mode: "existing" as const,
         guardian_id: g.id,
         name: g.name ?? "",
-        document: g.document ?? "",
+        document: maskCPF(g.document ?? ""),
         email: g.email ?? "",
         phone: maskPhone(g.phone ?? ""),
         relationship: g.relationship ?? "",
@@ -253,7 +255,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         rows.map((g: any) => ({
           value: String(g.id),
           label: g.name,
-          sublabel: g.document ? `Documento: ${g.document}` : undefined,
+          sublabel: g.document ? `CPF: ${maskCPF(g.document)}` : undefined,
           document: g.document ?? "",
           email: g.email ?? "",
         }))
@@ -274,7 +276,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         setForm({
           name: student.name ?? "",
           birth_date: isoToDisplay(student.birth_date ?? ""),
-          document: student.document ?? "",
+          document: maskCPF(student.document ?? ""),
           email: student.email ?? "",
           phone: maskPhone(student.phone ?? ""),
           is_minor: student.is_minor ? "true" : "false",
@@ -395,8 +397,8 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         localErrors[`guardians.${i}.name`] =
           "Nome do responsável é obrigatório.";
       }
-      if (g.mode === "new" && g.document.trim().length > 20) {
-        localErrors[`guardians.${i}.document`] = "Documento muito longo.";
+      if (g.mode === "new" && g.document.trim() && !isValidCPF(g.document)) {
+        localErrors[`guardians.${i}.document`] = "CPF inválido.";
       }
       if (
         g.mode === "new" &&
@@ -418,7 +420,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
       }
 
       if (g.mode === "new") {
-        const identity = `${g.document.trim().toUpperCase()}|${normalizeEmail(g.email)}`;
+        const identity = `${onlyDigits(g.document)}|${normalizeEmail(g.email)}`;
         if (identity !== "|" && newIdentitySelected.has(identity)) {
           localErrors[`guardians.${i}.email`] =
             "Este responsável já foi informado na lista.";
@@ -458,7 +460,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
             name: g.name.trim(),
             ...baseFlags,
           };
-          if (g.document.trim()) newGuardian.document = g.document.trim();
+          if (g.document.trim()) newGuardian.document = onlyDigits(g.document);
           if (g.email.trim()) newGuardian.email = g.email.trim();
           if (g.phone.trim()) newGuardian.phone = g.phone.trim();
           if (g.relationship) newGuardian.relationship = g.relationship;
@@ -468,7 +470,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
 
       if (form.email.trim()) payload.email = form.email.trim();
       if (form.phone.trim()) payload.phone = form.phone.trim();
-      if (form.document.trim()) payload.document = form.document.trim();
+      if (form.document.trim()) payload.document = onlyDigits(form.document);
       if (form.birth_date.trim()) payload.birth_date = displayToISO(form.birth_date);
 
       if (isEdit) {
@@ -478,7 +480,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         setForm({
           name: student.name ?? form.name,
           birth_date: isoToDisplay(student.birth_date ?? displayToISO(form.birth_date)),
-          document: student.document ?? form.document,
+          document: maskCPF(student.document ?? form.document),
           email: student.email ?? form.email,
           phone: maskPhone(student.phone ?? form.phone),
           is_minor: student.is_minor ? "true" : "false",
@@ -754,12 +756,13 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
             <View className="flex-row gap-4 mt-1">
               <View className="flex-1">
                 <FormInput
-                  label="Documento"
+                  label="CPF"
                   value={form.document}
-                  onChangeText={(v) => setForm({ ...form, document: v })}
+                  onChangeText={(v) => setForm({ ...form, document: maskCPF(v) })}
                   error={errors.document}
-                  placeholder="CPF ou RG"
-                  maxLength={20}
+                  placeholder="000.000.000-00"
+                  keyboardType="numeric"
+                  maxLength={14}
                 />
               </View>
               <View className="flex-1">
@@ -1021,13 +1024,14 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
 
                           <View style={{ maxWidth: 240 }} className="mt-2">
                             <FormInput
-                              label="Documento"
+                              label="CPF"
                               value={g.document}
                               onChangeText={(v) =>
-                                updateGuardian(idx, { document: v })
+                                updateGuardian(idx, { document: maskCPF(v) })
                               }
-                              placeholder="CPF ou RG"
-                              maxLength={20}
+                              placeholder="000.000.000-00"
+                              keyboardType="numeric"
+                              maxLength={14}
                               error={errors[`guardians.${idx}.document`]}
                             />
                           </View>
