@@ -18,6 +18,62 @@ class StudentGuardianController extends Controller
     use ScopedByTenant;
 
     #[OA\Get(
+        path: '/api/students/{student}/guardians/available',
+        tags: ['Guardians'],
+        summary: 'Listar responsáveis disponíveis para seleção do aluno',
+        security: [['sanctum' => []]],
+        parameters: [new OA\Parameter(name: 'student', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Lista de responsáveis disponíveis'),
+            new OA\Response(response: 404, description: 'Aluno não encontrado'),
+        ]
+    )]
+    public function available(Request $request, Student $student): JsonResponse
+    {
+        $this->authorizeTenant($request, $student->tenant_id);
+
+        $student->load('guardians');
+
+        $linkedGuardians = $student->guardians->keyBy('id');
+
+        $guardians = Guardian::query()
+            ->where('tenant_id', $student->tenant_id)
+            ->withTrashed()
+            ->orderBy('name')
+            ->get()
+            ->map(function (Guardian $guardian) use ($linkedGuardians) {
+                $linked = $linkedGuardians->get($guardian->id);
+                $pivot = $linked?->pivot;
+
+                return [
+                    'id' => $guardian->id,
+                    'tenant_id' => $guardian->tenant_id,
+                    'user_id' => $guardian->user_id,
+                    'name' => $guardian->name,
+                    'document' => $guardian->document,
+                    'email' => $guardian->email,
+                    'phone' => $guardian->phone,
+                    'relationship' => $guardian->relationship,
+                    'is_linked' => $linked !== null,
+                    'pivot' => $pivot ? [
+                        'is_financial_responsible' => (bool) $pivot->is_financial_responsible,
+                        'is_pedagogical_responsible' => (bool) $pivot->is_pedagogical_responsible,
+                        'can_access_portal' => (bool) $pivot->can_access_portal,
+                    ] : null,
+                    'created_at' => $guardian->created_at?->toISOString(),
+                    'updated_at' => $guardian->updated_at?->toISOString(),
+                    'deleted_at' => $guardian->deleted_at?->toISOString(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'student_id' => $student->id,
+            'guardians' => $guardians,
+        ]);
+    }
+
+    #[OA\Get(
         path: '/api/students/{student}/guardians',
         tags: ['Guardians'],
         summary: 'Listar responsáveis do aluno',

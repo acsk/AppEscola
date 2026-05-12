@@ -16,6 +16,14 @@ import Badge from "../components/ui/Badge";
 import Pagination from "../components/ui/Pagination";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import {
+  ChargeStatusResponse,
+  GeneratedCharge,
+  PaymentProvider,
+  generateUnifiedCharge,
+  getUnifiedChargeStatus,
+  listPaymentProviders,
+} from "../services/payments";
+import {
   useInvoiceStatuses,
   usePaymentMethods,
   domainToOptions,
@@ -95,6 +103,17 @@ export default function InvoicesScreen() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [providers, setProviders] = useState<PaymentProvider[]>([]);
+  const [chargeModalVisible, setChargeModalVisible] = useState(false);
+  const [chargeInvoice, setChargeInvoice] = useState<Invoice | null>(null);
+  const [chargeProvider, setChargeProvider] = useState("");
+  const [chargeEnvironment, setChargeEnvironment] = useState<"stage" | "prod">("stage");
+  const [chargeMethod, setChargeMethod] = useState("pix");
+  const [generatingCharge, setGeneratingCharge] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [chargeResult, setChargeResult] = useState<GeneratedCharge | null>(null);
+  const [chargeStatusResult, setChargeStatusResult] = useState<ChargeStatusResponse | null>(null);
+
   const [students, setStudents] = useState<Student[]>([]);
   const [guardians, setGuardians] = useState<Guardian[]>([]);
 
@@ -136,6 +155,20 @@ export default function InvoicesScreen() {
   }, [page, statusFilter]);
 
   useEffect(() => { fetch(); }, [fetch]);
+
+  useEffect(() => {
+    const loadProviders = async () => {
+      try {
+        const list = await listPaymentProviders();
+        const active = list.filter((item) => item.status !== "inactive");
+        setProviders(active);
+        if (active.length > 0) setChargeProvider(active[0].slug);
+      } catch {
+        // Mantem o fluxo da tela mesmo sem lista de provedores.
+      }
+    };
+    loadProviders();
+  }, []);
 
   const openCreate = async () => {
     await fetchLookups();
@@ -213,6 +246,63 @@ export default function InvoicesScreen() {
     setDeleting(false);
   };
 
+  const openChargeModal = (invoice: Invoice) => {
+    setChargeInvoice(invoice);
+    setChargeResult(null);
+    setChargeStatusResult(null);
+    if (!chargeProvider && providers.length > 0) {
+      setChargeProvider(providers[0].slug);
+    }
+    setChargeEnvironment("stage");
+    setChargeMethod(invoice.payment_method || "pix");
+    setChargeModalVisible(true);
+  };
+
+  const closeChargeModal = () => {
+    setChargeModalVisible(false);
+    setChargeInvoice(null);
+    setChargeResult(null);
+    setChargeStatusResult(null);
+  };
+
+  const onGenerateCharge = async () => {
+    if (!chargeInvoice || !chargeProvider) return;
+    setGeneratingCharge(true);
+    setChargeStatusResult(null);
+    try {
+      const result = await generateUnifiedCharge(chargeInvoice.id, {
+        provider: chargeProvider,
+        method: chargeMethod,
+        environment: chargeEnvironment,
+      });
+      setChargeResult(result);
+      fetch();
+    } catch {
+      setChargeResult(null);
+    }
+    setGeneratingCharge(false);
+  };
+
+  const onCheckChargeStatus = async () => {
+    if (!chargeInvoice) return;
+    setCheckingStatus(true);
+    try {
+      const result = await getUnifiedChargeStatus(chargeInvoice.id);
+      setChargeStatusResult(result);
+      fetch();
+    } catch {
+      setChargeStatusResult(null);
+    }
+    setCheckingStatus(false);
+  };
+
+  const copyPixCode = async () => {
+    if (!chargeResult?.pix_copy_paste) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(chargeResult.pix_copy_paste);
+    }
+  };
+
   const studentOptions = [
     { value: "", label: "Selecione o aluno" },
     ...students.map((s) => ({ value: String(s.id), label: s.name })),
@@ -220,6 +310,14 @@ export default function InvoicesScreen() {
   const guardianOptions = [
     { value: "", label: "Nenhum" },
     ...guardians.map((g) => ({ value: String(g.id), label: g.name })),
+  ];
+  const providerOptions = providers.map((item) => ({ value: item.slug, label: item.name }));
+  const chargeMethodOptions = [
+    { value: "pix", label: "Pix" },
+    { value: "boleto", label: "Boleto" },
+    { value: "credit_card", label: "Cartão Crédito" },
+    { value: "debit_card", label: "Cartão Débito" },
+    { value: "bank_transfer", label: "Transferência" },
   ];
   const allStatusOptions = [{ value: "", label: "Todos" }, ...statusOptions];
   const fmt = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";
@@ -257,7 +355,7 @@ export default function InvoicesScreen() {
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Vencimento</Text>
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Pagamento</Text>
           <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Status</Text>
-          <View style={{ width: 120 }} />
+          <View style={{ width: 152 }} />
         </View>
 
         {loading ? (
@@ -282,7 +380,7 @@ export default function InvoicesScreen() {
               <View style={{ flex: 1 }}>
                 <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
               </View>
-              <View style={{ width: 120 }} className="flex-row justify-end gap-1">
+              <View style={{ width: 152 }} className="flex-row justify-end gap-1">
                 {item.status === "pending" || item.status === "overdue" ? (
                   <TouchableOpacity onPress={() => markAsPaid(item.id)} className="p-1.5 bg-green-50 rounded-lg" style={{ marginRight: 2 }}>
                     <Ionicons name="checkmark-circle-outline" size={15} color="#22C55E" />
@@ -295,6 +393,9 @@ export default function InvoicesScreen() {
                 ) : null}
                 <TouchableOpacity onPress={() => openEdit(item)} className="p-1.5 bg-violet-50 rounded-lg" style={{ marginRight: 2 }}>
                   <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => openChargeModal(item)} className="p-1.5 bg-blue-50 rounded-lg" style={{ marginRight: 2 }}>
+                  <Ionicons name="qr-code-outline" size={15} color="#2563EB" />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
                   <Ionicons name="trash-outline" size={15} color="#EF4444" />
@@ -351,6 +452,102 @@ export default function InvoicesScreen() {
         </View>
         <FormInput label="ID da Matrícula (opcional)" value={form.enrollment_id} onChangeText={(v) => setForm({ ...form, enrollment_id: v })} error={errors.enrollment_id} placeholder="ID numérico" keyboardType="numeric" />
         <FormInput label="Observações" value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} error={errors.notes} placeholder="Observações adicionais" />
+      </Modal>
+
+      <Modal
+        visible={chargeModalVisible}
+        title={chargeInvoice ? `Cobrança #${chargeInvoice.id}` : "Gerar cobrança"}
+        onClose={closeChargeModal}
+        size="lg"
+        footer={
+          <>
+            <TouchableOpacity onPress={closeChargeModal} className="px-5 py-2.5 rounded-xl border border-gray-200">
+              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onCheckChargeStatus} disabled={checkingStatus || !chargeInvoice} className="px-5 py-2.5 rounded-xl border border-violet-200">
+              {checkingStatus ? <ActivityIndicator size="small" color="#7C3AED" /> : <Text className="text-sm font-semibold text-violet-700">Consultar status</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onGenerateCharge} disabled={generatingCharge || !chargeInvoice || !chargeProvider} className="px-5 py-2.5 rounded-xl bg-violet-600">
+              {generatingCharge ? <ActivityIndicator color="white" size="small" /> : <Text className="text-sm font-bold text-white">Gerar cobrança</Text>}
+            </TouchableOpacity>
+          </>
+        }
+      >
+        <View className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <Text className="text-xs text-gray-600">Contrato unificado: /generate-charge e /charge-status</Text>
+          <Text className="text-xs text-gray-500 mt-1">Fallback legado Cora ativo durante transição.</Text>
+        </View>
+
+        <View className="flex-row gap-4">
+          <View className="flex-1">
+            <FormSelect
+              label="Provedor"
+              required
+              value={chargeProvider}
+              options={providerOptions}
+              onChange={setChargeProvider}
+            />
+          </View>
+          <View className="flex-1">
+            <FormSelect
+              label="Método"
+              required
+              value={chargeMethod}
+              options={chargeMethodOptions}
+              onChange={setChargeMethod}
+            />
+          </View>
+        </View>
+
+        <FormSelect
+          label="Ambiente"
+          required
+          value={chargeEnvironment}
+          options={[
+            { value: "stage", label: "Ambiente de teste" },
+            { value: "prod", label: "Ambiente de produção" },
+          ]}
+          onChange={(v) => setChargeEnvironment(v === "prod" ? "prod" : "stage")}
+        />
+
+        <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 mb-3">
+          <Text className="text-xs text-gray-600">
+            A cobrança vai usar a credencial do ambiente selecionado no tenant.
+          </Text>
+        </View>
+
+        {!!chargeResult && (
+          <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 mb-3">
+            <Text className="text-sm font-semibold text-emerald-700">Cobrança gerada</Text>
+            <Text className="text-xs text-emerald-700 mt-1">ID cobrança: {chargeResult.charge_id || "—"}</Text>
+            <Text className="text-xs text-emerald-700 mt-1">Ambiente: {chargeResult.environment || chargeEnvironment}</Text>
+            <Text className="text-xs text-emerald-700 mt-1">Status: {chargeResult.status || "—"}</Text>
+            {!!chargeResult.payment_url && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (typeof window !== "undefined") window.open(chargeResult.payment_url || "", "_blank");
+                }}
+                className="mt-2 px-3 py-2 rounded-lg bg-emerald-600 self-start"
+              >
+                <Text className="text-xs font-semibold text-white">Abrir URL de pagamento</Text>
+              </TouchableOpacity>
+            )}
+            {!!chargeResult.pix_copy_paste && (
+              <TouchableOpacity onPress={copyPixCode} className="mt-2 px-3 py-2 rounded-lg border border-emerald-300 self-start">
+                <Text className="text-xs font-semibold text-emerald-700">Copiar Pix copia e cola</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {!!chargeStatusResult && (
+          <View className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <Text className="text-sm font-semibold text-blue-700">Status atualizado</Text>
+            <Text className="text-xs text-blue-700 mt-1">Provider: {chargeStatusResult.provider || "—"}</Text>
+            <Text className="text-xs text-blue-700 mt-1">Status: {chargeStatusResult.status || "—"}</Text>
+            <Text className="text-xs text-blue-700 mt-1">Pago em: {chargeStatusResult.paid_at || "—"}</Text>
+          </View>
+        )}
       </Modal>
 
       <ConfirmModal visible={!!deleteId} title="Excluir Cobrança" message="Esta ação não pode ser desfeita." onConfirm={remove} onCancel={() => setDeleteId(null)} loading={deleting} />

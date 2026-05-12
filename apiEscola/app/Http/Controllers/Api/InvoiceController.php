@@ -9,10 +9,13 @@ use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
+use App\Services\CoraPaymentService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 
 class InvoiceController extends Controller
 {
@@ -213,6 +216,62 @@ class InvoiceController extends Controller
         $invoice->update(['status' => 'cancelled']);
 
         return response()->json(new InvoiceResource($invoice));
+    }
+
+    #[OA\Post(
+        path: '/api/invoices/{id}/generate-cora-charge',
+        tags: ['Invoices'],
+        summary: 'Gerar cobrança na Cora para a fatura',
+        security: [['sanctum' => []]],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Cobrança da Cora gerada com sucesso'),
+            new OA\Response(response: 422, description: 'Fatura não elegível para cobrança'),
+            new OA\Response(response: 502, description: 'Falha de comunicação com Cora'),
+        ]
+    )]
+    public function generateCoraCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    {
+        $this->authorizeTenant($request, $invoice->tenant_id);
+
+        if (in_array($invoice->status, ['paid', 'cancelled'], true)) {
+            return response()->json([
+                'message' => 'Não é possível gerar cobrança Cora para fatura paga ou cancelada.',
+            ], 422);
+        }
+
+        $invoice->loadMissing(['student', 'guardian']);
+
+        try {
+            $result = $cora->createCharge($invoice);
+        } catch (ConnectionException|RequestException $e) {
+            return response()->json([
+                'message' => 'Erro ao comunicar com Cora.',
+                'error' => $e->getMessage(),
+            ], 502);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        $invoice->update([
+            'payment_method' => $invoice->payment_method ?? 'pix',
+            'cora_charge_id' => $result['external_id'],
+            'cora_status' => $result['status'],
+            'cora_payment_url' => $result['payment_url'],
+            'cora_pix_copy_paste' => $result['pix_copy_paste'],
+            'cora_payload' => $result['payload'],
+            'cora_last_synced_at' => now(),
+        ]);
+
+        $invoice->refresh()->load(['student', 'guardian']);
+
+        return response()->json([
+            'type' => 'success',
+            'message' => 'Cobrança Cora gerada com sucesso.',
+            'body' => new InvoiceResource($invoice),
+        ]);
     }
 
     private function authorizeTenant(Request $request, int $resourceTenantId): void

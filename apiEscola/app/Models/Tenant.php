@@ -80,4 +80,9 @@ class Tenant extends Model
     {
         return $this->hasMany(TenantApiToken::class);
     }
+
+    public function coraCredentials(): HasMany
+    {
+        return $this->hasMany(TenantCoraCredential::class);
+    }
 }

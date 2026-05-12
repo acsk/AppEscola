@@ -21,7 +21,6 @@ class StoreGuardianRequest extends FormRequest
                 'required',
                 'string',
                 'max:20',
-                Rule::unique('guardians', 'document')->where('tenant_id', $this->user()->tenant_id),
             ],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],

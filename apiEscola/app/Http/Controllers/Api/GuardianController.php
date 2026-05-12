@@ -56,7 +56,35 @@ class GuardianController extends Controller
     {
         $tenantId = $this->getTenantId($request);
 
-        $guardian = Guardian::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
+        $validated = $request->validated();
+        $document = $this->normalizeDocument((string) ($validated['document'] ?? ''));
+
+        $guardian = null;
+        if ($document !== '') {
+            $guardian = Guardian::withTrashed()
+                ->where('tenant_id', $tenantId)
+                ->where('document', $document)
+                ->first();
+        }
+
+        if ($guardian) {
+            if (method_exists($guardian, 'trashed') && $guardian->trashed()) {
+                $guardian->restore();
+            }
+
+            $guardian->update([
+                'name' => $validated['name'],
+                'document' => $document,
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+                'relationship' => $validated['relationship'] ?? null,
+            ]);
+        } else {
+            $guardian = Guardian::create(array_merge($validated, [
+                'tenant_id' => $tenantId,
+                'document' => $document,
+            ]));
+        }
 
         return $this->created(new GuardianResource($guardian));
     }
@@ -134,5 +162,10 @@ class GuardianController extends Controller
         if ($tenantId !== null && $tenantId !== $resourceTenantId) {
             abort(403, 'Acesso negado.');
         }
+    }
+
+    private function normalizeDocument(string $value): string
+    {
+        return preg_replace('/\D+/', '', $value) ?? '';
     }
 }

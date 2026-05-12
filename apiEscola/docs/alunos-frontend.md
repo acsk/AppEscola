@@ -13,6 +13,7 @@
 | `POST` | `/api/students` | Criar aluno + responsáveis |
 | `GET` | `/api/students/{id}` | Exibir aluno |
 | `PUT` | `/api/students/{id}` | Atualizar aluno + responsáveis |
+| `GET` | `/api/students/{id}/guardians/available` | Listar responsáveis do tenant com vínculo do aluno |
 | `POST` | `/api/students/{id}/upload-photo` | Upload da foto do aluno |
 | `DELETE` | `/api/students/{id}` | Remover aluno |
 
@@ -134,11 +135,53 @@ Também é válido **misturar**: um responsável existente (`guardian_id`) e um 
 | `email` | ❌ | email | max 255 |
 | `phone` | ❌ | string | max 20 |
 | `relationship` | ❌ | string | slug de `GET /api/domains/guardian-relationships` (ex: `mother`, `father`, `other`) |
-| `is_financial_responsible` | ❌ | boolean | **Máximo 1 por aluno.** Erro 422 se mais de um for `true` |
+| `is_financial_responsible` | ❌ | boolean | Pode haver mais de um responsável financeiro |
 | `is_pedagogical_responsible` | ❌ | boolean | |
 | `can_access_portal` | ❌ | boolean | default `true` |
 
-> **Atenção:** apenas **um** responsável pode ter `is_financial_responsible: true`. Enviar dois como `true` retorna erro 422.
+> **Atenção:** para alunos menores, é obrigatório informar pelo menos um responsável financeiro. O sistema aceita mais de um responsável financeiro no mesmo aluno.
+
+### Listar responsáveis disponíveis para seleção
+
+Use este endpoint para montar uma tela de seleção de responsáveis do aluno, sem depender de digitar CPF manualmente:
+
+```http
+GET /api/students/{id}/guardians/available
+Authorization: Bearer {token}
+```
+
+**Resposta 200:**
+
+```json
+{
+  "student_id": 12,
+  "guardians": [
+    {
+      "id": 8,
+      "name": "Maria Silva",
+      "document": "98765432100",
+      "is_linked": true,
+      "pivot": {
+        "is_financial_responsible": true,
+        "is_pedagogical_responsible": false,
+        "can_access_portal": true
+      }
+    },
+    {
+      "id": 15,
+      "name": "Carlos Silva",
+      "document": "12345678900",
+      "is_linked": false,
+      "pivot": null
+    }
+  ]
+}
+```
+
+No frontend, a recomendação é:
+- listar os responsáveis do tenant;
+- permitir marcar/desmarcar `is_financial_responsible`;
+- salvar a lista inteira no `PUT /api/students/{id}` ou via vínculo individual em `POST /api/students/{student_id}/guardians`.
 
 ---
 

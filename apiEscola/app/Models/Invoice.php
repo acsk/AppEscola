@@ -24,12 +24,20 @@ class Invoice extends Model
         'status',
         'payment_method',
         'notes',
+        'cora_charge_id',
+        'cora_status',
+        'cora_payment_url',
+        'cora_pix_copy_paste',
+        'cora_payload',
+        'cora_last_synced_at',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'paid_at' => 'datetime',
         'amount' => 'decimal:2',
+        'cora_payload' => 'array',
+        'cora_last_synced_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo

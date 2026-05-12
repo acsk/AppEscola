@@ -12,6 +12,7 @@ import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import { useStatuses, domainToOptions } from "../../hooks/useDomains";
 import { maskPhone, maskCPF, isoToDisplay } from "../../utils/masks";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
@@ -33,10 +34,18 @@ interface Props {
 
 export default function StudentsScreen({ navigate }: Props) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
+  const statuses = useStatuses();
+  const statusOptions = statuses.length
+    ? domainToOptions(statuses)
+    : [
+        { value: "active", label: "Ativo" },
+        { value: "inactive", label: "Inativo" },
+      ];
   const [rows, setRows] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [minorFilter, setMinorFilter] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({
     current_page: 1,
@@ -54,12 +63,22 @@ export default function StudentsScreen({ navigate }: Props) {
       const params: Record<string, any> = { page };
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
+      if (minorFilter) params.is_minor = minorFilter;
       const { data } = await api.get("/students", { params });
-      setRows(data.data);
-      setMeta(data.meta);
+      const list = data?.body ?? data?.data ?? data;
+      setRows(Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : []);
+      setMeta(
+        list?.meta ??
+          data?.meta ?? {
+            current_page: 1,
+            last_page: 1,
+            per_page: 20,
+            total: 0,
+          }
+      );
     } catch {}
     setLoading(false);
-  }, [page, search, statusFilter]);
+  }, [minorFilter, page, search, statusFilter]);
 
   useEffect(() => {
     fetchStudents();
@@ -77,6 +96,13 @@ export default function StudentsScreen({ navigate }: Props) {
   };
 
   const fmtDate = (iso: string | null) => (iso ? isoToDisplay(iso) : "—");
+  const fmtDocument = (value: string | null) => {
+    if (!value) return "—";
+    const digits = value.replace(/\D/g, "");
+    return digits.length === 11 ? maskCPF(digits) : value;
+  };
+  const statusLabel = (value: string) =>
+    statusOptions.find((item) => item.value === value)?.label ?? value;
 
   return (
     <ScrollView
@@ -150,8 +176,32 @@ export default function StudentsScreen({ navigate }: Props) {
           }}
         >
           <option value="">Todos os status</option>
-          <option value="active">Ativo</option>
-          <option value="inactive">Inativo</option>
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={minorFilter}
+          onChange={(e: any) => {
+            setMinorFilter(e.target.value);
+            setPage(1);
+          }}
+          style={{
+            border: "1px solid #E5E7EB",
+            borderRadius: 12,
+            padding: "0 14px",
+            fontSize: 14,
+            color: "#374151",
+            backgroundColor: "white",
+            height: 44,
+            minWidth: isMobile ? "100%" : 180,
+          }}
+        >
+          <option value="">Todos</option>
+          <option value="true">Somente menores</option>
+          <option value="false">Somente maiores</option>
         </select>
       </View>
 
@@ -261,13 +311,13 @@ export default function StudentsScreen({ navigate }: Props) {
                     </View>
                   </View>
                   <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
-                    <Text className="text-xs text-gray-500">CPF: {item.document ? maskCPF(item.document) : "—"}</Text>
+                    <Text className="text-xs text-gray-500">Documento: {fmtDocument(item.document)}</Text>
                     <Text className="text-xs text-gray-500">Telefone: {item.phone ? maskPhone(item.phone) : "—"}</Text>
                     <Text className="text-xs text-gray-500">Nascimento: {fmtDate(item.birth_date)}</Text>
                     <Text className="text-xs text-gray-500">E-mail: {item.email ?? "—"}</Text>
                   </View>
                   <View className="mt-2 self-start">
-                    <Badge slug={item.status} label={item.status === "active" ? "Ativo" : "Inativo"} />
+                    <Badge slug={item.status} label={statusLabel(item.status)} />
                   </View>
                 </>
               ) : (
@@ -281,7 +331,7 @@ export default function StudentsScreen({ navigate }: Props) {
                 </Text>
                 {item.document && (
                   <Text className="text-[11px] text-gray-400">
-                    {maskCPF(item.document)}
+                    {fmtDocument(item.document)}
                   </Text>
                 )}
               </View>
@@ -297,7 +347,7 @@ export default function StudentsScreen({ navigate }: Props) {
               <View style={{ flex: 1 }}>
                 <Badge
                   slug={item.status}
-                  label={item.status === "active" ? "Ativo" : "Inativo"}
+                  label={statusLabel(item.status)}
                 />
               </View>
               <View

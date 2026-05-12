@@ -124,6 +124,8 @@ Tipos de cobrança disponíveis.
 
 > Se `enrollment_payment` for **omitido**, o invoice terá `"status": "pending"` e `"paid_at": null`.
 
+> O campo `financial_guardian_id` identifica o responsável financeiro principal usado na matrícula e nas cobranças. O aluno pode ter mais de um responsável marcado como financeiro, mas o fluxo de matrícula resolve um responsável principal para a invoice.
+
 ---
 
 ## Endpoint: Matricular em Pacote
@@ -201,6 +203,8 @@ O pacote gera **uma matrícula por curso** + **uma única invoice** de taxa de m
 
 > A `amount` da invoice = `monthly_equivalent` do pacote − `discount_amount` (mínimo R$ 0,00).
 
+> Assim como no fluxo de plano, o sistema permite mais de um responsável financeiro no aluno, mas a matrícula resolve um `financial_guardian_id` principal para emissão da taxa.
+
 ---
 
 ## Lógica de Cálculo do Valor da Invoice
@@ -234,22 +238,26 @@ O campo `type` foi adicionado às invoices para distinguir o tipo de cobrança:
 1. Buscar planos/pacotes disponíveis
    GET /api/course-plans  ou  GET /api/course-bundles
 
-2. (Opcional) Buscar ciclos de cobrança para exibição
+2. Buscar responsáveis disponíveis do aluno para seleção do financeiro
+  GET /api/students/{student_id}/guardians/available
+
+3. (Opcional) Buscar ciclos de cobrança para exibição
    GET /api/domains/billing-cycles
 
-3. Montar o formulário com campos:
+4. Montar o formulário com campos:
    - Aluno, Turma(s), Plano/Pacote, Data de início
+  - Lista de responsáveis do aluno com marcação de `is_financial_responsible`
    - Desconto (opcional)
    - Seção "Pagar taxa de matrícula agora?" (toggle)
      └─ Se sim: mostrar select de método de pagamento, campo de data e observação
 
-4. Enviar POST para /api/enrollments/subscribe (plano)
+5. Enviar POST para /api/enrollments/subscribe (plano)
                ou  /api/enrollments/subscribe-bundle (pacote)
 
-5. Na resposta, exibir:
+6. Na resposta, exibir:
    - Número(s) da matrícula
    - Invoice da taxa de matrícula com status (paga/pendente)
-   - Dados do responsável financeiro detectado
+  - Dados do responsável financeiro principal detectado
 ```
 
 ---
@@ -267,3 +275,4 @@ O campo `type` foi adicionado às invoices para distinguir o tipo de cobrança:
 | `GET /api/domains/invoice-statuses` | Status de cobrança |
 | `GET /api/domains/billing-cycles` | ✨ Ciclos de cobrança (NOVO) |
 | `GET /api/domains/invoice-types` | ✨ Tipos de invoice (NOVO) |
+| `GET /api/students/{student_id}/guardians/available` | Responsáveis do aluno para seleção do financeiro |

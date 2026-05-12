@@ -35,7 +35,6 @@ class StoreStudentRequest extends FormRequest
                 'string',
                 'max:20',
                 'distinct',
-                Rule::unique('guardians', 'document')->where('tenant_id', $this->user()->tenant_id),
             ],
             'guardians.*.email'                     => ['required_without:guardians.*.guardian_id', 'nullable', 'email', 'max:255'],
             'guardians.*.phone'                     => ['nullable', 'string', 'max:20'],

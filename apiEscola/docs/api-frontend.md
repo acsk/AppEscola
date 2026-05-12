@@ -345,6 +345,14 @@ DELETE /api/guardians/{id}
 
 ## 7. Vinculação aluno ↔ responsável
 
+### Listar responsáveis disponíveis para o aluno
+```http
+GET /api/students/{student_id}/guardians/available
+Authorization: Bearer {token}
+```
+
+Esse endpoint retorna todos os responsáveis do tenant com o estado de vínculo atual do aluno. Use-o na tela para permitir selecionar quem será o responsável financeiro.
+
 ### Listar responsáveis de um aluno
 ```http
 GET /api/students/{student_id}/guardians
@@ -362,6 +370,12 @@ Content-Type: application/json
 ```json
 { "guardian_id": 3 }
 ```
+
+O corpo acima apenas vincula um responsável existente. Para definir o financeiro, envie também `is_financial_responsible: true`.
+
+> Observações:
+> - O sistema aceita mais de um responsável financeiro por aluno.
+> - Para aluno menor, é obrigatório manter pelo menos um responsável financeiro vinculado.
 
 ### Desvincular
 ```http

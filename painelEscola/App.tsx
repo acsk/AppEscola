@@ -26,6 +26,7 @@ import SchoolClassAttendanceScreen from "./screens/turmas/SchoolClassAttendanceS
 import EnrollmentsScreen from "./screens/matriculas";
 import EnrollmentFormScreen from "./screens/matriculas/EnrollmentFormScreen";
 import InvoicesScreen from "./screens/InvoicesScreen";
+import PaymentProvidersScreen from "./screens/payments/PaymentProvidersScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
@@ -84,6 +85,7 @@ const SCREEN_SLUGS = [
   "turmas",
   "matriculas",
   "cobrancas",
+  "pagamentos",
   "dashboard",
   "pacotes",
   "simulados",
@@ -657,6 +659,7 @@ function AppContent() {
       case "matriculas": return <EnrollmentsScreen navigate={navigate} />;
       case "matriculas-form": return <EnrollmentFormScreen navigate={navigate} />;
       case "cobrancas": return <InvoicesScreen />;
+      case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
       case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;

@@ -35,7 +35,6 @@ class UpdateStudentRequest extends FormRequest
                 'string',
                 'max:20',
                 'distinct',
-                Rule::unique('guardians', 'document')->where('tenant_id', $this->user()->tenant_id),
             ],
             'guardians.*.email'                     => ['required_without:guardians.*.guardian_id', 'nullable', 'email', 'max:255'],
             'guardians.*.phone'                     => ['nullable', 'string', 'max:20'],
@@ -78,7 +77,6 @@ class UpdateStudentRequest extends FormRequest
         return [
             'guardians.*.document.required_without' => 'Informe o CPF do responsável quando ele não estiver previamente cadastrado.',
             'guardians.*.document.distinct' => 'Não repita o mesmo CPF entre os responsáveis informados.',
-            'guardians.*.document.unique' => 'Já existe um responsável com este CPF.',
             'guardians.*.email.required_without' => 'Informe o e-mail do responsável quando ele não estiver previamente cadastrado.',
         ];
     }

@@ -21,10 +21,12 @@ use App\Http\Controllers\Api\SupportMaterialController;
 use App\Http\Controllers\Api\StudentDashboardController;
 use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
+use App\Http\Controllers\Api\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\PaymentProviderController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -84,6 +86,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'show']);
     Route::put('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'update']);
     Route::post('tenants/{tenant}/upload-photo', [TenantController::class, 'uploadPhoto']);
+    Route::get('tenants/{tenant}/cora-settings', [TenantCoraSettingsController::class, 'show']);
+    Route::post('tenants/{tenant}/cora-settings/upload', [TenantCoraSettingsController::class, 'upload']);
+    Route::post('tenants/{tenant}/cora-settings/token', [TenantCoraSettingsController::class, 'token']);
 
     // Administração de usuários (super_admin e admin)
     Route::apiResource('users', UserManagementController::class);
@@ -94,6 +99,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Responsáveis de um aluno (nested)
     Route::prefix('students/{student}/guardians')->group(function () {
+        Route::get('/available', [StudentGuardianController::class, 'available']);
         Route::get('/', [StudentGuardianController::class, 'index']);
         Route::post('/', [StudentGuardianController::class, 'store']);
         Route::delete('/{guardian}', [StudentGuardianController::class, 'destroy']);
@@ -143,9 +149,17 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::apiResource('enrollments', EnrollmentController::class);
 
     // Cobranças
+    Route::get('payment-providers', [PaymentProviderController::class, 'index']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
+    Route::post('invoices/{invoice}/generate-cora-charge', [InvoiceController::class, 'generateCoraCharge']);
+    Route::post('invoices/{invoice}/generate-charge', [PaymentProviderController::class, 'generateCharge']);
+    Route::get('invoices/{invoice}/charge-status', [PaymentProviderController::class, 'chargeStatus']);
+
+    Route::get('tenants/{tenant}/payment-providers/{provider}/settings-schema', [PaymentProviderController::class, 'settingsSchema']);
+    Route::post('tenants/{tenant}/payment-providers/{provider}/settings', [PaymentProviderController::class, 'saveSettings']);
+    Route::post('tenants/{tenant}/payment-providers/{provider}/test-connection', [PaymentProviderController::class, 'testConnection']);
 
     // Tokens de API por tenant
     Route::get('tenant-api-tokens', [TenantApiTokenController::class, 'index']);

@@ -284,15 +284,40 @@ class StudentController extends Controller
                 // Vincula guardião já existente
                 $guardianId = $item['guardian_id'];
             } else {
-                // Cria novo guardião no tenant
-                $guardian = Guardian::create([
-                    'tenant_id'    => $tenantId,
-                    'name'         => $item['name'],
-                    'document'     => $item['document'] ?? null,
-                    'email'        => $item['email'] ?? null,
-                    'phone'        => $item['phone'] ?? null,
-                    'relationship' => $item['relationship'] ?? null,
-                ]);
+                $normalizedDocument = $this->normalizeDocument((string) ($item['document'] ?? ''));
+
+                // Reaproveita responsável existente pelo CPF dentro do tenant.
+                $guardian = null;
+                if ($normalizedDocument !== '') {
+                    $guardian = Guardian::withTrashed()
+                        ->where('tenant_id', $tenantId)
+                        ->where('document', $normalizedDocument)
+                        ->first();
+                }
+
+                if ($guardian) {
+                    if (method_exists($guardian, 'trashed') && $guardian->trashed()) {
+                        $guardian->restore();
+                    }
+
+                    $guardian->update([
+                        'name' => $item['name'] ?? $guardian->name,
+                        'email' => $item['email'] ?? $guardian->email,
+                        'phone' => $item['phone'] ?? $guardian->phone,
+                        'relationship' => $item['relationship'] ?? $guardian->relationship,
+                    ]);
+                } else {
+                    // Cria novo guardião no tenant.
+                    $guardian = Guardian::create([
+                        'tenant_id'    => $tenantId,
+                        'name'         => $item['name'],
+                        'document'     => $normalizedDocument !== '' ? $normalizedDocument : null,
+                        'email'        => $item['email'] ?? null,
+                        'phone'        => $item['phone'] ?? null,
+                        'relationship' => $item['relationship'] ?? null,
+                    ]);
+                }
+
                 $guardianId = $guardian->id;
             }
 
@@ -306,5 +331,10 @@ class StudentController extends Controller
 
         // Substitui toda a lista de vínculos
         $student->guardians()->sync($pivotData);
+    }
+
+    private function normalizeDocument(string $value): string
+    {
+        return preg_replace('/\D+/', '', $value) ?? '';
     }
 }

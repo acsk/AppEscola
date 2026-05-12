@@ -19,13 +19,13 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import {
   maskPhone,
-  maskCPF,
-  isValidCPF,
+  onlyDigits,
   displayToISO,
   isoToDisplay,
 } from "../../utils/masks";
 import {
   useGuardianRelationships,
+  useStatuses,
   domainToOptions,
 } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
@@ -59,6 +59,7 @@ type GuardianForm = {
 type GuardianOption = {
   value: string;
   label: string;
+  sublabel?: string;
   document?: string;
   email?: string;
 };
@@ -100,13 +101,23 @@ function validateForm(form: Form): Record<string, string> {
   if (!form.name.trim()) errs.name = "Nome é obrigatório.";
   if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
     errs.email = "E-mail inválido.";
-  if (!form.phone.trim()) errs.phone = "Telefone é obrigatório.";
-  if (form.document.trim() && !isValidCPF(form.document))
-    errs.document = "CPF inválido.";
-  if (!form.birth_date.trim())
-    errs.birth_date = "Data de nascimento é obrigatória.";
-  else if (form.birth_date.length < 10)
+  if (form.birth_date.trim() && form.birth_date.length < 10)
     errs.birth_date = "Data incompleta. Use DD/MM/AAAA.";
+  else if (form.birth_date.trim()) {
+    const isoDate = displayToISO(form.birth_date);
+    if (!isoDate) {
+      errs.birth_date = "Data inválida.";
+    } else {
+      const selectedDate = new Date(`${isoDate}T00:00:00`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate >= today) {
+        errs.birth_date = "A data deve ser anterior a hoje.";
+      }
+    }
+  }
+  if (form.document.trim() && form.document.trim().length > 20)
+    errs.document = "Documento muito longo.";
   return errs;
 }
 
@@ -179,12 +190,13 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   });
 
   const relationships = useGuardianRelationships();
+  const statuses = useStatuses();
   const relationshipOptions = domainToOptions(relationships);
+  const statusOptions = statuses.length ? domainToOptions(statuses) : STATUS_OPTIONS;
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
   }, []);
 
-  const onlyDigits = (value: string) => value.replace(/\D/g, "");
   const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
   const mapApiGuardiansToForm = useCallback((items: any[]): GuardianForm[] => {
@@ -199,7 +211,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         mode: "existing" as const,
         guardian_id: g.id,
         name: g.name ?? "",
-        document: maskCPF(g.document ?? ""),
+        document: g.document ?? "",
         email: g.email ?? "",
         phone: maskPhone(g.phone ?? ""),
         relationship: g.relationship ?? "",
@@ -208,104 +220,6 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         can_access_portal: g.pivot?.can_access_portal ?? true,
       }));
   }, []);
-
-  const resolveGuardianIdByIdentity = useCallback(
-    (g: GuardianForm) => {
-      const doc = onlyDigits(g.document);
-      const email = normalizeEmail(g.email);
-      if (!doc && !email) return null;
-      const match = guardianOptions.find((opt) => {
-        const optDoc = onlyDigits(opt.document ?? "");
-        const optEmail = normalizeEmail(opt.email ?? "");
-        const byDoc = !!doc && !!optDoc && doc === optDoc;
-        const byEmail = !!email && !!optEmail && email === optEmail;
-        return byDoc || byEmail;
-      });
-      return match ? Number(match.value) : null;
-    },
-    [guardianOptions]
-  );
-
-  const syncStudentGuardians = useCallback(
-    async (targetStudentId: number) => {
-      const desired: Array<{
-        guardian_id: number;
-        is_financial_responsible: boolean;
-        is_pedagogical_responsible: boolean;
-        can_access_portal: boolean;
-      }> = [];
-
-      for (const g of guardians) {
-        let guardianId = g.mode === "existing" ? g.guardian_id : null;
-
-        if (!guardianId && g.mode === "new") {
-          guardianId = resolveGuardianIdByIdentity(g);
-        }
-
-        if (!guardianId && g.mode === "new") {
-          const createPayload: Record<string, any> = {
-            name: g.name.trim(),
-            document: onlyDigits(g.document),
-            email: g.email.trim(),
-          };
-          if (g.phone.trim()) createPayload.phone = onlyDigits(g.phone);
-          if (g.relationship) createPayload.relationship = g.relationship;
-          const { data: createdRaw } = await api.post("/guardians", createPayload);
-          const created = createdRaw?.body ?? createdRaw?.data ?? createdRaw;
-          guardianId = created?.id ?? null;
-        }
-
-        if (!guardianId) continue;
-
-        desired.push({
-          guardian_id: guardianId,
-          is_financial_responsible: g.is_financial_responsible,
-          is_pedagogical_responsible: g.is_pedagogical_responsible,
-          can_access_portal: g.can_access_portal,
-        });
-      }
-
-      const desiredUniqueMap = new Map<number, (typeof desired)[number]>();
-      for (const item of desired) desiredUniqueMap.set(item.guardian_id, item);
-      const desiredUnique = Array.from(desiredUniqueMap.values());
-
-      const { data: currentRaw } = await api.get(`/students/${targetStudentId}/guardians`);
-      const currentData = currentRaw?.body ?? currentRaw?.data ?? currentRaw;
-      const currentList = Array.isArray(currentData)
-        ? currentData
-        : Array.isArray(currentData?.data)
-        ? currentData.data
-        : [];
-      const currentIds = new Set<number>((currentList ?? []).map((g: any) => Number(g.id)));
-
-      // Deleta responsáveis não desejados
-      for (const currentId of currentIds) {
-        if (!desiredUniqueMap.has(currentId)) {
-          await api.delete(`/students/${targetStudentId}/guardians/${currentId}`);
-        }
-      }
-
-      // Atualiza ou cria responsáveis desejados (só DELETE+POST se mudou flags)
-      for (const item of desiredUnique) {
-        const currentGuardian = currentList.find((c: any) => Number(c.id) === item.guardian_id);
-        const flagsChanged = !currentGuardian || 
-          currentGuardian.pivot?.is_financial_responsible !== item.is_financial_responsible ||
-          currentGuardian.pivot?.is_pedagogical_responsible !== item.is_pedagogical_responsible ||
-          currentGuardian.pivot?.can_access_portal !== item.can_access_portal;
-
-        if (flagsChanged && currentGuardian) {
-          // Só faz DELETE+POST se as flags realmente mudaram
-          await api.delete(`/students/${targetStudentId}/guardians/${item.guardian_id}`);
-          await api.post(`/students/${targetStudentId}/guardians`, item);
-        } else if (!currentGuardian) {
-          // Se é novo responsável, só faz POST
-          await api.post(`/students/${targetStudentId}/guardians`, item);
-        }
-        // Se não mudou nada, não faz nada
-      }
-    },
-    [guardians, resolveGuardianIdByIdentity]
-  );
 
   // Auto-compute is_minor from birth_date
   useEffect(() => {
@@ -322,12 +236,16 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
 
   const fetchGuardianOptions = useCallback(async () => {
     try {
-      const { data } = await api.get("/guardians", {
-        params: { per_page: 999 },
-      });
+      const { data } = isEdit && studentId
+        ? await api.get(`/students/${studentId}/guardians/available`)
+        : await api.get("/guardians", {
+            params: { per_page: 999 },
+          });
       const guardiansData = data.body ?? data.data ?? data;
       const rows = Array.isArray(guardiansData)
         ? guardiansData
+        : Array.isArray(guardiansData?.guardians)
+        ? guardiansData.guardians
         : Array.isArray(guardiansData?.data)
         ? guardiansData.data
         : [];
@@ -335,12 +253,13 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         rows.map((g: any) => ({
           value: String(g.id),
           label: g.name,
+          sublabel: g.document ? `Documento: ${g.document}` : undefined,
           document: g.document ?? "",
           email: g.email ?? "",
         }))
       );
     } catch {}
-  }, []);
+  }, [isEdit, studentId]);
 
   // Load student data if editing
   useEffect(() => {
@@ -355,7 +274,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         setForm({
           name: student.name ?? "",
           birth_date: isoToDisplay(student.birth_date ?? ""),
-          document: maskCPF(student.document ?? ""),
+          document: student.document ?? "",
           email: student.email ?? "",
           phone: maskPhone(student.phone ?? ""),
           is_minor: student.is_minor ? "true" : "false",
@@ -464,9 +383,9 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
     const financialCount = guardians.filter(
       (g) => g.is_financial_responsible
     ).length;
-    if (financialCount > 1) {
+    if (form.is_minor === "true" && financialCount === 0) {
       localErrors.guardians =
-        "Apenas um responsável financeiro pode ser definido.";
+        "Para aluno menor de idade, informe ao menos um responsável financeiro.";
     }
     const existingSelected = new Set<number>();
     const newIdentitySelected = new Set<string>();
@@ -476,11 +395,15 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         localErrors[`guardians.${i}.name`] =
           "Nome do responsável é obrigatório.";
       }
-      if (g.mode === "new" && !g.document.trim()) {
-        localErrors[`guardians.${i}.document`] = "CPF é obrigatório.";
+      if (g.mode === "new" && g.document.trim().length > 20) {
+        localErrors[`guardians.${i}.document`] = "Documento muito longo.";
       }
-      if (g.mode === "new" && !g.email.trim()) {
-        localErrors[`guardians.${i}.email`] = "E-mail é obrigatório.";
+      if (
+        g.mode === "new" &&
+        g.email.trim() &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g.email)
+      ) {
+        localErrors[`guardians.${i}.email`] = "E-mail inválido.";
       }
       if (g.mode === "existing" && !g.guardian_id) {
         localErrors[`guardians.${i}.guardian_id`] = "Selecione o responsável.";
@@ -495,7 +418,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
       }
 
       if (g.mode === "new") {
-        const identity = `${onlyDigits(g.document)}|${normalizeEmail(g.email)}`;
+        const identity = `${g.document.trim().toUpperCase()}|${normalizeEmail(g.email)}`;
         if (identity !== "|" && newIdentitySelected.has(identity)) {
           localErrors[`guardians.${i}.email`] =
             "Este responsável já foi informado na lista.";
@@ -514,37 +437,54 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
     setErrors({});
     try {
       const payload: Record<string, any> = {
-        name: form.name,
-        email: form.email,
-        phone: form.phone.replace(/\D/g, ""),
-        document: form.document.replace(/\D/g, ""),
-        birth_date: displayToISO(form.birth_date),
+        name: form.name.trim(),
         is_minor: form.is_minor === "true",
         status: form.status,
+        guardians: guardians.map((g) => {
+          const baseFlags = {
+            is_financial_responsible: g.is_financial_responsible,
+            is_pedagogical_responsible: g.is_pedagogical_responsible,
+            can_access_portal: g.can_access_portal,
+          };
+
+          if (g.mode === "existing" && g.guardian_id) {
+            return {
+              guardian_id: g.guardian_id,
+              ...baseFlags,
+            };
+          }
+
+          const newGuardian: Record<string, any> = {
+            name: g.name.trim(),
+            ...baseFlags,
+          };
+          if (g.document.trim()) newGuardian.document = g.document.trim();
+          if (g.email.trim()) newGuardian.email = g.email.trim();
+          if (g.phone.trim()) newGuardian.phone = g.phone.trim();
+          if (g.relationship) newGuardian.relationship = g.relationship;
+          return newGuardian;
+        }),
       };
+
+      if (form.email.trim()) payload.email = form.email.trim();
+      if (form.phone.trim()) payload.phone = form.phone.trim();
+      if (form.document.trim()) payload.document = form.document.trim();
+      if (form.birth_date.trim()) payload.birth_date = displayToISO(form.birth_date);
 
       if (isEdit) {
         const { data } = await api.put(`/students/${studentId}`, payload);
-        await syncStudentGuardians(Number(studentId));
-        const { data: guardiansRaw } = await api.get(`/students/${studentId}/guardians`);
-        const guardiansData = guardiansRaw?.body ?? guardiansRaw?.data ?? guardiansRaw;
-        const guardiansList = Array.isArray(guardiansData)
-          ? guardiansData
-          : Array.isArray(guardiansData?.data)
-          ? guardiansData.data
-          : [];
         const student = data.body ?? data.data ?? data;
         setEnrollmentNumber(student.enrollment_number ?? enrollmentNumber);
         setForm({
           name: student.name ?? form.name,
           birth_date: isoToDisplay(student.birth_date ?? displayToISO(form.birth_date)),
-          document: maskCPF(student.document ?? form.document),
+          document: student.document ?? form.document,
           email: student.email ?? form.email,
           phone: maskPhone(student.phone ?? form.phone),
           is_minor: student.is_minor ? "true" : "false",
           status: student.status ?? form.status,
         });
-        setGuardians(mapApiGuardiansToForm(guardiansList));
+        setGuardians(mapApiGuardiansToForm(student.guardians ?? guardians));
         await fetchGuardianOptions();
         setToast({
           visible: true,
@@ -559,7 +499,6 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
         const created = rawCreate?.body ?? rawCreate?.data ?? rawCreate;
         const createdId = Number(created?.id);
         if (createdId) {
-          await syncStudentGuardians(createdId);
           await fetchGuardianOptions();
           if (pendingPhotoFile) {
             try {
@@ -589,11 +528,15 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
     } catch (e: any) {
       if (e.response?.status === 422) {
         const fieldErrors = parseApiErrors(e.response.data.errors ?? {});
+        const firstFieldError = Object.values(fieldErrors)[0];
         setErrors(fieldErrors);
         setToast({
           visible: true,
           type: "error",
-          message: e.response?.data?.message || "Dados inválidos.",
+          message:
+            firstFieldError ||
+            e.response?.data?.message ||
+            "Dados inválidos.",
         });
         scrollRef.current?.scrollTo({ y: 0, animated: true });
       } else {
@@ -798,7 +741,6 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
               <View className="flex-1">
                 <FormInput
                   label="Telefone"
-                  required
                   value={form.phone}
                   onChangeText={(v) => setForm({ ...form, phone: maskPhone(v) })}
                   error={errors.phone}
@@ -812,21 +754,17 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
             <View className="flex-row gap-4 mt-1">
               <View className="flex-1">
                 <FormInput
-                  label="CPF"
+                  label="Documento"
                   value={form.document}
-                  onChangeText={(v) =>
-                    setForm({ ...form, document: maskCPF(v) })
-                  }
+                  onChangeText={(v) => setForm({ ...form, document: v })}
                   error={errors.document}
-                  placeholder="000.000.000-00"
-                  keyboardType="numeric"
-                  maxLength={14}
+                  placeholder="CPF ou RG"
+                  maxLength={20}
                 />
               </View>
               <View className="flex-1">
                 <DatePickerInput
                   label="Data de Nascimento"
-                  required
                   value={form.birth_date}
                   onChangeText={(v) => setForm({ ...form, birth_date: v })}
                   error={errors.birth_date}
@@ -868,7 +806,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                   label="Status"
                   required
                   value={form.status}
-                  options={STATUS_OPTIONS}
+                  options={statusOptions}
                   onChange={(v) => setForm({ ...form, status: v })}
                   error={errors.status}
                 />
@@ -1039,33 +977,17 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                               />
                             </View>
                             <View className="flex-1">
-                              <Text className="text-xs font-medium text-gray-600 mb-1.5">
-                                Parentesco
-                              </Text>
-                              <select
+                              <FormSelect
+                                label="Parentesco"
                                 value={g.relationship}
-                                onChange={(e: any) =>
+                                onChange={(v) =>
                                   updateGuardian(idx, {
-                                    relationship: e.target.value,
+                                    relationship: v,
                                   })
                                 }
-                                style={{
-                                  width: "100%",
-                                  border: "1px solid #E5E7EB",
-                                  borderRadius: 8,
-                                  padding: "9px 12px",
-                                  fontSize: 14,
-                                  color: "#374151",
-                                  backgroundColor: "white",
-                                }}
-                              >
-                                <option value="">Selecione...</option>
-                                {relationshipOptions.map((o) => (
-                                  <option key={o.value} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
+                                options={relationshipOptions}
+                                placeholder="Selecione..."
+                              />
                             </View>
                           </View>
 
@@ -1099,14 +1021,13 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
 
                           <View style={{ maxWidth: 240 }} className="mt-2">
                             <FormInput
-                              label="CPF / RG"
+                              label="Documento"
                               value={g.document}
                               onChangeText={(v) =>
-                                updateGuardian(idx, { document: maskCPF(v) })
+                                updateGuardian(idx, { document: v })
                               }
-                              placeholder="000.000.000-00"
-                              keyboardType="numeric"
-                              maxLength={14}
+                              placeholder="CPF ou RG"
+                              maxLength={20}
                               error={errors[`guardians.${idx}.document`]}
                             />
                           </View>
