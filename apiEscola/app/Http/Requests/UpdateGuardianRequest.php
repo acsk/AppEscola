@@ -7,6 +7,15 @@ use Illuminate\Validation\Rule;
 
 class UpdateGuardianRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('document')) {
+            $this->merge([
+                'document' => $this->normalizeDocument($this->input('document')),
+            ]);
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -47,5 +56,16 @@ class UpdateGuardianRequest extends FormRequest
         return [
             'document' => 'CPF',
         ];
+    }
+
+    private function normalizeDocument($value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value) ?? '';
+
+        return $digits !== '' ? $digits : null;
     }
 }

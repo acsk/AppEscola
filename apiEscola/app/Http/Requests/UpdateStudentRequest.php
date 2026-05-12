@@ -8,6 +8,31 @@ use Illuminate\Validation\Validator;
 
 class UpdateStudentRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $payload = $this->all();
+
+        if (array_key_exists('document', $payload)) {
+            $payload['document'] = $this->normalizeDocument($payload['document']);
+        }
+
+        if (isset($payload['guardians']) && is_array($payload['guardians'])) {
+            $payload['guardians'] = array_map(function ($guardian) {
+                if (! is_array($guardian)) {
+                    return $guardian;
+                }
+
+                if (array_key_exists('document', $guardian)) {
+                    $guardian['document'] = $this->normalizeDocument($guardian['document']);
+                }
+
+                return $guardian;
+            }, $payload['guardians']);
+        }
+
+        $this->replace($payload);
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -35,6 +60,7 @@ class UpdateStudentRequest extends FormRequest
                 'string',
                 'max:20',
                 'distinct',
+                Rule::unique('guardians', 'document')->where('tenant_id', $this->user()->tenant_id),
             ],
             'guardians.*.email'                     => ['required_without:guardians.*.guardian_id', 'nullable', 'email', 'max:255'],
             'guardians.*.phone'                     => ['nullable', 'string', 'max:20'],
@@ -77,6 +103,7 @@ class UpdateStudentRequest extends FormRequest
         return [
             'guardians.*.document.required_without' => 'Informe o CPF do responsável quando ele não estiver previamente cadastrado.',
             'guardians.*.document.distinct' => 'Não repita o mesmo CPF entre os responsáveis informados.',
+            'guardians.*.document.unique' => 'Já existe um responsável com este CPF.',
             'guardians.*.email.required_without' => 'Informe o e-mail do responsável quando ele não estiver previamente cadastrado.',
         ];
     }
@@ -87,5 +114,16 @@ class UpdateStudentRequest extends FormRequest
             'guardians.*.document' => 'CPF do responsável',
             'guardians.*.email' => 'e-mail do responsável',
         ];
+    }
+
+    private function normalizeDocument($value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value) ?? '';
+
+        return $digits !== '' ? $digits : null;
     }
 }
