@@ -277,7 +277,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
           name: student.name ?? "",
           birth_date: isoToDisplay(student.birth_date ?? ""),
           document: maskCPF(student.document ?? ""),
-          email: student.email ?? "",
+          email: normalizeEmail(student.email ?? ""),
           phone: maskPhone(student.phone ?? ""),
           is_minor: student.is_minor ? "true" : "false",
           status: student.status ?? "active",
@@ -461,14 +461,14 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
             ...baseFlags,
           };
           if (g.document.trim()) newGuardian.document = onlyDigits(g.document);
-          if (g.email.trim()) newGuardian.email = g.email.trim();
+          if (g.email.trim()) newGuardian.email = normalizeEmail(g.email);
           if (g.phone.trim()) newGuardian.phone = g.phone.trim();
           if (g.relationship) newGuardian.relationship = g.relationship;
           return newGuardian;
         }),
       };
 
-      if (form.email.trim()) payload.email = form.email.trim();
+      if (form.email.trim()) payload.email = normalizeEmail(form.email);
       if (form.phone.trim()) payload.phone = form.phone.trim();
       if (form.document.trim()) payload.document = onlyDigits(form.document);
       if (form.birth_date.trim()) payload.birth_date = displayToISO(form.birth_date);
@@ -481,7 +481,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
           name: student.name ?? form.name,
           birth_date: isoToDisplay(student.birth_date ?? displayToISO(form.birth_date)),
           document: maskCPF(student.document ?? form.document),
-          email: student.email ?? form.email,
+          email: normalizeEmail(student.email ?? form.email),
           phone: maskPhone(student.phone ?? form.phone),
           is_minor: student.is_minor ? "true" : "false",
           status: student.status ?? form.status,
@@ -733,7 +733,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
                 <FormInput
                   label="E-mail"
                   value={form.email}
-                  onChangeText={(v) => setForm({ ...form, email: v })}
+                  onChangeText={(v) => setForm({ ...form, email: normalizeEmail(v) })}
                   error={errors.email}
                   placeholder="email@exemplo.com"
                   keyboardType="email-address"

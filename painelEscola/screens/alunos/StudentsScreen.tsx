@@ -101,6 +101,7 @@ export default function StudentsScreen({ navigate }: Props) {
     const digits = value.replace(/\D/g, "");
     return digits.length === 11 ? maskCPF(digits) : value;
   };
+  const fmtEmail = (value: string | null) => (value ? value.trim().toLowerCase() : "—");
   const statusLabel = (value: string) =>
     statusOptions.find((item) => item.value === value)?.label ?? value;
 
@@ -314,7 +315,7 @@ export default function StudentsScreen({ navigate }: Props) {
                     <Text className="text-xs text-gray-500">Documento: {fmtDocument(item.document)}</Text>
                     <Text className="text-xs text-gray-500">Telefone: {item.phone ? maskPhone(item.phone) : "—"}</Text>
                     <Text className="text-xs text-gray-500">Nascimento: {fmtDate(item.birth_date)}</Text>
-                    <Text className="text-xs text-gray-500">E-mail: {item.email ?? "—"}</Text>
+                    <Text className="text-xs text-gray-500">E-mail: {fmtEmail(item.email)}</Text>
                   </View>
                   <View className="mt-2 self-start">
                     <Badge slug={item.status} label={statusLabel(item.status)} />
@@ -336,7 +337,7 @@ export default function StudentsScreen({ navigate }: Props) {
                 )}
               </View>
               <Text className="text-xs text-gray-600" style={{ flex: 2 }}>
-                {item.email ?? "—"}
+                {fmtEmail(item.email)}
               </Text>
               <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
                 {item.phone ? maskPhone(item.phone) : "—"}
