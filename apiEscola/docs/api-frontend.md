@@ -415,6 +415,8 @@ Content-Type: application/json
 | `description` | ❌ | |
 | `status` | ❌ | `active` ou `inactive` |
 
+> O `name` da disciplina deve ser único por tenant.
+
 ### Exibir / Atualizar / Excluir
 ```http
 GET    /api/courses/{id}

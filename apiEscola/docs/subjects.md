@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | `id` | bigint PK | não | auto | |
 | `tenant_id` | bigint FK | não | — | Referência a `tenants.id` |
-| `name` | varchar(255) | não | — | Nome da disciplina |
+| `name` | varchar(255) | não | — | Nome da disciplina, único por tenant |
 | `description` | text | sim | null | Descrição |
 | `icon` | varchar(255) | sim | null | Nome ou código do ícone |
 | `color` | varchar(9) | sim | null | Cor em hex (`#RGB`, `#RRGGBB`, `#RRGGBBAA`) |
@@ -87,6 +87,8 @@ Cria uma nova disciplina.
 | `icon` | string | não | max 100 — nome do ícone da biblioteca usada no frontend |
 | `color` | string | não | hex válido: `#RGB`, `#RRGGBB` ou `#RRGGBBAA` |
 | `status` | string | não | `active` (padrão) ou `inactive` |
+
+> O campo `name` deve ser único dentro do mesmo tenant.
 
 **Exemplo:**
 
