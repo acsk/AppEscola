@@ -17,30 +17,42 @@ const linking: LinkingOptions<any> = {
   prefixes: [prefix, 'mobileescola://'],
   config: {
     screens: {
-      Home:       'home',
-      Simulados: {
-        path: 'simulados',
-        screens: {
-          SimuladosList: '',
-          SimuladoDetalhe: {
-            path: ':examId',
-            parse:     { examId: (id: string) => Number(id) },
-            stringify: { examId: (id: number) => String(id) },
-          },
-          SimuladoExam: {
-            path: ':examId/exam/:attemptId',
-            parse: {
-              examId:    (id: string) => Number(id),
-              attemptId: (id: string) => Number(id),
-            },
-            stringify: {
-              examId:    (id: number) => String(id),
-              attemptId: (id: number) => String(id),
-            },
-          },
+      Login: 'login',
+      PublicRegister: {
+        path: ':tenantSlug/register',
+        parse: {
+          tenantSlug: (slug: string) => slug,
         },
       },
-      Financeiro: 'financeiro',
+      AlunoTabs: {
+        screens: {
+          Home:       'home',
+          Simulados: {
+            path: 'simulados',
+            screens: {
+              SimuladosList: '',
+              SimuladoDetalhe: {
+                path: ':examId',
+                parse:     { examId: (id: string) => Number(id) },
+                stringify: { examId: (id: number) => String(id) },
+              },
+              SimuladoExam: {
+                path: ':examId/exam/:attemptId',
+                parse: {
+                  examId:    (id: string) => Number(id),
+                  attemptId: (id: string) => Number(id),
+                },
+                stringify: {
+                  examId:    (id: number) => String(id),
+                  attemptId: (id: number) => String(id),
+                },
+              },
+            },
+          },
+          Financeiro: 'financeiro',
+        },
+      },
+      AlterarSenha: 'alterar-senha',
     },
   },
 };

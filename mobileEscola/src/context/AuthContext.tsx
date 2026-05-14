@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { storage, STORAGE_KEYS } from '../services/storage';
+import { storage, STORAGE_KEYS, clearAuthStorage } from '../services/storage';
 import {
   registerUnauthorizedHandler,
   resetUnauthorizedNotice,
@@ -16,12 +16,25 @@ import {
 import {
   fetchMobileVersion,
   compareBuildVersions,
+  fetchMetaInfo,
 } from '../services/version.service';
 import { colors } from '../theme';
 import buildInfo from '../../buildInfo.json';
 
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? '-');
 const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
+const DEFAULT_SESSION_LOST_MESSAGE =
+  'Sua conexão com o servidor foi perdida ou seu login expirou. Faça login novamente para continuar usando o app.';
+const AUTH_DEBUG_PREFIX = '[AuthDebug]';
+
+function logAuthDebug(message: string, extra?: unknown) {
+  if (!__DEV__) return;
+  if (typeof extra === 'undefined') {
+    console.log(`${AUTH_DEBUG_PREFIX} ${message}`);
+    return;
+  }
+  console.log(`${AUTH_DEBUG_PREFIX} ${message}`, extra);
+}
 
 interface AuthContextData {
   user: AuthUser | null;
@@ -40,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading]                 = useState(true);
   const [requirePasswordChange, setRequirePasswordChange] = useState(false);
   const [sessionExpired, setSessionExpired]       = useState(false);
+  const [sessionLostMessage, setSessionLostMessage] = useState(DEFAULT_SESSION_LOST_MESSAGE);
   const [updateAvailable, setUpdateAvailable]     = useState<{
     visible: boolean;
     latest: string;
@@ -47,18 +61,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Limpeza interna de sessão (sem chamar a API) ───────────────────────
   const clearSession = useCallback(async () => {
-    await Promise.all([
-      storage.removeItem(STORAGE_KEYS.TOKEN),
-      storage.removeItem(STORAGE_KEYS.ROLE),
-      storage.removeItem(STORAGE_KEYS.USER_DATA),
-    ]);
+    logAuthDebug('clearSession iniciado');
+    await clearAuthStorage();
     setUser(null);
     setRequirePasswordChange(false);
+    logAuthDebug('clearSession finalizado');
   }, []);
 
-  // ── Disparado pelo interceptor 401/419: mostra modal e limpa sessão ───
+  // ── Disparado pelo interceptor 401/419/force_relogin ──────────────────
   const handleSessionLost = useCallback(
-    (_reason: SessionLostReason) => {
+    (reason: SessionLostReason) => {
+      logAuthDebug('handleSessionLost acionado', { reason });
+
+      if (reason === 'force_relogin') {
+        setSessionLostMessage(
+          'Sua sessão foi encerrada pelo servidor. Faça login novamente para continuar.',
+        );
+      } else {
+        setSessionLostMessage(DEFAULT_SESSION_LOST_MESSAGE);
+      }
+
       // Só exibe se havia sessão ativa (evita modal em telas públicas)
       setSessionExpired((prev) => prev || true);
       void clearSession();
@@ -66,8 +88,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [clearSession],
   );
 
+  const enforceForceReloginFromMeta = useCallback(
+    async (source: string): Promise<boolean> => {
+      try {
+        const meta = await fetchMetaInfo();
+        logAuthDebug('Meta consultado para force relogin', {
+          source,
+          forceRelogin: meta.forceRelogin,
+        });
+
+        if (!meta.forceRelogin) return false;
+
+        handleSessionLost('force_relogin');
+        return true;
+      } catch (err: any) {
+        logAuthDebug('Falha ao consultar /api/meta para force relogin', {
+          source,
+          message: err?.message,
+        });
+        return false;
+      }
+    },
+    [handleSessionLost],
+  );
+
   // ── Registra handler global de 401 ────────────────────────────────────
   useEffect(() => {
+    logAuthDebug('Registrando unauthorized handler no AuthContext');
     registerUnauthorizedHandler(handleSessionLost);
   }, [handleSessionLost]);
 
@@ -76,6 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     const checkVersion = async () => {
+      const forceRelogin = await enforceForceReloginFromMeta('version-check');
+      if (forceRelogin || !active) return;
+
       const remote = await fetchMobileVersion();
       if (!active || !remote?.version) return;
       if (compareBuildVersions(remote.version, CURRENT_BUILD_VERSION) > 0) {
@@ -90,14 +140,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       clearInterval(intervalId);
     };
-  }, []);
+  }, [enforceForceReloginFromMeta]);
 
   // ── Valida token salvo ao iniciar o app ───────────────────────────────
   useEffect(() => {
     async function validateStoredToken() {
       try {
         const token = await storage.getItem(STORAGE_KEYS.TOKEN);
+        logAuthDebug('validateStoredToken executado', { hasToken: Boolean(token) });
         if (!token) {
+          setIsLoading(false);
+          return;
+        }
+
+        const forceRelogin = await enforceForceReloginFromMeta('bootstrap');
+        if (forceRelogin) {
           setIsLoading(false);
           return;
         }
@@ -105,25 +162,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // Valida o token junto ao servidor
           const me = await getMeApi();
+          logAuthDebug('Token validado com sucesso em /api/me', { userId: me.id, role: me.role });
           setUser(me);
           // Atualiza dados locais com a resposta mais recente
           await storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(me));
           await storage.setItem(STORAGE_KEYS.ROLE, me.role);
         } catch (err: any) {
-          const status = err?.response?.status;
-
-          if (status === 401) {
-            // Token inválido/expirado → força novo login
-            await clearSession();
-          } else {
-            // Erro de rede ou servidor indisponível → restaura sessão local
-            const cached = await storage.getItem(STORAGE_KEYS.USER_DATA);
-            if (cached) {
-              setUser(JSON.parse(cached));
-            } else {
-              await clearSession();
-            }
-          }
+          logAuthDebug('Falha ao validar token em /api/me, limpando sessao', {
+            status: err?.response?.status,
+            message: err?.message,
+          });
+          // Se existe token persistido e não foi possível validá-lo,
+          // força logout local para sempre retornar ao login.
+          await clearSession();
         }
       } finally {
         setIsLoading(false);
@@ -131,10 +182,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     validateStoredToken();
-  }, [clearSession]);
+  }, [clearSession, enforceForceReloginFromMeta]);
 
   // ── Login ──────────────────────────────────────────────────────────────
   async function signIn(login: string, password: string) {
+    logAuthDebug('Tentativa de login iniciada', {
+      loginType: login.includes('@') ? 'email' : 'matricula',
+    });
     const response = await loginApi(login, password);
 
     await Promise.all([
@@ -143,14 +197,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user)),
     ]);
 
+    const forceRelogin = await enforceForceReloginFromMeta('post-login');
+    if (forceRelogin) {
+      resetUnauthorizedNotice();
+      return;
+    }
+
     setRequirePasswordChange(response.password_change_required);
     setUser(response.user);
     setSessionExpired(false);
     resetUnauthorizedNotice();
+    logAuthDebug('Login concluido', {
+      userId: response.user.id,
+      role: response.user.role,
+      requirePasswordChange: response.password_change_required,
+    });
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────
   async function signOut() {
+    logAuthDebug('Logout iniciado');
     try {
       await logoutApi();
     } catch {
@@ -159,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await clearSession();
       setSessionExpired(false);
       resetUnauthorizedNotice();
+      logAuthDebug('Logout finalizado');
     }
   }
 
@@ -203,13 +270,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             </View>
             <Text style={modalStyles.title}>Sessão expirada</Text>
             <Text style={modalStyles.message}>
-              Sua conexão com o servidor foi perdida ou seu login expirou.
-              Faça login novamente para continuar usando o app.
+              {sessionLostMessage}
             </Text>
             <TouchableOpacity
               style={modalStyles.button}
               onPress={() => {
                 setSessionExpired(false);
+                setSessionLostMessage(DEFAULT_SESSION_LOST_MESSAGE);
                 resetUnauthorizedNotice();
               }}
               activeOpacity={0.85}

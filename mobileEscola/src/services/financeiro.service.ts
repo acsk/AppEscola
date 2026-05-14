@@ -117,13 +117,18 @@ export async function getCobrancasApi(): Promise<CobrancasResponse> {
 }
 
 export async function getPaymentOptionsApi(invoiceId: number): Promise<PaymentOptionsResponse> {
+  const data = await getPaymentOptionsWithMessageApi(invoiceId);
+  return data.body!;
+}
+
+export async function getPaymentOptionsWithMessageApi(invoiceId: number): Promise<ApiResponse<PaymentOptionsResponse>> {
   const { data } = await api.get<ApiResponse<PaymentOptionsResponse>>(
     `/api/aluno/cobrancas/${invoiceId}/payment-options`
   );
   if (data.type === 'error') {
     throw new Error(data.message);
   }
-  return data.body!;
+  return data;
 }
 
 export async function generateChargeApi(invoiceId: number, method: PaymentMethod): Promise<GenerateChargeResponse> {

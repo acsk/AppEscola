@@ -4,6 +4,7 @@ return [
     'version' => env('API_VERSION', '1.0.14'),
     'contract_version' => env('API_CONTRACT_VERSION', date('Y-m-d')),
     'has_breaking_changes' => (bool) env('API_HAS_BREAKING_CHANGES', false),
+    'force_relogin' => (bool) env('API_FORCE_RELOGIN', false),
     'min_supported_app_version' => env('API_MIN_SUPPORTED_APP_VERSION', '1.0.0'),
     'recommended_app_version' => env('API_RECOMMENDED_APP_VERSION', '1.0.0'),
     'changelog_url' => env('API_CHANGELOG_URL', ''),

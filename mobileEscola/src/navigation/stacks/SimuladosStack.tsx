@@ -36,9 +36,10 @@ export function SimuladosNavigator() {
         options={{
           title: 'Simulado',
           headerBackTitle: 'Voltar',
-          headerStyle: { backgroundColor: colors.ink },
-          headerTintColor: colors.surface,
-          headerTitleStyle: { fontWeight: '600' },
+          headerStyle: { backgroundColor: '#FBFAFF' },
+          headerTintColor: colors.ink,
+          headerTitleStyle: { fontWeight: '800', color: '#111827' },
+          headerShadowVisible: false,
         }}
       />
       <Stack.Screen

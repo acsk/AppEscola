@@ -11,6 +11,15 @@ export interface MetaInfo {
   contractVersion: string;
   minSupportedVersion: string;
   recommendedVersion: string;
+  forceRelogin: boolean;
+}
+
+function parseBooleanFlag(value: unknown): boolean {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
 }
 
 const apiRoot = () => {
@@ -101,6 +110,9 @@ export async function fetchMetaInfo(): Promise<MetaInfo> {
       body?.recommended_app_version ??
         response.headers.get('x-recommended-app-version') ??
         '',
+    ),
+    forceRelogin: parseBooleanFlag(
+      body?.force_relogin ?? response.headers.get('x-force-relogin') ?? false,
     ),
   };
 }

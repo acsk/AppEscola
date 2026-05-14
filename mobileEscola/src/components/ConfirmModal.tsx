@@ -46,7 +46,7 @@ export default function ConfirmModal({
       {/* Backdrop separado — não envolve o card, elimina bubbling */}
       <Pressable style={s.backdrop} onPress={onCancel} />
 
-      <View style={s.overlay} pointerEvents="box-none">
+      <View style={[s.overlay, { pointerEvents: 'box-none' }]}>
         <View style={s.card}>
           {/* Ícone */}
           <View style={[s.iconCircle, { backgroundColor: iconColor + '1A' }]}>

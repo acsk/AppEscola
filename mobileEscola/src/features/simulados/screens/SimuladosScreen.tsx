@@ -15,16 +15,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import {
   listarSimulados,
-  listarTentativas,
   SimuladoListItem,
-  AttemptHistoryItem,
   AttemptStatus,
   subjectIconName,
 } from '../../../services/simulados.service';
 import { colors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'SimuladosList'>;
-type Aba = 'disponiveis' | 'historico';
 
 const STATUS_LABEL: Record<AttemptStatus, string> = {
   not_started:    'Disponível',
@@ -50,28 +47,6 @@ const STATUS_ICON: Record<AttemptStatus, React.ComponentProps<typeof Ionicons>['
   completed:      'checkmark-circle-outline',
 };
 
-const HIST_COLOR: Record<string, string> = {
-  in_progress:    '#F97316',
-  pending_review: '#F97316',
-  awaiting_release: '#F97316',
-  completed:      '#22C55E',
-  abandoned:      colors.debit,
-};
-const HIST_LABEL: Record<string, string> = {
-  in_progress:    'Em andamento',
-  pending_review: 'Aguardando correção',
-  awaiting_release: 'Aguardando liberação',
-  completed:      'Concluído',
-  abandoned:      'Abandonado',
-};
-const HIST_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
-  in_progress:    'time-outline',
-  pending_review: 'hourglass-outline',
-  awaiting_release: 'lock-closed-outline',
-  completed:      'checkmark-circle-outline',
-  abandoned:      'close-circle-outline',
-};
-
 function formatMinutes(min: number): string {
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
@@ -86,27 +61,23 @@ function formatDate(iso: string): string {
   });
 }
 
-function statusColor(status: AttemptStatus | string): string {
-  return STATUS_COLOR[status as AttemptStatus] ?? HIST_COLOR[status] ?? colors.muted;
+function statusColor(status: AttemptStatus): string {
+  return STATUS_COLOR[status] ?? colors.muted;
+}
+
+function tint(hex?: string, alpha = '18'): string {
+  if (!hex || !hex.startsWith('#')) return colors.soft;
+  return `${hex}${alpha}`;
 }
 
 export function SimuladosScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
 
-  const [aba, setAba] = useState<Aba>('disponiveis');
-
-  // ── Disponíveis ────────────────────────────────────────────────────────────
   const [simulados, setSimulados]   = useState<SimuladoListItem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro]             = useState<string | null>(null);
-
-  // ── Histórico ──────────────────────────────────────────────────────────────
-  const [tentativas, setTentativas]         = useState<AttemptHistoryItem[]>([]);
-  const [carregandoHist, setCarregandoHist] = useState(true);
-  const [atualizandoHist, setAtualizandoHist] = useState(false);
-  const [erroHist, setErroHist]             = useState<string | null>(null);
 
   const carregarDisponiveis = useCallback(async (refreshing = false) => {
     if (refreshing) setAtualizando(true);
@@ -122,45 +93,52 @@ export function SimuladosScreen() {
     }
   }, []);
 
-  const carregarHistorico = useCallback(async (refreshing = false) => {
-    if (refreshing) setAtualizandoHist(true);
-    else setCarregandoHist(true);
-    setErroHist(null);
-    try {
-      setTentativas(await listarTentativas());
-    } catch (e: any) {
-      setErroHist(e?.response?.data?.message ?? 'Não foi possível carregar o histórico.');
-    } finally {
-      setCarregandoHist(false);
-      setAtualizandoHist(false);
-    }
-  }, []);
-
   useFocusEffect(useCallback(() => {
     carregarDisponiveis();
-    carregarHistorico();
-  }, [carregarDisponiveis, carregarHistorico]));
+  }, [carregarDisponiveis]));
 
   // ── Render: card disponível ────────────────────────────────────────────────
   function renderDisponivel({ item }: { item: SimuladoListItem }) {
     const cor   = statusColor(item.attempt_status);
     const label = STATUS_LABEL[item.attempt_status];
     const icon  = STATUS_ICON[item.attempt_status];
+    const subjectColor = item.subject?.color ?? colors.primary;
+    const aproveitamentoAprovado =
+      item.aproveitamento != null ? item.aproveitamento >= item.passing_score : null;
+    const aproveitamentoColor =
+      aproveitamentoAprovado === true
+        ? '#22C55E'
+        : aproveitamentoAprovado === false
+        ? '#EF4444'
+        : colors.muted;
+    const aproveitamentoIcon =
+      aproveitamentoAprovado === true
+        ? 'checkmark-circle'
+        : aproveitamentoAprovado === false
+        ? 'close-circle'
+        : 'stats-chart-outline';
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[
+          styles.card,
+          {
+            backgroundColor: tint(subjectColor, '10'),
+            borderColor: tint(subjectColor, '35'),
+            shadowColor: subjectColor,
+          },
+        ]}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('SimuladoDetalhe', { examId: item.id })}
       >
         {item.subject && (
-          <View style={[styles.cardAccent, { backgroundColor: item.subject.color }]} />
+          <View style={[styles.cardAccent, { backgroundColor: subjectColor }]} />
         )}
         <View style={styles.cardTopo}>
           <View style={styles.cardTopoEsq}>
             {item.subject && (
-              <View style={[styles.subjectChip, { backgroundColor: item.subject.color + '22' }]}>
-                <Ionicons name={subjectIconName(item.subject.icon) as any} size={12} color={item.subject.color} />
-                <Text style={[styles.subjectNome, { color: item.subject.color }]}>{item.subject.name}</Text>
+              <View style={[styles.subjectChip, { backgroundColor: tint(subjectColor, '18') }]}>
+                <Ionicons name={subjectIconName(item.subject.icon) as any} size={12} color={subjectColor} />
+                <Text style={[styles.subjectNome, { color: subjectColor }]}>{item.subject.name}</Text>
               </View>
             )}
             {item.exam_type_label ? (
@@ -195,6 +173,21 @@ export function SimuladosScreen() {
             <Text style={styles.infoTexto}>Mínimo {item.passing_score}%</Text>
           </View>
         </View>
+        {item.aproveitamento != null && (
+          <View style={styles.aproveitamentoRow}>
+            <View style={styles.aproveitamentoLeft}>
+              <Ionicons name={aproveitamentoIcon as any} size={18} color={aproveitamentoColor} />
+              <Text style={styles.aproveitamentoLabel}>Aproveitamento</Text>
+            </View>
+            <Text style={[styles.aproveitamentoValor, { color: aproveitamentoColor }]}>
+              {item.aproveitamento.toLocaleString('pt-BR', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 1,
+              })}
+              %
+            </Text>
+          </View>
+        )}
         {item.ends_at && item.attempt_status !== 'completed' && (
           <View style={styles.prazoRow}>
             <Ionicons name="calendar-outline" size={12} color={colors.muted} />
@@ -211,197 +204,34 @@ export function SimuladosScreen() {
     );
   }
 
-  // ── Render: card histórico ─────────────────────────────────────────────────
-  function renderTentativa({ item }: { item: AttemptHistoryItem }) {
-    const cor   = statusColor(item.status);
-    const label = HIST_LABEL[item.status] ?? item.status;
-    const icon  = HIST_ICON[item.status]  ?? 'ellipse-outline';
-    const subj  = item.exam.subject;
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('SimuladoDetalhe', { examId: item.exam_id })}
-      >
-        {subj && <View style={[styles.cardAccent, { backgroundColor: subj.color }]} />}
-        <View style={styles.cardTopo}>
-          <View style={styles.cardTopoEsq}>
-            {subj && (
-              <View style={[styles.subjectChip, { backgroundColor: subj.color + '22' }]}>
-                <Ionicons name={subjectIconName(subj.icon) as any} size={12} color={subj.color} />
-                <Text style={[styles.subjectNome, { color: subj.color }]}>{subj.name}</Text>
-              </View>
-            )}
-            {item.exam.exam_type_label ? (
-              <View style={styles.tipoChip}>
-                <Text style={styles.tipoTexto}>{item.exam.exam_type_label}</Text>
-              </View>
-            ) : null}
-          </View>
-          <View style={[styles.badge, { backgroundColor: cor }]}>
-            <Ionicons name={icon} size={13} color={colors.surface} style={{ marginRight: 4 }} />
-            <Text style={styles.badgeTexto}>{label}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.cardTitulo} numberOfLines={2}>{item.exam.title}</Text>
-
-        {/* Métricas (só se concluído) */}
-        {item.status === 'completed' && item.percentage !== null && (
-          <View style={styles.histMetricas}>
-            <View style={styles.histMetricaItem}>
-              <Text style={[styles.histMetricaValor, { color: item.passed ? colors.credit : colors.debit }]}>
-                {item.percentage.toFixed(1)}%
-              </Text>
-              <Text style={styles.histMetricaLabel}>Aproveit.</Text>
-            </View>
-            <View style={styles.histMetricaSep} />
-            <View style={styles.histMetricaItem}>
-              <Text style={styles.histMetricaValor}>{item.score ?? 0}</Text>
-              <Text style={styles.histMetricaLabel}>Pontos</Text>
-            </View>
-            <View style={styles.histMetricaSep} />
-            <View style={styles.histMetricaItem}>
-              <Text style={styles.histMetricaValor}>{item.max_score ?? 0}</Text>
-              <Text style={styles.histMetricaLabel}>Máximo</Text>
-            </View>
-            <View style={styles.histMetricaSep} />
-            <View style={styles.histMetricaItem}>
-              <Ionicons
-                name={item.passed ? 'checkmark-circle' : 'close-circle'}
-                size={20}
-                color={item.passed ? colors.credit : colors.debit}
-              />
-              <Text style={[styles.histMetricaLabel, { color: item.passed ? colors.credit : colors.debit }]}>
-                {item.passed ? 'Aprovado' : 'Reprovado'}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Aguardando correção */}
-        {(item.status === 'pending_review' || item.status === 'awaiting_release') && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 }}>
-            <Ionicons name={item.status === 'awaiting_release' ? 'lock-closed-outline' : 'hourglass-outline'} size={14} color={item.status === 'awaiting_release' ? '#0891B2' : '#B45309'} />
-            <Text style={{ fontSize: 12, color: item.status === 'awaiting_release' ? '#0891B2' : '#B45309' }}>
-              {item.status === 'awaiting_release'
-                ? 'Resultado aguardando liberação automática'
-                : 'Aguardando correção manual pelo professor'}
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.prazoRow}>
-          <Ionicons name="calendar-outline" size={12} color={colors.muted} />
-          <Text style={styles.prazoTexto}>Iniciado: {formatDate(item.started_at)}</Text>
-          {item.finished_at && (
-            <Text style={[styles.prazoTexto, { marginLeft: 8 }]}>
-              · Finalizado: {formatDate(item.finished_at)}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  }
-
   // ── Header fixo ────────────────────────────────────────────────────────────
   const header = (
     <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+      <View style={styles.headerGlowPrimary} />
+      <View style={styles.headerGlowSecondary} />
       <Text style={styles.headerTitulo}>Simulados</Text>
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, aba === 'disponiveis' && styles.tabAtiva]}
-          onPress={() => setAba('disponiveis')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabTexto, aba === 'disponiveis' && styles.tabTextoAtivo]}>Disponíveis</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, aba === 'historico' && styles.tabAtiva]}
-          onPress={() => setAba('historico')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.tabTexto, aba === 'historico' && styles.tabTextoAtivo]}>Histórico</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 
-  // ── Aba Disponíveis ────────────────────────────────────────────────────────
-  if (aba === 'disponiveis') {
-    if (carregando) {
-      return (
-        <View style={styles.container}>
-          {header}
-          <View style={styles.centrado}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.carregandoTexto}>Carregando simulados…</Text>
-          </View>
-        </View>
-      );
-    }
-    if (erro) {
-      return (
-        <View style={styles.container}>
-          {header}
-          <View style={styles.centrado}>
-            <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
-            <Text style={styles.erroTexto}>{erro}</Text>
-            <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarDisponiveis()} activeOpacity={0.8}>
-              <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
-    }
-    return (
-      <View style={styles.container}>
-        {header}
-        <FlatList
-          data={simulados}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderDisponivel}
-          style={{ flex: 1 }}
-          contentContainerStyle={simulados.length === 0 ? styles.listaVazia : styles.lista}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={atualizando} onRefresh={() => carregarDisponiveis(true)} colors={[colors.primary]} tintColor={colors.primary} />
-          }
-          ListHeaderComponent={simulados.length > 0 ? (
-            <Text style={styles.cabecalho}>{simulados.length} simulado{simulados.length !== 1 ? 's' : ''}</Text>
-          ) : null}
-          ListEmptyComponent={
-            <View style={styles.vazio}>
-              <Ionicons name="clipboard-outline" size={56} color={colors.border} />
-              <Text style={styles.vazioTitulo}>Nenhum simulado disponível</Text>
-              <Text style={styles.vazioSub}>Verifique sua matrícula ou tente mais tarde.</Text>
-            </View>
-          }
-        />
-      </View>
-    );
-  }
-
-  // ── Aba Histórico ──────────────────────────────────────────────────────────
-  if (carregandoHist) {
+  if (carregando) {
     return (
       <View style={styles.container}>
         {header}
         <View style={styles.centrado}>
-        <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.carregandoTexto}>Carregando histórico…</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.carregandoTexto}>Carregando simulados…</Text>
         </View>
       </View>
     );
   }
-  if (erroHist) {
+  if (erro) {
     return (
       <View style={styles.container}>
         {header}
         <View style={styles.centrado}>
           <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
-          <Text style={styles.erroTexto}>{erroHist}</Text>
-          <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarHistorico()} activeOpacity={0.8}>
+          <Text style={styles.erroTexto}>{erro}</Text>
+          <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarDisponiveis()} activeOpacity={0.8}>
             <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
           </TouchableOpacity>
         </View>
@@ -412,23 +242,23 @@ export function SimuladosScreen() {
     <View style={styles.container}>
       {header}
       <FlatList
-        data={tentativas}
+        data={simulados}
         keyExtractor={(item) => String(item.id)}
-        renderItem={renderTentativa}
+        renderItem={renderDisponivel}
         style={{ flex: 1 }}
-        contentContainerStyle={tentativas.length === 0 ? styles.listaVazia : styles.lista}
+        contentContainerStyle={simulados.length === 0 ? styles.listaVazia : styles.lista}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={atualizandoHist} onRefresh={() => carregarHistorico(true)} colors={[colors.primary]} tintColor={colors.primary} />
+          <RefreshControl refreshing={atualizando} onRefresh={() => carregarDisponiveis(true)} colors={[colors.primary]} tintColor={colors.primary} />
         }
-        ListHeaderComponent={tentativas.length > 0 ? (
-          <Text style={styles.cabecalho}>{tentativas.length} tentativa{tentativas.length !== 1 ? 's' : ''}</Text>
+        ListHeaderComponent={simulados.length > 0 ? (
+          <Text style={styles.cabecalho}>{simulados.length} simulado{simulados.length !== 1 ? 's' : ''}</Text>
         ) : null}
         ListEmptyComponent={
           <View style={styles.vazio}>
-            <Ionicons name="time-outline" size={56} color={colors.border} />
-            <Text style={styles.vazioTitulo}>Nenhuma tentativa ainda</Text>
-            <Text style={styles.vazioSub}>Seus simulados realizados aparecerão aqui.</Text>
+            <Ionicons name="clipboard-outline" size={56} color={colors.border} />
+            <Text style={styles.vazioTitulo}>Nenhum simulado disponível</Text>
+            <Text style={styles.vazioSub}>Verifique sua matrícula ou tente mais tarde.</Text>
           </View>
         }
       />
@@ -437,27 +267,39 @@ export function SimuladosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F6F7FB' },
 
-  // Header + tabs
+  // Header
   headerWrap: {
-    backgroundColor: colors.ink,
+    backgroundColor: '#FBFAFF',
     paddingHorizontal: 20,
-    paddingBottom: 14,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, elevation: 4,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED', shadowOpacity: 0.08, shadowRadius: 18, elevation: 3,
   },
-  headerTitulo: { fontSize: 22, fontWeight: '800', color: colors.surface, paddingTop: 18, paddingBottom: 14 },
-  tabs: { flexDirection: 'row', gap: 8 },
-  tab: {
-    flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center',
-    backgroundColor: 'rgba(238,242,255,0.12)',
+  headerGlowPrimary: {
+    position: 'absolute',
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    right: -104,
+    top: -150,
+    backgroundColor: '#F0E9FF',
+    opacity: 0.92,
   },
-  tabAtiva: { backgroundColor: colors.surface },
-  tabTexto: { fontSize: 14, fontWeight: '700', color: '#CBD5E1' },
-  tabTextoAtivo: { color: colors.primary },
-
+  headerGlowSecondary: {
+    position: 'absolute',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    left: -76,
+    top: 58,
+    backgroundColor: '#F7F2FF',
+    opacity: 0.98,
+  },
+  headerTitulo: { fontSize: 22, fontWeight: '800', color: '#111827', paddingTop: 18, paddingBottom: 14 },
   lista:      { padding: 16, paddingTop: 12 },
   listaVazia: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   cabecalho:  { fontSize: 13, color: colors.muted, marginBottom: 12 },
@@ -465,15 +307,15 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface, borderRadius: 18, padding: 16, paddingLeft: 20,
     marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 2,
   },
   cardAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
   cardTopo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   cardTopoEsq: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  subjectChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  subjectNome: { fontSize: 11, fontWeight: '600' },
-  tipoChip: { backgroundColor: colors.soft, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
-  tipoTexto: { fontSize: 11, color: colors.muted, fontWeight: '600' },
+  subjectChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  subjectNome: { fontSize: 11, fontWeight: '800' },
+  tipoChip: { backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  tipoTexto: { fontSize: 11, color: '#64748B', fontWeight: '800' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -481,24 +323,49 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 1,
   },
   badgeTexto: { fontSize: 12, fontWeight: '800', color: colors.surface },
   foraPeriodo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   foraPeriodoTexto: { fontSize: 11, color: colors.muted },
-  cardTitulo: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 12, lineHeight: 22 },
+  cardTitulo: { fontSize: 16, fontWeight: '800', color: colors.ink, marginBottom: 12, lineHeight: 22 },
   cardRodape: { flexDirection: 'row', gap: 14, flexWrap: 'wrap' },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoTexto: { fontSize: 12, color: colors.muted },
+  aproveitamentoRow: {
+    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.68)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.92)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  aproveitamentoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flexShrink: 1,
+  },
+  aproveitamentoLabel: { fontSize: 12, color: colors.muted, fontWeight: '800' },
+  aproveitamentoValor: { fontSize: 16, fontWeight: '900' },
   prazoRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
   prazoTexto: { fontSize: 11, color: colors.muted },
 
   // Histórico
   histMetricas: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.soft, borderRadius: 12, padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.68)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 10, gap: 0,
   },
   histMetricaItem: { flex: 1, alignItems: 'center' },
@@ -506,7 +373,7 @@ const styles = StyleSheet.create({
   histMetricaLabel: { fontSize: 10, color: colors.muted, marginTop: 2 },
   histMetricaSep: { width: 1, height: 32, backgroundColor: colors.border },
 
-  centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: colors.background },
+  centrado: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#F6F7FB' },
   carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
   erroTexto: { fontSize: 14, color: colors.text, textAlign: 'center', marginTop: 12, lineHeight: 20 },
   botaoTentar: { marginTop: 20, backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },

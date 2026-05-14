@@ -13,6 +13,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../../context/AuthContext';
 import { ApiError } from '../../../services/auth.service';
 import { BASE_URL } from '../../../services/api';
@@ -29,6 +31,7 @@ import {
 } from '../../../services/version.service';
 import { AxiosError } from 'axios';
 import { colors } from '../../../theme';
+import { AuthStackParamList } from '../../../navigation/AuthNavigator';
 import buildInfo from '../../../../buildInfo.json';
 import appJson from '../../../../app.json';
 
@@ -60,6 +63,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 
 export function LoginScreen() {
   const { signIn } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { width } = useWindowDimensions();
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
@@ -491,6 +495,15 @@ export function LoginScreen() {
               )}
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.botaoCadastro}
+              onPress={() => navigation.navigate('PublicRegister')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="person-add-outline" size={18} color={colors.primary} />
+              <Text style={styles.botaoCadastroTexto}>Cadastre-se</Text>
+            </TouchableOpacity>
+
             {/* Rodapé do card: versões */}
             <View style={styles.metaFooter}>
               {metaLoading ? (
@@ -708,10 +721,6 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.08,
-    shadowRadius: 28,
     elevation: 5,
   },
   formPanelWide: {
@@ -776,13 +785,26 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
     elevation: 3,
   },
   botaoDesabilitado: { opacity: 0.6 },
+  botaoCadastro: {
+    marginTop: 10,
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  botaoCadastroTexto: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   botaoConteudo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -851,10 +873,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 22,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
     elevation: 8,
   },
   modalHeader: {

@@ -25,7 +25,13 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    'exposed_headers' => [
+        'X-API-Version',
+        'X-API-Contract-Version',
+        'X-Min-Supported-App-Version',
+        'X-Recommended-App-Version',
+        'X-Force-Relogin',
+    ],
 
     'max_age' => 0,
 

@@ -66,6 +66,11 @@ type GuardianOption = {
   email?: string;
 };
 
+type DesiredCourse = {
+  id: number;
+  name: string;
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const EMPTY: Form = {
@@ -177,7 +182,9 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [guardians, setGuardians] = useState<GuardianForm[]>([]);
   const [guardianOptions, setGuardianOptions] = useState<GuardianOption[]>([]);
+  const [desiredCourses, setDesiredCourses] = useState<DesiredCourse[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [approving, setApproving] = useState(false);
   const [deleteGuardianIndex, setDeleteGuardianIndex] = useState<number | null>(
     null
   );
@@ -282,6 +289,14 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
           is_minor: student.is_minor ? "true" : "false",
           status: student.status ?? "active",
         });
+        const desiredFromApi = Array.isArray(student.desired_courses)
+          ? student.desired_courses
+          : [];
+        setDesiredCourses(
+          desiredFromApi
+            .filter((item: any) => item?.id && item?.name)
+            .map((item: any) => ({ id: Number(item.id), name: String(item.name) }))
+        );
         setGuardians(mapApiGuardiansToForm(student.guardians ?? []));
         setPhotoUrl(student.photo_url ?? null);
       } catch {}
@@ -377,6 +392,27 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
     if (deleteGuardianIndex === null) return;
     setGuardians((prev) => prev.filter((_, i) => i !== deleteGuardianIndex));
     setDeleteGuardianIndex(null);
+  };
+
+  const approveRegistration = async () => {
+    if (!isEdit || !studentId) return;
+    setApproving(true);
+    try {
+      const { data } = await api.put(`/students/${studentId}`, { status: "active" });
+      setForm((prev) => ({ ...prev, status: "active" }));
+      setToast({
+        visible: true,
+        type: "success",
+        message: data?.message || "Cadastro aprovado com sucesso.",
+      });
+    } catch (e: any) {
+      setToast({
+        visible: true,
+        type: "error",
+        message: e?.response?.data?.message || "Não foi possível aprovar o cadastro.",
+      });
+    }
+    setApproving(false);
   };
 
   const save = async () => {
@@ -816,6 +852,57 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
               </View>
             </View>
           </View>
+
+          {(isEdit || desiredCourses.length > 0) && (
+            <View
+              className="bg-white rounded-2xl p-6 mb-5"
+              style={{
+                shadowColor: "#000",
+                shadowOpacity: 0.04,
+                shadowRadius: 8,
+                elevation: 1,
+              }}
+            >
+              <View className="flex-row items-center gap-2 mb-2">
+                <View className="w-8 h-8 bg-amber-100 rounded-lg items-center justify-center">
+                  <Ionicons name="school-outline" size={16} color="#B45309" />
+                </View>
+                <Text className="text-base font-semibold text-gray-800">Pré-cadastro</Text>
+              </View>
+
+              <Text className="text-xs text-gray-500 mb-3">
+                Cursos de interesse informados no cadastro público do app mobile.
+              </Text>
+
+              {desiredCourses.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2 mb-3">
+                  {desiredCourses.map((course) => (
+                    <View key={course.id} className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1">
+                      <Text className="text-xs font-semibold text-amber-700">{course.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text className="text-xs text-gray-400 mb-3">Nenhum curso de interesse informado.</Text>
+              )}
+
+              {isEdit && form.status === "inactive" && (
+                <TouchableOpacity
+                  onPress={approveRegistration}
+                  disabled={approving}
+                  className="flex-row items-center gap-2 self-start rounded-xl bg-emerald-600 px-4 py-2"
+                  activeOpacity={0.85}
+                >
+                  {approving ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Ionicons name="checkmark-circle-outline" size={16} color="white" />
+                  )}
+                  <Text className="text-sm font-semibold text-white">Aprovar cadastro (ativar aluno)</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {/* ── Card: Responsáveis ── */}
           <View

@@ -214,7 +214,33 @@ class ExamAttemptController extends Controller
 
         DB::transaction(function () use ($attempt) {
             $totalScore = 0;
-            $exam = $attempt->exam()->first(['id', 'ends_at', 'release_results_after_end']);
+            $exam = $attempt->exam()
+                ->with([
+                    'questions:id,exam_id,type,allow_text_answer,points',
+                    'questions.options:id,question_id,is_correct,triggers_text_input',
+                ])
+                ->first(['id', 'ends_at', 'release_results_after_end']);
+
+            // Garante registro de resposta para questões com correção manual mesmo quando o aluno
+            // não preencheu texto, evitando fechamento indevido com nota calculada.
+            foreach ($exam->questions as $question) {
+                $requiresManualReview = $question->type === 'essay' || (bool) $question->allow_text_answer;
+
+                if ($requiresManualReview) {
+                    ExamAnswer::firstOrCreate(
+                        [
+                            'attempt_id' => $attempt->id,
+                            'question_id' => $question->id,
+                        ],
+                        [
+                            'option_id' => null,
+                            'text_answer' => null,
+                            'is_correct' => null,
+                            'points_earned' => null,
+                        ]
+                    );
+                }
+            }
 
             $answers = $attempt->answers()->with('question.options')->get();
 
@@ -257,7 +283,7 @@ class ExamAttemptController extends Controller
             $attempt->update([
                 'status'      => $hasPending ? 'pending_review' : $this->resolveReleasedStatus($exam),
                 'finished_at' => now(),
-                'score'       => $totalScore,
+                'score'       => $hasPending ? null : $totalScore,
                 'percentage'  => $hasPending ? null : $percentage,
             ]);
         });

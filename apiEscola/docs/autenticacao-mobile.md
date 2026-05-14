@@ -288,3 +288,59 @@ api.interceptors.response.use(
   }
 );
 ```
+
+---
+
+## 10. Force Relogin — sessão forçada pelo servidor
+
+A API pode sinalizar que todos os usuários devem deslogar e logar novamente (ex.: após mudança de estrutura de token, migração de dados ou break de contrato).
+
+### Como funciona
+
+Todo response da API inclui o header:
+
+```
+X-Force-Relogin: false   ← valor normal
+X-Force-Relogin: true    ← ação requerida: deslogar
+```
+
+O valor também está disponível no endpoint público `GET /api/meta` no campo `force_relogin`.
+
+### Como ativar (lado servidor)
+
+No arquivo `.env` da API, defina:
+
+```env
+API_FORCE_RELOGIN=true
+```
+
+Depois execute `php artisan config:clear`. Quando o problema for resolvido, volte para `false` e limpe o cache novamente.
+
+### Implementação no interceptor (React Native)
+
+Atualize o interceptor do item 9 para também verificar o header:
+
+```ts
+api.interceptors.response.use(
+  (response) => {
+    const forceRelogin = response.headers['x-force-relogin'];
+    if (forceRelogin === 'true') {
+      SecureStore.deleteItemAsync('auth_token');
+      SecureStore.deleteItemAsync('user_role');
+      navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
+    return response;
+  },
+  async (error) => {
+    if (error.response?.status === 401) {
+      await SecureStore.deleteItemAsync('auth_token');
+      await SecureStore.deleteItemAsync('user_role');
+      navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+> **Atenção:** lembre de incluir `x-force-relogin` nos headers expostos no CORS (`Access-Control-Expose-Headers`) se o app for web/PWA.
+

@@ -17,6 +17,11 @@ export const STORAGE_KEYS = {
   USER_DATA: 'user_data',
 } as const;
 
+const LEGACY_AUTH_STORAGE_KEYS = [
+  'auth_user',
+  'user',
+] as const;
+
 export const storage = {
   async getItem(key: string): Promise<string | null> {
     if (isWeb) {
@@ -41,3 +46,14 @@ export const storage = {
     await SecureStore.deleteItemAsync(key);
   },
 };
+
+export async function clearAuthStorage(): Promise<void> {
+  const authKeys = [
+    STORAGE_KEYS.TOKEN,
+    STORAGE_KEYS.ROLE,
+    STORAGE_KEYS.USER_DATA,
+    ...LEGACY_AUTH_STORAGE_KEYS,
+  ];
+
+  await Promise.all(authKeys.map((key) => storage.removeItem(key)));
+}

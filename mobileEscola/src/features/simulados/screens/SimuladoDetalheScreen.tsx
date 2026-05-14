@@ -113,6 +113,11 @@ function statusInfo(status: AttemptStatus, awaitingRelease: boolean) {
   return map[status];
 }
 
+function tint(hex?: string, alpha = '18'): string {
+  if (!hex || !hex.startsWith('#')) return colors.soft;
+  return `${hex}${alpha}`;
+}
+
 interface QuestionImageProps {
   uri: string;
   maxWidth: number;
@@ -263,7 +268,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           activeOpacity={0.7}
           hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.surface} />
+          <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
       ),
     });
@@ -416,11 +421,22 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={[styles.card, { borderTopColor: subjectColor }]}>
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: tint(subjectColor, '0D'),
+            borderColor: tint(subjectColor, '35'),
+            borderTopColor: subjectColor,
+            shadowColor: subjectColor,
+          },
+        ]}
+      >
+        <View style={[styles.cardGlow, { backgroundColor: tint(subjectColor, '18') }]} />
         <View style={styles.headerBlock}>
           <View style={styles.titleGroup}>
             {detalhe.subject ? (
-              <View style={[styles.subjectBadge, { backgroundColor: subjectColor + '18' }]}>
+              <View style={[styles.subjectBadge, { backgroundColor: tint(subjectColor, '18') }]}>
                 <Ionicons name={subjectIconName(detalhe.subject.icon) as any} size={15} color={subjectColor} />
                 <Text style={[styles.subjectBadgeText, { color: subjectColor }]}>{detalhe.subject.name}</Text>
               </View>
@@ -463,22 +479,22 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 
         <View style={styles.grid}>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="help-circle-outline" size={22} color={colors.primary} />
+            <Ionicons name="help-circle-outline" size={22} color={subjectColor} />
             <Text style={styles.gridValor}>{detalhe.total_questions}</Text>
             <Text style={styles.gridLabel}>questões</Text>
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="time-outline" size={22} color={colors.primary} />
+            <Ionicons name="time-outline" size={22} color={subjectColor} />
             <Text style={styles.gridValor}>{formatMinutes(detalhe.duration_minutes)}</Text>
             <Text style={styles.gridLabel}>duração</Text>
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="ribbon-outline" size={22} color={colors.primary} />
+            <Ionicons name="ribbon-outline" size={22} color={subjectColor} />
             <Text style={styles.gridValor}>{detalhe.passing_score}%</Text>
             <Text style={styles.gridLabel}>mínimo</Text>
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="star-outline" size={22} color={colors.primary} />
+            <Ionicons name="star-outline" size={22} color={subjectColor} />
             <Text style={styles.gridValor}>{detalhe.total_points}</Text>
             <Text style={styles.gridLabel}>pontos</Text>
           </View>
@@ -514,17 +530,17 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
         {/* Gerar PDF para impressão */}
         <View style={styles.pdfWrap}>
           <TouchableOpacity
-            style={[styles.pdfBotao, gerandoPdf && styles.botaoDisabled]}
+            style={[styles.pdfBotao, { borderColor: subjectColor }, gerandoPdf && styles.botaoDisabled]}
             onPress={handleGerarPdf}
             disabled={gerandoPdf}
             activeOpacity={0.85}
           >
             {gerandoPdf ? (
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={subjectColor} />
             ) : (
               <>
-                <Ionicons name="print-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
-                <Text style={styles.pdfBotaoTexto}>Gerar PDF para impressão</Text>
+                <Ionicons name="print-outline" size={16} color={subjectColor} style={{ marginRight: 8 }} />
+                <Text style={[styles.pdfBotaoTexto, { color: subjectColor }]}>Gerar PDF para impressão</Text>
               </>
             )}
           </TouchableOpacity>
@@ -583,7 +599,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
         {concluidoComVisualizacao && (
           <View style={styles.previewWrap}>
             <View style={styles.previewHeader}>
-              <Ionicons name="document-text-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+              <Ionicons name="document-text-outline" size={18} color={subjectColor} style={{ marginRight: 8 }} />
               <Text style={styles.previewTitulo}>Visualização do simulado</Text>
             </View>
             <Text style={styles.previewSubtitulo}>
@@ -592,7 +608,12 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 
             {/* Score Card */}
             {revisao && revisao.score_display && (
-              <View style={[styles.scoreCard, { backgroundColor: revisao.passed ? '#D1FAE5' : '#FEE2E2' }]}>
+              <View
+                style={[
+                  styles.scoreCard,
+                  revisao.passed ? styles.scoreCardPassed : styles.scoreCardFailed,
+                ]}
+              >
                 <View style={styles.scoreCardContent}>
                   <View>
                     <Text style={styles.scoreCardLabel}>Sua pontuação</Text>
@@ -752,12 +773,12 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     paddingVertical: 8,
   },
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F6F7FB' },
   content:   { padding: 16 },
 
   centrado: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    padding: 32, backgroundColor: colors.background,
+    padding: 32, backgroundColor: '#F6F7FB',
   },
   carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
   erroTexto: {
@@ -774,7 +795,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderRadius: 20, padding: 20,
     borderWidth: 1, borderColor: colors.border,
     borderTopWidth: 4,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 2,
+    overflow: 'hidden',
+    shadowOpacity: 0.08, shadowRadius: 16, elevation: 2,
+  },
+  cardGlow: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    right: -110,
+    top: -112,
+    opacity: 0.92,
   },
   headerBlock: {
     flexDirection: 'row',
@@ -812,9 +843,9 @@ const styles = StyleSheet.create({
   descricao: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 16 },
 
   metaBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(255,255,255,0.72)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.95)',
     borderRadius: 14,
     padding: 12,
     gap: 10,
@@ -849,7 +880,9 @@ const styles = StyleSheet.create({
   gridItem:  {
     alignItems: 'flex-start',
     gap: 4,
-    backgroundColor: colors.soft,
+    backgroundColor: 'rgba(255,255,255,0.64)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.92)',
     borderRadius: 14,
     padding: 12,
     minHeight: 94,
@@ -859,7 +892,7 @@ const styles = StyleSheet.create({
 
   rulesBox: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.95)',
     borderRadius: 14,
     overflow: 'hidden',
     marginTop: 2,
@@ -883,8 +916,8 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+    borderTopColor: '#E5E7F3',
+    backgroundColor: 'rgba(255,255,255,0.72)',
   },
   ruleText: {
     flex: 1,
@@ -924,7 +957,7 @@ const styles = StyleSheet.create({
   previewWrap: {
     marginTop: 18,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#E5E7F3',
     paddingTop: 16,
   },
   previewHeader: {
@@ -949,17 +982,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginTop: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.74)',
   },
   previewQuestaoCorreta: {
     borderColor: '#BBF7D0',
     borderLeftColor: '#22C55E',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(240,253,244,0.72)',
   },
   previewQuestaoErrada: {
     borderColor: '#FECACA',
     borderLeftColor: '#EF4444',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(254,242,242,0.72)',
   },
   previewQuestaoTopo: {
     flexDirection: 'row',
@@ -1061,7 +1094,7 @@ const styles = StyleSheet.create({
   previewQuestaoEmCorrecao: {
     borderColor: '#FCD34D',
     borderLeftColor: '#F59E0B',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255,251,235,0.72)',
   },
   previewOpcaoSelecionadaPendente: {
     backgroundColor: colors.soft,
@@ -1073,7 +1106,9 @@ const styles = StyleSheet.create({
   },
   previewTextoResposta: {
     marginTop: 8,
-    backgroundColor: colors.soft,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: '#E5E7F3',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1105,7 +1140,14 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  scoreCardPassed: {
+    backgroundColor: 'rgba(209,250,229,0.78)',
+    borderColor: '#A7F3D0',
+  },
+  scoreCardFailed: {
+    backgroundColor: 'rgba(254,226,226,0.78)',
+    borderColor: '#FECACA',
   },
   scoreCardContent: {
     flexDirection: 'row',
@@ -1132,7 +1174,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#E5E7F3',
   },
   materiaisHeader: {
     flexDirection: 'row',
@@ -1156,7 +1198,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 999,
     borderWidth: 1.5,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.74)',
     maxWidth: '100%',
   },
   materialChipTexto: {
@@ -1170,7 +1212,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#E5E7F3',
   },
   pdfBotao: {
     flexDirection: 'row',
@@ -1180,7 +1222,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.74)',
   },
   pdfBotaoTexto: {
     color: colors.primary,

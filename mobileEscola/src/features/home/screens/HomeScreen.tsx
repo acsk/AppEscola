@@ -5,12 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   ActivityIndicator,
   Image,
   Alert,
   Platform,
   useWindowDimensions,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -57,8 +57,6 @@ interface DashboardEnvelope {
   data?: AlunoDashboardMetrics;
 }
 
-const META_TARGET = 300;
-
 function formatPct(value: number, fractionDigits = 1): string {
   return `${value.toLocaleString('pt-BR', {
     minimumFractionDigits: fractionDigits,
@@ -80,6 +78,13 @@ const SIM_STATUS_LABEL: Record<AttemptStatus, string> = {
   pending_review: 'Aguardando correção',
   awaiting_release: 'Aguardando liberação',
 };
+
+const SIM_CARD_ACCENTS = [
+  { main: '#6D4DE6', soft: '#F5F0FF', border: '#D8C7FF', shadow: '#6D4DE6' },
+  { main: '#2FAE58', soft: '#F0FFF5', border: '#BEE8CB', shadow: '#22A84D' },
+  { main: '#F59E0B', soft: '#FFF9ED', border: '#FFDFA3', shadow: '#F59E0B' },
+  { main: '#1D7FEA', soft: '#EFF7FF', border: '#B9DDFF', shadow: '#1D7FEA' },
+];
 
 function diffCalendarDays(from: Date, to: Date): number {
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
@@ -161,17 +166,6 @@ export function HomeScreen() {
   }, [dashboardPeriod, user?.role]);
 
   const [painelAberto, setPainelAberto]         = useState(false);
-  const [formAberto, setFormAberto]             = useState(false);
-  const [senhaAtual, setSenhaAtual]             = useState('');
-  const [novaSenha, setNovaSenha]               = useState('');
-  const [confirmacao, setConfirmacao]           = useState('');
-  const [atualVisivel, setAtualVisivel]         = useState(false);
-  const [novaVisivel, setNovaVisivel]           = useState(false);
-  const [confirmVisivel, setConfirmVisivel]     = useState(false);
-  const [salvando, setSalvando]                 = useState(false);
-  const [campoErros, setCampoErros]             = useState<Record<string, string>>({});
-  const [erroGeral, setErroGeral]               = useState<string | null>(null);
-  const [sucesso, setSucesso]                   = useState(false);
   const [confirmandoSaida, setConfirmandoSaida] = useState(false);
   const [saindo, setSaindo]                     = useState(false);
   const [avatarUploading, setAvatarUploading]   = useState(false);
@@ -182,40 +176,6 @@ export function HomeScreen() {
   useEffect(() => {
     setAvatarFeedback(null);
   }, [user?.id]);
-
-  function limparErro(campo: string) {
-    setCampoErros((prev) => { const next = { ...prev }; delete next[campo]; return next; });
-    setErroGeral(null);
-  }
-
-  async function handleAlterarSenha() {
-    const loc: Record<string, string> = {};
-    if (!senhaAtual) loc.current_password = 'Informe a senha atual.';
-    if (!novaSenha)  loc.password         = 'Informe a nova senha.';
-    else if (novaSenha.length < 8) loc.password = 'Mínimo de 8 caracteres.';
-    if (!confirmacao) loc.password_confirmation = 'Confirme a nova senha.';
-    else if (novaSenha && novaSenha !== confirmacao) loc.password_confirmation = 'As senhas não conferem.';
-    if (Object.keys(loc).length) { setCampoErros(loc); setErroGeral(null); return; }
-
-    setCampoErros({}); setErroGeral(null);
-    try {
-      setSalvando(true);
-      await api.put('/api/me/password', {
-        current_password: senhaAtual, password: novaSenha, password_confirmation: confirmacao,
-      });
-      setSucesso(true);
-      setSenhaAtual(''); setNovaSenha(''); setConfirmacao('');
-    } catch (error: any) {
-      const apiErros: Record<string, string[]> | undefined = error?.response?.data?.errors;
-      if (apiErros) {
-        const m: Record<string, string> = {};
-        Object.entries(apiErros).forEach(([k, v]) => { m[k] = v[0]; });
-        setCampoErros(m);
-      } else {
-        setErroGeral(error?.response?.data?.message ?? 'Não foi possível alterar a senha.');
-      }
-    } finally { setSalvando(false); }
-  }
 
   async function handleSair() { setSaindo(true); await signOut(); }
 
@@ -352,22 +312,13 @@ export function HomeScreen() {
 
   const totalExams = dashboard?.total_exams ?? 0;
   const avgAccuracy = dashboard?.avg_accuracy ?? 0;
-  const currentStreakDays = dashboard?.current_streak_days ?? 0;
   const summaryAccuracy = dashboard?.summary?.accuracy ?? avgAccuracy;
   const summaryCorrect = dashboard?.summary?.correct ?? 0;
   const summaryWrong = dashboard?.summary?.wrong ?? 0;
   const summaryAccuracyChange = dashboard?.summary?.accuracy_change ?? 0;
-
-  const stats = [
-    { icon: 'book-outline', value: String(totalExams), label: 'Simulados\nrealizados' },
-    { icon: 'trending-up-outline', value: formatPct(avgAccuracy, 1), label: 'Precisão\nmédia' },
-    { icon: 'flame-outline', value: String(currentStreakDays), label: 'Dias de\nstreak' },
-  ];
-
   const totalRespostas = Math.max(1, summaryCorrect + summaryWrong);
   const acertosPct = Math.max(0, Math.min(100, (summaryCorrect / totalRespostas) * 100));
   const errosPct = Math.max(0, Math.min(100, (summaryWrong / totalRespostas) * 100));
-  const metaPct = Math.max(0, Math.min(100, (totalExams / META_TARGET) * 100));
   const trendPositivo = summaryAccuracyChange >= 0;
   const periodoLabel = dashboardPeriod === 'month' ? 'Este mês' : 'Período geral';
   const comparativoLabel = dashboardPeriod === 'month' ? 'mês anterior' : 'período anterior';
@@ -377,6 +328,8 @@ export function HomeScreen() {
 
       {/* ── Cabeçalho ──────────────────────────────────────────────────── */}
       <View style={[styles.header, isCompact && styles.headerCompact]}>
+        <View style={styles.headerGlowPrimary} />
+        <View style={styles.headerGlowSecondary} />
         <View style={[styles.headerProfileRow, isCompact && styles.headerProfileRowCompact]}>
           <View style={[styles.studentBlock, isCompact && styles.studentBlockCompact]}>
             <TouchableOpacity
@@ -423,31 +376,22 @@ export function HomeScreen() {
 
           <View style={[styles.headerIcons, isCompact && styles.headerIconsCompact]}>
             <TouchableOpacity style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}>
-              <Ionicons name="notifications-outline" size={isCompact ? 20 : 22} color={colors.surface} />
+              <Ionicons name="notifications-outline" size={isCompact ? 20 : 22} color={colors.ink} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.iconBtn, isCompact && styles.iconBtnCompact]} onPress={() => setPainelAberto(!painelAberto)}>
-              <Ionicons name="settings-outline" size={isCompact ? 20 : 22} color={colors.surface} />
+              <Ionicons name="settings-outline" size={isCompact ? 20 : 22} color={colors.ink} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}
-              onPress={() => { setPainelAberto(true); setConfirmandoSaida(true); }}
+              onPress={() => setConfirmandoSaida(true)}
               disabled={saindo}
             >
-              <Ionicons name="log-out-outline" size={isCompact ? 20 : 22} color={colors.surface} />
+              <Ionicons name="log-out-outline" size={isCompact ? 20 : 22} color={colors.ink} />
             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={[styles.statsRow, isCompact && styles.statsRowCompact]}>
-          {stats.map((s, i) => (
-            <View key={i} style={[styles.statItem, i < stats.length - 1 && styles.statBorder]}>
-              <Ionicons name={s.icon as any} size={isCompact ? 18 : 19} color={colors.muted} />
-              <Text style={[styles.statValue, isCompact && styles.statValueCompact]}>{s.value}</Text>
-              <Text style={[styles.statLabel, isCompact && styles.statLabelCompact]}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
       </View>
 
       {/* ── Painel de configurações ────────────────────────────────────── */}
@@ -455,158 +399,82 @@ export function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Configurações</Text>
 
-          <TouchableOpacity style={styles.acaoLinha}
-            onPress={() => { setFormAberto(!formAberto); setSucesso(false); }} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.acaoLinha}
+            onPress={() => {
+              setPainelAberto(false);
+              navigation.navigate('AlterarSenha');
+            }}
+            activeOpacity={0.7}
+          >
             <Ionicons name="key-outline" size={20} color={colors.muted} />
             <Text style={styles.acaoTexto}>Alterar senha</Text>
-            <Ionicons name={formAberto ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
           </TouchableOpacity>
-
-          {formAberto && (
-            <View style={styles.formSenha}>
-              {sucesso && (
-                <View style={styles.sucessoContainer}>
-                  <Ionicons name="checkmark-circle-outline" size={16} color="#059669" style={{ marginRight: 8 }} />
-                  <Text style={styles.sucessoTexto}>Senha alterada com sucesso!</Text>
-                </View>
-              )}
-              {/* Senha atual */}
-              <View style={[styles.campo, campoErros.current_password ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.current_password ? '#DC2626' : colors.muted} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Senha atual" placeholderTextColor={colors.muted}
-                  secureTextEntry={!atualVisivel} value={senhaAtual}
-                  onChangeText={(v) => { setSenhaAtual(v); limparErro('current_password'); setSucesso(false); }}
-                  autoCapitalize="none" />
-                <TouchableOpacity onPress={() => setAtualVisivel(!atualVisivel)}>
-                  <Ionicons name={atualVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
-                </TouchableOpacity>
-              </View>
-              {campoErros.current_password ? <Text style={styles.erroCampo}>{campoErros.current_password}</Text> : null}
-
-              {/* Nova senha */}
-              <View style={[styles.campo, campoErros.password ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password ? '#DC2626' : colors.muted} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Nova senha" placeholderTextColor={colors.muted}
-                  secureTextEntry={!novaVisivel} value={novaSenha}
-                  onChangeText={(v) => { setNovaSenha(v); limparErro('password'); setSucesso(false); }}
-                  autoCapitalize="none" />
-                <TouchableOpacity onPress={() => setNovaVisivel(!novaVisivel)}>
-                  <Ionicons name={novaVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
-                </TouchableOpacity>
-              </View>
-              {campoErros.password ? <Text style={styles.erroCampo}>{campoErros.password}</Text> : null}
-
-              {/* Confirmação */}
-              <View style={[styles.campo, campoErros.password_confirmation ? styles.campoErro : null]}>
-                <Ionicons name="lock-closed-outline" size={17} color={campoErros.password_confirmation ? '#DC2626' : colors.muted} style={styles.icone} />
-                <TextInput style={styles.input} placeholder="Confirmar nova senha" placeholderTextColor={colors.muted}
-                  secureTextEntry={!confirmVisivel} value={confirmacao}
-                  onChangeText={(v) => { setConfirmacao(v); limparErro('password_confirmation'); setSucesso(false); }}
-                  autoCapitalize="none" />
-                <TouchableOpacity onPress={() => setConfirmVisivel(!confirmVisivel)}>
-                  <Ionicons name={confirmVisivel ? 'eye-off-outline' : 'eye-outline'} size={17} color={colors.muted} />
-                </TouchableOpacity>
-              </View>
-              {campoErros.password_confirmation ? <Text style={styles.erroCampo}>{campoErros.password_confirmation}</Text> : null}
-
-              {erroGeral ? (
-                <View style={styles.erroContainer}>
-                  <Ionicons name="alert-circle-outline" size={15} color="#DC2626" style={{ marginRight: 8 }} />
-                  <Text style={styles.erroTexto}>{erroGeral}</Text>
-                </View>
-              ) : null}
-
-              <TouchableOpacity style={[styles.botaoSalvar, salvando && styles.botaoDisabled]}
-                onPress={handleAlterarSenha} disabled={salvando} activeOpacity={0.8}>
-                {salvando ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.botaoSalvarTexto}>Salvar nova senha</Text>}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={styles.divisor} />
-
-          {!confirmandoSaida ? (
-            <TouchableOpacity style={styles.acaoLinha} onPress={() => setConfirmandoSaida(true)} activeOpacity={0.7}>
-              <Ionicons name="log-out-outline" size={20} color={colors.debit} />
-              <Text style={[styles.acaoTexto, { color: colors.debit }]}>Sair</Text>
-            </TouchableOpacity>
-          ) : (
-            <View>
-              <Text style={styles.confirmTexto}>Tem certeza que deseja sair?</Text>
-              <View style={styles.confirmBotoes}>
-                <TouchableOpacity style={styles.botaoCancelar} onPress={() => setConfirmandoSaida(false)} activeOpacity={0.8}>
-                  <Text style={styles.botaoCancelarTexto}>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.botaoConfirmarSair, saindo && styles.botaoDisabled]}
-                  onPress={handleSair} disabled={saindo} activeOpacity={0.8}>
-                  {saindo ? <ActivityIndicator color={colors.surface} size="small" /> : <Text style={styles.botaoConfirmarSairTexto}>Confirmar saída</Text>}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
         </View>
       )}
 
       {/* ── Resumo de desempenho ───────────────────────────────────────── */}
-      <View style={[styles.card, isCompact && styles.cardCompact]}>
-        <View style={[styles.cardHeader, isCompact && styles.cardHeaderCompact]}>
-          <View style={styles.cardHeaderLeft}>
-            <Text style={styles.cardTitle} numberOfLines={1}>Resumo de desempenho</Text>
-            <Ionicons name="eye-outline" size={16} color={colors.muted} style={{ marginLeft: 6 }} />
+      {user?.role === 'aluno' && (
+        <View style={[styles.card, isCompact && styles.cardCompact]}>
+          <View style={[styles.cardHeader, isCompact && styles.cardHeaderCompact]}>
+            <View style={styles.cardHeaderLeft}>
+              <Text style={styles.cardTitle} numberOfLines={1}>Resumo de desempenho</Text>
+              <Ionicons name="eye-outline" size={16} color={colors.muted} style={{ marginLeft: 6 }} />
+            </View>
+            <TouchableOpacity
+              style={styles.periodoPicker}
+              activeOpacity={0.8}
+              onPress={() => setDashboardPeriod((prev) => (prev === 'month' ? 'all' : 'month'))}
+            >
+              <Text style={styles.periodoTexto}>{periodoLabel}</Text>
+              {dashboardLoading ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : null}
+              <Ionicons name="chevron-down" size={13} color={colors.text} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.periodoPicker}
-            activeOpacity={0.8}
-            onPress={() => setDashboardPeriod((prev) => (prev === 'month' ? 'all' : 'month'))}
-          >
-            <Text style={styles.periodoTexto}>{periodoLabel}</Text>
-            {dashboardLoading ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : null}
-            <Ionicons name="chevron-down" size={13} color={colors.text} />
-          </TouchableOpacity>
-        </View>
 
-        <Text style={[styles.mediaGrande, isCompact && styles.mediaGrandeCompact]}>
-          {summaryAccuracy.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-          <Text style={styles.mediaDecimal}>%</Text>
-        </Text>
-        <View style={styles.trendRow}>
-          <Ionicons name={trendPositivo ? 'arrow-up' : 'arrow-down'} size={12} color={colors.muted} />
-          <Text style={styles.trendTexto}>
-            {formatPct(Math.abs(summaryAccuracyChange), 1)} vs {comparativoLabel}
+          <Text style={[styles.mediaGrande, isCompact && styles.mediaGrandeCompact]}>
+            {summaryAccuracy.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+            <Text style={styles.mediaDecimal}>%</Text>
           </Text>
-        </View>
+          <View style={styles.trendRow}>
+            <Ionicons name={trendPositivo ? 'arrow-up' : 'arrow-down'} size={12} color={trendPositivo ? '#22C55E' : '#EF4444'} />
+            <Text style={styles.trendTexto}>
+              {formatPct(Math.abs(summaryAccuracyChange), 1)} vs {comparativoLabel}
+            </Text>
+          </View>
 
-        <View style={[styles.acertosErros, isCompact && styles.acertosErrosCompact]}>
-          <View style={styles.aeItem}>
-            <Text style={styles.aeLabel}>Acertos</Text>
-            <Text style={styles.aeValor}>{summaryCorrect}</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${acertosPct}%` }]} />
+          <View style={[styles.acertosErros, isCompact && styles.acertosErrosCompact]}>
+            <View style={styles.aeItem}>
+              <Text style={styles.aeLabel}>Acertos</Text>
+              <Text style={styles.aeValor}>{summaryCorrect}</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${acertosPct}%`, backgroundColor: '#22C55E' }]} />
+              </View>
+            </View>
+            <View style={styles.aeItem}>
+              <Text style={styles.aeLabel}>Erros</Text>
+              <Text style={styles.aeValor}>{summaryWrong}</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${errosPct}%`, backgroundColor: '#EF4444' }]} />
+              </View>
             </View>
           </View>
-          <View style={styles.aeItem}>
-            <Text style={styles.aeLabel}>Erros</Text>
-            <Text style={styles.aeValor}>{summaryWrong}</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${errosPct}%` }]} />
-            </View>
+
+          <View style={[styles.insightBox, isCompact && styles.insightBoxCompact]}>
+            <Ionicons name="bulb-outline" size={17} color={colors.primary} style={{ marginRight: 8, flexShrink: 0 }} />
+            <Text style={styles.insightTexto}>
+              Seu desempenho no período está em{' '}
+              <Text style={{ color: colors.ink, fontWeight: '700' }}>{formatPct(summaryAccuracy, 1)}</Text>
+              {' '}com variação de{' '}
+              <Text style={{ color: colors.ink, fontWeight: '700' }}>{formatPct(summaryAccuracyChange, 1)}</Text>
+              {' '}em relação ao {comparativoLabel}.
+            </Text>
           </View>
         </View>
-
-        <View style={[styles.insightBox, isCompact && styles.insightBoxCompact]}>
-          <Ionicons name="bulb-outline" size={17} color={colors.muted} style={{ marginRight: 8, flexShrink: 0 }} />
-          <Text style={styles.insightTexto}>
-            Seu desempenho no período está em{' '}
-            <Text style={{ color: colors.ink, fontWeight: '700' }}>{formatPct(summaryAccuracy, 1)}</Text>
-            {' '}com variação de{' '}
-            <Text style={{ color: colors.ink, fontWeight: '700' }}>{formatPct(summaryAccuracyChange, 1)}</Text>
-            {' '}em relação ao {comparativoLabel}.
-          </Text>
-          <Ionicons name="chevron-forward" size={15} color={colors.muted} style={{ flexShrink: 0 }} />
-        </View>
-      </View>
+      )}
 
       {/* ── Meus simulados ────────────────────────────────────────────── */}
       {user?.role === 'aluno' && (
@@ -628,7 +496,8 @@ export function HomeScreen() {
               <View style={styles.simCardVazio}>
                 <Text style={styles.simCardVazioTexto}>Nenhum simulado disponível</Text>
               </View>
-            ) : simuladosRecentes.map((s) => {
+            ) : simuladosRecentes.map((s, index) => {
+              const accent = SIM_CARD_ACCENTS[index % SIM_CARD_ACCENTS.length];
               const cor = SIM_STATUS_COLOR[s.attempt_status];
               const contadorDias = getSimuladoDayCounter(s);
               const notaDisplay =
@@ -650,10 +519,31 @@ export function HomeScreen() {
                 s.aproveitamento != null && s.passing_score != null
                   ? s.aproveitamento >= s.passing_score
                   : null;
+              const aproveitamentoColor =
+                aproveitamentoAprovado === true
+                  ? '#22C55E'
+                  : aproveitamentoAprovado === false
+                  ? '#EF4444'
+                  : colors.muted;
+              const aproveitamentoIcon =
+                aproveitamentoAprovado === true
+                  ? 'checkmark-circle'
+                  : aproveitamentoAprovado === false
+                  ? 'close-circle'
+                  : 'stats-chart-outline';
               return (
                 <TouchableOpacity
                   key={s.id}
-                  style={[styles.simCard, isCompact && styles.simCardCompact, { width: simCardWidth }]}
+                  style={[
+                    styles.simCard,
+                    isCompact && styles.simCardCompact,
+                    {
+                      width: simCardWidth,
+                      backgroundColor: accent.soft,
+                      borderColor: accent.border,
+                      shadowColor: accent.shadow,
+                    },
+                  ]}
                   activeOpacity={0.85}
                   onPress={() => navigation.navigate('Simulados', {
                     screen: 'SimuladoDetalhe',
@@ -661,11 +551,11 @@ export function HomeScreen() {
                   })}
                 >
                   <View style={styles.simTopo}>
-                    <View style={styles.simIconWrap}>
+                    <View style={[styles.simIconWrap, { backgroundColor: accent.main }]}>
                       <Ionicons
                         name={subjectIconName(s.subject?.icon ?? '') as any}
                         size={22}
-                        color={colors.primary}
+                        color={colors.surface}
                       />
                     </View>
                     <View style={styles.simTopoInfo}>
@@ -676,8 +566,8 @@ export function HomeScreen() {
                       )}
                       {contadorDias ? (
                         <View style={styles.simDaysPill}>
-                          <Ionicons name="calendar-outline" size={11} color={colors.muted} />
-                          <Text style={styles.simDaysText} numberOfLines={1}>{contadorDias}</Text>
+                          <Ionicons name="calendar-outline" size={11} color={accent.main} />
+                          <Text style={[styles.simDaysText, { color: accent.main }]} numberOfLines={1}>{contadorDias}</Text>
                         </View>
                       ) : null}
                     </View>
@@ -701,58 +591,35 @@ export function HomeScreen() {
                     ) : null}
                   </View>
 
-                  <View
-                    style={[
-                      styles.simAproveitamentoBox,
-                      aproveitamentoAprovado === true && styles.simAproveitamentoBoxOk,
-                      aproveitamentoAprovado === false && styles.simAproveitamentoBoxFail,
-                    ]}
-                  >
+                  <View style={styles.simAproveitamentoBox}>
                     <View style={styles.simAproveitamentoHeader}>
-                      <View style={styles.simAproveitamentoLabelRow}>
-                        <Ionicons
-                          name="stats-chart-outline"
-                          size={12}
-                          color={
-                            aproveitamentoAprovado === true
-                              ? '#22C55E'
-                              : aproveitamentoAprovado === false
-                              ? '#EF4444'
-                              : '#0284C7'
-                          }
-                        />
+                      <Ionicons
+                        name={aproveitamentoIcon as any}
+                        size={18}
+                        color={aproveitamentoColor}
+                      />
+                      <View style={styles.simAproveitamentoTextos}>
                         <Text style={styles.simAproveitamentoLabel}>Aproveitamento</Text>
+                        <Text style={styles.simAproveitamentoMinimo} numberOfLines={1}>
+                          Mínimo: {s.passing_score ?? 0}%
+                        </Text>
                       </View>
                       <Text
                         style={[
                           styles.simAproveitamentoValor,
-                          aproveitamentoAprovado === true && styles.simAproveitamentoValorOk,
-                          aproveitamentoAprovado === false && styles.simAproveitamentoValorFail,
+                          { color: aproveitamentoColor },
                         ]}
                         numberOfLines={1}
                       >
                         {aproveitamentoDisplay ?? '--'}
                       </Text>
                     </View>
-                    <View style={styles.simAproveitamentoBar}>
-                      <View
-                        style={[
-                          styles.simAproveitamentoFill,
-                          { width: `${Math.min(Math.max(s.aproveitamento ?? 0, 0), 100)}%` },
-                          aproveitamentoAprovado === true && styles.simAproveitamentoFillOk,
-                          aproveitamentoAprovado === false && styles.simAproveitamentoFillFail,
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.simAproveitamentoMinimo} numberOfLines={1}>
-                      Mínimo: {s.passing_score ?? 0}%
-                    </Text>
                   </View>
 
                   <View style={styles.simRodape}>
                     <View style={styles.simOpenButton}>
-                      <Text style={styles.simLink}>Abrir</Text>
-                      <Ionicons name="arrow-forward" size={13} color={colors.surface} />
+                      <Text style={[styles.simLink, { color: accent.main }]}>Abrir</Text>
+                      <Ionicons name="arrow-forward" size={14} color={accent.main} />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -761,8 +628,49 @@ export function HomeScreen() {
           </ScrollView>
         </>
       )}
+      <Modal
+        visible={confirmandoSaida}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!saindo) setConfirmandoSaida(false);
+        }}
+      >
+        <View style={styles.logoutModalOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutModalIcon}>
+              <Ionicons name="log-out-outline" size={24} color={colors.debit} />
+            </View>
+            <Text style={styles.logoutModalTitle}>Sair da conta?</Text>
+            <Text style={styles.logoutModalText}>
+              Você precisará entrar novamente para acessar o aplicativo.
+            </Text>
+            <View style={styles.logoutModalActions}>
+              <TouchableOpacity
+                style={styles.logoutCancelButton}
+                onPress={() => setConfirmandoSaida(false)}
+                disabled={saindo}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.logoutCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.logoutConfirmButton, saindo && styles.botaoDisabled]}
+                onPress={handleSair}
+                disabled={saindo}
+                activeOpacity={0.85}
+              >
+                {saindo ? (
+                  <ActivityIndicator color={colors.surface} size="small" />
+                ) : (
+                  <Text style={styles.logoutConfirmText}>Sair</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
- 
 
       <View style={{ height: 24 }} />
     </ScrollView>
@@ -775,13 +683,14 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    backgroundColor: colors.ink,
+    backgroundColor: '#FBFAFF',
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 14, elevation: 4,
+    paddingTop: 22,
+    paddingBottom: 26,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED', shadowOpacity: 0.08, shadowRadius: 18, elevation: 3,
   },
   headerCompact: {
     paddingHorizontal: 16,
@@ -789,6 +698,26 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+  },
+  headerGlowPrimary: {
+    position: 'absolute',
+    width: 360,
+    height: 360,
+    borderRadius: 180,
+    right: -120,
+    top: -150,
+    backgroundColor: '#F0E9FF',
+    opacity: 0.88,
+  },
+  headerGlowSecondary: {
+    position: 'absolute',
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    left: -76,
+    top: 70,
+    backgroundColor: '#F7F2FF',
+    opacity: 0.95,
   },
   headerProfileRow: {
     flexDirection: 'row',
@@ -814,7 +743,10 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(238,242,255,0.12)', position: 'relative',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: '#EEE8FF',
+    position: 'relative',
   },
   iconBtnCompact: {
     width: 32,
@@ -824,14 +756,14 @@ const styles = StyleSheet.create({
   notifDot: {
     position: 'absolute', top: 8, right: 8,
     width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary,
-    borderWidth: 1, borderColor: colors.ink,
+    borderWidth: 1, borderColor: colors.surface,
   },
   avatarWrap:    { position: 'relative', marginRight: 18 },
   avatarWrapCompact: { marginRight: 12 },
   avatarCircle:  {
     width: 104, height: 104, borderRadius: 52,
-    backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 4, borderColor: 'rgba(238,242,255,0.18)', overflow: 'hidden',
+    backgroundColor: '#E9DDFF', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 4, borderColor: '#F5F0FF', overflow: 'hidden',
   },
   avatarCircleCompact: {
     width: 82,
@@ -846,7 +778,8 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 4, right: 4,
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: colors.ink,
+    borderWidth: 1, borderColor: '#EEE8FF',
+    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, elevation: 2,
   },
   avatarEditBtnCompact: {
     width: 26,
@@ -856,11 +789,11 @@ const styles = StyleSheet.create({
     right: 2,
   },
   userInfo:   { flex: 1, minWidth: 0 },
-  userName:   { fontSize: 23, fontWeight: '800', color: colors.surface, marginBottom: 3 },
+  userName:   { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 3 },
   userNameCompact: { fontSize: 22, lineHeight: 24 },
-  userRole:   { fontSize: 14, color: '#CBD5E1', marginBottom: 10 },
+  userRole:   { fontSize: 14, color: '#525A76', marginBottom: 10 },
   userRoleCompact: { fontSize: 13, marginBottom: 6 },
-  avatarFeedback: { fontSize: 12, color: '#E2E8F0', marginBottom: 8 },
+  avatarFeedback: { fontSize: 12, color: colors.muted, marginBottom: 8 },
   levelBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     alignSelf: 'flex-start',
@@ -871,28 +804,40 @@ const styles = StyleSheet.create({
 
   statsRow:  {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.62)',
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#F0EBFF',
   },
   statsRowCompact: {
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 2,
   },
-  statItem:  { flex: 1, alignItems: 'center', gap: 4 },
-  statBorder:{ borderRightWidth: 1, borderRightColor: colors.border },
-  statValue: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  statItem:  { flex: 1, alignItems: 'center', gap: 5 },
+  statBorder:{ borderRightWidth: 1, borderRightColor: '#E8E3F4' },
+  statIconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  statValue: { fontSize: 19, fontWeight: '800', color: '#111827' },
   statValueCompact: { fontSize: 17 },
-  statLabel: { fontSize: 11, color: colors.muted, textAlign: 'center', lineHeight: 14 },
+  statLabel: { fontSize: 11, color: '#5F6680', textAlign: 'center', lineHeight: 14 },
   statLabelCompact: { fontSize: 10, lineHeight: 13 },
 
   // Card genérico
   card: {
     backgroundColor: colors.surface, marginHorizontal: 16, marginTop: 16,
     borderRadius: 18, padding: 18,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0ECFA',
+    shadowColor: '#6D4DE6', shadowOpacity: 0.08, shadowRadius: 16, elevation: 2,
   },
   cardCompact: {
     marginHorizontal: 16,
@@ -906,8 +851,8 @@ const styles = StyleSheet.create({
   cardTitle:      { fontSize: 16, fontWeight: '700', color: colors.ink },
   periodoPicker:  {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.soft, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+    backgroundColor: '#FBFAFF', borderWidth: 1, borderColor: '#DED7EF',
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7,
     flexShrink: 0,
   },
   periodoTexto: { fontSize: 13, color: colors.text, fontWeight: '500' },
@@ -923,11 +868,14 @@ const styles = StyleSheet.create({
   aeItem:       { flex: 1 },
   aeLabel:      { fontSize: 12, color: colors.muted, marginBottom: 2 },
   aeValor:      { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 6 },
-  progressBar:  { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#E0E7FF' },
+  progressBar:  { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#E6DDF9' },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.primary },
   insightBox:   {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.soft, borderRadius: 12,
+    backgroundColor: '#FBFAFF',
+    borderWidth: 1,
+    borderColor: '#E4DAFF',
+    borderRadius: 12,
     padding: 12, gap: 4,
   },
   insightBoxCompact: { padding: 11 },
@@ -941,9 +889,9 @@ const styles = StyleSheet.create({
 
   // Simulados
   simCard: {
-    minHeight: 246, backgroundColor: colors.surface, borderRadius: 16, padding: 14,
+    minHeight: 246, backgroundColor: colors.surface, borderRadius: 16, padding: 16,
     borderWidth: 1, borderColor: colors.border,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+    shadowOpacity: 0.1, shadowRadius: 14, elevation: 3,
     flexDirection: 'column',
   },
   simCardCompact: {
@@ -963,8 +911,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   simIconWrap: {
-    width: 44, height: 44, borderRadius: 13, backgroundColor: colors.soft,
+    width: 48, height: 48, borderRadius: 10, backgroundColor: colors.soft,
     justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 2,
   },
   simTopoInfo: {
     flex: 1,
@@ -972,14 +921,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   simMateria: { fontSize: 11, fontWeight: '800', color: colors.muted },
-  simTitulo:  { fontSize: 14, fontWeight: '800', color: colors.ink, marginBottom: 12, lineHeight: 19, minHeight: 38 },
+  simTitulo:  { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 12, lineHeight: 20, minHeight: 40 },
   simDaysPill: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 5,
     maxWidth: '100%',
-    backgroundColor: colors.soft,
+    backgroundColor: 'rgba(255,255,255,0.72)',
     borderRadius: 20,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -1006,11 +955,12 @@ const styles = StyleSheet.create({
   },
   simNotaText: { fontSize: 10, fontWeight: '800', color: '#A16207' },
   simAproveitamentoBox: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: 'rgba(255,255,255,0.68)',
     borderWidth: 1,
-    borderColor: '#BAE6FD',
+    borderColor: 'rgba(255,255,255,0.92)',
     borderRadius: 12,
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     marginBottom: 12,
   },
   simAproveitamentoBoxOk: {
@@ -1021,7 +971,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
-  simAproveitamentoHeader: { gap: 4 },
+  simAproveitamentoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  simAproveitamentoTextos: {
+    flex: 1,
+    minWidth: 0,
+  },
   simAproveitamentoLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1029,7 +987,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   simAproveitamentoLabel: { fontSize: 10, fontWeight: '800', color: colors.muted },
-  simAproveitamentoValor: { fontSize: 20, fontWeight: '900', color: '#0284C7', lineHeight: 24 },
+  simAproveitamentoValor: { fontSize: 16, fontWeight: '900', color: colors.muted, lineHeight: 20 },
   simAproveitamentoValorOk: { color: '#22C55E' },
   simAproveitamentoValorFail: { color: '#EF4444' },
   simAproveitamentoBar: {
@@ -1050,17 +1008,15 @@ const styles = StyleSheet.create({
   simAproveitamentoFillFail: {
     backgroundColor: '#EF4444',
   },
-  simAproveitamentoMinimo: { marginTop: 6, fontSize: 9, fontWeight: '700', color: colors.muted },
+  simAproveitamentoMinimo: { marginTop: 2, fontSize: 9, fontWeight: '700', color: colors.muted },
   simOpenButton: {
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primary,
+    minHeight: 28,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+    justifyContent: 'flex-start',
+    gap: 5,
   },
-  simLink:    { fontSize: 12, fontWeight: '800', color: colors.surface },
+  simLink:    { fontSize: 13, fontWeight: '800', color: colors.primary },
 
   // Meta
   metaCard: {
@@ -1116,4 +1072,78 @@ const styles = StyleSheet.create({
   botaoCancelarTexto:     { fontSize: 14, color: colors.text, fontWeight: '500' },
   botaoConfirmarSair:     { flex: 1, backgroundColor: colors.debit, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   botaoConfirmarSairTexto:{ fontSize: 14, color: colors.surface, fontWeight: '600' },
+  logoutModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  logoutModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F0ECFA',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  logoutModalIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  logoutModalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#111827',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  logoutModalText: {
+    fontSize: 13,
+    color: colors.muted,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  logoutModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  logoutCancelButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  logoutCancelText: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '800',
+  },
+  logoutConfirmButton: {
+    flex: 1,
+    backgroundColor: colors.debit,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  logoutConfirmText: {
+    fontSize: 14,
+    color: colors.surface,
+    fontWeight: '800',
+  },
 });

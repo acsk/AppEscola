@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import { HomeScreen } from '../../features/home/screens/HomeScreen';
+import { AlterarSenhaScreen } from '../../features/home/screens/AlterarSenhaScreen';
 import { SimuladosNavigator } from './SimuladosStack';
 import type { SimuladosStackParamList } from './SimuladosStack';
 import { FinanceiroScreen } from '../../features/financeiro/screens/FinanceiroScreen';
@@ -17,6 +18,11 @@ type AlunoTabParamList = {
   Financeiro: undefined;
 };
 
+export type AlunoStackParamList = {
+  AlunoTabs: undefined;
+  AlterarSenha: undefined;
+};
+
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }> = {
@@ -26,8 +32,9 @@ const ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }> = 
 };
 
 const Tab = createBottomTabNavigator<AlunoTabParamList>();
+const Stack = createNativeStackNavigator<AlunoStackParamList>();
 
-export function AlunoStack() {
+function AlunoTabs() {
   const { signOut } = useAuth();
 
   function confirmarSair() {
@@ -71,5 +78,20 @@ export function AlunoStack() {
       />
       <Tab.Screen name="Financeiro" component={FinanceiroScreen}    options={{ title: 'Financeiro', headerShown: false }} />
     </Tab.Navigator>
+  );
+}
+
+export function AlunoStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        animationTypeForReplace: 'push',
+      }}
+    >
+      <Stack.Screen name="AlunoTabs" component={AlunoTabs} />
+      <Stack.Screen name="AlterarSenha" component={AlterarSenhaScreen} />
+    </Stack.Navigator>
   );
 }

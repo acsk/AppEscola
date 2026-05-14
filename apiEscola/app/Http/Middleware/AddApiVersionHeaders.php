@@ -20,11 +20,13 @@ class AddApiVersionHeaders
         $contractVersion = (string) config('api_meta.contract_version', date('Y-m-d'));
         $minAppVersion = (string) config('api_meta.min_supported_app_version', '1.0.0');
         $recommendedAppVersion = (string) config('api_meta.recommended_app_version', $minAppVersion);
+        $forceRelogin = (bool) config('api_meta.force_relogin', false);
 
         $response->headers->set('X-API-Version', $apiVersion);
         $response->headers->set('X-API-Contract-Version', $contractVersion);
         $response->headers->set('X-Min-Supported-App-Version', $minAppVersion);
         $response->headers->set('X-Recommended-App-Version', $recommendedAppVersion);
+        $response->headers->set('X-Force-Relogin', $forceRelogin ? 'true' : 'false');
 
         return $response;
     }

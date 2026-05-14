@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PaymentProviderController;
+use App\Http\Controllers\Api\PublicRegistrationController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +37,14 @@ Route::get('/health', [HealthController::class, 'check']);
 
 // Autenticação (pública)
 Route::post('/login', [AuthController::class, 'login']);
+
+// Cadastro público (mobile — sem autenticação, com throttle anti-abuso)
+Route::prefix('public/{tenant_slug}')
+    ->middleware('throttle:30,1')
+    ->group(function () {
+        Route::get('/courses',  [PublicRegistrationController::class, 'courses']);
+        Route::post('/register', [PublicRegistrationController::class, 'register']);
+    });
 
 // Versões dos apps (público — atualizado a cada build)
 Route::get('/version/panel',   [AppVersionController::class, 'panel']);
@@ -52,6 +61,7 @@ Route::get('/meta', function () {
             'api_version' => (string) config('api_meta.version', '1.0.0'),
             'contract_version' => (string) config('api_meta.contract_version', date('Y-m-d')),
             'has_breaking_changes' => (bool) config('api_meta.has_breaking_changes', false),
+            'force_relogin' => (bool) config('api_meta.force_relogin', false),
             'min_supported_app_version' => (string) config('api_meta.min_supported_app_version', '1.0.0'),
             'recommended_app_version' => (string) config('api_meta.recommended_app_version', '1.0.0'),
             'changelog_url' => (string) config('api_meta.changelog_url', ''),

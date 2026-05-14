@@ -26,6 +26,15 @@ type Student = {
   phone: string | null;
   is_minor: boolean;
   status: string;
+  desired_courses?: Array<{ id: number; name: string }>;
+  desired_course_id?: number | null;
+  desired_course?: { id: number; name: string } | null;
+  guardians?: Array<{ id: number; name: string }>;
+};
+
+type CourseOption = {
+  id: number;
+  name: string;
 };
 
 interface Props {
@@ -45,6 +54,7 @@ export default function StudentsScreen({ navigate }: Props) {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [courseFilter, setCourseFilter] = useState("");
   const [minorFilter, setMinorFilter] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({
@@ -56,6 +66,25 @@ export default function StudentsScreen({ navigate }: Props) {
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
+
+  const fetchCourses = useCallback(async () => {
+    try {
+      const { data } = await api.get("/courses", {
+        params: { status: "active", per_page: 500 },
+      });
+      const list = data?.body ?? data?.data ?? data;
+      const rows = Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : [];
+      setCourses(
+        rows
+          .filter((course: any) => course?.id && course?.name)
+          .map((course: any) => ({ id: Number(course.id), name: String(course.name) }))
+      );
+    } catch {
+      setCourses([]);
+    }
+  }, []);
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -63,10 +92,23 @@ export default function StudentsScreen({ navigate }: Props) {
       const params: Record<string, any> = { page };
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
+      if (courseFilter) params.course_id = Number(courseFilter);
       if (minorFilter) params.is_minor = minorFilter;
       const { data } = await api.get("/students", { params });
       const list = data?.body ?? data?.data ?? data;
-      setRows(Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : []);
+      const fetchedRows = Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : [];
+      const selectedCourseId = courseFilter ? Number(courseFilter) : null;
+      const filteredRows = selectedCourseId
+        ? fetchedRows.filter((student: Student) => {
+            const desiredIds = [
+              ...(student.desired_courses ?? []).map((course) => course.id),
+              student.desired_course_id ?? null,
+              student.desired_course?.id ?? null,
+            ].filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
+            return desiredIds.includes(selectedCourseId);
+          })
+        : fetchedRows;
+      setRows(filteredRows);
       setMeta(
         list?.meta ??
           data?.meta ?? {
@@ -78,11 +120,15 @@ export default function StudentsScreen({ navigate }: Props) {
       );
     } catch {}
     setLoading(false);
-  }, [minorFilter, page, search, statusFilter]);
+  }, [courseFilter, minorFilter, page, search, statusFilter]);
 
   useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
 
   const remove = async () => {
     if (!deleteId) return;
@@ -95,6 +141,15 @@ export default function StudentsScreen({ navigate }: Props) {
     setDeleting(false);
   };
 
+  const approveStudent = async (studentId: number) => {
+    setApprovingId(studentId);
+    try {
+      await api.put(`/students/${studentId}`, { status: "active" });
+      fetchStudents();
+    } catch {}
+    setApprovingId(null);
+  };
+
   const fmtDate = (iso: string | null) => (iso ? isoToDisplay(iso) : "—");
   const fmtDocument = (value: string | null) => {
     if (!value) return "—";
@@ -102,6 +157,20 @@ export default function StudentsScreen({ navigate }: Props) {
     return digits.length === 11 ? maskCPF(digits) : value;
   };
   const fmtEmail = (value: string | null) => (value ? value.trim().toLowerCase() : "—");
+  const fmtNames = (items?: Array<{ name: string }>) => {
+    if (!items || items.length === 0) return "—";
+    return items.map((item) => item.name).join(", ");
+  };
+  const courseLabel = (items?: Array<{ id: number; name: string }>) => {
+    if (!items || items.length === 0) return "—";
+    return items.map((item) => item.name).join(", ");
+  };
+  const studentCourseLabel = (student: Student) => {
+    const primaryCourses = student.desired_courses ?? [];
+    if (primaryCourses.length > 0) return courseLabel(primaryCourses);
+    if (student.desired_course) return student.desired_course.name;
+    return "—";
+  };
   const statusLabel = (value: string) =>
     statusOptions.find((item) => item.value === value)?.label ?? value;
 
@@ -184,6 +253,30 @@ export default function StudentsScreen({ navigate }: Props) {
           ))}
         </select>
         <select
+          value={courseFilter}
+          onChange={(e: any) => {
+            setCourseFilter(e.target.value);
+            setPage(1);
+          }}
+          style={{
+            border: "1px solid #E5E7EB",
+            borderRadius: 12,
+            padding: "0 14px",
+            fontSize: 14,
+            color: "#374151",
+            backgroundColor: "white",
+            height: 44,
+            minWidth: isMobile ? "100%" : 220,
+          }}
+        >
+          <option value="">Todos os cursos</option>
+          {courses.map((course) => (
+            <option key={course.id} value={course.id}>
+              {course.name}
+            </option>
+          ))}
+        </select>
+        <select
           value={minorFilter}
           onChange={(e: any) => {
             setMinorFilter(e.target.value);
@@ -259,6 +352,12 @@ export default function StudentsScreen({ navigate }: Props) {
             className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
             style={{ flex: 1 }}
           >
+            Cursos
+          </Text>
+          <Text
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            style={{ flex: 1 }}
+          >
             Status
           </Text>
           <View style={{ width: 72 }} />
@@ -316,10 +415,26 @@ export default function StudentsScreen({ navigate }: Props) {
                     <Text className="text-xs text-gray-500">Telefone: {item.phone ? maskPhone(item.phone) : "—"}</Text>
                     <Text className="text-xs text-gray-500">Nascimento: {fmtDate(item.birth_date)}</Text>
                     <Text className="text-xs text-gray-500">E-mail: {fmtEmail(item.email)}</Text>
+                    <Text className="text-xs text-gray-500">Cursos: {courseLabel(item.desired_courses)}</Text>
+                    <Text className="text-xs text-gray-500">Responsáveis: {fmtNames(item.guardians)}</Text>
                   </View>
                   <View className="mt-2 self-start">
                     <Badge slug={item.status} label={statusLabel(item.status)} />
                   </View>
+                  {item.status === "inactive" && (
+                    <TouchableOpacity
+                      onPress={() => approveStudent(item.id)}
+                      disabled={approvingId === item.id}
+                      className="mt-2 flex-row items-center gap-1.5 self-start rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5"
+                    >
+                      {approvingId === item.id ? (
+                        <ActivityIndicator size="small" color="#047857" />
+                      ) : (
+                        <Ionicons name="checkmark-circle-outline" size={14} color="#047857" />
+                      )}
+                      <Text className="text-xs font-semibold text-emerald-700">Aprovar cadastro</Text>
+                    </TouchableOpacity>
+                  )}
                 </>
               ) : (
                 <>
@@ -345,6 +460,9 @@ export default function StudentsScreen({ navigate }: Props) {
               <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
                 {fmtDate(item.birth_date)}
               </Text>
+              <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
+                {studentCourseLabel(item)}
+              </Text>
               <View style={{ flex: 1 }}>
                 <Badge
                   slug={item.status}
@@ -352,9 +470,22 @@ export default function StudentsScreen({ navigate }: Props) {
                 />
               </View>
               <View
-                style={{ width: 72 }}
+                style={{ width: 112 }}
                 className="flex-row justify-end gap-2"
               >
+                {item.status === "inactive" && (
+                  <TouchableOpacity
+                    onPress={() => approveStudent(item.id)}
+                    disabled={approvingId === item.id}
+                    className="p-1.5 bg-emerald-50 rounded-lg"
+                  >
+                    {approvingId === item.id ? (
+                      <ActivityIndicator size="small" color="#047857" />
+                    ) : (
+                      <Ionicons name="checkmark-circle-outline" size={15} color="#047857" />
+                    )}
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   onPress={() =>
                     navigate("alunos-form", { studentId: item.id })

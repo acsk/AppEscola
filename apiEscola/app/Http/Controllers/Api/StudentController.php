@@ -39,7 +39,7 @@ class StudentController extends Controller
     )]
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Student::query()->with('guardians');
+        $query = Student::query()->with(['guardians', 'desiredCourses']);
         $this->applyTenantScope($query, $request);
 
         $query
@@ -156,7 +156,7 @@ class StudentController extends Controller
     {
         $this->authorizeTenant($request, $student->tenant_id);
 
-        $student->load('guardians');
+        $student->load(['guardians', 'desiredCourses']);
 
         return $this->success(new StudentResource($student));
     }
@@ -187,7 +187,7 @@ class StudentController extends Controller
             }
         });
 
-        $student->load('guardians');
+        $student->load(['guardians', 'desiredCourses']);
 
         return $this->success(new StudentResource($student));
     }

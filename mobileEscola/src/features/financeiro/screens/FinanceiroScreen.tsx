@@ -8,6 +8,7 @@ import {
   generateChargeApi,
   getCobrancasApi,
   getPaymentOptionsApi,
+  getPaymentOptionsWithMessageApi,
   resolvePixQrImageUrl,
   CobrancasResponse,
   Cobranca,
@@ -18,6 +19,13 @@ import {
 
 type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
+type ConsultaStatusModalData = {
+  message: string;
+  invoice: Cobranca;
+  currentMethod: PaymentMethod | string | null;
+  allowedMethods: PaymentMethod[];
+};
+
 function formatarMoeda(valor: string | number): string {
   const num = typeof valor === 'string' ? parseFloat(valor) : valor;
   return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -26,6 +34,69 @@ function formatarMoeda(valor: string | number): string {
 function formatarData(data: string): string {
   const [ano, mes, dia] = data.split('-');
   return `${dia}/${mes}/${ano}`;
+}
+
+function HeaderFinanceiro({
+  topInset,
+  resumo,
+}: {
+  topInset: number;
+  resumo?: CobrancasResponse['resumo'];
+}) {
+  return (
+    <View style={[styles.headerWrap, { paddingTop: topInset }]}>
+      <View style={styles.headerGlowPrimary} />
+      <View style={styles.headerGlowSecondary} />
+      <View style={styles.headerTituloRow}>
+        <View style={styles.headerTituloIcone}>
+          <Ionicons name="cash-outline" size={24} color={colors.surface} />
+        </View>
+        <Text style={styles.headerTitulo}>Financeiro</Text>
+      </View>
+      {resumo ? (
+        <View style={styles.resumoGrid}>
+          <View style={styles.resumoItem}>
+            <View style={[styles.resumoIcone, styles.resumoIconeAtrasado]}>
+              <Ionicons name="alert-circle-outline" size={16} color={colors.debit} />
+            </View>
+            <Text style={styles.resumoItemLabel}>Atrasados</Text>
+            <Text style={[styles.resumoItemValor, { color: colors.debit }]}>
+              {formatarMoeda(resumo.valor_total_atrasados)}
+            </Text>
+            <Text style={styles.resumoItemQtd}>{resumo.quantidade_atrasados} cobranças</Text>
+          </View>
+
+          {resumo.possui_atual && (
+            <>
+              <View style={styles.divisorResumo} />
+              <View style={styles.resumoItem}>
+                <View style={[styles.resumoIcone, styles.resumoIconeAtual]}>
+                  <Ionicons name="calendar-outline" size={16} color="#F97316" />
+                </View>
+                <Text style={styles.resumoItemLabel}>Atual</Text>
+                <Text style={[styles.resumoItemValor, { color: '#F97316' }]}>
+                  {formatarMoeda(resumo.valor_atual || '0')}
+                </Text>
+                <Text style={styles.resumoItemQtd}>Maio/2026</Text>
+              </View>
+            </>
+          )}
+
+          <View style={styles.divisorResumo} />
+          <View style={styles.resumoItem}>
+            <View style={[styles.resumoIcone, styles.resumoIconePago]}>
+              <Ionicons name="checkmark-circle-outline" size={16} color={colors.credit} />
+            </View>
+            <Text style={styles.resumoItemLabel}>Pagas</Text>
+            <Text style={[styles.resumoItemValor, { color: colors.credit }]}>
+              {formatarMoeda(resumo.valor_total_pagas)}
+            </Text>
+            <Text style={styles.resumoItemQtd}>{resumo.quantidade_pagas} cobranças</Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 export function FinanceiroScreen() {
@@ -39,7 +110,10 @@ export function FinanceiroScreen() {
   const [paymentResult, setPaymentResult] = useState<GenerateChargeResponse | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [generatingMethod, setGeneratingMethod] = useState<PaymentMethod | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [consultaStatusModalVisivel, setConsultaStatusModalVisivel] = useState(false);
+  const [consultaStatusData, setConsultaStatusData] = useState<ConsultaStatusModalData | null>(null);
   const modalTranslateY = useRef(new Animated.Value(64)).current;
   const modalAnimatedOpacity = useRef(new Animated.Value(0)).current;
 
@@ -99,6 +173,26 @@ export function FinanceiroScreen() {
       return {
         ...prev,
         atual: prev.atual ? atualizar(prev.atual) : null,
+        atrasados: prev.atrasados.map(atualizar),
+        pagas: prev.pagas.map(atualizar),
+      };
+    });
+  };
+
+  const atualizarCobrancaNoEstado = (updatedInvoice: Cobranca) => {
+    setCobrancaSelecionada(updatedInvoice);
+    setData((prev) => {
+      if (!prev) return prev;
+
+      const atualizar = (cobranca: Cobranca): Cobranca =>
+        cobranca.id === updatedInvoice.id ? updatedInvoice : cobranca;
+
+      return {
+        ...prev,
+        atual:
+          prev.atual && prev.atual.id === updatedInvoice.id
+            ? updatedInvoice
+            : prev.atual,
         atrasados: prev.atrasados.map(atualizar),
         pagas: prev.pagas.map(atualizar),
       };
@@ -181,8 +275,134 @@ export function FinanceiroScreen() {
     }
   };
 
+  const consultarStatusCobranca = async () => {
+    if (!cobrancaSelecionada) return;
+
+    try {
+      setPaymentError(null);
+      setCheckingStatus(true);
+
+      const response = await getPaymentOptionsWithMessageApi(cobrancaSelecionada.id);
+      const options = response.body!;
+      setPaymentOptions(options);
+      atualizarCobrancaNoEstado(options.invoice);
+
+      setConsultaStatusData({
+        message: response.message,
+        invoice: options.invoice,
+        currentMethod: options.current_method,
+        allowedMethods: options.allowed_methods,
+      });
+      setConsultaStatusModalVisivel(true);
+
+      setPaymentResult((prev) => {
+        if (!prev) return prev;
+
+        const methodFromOptions =
+          options.current_method === 'pix' || options.current_method === 'boleto'
+            ? options.current_method
+            : prev.method;
+
+        return {
+          ...prev,
+          method: methodFromOptions,
+          status: options.invoice.status,
+          payment_assets: options.payment_assets,
+          actions: options.actions,
+        };
+      });
+    } catch (err: any) {
+      setPaymentError(err.response?.data?.message ?? err.message ?? 'Não foi possível consultar o status da cobrança.');
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const statusEhPago = (status: string) => status.toLowerCase() === 'paid';
+
+  const obterTemaModalStatus = (status: string) => {
+    if (statusEhPago(status)) {
+      return {
+        card: styles.consultaStatusCardSucesso,
+        box: styles.consultaStatusBoxSucesso,
+        mensagem: styles.consultaStatusMensagemSucesso,
+        indicadorWrap: styles.consultaStatusIndicadorSucesso,
+        indicadorCor: '#166534',
+        indicadorIcone: 'checkmark-circle',
+        indicadorTexto: 'Pagamento confirmado',
+        botao: styles.consultaStatusBotaoFecharSucesso,
+      };
+    }
+
+    return {
+      card: styles.consultaStatusCardWarning,
+      box: styles.consultaStatusBoxWarning,
+      mensagem: styles.consultaStatusMensagemWarning,
+      indicadorWrap: styles.consultaStatusIndicadorWarning,
+      indicadorCor: '#92400E',
+      indicadorIcone: 'alert-circle',
+      indicadorTexto: 'Pagamento pendente',
+      botao: styles.consultaStatusBotaoFecharWarning,
+    };
+  };
+
+  const fecharModalConsultaStatus = async () => {
+    const deveAtualizarPagamentos =
+      Boolean(consultaStatusData) && statusEhPago(consultaStatusData!.invoice.status);
+
+    setConsultaStatusModalVisivel(false);
+    setConsultaStatusData(null);
+
+    if (deveAtualizarPagamentos) {
+      fecharModalPagamento();
+      await carregarCobrancas();
+    }
+  };
+
   const metodoPermitido = (method: PaymentMethod) =>
     !paymentOptions || paymentOptions.allowed_methods.includes(method);
+
+  const formatarStatusCobranca = (status: string): string => {
+    const normalized = status.toLowerCase();
+    if (normalized === 'pending') return 'Pendente';
+    if (normalized === 'paid') return 'Paga';
+    if (normalized === 'overdue') return 'Atrasada';
+    if (normalized === 'canceled' || normalized === 'cancelled') return 'Cancelada';
+    return status;
+  };
+
+  const obterEstiloBadgeStatus = (status: string) => {
+    const normalized = status.toLowerCase();
+    if (normalized === 'pending') {
+      return {
+        container: styles.consultaStatusBadgePendente,
+        texto: styles.consultaStatusBadgeTextoPendente,
+      };
+    }
+    if (normalized === 'paid') {
+      return {
+        container: styles.consultaStatusBadgePaga,
+        texto: styles.consultaStatusBadgeTextoPaga,
+      };
+    }
+    if (normalized === 'overdue') {
+      return {
+        container: styles.consultaStatusBadgeAtrasada,
+        texto: styles.consultaStatusBadgeTextoAtrasada,
+      };
+    }
+    if (normalized === 'canceled' || normalized === 'cancelled') {
+      return {
+        container: styles.consultaStatusBadgeCancelada,
+        texto: styles.consultaStatusBadgeTextoCancelada,
+      };
+    }
+
+    return {
+      container: styles.consultaStatusBadgeDefault,
+      texto: styles.consultaStatusBadgeTextoDefault,
+    };
+  };
 
   const renderResultadoPagamento = () => {
     if (!paymentResult) return null;
@@ -269,26 +489,43 @@ export function FinanceiroScreen() {
   };
 
   const renderCardCobranca = (cobranca: Cobranca, tipo: 'atrasada' | 'atual' | 'paga') => {
-    const corFundo = tipo === 'atrasada' ? '#FEF2F2' : tipo === 'atual' ? '#FEF3F2' : '#ECFDF5';
+    const corFundo = tipo === 'atrasada' ? '#FEF2F2' : tipo === 'atual' ? '#FFF7ED' : '#ECFDF5';
+    const corBorda = tipo === 'atrasada' ? '#FECACA' : tipo === 'atual' ? '#FED7AA' : '#BBF7D0';
     const corIcone = tipo === 'atrasada' ? colors.debit : tipo === 'atual' ? '#F97316' : colors.credit;
     const icone = tipo === 'atrasada' ? 'alert-circle-outline' : tipo === 'atual' ? 'time-outline' : 'checkmark-circle-outline';
     const statusLabel = tipo === 'atrasada' ? 'Atrasado' : tipo === 'atual' ? 'Aberto' : 'Pago';
 
     return (
-      <View key={cobranca.id} style={[styles.cobrancaCard, { borderLeftColor: corIcone }]}>
+      <View
+        key={cobranca.id}
+        style={[
+          styles.cobrancaCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: corBorda,
+            borderLeftColor: corIcone,
+          },
+        ]}
+      >
         <View style={styles.cobrancaHeader}>
           <View style={[styles.cobrancaIcone, { backgroundColor: corFundo }]}>
-            <Ionicons name={icone as any} size={28} color={corIcone} />
+            <Ionicons name={icone as any} size={21} color={corIcone} />
           </View>
           <View style={styles.cobrancaInfo}>
             <Text style={styles.cobrancaDescricao}>{cobranca.description}</Text>
             <Text style={styles.cobrancaData}>Vencimento: {formatarData(cobranca.due_date)}</Text>
           </View>
           <View style={styles.cobrancaMeta}>
-            <Text style={[styles.cobrancaStatus, { backgroundColor: corFundo, color: corIcone }]}>
+            <Text
+              style={[
+                styles.cobrancaStatus,
+                { backgroundColor: corFundo, color: corIcone },
+                tipo === 'paga' && styles.cobrancaStatusPago,
+              ]}
+            >
               {statusLabel}
             </Text>
-            <Text style={[styles.cobrancaValor, { color: corIcone }]}>{formatarMoeda(cobranca.amount)}</Text>
+            <Text style={styles.cobrancaValor}>{formatarMoeda(cobranca.amount)}</Text>
           </View>
         </View>
 
@@ -309,9 +546,9 @@ export function FinanceiroScreen() {
   };
 
   const renderTelaVazia = () => (
-    <View style={styles.telaVaziaContainer}>
-      <Ionicons name="document-text-outline" size={64} color={colors.muted} />
-      <Text style={styles.telaVaziaTexto}>Nenhuma cobrança encontrada</Text>
+      <View style={styles.telaVaziaContainer}>
+        <Ionicons name="document-text-outline" size={64} color={colors.muted} />
+        <Text style={styles.telaVaziaTexto}>Nenhuma cobrança encontrada</Text>
       <Text style={styles.telaVaziaSubtexto}>Você está com todas as contas em dia 🎉</Text>
     </View>
   );
@@ -337,9 +574,7 @@ export function FinanceiroScreen() {
   if (state === 'loading') {
     return (
       <View style={styles.container}>
-        <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-          <Text style={styles.headerTitulo}>Financeiro</Text>
-        </View>
+        <HeaderFinanceiro topInset={insets.top} />
         {renderCarregando()}
       </View>
     );
@@ -348,9 +583,7 @@ export function FinanceiroScreen() {
   if (state === 'error') {
     return (
       <View style={styles.container}>
-        <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-          <Text style={styles.headerTitulo}>Financeiro</Text>
-        </View>
+        <HeaderFinanceiro topInset={insets.top} />
         {renderErro()}
       </View>
     );
@@ -359,9 +592,7 @@ export function FinanceiroScreen() {
   if (!data || (!data.atrasados.length && !data.atual && !data.pagas.length)) {
     return (
       <View style={styles.container}>
-        <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-          <Text style={styles.headerTitulo}>Financeiro</Text>
-        </View>
+        <HeaderFinanceiro topInset={insets.top} />
         {renderTelaVazia()}
       </View>
     );
@@ -479,58 +710,138 @@ export function FinanceiroScreen() {
               </>
             )}
 
-            <TouchableOpacity
-              style={styles.modalBotaoCancelar}
-              onPress={fecharModalPagamento}
-            >
-              <Text style={styles.modalBotaoCancelarTexto}>Cancelar</Text>
-            </TouchableOpacity>
+            <View style={styles.modalAcoesFooter}>
+              <TouchableOpacity
+                style={[styles.modalBotaoCancelar, styles.modalBotaoConsultar]}
+                onPress={consultarStatusCobranca}
+                disabled={checkingStatus || paymentLoading || Boolean(generatingMethod)}
+              >
+                {checkingStatus ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="refresh-outline" size={18} color={colors.primary} />
+                    <Text style={styles.modalBotaoConsultarTexto}>Consultar status</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalBotaoCancelar, styles.modalBotaoCancelarSecundario]}
+                onPress={fecharModalPagamento}
+              >
+                <Text style={styles.modalBotaoCancelarTexto}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </Animated.View>
       </View>
     </Modal>
   );
 
-  return (
-    <View style={styles.container}>
-      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-        <Text style={styles.headerTitulo}>Financeiro</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Resumo */}
-        <View style={styles.resumoContainer}>
-          <View style={styles.resumoItem}>
-            <Text style={styles.resumoItemLabel}>Atrasados</Text>
-            <Text style={[styles.resumoItemValor, { color: colors.debit }]}>
-              {formatarMoeda(data.resumo.valor_total_atrasados)}
-            </Text>
-            <Text style={styles.resumoItemQtd}>{data.resumo.quantidade_atrasados} cobranças</Text>
+  const renderModalConsultaStatus = () => (
+    <Modal
+      visible={consultaStatusModalVisivel}
+      transparent
+      animationType="fade"
+      onRequestClose={fecharModalConsultaStatus}
+    >
+      <View style={styles.consultaStatusOverlay}>
+        <View
+          style={[
+            styles.consultaStatusCard,
+            consultaStatusData && statusEhPago(consultaStatusData.invoice.status)
+              ? styles.consultaStatusCardSucesso
+              : styles.consultaStatusCardWarning,
+          ]}
+        >
+          <View style={styles.consultaStatusHeader}>
+            <Text style={styles.consultaStatusTitulo}>Status da cobrança</Text>
+            <TouchableOpacity onPress={fecharModalConsultaStatus}>
+              <Ionicons name="close-outline" size={24} color={colors.muted} />
+            </TouchableOpacity>
           </View>
 
-          {data.resumo.possui_atual && (
-            <>
-              <View style={styles.divisorResumo} />
-              <View style={styles.resumoItem}>
-                <Text style={styles.resumoItemLabel}>Atual</Text>
-                <Text style={[styles.resumoItemValor, { color: '#F97316' }]}>
-                  {formatarMoeda(data.resumo.valor_atual || '0')}
-                </Text>
-                <Text style={styles.resumoItemQtd}>Maio/2026</Text>
-              </View>
-            </>
+          {consultaStatusData && (
+            (() => {
+              const tema = obterTemaModalStatus(consultaStatusData.invoice.status);
+              return (
+                <>
+                  <View style={[styles.consultaStatusIndicador, tema.indicadorWrap]}>
+                    <Ionicons name={tema.indicadorIcone as any} size={18} color={tema.indicadorCor} />
+                    <Text style={[styles.consultaStatusIndicadorTexto, { color: tema.indicadorCor }]}>
+                      {tema.indicadorTexto}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.consultaStatusBox, tema.box]}>
+                    <Text style={styles.consultaStatusLabel}>{consultaStatusData.invoice.description}</Text>
+                    <Text style={styles.consultaStatusSubLabel}>
+                      Vence em {formatarData(consultaStatusData.invoice.due_date)}
+                    </Text>
+                    <Text style={styles.consultaStatusValor}>{formatarMoeda(consultaStatusData.invoice.amount)}</Text>
+
+                    <View style={styles.consultaStatusLinha}>
+                      <Text style={styles.consultaStatusCampo}>Status:</Text>
+                      {(() => {
+                        const badgeStyle = obterEstiloBadgeStatus(consultaStatusData.invoice.status);
+                        return (
+                          <View style={[styles.consultaStatusBadge, badgeStyle.container]}>
+                            <Text style={[styles.consultaStatusBadgeTexto, badgeStyle.texto]}>
+                              {formatarStatusCobranca(consultaStatusData.invoice.status)}
+                            </Text>
+                          </View>
+                        );
+                      })()}
+                    </View>
+
+                    <View style={styles.consultaStatusLinha}>
+                      <Text style={styles.consultaStatusCampo}>Método atual:</Text>
+                      <Text style={styles.consultaStatusCampoValor}>
+                        {consultaStatusData.currentMethod ? String(consultaStatusData.currentMethod).toUpperCase() : 'Não definido'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.consultaStatusLinha}>
+                      <Text style={styles.consultaStatusCampo}>Formas disponíveis:</Text>
+                      <Text style={styles.consultaStatusCampoValor}>
+                        {consultaStatusData.allowedMethods.length
+                          ? consultaStatusData.allowedMethods.map((method) => method.toUpperCase()).join(', ')
+                          : 'Nenhuma'}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              );
+            })()
           )}
 
-          <View style={styles.divisorResumo} />
-          <View style={styles.resumoItem}>
-            <Text style={styles.resumoItemLabel}>Pagas</Text>
-            <Text style={[styles.resumoItemValor, { color: colors.credit }]}>
-              {formatarMoeda(data.resumo.valor_total_pagas)}
+          <TouchableOpacity
+            style={[
+              styles.consultaStatusBotaoFechar,
+              consultaStatusData && statusEhPago(consultaStatusData.invoice.status)
+                ? styles.consultaStatusBotaoFecharSucesso
+                : styles.consultaStatusBotaoFecharWarning,
+            ]}
+            onPress={fecharModalConsultaStatus}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.consultaStatusBotaoFecharTexto}>
+              {consultaStatusData && statusEhPago(consultaStatusData.invoice.status)
+                ? 'Fechar e atualizar pagamentos'
+                : 'Fechar'}
             </Text>
-            <Text style={styles.resumoItemQtd}>{data.resumo.quantidade_pagas} cobranças</Text>
-          </View>
+          </TouchableOpacity>
         </View>
+      </View>
+    </Modal>
+  );
 
+  return (
+    <View style={styles.container}>
+      <HeaderFinanceiro topInset={insets.top} resumo={data.resumo} />
+
+      <ScrollView contentContainerStyle={styles.content}>
         {/* Atrasados */}
         {data.atrasados.length > 0 && (
           <>
@@ -566,59 +877,116 @@ export function FinanceiroScreen() {
       </ScrollView>
 
       {renderModalPagamento()}
+      {renderModalConsultaStatus()}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingTop: 14, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: '#F6F7FB' },
+  content: { padding: 14, paddingTop: 16, paddingBottom: 32 },
   headerWrap: {
-    backgroundColor: colors.ink,
+    backgroundColor: '#FBFAFF',
     paddingHorizontal: 20,
-    paddingBottom: 14,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 4,
+    paddingBottom: 18,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 3,
   },
-  headerTitulo: { fontSize: 25, fontWeight: '800', color: colors.surface, paddingTop: 18, paddingBottom: 14 },
+  headerGlowPrimary: {
+    position: 'absolute',
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    right: -104,
+    top: -150,
+    backgroundColor: '#F0E9FF',
+    opacity: 0.92,
+  },
+  headerGlowSecondary: {
+    position: 'absolute',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    left: -76,
+    top: 58,
+    backgroundColor: '#F7F2FF',
+    opacity: 0.98,
+  },
+  headerTituloRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 14,
+    paddingBottom: 14,
+  },
+  headerTituloIcone: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  headerTitulo: { fontSize: 22, fontWeight: '800', color: '#111827' },
   
   // Resumo
-  resumoContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 14,
+  resumoGrid: {
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#EEE8FF',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    marginBottom: 26,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 1,
+    gap: 8,
   },
-  resumoItem: { alignItems: 'center', flex: 1 },
-  resumoItemLabel: { fontSize: 15, color: colors.muted, marginBottom: 6, fontWeight: '700' },
-  resumoItemValor: { fontSize: 21, fontWeight: '900', marginBottom: 4 },
-  resumoItemQtd: { fontSize: 13, color: colors.muted, fontWeight: '600' },
-  divisorResumo: { width: 1, height: 48, backgroundColor: colors.border },
+  resumoItem: {
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  resumoIcone: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 7,
+  },
+  resumoIconeAtrasado: { backgroundColor: '#FEF2F2' },
+  resumoIconeAtual: { backgroundColor: '#FFF7ED' },
+  resumoIconePago: { backgroundColor: '#ECFDF5' },
+  resumoItemLabel: { fontSize: 12, color: '#64748B', marginBottom: 3, fontWeight: '800' },
+  resumoItemValor: { fontSize: 18, fontWeight: '900', marginBottom: 2 },
+  resumoItemQtd: { fontSize: 11, color: '#64748B', fontWeight: '700', textAlign: 'center' },
+  divisorResumo: { display: 'none' },
   
   // Seções
   secaoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 12,
-    marginTop: 16,
+    marginBottom: 8,
+    marginTop: 12,
   },
   secaoTitulo: {
-    fontSize: 19,
+    fontSize: 16,
     fontWeight: '800',
     color: colors.ink,
   },
@@ -626,64 +994,67 @@ const styles = StyleSheet.create({
   // Cards de cobrança
   cobrancaCard: {
     backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
     borderLeftWidth: 3,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.025,
-    shadowRadius: 6,
-    elevation: 1,
   },
   cobrancaHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 14,
-    gap: 12,
+    marginBottom: 10,
+    gap: 10,
   },
   cobrancaIcone: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.8)',
   },
   cobrancaInfo: { flex: 1, minWidth: 0 },
-  cobrancaDescricao: { fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 5, lineHeight: 23 },
-  cobrancaData: { fontSize: 15, color: colors.muted, fontWeight: '500' },
+  cobrancaDescricao: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 4, lineHeight: 19 },
+  cobrancaData: { fontSize: 12, color: colors.muted, fontWeight: '600' },
   cobrancaMeta: { alignItems: 'flex-end', marginLeft: 6 },
   cobrancaStatus: {
     overflow: 'hidden',
     borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  cobrancaStatusPago: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 8,
+    fontSize: 13,
   },
-  cobrancaValor: { fontSize: 20, fontWeight: '900' },
+  cobrancaValor: { fontSize: 16, fontWeight: '900', color: '#111827' },
   
   // Ações/Botões de cobrança
   acoesBotoes: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  botaoAcao: { paddingVertical: 12, paddingHorizontal: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  botaoAcao: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   botaoPagarPrimario: { backgroundColor: '#F97316', flex: 1, justifyContent: 'center' },
   botaoAcaoPrimario: { backgroundColor: colors.primary, flex: 1, justifyContent: 'center' },
   botaoAcaoSecundario: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
-  botaoAcaoTexto: { fontSize: 15, fontWeight: '800', color: colors.surface },
+  botaoAcaoTexto: { fontSize: 13, fontWeight: '800', color: colors.surface },
   
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
     alignItems: 'stretch',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     paddingTop: 10,
     paddingHorizontal: 16,
     paddingBottom: 22,
@@ -729,12 +1100,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   modalInfoCobranca: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F0ECFA',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -744,18 +1115,18 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   modalInfoLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.ink,
     fontWeight: '800',
     marginBottom: 4,
   },
   modalInfoVencimento: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.muted,
     fontWeight: '600',
   },
   modalInfoValor: {
-    fontSize: 24,
+    fontSize: 19,
     fontWeight: '900',
     color: colors.primary,
   },
@@ -763,11 +1134,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F0ECFA',
   },
   modalBotaoPrincipal: {
     justifyContent: 'center',
@@ -781,12 +1152,12 @@ const styles = StyleSheet.create({
     color: colors.surface,
   },
   modalBotaoIcone: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: 12,
   },
   modalBotaoIconeBoleto: {
     backgroundColor: '#EFF6FF',
@@ -799,7 +1170,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   modalBotaoTitulo: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '900',
     color: colors.ink,
     marginBottom: 3,
@@ -823,7 +1194,7 @@ const styles = StyleSheet.create({
     height: 188,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F0ECFA',
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -840,9 +1211,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     justifyContent: 'center',
     marginBottom: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F0ECFA',
     overflow: 'hidden',
   },
   pixCodeLabel: {
@@ -884,13 +1255,32 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   modalBotaoCancelar: {
-    borderRadius: 14,
-    paddingVertical: 15,
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F0ECFA',
+    backgroundColor: colors.surface,
+  },
+  modalAcoesFooter: {
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 6,
-    backgroundColor: '#F8FAFC',
+  },
+  modalBotaoConsultar: {
+    flex: 1.45,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  modalBotaoConsultarTexto: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  modalBotaoCancelarSecundario: {
+    flex: 1,
+    marginTop: 0,
   },
   modalBotaoCancelarTexto: {
     fontSize: 16,
@@ -904,9 +1294,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F0ECFA',
   },
   boletoLinhaTextWrap: {
     flex: 1,
@@ -938,9 +1328,188 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
+  consultaStatusOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  consultaStatusCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F0ECFA',
+    padding: 12,
+  },
+  consultaStatusCardWarning: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+  },
+  consultaStatusCardSucesso: {
+    borderColor: '#86EFAC',
+    backgroundColor: '#F0FDF4',
+  },
+  consultaStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  consultaStatusTitulo: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: colors.ink,
+  },
+  consultaStatusMensagem: {
+    fontSize: 14,
+    color: colors.muted,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  consultaStatusMensagemWarning: {
+    color: '#92400E',
+  },
+  consultaStatusMensagemSucesso: {
+    color: '#166534',
+  },
+  consultaStatusIndicador: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  consultaStatusIndicadorWarning: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FEF3C7',
+  },
+  consultaStatusIndicadorSucesso: {
+    borderColor: '#BBF7D0',
+    backgroundColor: '#DCFCE7',
+  },
+  consultaStatusIndicadorTexto: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  consultaStatusBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F0ECFA',
+    backgroundColor: '#FCFBFF',
+    padding: 10,
+    gap: 4,
+  },
+  consultaStatusBoxWarning: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  consultaStatusBoxSucesso: {
+    borderColor: '#BBF7D0',
+    backgroundColor: '#F7FFF9',
+  },
+  consultaStatusLabel: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.ink,
+  },
+  consultaStatusSubLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  consultaStatusValor: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: colors.primary,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  consultaStatusLinha: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  consultaStatusCampo: {
+    fontSize: 12,
+    color: colors.muted,
+    fontWeight: '700',
+  },
+  consultaStatusCampoValor: {
+    fontSize: 12,
+    color: colors.ink,
+    fontWeight: '800',
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+  consultaStatusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+  },
+  consultaStatusBadgeTexto: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  consultaStatusBadgePendente: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  consultaStatusBadgeTextoPendente: {
+    color: '#92400E',
+  },
+  consultaStatusBadgePaga: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  consultaStatusBadgeTextoPaga: {
+    color: '#166534',
+  },
+  consultaStatusBadgeAtrasada: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
+  },
+  consultaStatusBadgeTextoAtrasada: {
+    color: '#991B1B',
+  },
+  consultaStatusBadgeCancelada: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  consultaStatusBadgeTextoCancelada: {
+    color: '#374151',
+  },
+  consultaStatusBadgeDefault: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#E0E7FF',
+  },
+  consultaStatusBadgeTextoDefault: {
+    color: '#3730A3',
+  },
+  consultaStatusBotaoFechar: {
+    marginTop: 10,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+  },
+  consultaStatusBotaoFecharWarning: {
+    backgroundColor: '#D97706',
+  },
+  consultaStatusBotaoFecharSucesso: {
+    backgroundColor: '#16A34A',
+  },
+  consultaStatusBotaoFecharTexto: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.surface,
+  },
   
   // Telas vazias/erro/loading
-  telaVaziaContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
+  telaVaziaContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, backgroundColor: '#F6F7FB' },
   telaVaziaTexto: { fontSize: 16, fontWeight: '800', color: colors.ink, marginTop: 16, textAlign: 'center' },
   telaVaziaSubtexto: { fontSize: 14, color: colors.muted, marginTop: 8, textAlign: 'center' },
   botaoTentarNovamente: {

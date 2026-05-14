@@ -26,6 +26,7 @@ class Student extends Model
         'photo_url',
         'is_minor',
         'status',
+        'desired_course_id',
         'created_by',
         'updated_by',
         'deleted_by',
@@ -60,6 +61,13 @@ class Student extends Model
                 'is_pedagogical_responsible',
                 'can_access_portal',
             ])
+            ->withTimestamps();
+    }
+
+    public function desiredCourses(): BelongsToMany
+    {
+        return $this->belongsToMany(Course::class, 'student_desired_courses')
+            ->withPivot(['tenant_id'])
             ->withTimestamps();
     }
 

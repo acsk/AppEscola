@@ -22,6 +22,10 @@ class StudentResource extends JsonResource
             'photo_url' => $this->photo_url,
             'is_minor' => $this->is_minor,
             'status' => $this->status,
+            'desired_courses' => $this->whenLoaded('desiredCourses', fn () => $this->desiredCourses->map(fn ($course) => [
+                'id' => $course->id,
+                'name' => $course->name,
+            ])->values()),
             'guardians' => GuardianResource::collection($this->whenLoaded('guardians')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
