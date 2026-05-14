@@ -292,7 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={() => {}}
+        onRequestClose={() => setUpdateAvailable({ visible: false, latest: '' })}
       >
         <View style={modalStyles.backdrop}>
           <View style={modalStyles.card}>
@@ -308,27 +308,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 ? 'Recarregue a página para atualizar.'
                 : 'Atualize o app na loja para continuar com a versão mais recente.'}
             </Text>
-            {Platform.OS === 'web' ? (
+            <View style={modalStyles.actionsRow}>
               <TouchableOpacity
-                style={modalStyles.button}
-                onPress={() => {
-                  if (typeof window !== 'undefined') {
-                    window.location.reload();
-                  }
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={modalStyles.buttonText}>Recarregar agora</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={modalStyles.button}
+                style={[modalStyles.button, modalStyles.buttonSecondary]}
                 onPress={() => setUpdateAvailable({ visible: false, latest: '' })}
                 activeOpacity={0.85}
               >
-                <Text style={modalStyles.buttonText}>Entendi</Text>
+                <Text style={modalStyles.buttonSecondaryText}>Depois</Text>
               </TouchableOpacity>
-            )}
+
+              {Platform.OS === 'web' ? (
+                <TouchableOpacity
+                  style={[modalStyles.button, modalStyles.buttonPrimary]}
+                  onPress={() => {
+                    if (typeof window !== 'undefined') {
+                      window.location.reload();
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={modalStyles.buttonText}>Recarregar agora</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
         </View>
       </Modal>
@@ -375,16 +377,31 @@ const modalStyles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
-  button: {
+  actionsRow: {
     width: '100%',
-    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  button: {
+    flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
   },
+  buttonPrimary: {
+    backgroundColor: colors.primary,
+  },
+  buttonSecondary: {
+    backgroundColor: colors.soft,
+  },
   buttonText: {
     color: colors.surface,
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  buttonSecondaryText: {
+    color: colors.text,
+    fontSize: 16,
     fontWeight: '700',
   },
 });
@@ -394,5 +411,6 @@ export function useAuth(): AuthContextData {
   if (!context) {
     throw new Error('useAuth deve ser usado dentro de AuthProvider');
   }
+
   return context;
 }

@@ -221,10 +221,6 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
       errors.studentName = 'Nome do aluno é obrigatório.';
     }
 
-    if (!form.studentEmail.trim()) {
-      errors.studentEmail = 'E-mail do aluno é obrigatório.';
-    }
-
     if (!form.studentBirthDate.trim()) {
       errors.studentBirthDate = 'Data de nascimento do aluno é obrigatória.';
     }
@@ -278,7 +274,7 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
       const response = await registerPublicStudent({
         student: {
           name: form.studentName.trim(),
-          email: form.studentEmail.trim(),
+          email: sanitizeOptional(form.studentEmail),
           birth_date: dateBrToIso(form.studentBirthDate.trim()),
           document: normalizeCpfDocument(form.studentDocument),
           phone: sanitizeOptional(form.studentPhone),
@@ -417,7 +413,7 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
-              <Text style={styles.label}>E-mail do aluno *</Text>
+              <Text style={styles.label}>E-mail do aluno</Text>
               <TextInput
                 style={[styles.input, getFieldError('studentEmail', 'student.email') && styles.inputError]}
                 placeholder="email@exemplo.com"
