@@ -183,6 +183,7 @@ class PublicRegistrationController extends Controller
                 'id'                => $student->id,
                 'enrollment_number' => $student->enrollment_number,
                 'name'              => $student->name,
+                'email'             => $student->email,
                 'status'            => $student->status,
                 'desired_courses'   => $selectedCourseIds->map(fn (int $id) => [
                     'id' => $id,

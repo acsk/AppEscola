@@ -99,6 +99,7 @@ Content-Type: application/json
       "id": 24,
       "enrollment_number": "202600024",
       "name": "JOÃO DA SILVA",
+      "email": "joao@email.com",
       "status": "inactive",
       "desired_courses": [
         { "id": 4, "name": "CPM - PORT/MAT" },

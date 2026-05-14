@@ -29,6 +29,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'PublicRegister'>;
 
 type FormState = {
   studentName: string;
+  studentEmail: string;
   studentBirthDate: string;
   studentDocument: string;
   studentPhone: string;
@@ -42,6 +43,7 @@ type FormState = {
 
 const INITIAL_FORM: FormState = {
   studentName: '',
+  studentEmail: '',
   studentBirthDate: '',
   studentDocument: '',
   studentPhone: '',
@@ -219,6 +221,10 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
       errors.studentName = 'Nome do aluno é obrigatório.';
     }
 
+    if (!form.studentEmail.trim()) {
+      errors.studentEmail = 'E-mail do aluno é obrigatório.';
+    }
+
     if (!form.studentBirthDate.trim()) {
       errors.studentBirthDate = 'Data de nascimento do aluno é obrigatória.';
     }
@@ -251,6 +257,10 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
       errors.guardianEmail = 'Informe um e-mail válido.';
     }
 
+    if (form.studentEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.studentEmail.trim())) {
+      errors.studentEmail = 'Informe um e-mail válido.';
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -268,6 +278,7 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
       const response = await registerPublicStudent({
         student: {
           name: form.studentName.trim(),
+          email: form.studentEmail.trim(),
           birth_date: dateBrToIso(form.studentBirthDate.trim()),
           document: normalizeCpfDocument(form.studentDocument),
           phone: sanitizeOptional(form.studentPhone),
@@ -295,6 +306,7 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
 
         const mapped: Record<string, string> = {
           studentName: apiErrors['student.name'] || '',
+          studentEmail: apiErrors['student.email'] || '',
           studentBirthDate: apiErrors['student.birth_date'] || '',
           studentDocument: apiErrors['student.document'] || '',
           studentPhone: apiErrors['student.phone'] || '',
@@ -405,6 +417,21 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
+              <Text style={styles.label}>E-mail do aluno *</Text>
+              <TextInput
+                style={[styles.input, getFieldError('studentEmail', 'student.email') && styles.inputError]}
+                placeholder="email@exemplo.com"
+                value={form.studentEmail}
+                onChangeText={(value) => setField('studentEmail', value)}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              {getFieldError('studentEmail', 'student.email') ? (
+                <Text style={styles.fieldError}>{getFieldError('studentEmail', 'student.email')}</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.fieldCol}>
               <Text style={styles.label}>Telefone do aluno</Text>
               <TextInput
                 style={[styles.input, getFieldError('studentPhone', 'student.phone') && styles.inputError]}
@@ -417,20 +444,17 @@ export function PublicRegisterScreen({ navigation, route }: Props) {
                 <Text style={styles.fieldError}>{getFieldError('studentPhone', 'student.phone')}</Text>
               ) : null}
             </View>
+          </View>
 
-            <View style={styles.fieldCol}>
-              <Text style={styles.label}>Menor de idade</Text>
-              <View style={styles.autoFlagBox}>
-                <Ionicons
-                  name={isMinorCalculated ? 'shield-checkmark' : 'person-outline'}
-                  size={16}
-                  color={colors.primary}
-                />
-                <Text style={styles.autoFlagText}>
-                  {isMinorCalculated === null ? 'Preencha a data' : isMinorCalculated ? 'Sim' : 'Não'}
-                </Text>
-              </View>
-            </View>
+          <View style={styles.autoFlagBox}>
+            <Ionicons
+              name={isMinorCalculated ? 'shield-checkmark' : 'person-outline'}
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={styles.autoFlagText}>
+              Menor de idade: {isMinorCalculated === null ? 'preencha a data' : isMinorCalculated ? 'Sim' : 'Não'}
+            </Text>
           </View>
 
           <Text style={styles.label}>Selecione os cursos matriculados</Text>

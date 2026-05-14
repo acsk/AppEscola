@@ -14,6 +14,7 @@ export interface PublicCourse {
 
 export interface PublicRegisterStudentInput {
   name: string;
+  email: string;
   birth_date?: string;
   document?: string;
   phone?: string;

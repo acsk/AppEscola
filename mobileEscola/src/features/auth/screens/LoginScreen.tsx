@@ -596,9 +596,7 @@ export function LoginScreen() {
                 onPress={closeReloadConfirmation}
                 activeOpacity={0.85}
               >
-                <Text style={styles.modalButtonSecondaryText}>
-                  {Platform.OS === 'web' ? 'Cancelar' : 'Entendi'}
-                </Text>
+                <Text style={styles.modalButtonSecondaryText}>Depois</Text>
               </TouchableOpacity>
               {Platform.OS === 'web' ? (
                 <TouchableOpacity
