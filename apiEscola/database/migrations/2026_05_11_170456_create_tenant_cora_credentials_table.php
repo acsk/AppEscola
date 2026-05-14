@@ -16,6 +16,10 @@ return new class extends Migration
             $table->string('client_id');
             $table->string('certificate_path');
             $table->string('private_key_path');
+            $table->string('test_account_main_cpf')->nullable();
+            $table->string('test_account_main_password')->nullable();
+            $table->string('test_account_secondary_cpf')->nullable();
+            $table->string('test_account_secondary_password')->nullable();
             $table->string('environment', 20)->default('stage');
             $table->boolean('active')->default(true);
             $table->timestamp('configured_at')->nullable();
