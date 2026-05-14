@@ -576,7 +576,7 @@ Authorization: Bearer {token}
 | `start_date` | date | `YYYY-MM-DD` |
 | `end_date` | date | `YYYY-MM-DD` |
 
-### Criar
+### Criar (CRUD direto)
 ```http
 POST /api/enrollments
 Authorization: Bearer {token}
@@ -609,6 +609,42 @@ Content-Type: application/json
 | `monthly_amount` | ❌ | decimal ≥ 0 |
 | `discount_amount` | ❌ | decimal ≥ 0 |
 | `payment_due_day` | ❌ | dia do mês: 1–28 |
+
+### Matricular em plano (recomendado)
+```http
+POST /api/enrollments/subscribe
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body (resumo):**
+```json
+{
+  "student_id": 5,
+  "school_class_id": 2,
+  "course_plan_id": 3,
+  "start_date": "2026-02-01",
+  "discount_amount": 0,
+  "payment_due_day": 10,
+  "guardian_id": 2,
+  "enrollment_payment": {
+    "payment_method": "pix",
+    "paid_at": "2026-02-01",
+    "notes": "Pago no ato"
+  }
+}
+```
+
+> Esse endpoint cria a matrícula e a invoice de `enrollment_fee` automaticamente.
+
+### Matricular em pacote (recomendado)
+```http
+POST /api/enrollments/subscribe-bundle
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+> Esse endpoint cria uma matrícula por curso do pacote e uma invoice de taxa de matrícula do pacote.
 
 ### Exibir / Atualizar / Excluir
 ```http
@@ -677,6 +713,54 @@ PUT    /api/invoices/{id}
 DELETE /api/invoices/{id}
 ```
 
+### Gerar cobrança por provedor (PIX/Boleto)
+```http
+POST /api/invoices/{id}/generate-charge
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "provider": "cora",
+  "method": "pix",
+  "environment": "stage"
+}
+```
+
+| Campo | Obrigatório | Notas |
+|---|---|---|
+| `provider` | ✅ | atualmente: `cora` |
+| `method` | ❌ | `pix`, `boleto` ou `bank_slip` |
+| `environment` | ❌ | `stage`, `prod` ou `production` |
+
+Retorna `charge_id`, `payment_url` e `pix_copy_paste` (quando método for PIX).
+
+### Consultar status da cobrança externa
+```http
+GET /api/invoices/{id}/charge-status
+Authorization: Bearer {token}
+```
+
+Retorna `provider`, `status` e `paid_at`.
+
+### Simular pagamento em stage (teste)
+```http
+POST /api/invoices/{id}/pay-charge
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Body (opcional):**
+```json
+{
+  "environment": "stage"
+}
+```
+
+> Disponível apenas para ambiente de teste (`stage`).
+
 ### Marcar como pago
 ```http
 POST /api/invoices/{id}/mark-as-paid
@@ -688,6 +772,15 @@ Authorization: Bearer {token}
 POST /api/invoices/{id}/cancel
 Authorization: Bearer {token}
 ```
+
+### Fluxo recomendado para o frontend
+
+1. Criar matrícula por `subscribe` ou `subscribe-bundle`.
+2. Ler invoices pendentes da matrícula.
+3. No painel admin, gerar cobrança com `generate-charge` escolhendo PIX ou boleto.
+4. Exibir no painel/mobile do aluno os dados retornados (`payment_url` e/ou `pix_copy_paste`).
+5. Consultar `charge-status` para atualização de estado.
+6. Em stage, usar `pay-charge` para simulação de pagamento.
 
 ---
 
@@ -704,6 +797,12 @@ Authorization: Bearer {token}
 3. POST /api/students                       → cria aluno → obtém student.id
 4. POST /api/guardians                      → cria responsável → obtém guardian.id
 5. POST /api/students/{id}/guardians        → vincula responsável ao aluno
-6. POST /api/enrollments                    → cria matrícula com student_id + school_class_id
-7. POST /api/invoices                       → gera a primeira cobrança (mensalidade)
+6. POST /api/enrollments/subscribe          → cria matrícula e invoice de enrollment_fee
+  (ou POST /api/enrollments/subscribe-bundle para pacote)
+7. POST /api/invoices/{invoice_id}/generate-charge
+  → gera cobrança externa (PIX/boleto) para pagamento
+8. GET  /api/invoices/{invoice_id}/charge-status
+  → acompanha pagamento
+9. (somente stage) POST /api/invoices/{invoice_id}/pay-charge
+  → simula pagamento em ambiente de teste
 ```

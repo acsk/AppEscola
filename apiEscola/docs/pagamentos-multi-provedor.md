@@ -235,11 +235,61 @@ Retorno recomendado:
 }
 ```
 
+### 7. Pagar cobrança (boleto/PIX em stage - teste)
+
+`POST /api/invoices/{invoice}/pay-charge`
+
+**Apenas em `stage` para testes.** Simula o pagamento de um boleto ou PIX gerado anteriormente.
+
+**Body (opcional):**
+
+```json
+{
+  "environment": "stage"
+}
+```
+
+**Resposta esperada `200`:**
+
+```json
+{
+  "type": "success",
+  "message": "Cobrança paga com sucesso.",
+  "body": {
+    "invoice_id": 123,
+    "provider": "cora",
+    "environment": "stage",
+    "status": "paid",
+    "paid_at": "2026-05-11T14:35:00Z"
+  }
+}
+```
+
+## Fluxo completo de pagamento
+
+1. **Admin gera a cobrança** (boleto ou PIX):
+   - `POST /api/invoices/{invoice}/generate-charge` com `method` (pix/boleto) e `environment` (stage/prod)
+   - Retorna `charge_id`, `payment_url`, `pix_copy_paste` (se PIX)
+
+2. **Cliente vê o boleto/PIX** (no painel ou mobile):
+   - Frontend exibe o código de barras (boleto) ou QR-code (PIX)
+   - Ou redireciona para `payment_url`
+
+3. **Em stage (testes), admin simula o pagamento**:
+   - `POST /api/invoices/{invoice}/pay-charge` com `environment: stage`
+   - Fatura é marcada como `paid` automaticamente
+   - **IMPORTANTE**: Apenas em `stage` para testes. Em `prod`, webhooks da Cora confirmam o pagamento real.
+
+4. **Consultar status em tempo real**:
+   - `GET /api/invoices/{invoice}/charge-status` para saber se foi pago
+
 ## Mapeamento para UI (frontend)
 
 - Tela "Configuração de Pagamento": renderizar campos por schema dinâmico.
 - Na tela da Cora, separar visualmente "Ambiente de teste" e "Ambiente de produção".
 - Tela "Cobrança": usar apenas campos unificados (`status`, `payment_url`, `pix_copy_paste`).
+- Em **stage**: mostrar botão "Simular Pagamento" que chama `pay-charge`
+- Em **prod**: pagamento real via webhook da Cora
 - Evitar regras condicionais por banco no frontend.
 
 ## Estratégia recomendada de uso no frontend
@@ -251,8 +301,10 @@ Use esta ordem:
 3. escolher `environment` (`stage` ou `prod`) na UI
 4. salvar configuração pelo endpoint genérico de `settings`
 5. testar conexão com `test-connection` informando o ambiente
-6. gerar cobrança com `POST /api/invoices/{invoice}/generate-charge` informando o ambiente
+6. gerar cobrança com `POST /api/invoices/{invoice}/generate-charge` informando o ambiente e método (pix/boleto)
 7. consultar andamento com `GET /api/invoices/{invoice}/charge-status`
+8. **Em stage**: chamar `POST /api/invoices/{invoice}/pay-charge` para simular pagamento
+9. **Em prod**: aguardar webhook da Cora para confirmação de pagamento real
 
 Os endpoints legados da Cora devem ser usados apenas para compatibilidade ou diagnóstico.
 
@@ -263,6 +315,8 @@ Os endpoints legados da Cora devem ser usados apenas para compatibilidade ou dia
 - Retornar token completo somente para teste administrativo controlado.
 - Em produção, preferir `test-connection` com `ok/erro` sem expor token.
 - Armazenar payload bruto de provedores apenas no backend para auditoria/debug.
+- Endpoint `pay-charge` apenas para admins (roles: super_admin, admin).
+- Apenas permitir `pay-charge` em `stage` para evitar pagamentos duplos.
 
 ## Próxima evolução recomendada
 
@@ -271,3 +325,4 @@ Os endpoints legados da Cora devem ser usados apenas para compatibilidade ou dia
 - Fazer `charge-status` consultar o provedor em tempo real ou via sincronização/webhook.
 - Manter endpoint legado da Cora durante a transição, até o frontend migrar 100% para o contrato genérico.
 - Avaliar criptografia em repouso para `client_id` e padronização de armazenamento dos arquivos sensíveis.
+- Implementar retry automático e sincronização periódica com status de pagamentos na Cora.

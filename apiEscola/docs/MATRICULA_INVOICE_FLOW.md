@@ -1,6 +1,6 @@
 # Fluxo de Matrícula com Criação Automática de Invoice
 
-> Atualizado em 28/04/2026
+> Atualizado em 13/05/2026
 
 ---
 
@@ -259,6 +259,119 @@ O campo `type` foi adicionado às invoices para distinguir o tipo de cobrança:
    - Invoice da taxa de matrícula com status (paga/pendente)
   - Dados do responsável financeiro principal detectado
 ```
+
+---
+
+## Fluxo de Cobrança (Painel Admin + Mobile Aluno)
+
+Depois que a matrícula gera a invoice, o fluxo recomendado para front é:
+
+```
+1. Admin (painel) gera a forma de pagamento da invoice
+   POST /api/invoices/{invoice}/generate-charge
+   body: { provider: "cora", method: "pix"|"boleto", environment: "stage"|"prod" }
+
+2. Front exibe para o cliente/aluno
+   - payment_url (boleto)
+   - pix_copy_paste (pix)
+
+3. Front consulta status
+   GET /api/invoices/{invoice}/charge-status
+
+4. Em stage (teste), admin pode simular pagamento
+   POST /api/invoices/{invoice}/pay-charge
+   body: { environment: "stage" }
+
+5. Em produção, confirmação real ocorre por integração do provedor
+```
+
+### Endpoints de Cobrança para o Front
+
+#### 1) Gerar cobrança por provedor/método
+
+`POST /api/invoices/{invoice}/generate-charge`
+
+Body:
+
+```json
+{
+  "provider": "cora",
+  "method": "pix",
+  "environment": "stage"
+}
+```
+
+Resposta esperada:
+
+```json
+{
+  "type": "success",
+  "body": {
+    "invoice_id": 123,
+    "provider": "cora",
+    "environment": "stage",
+    "method": "pix",
+    "charge_id": "inv_xxx",
+    "status": "PENDING",
+    "payment_url": "https://...",
+    "pix_copy_paste": "000201...",
+    "qr_code_image_url": null,
+    "expires_at": null
+  }
+}
+```
+
+#### 2) Consultar status da cobrança
+
+`GET /api/invoices/{invoice}/charge-status`
+
+Resposta esperada:
+
+```json
+{
+  "type": "success",
+  "body": {
+    "provider": "cora",
+    "status": "paid",
+    "paid_at": "2026-05-11T14:30:00Z"
+  }
+}
+```
+
+#### 3) Simular pagamento em stage (teste)
+
+`POST /api/invoices/{invoice}/pay-charge`
+
+Body:
+
+```json
+{
+  "environment": "stage"
+}
+```
+
+Resposta esperada:
+
+```json
+{
+  "type": "success",
+  "message": "Cobrança paga com sucesso.",
+  "body": {
+    "invoice_id": 123,
+    "provider": "cora",
+    "environment": "stage",
+    "status": "IN_PAYMENT",
+    "paid_at": "2026-05-13T18:30:00Z"
+  }
+}
+```
+
+### Regras para UX no Front
+
+- Painel admin: mostrar ações de gerar cobrança (`generate-charge`) e simular pagamento em stage (`pay-charge`).
+- Mobile do aluno: exibir dados da cobrança (link/PIX/status), sem ação administrativa.
+- Em stage: habilitar botão de simulação de pagamento.
+- Em produção: não usar `pay-charge`; acompanhar status por atualização da cobrança.
 
 ---
 

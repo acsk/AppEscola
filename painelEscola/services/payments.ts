@@ -75,6 +75,8 @@ export type GeneratedCharge = {
   status: string;
   payment_url: string | null;
   pix_copy_paste: string | null;
+  boleto_number?: string | null;
+  boleto_digitable?: string | null;
   qr_code_image_url: string | null;
   expires_at: string | null;
   raw?: Record<string, unknown>;
@@ -82,6 +84,19 @@ export type GeneratedCharge = {
 
 export type ChargeStatusResponse = {
   provider: string;
+  status: string;
+  paid_at: string | null;
+  raw?: Record<string, unknown>;
+};
+
+export type PayChargePayload = {
+  environment?: "stage" | "prod";
+};
+
+export type PaidChargeResponse = {
+  invoice_id: number;
+  provider: string;
+  environment?: string;
   status: string;
   paid_at: string | null;
   raw?: Record<string, unknown>;
@@ -212,6 +227,8 @@ export const generateUnifiedCharge = async (
           (legacy?.pix_emv as string) ??
           (legacy?.pix_code as string) ??
           null,
+        boleto_number: (legacy?.boleto_number as string) ?? null,
+        boleto_digitable: (legacy?.boleto_digitable as string) ?? null,
         qr_code_image_url: (legacy?.qr_code_image_url as string) ?? null,
         expires_at: (legacy?.expires_at as string) ?? null,
         raw: legacy,
@@ -228,4 +245,15 @@ export const getUnifiedChargeStatus = async (
     `/invoices/${invoiceId}/charge-status`
   );
   return unwrap<ChargeStatusResponse>(data);
+};
+
+export const payUnifiedCharge = async (
+  invoiceId: number,
+  payload: PayChargePayload = { environment: "stage" }
+): Promise<PaidChargeResponse> => {
+  const { data } = await api.post<ApiEnvelope<PaidChargeResponse>>(
+    `/invoices/${invoiceId}/pay-charge`,
+    payload
+  );
+  return unwrap<PaidChargeResponse>(data);
 };

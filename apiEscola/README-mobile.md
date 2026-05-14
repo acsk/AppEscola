@@ -17,6 +17,9 @@
 8. [Navegação por perfil (role)](#8-navegação-por-perfil-role)
 9. [Erros comuns](#9-erros-comuns)
 
+Documento complementar de Financeiro (Mobile):
+- docs/mobile-financeiro-boletos.md
+
 ---
 
 ## 1. Autenticação
@@ -146,7 +149,91 @@ Todas as respostas seguem este envelope:
 
 ---
 
-## 3. Simulados — Aluno
+## 3. Financeiro - Aluno
+
+### Listar cobrancas pagas, atrasadas e atual
+
+```
+GET /api/aluno/boletos
+Authorization: Bearer {token}
+```
+
+Retorna as cobrancas do aluno em tres grupos:
+- `pagas`: cobrancas com status `paid`
+- `atrasados`: cobrancas em aberto com vencimento anterior a hoje
+- `atual`: apenas uma cobranca em aberto do mes atual (mais proxima de hoje)
+
+**Resposta `200`:**
+
+```json
+{
+  "type": "success",
+  "message": "Cobrancas carregadas com sucesso.",
+  "body": {
+    "student_id": 12,
+    "referencia": {
+      "hoje": "2026-05-13",
+      "inicio_mes": "2026-05-01",
+      "fim_mes": "2026-05-31"
+    },
+    "pagas": [
+      {
+        "id": 41,
+        "enrollment_id": 3,
+        "description": "Mensalidade Marco/2026",
+        "amount": "650.00",
+        "due_date": "2026-03-10",
+        "status": "paid",
+        "payment_method": "pix",
+        "boleto_number": null,
+        "boleto_digitable": null,
+        "payment_url": null,
+        "is_overdue": false
+      }
+    ],
+    "atrasados": [
+      {
+        "id": 44,
+        "enrollment_id": 3,
+        "description": "Mensalidade Abril/2026",
+        "amount": "650.00",
+        "due_date": "2026-04-10",
+        "status": "pending",
+        "payment_method": "bank_slip",
+        "boleto_number": "34191.79001 01043.510047 91020.150008 2 00000065000",
+        "boleto_digitable": "34191.79001 01043.510047 91020.150008 2 00000065000",
+        "payment_url": "https://...",
+        "is_overdue": true
+      }
+    ],
+    "atual": {
+      "id": 45,
+      "enrollment_id": 3,
+      "description": "Mensalidade Maio/2026",
+      "amount": "650.00",
+      "due_date": "2026-05-25",
+      "status": "pending",
+      "payment_method": "bank_slip",
+      "boleto_number": "...",
+      "boleto_digitable": "...",
+      "payment_url": "https://...",
+      "is_overdue": false
+    },
+    "resumo": {
+      "quantidade_pagas": 1,
+      "quantidade_atrasados": 1,
+      "possui_atual": true,
+      "valor_total_pagas": 650,
+      "valor_total_atrasados": 650,
+      "valor_atual": 650
+    }
+  }
+}
+```
+
+---
+
+## 4. Simulados — Aluno
 
 > Estes endpoints são exclusivos para usuários com `role: "aluno"`.  
 > Critérios verificados automaticamente:

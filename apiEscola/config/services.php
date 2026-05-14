@@ -37,8 +37,8 @@ return [
 
     'cora' => [
         'base_url' => env('CORA_BASE_URL', 'https://api.cora.com.br'),
-        'api_base_url_stage' => env('CORA_API_BASE_URL_STAGE', 'https://matls-clients.api.stage.cora.com.br'),
-        'api_base_url_prod' => env('CORA_API_BASE_URL_PROD', 'https://matls-clients.api.cora.com.br'),
+        'api_base_url_stage' => env('CORA_API_BASE_URL_STAGE', 'https://api.stage.cora.com.br'),
+        'api_base_url_prod' => env('CORA_API_BASE_URL_PROD', 'https://api.cora.com.br'),
         'token' => env('CORA_API_TOKEN'),
         'charges_endpoint' => env('CORA_CHARGES_ENDPOINT', '/v1/charges'),
         'timeout' => (int) env('CORA_TIMEOUT', 20),

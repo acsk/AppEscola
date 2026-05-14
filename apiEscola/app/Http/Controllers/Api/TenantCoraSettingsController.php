@@ -62,6 +62,12 @@ class TenantCoraSettingsController extends Controller
             'test_account_secondary_password' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $normalizedClientId = trim((string) $data['client_id']);
+
+        if ($normalizedClientId === '') {
+            return $this->error('client_id inválido para a Cora.', null, 422);
+        }
+
         $environment = $data['environment'] === 'production' ? 'prod' : $data['environment'];
 
         $baseDir = 'secure/cora/tenants/' . $tenant->id . '/' . ($environment === 'prod' ? 'production' : 'test');
@@ -75,7 +81,7 @@ class TenantCoraSettingsController extends Controller
                 'environment' => $environment,
             ],
             [
-                'client_id' => $data['client_id'],
+                'client_id' => $normalizedClientId,
                 'certificate_path' => $certPath,
                 'private_key_path' => $keyPath,
                 'environment' => $environment,
@@ -92,7 +98,7 @@ class TenantCoraSettingsController extends Controller
             'tenant_id' => $tenant->id,
             'cora' => [
                 'environment' => $environment,
-                'client_id' => $data['client_id'],
+                'client_id' => $normalizedClientId,
                 'configured' => true,
                 'configured_at' => now()->toISOString(),
                 'cert_uploaded' => Storage::disk('local')->exists($certPath),

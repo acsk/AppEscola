@@ -411,7 +411,7 @@ export default function EnrollmentsScreen({ navigate }: Props) {
                 className="flex-row justify-end gap-2"
               >
                 <TouchableOpacity
-                  onPress={() => openView(item.id)}
+                  onPress={() => navigate("matriculas-detail", { enrollmentId: item.id })}
                   className="p-1.5 bg-blue-50 rounded-lg"
                 >
                   <Ionicons name="eye-outline" size={15} color="#3B82F6" />

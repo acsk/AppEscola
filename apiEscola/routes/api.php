@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\GuardianController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\SchoolClassController;
 use App\Http\Controllers\Api\StudentController;
+use App\Http\Controllers\Api\StudentFinanceController;
 use App\Http\Controllers\Api\StudentAttendanceController;
 use App\Http\Controllers\Api\StudentGuardianController;
 use App\Http\Controllers\Api\SubjectController;
@@ -154,8 +155,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
     Route::post('invoices/{invoice}/generate-cora-charge', [InvoiceController::class, 'generateCoraCharge']);
+    Route::get('invoices/{invoice}/payment-options', [PaymentProviderController::class, 'paymentOptions']);
     Route::post('invoices/{invoice}/generate-charge', [PaymentProviderController::class, 'generateCharge']);
     Route::get('invoices/{invoice}/charge-status', [PaymentProviderController::class, 'chargeStatus']);
+    Route::post('invoices/{invoice}/pay-charge', [PaymentProviderController::class, 'payCharge']);
 
     Route::get('tenants/{tenant}/payment-providers/{provider}/settings-schema', [PaymentProviderController::class, 'settingsSchema']);
     Route::post('tenants/{tenant}/payment-providers/{provider}/settings', [PaymentProviderController::class, 'saveSettings']);
@@ -168,6 +171,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Simulados do aluno autenticado (role: aluno)
     Route::get('aluno/dashboard',                [StudentDashboardController::class, 'index']);
+    Route::get('aluno/boletos',                  [StudentFinanceController::class, 'boletos']);
+    Route::get('aluno/cobrancas/{invoice}/payment-options', [StudentFinanceController::class, 'paymentOptions']);
+    Route::post('aluno/cobrancas/{invoice}/generate-charge', [StudentFinanceController::class, 'generateCharge']);
     Route::get('aluno/exams',                    [StudentExamController::class, 'index']);
     Route::get('aluno/exams/{exam}',             [StudentExamController::class, 'show']);
     Route::get('aluno/attempts',                 [StudentExamController::class, 'attempts']);

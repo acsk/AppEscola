@@ -17,6 +17,7 @@ class StoreInvoiceRequest extends FormRequest
             'enrollment_id' => ['nullable', 'exists:enrollments,id'],
             'student_id' => ['required', 'exists:students,id'],
             'guardian_id' => ['nullable', 'exists:guardians,id'],
+            'type' => ['nullable', 'exists:domain_invoice_types,slug'],
             'description' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'due_date' => ['required', 'date'],

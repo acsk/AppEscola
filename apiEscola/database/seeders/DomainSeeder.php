@@ -97,6 +97,10 @@ class DomainSeeder extends Seeder
         DB::table('domain_invoice_types')->insertOrIgnore([
             ['slug' => 'enrollment_fee', 'name' => 'Taxa de Matrícula'],
             ['slug' => 'monthly',        'name' => 'Mensalidade'],
+            ['slug' => 'uniform',        'name' => 'Fardamento'],
+            ['slug' => 'material',       'name' => 'Material Didático'],
+            ['slug' => 'transport',      'name' => 'Transporte'],
+            ['slug' => 'late_fee',       'name' => 'Multa/Juros'],
             ['slug' => 'other',          'name' => 'Outro'],
         ]);
     }

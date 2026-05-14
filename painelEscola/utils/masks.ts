@@ -162,6 +162,33 @@ export function displayDateTimeToISO(display: string): string {
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:00`;
 }
 
+// ─── Moeda ────────────────────────────────────────────────────────────────────
+// Formata enquanto digita: 1234 → "12,34" / 123456 → "1.234,56"
+export function maskCurrency(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 13); // máx 99.999.999,99
+  if (!digits) return "";
+  const num = parseInt(digits, 10);
+  return (num / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+// "1.234,56" → 1234.56 (para enviar à API)
+export function currencyToFloat(masked: string): number {
+  const clean = masked.replace(/\./g, "").replace(",", ".");
+  const val = parseFloat(clean);
+  return Number.isNaN(val) ? 0 : val;
+}
+
+// 1234.56 → "1.234,56" (para exibir no formulário a partir do valor da API)
+export function floatToCurrency(value: string | number | null): string {
+  if (value === null || value === undefined || value === "") return "";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (Number.isNaN(num)) return "";
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // YYYY-MM-DDTHH:MM:SS[.000Z] → DD/MM/AAAA HH:MM (para exibir no formulário)
 export function isoToDisplayDateTime(iso: string): string {
   if (!iso) return "";

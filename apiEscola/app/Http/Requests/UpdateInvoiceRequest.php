@@ -16,6 +16,7 @@ class UpdateInvoiceRequest extends FormRequest
         return [
             'enrollment_id' => ['nullable', 'exists:enrollments,id'],
             'guardian_id' => ['nullable', 'exists:guardians,id'],
+            'type' => ['sometimes', 'exists:domain_invoice_types,slug'],
             'description' => ['sometimes', 'string', 'max:255'],
             'amount' => ['sometimes', 'numeric', 'min:0.01'],
             'due_date' => ['sometimes', 'date'],
@@ -23,6 +24,7 @@ class UpdateInvoiceRequest extends FormRequest
             'paid_at' => ['nullable', 'date'],
             'payment_method' => ['nullable', 'exists:domain_payment_methods,slug'],
             'notes' => ['nullable', 'string'],
+            'edit_reason' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

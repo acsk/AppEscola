@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text } from "react-native";
 
-type Variant = "success" | "warning" | "error" | "info" | "default";
+type Variant = "success" | "warning" | "error" | "info" | "default" | "secondary";
 
 const VARIANTS: Record<Variant, { bg: string; text: string }> = {
   success: { bg: "#ECFDF5", text: "#065F46" },
@@ -9,6 +9,7 @@ const VARIANTS: Record<Variant, { bg: string; text: string }> = {
   error: { bg: "#FEF2F2", text: "#991B1B" },
   info: { bg: "#EFF6FF", text: "#1E40AF" },
   default: { bg: "#F3F4F6", text: "#374151" },
+  secondary: { bg: "#F1F5F9", text: "#334155" },
 };
 
 const SLUG_MAP: Record<string, Variant> = {

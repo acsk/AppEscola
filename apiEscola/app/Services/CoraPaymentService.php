@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Models\TenantCoraCredential;
 use App\Models\Tenant;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -19,7 +23,7 @@ class CoraPaymentService
     /**
      * Cria uma cobrança na Cora para a fatura local.
      *
-     * @return array{external_id: string, status: string|null, payment_url: string|null, pix_copy_paste: string|null, payload: array}
+     * @return array{external_id: string, status: string|null, payment_url: string|null, pix_copy_paste: string|null, qr_code_image_url: string|null, payload: array}
      *
      * @throws RuntimeException
      * @throws ConnectionException
@@ -28,6 +32,13 @@ class CoraPaymentService
     public function createCharge(Invoice $invoice, string $environment = 'stage', string $method = 'pix'): array
     {
         $invoice->loadMissing(['tenant', 'student', 'guardian']);
+
+        Log::info('Cora createCharge started', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'requested_method' => $method,
+        ]);
 
         $token = $this->resolveBearerToken($invoice->tenant, $environment);
         $normalizedMethod = strtolower(trim($method));
@@ -54,37 +65,53 @@ class CoraPaymentService
             $endpoint = '/v2/invoices';
             $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
         } else {
-            $endpoint = '/' . ltrim((string) config('services.cora.charges_endpoint', '/v1/charges'), '/');
-            $payload = [
-                'external_reference' => 'invoice-' . $invoice->id,
-                'amount' => (int) round(((float) $invoice->amount) * 100),
-                'currency' => 'BRL',
-                'description' => $invoice->description,
-                'due_date' => $invoice->due_date?->toDateString(),
-                'payment_method' => 'pix',
-                'payer' => array_filter([
-                    'name' => $payerName,
-                    'document' => $payerDocument !== '' ? $payerDocument : null,
-                    'email' => $payerEmail,
-                ], static fn ($value) => $value !== null && $value !== ''),
-                'metadata' => [
-                    'tenant_id' => $invoice->tenant_id,
-                    'invoice_id' => $invoice->id,
-                    'student_id' => $invoice->student_id,
-                    'environment' => $environment,
-                ],
-            ];
+            $endpoint = '/v2/invoices';
+            $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
+            $payload['payment_forms'] = ['PIX'];
         }
 
-        $response = Http::timeout((int) config('services.cora.timeout', 20))
-            ->acceptJson()
-            ->asJson()
-            ->withToken($token)
-            ->withHeaders([
-                'Idempotency-Key' => (string) Str::uuid(),
-            ])
-            ->post($baseUrl . $endpoint, $payload)
-            ->throw();
+        Log::info('Cora createCharge request prepared', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'normalized_method' => $normalizedMethod,
+            'endpoint' => $baseUrl . $endpoint,
+        ]);
+
+        $httpOptions = $this->resolveHttpClientOptions($invoice->tenant, $environment);
+
+        Log::info('Cora createCharge HTTP options', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'mtls_enabled' => isset($httpOptions['cert'], $httpOptions['ssl_key']),
+            'verify_ssl' => $httpOptions['verify'] ?? null,
+        ]);
+
+        try {
+            $response = Http::timeout((int) config('services.cora.timeout', 20))
+                ->acceptJson()
+                ->asJson()
+                ->withOptions($httpOptions)
+                ->withToken($token)
+                ->withHeaders([
+                    'Idempotency-Key' => (string) Str::uuid(),
+                ])
+                ->post($baseUrl . $endpoint, $payload)
+                ->throw();
+        } catch (RequestException $e) {
+            Log::warning('Cora createCharge request failed', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'environment' => $environment,
+                'normalized_method' => $normalizedMethod,
+                'status' => $e->response?->status(),
+                'provider_error' => $e->response?->json('error'),
+                'provider_message' => $e->response?->json('message'),
+            ]);
+
+            throw $e;
+        }
 
         $body = $response->json();
 
@@ -98,11 +125,23 @@ class CoraPaymentService
             throw new RuntimeException('Resposta da Cora sem identificador da cobrança.');
         }
 
+        Log::info('Cora createCharge succeeded', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'normalized_method' => $normalizedMethod,
+            'external_id' => $externalId,
+            'status' => $body['status'] ?? null,
+        ]);
+
         return [
             'external_id' => $externalId,
             'status' => isset($body['status']) ? (string) $body['status'] : null,
             'payment_url' => $this->extractPaymentUrl($body),
             'pix_copy_paste' => $normalizedMethod === 'pix' ? $this->extractPixCode($body) : null,
+            'qr_code_image_url' => $normalizedMethod === 'pix' ? $this->extractPixImageUrl($body) : null,
+            'boleto_number' => $normalizedMethod === 'boleto' ? $this->extractBoletoNumber($body) : null,
+            'boleto_digitable' => $normalizedMethod === 'boleto' ? $this->extractBoletoDigitable($body) : null,
             'payload' => $body,
         ];
     }
@@ -117,6 +156,7 @@ class CoraPaymentService
         $identity = $payerDocument !== '' ? $payerDocument : '45114521802';
         $docType = strlen($identity) > 11 ? 'CNPJ' : 'CPF';
         $description = trim((string) $invoice->description) !== '' ? (string) $invoice->description : 'Cobrança escolar';
+        $providerDueDate = $this->resolveProviderDueDate($invoice);
 
         return [
             'code' => 'invoice-' . $invoice->id . '-' . now()->format('YmdHis'),
@@ -136,7 +176,7 @@ class CoraPaymentService
                 ],
             ],
             'payment_terms' => [
-                'due_date' => $invoice->due_date?->toDateString(),
+                'due_date' => $providerDueDate,
             ],
             'metadata' => [
                 'tenant_id' => $invoice->tenant_id,
@@ -145,6 +185,21 @@ class CoraPaymentService
                 'environment' => $environment,
             ],
         ];
+    }
+
+    private function resolveProviderDueDate(Invoice $invoice): string
+    {
+        $baseDate = $invoice->due_date instanceof Carbon
+            ? $invoice->due_date->copy()->startOfDay()
+            : Carbon::today();
+
+        $minimumDate = Carbon::today()->addDay()->startOfDay();
+
+        if ($baseDate->lt($minimumDate)) {
+            return $minimumDate->toDateString();
+        }
+
+        return $baseDate->toDateString();
     }
 
     private function extractPaymentUrl(array $body): ?string
@@ -186,6 +241,64 @@ class CoraPaymentService
         return null;
     }
 
+    private function extractPixImageUrl(array $body): ?string
+    {
+        $candidates = [
+            $body['pix']['qr_code_image_url'] ?? null,
+            $body['pix']['qr_code_url'] ?? null,
+            $body['payment_options']['pix']['url'] ?? null,
+            $body['payment_options']['pix']['qr_code_url'] ?? null,
+            $body['qr_code_image_url'] ?? null,
+            $body['qr_code_url'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    private function extractBoletoNumber(array $body): ?string
+    {
+        $candidates = [
+            $body['payment_options']['bank_slip']['barcode'] ?? null,
+            $body['payment_options']['bank_slip']['number'] ?? null,
+            $body['bank_slip']['barcode'] ?? null,
+            $body['boleto']['barcode'] ?? null,
+            $body['barcode'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    private function extractBoletoDigitable(array $body): ?string
+    {
+        $candidates = [
+            $body['payment_options']['bank_slip']['digitable'] ?? null,
+            $body['payment_options']['bank_slip']['our_number'] ?? null,
+            $body['bank_slip']['digitable'] ?? null,
+            $body['boleto']['digitable'] ?? null,
+            $body['digitable'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
     private function digitsOnly(string $value): string
     {
         return preg_replace('/\D+/', '', $value) ?? '';
@@ -200,14 +313,157 @@ class CoraPaymentService
         return (string) config('services.cora.token', '');
     }
 
+    /**
+     * Realiza o pagamento de um boleto ou PIX na Cora (apenas em stage para testes).
+     *
+     * @return array{status: string|null, paid_at: string|null, payload: array}
+     *
+     * @throws RuntimeException
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function payCharge(Invoice $invoice, string $environment = 'stage'): array
+    {
+        $invoice->loadMissing(['tenant']);
+
+        Log::info('Cora payCharge started', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'cora_charge_id' => $invoice->cora_charge_id,
+        ]);
+
+        if (! $invoice->cora_charge_id) {
+            throw new RuntimeException('Fatura sem ID de cobrança Cora. Gere a cobrança primeiro.');
+        }
+
+        $token = $this->resolveBearerToken($invoice->tenant, $environment);
+        $baseUrl = $this->resolveApiBaseUrl($environment);
+
+        if ($token === '' || $baseUrl === '') {
+            throw new RuntimeException('Integração Cora não configurada. Configure credenciais do tenant ou CORA_API_TOKEN.');
+        }
+
+        $endpoint = '/v2/invoices/pay';
+        $payload = [
+            'id' => $invoice->cora_charge_id,
+        ];
+
+        $httpOptions = $this->resolveHttpClientOptions($invoice->tenant, $environment);
+
+        Log::info('Cora payCharge HTTP options', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'mtls_enabled' => isset($httpOptions['cert'], $httpOptions['ssl_key']),
+            'verify_ssl' => $httpOptions['verify'] ?? null,
+        ]);
+
+        try {
+            $response = Http::timeout((int) config('services.cora.timeout', 20))
+                ->acceptJson()
+                ->asJson()
+                ->withOptions($httpOptions)
+                ->withToken($token)
+                ->withHeaders([
+                    'Idempotency-Key' => (string) Str::uuid(),
+                ])
+                ->post($baseUrl . $endpoint, $payload)
+                ->throw();
+        } catch (RequestException $e) {
+            Log::warning('Cora payCharge request failed', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'environment' => $environment,
+                'cora_charge_id' => $invoice->cora_charge_id,
+                'status' => $e->response?->status(),
+                'provider_error' => $e->response?->json('error'),
+                'provider_message' => $e->response?->json('message'),
+            ]);
+
+            throw $e;
+        }
+
+        $body = $response->json();
+
+        if (! is_array($body)) {
+            throw new RuntimeException('Resposta inválida da Cora ao pagar cobrança.');
+        }
+
+        $status = isset($body['status']) ? (string) $body['status'] : null;
+        $paidAt = null;
+
+        // Se o status indica que foi pago, usar a data/hora atual
+        if (in_array($status, ['paid', 'IN_PAYMENT', 'in_payment', 'completed'], true)) {
+            $paidAt = now()->toISOString();
+        }
+
+        Log::info('Cora payCharge finished', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'cora_charge_id' => $invoice->cora_charge_id,
+            'status' => $status,
+            'paid_at' => $paidAt,
+        ]);
+
+        return [
+            'status' => $status,
+            'paid_at' => $paidAt,
+            'payload' => $body,
+        ];
+    }
+
     private function resolveApiBaseUrl(string $environment): string
     {
         $env = strtolower(trim($environment));
 
         if (in_array($env, ['prod', 'production'], true)) {
-            return rtrim((string) config('services.cora.api_base_url_prod', 'https://matls-clients.api.cora.com.br'), '/');
+            return rtrim((string) config('services.cora.api_base_url_prod', 'https://api.cora.com.br'), '/');
         }
 
-        return rtrim((string) config('services.cora.api_base_url_stage', 'https://matls-clients.api.stage.cora.com.br'), '/');
+        return rtrim((string) config('services.cora.api_base_url_stage', 'https://api.stage.cora.com.br'), '/');
+    }
+
+    private function resolveHttpClientOptions(?Tenant $tenant, string $environment): array
+    {
+        $options = [
+            'verify' => (bool) config('services.cora.verify_ssl', true),
+        ];
+
+        if (! $tenant) {
+            return $options;
+        }
+
+        $normalizedEnvironment = in_array(strtolower(trim($environment)), ['prod', 'production'], true)
+            ? 'prod'
+            : 'stage';
+
+        $credential = $tenant->coraCredentials()
+            ->where('active', true)
+            ->where('environment', $normalizedEnvironment)
+            ->orderByDesc('configured_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $credential instanceof TenantCoraCredential) {
+            return $options;
+        }
+
+        $certPath = (string) $credential->certificate_path;
+        $keyPath = (string) $credential->private_key_path;
+
+        if ($certPath === '' || $keyPath === '') {
+            return $options;
+        }
+
+        if (! Storage::disk('local')->exists($certPath) || ! Storage::disk('local')->exists($keyPath)) {
+            return $options;
+        }
+
+        $options['cert'] = Storage::disk('local')->path($certPath);
+        $options['ssl_key'] = Storage::disk('local')->path($keyPath);
+
+        return $options;
     }
 }

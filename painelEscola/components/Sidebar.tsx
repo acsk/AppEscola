@@ -38,7 +38,6 @@ const menuItems: NavItem[] = [
   { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
   { id: "turmas", label: "Turmas", icon: "grid-outline" },
   { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
-  { id: "cobrancas", label: "Cobranças", icon: "cash-outline" },
   { id: "pagamentos", label: "Pagamentos", icon: "card-outline" },
   { id: "simulados", label: "Simulados", icon: "document-text-outline" },
 ];
@@ -129,9 +128,7 @@ export default function Sidebar({
       style={{
         width: isMobile ? Math.min(300, width * 0.84) : 220,
         height: "100%",
-        shadowColor: "#000",
-        shadowOpacity: isMobile ? 0.16 : 0.04,
-        shadowRadius: isMobile ? 18 : 8,
+        boxShadow: isMobile ? "0px 8px 24px rgba(0, 0, 0, 0.16)" : "0px 4px 12px rgba(0, 0, 0, 0.04)",
         elevation: 8,
       }}
     >

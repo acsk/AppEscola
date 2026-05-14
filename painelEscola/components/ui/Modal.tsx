@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   useWindowDimensions,
+  ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -14,8 +15,11 @@ type Props = {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  headerContent?: React.ReactNode;
   footer?: React.ReactNode;
   size?: "sm" | "md" | "lg";
+  maxHeight?: ViewStyle["maxHeight"];
+  footerStyle?: ViewStyle;
 };
 
 const widths = { sm: 560, md: 760, lg: 980 };
@@ -25,8 +29,11 @@ export default function Modal({
   title,
   onClose,
   children,
+  headerContent,
   footer,
   size = "md",
+  maxHeight = "94%",
+  footerStyle,
 }: Props) {
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
@@ -54,24 +61,27 @@ export default function Modal({
           style={{
             width: "100%",
             maxWidth: Math.min(width - horizontalPadding * 2, widths[size]),
-            maxHeight: "88%",
+            maxHeight,
           }}
         >
           {/* Header */}
-          <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
-            <Text className="text-base font-bold text-gray-800">{title}</Text>
-            <TouchableOpacity
-              onPress={onClose}
-              className="p-1 rounded-lg bg-gray-100"
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={18} color="#6B7280" />
-            </TouchableOpacity>
+          <View className="px-6 py-4 border-b border-gray-100">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-base font-bold text-gray-800">{title}</Text>
+              <TouchableOpacity
+                onPress={onClose}
+                className="p-1 rounded-lg bg-gray-100"
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={18} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            {headerContent}
           </View>
 
           {/* Body */}
           <ScrollView
-            className="px-6 py-5"
+            className={isMobile ? "px-4 py-4" : "px-6 py-4"}
             showsVerticalScrollIndicator={false}
           >
             {children}
@@ -81,7 +91,7 @@ export default function Modal({
           {footer && (
             <View
               className="justify-end px-6 py-4 border-t border-gray-100"
-              style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}
+              style={{ flexDirection: isMobile ? "column" : "row", gap: 12, ...footerStyle }}
             >
               {footer}
             </View>

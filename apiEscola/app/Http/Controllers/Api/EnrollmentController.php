@@ -100,7 +100,13 @@ class EnrollmentController extends Controller
     {
         $this->authorizeTenant($request, $enrollment->tenant_id);
 
-        $enrollment->load(['student', 'schoolClass.course']);
+        $enrollment->load([
+            'student',
+            'schoolClass.course',
+            'coursePlan',
+            'bundle',
+            'invoices' => fn ($q) => $q->orderBy('due_date'),
+        ]);
 
         return response()->json(new EnrollmentResource($enrollment));
     }

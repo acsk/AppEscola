@@ -89,7 +89,7 @@ class InvoiceController extends Controller
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
-        $invoice->load(['student', 'guardian', 'enrollment']);
+        $invoice->load(['student', 'guardian', 'enrollment', 'createdByUser', 'updatedByUser']);
 
         return response()->json(new InvoiceResource($invoice));
     }
@@ -122,7 +122,7 @@ class InvoiceController extends Controller
         }
 
         $invoice->update($data);
-        $invoice->load(['student', 'guardian']);
+        $invoice->load(['student', 'guardian', 'createdByUser', 'updatedByUser']);
 
         return response()->json(new InvoiceResource($invoice));
     }
@@ -261,6 +261,8 @@ class InvoiceController extends Controller
             'cora_status' => $result['status'],
             'cora_payment_url' => $result['payment_url'],
             'cora_pix_copy_paste' => $result['pix_copy_paste'],
+            'boleto_number' => $result['boleto_number'],
+            'boleto_digitable' => $result['boleto_digitable'],
             'cora_payload' => $result['payload'],
             'cora_last_synced_at' => now(),
         ]);

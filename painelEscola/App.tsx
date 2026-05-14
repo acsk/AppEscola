@@ -25,6 +25,7 @@ import SchoolClassFormScreen from "./screens/turmas/SchoolClassFormScreen";
 import SchoolClassAttendanceScreen from "./screens/turmas/SchoolClassAttendanceScreen";
 import EnrollmentsScreen from "./screens/matriculas";
 import EnrollmentFormScreen from "./screens/matriculas/EnrollmentFormScreen";
+import EnrollmentDetailScreen from "./screens/matriculas/EnrollmentDetailScreen";
 import InvoicesScreen from "./screens/InvoicesScreen";
 import PaymentProvidersScreen from "./screens/payments/PaymentProvidersScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
@@ -92,6 +93,7 @@ const SCREEN_SLUGS = [
   "simulados-tentativas",
   "tenants",
   "users",
+  "matriculas-detail",
 ];
 
 function hashToNav(hash: string): NavState {
@@ -125,6 +127,8 @@ function hashToNav(hash: string): NavState {
   if (seg0 === "matriculas") {
     if (!seg1) return { screen: "matriculas" };
     if (seg1 === "nova") return { screen: "matriculas-form" };
+    const id = parseInt(seg1, 10);
+    if (!isNaN(id)) return { screen: "matriculas-detail", params: { enrollmentId: id } };
     return { screen: "matriculas" };
   }
 
@@ -189,6 +193,10 @@ function navToHash(nav: NavState): string {
     return id != null ? `#/pacotes/${id}` : "#/pacotes/novo";
   }
   if (nav.screen === "matriculas-form") return "#/matriculas/nova";
+  if (nav.screen === "matriculas-detail") {
+    const id = nav.params?.enrollmentId;
+    return id != null ? `#/matriculas/${id}` : "#/matriculas";
+  }
   if (nav.screen === "simulados-form") {
     const id = nav.params?.examId;
     return id != null ? `#/simulados/${id}` : "#/simulados/novo";
@@ -658,6 +666,7 @@ function AppContent() {
       case "turmas-frequencia": return <SchoolClassAttendanceScreen navigate={navigate} classId={nav.params?.classId ?? null} />;
       case "matriculas": return <EnrollmentsScreen navigate={navigate} />;
       case "matriculas-form": return <EnrollmentFormScreen navigate={navigate} />;
+      case "matriculas-detail": return <EnrollmentDetailScreen navigate={navigate} enrollmentId={nav.params?.enrollmentId} />;
       case "cobrancas": return <InvoicesScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;

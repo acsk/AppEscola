@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
 use App\Models\Tenant;
 use App\Models\TenantCoraCredential;
@@ -13,6 +12,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -163,6 +163,12 @@ class PaymentProviderController extends Controller
             'test_account_secondary_password' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $normalizedClientId = trim((string) $data['client_id']);
+
+        if ($normalizedClientId === '') {
+            return $this->error('client_id inválido para o provedor.', null, 422);
+        }
+
         $environment = $data['environment'] === 'production' ? 'prod' : $data['environment'];
 
         $baseDir = 'secure/cora/tenants/' . $tenant->id;
@@ -178,7 +184,7 @@ class PaymentProviderController extends Controller
                 'environment' => $environment,
             ],
             [
-                'client_id' => $data['client_id'],
+                'client_id' => $normalizedClientId,
                 'certificate_path' => $certPath,
                 'private_key_path' => $keyPath,
                 'environment' => $environment,
@@ -206,7 +212,18 @@ class PaymentProviderController extends Controller
         $this->ensureCanManageTenant($request, $tenant);
         $this->ensureSupportedProvider($provider);
 
-        $environment = (string) $request->input('environment', 'stage');
+        $requestedEnv = (string) $request->input('environment', 'stage');
+        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
+
+        // Same environment enforcement as generateCharge
+        $user = $request->user();
+        if (! app()->environment('production')) {
+            $environment = 'stage';
+        } elseif ($user && $user->isSuperAdmin()) {
+            $environment = $requestedEnv ?: 'prod';
+        } else {
+            $environment = 'prod';
+        }
 
         try {
             $token = $tokenService->generateForTenant($tenant, $environment);
@@ -236,6 +253,49 @@ class PaymentProviderController extends Controller
         ], 'Conexão com o provedor validada com sucesso.');
     }
 
+    public function paymentOptions(Request $request, Invoice $invoice): JsonResponse
+    {
+        $this->ensureCanAccessInvoice($request, $invoice);
+
+        $pixQrImageUrl = data_get($invoice->cora_payload, 'pix.qr_code_image_url')
+            ?? data_get($invoice->cora_payload, 'pix.qr_code_url')
+            ?? data_get($invoice->cora_payload, 'payment_options.pix.qr_code_url')
+            ?? data_get($invoice->cora_payload, 'qr_code_image_url');
+
+        return $this->success([
+            'invoice' => [
+                'id'             => $invoice->id,
+                'description'    => $invoice->description,
+                'amount'         => (string) $invoice->amount,
+                'due_date'       => $invoice->due_date?->toDateString(),
+                'status'         => $invoice->status,
+                'payment_method' => $invoice->payment_method,
+            ],
+            'allowed_methods' => ['pix', 'boleto'],
+            'current_method'  => match (true) {
+                $invoice->payment_method === 'bank_slip' => 'boleto',
+                in_array($invoice->payment_method, ['pix', 'boleto'], true) => $invoice->payment_method,
+                default => null,
+            },
+            'actions' => [
+                'can_generate_charge'  => ! in_array($invoice->status, ['paid', 'cancelled'], true),
+                'can_open_boleto_url'  => (bool) $invoice->cora_payment_url,
+                'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
+                'can_copy_pix_code'    => (bool) $invoice->cora_pix_copy_paste,
+            ],
+            'payment_assets' => [
+                'charge_id'       => $invoice->cora_charge_id,
+                'charge_status'   => $invoice->cora_status,
+                'boleto_number'   => $invoice->boleto_number,
+                'boleto_digitable'=> $invoice->boleto_digitable,
+                'boleto_url'      => $invoice->cora_payment_url,
+                'pix_copy_paste'  => $invoice->cora_pix_copy_paste,
+                'pix_qr_image_url'=> $pixQrImageUrl,
+                'last_synced_at'  => $invoice->cora_last_synced_at?->toISOString(),
+            ],
+        ], 'Opções de pagamento carregadas com sucesso.');
+    }
+
     public function generateCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
@@ -246,37 +306,205 @@ class PaymentProviderController extends Controller
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
         ]);
 
-        $environment = $data['environment'] ?? 'stage';
-        $environment = $environment === 'production' ? 'prod' : $environment;
-        $requestedMethod = strtolower((string) ($data['method'] ?? 'pix'));
-        $coraMethod = in_array($requestedMethod, ['boleto', 'bank_slip'], true) ? 'boleto' : 'pix';
-        $storedMethod = $coraMethod === 'boleto' ? 'bank_slip' : 'pix';
+        $requestedEnv = $data['environment'] ?? 'stage';
+        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
+
+        // Enforce environment based on app environment:
+        //   - Not production → always stage
+        //   - Production + not super_admin → always prod
+        //   - Production + super_admin → honor request (default prod)
+        $user = $request->user();
+        if (! app()->environment('production')) {
+            $environment = 'stage';
+        } elseif ($user && $user->isSuperAdmin()) {
+            $environment = $requestedEnv ?: 'prod';
+        } else {
+            $environment = 'prod';
+        }
+
+        $requestedMethodRaw = strtolower((string) ($data['method'] ?? ''));
+        $requestedMethod = in_array($requestedMethodRaw, ['pix', 'boleto', 'bank_slip'], true)
+            ? $requestedMethodRaw
+            : '';
+        $requestedStoredMethod = $requestedMethod !== ''
+            ? (in_array($requestedMethod, ['boleto', 'bank_slip'], true) ? 'bank_slip' : 'pix')
+            : null;
+        $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
+        $reusableCharge = $this->resolveReusableCharge($invoice, $requestedStoredMethod);
+
+        Log::info('PaymentProviderController generateCharge called', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'provider' => $data['provider'],
+            'requested_method' => $requestedMethod !== '' ? $requestedMethod : null,
+            'resolved_method' => $requestedStoredMethod,
+            'existing_method' => $existingStoredMethod,
+            'environment' => $environment,
+        ]);
 
         if (in_array($invoice->status, ['paid', 'cancelled'], true)) {
             return $this->error('Não é possível gerar cobrança para fatura paga ou cancelada.', null, 422);
         }
 
+        if ($reusableCharge) {
+            if (($reusableCharge['source'] ?? 'current') === 'history') {
+                $invoice->update([
+                    'payment_method' => $reusableCharge['method'],
+                    'cora_charge_id' => $reusableCharge['charge_id'],
+                    'cora_status' => $reusableCharge['status'],
+                    'cora_payment_url' => $reusableCharge['payment_url'],
+                    'cora_pix_copy_paste' => $reusableCharge['pix_copy_paste'],
+                    'boleto_number' => $reusableCharge['boleto_number'],
+                    'boleto_digitable' => $reusableCharge['boleto_digitable'],
+                    'cora_last_synced_at' => now(),
+                ]);
+
+                $invoice->refresh();
+            }
+
+            Log::info('PaymentProviderController generateCharge reused existing charge', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'provider' => 'cora',
+                'environment' => $environment,
+                'requested_method' => $requestedStoredMethod,
+                'reused_method' => $reusableCharge['method'],
+                'source' => $reusableCharge['source'] ?? 'current',
+                'charge_id' => $reusableCharge['charge_id'],
+                'status' => $reusableCharge['status'],
+            ]);
+
+            return $this->success([
+                'invoice_id' => $invoice->id,
+                'provider' => 'cora',
+                'environment' => $environment,
+                'method' => $reusableCharge['method'],
+                'charge_id' => $reusableCharge['charge_id'],
+                'status' => $reusableCharge['status'],
+                'payment_url' => $reusableCharge['payment_url'],
+                'pix_copy_paste' => $reusableCharge['pix_copy_paste'],
+                'boleto_number' => $reusableCharge['boleto_number'],
+                'boleto_digitable' => $reusableCharge['boleto_digitable'],
+                'qr_code_image_url' => $reusableCharge['qr_code_image_url'],
+                'expires_at' => null,
+                'reused_existing_charge' => true,
+            ], 'Cobrança existente reutilizada com sucesso.');
+        }
+
+        if ($requestedStoredMethod !== null && $existingStoredMethod !== null && $requestedStoredMethod !== $existingStoredMethod) {
+            Log::info('PaymentProviderController generateCharge creating new charge due to method change', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'provider' => 'cora',
+                'environment' => $environment,
+                'requested_method' => $requestedStoredMethod,
+                'existing_method' => $existingStoredMethod,
+                'existing_charge_id' => $invoice->cora_charge_id,
+            ]);
+        }
+
+        $storedMethod = $requestedStoredMethod ?? $existingStoredMethod ?? 'pix';
+        $coraMethod = $storedMethod === 'bank_slip' ? 'boleto' : 'pix';
+
         try {
             $result = $cora->createCharge($invoice, $environment, $coraMethod);
         } catch (ConnectionException|RequestException $e) {
-            return $this->error('Erro ao comunicar com o provedor.', [
+            $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
+            $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';
+            $providerMessage = $e instanceof RequestException ? (string) ($e->response?->json('message') ?? '') : '';
+            $providerError = $e instanceof RequestException ? (string) ($e->response?->json('error') ?? '') : '';
+
+            $userMessage = 'Erro ao comunicar com o provedor.';
+            $httpStatus = 502;
+
+            if ($status >= 400 && $status < 500) {
+                $httpStatus = 422;
+                $userMessage = $providerMessage !== ''
+                    ? $providerMessage
+                    : ($providerError !== '' ? $providerError : 'Falha de validação retornada pelo provedor.');
+            }
+
+            Log::warning('PaymentProviderController generateCharge communication error', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'provider' => $data['provider'],
+                'environment' => $environment,
+                'method' => $coraMethod,
+                'status' => $status,
+                'provider_code' => $providerCode,
+                'provider_message' => $providerMessage,
+                'provider_error' => $providerError,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($userMessage, [
+                'provider' => $data['provider'],
+                'environment' => $environment,
+                'method' => $coraMethod,
+                'provider_code' => $providerCode !== '' ? $providerCode : null,
+                'provider_message' => $providerMessage !== '' ? $providerMessage : null,
+                'provider_error' => $providerError !== '' ? $providerError : null,
+                'error' => $e->getMessage(),
+            ], $httpStatus);
+        } catch (\RuntimeException $e) {
+            Log::warning('PaymentProviderController generateCharge runtime error', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
                 'provider' => $data['provider'],
                 'environment' => $environment,
                 'method' => $coraMethod,
                 'error' => $e->getMessage(),
-            ], 502);
-        } catch (\RuntimeException $e) {
+            ]);
+
             return $this->error($e->getMessage(), null, 422);
         }
 
+        $existingSnapshot = $this->buildChargeSnapshotFromInvoice($invoice, $existingStoredMethod);
+        $methodCharges = $this->extractMethodCharges($invoice->cora_payload);
+
+        if ($existingSnapshot) {
+            $methodCharges[$existingSnapshot['method']] = $existingSnapshot;
+        }
+
+        $newSnapshot = [
+            'method' => $storedMethod,
+            'charge_id' => $result['external_id'],
+            'status' => $result['status'],
+            'payment_url' => $result['payment_url'],
+            'pix_copy_paste' => $result['pix_copy_paste'],
+            'boleto_number' => $result['boleto_number'],
+            'boleto_digitable' => $result['boleto_digitable'],
+            'qr_code_image_url' => $result['qr_code_image_url']
+                ?? data_get($result['payload'], 'pix.qr_code_image_url')
+                ?? data_get($result['payload'], 'pix.qr_code_url')
+                ?? data_get($result['payload'], 'payment_options.pix.qr_code_url')
+                ?? data_get($result['payload'], 'qr_code_image_url'),
+        ];
+        $methodCharges[$storedMethod] = $newSnapshot;
+
+        $payloadToPersist = is_array($result['payload']) ? $result['payload'] : [];
+        $payloadToPersist['method_charges'] = $methodCharges;
+
         $invoice->update([
-            'payment_method' => $invoice->payment_method ?? $storedMethod,
+            'payment_method' => $storedMethod,
             'cora_charge_id' => $result['external_id'],
             'cora_status' => $result['status'],
             'cora_payment_url' => $result['payment_url'],
             'cora_pix_copy_paste' => $result['pix_copy_paste'],
-            'cora_payload' => $result['payload'],
+            'boleto_number' => $result['boleto_number'],
+            'boleto_digitable' => $result['boleto_digitable'],
+            'cora_payload' => $payloadToPersist,
             'cora_last_synced_at' => now(),
+        ]);
+
+        Log::info('PaymentProviderController generateCharge succeeded', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'provider' => 'cora',
+            'environment' => $environment,
+            'method' => $storedMethod,
+            'charge_id' => $invoice->fresh()->cora_charge_id,
+            'status' => $invoice->fresh()->cora_status,
         ]);
 
         return $this->success([
@@ -288,9 +516,140 @@ class PaymentProviderController extends Controller
             'status' => $invoice->fresh()->cora_status,
             'payment_url' => $invoice->fresh()->cora_payment_url,
             'pix_copy_paste' => $invoice->fresh()->cora_pix_copy_paste,
-            'qr_code_image_url' => null,
+            'boleto_number' => $invoice->fresh()->boleto_number,
+            'boleto_digitable' => $invoice->fresh()->boleto_digitable,
+            'qr_code_image_url' => $result['qr_code_image_url']
+                ?? data_get($invoice->fresh()->cora_payload, 'pix.qr_code_image_url')
+                ?? data_get($invoice->fresh()->cora_payload, 'pix.qr_code_url')
+                ?? data_get($invoice->fresh()->cora_payload, 'payment_options.pix.qr_code_url'),
             'expires_at' => null,
+            'reused_existing_charge' => false,
         ], 'Cobrança gerada com sucesso.');
+    }
+
+    private function shouldReuseExistingCharge(Invoice $invoice, ?string $storedMethod): bool
+    {
+        if (! $storedMethod) {
+            return false;
+        }
+
+        if (! $invoice->cora_charge_id) {
+            return false;
+        }
+
+        $providerStatus = strtoupper(trim((string) $invoice->cora_status));
+
+        if (! in_array($providerStatus, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function resolveStoredMethodForExistingCharge(Invoice $invoice): ?string
+    {
+        $paymentMethod = strtolower((string) $invoice->payment_method);
+
+        if (in_array($paymentMethod, ['boleto', 'bank_slip'], true)) {
+            return 'bank_slip';
+        }
+
+        if ($paymentMethod === 'pix') {
+            return 'pix';
+        }
+
+        if ($invoice->boleto_digitable || $invoice->boleto_number || $invoice->cora_payment_url) {
+            return 'bank_slip';
+        }
+
+        if ($invoice->cora_pix_copy_paste) {
+            return 'pix';
+        }
+
+        return null;
+    }
+
+    private function resolveReusableCharge(Invoice $invoice, ?string $requestedStoredMethod): ?array
+    {
+        $currentStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
+        $currentSnapshot = $this->buildChargeSnapshotFromInvoice($invoice, $currentStoredMethod);
+
+        if ($currentSnapshot
+            && ($requestedStoredMethod === null || $requestedStoredMethod === $currentSnapshot['method'])
+            && $this->isReusableChargeStatus($currentSnapshot['status'])) {
+            $currentSnapshot['source'] = 'current';
+
+            return $currentSnapshot;
+        }
+
+        if ($requestedStoredMethod === null) {
+            return null;
+        }
+
+        $methodCharges = $this->extractMethodCharges($invoice->cora_payload);
+        $candidate = $methodCharges[$requestedStoredMethod] ?? null;
+
+        if (! is_array($candidate)) {
+            return null;
+        }
+
+        $chargeId = (string) ($candidate['charge_id'] ?? '');
+        $status = isset($candidate['status']) ? strtoupper(trim((string) $candidate['status'])) : '';
+
+        if ($chargeId === '' || ! $this->isReusableChargeStatus($status)) {
+            return null;
+        }
+
+        return [
+            'method' => $requestedStoredMethod,
+            'charge_id' => $chargeId,
+            'status' => $status,
+            'payment_url' => isset($candidate['payment_url']) ? (string) $candidate['payment_url'] : null,
+            'pix_copy_paste' => isset($candidate['pix_copy_paste']) ? (string) $candidate['pix_copy_paste'] : null,
+            'boleto_number' => isset($candidate['boleto_number']) ? (string) $candidate['boleto_number'] : null,
+            'boleto_digitable' => isset($candidate['boleto_digitable']) ? (string) $candidate['boleto_digitable'] : null,
+            'qr_code_image_url' => isset($candidate['qr_code_image_url']) ? (string) $candidate['qr_code_image_url'] : null,
+            'source' => 'history',
+        ];
+    }
+
+    private function buildChargeSnapshotFromInvoice(Invoice $invoice, ?string $storedMethod): ?array
+    {
+        if (! $storedMethod || ! $invoice->cora_charge_id) {
+            return null;
+        }
+
+        return [
+            'method' => $storedMethod,
+            'charge_id' => $invoice->cora_charge_id,
+            'status' => $invoice->cora_status,
+            'payment_url' => $invoice->cora_payment_url,
+            'pix_copy_paste' => $invoice->cora_pix_copy_paste,
+            'boleto_number' => $invoice->boleto_number,
+            'boleto_digitable' => $invoice->boleto_digitable,
+            'qr_code_image_url' => data_get($invoice->cora_payload, 'pix.qr_code_image_url')
+                ?? data_get($invoice->cora_payload, 'pix.qr_code_url')
+                ?? data_get($invoice->cora_payload, 'payment_options.pix.qr_code_url')
+                ?? data_get($invoice->cora_payload, 'qr_code_image_url'),
+        ];
+    }
+
+    private function extractMethodCharges(mixed $payload): array
+    {
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        $methodCharges = $payload['method_charges'] ?? [];
+
+        return is_array($methodCharges) ? $methodCharges : [];
+    }
+
+    private function isReusableChargeStatus(?string $status): bool
+    {
+        $providerStatus = strtoupper(trim((string) $status));
+
+        return in_array($providerStatus, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true);
     }
 
     public function chargeStatus(Request $request, Invoice $invoice): JsonResponse
@@ -302,5 +661,116 @@ class PaymentProviderController extends Controller
             'status' => $invoice->cora_status,
             'paid_at' => $invoice->paid_at?->toISOString(),
         ], 'Status da cobrança carregado com sucesso.');
+    }
+
+    public function payCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    {
+        $this->ensureCanAccessInvoice($request, $invoice);
+
+        $data = $request->validate([
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
+        ]);
+
+        $environment = $data['environment'] ?? 'stage';
+        $environment = $environment === 'production' ? 'prod' : $environment;
+
+        Log::info('PaymentProviderController payCharge called', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'cora_charge_id' => $invoice->cora_charge_id,
+        ]);
+
+        // Apenas em stage para testes
+        if ($environment !== 'stage') {
+            return $this->error('Pagamento de cobrança (teste) disponível apenas em stage.', null, 422);
+        }
+
+        if (! $invoice->cora_charge_id) {
+            return $this->error('Fatura sem ID de cobrança Cora. Gere a cobrança primeiro.', null, 422);
+        }
+
+        if ($invoice->status === 'paid') {
+            return $this->error('Fatura já está paga.', null, 422);
+        }
+
+        if ($invoice->status === 'cancelled') {
+            return $this->error('Não é possível pagar uma fatura cancelada.', null, 422);
+        }
+
+        try {
+            $result = $cora->payCharge($invoice, $environment);
+        } catch (ConnectionException|RequestException $e) {
+            $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
+            $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';
+            $providerMessage = $e instanceof RequestException ? (string) ($e->response?->json('message') ?? '') : '';
+            $providerError = $e instanceof RequestException ? (string) ($e->response?->json('error') ?? '') : '';
+
+            $userMessage = 'Erro ao comunicar com o provedor.';
+            $httpStatus = 502;
+
+            if ($status >= 400 && $status < 500) {
+                $httpStatus = 422;
+                $userMessage = $providerMessage !== ''
+                    ? $providerMessage
+                    : ($providerError !== '' ? $providerError : 'Falha de validação retornada pelo provedor.');
+            }
+
+            Log::warning('PaymentProviderController payCharge communication error', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'environment' => $environment,
+                'status' => $status,
+                'provider_code' => $providerCode,
+                'provider_message' => $providerMessage,
+                'provider_error' => $providerError,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($userMessage, [
+                'provider' => 'cora',
+                'environment' => $environment,
+                'provider_code' => $providerCode !== '' ? $providerCode : null,
+                'provider_message' => $providerMessage !== '' ? $providerMessage : null,
+                'provider_error' => $providerError !== '' ? $providerError : null,
+                'error' => $e->getMessage(),
+            ], $httpStatus);
+        } catch (\RuntimeException $e) {
+            Log::warning('PaymentProviderController payCharge runtime error', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'environment' => $environment,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($e->getMessage(), null, 422);
+        }
+
+        // Atualizar status da fatura baseado na resposta da Cora
+        $paidAt = $result['paid_at'] ? new \DateTime($result['paid_at']) : now();
+
+        $invoice->update([
+            'status' => 'paid',
+            'paid_at' => $paidAt,
+            'cora_status' => $result['status'],
+            'cora_payload' => $result['payload'],
+            'cora_last_synced_at' => now(),
+        ]);
+
+        Log::info('PaymentProviderController payCharge succeeded', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'status' => $invoice->fresh()->cora_status,
+            'paid_at' => $invoice->fresh()->paid_at?->toISOString(),
+        ]);
+
+        return $this->success([
+            'invoice_id' => $invoice->id,
+            'provider' => 'cora',
+            'environment' => $environment,
+            'status' => $invoice->fresh()->cora_status,
+            'paid_at' => $invoice->fresh()->paid_at?->toISOString(),
+        ], 'Cobrança paga com sucesso.');
     }
 }

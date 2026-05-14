@@ -5,6 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../services/api";
@@ -18,10 +20,12 @@ import ConfirmModal from "../components/ui/ConfirmModal";
 import {
   ChargeStatusResponse,
   GeneratedCharge,
+  PaidChargeResponse,
   PaymentProvider,
   generateUnifiedCharge,
   getUnifiedChargeStatus,
   listPaymentProviders,
+  payUnifiedCharge,
 } from "../services/payments";
 import {
   useInvoiceStatuses,
@@ -29,6 +33,20 @@ import {
   domainToOptions,
 } from "../hooks/useDomains";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+
+const reactPdf = Platform.OS === "web" ? require("react-pdf") : null;
+const PdfDocument = reactPdf?.Document as React.ComponentType<any> | null;
+const PdfPage = reactPdf?.Page as React.ComponentType<any> | null;
+const pdfjs = reactPdf?.pdfjs as
+  | {
+      version: string;
+      GlobalWorkerOptions: { workerSrc: string };
+    }
+  | undefined;
+
+if (Platform.OS === "web" && pdfjs) {
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+}
 
 type Student = { id: number; name: string };
 type Guardian = { id: number; name: string };
@@ -44,6 +62,12 @@ type Invoice = {
   student?: Student;
   guardian?: Guardian;
   enrollment_id: number | null;
+};
+
+const canGenerateChargeForInvoice = (invoice: Invoice | null) => {
+  if (!invoice) return false;
+
+  return invoice.status !== "paid" && invoice.status !== "cancelled";
 };
 
 type Form = {
@@ -111,8 +135,15 @@ export default function InvoicesScreen() {
   const [chargeMethod, setChargeMethod] = useState("pix");
   const [generatingCharge, setGeneratingCharge] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [payingCharge, setPayingCharge] = useState(false);
   const [chargeResult, setChargeResult] = useState<GeneratedCharge | null>(null);
   const [chargeStatusResult, setChargeStatusResult] = useState<ChargeStatusResponse | null>(null);
+  const [paidChargeResult, setPaidChargeResult] = useState<PaidChargeResponse | null>(null);
+  const [chargeActionError, setChargeActionError] = useState<string | null>(null);
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [guardians, setGuardians] = useState<Guardian[]>([]);
@@ -221,11 +252,7 @@ export default function InvoicesScreen() {
       fetch();
     } catch (e: any) {
       if (e.response?.status === 422) {
-        const errs: Record<string, string> = {};
-        Object.entries(e.response.data.errors ?? {}).forEach(([k, v]) => {
-          errs[k] = Array.isArray(v) ? (v[0] as string) : (v as string);
-        });
-        setErrors(errs);
+        setErrors(parseApiErrors(e.response.data.errors ?? {}));
       }
     }
     setSaving(false);
@@ -247,14 +274,25 @@ export default function InvoicesScreen() {
   };
 
   const openChargeModal = (invoice: Invoice) => {
+    const normalizedMethod =
+      invoice.payment_method === "bank_slip" || invoice.payment_method === "boleto"
+        ? "boleto"
+        : "pix";
+
     setChargeInvoice(invoice);
     setChargeResult(null);
     setChargeStatusResult(null);
+    setPaidChargeResult(null);
+    setChargeActionError(
+      canGenerateChargeForInvoice(invoice)
+        ? null
+        : "Não é possível gerar cobrança para uma fatura paga ou cancelada."
+    );
     if (!chargeProvider && providers.length > 0) {
       setChargeProvider(providers[0].slug);
     }
     setChargeEnvironment("stage");
-    setChargeMethod(invoice.payment_method || "pix");
+    setChargeMethod(normalizedMethod);
     setChargeModalVisible(true);
   };
 
@@ -263,12 +301,35 @@ export default function InvoicesScreen() {
     setChargeInvoice(null);
     setChargeResult(null);
     setChargeStatusResult(null);
+    setPaidChargeResult(null);
+    setChargeActionError(null);
+  };
+
+  const closePreviewModal = () => {
+    setPreviewModalVisible(false);
+    setPdfPageCount(0);
+    setPdfPreviewError(null);
+  };
+
+  const openPreviewModal = (url: string | null) => {
+    if (!url) return;
+    setPreviewUrl(url);
+    setPdfPageCount(0);
+    setPdfPreviewError(null);
+    setPreviewModalVisible(true);
   };
 
   const onGenerateCharge = async () => {
     if (!chargeInvoice || !chargeProvider) return;
+    if (!canGenerateChargeForInvoice(chargeInvoice)) {
+      setChargeActionError("Não é possível gerar cobrança para uma fatura paga ou cancelada.");
+      return;
+    }
+
     setGeneratingCharge(true);
     setChargeStatusResult(null);
+    setPaidChargeResult(null);
+    setChargeActionError(null);
     try {
       const result = await generateUnifiedCharge(chargeInvoice.id, {
         provider: chargeProvider,
@@ -276,9 +337,14 @@ export default function InvoicesScreen() {
         environment: chargeEnvironment,
       });
       setChargeResult(result);
+      if (result.payment_url) {
+        openPreviewModal(result.payment_url);
+      }
       fetch();
-    } catch {
+    } catch (e: any) {
       setChargeResult(null);
+      const message = e?.response?.data?.message ?? "Não foi possível gerar a cobrança.";
+      setChargeActionError(message);
     }
     setGeneratingCharge(false);
   };
@@ -286,14 +352,41 @@ export default function InvoicesScreen() {
   const onCheckChargeStatus = async () => {
     if (!chargeInvoice) return;
     setCheckingStatus(true);
+    setChargeActionError(null);
     try {
       const result = await getUnifiedChargeStatus(chargeInvoice.id);
       setChargeStatusResult(result);
       fetch();
-    } catch {
+    } catch (e: any) {
       setChargeStatusResult(null);
+      const message = e?.response?.data?.message ?? "Não foi possível consultar o status da cobrança.";
+      setChargeActionError(message);
     }
     setCheckingStatus(false);
+  };
+
+  const onPayCharge = async () => {
+    if (!chargeInvoice) return;
+    if (chargeEnvironment !== "stage") {
+      setChargeActionError("A simulação de pagamento está disponível apenas no ambiente de teste (stage).");
+      return;
+    }
+
+    setPayingCharge(true);
+    setChargeActionError(null);
+    setPaidChargeResult(null);
+
+    try {
+      const result = await payUnifiedCharge(chargeInvoice.id, { environment: "stage" });
+      setPaidChargeResult(result);
+      await onCheckChargeStatus();
+      fetch();
+    } catch (e: any) {
+      const message = e?.response?.data?.message ?? "Não foi possível simular o pagamento da cobrança.";
+      setChargeActionError(message);
+    }
+
+    setPayingCharge(false);
   };
 
   const copyPixCode = async () => {
@@ -301,6 +394,25 @@ export default function InvoicesScreen() {
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(chargeResult.pix_copy_paste);
     }
+  };
+
+  const isImagePreviewUrl = (url: string | null) => {
+    if (!url) return false;
+    const normalizedUrl = url.toLowerCase();
+    return [".png", ".jpg", ".jpeg", ".webp", "image/png", "image/jpeg", "image/webp"].some((token) =>
+      normalizedUrl.includes(token)
+    );
+  };
+
+  const isPdfPreviewUrl = (url: string | null) => {
+    if (!url) return false;
+    return url.toLowerCase().includes(".pdf") || url.toLowerCase().includes("application/pdf");
+  };
+
+  const getPdfPreviewWidth = () => {
+    if (typeof window === "undefined") return 760;
+
+    return Math.max(280, Math.min(window.innerWidth - 220, 820));
   };
 
   const studentOptions = [
@@ -315,9 +427,6 @@ export default function InvoicesScreen() {
   const chargeMethodOptions = [
     { value: "pix", label: "Pix" },
     { value: "boleto", label: "Boleto" },
-    { value: "credit_card", label: "Cartão Crédito" },
-    { value: "debit_card", label: "Cartão Débito" },
-    { value: "bank_transfer", label: "Transferência" },
   ];
   const allStatusOptions = [{ value: "", label: "Todos" }, ...statusOptions];
   const fmt = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";
@@ -394,9 +503,15 @@ export default function InvoicesScreen() {
                 <TouchableOpacity onPress={() => openEdit(item)} className="p-1.5 bg-violet-50 rounded-lg" style={{ marginRight: 2 }}>
                   <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => openChargeModal(item)} className="p-1.5 bg-blue-50 rounded-lg" style={{ marginRight: 2 }}>
-                  <Ionicons name="qr-code-outline" size={15} color="#2563EB" />
-                </TouchableOpacity>
+                {canGenerateChargeForInvoice(item) ? (
+                  <TouchableOpacity onPress={() => openChargeModal(item)} className="p-1.5 bg-blue-50 rounded-lg" style={{ marginRight: 2 }}>
+                    <Ionicons name="qr-code-outline" size={15} color="#2563EB" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity onPress={() => openChargeModal(item)} className="p-1.5 bg-gray-100 rounded-lg" style={{ marginRight: 2 }}>
+                    <Ionicons name="qr-code-outline" size={15} color="#9CA3AF" />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
                   <Ionicons name="trash-outline" size={15} color="#EF4444" />
                 </TouchableOpacity>
@@ -467,7 +582,22 @@ export default function InvoicesScreen() {
             <TouchableOpacity onPress={onCheckChargeStatus} disabled={checkingStatus || !chargeInvoice} className="px-5 py-2.5 rounded-xl border border-violet-200">
               {checkingStatus ? <ActivityIndicator size="small" color="#7C3AED" /> : <Text className="text-sm font-semibold text-violet-700">Consultar status</Text>}
             </TouchableOpacity>
-            <TouchableOpacity onPress={onGenerateCharge} disabled={generatingCharge || !chargeInvoice || !chargeProvider} className="px-5 py-2.5 rounded-xl bg-violet-600">
+            <TouchableOpacity
+              onPress={onPayCharge}
+              disabled={payingCharge || !chargeInvoice || chargeEnvironment !== "stage"}
+              className="px-5 py-2.5 rounded-xl border border-emerald-300"
+            >
+              {payingCharge ? (
+                <ActivityIndicator size="small" color="#059669" />
+              ) : (
+                <Text className="text-sm font-semibold text-emerald-700">Simular pagamento</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onGenerateCharge}
+              disabled={generatingCharge || !chargeInvoice || !chargeProvider || !canGenerateChargeForInvoice(chargeInvoice)}
+              className={`px-5 py-2.5 rounded-xl ${canGenerateChargeForInvoice(chargeInvoice) ? "bg-violet-600" : "bg-gray-300"}`}
+            >
               {generatingCharge ? <ActivityIndicator color="white" size="small" /> : <Text className="text-sm font-bold text-white">Gerar cobrança</Text>}
             </TouchableOpacity>
           </>
@@ -475,7 +605,7 @@ export default function InvoicesScreen() {
       >
         <View className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
           <Text className="text-xs text-gray-600">Contrato unificado: /generate-charge e /charge-status</Text>
-          <Text className="text-xs text-gray-500 mt-1">Fallback legado Cora ativo durante transição.</Text>
+          <Text className="text-xs text-gray-500 mt-1">No ambiente stage, use "Simular pagamento" para testar /pay-charge.</Text>
         </View>
 
         <View className="flex-row gap-4">
@@ -514,6 +644,11 @@ export default function InvoicesScreen() {
           <Text className="text-xs text-gray-600">
             A cobrança vai usar a credencial do ambiente selecionado no tenant.
           </Text>
+          {!!chargeInvoice && !canGenerateChargeForInvoice(chargeInvoice) && (
+            <Text className="text-xs text-red-600 mt-2">
+              Esta fatura está {STATUS_LABELS[chargeInvoice.status] ?? chargeInvoice.status} e não permite nova geração de cobrança.
+            </Text>
+          )}
         </View>
 
         {!!chargeResult && (
@@ -523,14 +658,22 @@ export default function InvoicesScreen() {
             <Text className="text-xs text-emerald-700 mt-1">Ambiente: {chargeResult.environment || chargeEnvironment}</Text>
             <Text className="text-xs text-emerald-700 mt-1">Status: {chargeResult.status || "—"}</Text>
             {!!chargeResult.payment_url && (
-              <TouchableOpacity
-                onPress={() => {
-                  if (typeof window !== "undefined") window.open(chargeResult.payment_url || "", "_blank");
-                }}
-                className="mt-2 px-3 py-2 rounded-lg bg-emerald-600 self-start"
-              >
-                <Text className="text-xs font-semibold text-white">Abrir URL de pagamento</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <TouchableOpacity
+                  onPress={() => openPreviewModal(chargeResult.payment_url || null)}
+                  className="px-3 py-2 rounded-lg bg-emerald-600 self-start"
+                >
+                  <Text className="text-xs font-semibold text-white">Visualizar documento</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (typeof window !== "undefined") window.open(chargeResult.payment_url || "", "_blank");
+                  }}
+                  className="px-3 py-2 rounded-lg border border-emerald-300 self-start"
+                >
+                  <Text className="text-xs font-semibold text-emerald-700">Abrir em nova aba</Text>
+                </TouchableOpacity>
+              </View>
             )}
             {!!chargeResult.pix_copy_paste && (
               <TouchableOpacity onPress={copyPixCode} className="mt-2 px-3 py-2 rounded-lg border border-emerald-300 self-start">
@@ -546,6 +689,103 @@ export default function InvoicesScreen() {
             <Text className="text-xs text-blue-700 mt-1">Provider: {chargeStatusResult.provider || "—"}</Text>
             <Text className="text-xs text-blue-700 mt-1">Status: {chargeStatusResult.status || "—"}</Text>
             <Text className="text-xs text-blue-700 mt-1">Pago em: {chargeStatusResult.paid_at || "—"}</Text>
+          </View>
+        )}
+
+        {!!paidChargeResult && (
+          <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 mt-3">
+            <Text className="text-sm font-semibold text-emerald-700">Pagamento simulado</Text>
+            <Text className="text-xs text-emerald-700 mt-1">Status: {paidChargeResult.status || "—"}</Text>
+            <Text className="text-xs text-emerald-700 mt-1">Pago em: {paidChargeResult.paid_at || "—"}</Text>
+          </View>
+        )}
+
+        {!!chargeActionError && (
+          <View className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 mt-3">
+            <Text className="text-sm font-semibold text-red-700">Atenção</Text>
+            <Text className="text-xs text-red-700 mt-1">{chargeActionError}</Text>
+          </View>
+        )}
+      </Modal>
+
+      <Modal
+        visible={previewModalVisible}
+        title="Visualização da cobrança"
+        onClose={closePreviewModal}
+        size="lg"
+        footer={
+          <>
+            <TouchableOpacity onPress={closePreviewModal} className="px-5 py-2.5 rounded-xl border border-gray-200">
+              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+            {!!previewUrl && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (typeof window !== "undefined") window.open(previewUrl, "_blank");
+                }}
+                className="px-5 py-2.5 rounded-xl bg-violet-600"
+              >
+                <Text className="text-sm font-bold text-white">Abrir em nova aba</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        }
+      >
+        {!previewUrl ? (
+          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <Text className="text-sm text-gray-600">Nenhum documento disponível para visualização.</Text>
+          </View>
+        ) : Platform.OS !== "web" ? (
+          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <Text className="text-sm text-gray-700">A visualização embutida está disponível no web.</Text>
+            <Text className="text-xs text-gray-500 mt-2">Use "Abrir em nova aba" para ver o documento.</Text>
+          </View>
+        ) : isImagePreviewUrl(previewUrl) ? (
+          <View>
+            <Image
+              source={{ uri: previewUrl }}
+              style={{ width: "100%", height: 640, borderRadius: 16, resizeMode: "contain", backgroundColor: "#F9FAFB" }}
+            />
+          </View>
+        ) : isPdfPreviewUrl(previewUrl) && PdfDocument && PdfPage ? (
+          <View style={{ width: "100%", maxHeight: 680, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" }}>
+            <ScrollView contentContainerStyle={{ padding: 16, alignItems: "center", gap: 16 }}>
+              <PdfDocument
+                file={previewUrl}
+                loading={<Text className="text-sm text-gray-600">Carregando PDF...</Text>}
+                onLoadSuccess={({ numPages }: { numPages: number }) => {
+                  setPdfPageCount(numPages);
+                  setPdfPreviewError(null);
+                }}
+                onLoadError={(error: Error) => {
+                  setPdfPageCount(0);
+                  setPdfPreviewError(error.message || "Não foi possível renderizar o PDF.");
+                }}
+              >
+                {Array.from({ length: pdfPageCount || 1 }, (_, index) => (
+                  <View key={`pdf-page-${index + 1}`} style={{ marginBottom: 16 }}>
+                    <PdfPage
+                      pageNumber={index + 1}
+                      width={getPdfPreviewWidth()}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                    />
+                  </View>
+                ))}
+              </PdfDocument>
+
+              {!!pdfPreviewError && (
+                <View className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <Text className="text-sm font-semibold text-red-700">Falha ao renderizar PDF</Text>
+                  <Text className="text-xs text-red-700 mt-1">{pdfPreviewError}</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        ) : (
+          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <Text className="text-sm text-gray-700">Esse tipo de documento não suporta preview embutido.</Text>
+            <Text className="text-xs text-gray-500 mt-2">Use "Abrir em nova aba" para visualizar o arquivo.</Text>
           </View>
         )}
       </Modal>
