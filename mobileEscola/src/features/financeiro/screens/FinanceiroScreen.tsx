@@ -742,17 +742,6 @@ export function FinanceiroScreen() {
               </TouchableOpacity>
             ) : (
               <>
-                {mostrarBloqueioMetodo && (
-                  <View style={styles.modalBloqueioContainer}>
-                    <Ionicons name="lock-closed-outline" size={22} color="#92400E" />
-                    <View style={styles.modalBloqueioTextoWrap}>
-                      <Text style={styles.modalBloqueioTexto}>
-                        {textoLockMetodo(paymentOptions?.method_lock?.reason)}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
                 {metodoPermitido('boleto') && (
                   <TouchableOpacity
                     style={styles.modalBotao}
