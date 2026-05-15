@@ -238,12 +238,7 @@ class CoraEnrollmentInvoiceSyncService
                 ->exists();
         }
 
-        $customerDocument = $this->digitsOnly((string) (
-            data_get($externalInvoice, 'customer.document.identity')
-            ?? data_get($externalInvoice, 'customer.document')
-            ?? data_get($externalInvoice, 'customer.identity')
-            ?? ''
-        ));
+        $customerDocument = $this->extractCustomerDocument($externalInvoice);
 
         if ($customerDocument === '') {
             return false;
@@ -467,11 +462,56 @@ class CoraEnrollmentInvoiceSyncService
             }
         }
 
+        $methodCandidates = [
+            $externalInvoice['payment_form'] ?? null,
+            $externalInvoice['payment_method'] ?? null,
+            data_get($externalInvoice, 'payment.form'),
+            data_get($externalInvoice, 'payment.method'),
+            data_get($externalInvoice, 'payment_options.selected'),
+        ];
+
+        foreach ($methodCandidates as $method) {
+            $normalized = strtoupper(trim((string) $method));
+            if (in_array($normalized, ['BANK_SLIP', 'BOLETO', 'BILLET', 'BANKSLIP'], true)) {
+                return true;
+            }
+        }
+
         return $this->extractBoletoNumber($externalInvoice) !== null
             || $this->extractBoletoDigitable($externalInvoice) !== null
             || data_get($externalInvoice, 'payment_options.bank_slip') !== null
             || data_get($externalInvoice, 'bank_slip') !== null
-            || data_get($externalInvoice, 'boleto') !== null;
+            || data_get($externalInvoice, 'boleto') !== null
+            || data_get($externalInvoice, 'bank_slip_url') !== null
+            || data_get($externalInvoice, 'boleto_url') !== null;
+    }
+
+    private function extractCustomerDocument(array $externalInvoice): string
+    {
+        $candidates = [
+            data_get($externalInvoice, 'customer.document.identity'),
+            data_get($externalInvoice, 'customer.document.number'),
+            data_get($externalInvoice, 'customer.document.value'),
+            data_get($externalInvoice, 'customer.document'),
+            data_get($externalInvoice, 'customer.identity'),
+            data_get($externalInvoice, 'customer.tax_document'),
+            data_get($externalInvoice, 'customer.tax_id'),
+            data_get($externalInvoice, 'payer.document.identity'),
+            data_get($externalInvoice, 'payer.document.number'),
+            data_get($externalInvoice, 'payer.document'),
+            data_get($externalInvoice, 'document.identity'),
+            data_get($externalInvoice, 'document.number'),
+            data_get($externalInvoice, 'document'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $digits = $this->digitsOnly((string) $candidate);
+            if ($digits !== '') {
+                return $digits;
+            }
+        }
+
+        return '';
     }
 
     private function mapExternalStatusToLocal(string $externalStatus): string

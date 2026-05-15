@@ -166,54 +166,170 @@ class CoraPaymentService
 
         $httpOptions = $this->resolveHttpClientOptions($tenant, $environment);
 
-        $response = Http::timeout((int) config('services.cora.timeout', 20))
-            ->acceptJson()
-            ->withOptions($httpOptions)
-            ->withToken($token)
-            ->get($baseUrl . '/v2/invoices', $query)
-            ->throw();
+        $baseQuery = $query;
+        $maxPages = max(1, (int) ($baseQuery['max_pages'] ?? 8));
+        unset($baseQuery['max_pages']);
 
-        $body = $response->json();
-
-        if (! is_array($body)) {
-            throw new RuntimeException('Resposta invalida da Cora ao listar cobrancas.');
+        if (! isset($baseQuery['limit'])) {
+            $baseQuery['limit'] = 200;
         }
 
-        $invoices = $this->extractInvoicesCollection($body);
+        $allInvoices = [];
+        $seenKeys = [];
+        $nextCursor = null;
+
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $pageQuery = $baseQuery;
+
+            if ($nextCursor !== null && $nextCursor !== '') {
+                $pageQuery['cursor'] = $nextCursor;
+            }
+
+            $response = Http::timeout((int) config('services.cora.timeout', 20))
+                ->acceptJson()
+                ->withOptions($httpOptions)
+                ->withToken($token)
+                ->get($baseUrl . '/v2/invoices', $pageQuery)
+                ->throw();
+
+            $body = $response->json();
+
+            if (! is_array($body)) {
+                throw new RuntimeException('Resposta invalida da Cora ao listar cobrancas.');
+            }
+
+            $invoices = $this->extractInvoicesCollection($body);
+
+            foreach ($invoices as $invoice) {
+                $key = trim((string) (
+                    $invoice['id']
+                    ?? $invoice['invoice_id']
+                    ?? $invoice['charge_id']
+                    ?? md5(json_encode($invoice))
+                ));
+
+                if ($key === '' || isset($seenKeys[$key])) {
+                    continue;
+                }
+
+                $seenKeys[$key] = true;
+                $allInvoices[] = $invoice;
+            }
+
+            $nextCursor = $this->extractNextCursor($body);
+            $hasMore = $this->extractHasMore($body);
+
+            $this->writeSyncDebug('listInvoices-page', [
+                'tenant_id' => $tenant->id,
+                'environment' => $environment,
+                'page' => $page,
+                'query' => $pageQuery,
+                'http_status' => $response->status(),
+                'body_keys' => array_keys($body),
+                'page_items' => count($invoices),
+                'accumulated_items' => count($allInvoices),
+                'next_cursor' => $nextCursor,
+                'has_more' => $hasMore,
+            ]);
+
+            if ($nextCursor === '' || $nextCursor === null) {
+                if (! $hasMore) {
+                    break;
+                }
+
+                if (isset($pageQuery['page']) && is_numeric($pageQuery['page'])) {
+                    $baseQuery['page'] = ((int) $pageQuery['page']) + 1;
+                    continue;
+                }
+
+                break;
+            }
+        }
 
         $this->writeSyncDebug('listInvoices', [
             'tenant_id' => $tenant->id,
             'environment' => $environment,
             'query' => $query,
-            'http_status' => $response->status(),
-            'body_keys' => array_keys($body),
-            'parsed_count' => count($invoices),
-            'raw_preview' => array_slice($body, 0, 10, true),
-            'first_invoice_preview' => isset($invoices[0]) ? array_slice($invoices[0], 0, 12, true) : null,
+            'parsed_count' => count($allInvoices),
+            'first_invoice_preview' => isset($allInvoices[0]) ? array_slice($allInvoices[0], 0, 12, true) : null,
         ]);
 
         Log::info('Cora listInvoices response parsed', [
             'tenant_id' => $tenant->id,
             'environment' => $environment,
             'query' => $query,
-            'http_status' => $response->status(),
-            'body_keys' => array_keys($body),
-            'parsed_count' => count($invoices),
-            'raw_preview' => array_slice($body, 0, 3, true),
+            'parsed_count' => count($allInvoices),
         ]);
 
-        if ($invoices === []) {
+        if ($allInvoices === []) {
             Log::warning('Cora listInvoices parsed vazio', [
                 'tenant_id' => $tenant->id,
                 'environment' => $environment,
                 'query' => $query,
-                'http_status' => $response->status(),
-                'body_keys' => array_keys($body),
-                'raw_preview' => array_slice($body, 0, 10, true),
             ]);
         }
 
-        return $invoices;
+        return $allInvoices;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function extractNextCursor(array $body): ?string
+    {
+        $candidates = [
+            $body['next_cursor'] ?? null,
+            $body['next'] ?? null,
+            $body['cursor'] ?? null,
+            data_get($body, 'meta.next_cursor'),
+            data_get($body, 'pagination.next_cursor'),
+            data_get($body, 'page.next_cursor'),
+            data_get($body, 'links.next'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && trim($candidate) !== '') {
+                $value = trim($candidate);
+
+                if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+                    $parts = parse_url($value);
+                    parse_str((string) ($parts['query'] ?? ''), $params);
+                    $cursorFromUrl = trim((string) ($params['cursor'] ?? $params['next_cursor'] ?? ''));
+                    if ($cursorFromUrl !== '') {
+                        return $cursorFromUrl;
+                    }
+                }
+
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function extractHasMore(array $body): bool
+    {
+        $candidates = [
+            $body['has_more'] ?? null,
+            data_get($body, 'meta.has_more'),
+            data_get($body, 'pagination.has_more'),
+            data_get($body, 'page.has_more'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_bool($candidate)) {
+                return $candidate;
+            }
+
+            if (is_numeric($candidate)) {
+                return ((int) $candidate) === 1;
+            }
+        }
+
+        return false;
     }
 
     private function buildBoletoPayload(
