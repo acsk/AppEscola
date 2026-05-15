@@ -623,6 +623,18 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const fmt = (v: string | null) =>
     v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";
 
+  const fmtDateTime = (v: string | null) => {
+    if (!v) return "—";
+    try {
+      const d = new Date(v);
+      const date = d.toLocaleDateString("pt-BR");
+      const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return `${date} às ${time}`;
+    } catch {
+      return v;
+    }
+  };
+
   const providerOptions = providers.map((item) => ({ value: item.slug, label: item.name }));
   const chargeMethodOptions = [
     { value: "pix", label: "Pix" },
@@ -1570,8 +1582,27 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
 
         {chargeModalStep === "result" && !!chargeResult && (
           <View>
+            {/* ── Pago com sucesso ── */}
+            {chargeStatusResult?.status?.toUpperCase() === "PAID" ? (
+              <View className="items-center py-6 px-4 gap-3">
+                <View className="w-20 h-20 rounded-full bg-emerald-100 items-center justify-center mb-1">
+                  <Ionicons name="checkmark-circle" size={52} color="#059669" />
+                </View>
+                <Text className="text-xl font-bold text-emerald-700 text-center">Pagamento confirmado!</Text>
+                <Text className="text-sm text-gray-600 text-center">
+                  Esta cobrança já foi paga e não precisa de nenhuma ação adicional.
+                </Text>
+                {!!chargeStatusResult.paid_at && (
+                  <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 mt-1 w-full items-center">
+                    <Text className="text-xs text-emerald-600 font-semibold">Data do pagamento</Text>
+                    <Text className="text-sm font-bold text-emerald-800 mt-0.5">{fmtDateTime(chargeStatusResult.paid_at)}</Text>
+                  </View>
+                )}
+              </View>
+            ) : null}
+
             {/* ── PIX ── */}
-            {chargeMethod === "pix" && (
+            {chargeMethod === "pix" && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
               <>
                 <View className="items-center mb-3">
                   <View className="w-64 h-64 bg-white rounded-2xl border border-gray-200 items-center justify-center overflow-hidden">
@@ -1626,7 +1657,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
             )}
 
             {/* ── BOLETO ── */}
-            {chargeMethod === "boleto" && (
+            {chargeMethod === "boleto" && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
               <>
                 {!!chargeResult.boleto_digitable && (
                   <View className="bg-gray-50 rounded-2xl border border-gray-200 p-4 mb-3 flex-row items-center gap-3">
@@ -1682,7 +1713,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
             <Text className="text-sm font-bold text-blue-700">Status atualizado</Text>
             <Text className="text-xs text-blue-700 mt-1">Provider: {chargeStatusResult.provider || "—"}</Text>
             <Text className="text-xs text-blue-700 mt-1">Status: {chargeStatusResult.status || "—"}</Text>
-            <Text className="text-xs text-blue-700 mt-1">Pago em: {chargeStatusResult.paid_at || "—"}</Text>
+            <Text className="text-xs text-blue-700 mt-1">Pago em: {fmtDateTime(chargeStatusResult.paid_at)}</Text>
           </View>
         )}
 
@@ -1690,7 +1721,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
           <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 mt-3">
             <Text className="text-sm font-bold text-emerald-700">Pagamento simulado</Text>
             <Text className="text-xs text-emerald-700 mt-1">Status: {paidChargeResult.status || "—"}</Text>
-            <Text className="text-xs text-emerald-700 mt-1">Pago em: {paidChargeResult.paid_at || "—"}</Text>
+            <Text className="text-xs text-emerald-700 mt-1">Pago em: {fmtDateTime(paidChargeResult.paid_at)}</Text>
           </View>
         )}
       </Modal>
