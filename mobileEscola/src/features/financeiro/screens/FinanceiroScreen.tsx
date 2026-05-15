@@ -161,6 +161,18 @@ export function FinanceiroScreen() {
     return method ? String(method).toUpperCase() : 'Não definido';
   };
 
+  const textoLockMetodo = (reason: string | null | undefined): string => {
+    if (!reason) {
+      return 'O método de pagamento desta cobrança não pode ser alterado.';
+    }
+
+    if (reason === 'synced_charge_method_lock') {
+      return 'O método de pagamento desta cobrança está bloqueado.';
+    }
+
+    return reason;
+  };
+
   const baixarBoleto = async (url: string) => {
     try {
       await Linking.openURL(url);
@@ -366,26 +378,14 @@ export function FinanceiroScreen() {
   const obterTemaModalStatus = (status: string) => {
     if (statusEhPago(status)) {
       return {
-        card: styles.consultaStatusCardSucesso,
-        box: styles.consultaStatusBoxSucesso,
-        mensagem: styles.consultaStatusMensagemSucesso,
-        indicadorWrap: styles.consultaStatusIndicadorSucesso,
-        indicadorCor: '#166534',
         indicadorIcone: 'checkmark-circle',
         indicadorTexto: 'Pagamento confirmado',
-        botao: styles.consultaStatusBotaoFecharSucesso,
       };
     }
 
     return {
-      card: styles.consultaStatusCardWarning,
-      box: styles.consultaStatusBoxWarning,
-      mensagem: styles.consultaStatusMensagemWarning,
-      indicadorWrap: styles.consultaStatusIndicadorWarning,
-      indicadorCor: '#92400E',
       indicadorIcone: 'alert-circle',
       indicadorTexto: 'Pagamento pendente',
-      botao: styles.consultaStatusBotaoFecharWarning,
     };
   };
 
@@ -727,10 +727,7 @@ export function FinanceiroScreen() {
                 <Ionicons name="lock-closed-outline" size={22} color="#92400E" />
                 <View style={styles.modalBloqueioTextoWrap}>
                   <Text style={styles.modalBloqueioTexto}>
-                    {paymentOptions.method_lock?.reason || 'Esta cobrança está com o método travado no servidor.'}
-                  </Text>
-                  <Text style={styles.modalBloqueioSubtexto}>
-                    Método atual: {rotuloMetodoPagamento(metodoBloqueadoSelecionado ?? paymentOptions.current_method)}
+                    {textoLockMetodo(paymentOptions.method_lock?.reason)}
                   </Text>
                 </View>
               </View>
@@ -750,11 +747,7 @@ export function FinanceiroScreen() {
                     <Ionicons name="lock-closed-outline" size={22} color="#92400E" />
                     <View style={styles.modalBloqueioTextoWrap}>
                       <Text style={styles.modalBloqueioTexto}>
-                        {paymentOptions?.method_lock?.reason || 'O método de pagamento desta cobrança não pode ser alterado.'}
-                      </Text>
-                      <Text style={styles.modalBloqueioSubtexto}>
-                        Método disponível:{' '}
-                        {rotuloMetodoPagamento(metodoBloqueadoSelecionado ?? paymentOptions?.current_method)}
+                        {textoLockMetodo(paymentOptions?.method_lock?.reason)}
                       </Text>
                     </View>
                   </View>
@@ -833,103 +826,84 @@ export function FinanceiroScreen() {
     </Modal>
   );
 
-  const renderModalConsultaStatus = () => (
-    <Modal
-      visible={consultaStatusModalVisivel}
-      transparent
-      animationType="fade"
-      onRequestClose={fecharModalConsultaStatus}
-    >
-      <View style={styles.consultaStatusOverlay}>
-        <View
-          style={[
-            styles.consultaStatusCard,
-            consultaStatusData && statusEhPago(consultaStatusData.invoice.status)
-              ? styles.consultaStatusCardSucesso
-              : styles.consultaStatusCardWarning,
-          ]}
-        >
-          <View style={styles.consultaStatusHeader}>
-            <Text style={styles.consultaStatusTitulo}>Status da cobrança</Text>
-            <TouchableOpacity onPress={fecharModalConsultaStatus}>
-              <Ionicons name="close-outline" size={24} color={colors.muted} />
+  const renderModalConsultaStatus = () => {
+    const isPago = Boolean(consultaStatusData && statusEhPago(consultaStatusData.invoice.status));
+    const tema = consultaStatusData ? obterTemaModalStatus(consultaStatusData.invoice.status) : null;
+    const badgeStyle = consultaStatusData ? obterEstiloBadgeStatus(consultaStatusData.invoice.status) : null;
+
+    return (
+      <Modal
+        visible={consultaStatusModalVisivel}
+        transparent
+        animationType="fade"
+        onRequestClose={fecharModalConsultaStatus}
+      >
+        <View style={styles.consultaStatusOverlay}>
+          <View style={styles.consultaStatusCard}>
+
+            {/* Faixa colorida no topo */}
+            <View style={[styles.consultaStatusTopBar, isPago ? styles.consultaStatusTopBarSucesso : styles.consultaStatusTopBarWarning]} />
+
+            {/* Botão fechar */}
+            <TouchableOpacity style={styles.consultaStatusFecharBtn} onPress={fecharModalConsultaStatus} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={20} color={colors.muted} />
+            </TouchableOpacity>
+
+            {/* Ícone grande central */}
+            {tema && (
+              <View style={[styles.consultaStatusIconeWrap, isPago ? styles.consultaStatusIconeWrapSucesso : styles.consultaStatusIconeWrapWarning]}>
+                <Ionicons name={tema.indicadorIcone as any} size={38} color={isPago ? '#16A34A' : '#D97706'} />
+              </View>
+            )}
+
+            {/* Texto de status */}
+            {tema && (
+              <Text style={[styles.consultaStatusStatusTexto, { color: isPago ? '#16A34A' : '#D97706' }]}>
+                {tema.indicadorTexto}
+              </Text>
+            )}
+
+            {/* Descrição e valor */}
+            {consultaStatusData && (
+              <>
+                <Text style={styles.consultaStatusDescricao} numberOfLines={2}>
+                  {consultaStatusData.invoice.description}
+                </Text>
+
+                <Text style={styles.consultaStatusVencimento}>
+                  <Ionicons name="calendar-outline" size={13} color={colors.muted} />{' '}
+                  Vence em {formatarData(consultaStatusData.invoice.due_date)}
+                </Text>
+
+                <Text style={styles.consultaStatusValor}>
+                  {formatarMoeda(consultaStatusData.invoice.amount)}
+                </Text>
+
+                {badgeStyle && (
+                  <View style={[styles.consultaStatusBadge, badgeStyle.container]}>
+                    <Text style={[styles.consultaStatusBadgeTexto, badgeStyle.texto]}>
+                      {formatarStatusCobranca(consultaStatusData.invoice.status)}
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Botão principal */}
+            <TouchableOpacity
+              style={[styles.consultaStatusBotaoFechar, isPago ? styles.consultaStatusBotaoFecharSucesso : styles.consultaStatusBotaoFecharWarning]}
+              onPress={fecharModalConsultaStatus}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.consultaStatusBotaoFecharTexto}>
+                {isPago ? 'Pagamento confirmado — Fechar' : 'Fechar'}
+              </Text>
             </TouchableOpacity>
           </View>
-
-          {consultaStatusData && (
-            (() => {
-              const tema = obterTemaModalStatus(consultaStatusData.invoice.status);
-              return (
-                <>
-                  <View style={[styles.consultaStatusIndicador, tema.indicadorWrap]}>
-                    <Ionicons name={tema.indicadorIcone as any} size={18} color={tema.indicadorCor} />
-                    <Text style={[styles.consultaStatusIndicadorTexto, { color: tema.indicadorCor }]}>
-                      {tema.indicadorTexto}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.consultaStatusBox, tema.box]}>
-                    <Text style={styles.consultaStatusLabel}>{consultaStatusData.invoice.description}</Text>
-                    <Text style={styles.consultaStatusSubLabel}>
-                      Vence em {formatarData(consultaStatusData.invoice.due_date)}
-                    </Text>
-                    <Text style={styles.consultaStatusValor}>{formatarMoeda(consultaStatusData.invoice.amount)}</Text>
-
-                    <View style={styles.consultaStatusLinha}>
-                      <Text style={styles.consultaStatusCampo}>Status:</Text>
-                      {(() => {
-                        const badgeStyle = obterEstiloBadgeStatus(consultaStatusData.invoice.status);
-                        return (
-                          <View style={[styles.consultaStatusBadge, badgeStyle.container]}>
-                            <Text style={[styles.consultaStatusBadgeTexto, badgeStyle.texto]}>
-                              {formatarStatusCobranca(consultaStatusData.invoice.status)}
-                            </Text>
-                          </View>
-                        );
-                      })()}
-                    </View>
-
-                    <View style={styles.consultaStatusLinha}>
-                      <Text style={styles.consultaStatusCampo}>Método atual:</Text>
-                      <Text style={styles.consultaStatusCampoValor}>
-                        {consultaStatusData.currentMethod ? String(consultaStatusData.currentMethod).toUpperCase() : 'Não definido'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.consultaStatusLinha}>
-                      <Text style={styles.consultaStatusCampo}>Formas disponíveis:</Text>
-                      <Text style={styles.consultaStatusCampoValor}>
-                        {consultaStatusData.allowedMethods.length
-                          ? consultaStatusData.allowedMethods.map((method) => method.toUpperCase()).join(', ')
-                          : 'Nenhuma'}
-                      </Text>
-                    </View>
-                  </View>
-                </>
-              );
-            })()
-          )}
-
-          <TouchableOpacity
-            style={[
-              styles.consultaStatusBotaoFechar,
-              consultaStatusData && statusEhPago(consultaStatusData.invoice.status)
-                ? styles.consultaStatusBotaoFecharSucesso
-                : styles.consultaStatusBotaoFecharWarning,
-            ]}
-            onPress={fecharModalConsultaStatus}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.consultaStatusBotaoFecharTexto}>
-              {consultaStatusData && statusEhPago(consultaStatusData.invoice.status)
-                ? 'Fechar e atualizar pagamentos'
-                : 'Fechar'}
-            </Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -1469,128 +1443,96 @@ const styles = StyleSheet.create({
   },
   consultaStatusOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 24,
   },
   consultaStatusCard: {
     backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F0ECFA',
-    padding: 12,
-  },
-  consultaStatusCardWarning: {
-    borderColor: '#FDE68A',
-    backgroundColor: '#FFFBEB',
-  },
-  consultaStatusCardSucesso: {
-    borderColor: '#86EFAC',
-    backgroundColor: '#F0FDF4',
-  },
-  consultaStatusHeader: {
-    flexDirection: 'row',
+    borderRadius: 20,
+    overflow: 'hidden',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    paddingTop: 0,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
   },
-  consultaStatusTitulo: {
-    fontSize: 19,
-    fontWeight: '900',
-    color: colors.ink,
+  consultaStatusTopBar: {
+    height: 5,
+    width: '100%',
+    marginBottom: 16,
   },
-  consultaStatusMensagem: {
-    fontSize: 14,
-    color: colors.muted,
-    fontWeight: '600',
-    marginBottom: 12,
+  consultaStatusTopBarWarning: {
+    backgroundColor: '#F59E0B',
   },
-  consultaStatusMensagemWarning: {
-    color: '#92400E',
+  consultaStatusTopBarSucesso: {
+    backgroundColor: '#22C55E',
   },
-  consultaStatusMensagemSucesso: {
-    color: '#166534',
-  },
-  consultaStatusIndicador: {
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    marginBottom: 8,
-    flexDirection: 'row',
+  consultaStatusFecharBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
   },
-  consultaStatusIndicadorWarning: {
-    borderColor: '#FDE68A',
+  consultaStatusIconeWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  consultaStatusIconeWrapWarning: {
     backgroundColor: '#FEF3C7',
   },
-  consultaStatusIndicadorSucesso: {
-    borderColor: '#BBF7D0',
+  consultaStatusIconeWrapSucesso: {
     backgroundColor: '#DCFCE7',
   },
-  consultaStatusIndicadorTexto: {
-    fontSize: 12,
-    fontWeight: '800',
+  consultaStatusStatusTexto: {
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 16,
+    letterSpacing: 0.1,
   },
-  consultaStatusBox: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#F0ECFA',
-    backgroundColor: '#FCFBFF',
-    padding: 10,
-    gap: 4,
-  },
-  consultaStatusBoxWarning: {
-    borderColor: '#FDE68A',
-    backgroundColor: '#FFFDF5',
-  },
-  consultaStatusBoxSucesso: {
-    borderColor: '#BBF7D0',
-    backgroundColor: '#F7FFF9',
-  },
-  consultaStatusLabel: {
+  consultaStatusDescricao: {
     fontSize: 15,
     fontWeight: '800',
     color: colors.ink,
+    textAlign: 'center',
+    marginBottom: 6,
+    lineHeight: 21,
   },
-  consultaStatusSubLabel: {
+  consultaStatusVencimento: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.muted,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   consultaStatusValor: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: '900',
-    color: colors.primary,
-    marginTop: 4,
-    marginBottom: 2,
-  },
-  consultaStatusLinha: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  consultaStatusCampo: {
-    fontSize: 12,
-    color: colors.muted,
-    fontWeight: '700',
-  },
-  consultaStatusCampoValor: {
-    fontSize: 12,
     color: colors.ink,
-    fontWeight: '800',
-    textAlign: 'right',
-    flexShrink: 1,
+    textAlign: 'center',
+    marginBottom: 14,
   },
   consultaStatusBadge: {
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
     borderWidth: 1,
+    marginBottom: 20,
   },
   consultaStatusBadgeTexto: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
   },
   consultaStatusBadgePendente: {
@@ -1629,9 +1571,9 @@ const styles = StyleSheet.create({
     color: '#3730A3',
   },
   consultaStatusBotaoFechar: {
-    marginTop: 10,
-    borderRadius: 10,
-    paddingVertical: 10,
+    width: '100%',
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
     backgroundColor: colors.primary,
   },
@@ -1642,8 +1584,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#16A34A',
   },
   consultaStatusBotaoFecharTexto: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
     color: colors.surface,
   },
   
