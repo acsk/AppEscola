@@ -181,6 +181,17 @@ class CoraPaymentService
 
         $invoices = $this->extractInvoicesCollection($body);
 
+        $this->writeSyncDebug('listInvoices', [
+            'tenant_id' => $tenant->id,
+            'environment' => $environment,
+            'query' => $query,
+            'http_status' => $response->status(),
+            'body_keys' => array_keys($body),
+            'parsed_count' => count($invoices),
+            'raw_preview' => array_slice($body, 0, 10, true),
+            'first_invoice_preview' => isset($invoices[0]) ? array_slice($invoices[0], 0, 12, true) : null,
+        ]);
+
         Log::info('Cora listInvoices response parsed', [
             'tenant_id' => $tenant->id,
             'environment' => $environment,
@@ -190,6 +201,17 @@ class CoraPaymentService
             'parsed_count' => count($invoices),
             'raw_preview' => array_slice($body, 0, 3, true),
         ]);
+
+        if ($invoices === []) {
+            Log::warning('Cora listInvoices parsed vazio', [
+                'tenant_id' => $tenant->id,
+                'environment' => $environment,
+                'query' => $query,
+                'http_status' => $response->status(),
+                'body_keys' => array_keys($body),
+                'raw_preview' => array_slice($body, 0, 10, true),
+            ]);
+        }
 
         return $invoices;
     }
@@ -478,6 +500,18 @@ class CoraPaymentService
      */
     private function extractInvoicesCollection(array $body): array
     {
+        if ($this->looksLikeInvoiceItem($body)) {
+            return [$body];
+        }
+
+        if (isset($body['data']) && is_array($body['data']) && $this->looksLikeInvoiceItem($body['data'])) {
+            return [$body['data']];
+        }
+
+        if (isset($body['body']) && is_array($body['body']) && $this->looksLikeInvoiceItem($body['body'])) {
+            return [$body['body']];
+        }
+
         $sources = [
             $body['items'] ?? null,
             $body['data'] ?? null,
@@ -624,5 +658,24 @@ class CoraPaymentService
         $options['ssl_key'] = Storage::disk('local')->path($keyPath);
 
         return $options;
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function writeSyncDebug(string $stage, array $context): void
+    {
+        try {
+            Log::build([
+                'driver' => 'single',
+                'path' => storage_path('logs/cora_sync_debug.log'),
+                'level' => 'debug',
+            ])->debug('[CORA_SYNC_DEBUG] ' . $stage, $context);
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao escrever cora_sync_debug.log', [
+                'stage' => $stage,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

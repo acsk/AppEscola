@@ -50,6 +50,34 @@ class CoraEnrollmentInvoiceSyncService
             'limit' => 200,
         ]);
 
+        $studentDocument = $this->digitsOnly((string) ($enrollment->student?->document ?? ''));
+        $guardianDocuments = array_values(array_filter(array_map(
+            fn ($guardian) => $this->digitsOnly((string) ($guardian->document ?? '')),
+            $enrollment->student?->guardians?->all() ?? []
+        )));
+
+        $this->writeSyncDebug('sync-start', [
+            'tenant_id' => $tenant->id,
+            'enrollment_id' => $enrollment->id,
+            'environment' => $environment,
+            'external_total_before_filters' => count($externalInvoices),
+            'requested_charge_ids' => $chargeIds,
+            'student_document' => $studentDocument,
+            'guardian_documents' => $guardianDocuments,
+            'external_preview' => array_map(fn (array $inv) => [
+                'id' => $this->extractExternalChargeId($inv),
+                'status' => (string) ($inv['status'] ?? ''),
+                'customer_document' => $this->digitsOnly((string) (
+                    data_get($inv, 'customer.document.identity')
+                    ?? data_get($inv, 'customer.document')
+                    ?? data_get($inv, 'customer.identity')
+                    ?? ''
+                )),
+                'amount' => $this->extractAmount($inv),
+                'due_date' => (string) ($inv['due_date'] ?? ''),
+            ], array_slice($externalInvoices, 0, 20)),
+        ]);
+
         if ($externalInvoices === []) {
             Log::warning('Cora sync sem invoices retornadas', [
                 'tenant_id' => $tenant->id,
@@ -77,6 +105,28 @@ class CoraEnrollmentInvoiceSyncService
         $processedCharges = [];
 
         foreach ($externalInvoices as $externalInvoice) {
+            $externalId = $this->extractExternalChargeId($externalInvoice);
+            $belongs = $this->belongsToEnrollment($enrollment, $externalInvoice);
+            $isBoleto = $this->isBoletoInvoice($externalInvoice);
+
+            $this->writeSyncDebug('sync-invoice-check', [
+                'tenant_id' => $tenant->id,
+                'enrollment_id' => $enrollment->id,
+                'environment' => $environment,
+                'external_id' => $externalId,
+                'is_boleto' => $isBoleto,
+                'belongs_to_enrollment' => $belongs,
+                'status' => (string) ($externalInvoice['status'] ?? ''),
+                'customer_document' => $this->digitsOnly((string) (
+                    data_get($externalInvoice, 'customer.document.identity')
+                    ?? data_get($externalInvoice, 'customer.document')
+                    ?? data_get($externalInvoice, 'customer.identity')
+                    ?? ''
+                )),
+                'amount' => $this->extractAmount($externalInvoice),
+                'due_date' => (string) ($externalInvoice['due_date'] ?? ''),
+            ]);
+
             if (! $this->isBoletoInvoice($externalInvoice)) {
                 $ignored++;
                 continue;
@@ -137,6 +187,25 @@ class CoraEnrollmentInvoiceSyncService
             'ignored' => $ignored,
             'processed_charge_ids' => array_values(array_unique($processedCharges)),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function writeSyncDebug(string $stage, array $context): void
+    {
+        try {
+            Log::build([
+                'driver' => 'single',
+                'path' => storage_path('logs/cora_sync_debug.log'),
+                'level' => 'debug',
+            ])->debug('[CORA_SYNC_DEBUG] ' . $stage, $context);
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao escrever cora_sync_debug.log', [
+                'stage' => $stage,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function belongsToEnrollment(Enrollment $enrollment, array $externalInvoice): bool
