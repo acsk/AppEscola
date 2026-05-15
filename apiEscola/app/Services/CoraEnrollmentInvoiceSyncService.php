@@ -133,6 +133,8 @@ class CoraEnrollmentInvoiceSyncService
                 continue;
             }
 
+            $externalInvoice = $this->hydrateInvoiceWithDetailsForBoleto($tenant, $environment, $externalInvoice, $chargeId);
+
             $processedCharges[] = $chargeId;
 
             $result = DB::transaction(function () use ($enrollment, $externalInvoice, $chargeId, $createMissing): string {
@@ -177,6 +179,50 @@ class CoraEnrollmentInvoiceSyncService
             'ignored' => $ignored,
             'processed_charge_ids' => array_values(array_unique($processedCharges)),
         ];
+    }
+
+    /**
+     * Enriquecer com dados detalhados para obter linha digitavel/codigo de barras
+     * quando a listagem nao traz os campos de boleto.
+     *
+     * @param array<string, mixed> $externalInvoice
+     * @return array<string, mixed>
+     */
+    private function hydrateInvoiceWithDetailsForBoleto(Tenant $tenant, string $environment, array $externalInvoice, string $chargeId): array
+    {
+        if ($this->extractBoletoNumber($externalInvoice) !== null || $this->extractBoletoDigitable($externalInvoice) !== null) {
+            return $externalInvoice;
+        }
+
+        try {
+            $detailed = $this->coraPaymentService->getInvoiceById($tenant, $chargeId, $environment);
+
+            if ($detailed === []) {
+                return $externalInvoice;
+            }
+
+            $merged = array_replace_recursive($externalInvoice, $detailed);
+
+            $this->writeSyncDebug('sync-invoice-hydrated-details', [
+                'tenant_id' => $tenant->id,
+                'enrollment_id' => $this->toNullableInt($externalInvoice['metadata']['enrollment_id'] ?? null),
+                'environment' => $environment,
+                'external_id' => $chargeId,
+                'had_boleto_before' => $this->extractBoletoNumber($externalInvoice) !== null || $this->extractBoletoDigitable($externalInvoice) !== null,
+                'has_boleto_after' => $this->extractBoletoNumber($merged) !== null || $this->extractBoletoDigitable($merged) !== null,
+            ]);
+
+            return $merged;
+        } catch (\Throwable $e) {
+            $this->writeSyncDebug('sync-invoice-hydrate-failed', [
+                'tenant_id' => $tenant->id,
+                'environment' => $environment,
+                'external_id' => $chargeId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $externalInvoice;
+        }
     }
 
     /**

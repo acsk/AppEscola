@@ -273,6 +273,60 @@ class CoraPaymentService
     }
 
     /**
+     * Busca uma cobranca especifica na Cora por ID.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws RuntimeException
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function getInvoiceById(Tenant $tenant, string $chargeId, string $environment = 'prod'): array
+    {
+        $chargeId = trim($chargeId);
+
+        if ($chargeId === '') {
+            throw new RuntimeException('ID da cobranca Cora obrigatorio para consulta detalhada.');
+        }
+
+        $token = $this->resolveBearerToken($tenant, $environment);
+        $baseUrl = $this->resolveApiBaseUrl($environment);
+
+        if ($token === '' || $baseUrl === '') {
+            throw new RuntimeException('Integracao Cora nao configurada para consultar cobranca.');
+        }
+
+        $httpOptions = $this->resolveHttpClientOptions($tenant, $environment);
+
+        $response = Http::timeout((int) config('services.cora.timeout', 20))
+            ->acceptJson()
+            ->withOptions($httpOptions)
+            ->withToken($token)
+            ->get($baseUrl . '/v2/invoices/' . $chargeId)
+            ->throw();
+
+        $body = $response->json();
+
+        if (! is_array($body)) {
+            throw new RuntimeException('Resposta invalida da Cora ao consultar cobranca por ID.');
+        }
+
+        if ($this->looksLikeInvoiceItem($body)) {
+            return $body;
+        }
+
+        if (isset($body['data']) && is_array($body['data']) && $this->looksLikeInvoiceItem($body['data'])) {
+            return $body['data'];
+        }
+
+        if (isset($body['body']) && is_array($body['body']) && $this->looksLikeInvoiceItem($body['body'])) {
+            return $body['body'];
+        }
+
+        return $body;
+    }
+
+    /**
      * @param array<string, mixed> $body
      */
     private function extractNextCursor(array $body): ?string
