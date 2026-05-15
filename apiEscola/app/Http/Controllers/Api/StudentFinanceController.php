@@ -86,15 +86,17 @@ class StudentFinanceController extends Controller
             return $this->forbidden('Cobrança não pertence ao aluno autenticado.');
         }
 
-        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+        $methodLock = $this->resolveMethodLock($invoice);
+        $lockedMethod = $methodLock['method'];
+        $lockReason = $methodLock['reason'];
 
-        $allowedMethods = $lockedSyncedMethod === 'bank_slip'
+        $allowedMethods = $lockedMethod === 'bank_slip'
             ? ['boleto']
-            : ($lockedSyncedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
+            : ($lockedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
 
         $currentMethod = in_array($invoice->payment_method, ['pix', 'bank_slip', 'boleto'], true)
             ? ($invoice->payment_method === 'bank_slip' ? 'boleto' : $invoice->payment_method)
-            : ($lockedSyncedMethod === 'bank_slip' ? 'boleto' : $lockedSyncedMethod);
+            : ($lockedMethod === 'bank_slip' ? 'boleto' : $lockedMethod);
 
         return $this->success([
             'invoice' => $this->mapBoleto($invoice),
@@ -102,15 +104,15 @@ class StudentFinanceController extends Controller
             'current_method' => $currentMethod,
             'actions' => [
                 'can_generate_charge' => ! in_array($invoice->status, ['paid', 'cancelled'], true),
-                'can_change_method' => $lockedSyncedMethod === null,
+                'can_change_method' => $lockedMethod === null,
                 'can_open_boleto_url' => (bool) $invoice->cora_payment_url,
                 'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
                 'can_copy_pix_code' => (bool) $invoice->cora_pix_copy_paste,
             ],
             'method_lock' => [
-                'locked' => $lockedSyncedMethod !== null,
-                'method' => $lockedSyncedMethod === 'bank_slip' ? 'boleto' : $lockedSyncedMethod,
-                'reason' => $lockedSyncedMethod !== null ? 'synced_charge_method_lock' : null,
+                'locked' => $lockedMethod !== null,
+                'method' => $lockedMethod === 'bank_slip' ? 'boleto' : $lockedMethod,
+                'reason' => $lockReason,
             ],
             'payment_assets' => [
                 'boleto_number' => $invoice->boleto_number,
@@ -151,38 +153,50 @@ class StudentFinanceController extends Controller
         $coraMethod = in_array($requestedMethod, ['boleto', 'bank_slip'], true) ? 'boleto' : 'pix';
         $storedMethod = $coraMethod === 'boleto' ? 'bank_slip' : 'pix';
 
-        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+        $methodLock = $this->resolveMethodLock($invoice);
+        $lockedMethod = $methodLock['method'];
+        $lockReason = $methodLock['reason'];
 
-        if ($lockedSyncedMethod !== null) {
-            if ($storedMethod !== $lockedSyncedMethod) {
+        if ($lockedMethod !== null) {
+            if ($storedMethod !== $lockedMethod) {
+                $message = $lockReason === 'synced_charge_method_lock'
+                    ? 'Esta cobrança foi sincronizada e deve manter o método original.'
+                    : 'Não é possível alterar o método de pagamento de uma cobrança já gerada.';
+
                 return $this->error(
-                    'Esta cobrança foi sincronizada e deve manter o método original.',
+                    $message,
                     [
                         'requested_method' => $storedMethod,
-                        'locked_method' => $lockedSyncedMethod,
-                        'locked_reason' => 'synced_charge_method_lock',
+                        'locked_method' => $lockedMethod,
+                        'locked_reason' => $lockReason,
                     ],
                     422
                 );
             }
 
-            if ($this->shouldReuseExistingCharge($invoice, $lockedSyncedMethod)) {
-                $lockedMethod = $lockedSyncedMethod === 'bank_slip' ? 'boleto' : 'pix';
+            if ($this->shouldReuseExistingCharge($invoice, $lockedMethod)) {
+                $responseMethod = $lockedMethod === 'bank_slip' ? 'boleto' : 'pix';
+
+                $successMessage = $lockReason === 'synced_charge_method_lock'
+                    ? 'Cobrança sincronizada reutilizada com sucesso.'
+                    : 'Cobrança existente reutilizada com sucesso.';
 
                 return $this->success(
-                    $this->buildChargeResponsePayload($invoice, $lockedMethod, true),
-                    'Cobrança sincronizada reutilizada com sucesso.'
+                    $this->buildChargeResponsePayload($invoice, $responseMethod, true),
+                    $successMessage
                 );
             }
 
-            return $this->error(
-                'Cobrança sincronizada sem dados reutilizáveis. A geração de nova cobrança está bloqueada para este título.',
-                [
-                    'locked_method' => $lockedSyncedMethod,
-                    'locked_reason' => 'synced_charge_method_lock',
-                ],
-                422
-            );
+            if ($lockReason === 'synced_charge_method_lock') {
+                return $this->error(
+                    'Cobrança sincronizada sem dados reutilizáveis. A geração de nova cobrança está bloqueada para este título.',
+                    [
+                        'locked_method' => $lockedMethod,
+                        'locked_reason' => $lockReason,
+                    ],
+                    422
+                );
+            }
         }
 
         if ($this->shouldReuseExistingCharge($invoice, $storedMethod)) {
@@ -302,6 +316,44 @@ class StudentFinanceController extends Controller
         }
 
         return null;
+    }
+
+    private function resolveMethodLock(Invoice $invoice): array
+    {
+        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+
+        if ($lockedSyncedMethod !== null) {
+            return [
+                'method' => $lockedSyncedMethod,
+                'reason' => 'synced_charge_method_lock',
+            ];
+        }
+
+        if (! $invoice->cora_charge_id) {
+            return [
+                'method' => null,
+                'reason' => null,
+            ];
+        }
+
+        if ($invoice->payment_method === 'pix') {
+            return [
+                'method' => 'pix',
+                'reason' => 'method_already_charged',
+            ];
+        }
+
+        if (in_array($invoice->payment_method, ['bank_slip', 'boleto'], true)) {
+            return [
+                'method' => 'bank_slip',
+                'reason' => 'method_already_charged',
+            ];
+        }
+
+        return [
+            'method' => null,
+            'reason' => null,
+        ];
     }
 
     private function buildChargeResponsePayload(

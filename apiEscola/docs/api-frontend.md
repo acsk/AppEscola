@@ -737,6 +737,47 @@ Content-Type: application/json
 
 Retorna `charge_id`, `payment_url` e `pix_copy_paste` (quando método for PIX).
 
+### Opções de pagamento por invoice (Painel)
+```http
+GET /api/invoices/{id}/payment-options
+Authorization: Bearer {token}
+```
+
+Use este endpoint para renderizar os botões de pagamento no painel antes de chamar `generate-charge`.
+
+Campos relevantes na resposta:
+- `allowed_methods`: métodos permitidos para a invoice no momento
+- `current_method`: método atual da invoice
+- `actions.can_change_method`: indica se o painel pode permitir troca de método
+- `method_lock.locked`: quando `true`, a invoice está travada no método original
+- `method_lock.method`: método travado (`pix` ou `boleto`)
+- `payment_assets`: dados para pagamento (boleto e/ou pix)
+
+### Atualização importante: boleto + PIX no PainelEscola
+
+Regra para implementação no painel:
+1. Sempre consultar `payment-options` antes de exibir ações.
+2. Se `method_lock.locked = true`, desabilitar troca de método e usar o método de `method_lock.method`.
+3. Se `payment_assets` vier com dados de boleto **e** pix ao mesmo tempo, tratar como canais da mesma cobrança — **isso ocorre automaticamente** quando o método `boleto` é gerado, pois o backend solicita `BANK_SLIP + PIX` na Cora. Exibir os dois canais na mesma tela sem criar nova cobrança.
+4. Chamar `generate-charge` apenas quando a troca/geração estiver permitida (`actions.can_change_method = true`).
+5. Se o backend retornar `422` com `locked_reason = synced_charge_method_lock` ou `locked_reason = method_already_charged`, tratar como regra de negócio esperada (não como erro inesperado).
+
+Regra de bloqueio de método:
+- Assim que uma cobrança é gerada para uma invoice (PIX **ou** boleto), o método fica permanentemente travado.
+- PIX gerado → somente PIX. Boleto gerado → somente boleto.
+- O painel não deve exibir a opção de trocar de método quando `method_lock.locked = true`.
+
+Valores possíveis de `method_lock.reason`:
+| Valor | Significado |
+|---|---|
+| `method_already_charged` | Cobrança gerada normalmente — método não pode ser alterado |
+| `synced_charge_method_lock` | Cobrança importada/sincronizada da Cora — método original preservado |
+
+Em cobranças sincronizadas/importadas da Cora:
+- boleto sincronizado permanece boleto
+- pix sincronizado permanece pix
+- o painel não deve gerar outro tipo de cobrança para a mesma invoice
+
 ### Consultar status da cobrança externa
 ```http
 GET /api/invoices/{id}/charge-status

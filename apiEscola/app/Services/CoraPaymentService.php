@@ -138,10 +138,10 @@ class CoraPaymentService
             'external_id' => $externalId,
             'status' => isset($body['status']) ? (string) $body['status'] : null,
             'payment_url' => $this->extractPaymentUrl($body),
-            'pix_copy_paste' => $normalizedMethod === 'pix' ? $this->extractPixCode($body) : null,
-            'qr_code_image_url' => $normalizedMethod === 'pix' ? $this->extractPixImageUrl($body) : null,
-            'boleto_number' => $normalizedMethod === 'boleto' ? $this->extractBoletoNumber($body) : null,
-            'boleto_digitable' => $normalizedMethod === 'boleto' ? $this->extractBoletoDigitable($body) : null,
+            'pix_copy_paste' => $this->extractPixCode($body),
+            'qr_code_image_url' => $this->extractPixImageUrl($body),
+            'boleto_number' => $this->extractBoletoNumber($body),
+            'boleto_digitable' => $this->extractBoletoDigitable($body),
             'payload' => $body,
         ];
     }
@@ -393,7 +393,7 @@ class CoraPaymentService
         ?string $payerEmail,
         string $environment
     ): array {
-        $identity = $payerDocument !== '' ? $payerDocument : '45114521802';
+        $identity = $payerDocument !== '' ? $payerDocument : '';
         $docType = strlen($identity) > 11 ? 'CNPJ' : 'CPF';
         $description = trim((string) $invoice->description) !== '' ? (string) $invoice->description : 'Cobrança escolar';
         $providerDueDate = $this->resolveProviderDueDate($invoice);
@@ -418,6 +418,7 @@ class CoraPaymentService
             'payment_terms' => [
                 'due_date' => $providerDueDate,
             ],
+            'payment_forms' => ['BANK_SLIP', 'PIX'],
             'metadata' => [
                 'tenant_id' => $invoice->tenant_id,
                 'invoice_id' => $invoice->id,

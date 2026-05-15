@@ -257,7 +257,15 @@ class PaymentProviderController extends Controller
     public function paymentOptions(Request $request, Invoice $invoice): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
-        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+        $lockedSyncedMethod  = $this->resolveLockedMethodForSyncedInvoice($invoice);
+        $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
+
+        // Trava geral: qualquer invoice com cobrança já gerada fica no método original.
+        $lockedMethod = $lockedSyncedMethod
+            ?? ($invoice->cora_charge_id ? $existingStoredMethod : null);
+        $lockReason   = $lockedSyncedMethod !== null
+            ? 'synced_charge_method_lock'
+            : ($lockedMethod !== null ? 'method_already_charged' : null);
 
         $pixQrImageUrl = data_get($invoice->cora_payload, 'pix.qr_code_image_url')
             ?? data_get($invoice->cora_payload, 'pix.qr_code_url')
@@ -267,14 +275,14 @@ class PaymentProviderController extends Controller
         $currentMethod = match (true) {
             $invoice->payment_method === 'bank_slip' => 'boleto',
             in_array($invoice->payment_method, ['pix', 'boleto'], true) => $invoice->payment_method,
-            $lockedSyncedMethod === 'bank_slip' => 'boleto',
-            in_array($lockedSyncedMethod, ['pix', 'boleto'], true) => $lockedSyncedMethod,
+            $lockedMethod === 'bank_slip' => 'boleto',
+            in_array($lockedMethod, ['pix', 'boleto'], true) => $lockedMethod,
             default => null,
         };
 
-        $allowedMethods = $lockedSyncedMethod === 'bank_slip'
+        $allowedMethods = $lockedMethod === 'bank_slip'
             ? ['boleto']
-            : ($lockedSyncedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
+            : ($lockedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
 
         return $this->success([
             'invoice' => [
@@ -289,15 +297,15 @@ class PaymentProviderController extends Controller
             'current_method'  => $currentMethod,
             'actions' => [
                 'can_generate_charge'  => ! in_array($invoice->status, ['paid', 'cancelled'], true),
-                'can_change_method'    => $lockedSyncedMethod === null,
+                'can_change_method'    => $lockedMethod === null,
                 'can_open_boleto_url'  => (bool) $invoice->cora_payment_url,
                 'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
                 'can_copy_pix_code'    => (bool) $invoice->cora_pix_copy_paste,
             ],
             'method_lock' => [
-                'locked' => $lockedSyncedMethod !== null,
-                'method' => $lockedSyncedMethod === 'bank_slip' ? 'boleto' : $lockedSyncedMethod,
-                'reason' => $lockedSyncedMethod !== null ? 'synced_charge_method_lock' : null,
+                'locked' => $lockedMethod !== null,
+                'method' => $lockedMethod === 'bank_slip' ? 'boleto' : $lockedMethod,
+                'reason' => $lockReason,
             ],
             'payment_assets' => [
                 'charge_id'       => $invoice->cora_charge_id,
@@ -364,6 +372,32 @@ class PaymentProviderController extends Controller
                     'requested_method' => $requestedStoredMethod,
                     'locked_method' => $lockedSyncedMethod,
                     'locked_reason' => 'synced_charge_method_lock',
+                ],
+                422
+            );
+        }
+
+        // Trava geral: qualquer invoice com cobrança já gerada não pode trocar de método.
+        if ($lockedSyncedMethod === null
+            && $existingStoredMethod !== null
+            && $requestedStoredMethod !== null
+            && $requestedStoredMethod !== $existingStoredMethod
+        ) {
+            Log::info('PaymentProviderController generateCharge blocked by method_already_charged lock', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'requested_method' => $requestedStoredMethod,
+                'locked_method' => $existingStoredMethod,
+                'cora_charge_id' => $invoice->cora_charge_id,
+            ]);
+
+            return $this->error(
+                'Não é possível alterar o método de pagamento de uma cobrança já gerada.',
+                [
+                    'provider' => 'cora',
+                    'requested_method' => $requestedStoredMethod,
+                    'locked_method' => $existingStoredMethod,
+                    'locked_reason' => 'method_already_charged',
                 ],
                 422
             );

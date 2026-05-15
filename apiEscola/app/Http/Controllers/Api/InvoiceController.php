@@ -111,7 +111,7 @@ class InvoiceController extends Controller
         $this->authorizeTenant($request, $invoice->tenant_id);
 
         if (in_array($invoice->status, ['paid', 'cancelled'])) {
-            return response()->json(['message' => 'Não é possível editar uma cobrança paga ou cancelada.'], 422);
+            return $this->error('Não é possível editar uma cobrança paga ou cancelada.', null, 422);
         }
 
         $data = $request->validated();
@@ -142,9 +142,13 @@ class InvoiceController extends Controller
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
+        if ($invoice->status === 'paid') {
+            return $this->error('Não é possível excluir uma cobrança paga.', null, 422);
+        }
+
         $invoice->delete();
 
-        return response()->json(['message' => 'Cobrança removida com sucesso.']);
+        return $this->deleted('Cobrança removida com sucesso.');
     }
 
     #[OA\Post(

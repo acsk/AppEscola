@@ -102,6 +102,43 @@ export type PaidChargeResponse = {
   raw?: Record<string, unknown>;
 };
 
+export type InvoicePaymentAssets = {
+  charge_id?: string | null;
+  charge_status?: string | null;
+  boleto_number?: string | null;
+  boleto_digitable?: string | null;
+  boleto_url?: string | null;
+  pix_copy_paste?: string | null;
+  pix_qr_image_url?: string | null;
+  last_synced_at?: string | null;
+};
+
+export type InvoicePaymentOptionsResponse = {
+  invoice: {
+    id: number;
+    description: string;
+    amount: string;
+    due_date: string | null;
+    status: string;
+    payment_method: string | null;
+  };
+  allowed_methods: string[];
+  current_method: string | null;
+  actions: {
+    can_generate_charge: boolean;
+    can_change_method: boolean;
+    can_open_boleto_url?: boolean;
+    can_copy_boleto_line?: boolean;
+    can_copy_pix_code?: boolean;
+  };
+  method_lock: {
+    locked: boolean;
+    method: string | null;
+    reason: string | null;
+  };
+  payment_assets: InvoicePaymentAssets;
+};
+
 const unwrap = <T>(payload: ApiEnvelope<T> | T): T => {
   const casted = payload as ApiEnvelope<T>;
   return (casted?.body ?? casted?.data ?? payload) as T;
@@ -245,6 +282,87 @@ export const getUnifiedChargeStatus = async (
     `/invoices/${invoiceId}/charge-status`
   );
   return unwrap<ChargeStatusResponse>(data);
+};
+
+export type InvoiceReceiptSchool = {
+  name: string;
+  corporate_name: string | null;
+  cnpj: string;
+  email: string | null;
+  phone: string | null;
+  logo_url: string | null;
+  address: string | null;
+};
+
+export type InvoiceReceiptStudent = {
+  name: string;
+  document: string;
+  email: string | null;
+  phone: string | null;
+};
+
+export type InvoiceReceiptPayer = {
+  name: string;
+  document: string;
+  is_guardian: boolean;
+  guardian_name: string | null;
+};
+
+export type InvoiceReceiptEnrollment = {
+  id: number;
+  enrollment_number: string;
+  school_class: string;
+  start_date: string;
+  end_date: string | null;
+} | null;
+
+export type InvoiceReceiptInvoice = {
+  id: number;
+  description: string;
+  type: string;
+  amount: string;
+  amount_raw: number;
+  due_date: string;
+  paid_at: string;
+  paid_at_date: string;
+  paid_at_time: string;
+  payment_method: string;
+  payment_method_slug: string;
+  cora_charge_id: string | null;
+  notes: string | null;
+};
+
+export type InvoiceReceiptResponse = {
+  receipt_number: string;
+  receipt_hash: string;
+  issued_at: string;
+  school: InvoiceReceiptSchool;
+  student: InvoiceReceiptStudent;
+  payer: InvoiceReceiptPayer;
+  enrollment: InvoiceReceiptEnrollment;
+  invoice: InvoiceReceiptInvoice;
+  verification: {
+    message: string;
+    verify_hash: string;
+  };
+};
+
+export const getInvoiceReceipt = async (
+  invoiceId: number
+): Promise<InvoiceReceiptResponse> => {
+  const { data } = await api.get<ApiEnvelope<InvoiceReceiptResponse>>(
+    `/invoices/${invoiceId}/receipt`
+  );
+  return unwrap<InvoiceReceiptResponse>(data);
+};
+
+export const getInvoicePaymentOptions = async (
+  invoiceId: number
+): Promise<InvoicePaymentOptionsResponse> => {
+  const { data } = await api.get<ApiEnvelope<InvoicePaymentOptionsResponse>>(
+    `/invoices/${invoiceId}/payment-options`
+  );
+  return unwrap<InvoicePaymentOptionsResponse>(data);
 };
 
 export const payUnifiedCharge = async (

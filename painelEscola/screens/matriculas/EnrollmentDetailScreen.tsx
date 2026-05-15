@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Animated,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import QRCode from "react-native-qrcode-svg";
@@ -32,14 +34,33 @@ import { useAuth } from "../../contexts/AuthContext";
 import {
   ChargeStatusResponse,
   GeneratedCharge,
+  InvoicePaymentAssets,
+  InvoicePaymentOptionsResponse,
+  InvoiceReceiptResponse,
   PaidChargeResponse,
   PaymentProvider,
   generateUnifiedCharge,
+  getInvoicePaymentOptions,
+  getInvoiceReceipt,
   getUnifiedChargeStatus,
   listPaymentProviders,
   payUnifiedCharge,
 } from "../../services/payments";
 import { syncEnrollmentCoraCharges, SyncCoraChargesResult } from "../../services/cora";
+
+const reactPdf = Platform.OS === "web" ? require("react-pdf") : null;
+const PdfDocument = reactPdf?.Document as React.ComponentType<any> | null;
+const PdfPage = reactPdf?.Page as React.ComponentType<any> | null;
+const pdfjs = reactPdf?.pdfjs as
+  | {
+      version: string;
+      GlobalWorkerOptions: { workerSrc: string };
+    }
+  | undefined;
+
+if (Platform.OS === "web" && pdfjs) {
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -247,17 +268,154 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [payingCharge, setPayingCharge] = useState(false);
   const [chargeResult, setChargeResult] = useState<GeneratedCharge | null>(null);
+  const [chargePaymentOptions, setChargePaymentOptions] = useState<InvoicePaymentOptionsResponse | null>(null);
+  const [loadingChargeOptions, setLoadingChargeOptions] = useState(false);
   const [chargeStatusResult, setChargeStatusResult] = useState<ChargeStatusResponse | null>(null);
   const [paidChargeResult, setPaidChargeResult] = useState<PaidChargeResponse | null>(null);
   const [chargeActionError, setChargeActionError] = useState<string | null>(null);
+
+  // Receipt modal
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [receiptData, setReceiptData] = useState<InvoiceReceiptResponse | null>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
+  const openReceiptModal = async (invoice: Invoice) => {
+    setReceiptData(null);
+    setReceiptError(null);
+    setReceiptModalVisible(true);
+    setLoadingReceipt(true);
+    try {
+      const data = await getInvoiceReceipt(invoice.id);
+      setReceiptData(data);
+    } catch (e: any) {
+      setReceiptError(
+        e?.response?.data?.message ?? "Não foi possível carregar o recibo."
+      );
+    }
+    setLoadingReceipt(false);
+  };
+
+  const printReceipt = (r: InvoiceReceiptResponse) => {
+    if (typeof window === "undefined") return;
+    const logoHtml = r.school.logo_url
+      ? `<img src="${r.school.logo_url}" style="width:64px;height:64px;object-fit:contain;border-radius:8px;margin-bottom:8px;" />`
+      : "";
+    const enrollmentHtml = r.enrollment
+      ? `<section class="card">
+          <div class="row"><span class="label">Matrícula:</span><span>${r.enrollment.enrollment_number} — ${r.enrollment.school_class}</span></div>
+          ${r.enrollment.start_date ? `<div class="row"><span class="label">Período:</span><span>${isoToDisplay(r.enrollment.start_date)}${r.enrollment.end_date ? ` até ${isoToDisplay(r.enrollment.end_date)}` : ""}</span></div>` : ""}
+        </section>`
+      : "";
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Recibo ${r.receipt_number}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; color: #111; background: #fff; padding: 32px; max-width: 680px; margin: 0 auto; }
+    .school-header { text-align: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px; margin-bottom: 16px; }
+    .school-header .name { font-size: 15px; font-weight: 700; }
+    .school-header .sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .receipt-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .receipt-title h1 { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+    .receipt-number { background: #ede9fe; color: #6d28d9; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; }
+    .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+    .row { display: flex; gap: 8px; margin-bottom: 4px; }
+    .row:last-child { margin-bottom: 0; }
+    .label { color: #6b7280; min-width: 90px; flex-shrink: 0; }
+    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
+    .amount { font-size: 15px; font-weight: 700; color: #059669; }
+    .verify { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; }
+    .verify p { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
+    .verify code { font-size: 10px; font-family: monospace; color: #9ca3af; word-break: break-all; }
+    @media print { body { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="school-header">
+    ${logoHtml}
+    <div class="name">${r.school.name}</div>
+    ${r.school.corporate_name ? `<div class="sub">${r.school.corporate_name}</div>` : ""}
+    <div class="sub">CNPJ: ${r.school.cnpj}</div>
+    ${r.school.address ? `<div class="sub">${r.school.address}</div>` : ""}
+  </div>
+
+  <div class="receipt-title">
+    <h1>RECIBO DE PAGAMENTO</h1>
+    <span class="receipt-number">${r.receipt_number}</span>
+  </div>
+
+  <section class="card">
+    <div class="row"><span class="label">Aluno:</span><span><strong>${r.student.name}</strong></span></div>
+    <div class="row"><span class="label">CPF aluno:</span><span>${r.student.document}</span></div>
+    <div class="row"><span class="label">Pagador:</span><span><strong>${r.payer.is_guardian ? r.payer.guardian_name ?? r.payer.name : r.payer.name}</strong></span></div>
+    <div class="row"><span class="label">CPF pagador:</span><span>${r.payer.document}</span></div>
+  </section>
+
+  ${enrollmentHtml}
+
+  <section class="card">
+    <div class="row"><span class="label">Descrição:</span><span><strong>${r.invoice.description}</strong></span></div>
+    <div class="row"><span class="label">Vencimento:</span><span>${isoToDisplay(r.invoice.due_date)}</span></div>
+    <div class="row"><span class="label">Pagamento:</span><span>${isoToDisplay(r.invoice.paid_at_date)} às ${r.invoice.paid_at_time}</span></div>
+    <div class="row"><span class="label">Método:</span><span>${r.invoice.payment_method}</span></div>
+    <hr class="divider" />
+    <div class="row"><span class="label">Valor:</span><span class="amount">R$ ${r.invoice.amount}</span></div>
+  </section>
+
+  <div class="verify">
+    <p>${r.verification.message}</p>
+    <code>${r.verification.verify_hash}</code>
+  </div>
+</body>
+</html>`;
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;width:0;height:0;border:none;opacity:0;pointer-events:none;";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow?.document;
+    if (!doc) { document.body.removeChild(iframe); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    iframe.contentWindow!.onafterprint = () => document.body.removeChild(iframe);
+    setTimeout(() => iframe.contentWindow?.print(), 300);
+  };
+
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
   const [chargeStatusModal, setChargeStatusModal] = useState<{
     visible: boolean;
     type: "success" | "info";
     title: string;
     message: string;
   }>({ visible: false, type: "info", title: "", message: "" });
+  const chargeTabOpacity = useRef(new Animated.Value(1)).current;
+  const chargeTabTranslateY = useRef(new Animated.Value(0)).current;
 
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (chargeModalStep !== "result") return;
+
+    chargeTabOpacity.setValue(0);
+    chargeTabTranslateY.setValue(8);
+    Animated.parallel([
+      Animated.timing(chargeTabOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(chargeTabTranslateY, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [chargeMethod, chargeModalStep, chargeTabOpacity, chargeTabTranslateY]);
   const isProductionHost =
     typeof window !== "undefined" && window.location.hostname !== "localhost";
   const isSuperAdmin = user?.role === "super_admin";
@@ -509,7 +667,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
 
   // ── Charge actions ───────────────────────────────────────────────────────────
 
-  const openChargeModal = (invoice: Invoice, preferredMethod?: "pix" | "boleto") => {
+  const openChargeModal = async (invoice: Invoice, preferredMethod?: "pix" | "boleto") => {
     const normalizedMethod =
       invoice.payment_method === "bank_slip" || invoice.payment_method === "boleto"
         ? "boleto"
@@ -535,6 +693,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
 
     setChargeInvoice(invoice);
     setChargeResult(existingResult);
+    setChargePaymentOptions(null);
     setChargeStatusResult(null);
     setPaidChargeResult(null);
     setChargeModalStep(existingResult ? "result" : "select");
@@ -547,21 +706,83 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     setChargeEnvironment(defaultChargeEnvironment);
     setChargeMethod(method);
     setChargeModalVisible(true);
+
+    setLoadingChargeOptions(true);
+    try {
+      const options = await getInvoicePaymentOptions(invoice.id);
+      setChargePaymentOptions(options);
+
+      const lockedMethod = normalizeChargeMethod(options.method_lock?.method);
+      const currentMethod = normalizeChargeMethod(options.current_method);
+      const allowedMethods = (options.allowed_methods ?? [])
+        .map((item) => normalizeChargeMethod(item))
+        .filter((item): item is "pix" | "boleto" => item === "pix" || item === "boleto");
+
+      const selectedMethod =
+        preferredMethod ?? lockedMethod ?? currentMethod ?? allowedMethods[0] ?? method;
+      setChargeMethod(selectedMethod);
+
+      const resultFromAssets = toGeneratedChargeFromAssets(
+        invoice.id,
+        options.payment_assets,
+        chargeProvider || "cora",
+        invoice.cora?.status ?? ""
+      );
+      if (resultFromAssets) {
+        setChargeResult(resultFromAssets);
+        setChargeModalStep("result");
+      }
+
+      if (options.method_lock?.locked) {
+        setChargeActionError(null);
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? "Não foi possível carregar as opções de pagamento.";
+      setChargeActionError(shouldHideMethodLockedNotice(msg) ? null : msg);
+    }
+    setLoadingChargeOptions(false);
   };
 
   const closeChargeModal = () => {
     setChargeModalVisible(false);
     setChargeInvoice(null);
     setChargeResult(null);
+    setChargePaymentOptions(null);
     setChargeStatusResult(null);
     setPaidChargeResult(null);
     setChargeActionError(null);
     setChargeModalStep("select");
   };
 
+  const closePreviewModal = () => {
+    setPreviewModalVisible(false);
+    setPreviewUrl(null);
+    setPdfPageCount(0);
+    setPdfPreviewError(null);
+  };
+
+  const openPreviewModal = (url: string | null) => {
+    if (!url) return;
+    setPreviewUrl(url);
+    setPdfPageCount(0);
+    setPdfPreviewError(null);
+    setPreviewModalVisible(true);
+  };
+
   const onGenerateCharge = async (methodOverride?: "pix" | "boleto") => {
     if (!chargeInvoice || !chargeProvider) return;
     const methodToGenerate = methodOverride ?? (chargeMethod as "pix" | "boleto");
+
+    if (chargePaymentOptions && !chargePaymentOptions.actions.can_change_method) {
+      setChargeActionError(null);
+      return;
+    }
+
+    if (chargePaymentOptions && !chargePaymentOptions.actions.can_generate_charge) {
+      setChargeActionError("Esta cobrança não permite gerar nova cobrança neste momento.");
+      return;
+    }
+
     if (!canGenerateChargeForInvoice(chargeInvoice)) {
       setChargeActionError("Não é possível gerar cobrança para uma fatura paga ou cancelada.");
       return;
@@ -577,10 +798,45 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       });
       setChargeResult(result);
       setChargeModalStep("result");
+      try {
+        const options = await getInvoicePaymentOptions(chargeInvoice.id);
+        setChargePaymentOptions(options);
+      } catch {
+        // Sem bloquear a UX caso o endpoint ainda não esteja disponível.
+      }
       fetch();
     } catch (e: any) {
-      setChargeResult(null);
-      setChargeActionError(e?.response?.data?.message ?? "Não foi possível gerar a cobrança.");
+      const lockedReason =
+        e?.response?.data?.locked_reason ??
+        e?.response?.data?.body?.locked_reason ??
+        e?.response?.data?.errors?.locked_reason?.[0];
+
+      if (
+        e?.response?.status === 422 &&
+        (lockedReason === "synced_charge_method_lock" || lockedReason === "method_already_charged")
+      ) {
+        setChargeActionError(null);
+        try {
+          const options = await getInvoicePaymentOptions(chargeInvoice.id);
+          setChargePaymentOptions(options);
+          const resultFromAssets = toGeneratedChargeFromAssets(
+            chargeInvoice.id,
+            options.payment_assets,
+            chargeProvider,
+            chargeResult?.status ?? ""
+          );
+          if (resultFromAssets) {
+            setChargeResult(resultFromAssets);
+            setChargeModalStep("result");
+          }
+        } catch {
+          // Ignora fallback secundário.
+        }
+      } else {
+        setChargeResult(null);
+        const errorMessage = e?.response?.data?.message ?? "Não foi possível gerar a cobrança.";
+        setChargeActionError(shouldHideMethodLockedNotice(errorMessage) ? null : errorMessage);
+      }
     }
     setGeneratingCharge(false);
   };
@@ -636,10 +892,30 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   };
 
   const copyPixCode = async () => {
-    if (!chargeResult?.pix_copy_paste) return;
+    const pixCode = chargePaymentOptions?.payment_assets?.pix_copy_paste ?? chargeResult?.pix_copy_paste;
+    if (!pixCode) return;
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(chargeResult.pix_copy_paste);
+      await navigator.clipboard.writeText(pixCode);
     }
+  };
+
+  const isImagePreviewUrl = (url: string | null) => {
+    if (!url) return false;
+    const normalizedUrl = url.toLowerCase();
+    return [".png", ".jpg", ".jpeg", ".webp", "image/png", "image/jpeg", "image/webp"].some((token) =>
+      normalizedUrl.includes(token)
+    );
+  };
+
+  const isPdfPreviewUrl = (url: string | null) => {
+    if (!url) return false;
+    const normalizedUrl = url.toLowerCase();
+    return normalizedUrl.includes(".pdf") || normalizedUrl.includes("application/pdf");
+  };
+
+  const getPdfPreviewWidth = () => {
+    if (typeof window === "undefined") return 760;
+    return Math.max(280, Math.min(window.innerWidth - 220, 820));
   };
 
   const fmt = (v: string | null) =>
@@ -669,6 +945,55 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     };
 
     return labels[normalized] ?? status ?? "—";
+  };
+
+  const shouldHideMethodLockedNotice = (message?: string | null) => {
+    if (!message) return false;
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes("cobrança está travada") ||
+      normalized.includes("nao é permitido trocar o método") ||
+      normalized.includes("não é permitido trocar o método")
+    );
+  };
+
+  const normalizeChargeMethod = (method?: string | null): "pix" | "boleto" | null => {
+    if (!method) return null;
+    if (method === "pix") return "pix";
+    if (method === "boleto" || method === "bank_slip") return "boleto";
+    return null;
+  };
+
+  const toGeneratedChargeFromAssets = (
+    invoiceId: number,
+    assets?: InvoicePaymentAssets | null,
+    provider = "cora",
+    fallbackStatus = ""
+  ): GeneratedCharge | null => {
+    if (!assets) return null;
+    const hasAnyAsset = !!(
+      assets.charge_id ||
+      assets.pix_copy_paste ||
+      assets.pix_qr_image_url ||
+      assets.boleto_digitable ||
+      assets.boleto_url ||
+      assets.boleto_number
+    );
+    if (!hasAnyAsset) return null;
+
+    return {
+      invoice_id: invoiceId,
+      provider,
+      environment: undefined,
+      charge_id: assets.charge_id ?? "",
+      status: assets.charge_status ?? fallbackStatus,
+      payment_url: assets.boleto_url ?? null,
+      pix_copy_paste: assets.pix_copy_paste ?? null,
+      boleto_number: assets.boleto_number ?? null,
+      boleto_digitable: assets.boleto_digitable ?? null,
+      qr_code_image_url: assets.pix_qr_image_url ?? null,
+      expires_at: null,
+    };
   };
 
   const providerOptions = providers.map((item) => ({ value: item.slug, label: item.name }));
@@ -707,6 +1032,31 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     value && !Number.isNaN(parseFloat(value))
       ? `R$ ${parseFloat(value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
       : "—";
+
+  const chargeAssets = chargePaymentOptions?.payment_assets;
+  const pixCopyPaste = chargeAssets?.pix_copy_paste ?? chargeResult?.pix_copy_paste ?? null;
+  const pixQrCodeImageUrl = chargeAssets?.pix_qr_image_url ?? chargeResult?.qr_code_image_url ?? null;
+  const boletoDigitable = chargeAssets?.boleto_digitable ?? chargeResult?.boleto_digitable ?? null;
+  const boletoPaymentUrl = chargeAssets?.boleto_url ?? chargeResult?.payment_url ?? null;
+  const lockedChargeMethod = normalizeChargeMethod(chargePaymentOptions?.method_lock?.method);
+  const isChargeMethodLocked = !!chargePaymentOptions?.method_lock?.locked;
+  const canGenerateChargeAction = chargePaymentOptions?.actions?.can_generate_charge ?? true;
+  const allowedChargeMethods = (chargePaymentOptions?.allowed_methods ?? ["pix", "boleto"])
+    .map((item) => normalizeChargeMethod(item))
+    .filter((item): item is "pix" | "boleto" => item === "pix" || item === "boleto");
+  const canUsePix = allowedChargeMethods.includes("pix") || !!pixCopyPaste || !!pixQrCodeImageUrl;
+  const canUseBoleto = allowedChargeMethods.includes("boleto") || !!boletoDigitable || !!boletoPaymentUrl;
+  const hasPixAssets = !!(pixCopyPaste || pixQrCodeImageUrl);
+  const hasBoletoAssets = !!(boletoDigitable || boletoPaymentUrl);
+  const hasDualPaymentAssets = hasPixAssets && hasBoletoAssets;
+  const activeChargeMethod: "pix" | "boleto" = (() => {
+    if (chargeMethod === "pix" && hasPixAssets) return "pix";
+    if (chargeMethod === "boleto" && hasBoletoAssets) return "boleto";
+    return hasBoletoAssets ? "boleto" : "pix";
+  })();
+  const checkoutQrSize = isMobile ? 176 : 148;
+  const checkoutActionHeight = isMobile ? 48 : 42;
+  const checkoutActionBasis = isMobile ? "100%" : 132;
 
   const renderInvoiceActions = (item: Invoice) => (
     <View className="flex-row justify-end gap-1">
@@ -754,6 +1104,16 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
           color={canGenerateChargeForInvoice(item) ? "#2563EB" : "#9CA3AF"}
         />
       </TouchableOpacity>
+      {item.status === "paid" && (
+        <TouchableOpacity
+          onPress={() => openReceiptModal(item)}
+          className="items-center justify-center bg-emerald-50 rounded-lg"
+          style={{ width: 30, height: 30 }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="receipt-outline" size={15} color="#059669" />
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         onPress={() => setDeleteInvoiceId(item.id)}
         className="items-center justify-center bg-red-50 rounded-lg"
@@ -1423,37 +1783,41 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
         maxHeight="97%"
         headerContent={
           chargeInvoice ? (
-            <View className="mt-3 rounded-xl bg-gray-50 border border-gray-200 px-3 py-2">
+            <View className="mt-3 rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-row items-start gap-3 flex-1">
                   {chargeModalStep === "result" && (
                     <View
-                      className={`w-9 h-9 rounded-xl items-center justify-center ${
+                      className={`w-10 h-10 rounded-2xl items-center justify-center ${
                         chargeMethod === "pix" ? "bg-emerald-50" : "bg-blue-50"
                       }`}
-                      style={chargeMethod === "pix" ? { width: 58, height: 58, borderRadius: 18 } : undefined}
                     >
                       {chargeMethod === "pix" ? (
-                        <PixLogoIcon size={42} color="#059669" weight="fill" />
+                        <PixLogoIcon size={25} color="#059669" weight="fill" />
                       ) : (
-                        <Ionicons name="barcode-outline" size={19} color="#2563EB" />
+                        <Ionicons name="barcode-outline" size={20} color="#2563EB" />
                       )}
                     </View>
                   )}
                   <View className="flex-1">
-                  <Text className="text-xs text-gray-400 uppercase font-semibold" numberOfLines={1}>
-                    Cobrança #{chargeInvoice.id}
-                  </Text>
-                  <Text className="text-sm font-bold text-gray-900 mt-0.5" numberOfLines={1}>
-                    {chargeInvoice.description}
-                  </Text>
-                  <Text className="text-xs text-gray-500 mt-1">
-                    Vencimento {fmt(chargeInvoice.due_date)}
-                  </Text>
+                    <View className="flex-row items-center gap-2 flex-wrap">
+                      <Text className="text-xs text-slate-500 uppercase font-bold" numberOfLines={1}>
+                        Cobrança #{chargeInvoice.id}
+                      </Text>
+                      <View className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 flex-row items-center gap-1.5">
+                        <Ionicons name="calendar-outline" size={12} color="#7C3AED" />
+                        <Text className="text-xs font-bold text-violet-700">
+                          Vencimento {fmt(chargeInvoice.due_date)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text className="text-sm font-bold text-gray-900 mt-0.5" numberOfLines={2}>
+                      {chargeInvoice.description}
+                    </Text>
                   </View>
                 </View>
-                <View className="items-end">
-                  <Text className="text-xs text-gray-400 uppercase font-semibold">Total</Text>
+                <View className="items-end" style={{ minWidth: 104 }}>
+                  <Text className="text-xs text-slate-500 uppercase font-bold">Total</Text>
                   <Text className="text-xl font-bold text-violet-700">
                     {money(chargeInvoice.amount)}
                   </Text>
@@ -1462,28 +1826,22 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
             </View>
           ) : undefined
         }
-        footerStyle={{ backgroundColor: "#F3F4F6" }}
+        footerStyle={{
+          backgroundColor: "#F8FAFC",
+          flexWrap: "wrap",
+          alignItems: "stretch",
+          paddingHorizontal: isMobile ? 16 : 24,
+          paddingVertical: isMobile ? 14 : 10,
+        }}
         footer={
           chargeModalStep === "result" ? (
             <>
               <TouchableOpacity
-                onPress={() => {
-                  setChargeModalStep("select");
-                  setChargeActionError(null);
-                }}
-                activeOpacity={0.8}
-                className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white items-center flex-row justify-center gap-2"
-                style={{ flex: isMobile ? undefined : 1 }}
-              >
-                <Ionicons name="swap-horizontal-outline" size={15} color="#1F2937" />
-                <Text className="text-xs font-bold text-gray-800">Escolher outra forma</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 onPress={onCheckChargeStatus}
                 disabled={checkingStatus || !chargeInvoice}
                 activeOpacity={0.8}
-                className="px-4 py-2.5 rounded-xl border border-violet-200 bg-white items-center flex-row justify-center gap-2"
-                style={{ flex: isMobile ? undefined : 1 }}
+                className="px-3 py-2 rounded-xl border border-violet-200 bg-white items-center flex-row justify-center gap-2"
+                style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
               >
                 {checkingStatus ? (
                   <ActivityIndicator size="small" color="#7C3AED" />
@@ -1494,13 +1852,24 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
                   </>
                 )}
               </TouchableOpacity>
+              {!!boletoPaymentUrl && activeChargeMethod === "boleto" && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+                <TouchableOpacity
+                  onPress={() => openPreviewModal(boletoPaymentUrl)}
+                  activeOpacity={0.85}
+                  className="px-3 py-2 rounded-xl border border-violet-600 bg-violet-600 items-center flex-row justify-center gap-2"
+                  style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
+                >
+                  <Ionicons name="document-text-outline" size={15} color="white" />
+                  <Text className="text-xs font-bold text-white">Ver boleto</Text>
+                </TouchableOpacity>
+              )}
               {typeof window !== "undefined" && window.location.hostname === "localhost" && (
                 <TouchableOpacity
                   onPress={onPayCharge}
                   disabled={payingCharge || !chargeInvoice || chargeEnvironment !== "stage"}
                   activeOpacity={0.8}
-                  className="px-4 py-2.5 rounded-xl border border-emerald-300 bg-white items-center flex-row justify-center gap-2"
-                  style={{ flex: isMobile ? undefined : 1 }}
+                  className="px-3 py-2 rounded-xl border border-emerald-300 bg-white items-center flex-row justify-center gap-2"
+                  style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
                 >
                   {payingCharge ? (
                     <ActivityIndicator size="small" color="#059669" />
@@ -1532,193 +1901,224 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
               <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                 Escolha a forma de pagamento
               </Text>
+              {loadingChargeOptions && (
+                <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 mb-2 flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color="#6B7280" />
+                  <Text className="text-xs text-gray-600">Carregando opções de pagamento...</Text>
+                </View>
+              )}
+              {hasDualPaymentAssets && (
+                <View className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 mb-2">
+                  <Text className="text-xs font-bold text-blue-700">Boleto + PIX disponíveis</Text>
+                  <Text className="text-xs text-blue-700 mt-1">
+                    Esta cobrança possui os dois canais de pagamento. Você pode usar qualquer um sem gerar nova cobrança.
+                  </Text>
+                </View>
+              )}
               <View
                 className="gap-2"
                 style={{ flexDirection: isMobile ? "column" : "row" }}
               >
-              <TouchableOpacity
-                onPress={() => {
-                  void onGenerateCharge("boleto");
-                }}
-                disabled={
-                  generatingCharge ||
-                  !chargeInvoice ||
-                  !chargeProvider ||
-                  !canGenerateChargeForInvoice(chargeInvoice)
-                }
-                activeOpacity={0.85}
-                className="flex-1 flex-row items-center rounded-2xl border border-gray-200 px-4 py-4 bg-white"
-                style={{
-                  shadowColor: "#111827",
-                  shadowOpacity: 0.04,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 3 },
-                  elevation: 1,
-                }}
-              >
-                <View className="w-12 h-12 rounded-2xl items-center justify-center" style={{ backgroundColor: "#EEF2FF" }}>
-                  <Ionicons name="barcode-outline" size={24} color="#2563EB" />
-                </View>
-                <View className="ml-3 flex-1">
-                  <Text className="text-sm font-bold text-gray-900">Pagar com boleto</Text>
-                  <Text className="text-xs text-gray-500" numberOfLines={1}>
-                    Linha digitável e PDF
-                  </Text>
-                </View>
-                {generatingCharge && chargeMethod === "boleto" ? (
-                  <ActivityIndicator size="small" color="#6B7280" />
-                ) : (
-                  <View className="w-8 h-8 rounded-full bg-gray-50 items-center justify-center">
-                    <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+                <TouchableOpacity
+                  onPress={() => {
+                    void onGenerateCharge("boleto");
+                  }}
+                  disabled={
+                    generatingCharge ||
+                    loadingChargeOptions ||
+                    !chargeInvoice ||
+                    !chargeProvider ||
+                    !canGenerateChargeForInvoice(chargeInvoice) ||
+                    !canGenerateChargeAction ||
+                    !canUseBoleto ||
+                    (isChargeMethodLocked && lockedChargeMethod !== "boleto")
+                  }
+                  activeOpacity={0.85}
+                  className={`flex-1 flex-row items-center rounded-2xl border px-4 py-4 ${
+                    canUseBoleto ? "border-gray-200 bg-white" : "border-gray-100 bg-gray-100"
+                  }`}
+                  style={{
+                    shadowColor: "#111827",
+                    shadowOpacity: 0.04,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 3 },
+                    elevation: 1,
+                  }}
+                >
+                  <View className="w-12 h-12 rounded-2xl items-center justify-center" style={{ backgroundColor: "#EEF2FF" }}>
+                    <Ionicons name="barcode-outline" size={24} color="#2563EB" />
                   </View>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  void onGenerateCharge("pix");
-                }}
-                disabled={
-                  generatingCharge ||
-                  !chargeInvoice ||
-                  !chargeProvider ||
-                  !canGenerateChargeForInvoice(chargeInvoice)
-                }
-                activeOpacity={0.85}
-                className="flex-1 flex-row items-center rounded-2xl border border-emerald-100 px-4 py-4 bg-white"
-                style={{
-                  shadowColor: "#059669",
-                  shadowOpacity: 0.05,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 3 },
-                  elevation: 1,
-                }}
-              >
-                <View className="w-12 h-12 rounded-2xl items-center justify-center" style={{ backgroundColor: "#ECFDF5" }}>
-                  <PixLogoIcon size={32} color="#059669" weight="fill" />
-                </View>
-                <View className="ml-3 flex-1">
-                  <Text className="text-sm font-bold text-gray-900">Pagar com PIX</Text>
-                  <Text className="text-xs text-gray-500" numberOfLines={1}>
-                    QR Code instantâneo
-                  </Text>
-                </View>
-                {generatingCharge && chargeMethod === "pix" ? (
-                  <ActivityIndicator size="small" color="#6B7280" />
-                ) : (
-                  <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center">
-                    <Ionicons name="chevron-forward-outline" size={18} color="#059669" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-sm font-bold text-gray-900">Gerar cobrança (boleto + PIX)</Text>
+                    <Text className="text-xs text-gray-500" numberOfLines={1}>
+                      {hasBoletoAssets ? "Cobrança já disponível" : "Gera boleto e também canal PIX"}
+                    </Text>
                   </View>
-                )}
-              </TouchableOpacity>
+                  {generatingCharge && chargeMethod === "boleto" ? (
+                    <ActivityIndicator size="small" color="#6B7280" />
+                  ) : (
+                    <View className="w-8 h-8 rounded-full bg-gray-50 items-center justify-center">
+                      <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           </>
         )}
 
-        {chargeModalStep === "result" && !!chargeResult && (
-          <View>
-            {/* ── PIX ── */}
-            {chargeMethod === "pix" && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
-              <>
-                <View className="items-center mb-3">
-                  <View className="w-64 h-64 bg-white rounded-2xl border border-gray-200 items-center justify-center overflow-hidden">
-                    {chargeResult.qr_code_image_url && chargeResult.qr_code_image_url !== "" ? (
-                      <Image
-                        source={{ uri: chargeResult.qr_code_image_url }}
-                        style={{ width: 256, height: 256 }}
-                        resizeMode="contain"
-                      />
-                    ) : chargeResult.pix_copy_paste ? (
-                      <View style={{ transform: [{ scale: 1.28 }] }}>
+        {chargeModalStep === "result" && (!!chargeResult || hasPixAssets || hasBoletoAssets) && (
+          <View className="gap-2.5">
+            {hasDualPaymentAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+              <View className="rounded-2xl border border-slate-200 bg-slate-50 p-1 flex-row gap-1">
+                <TouchableOpacity
+                  onPress={() => setChargeMethod("boleto")}
+                  activeOpacity={0.85}
+                  className={`flex-1 rounded-xl py-2.5 flex-row items-center justify-center gap-2 ${
+                    activeChargeMethod === "boleto" ? "bg-violet-600" : "bg-white"
+                  }`}
+                  style={activeChargeMethod === "boleto" ? { shadowColor: "#4F46E5", shadowOpacity: 0.16, shadowRadius: 8, elevation: 1 } : undefined}
+                >
+                  <Ionicons
+                    name="barcode-outline"
+                    size={16}
+                    color={activeChargeMethod === "boleto" ? "white" : "#64748B"}
+                  />
+                  <Text className={`text-xs font-bold ${activeChargeMethod === "boleto" ? "text-white" : "text-slate-600"}`}>
+                    Boleto
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setChargeMethod("pix")}
+                  activeOpacity={0.85}
+                  className={`flex-1 rounded-xl py-2.5 flex-row items-center justify-center gap-2 ${
+                    activeChargeMethod === "pix" ? "bg-violet-600" : "bg-white"
+                  }`}
+                  style={activeChargeMethod === "pix" ? { shadowColor: "#4F46E5", shadowOpacity: 0.16, shadowRadius: 8, elevation: 1 } : undefined}
+                >
+                  <PixLogoIcon
+                    size={17}
+                    color={activeChargeMethod === "pix" ? "white" : "#64748B"}
+                    weight="fill"
+                  />
+                  <Text className={`text-xs font-bold ${activeChargeMethod === "pix" ? "text-white" : "text-slate-600"}`}>
+                    PIX
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <Animated.View
+              style={{
+                opacity: chargeTabOpacity,
+                transform: [{ translateY: chargeTabTranslateY }],
+              }}
+            >
+              {/* ── PIX ── */}
+              {activeChargeMethod === "pix" && hasPixAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+                <View
+                  className="rounded-2xl border border-gray-200 bg-white p-3"
+                  style={{
+                    flexDirection: isMobile ? "column" : "row",
+                    gap: isMobile ? 14 : 12,
+                  }}
+                >
+                  <View className="items-center justify-center">
+                    <View className="rounded-2xl border border-gray-200 bg-white p-2.5">
+                      {pixQrCodeImageUrl && pixQrCodeImageUrl !== "" ? (
+                        <Image
+                          source={{ uri: pixQrCodeImageUrl }}
+                          style={{ width: checkoutQrSize, height: checkoutQrSize }}
+                          resizeMode="contain"
+                        />
+                      ) : pixCopyPaste ? (
                         <QRCode
-                          value={chargeResult.pix_copy_paste}
-                          size={200}
+                          value={pixCopyPaste}
+                          size={checkoutQrSize}
                           color="#000000"
                           backgroundColor="#FFFFFF"
                         />
-                      </View>
-                    ) : (
-                      <Text className="text-xs text-gray-500">Gerando QR Code...</Text>
-                    )}
+                      ) : (
+                        <View className="items-center justify-center" style={{ width: checkoutQrSize, height: checkoutQrSize }}>
+                          <ActivityIndicator size="small" color="#6B7280" />
+                          <Text className="text-xs text-gray-500 mt-2">Gerando QR Code...</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-                {!!chargeResult.pix_copy_paste && (
-                  <View className="bg-gray-50 rounded-xl border border-gray-200 px-3 py-2 mb-3">
-                    <View className="flex-row items-center gap-2">
-                      <View className="flex-1 min-w-0">
-                        <Text className="text-xs font-semibold text-gray-500 mb-1">
-                          PIX copia e cola
-                        </Text>
-                      <Text
-                          className="text-xs font-mono text-gray-800"
-                        selectable
-                          numberOfLines={1}
-                        ellipsizeMode="middle"
-                      >
-                        {chargeResult.pix_copy_paste}
+                  {!!pixCopyPaste && (
+                    <View className="flex-1 justify-center min-w-0">
+                      <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                        Pix copia e cola
                       </Text>
+                      <View className="bg-slate-50 rounded-2xl border border-slate-200 px-3 py-2.5">
+                        <View className="flex-row items-center gap-2">
+                          <View className="w-8 h-8 rounded-xl items-center justify-center" style={{ backgroundColor: "#ECFDF5" }}>
+                            <PixLogoIcon size={19} color="#059669" weight="fill" />
+                          </View>
+                          <View className="flex-1 min-w-0">
+                            <Text
+                              className="text-xs font-mono text-gray-900 leading-4"
+                              selectable
+                              numberOfLines={2}
+                              ellipsizeMode="middle"
+                            >
+                              {pixCopyPaste}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={copyPixCode}
+                            activeOpacity={0.8}
+                            className="rounded-xl bg-violet-600 px-3 py-2 flex-row items-center gap-1"
+                          >
+                            <Ionicons name="copy-outline" size={14} color="white" />
+                            <Text className="text-xs font-bold text-white">Copiar</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* ── BOLETO ── */}
+              {activeChargeMethod === "boleto" && hasBoletoAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+                <View className="gap-2.5">
+                  {!!boletoDigitable && (
+                    <View className="bg-slate-50 rounded-2xl border border-slate-200 px-3 py-2.5 flex-row items-center gap-3">
+                      <View className="w-8 h-8 rounded-xl items-center justify-center bg-blue-50">
+                        <Ionicons name="barcode-outline" size={19} color="#2563EB" />
+                      </View>
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Linha digitável</Text>
+                        <Text
+                          className="text-sm font-mono text-gray-900 font-semibold leading-5"
+                          selectable
+                          numberOfLines={2}
+                        >
+                          {boletoDigitable}
+                        </Text>
                       </View>
                       <TouchableOpacity
-                        onPress={copyPixCode}
+                        onPress={async () => {
+                          if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                            await navigator.clipboard.writeText(boletoDigitable || "");
+                          }
+                        }}
                         activeOpacity={0.8}
-                        className="rounded-lg bg-violet-600 px-3 py-2 flex-row items-center gap-1"
+                        className="bg-violet-600 rounded-xl px-3 py-2 flex-row items-center gap-1"
                       >
                         <Ionicons name="copy-outline" size={14} color="white" />
                         <Text className="text-xs font-bold text-white">Copiar</Text>
                       </TouchableOpacity>
                     </View>
-                  </View>
-                )}
-              </>
-            )}
-
-            {/* ── BOLETO ── */}
-            {chargeMethod === "boleto" && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
-              <>
-                {!!chargeResult.boleto_digitable && (
-                  <View className="bg-gray-50 rounded-2xl border border-gray-200 p-4 mb-3 flex-row items-center gap-3">
-                    <View className="flex-1 min-w-0">
-                      <Text className="text-xs font-semibold text-gray-500 mb-1">Linha digitável</Text>
-                      <Text
-                        className="text-xs font-mono text-gray-900 font-semibold leading-4"
-                        selectable
-                      >
-                        {chargeResult.boleto_digitable}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={async () => {
-                        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-                          await navigator.clipboard.writeText(chargeResult.boleto_digitable || "");
-                        }
-                      }}
-                      activeOpacity={0.8}
-                      className="bg-violet-600 rounded-xl px-3 py-2.5 flex-row items-center gap-1"
-                    >
-                      <Ionicons name="copy-outline" size={14} color="white" />
-                      <Text className="text-xs font-bold text-white">Copiar</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                {!!chargeResult.payment_url && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (typeof window !== "undefined")
-                        window.open(chargeResult.payment_url || "", "_blank");
-                    }}
-                    activeOpacity={0.8}
-                    className="flex-row items-center gap-2 text-violet-600 mb-3"
-                  >
-                    <Ionicons name="download-outline" size={16} color="#7C3AED" />
-                    <Text className="text-sm font-bold text-violet-600">Baixar boleto</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
+                  )}
+                </View>
+              )}
+            </Animated.View>
           </View>
         )}
-        {!!chargeActionError && (
+        {!!chargeActionError && !shouldHideMethodLockedNotice(chargeActionError) && (
           <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 mt-3">
             <Text className="text-sm font-bold text-red-700">Atenção</Text>
             <Text className="text-xs text-red-700 mt-1">{chargeActionError}</Text>
@@ -1730,6 +2130,100 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
             <Text className="text-sm font-bold text-emerald-700">Pagamento simulado</Text>
             <Text className="text-xs text-emerald-700 mt-1">Status: {paidChargeResult.status || "—"}</Text>
             <Text className="text-xs text-emerald-700 mt-1">Pago em: {fmtDateTime(paidChargeResult.paid_at)}</Text>
+          </View>
+        )}
+      </Modal>
+
+      <Modal
+        visible={previewModalVisible}
+        title="Boleto"
+        onClose={closePreviewModal}
+        size="lg"
+        maxHeight="94%"
+        footer={
+          <>
+            <TouchableOpacity
+              onPress={closePreviewModal}
+              activeOpacity={0.85}
+              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+            >
+              <Text className="text-xs font-bold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+            {!!previewUrl && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (typeof window !== "undefined") window.open(previewUrl, "_blank");
+                }}
+                activeOpacity={0.85}
+                className="px-4 py-2.5 rounded-xl bg-violet-600"
+              >
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="download-outline" size={15} color="white" />
+                  <Text className="text-xs font-bold text-white">Baixar boleto</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </>
+        }
+      >
+        {!previewUrl ? (
+          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <Text className="text-sm text-gray-600">Nenhum boleto disponível para visualização.</Text>
+          </View>
+        ) : Platform.OS !== "web" ? (
+          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <Text className="text-sm text-gray-700">A visualização embutida está disponível no web.</Text>
+            <Text className="text-xs text-gray-500 mt-2">Use "Abrir em nova aba" para ver o boleto.</Text>
+          </View>
+        ) : isImagePreviewUrl(previewUrl) ? (
+          <View>
+            <Image
+              source={{ uri: previewUrl }}
+              style={{ width: "100%", height: 640, borderRadius: 16, resizeMode: "contain", backgroundColor: "#F9FAFB" }}
+            />
+          </View>
+        ) : isPdfPreviewUrl(previewUrl) && PdfDocument && PdfPage ? (
+          <View style={{ width: "100%", maxHeight: 680, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" }}>
+            <ScrollView contentContainerStyle={{ padding: 16, alignItems: "center", gap: 16 }}>
+              <PdfDocument
+                file={previewUrl}
+                loading={<Text className="text-sm text-gray-600">Carregando PDF...</Text>}
+                onLoadSuccess={({ numPages }: { numPages: number }) => {
+                  setPdfPageCount(numPages);
+                  setPdfPreviewError(null);
+                }}
+                onLoadError={(error: Error) => {
+                  setPdfPageCount(0);
+                  setPdfPreviewError(error.message || "Não foi possível renderizar o PDF.");
+                }}
+              >
+                {Array.from({ length: pdfPageCount || 1 }, (_, index) => (
+                  <View key={`boleto-pdf-page-${index + 1}`} style={{ marginBottom: 16 }}>
+                    <PdfPage
+                      pageNumber={index + 1}
+                      width={getPdfPreviewWidth()}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                    />
+                  </View>
+                ))}
+              </PdfDocument>
+
+              {!!pdfPreviewError && (
+                <View className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <Text className="text-sm font-semibold text-red-700">Falha ao renderizar PDF</Text>
+                  <Text className="text-xs text-red-700 mt-1">{pdfPreviewError}</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        ) : (
+          <View style={{ width: "100%", height: 680, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" }}>
+            {React.createElement("iframe", {
+              src: previewUrl,
+              title: "Boleto",
+              style: { width: "100%", height: "100%", border: 0, backgroundColor: "white" },
+            })}
           </View>
         )}
       </Modal>
@@ -1856,6 +2350,164 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
         message={chargeStatusModal.message}
         onClose={closeChargeStatusModal}
       />
+
+      {/* Receipt Modal */}
+      <Modal
+        visible={receiptModalVisible}
+        onClose={() => setReceiptModalVisible(false)}
+        title="Recibo de Pagamento"
+        size="md"
+        footer={
+          receiptData ? (
+            <View className="flex-row justify-end gap-2">
+              {typeof window !== "undefined" && (
+                <TouchableOpacity
+                  onPress={() => printReceipt(receiptData)}
+                  activeOpacity={0.85}
+                  className="px-4 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+                >
+                  <Ionicons name="print-outline" size={15} color="white" />
+                  <Text className="text-xs font-bold text-white">Imprimir</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : undefined
+        }
+      >
+        {loadingReceipt && (
+          <View className="items-center py-8">
+            <ActivityIndicator size="small" color="#7C3AED" />
+            <Text className="text-xs text-gray-500 mt-2">Carregando recibo...</Text>
+          </View>
+        )}
+        {!loadingReceipt && receiptError && (
+          <View className="bg-red-50 border border-red-200 rounded-xl p-3">
+            <Text className="text-xs text-red-700">{receiptError}</Text>
+          </View>
+        )}
+        {!loadingReceipt && receiptData && (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Cabeçalho da escola */}
+            <View className="items-center pb-4 mb-4 border-b border-gray-200">
+              {receiptData.school.logo_url ? (
+                <Image
+                  source={{ uri: receiptData.school.logo_url }}
+                  style={{ width: 64, height: 64, borderRadius: 8, marginBottom: 8 }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View className="w-16 h-16 rounded-xl bg-violet-100 items-center justify-center mb-2">
+                  <Ionicons name="school-outline" size={28} color="#7C3AED" />
+                </View>
+              )}
+              <Text className="text-sm font-bold text-gray-900 text-center">
+                {receiptData.school.name}
+              </Text>
+              {receiptData.school.corporate_name && (
+                <Text className="text-xs text-gray-500 text-center">{receiptData.school.corporate_name}</Text>
+              )}
+              <Text className="text-xs text-gray-500 mt-0.5">CNPJ: {receiptData.school.cnpj}</Text>
+              {receiptData.school.address && (
+                <Text className="text-xs text-gray-400 text-center mt-0.5">{receiptData.school.address}</Text>
+              )}
+            </View>
+
+            {/* Número do recibo */}
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-sm font-bold text-gray-900">RECIBO DE PAGAMENTO</Text>
+              <View className="bg-violet-100 px-2.5 py-1 rounded-lg">
+                <Text className="text-xs font-bold text-violet-700">{receiptData.receipt_number}</Text>
+              </View>
+            </View>
+
+            {/* Seção Aluno / Pagador */}
+            <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3 gap-1.5">
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">Aluno:</Text>
+                <Text className="text-xs font-semibold text-gray-800 flex-1">{receiptData.student.name}</Text>
+              </View>
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">CPF aluno:</Text>
+                <Text className="text-xs text-gray-700 flex-1">{receiptData.student.document}</Text>
+              </View>
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">Pagador:</Text>
+                <Text className="text-xs font-semibold text-gray-800 flex-1">
+                  {receiptData.payer.is_guardian
+                    ? receiptData.payer.guardian_name ?? receiptData.payer.name
+                    : receiptData.payer.name}
+                </Text>
+              </View>
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">CPF pagador:</Text>
+                <Text className="text-xs text-gray-700 flex-1">{receiptData.payer.document}</Text>
+              </View>
+            </View>
+
+            {/* Matrícula */}
+            {receiptData.enrollment && (
+              <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3 gap-1.5">
+                <View className="flex-row gap-1">
+                  <Text className="text-xs text-gray-500 w-20">Matrícula:</Text>
+                  <Text className="text-xs font-semibold text-gray-800 flex-1">
+                    {receiptData.enrollment.enrollment_number} — {receiptData.enrollment.school_class}
+                  </Text>
+                </View>
+                {receiptData.enrollment.start_date && (
+                  <View className="flex-row gap-1">
+                    <Text className="text-xs text-gray-500 w-20">Período:</Text>
+                    <Text className="text-xs text-gray-700 flex-1">
+                      {isoToDisplay(receiptData.enrollment.start_date)}
+                      {receiptData.enrollment.end_date
+                        ? ` até ${isoToDisplay(receiptData.enrollment.end_date)}`
+                        : ""}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Dados da cobrança */}
+            <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3 gap-1.5">
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">Descrição:</Text>
+                <Text className="text-xs font-semibold text-gray-800 flex-1">{receiptData.invoice.description}</Text>
+              </View>
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">Vencimento:</Text>
+                <Text className="text-xs text-gray-700 flex-1">{isoToDisplay(receiptData.invoice.due_date)}</Text>
+              </View>
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">Pagamento:</Text>
+                <Text className="text-xs text-gray-700 flex-1">
+                  {isoToDisplay(receiptData.invoice.paid_at_date)} às {receiptData.invoice.paid_at_time}
+                </Text>
+              </View>
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">Método:</Text>
+                <Text className="text-xs text-gray-700 flex-1">{receiptData.invoice.payment_method}</Text>
+              </View>
+              <View className="h-px bg-gray-200 my-1" />
+              <View className="flex-row gap-1 items-center">
+                <Text className="text-xs text-gray-500 w-20">Valor:</Text>
+                <Text className="text-sm font-bold text-emerald-700 flex-1">R$ {receiptData.invoice.amount}</Text>
+              </View>
+            </View>
+
+            {/* Verificação */}
+            <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 gap-1.5">
+              <Text className="text-xs text-gray-500">{receiptData.verification.message}</Text>
+              <Text
+                className="text-xs font-mono text-gray-400"
+                numberOfLines={2}
+                selectable
+              >
+                {receiptData.verification.verify_hash}
+              </Text>
+            </View>
+          </ScrollView>
+        )}
+      </Modal>
     </View>
   );
 }

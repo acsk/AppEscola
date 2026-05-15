@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PaymentProviderController;
 use App\Http\Controllers\Api\PublicRegistrationController;
+use App\Http\Controllers\Api\ReceiptController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -170,6 +171,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('invoices/{invoice}/generate-charge', [PaymentProviderController::class, 'generateCharge']);
     Route::get('invoices/{invoice}/charge-status', [PaymentProviderController::class, 'chargeStatus']);
     Route::post('invoices/{invoice}/pay-charge', [PaymentProviderController::class, 'payCharge']);
+    Route::get('invoices/{invoice}/receipt', [ReceiptController::class, 'show']);
 
     Route::get('tenants/{tenant}/payment-providers/{provider}/settings-schema', [PaymentProviderController::class, 'settingsSchema']);
     Route::post('tenants/{tenant}/payment-providers/{provider}/settings', [PaymentProviderController::class, 'saveSettings']);
@@ -185,6 +187,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('aluno/boletos',                  [StudentFinanceController::class, 'boletos']);
     Route::get('aluno/cobrancas/{invoice}/payment-options', [StudentFinanceController::class, 'paymentOptions']);
     Route::post('aluno/cobrancas/{invoice}/generate-charge', [StudentFinanceController::class, 'generateCharge']);
+    Route::get('aluno/cobrancas/{invoice}/receipt', [ReceiptController::class, 'aluno']);
     Route::get('aluno/exams',                    [StudentExamController::class, 'index']);
     Route::get('aluno/exams/{exam}',             [StudentExamController::class, 'show']);
     Route::get('aluno/attempts',                 [StudentExamController::class, 'attempts']);

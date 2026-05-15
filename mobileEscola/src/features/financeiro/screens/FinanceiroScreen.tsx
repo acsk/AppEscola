@@ -114,8 +114,8 @@ export function FinanceiroScreen() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [consultaStatusModalVisivel, setConsultaStatusModalVisivel] = useState(false);
   const [consultaStatusData, setConsultaStatusData] = useState<ConsultaStatusModalData | null>(null);
-  const modalTranslateY = useRef(new Animated.Value(64)).current;
-  const modalAnimatedOpacity = useRef(new Animated.Value(0)).current;
+  const [activePaymentTab, setActivePaymentTab] = useState<'boleto' | 'pix'>('boleto');
+  const modalTranslateY = useRef(new Animated.Value(520)).current;
 
   useEffect(() => {
     carregarCobrancas();
@@ -210,10 +210,25 @@ export function FinanceiroScreen() {
   };
 
   const criarResultadoDeOpcoes = (options: PaymentOptionsResponse): GenerateChargeResponse | null => {
-    if (options.actions.can_generate_charge !== false) return null;
+    // Exibe assets diretamente se já existem (boleto ou PIX já gerados),
+    // independente de can_generate_charge — evita chamada redundante ao backend.
+    const temAssets = Boolean(
+      options.payment_assets.boleto_digitable ||
+      options.payment_assets.boleto_number ||
+      options.payment_assets.boleto_url ||
+      options.payment_assets.pix_copy_paste ||
+      options.payment_assets.pix_qr_image_url
+    );
 
-    const metodo = normalizarMetodoPagamento(options.method_lock?.method ?? options.current_method);
-    if (!metodo) return null;
+    if (!temAssets && options.actions.can_generate_charge !== false) return null;
+    if (!temAssets) {
+      // Sem assets e não pode gerar: exibe tela de bloqueio (sem result)
+      return null;
+    }
+
+    const metodo = normalizarMetodoPagamento(
+      options.method_lock?.method ?? options.current_method
+    ) ?? 'boleto';
 
     return {
       invoice_id: options.invoice.id,
@@ -249,22 +264,13 @@ export function FinanceiroScreen() {
   const abrirModalPagamento = async (cobranca: Cobranca) => {
     setCobrancaSelecionada(cobranca);
     setModalPagamentoVisivel(true);
-    modalTranslateY.setValue(64);
-    modalAnimatedOpacity.setValue(0);
-    Animated.parallel([
-      Animated.timing(modalTranslateY, {
-        toValue: 0,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(modalAnimatedOpacity, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
+    modalTranslateY.setValue(520);
+    Animated.timing(modalTranslateY, {
+      toValue: 0,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
 
     setPaymentOptions(null);
     setPaymentResult(null);
@@ -286,20 +292,12 @@ export function FinanceiroScreen() {
   };
 
   const fecharModalPagamento = () => {
-    Animated.parallel([
-      Animated.timing(modalTranslateY, {
-        toValue: 64,
-        duration: 240,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(modalAnimatedOpacity, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    Animated.timing(modalTranslateY, {
+      toValue: 520,
+      duration: 260,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
       setModalPagamentoVisivel(false);
       setCobrancaSelecionada(null);
       setPaymentOptions(null);
@@ -307,6 +305,7 @@ export function FinanceiroScreen() {
       setPaymentError(null);
       setPaymentLoading(false);
       setGeneratingMethod(null);
+      setActivePaymentTab('boleto');
     });
   };
 
@@ -317,8 +316,34 @@ export function FinanceiroScreen() {
       setPaymentError(null);
       setGeneratingMethod(method);
       const result = await generateChargeApi(cobrancaSelecionada.id, method);
-      setPaymentResult(result);
-      aplicarCobrancaGerada(cobrancaSelecionada.id, result);
+
+      // Busca payment-options para garantir que assets de PIX embutido estejam presentes,
+      // pois o endpoint generate-charge pode não retornar pix_copy_paste diretamente.
+      let finalResult = result;
+      const temPixNoResult = Boolean(result.payment_assets.pix_copy_paste || result.payment_assets.pix_qr_image_url);
+      if (!temPixNoResult) {
+        try {
+          const options = await getPaymentOptionsApi(cobrancaSelecionada.id);
+          setPaymentOptions(options);
+          const temPixNasOptions = Boolean(options.payment_assets.pix_copy_paste || options.payment_assets.pix_qr_image_url);
+          if (temPixNasOptions) {
+            finalResult = {
+              ...result,
+              payment_assets: {
+                ...result.payment_assets,
+                pix_copy_paste: options.payment_assets.pix_copy_paste,
+                pix_qr_image_url: options.payment_assets.pix_qr_image_url,
+              },
+              actions: options.actions,
+            };
+          }
+        } catch {
+          // ignora erro ao buscar options; exibe somente os dados do generate
+        }
+      }
+
+      setPaymentResult(finalResult);
+      aplicarCobrancaGerada(cobrancaSelecionada.id, finalResult);
     } catch (err: any) {
       setPaymentError(err.response?.data?.message ?? err.message ?? 'Não foi possível gerar a cobrança.');
     } finally {
@@ -465,25 +490,29 @@ export function FinanceiroScreen() {
   const renderResultadoPagamento = () => {
     if (!paymentResult) return null;
 
-    const { method, payment_assets: assets, actions } = paymentResult;
-    const isPix = method === 'pix';
-    const pixQrUrl = isPix ? resolvePixQrImageUrl(assets, 320) : null;
+    const { payment_assets: assets, actions } = paymentResult;
+
+    const temBoleto = Boolean(assets.boleto_digitable || assets.boleto_number || assets.boleto_url);
+    const temPix    = Boolean(assets.pix_copy_paste || assets.pix_qr_image_url);
+    const temAmbos  = temBoleto && temPix;
+
+    // garante que a aba ativa seja válida
+    const abaAtiva: 'boleto' | 'pix' =
+      activePaymentTab === 'pix' && temPix ? 'pix' :
+      activePaymentTab === 'boleto' && temBoleto ? 'boleto' :
+      temBoleto ? 'boleto' : 'pix';
+
+    const pixQrUrl = temPix ? resolvePixQrImageUrl(assets, 320) : null;
 
     return (
       <View>
         {/* Header compacto: ícone + título + valor */}
         <View style={styles.modalResultadoHeaderRow}>
-          <View style={[styles.modalResultadoIcone, isPix ? styles.modalBotaoIconePix : styles.modalBotaoIconeBoleto]}>
-            {isPix ? (
-              <FontAwesome6 name="pix" size={24} color="#00A884" />
-            ) : (
-              <MaterialCommunityIcons name="barcode-scan" size={26} color="#2563EB" />
-            )}
+          <View style={[styles.modalResultadoIcone, styles.modalBotaoIconeBoleto]}>
+            <MaterialCommunityIcons name="barcode-scan" size={26} color="#2563EB" />
           </View>
           <View style={styles.modalResultadoHeaderTexto}>
-            <Text style={styles.modalResultadoTitulo}>
-              {isPix ? 'PIX gerado' : 'Boleto gerado'}
-            </Text>
+            <Text style={styles.modalResultadoTitulo}>Boleto gerado</Text>
             {cobrancaSelecionada && (
               <Text style={styles.modalResultadoValor}>
                 {formatarMoeda(cobrancaSelecionada.amount)}
@@ -492,72 +521,130 @@ export function FinanceiroScreen() {
           </View>
         </View>
 
-        {isPix && pixQrUrl && (
-          <View style={styles.pixQrWrap}>
-            <Image source={{ uri: pixQrUrl }} style={styles.pixQrImage} resizeMode="contain" />
+        {/* Abas boleto / PIX quando ambos disponíveis */}
+        {temAmbos && (
+          <View style={styles.paymentTabRow}>
+            <TouchableOpacity
+              style={[
+                styles.paymentTab,
+                abaAtiva === 'boleto' && styles.paymentTabAtiva,
+                abaAtiva === 'boleto' && styles.paymentTabAtivaBoleto,
+              ]}
+              onPress={() => setActivePaymentTab('boleto')}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons
+                name="barcode-scan"
+                size={16}
+                color={abaAtiva === 'boleto' ? colors.surface : colors.muted}
+              />
+              <Text style={[styles.paymentTabTexto, abaAtiva === 'boleto' && styles.paymentTabTextoAtivo]}>
+                Boleto
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.paymentTab,
+                abaAtiva === 'pix' && styles.paymentTabAtiva,
+                abaAtiva === 'pix' && styles.paymentTabAtivaPix,
+              ]}
+              onPress={() => setActivePaymentTab('pix')}
+              activeOpacity={0.8}
+            >
+              <FontAwesome6
+                name="pix"
+                size={14}
+                color={abaAtiva === 'pix' ? colors.surface : colors.muted}
+              />
+              <Text style={[styles.paymentTabTexto, abaAtiva === 'pix' && styles.paymentTabTextoAtivoPix]}>
+                PIX
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {isPix && actions.can_copy_pix_code && assets.pix_copy_paste && (
-          <TouchableOpacity
-            style={[styles.modalBotao, styles.modalBotaoPrincipal]}
-            onPress={() => copiarParaClipboard(assets.pix_copy_paste!, 'Código PIX')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="copy-outline" size={22} color={colors.surface} />
-            <Text style={styles.modalBotaoPrincipalTexto}>Copiar e cola PIX</Text>
-          </TouchableOpacity>
+        {/* Canal PIX */}
+        {(abaAtiva === 'pix' || (!temAmbos && temPix)) && (
+          <>
+            {pixQrUrl && (
+              <View style={styles.pixQrWrap}>
+                <Image source={{ uri: pixQrUrl }} style={styles.pixQrImage} resizeMode="contain" />
+              </View>
+            )}
+            {actions.can_copy_pix_code && assets.pix_copy_paste && (
+              <TouchableOpacity
+                style={[styles.modalBotao, styles.modalBotaoPrincipalPix]}
+                onPress={() => copiarParaClipboard(assets.pix_copy_paste!, 'Código PIX')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="copy-outline" size={22} color={colors.surface} />
+                <Text style={styles.modalBotaoPrincipalTexto}>Copiar código PIX</Text>
+              </TouchableOpacity>
+            )}
+            {assets.pix_copy_paste && (
+              <View style={styles.pixCodeBox}>
+                <Text style={styles.pixCodeLabel}>PIX copia e cola</Text>
+                <Text style={styles.pixCodeValue} numberOfLines={1} ellipsizeMode="middle">
+                  {assets.pix_copy_paste}
+                </Text>
+              </View>
+            )}
+          </>
         )}
 
-        {isPix && assets.pix_copy_paste && (
-          <View style={styles.pixCodeBox}>
-            <Text style={styles.pixCodeLabel}>PIX copia e cola</Text>
-            <Text style={styles.pixCodeValue} numberOfLines={1} ellipsizeMode="middle">
-              {assets.pix_copy_paste}
+        {/* Canal Boleto */}
+        {(abaAtiva === 'boleto' || (!temAmbos && temBoleto)) && (
+          <>
+            {assets.boleto_digitable && (
+              <View style={styles.boletoLinhaBox}>
+                <View style={styles.boletoLinhaTextWrap}>
+                  <Text style={styles.boletoLinhaLabel}>Linha digitável</Text>
+                  <Text style={styles.boletoLinhaValor} selectable>
+                    {assets.boleto_digitable}
+                  </Text>
+                </View>
+                {actions.can_copy_boleto_line && (
+                  <TouchableOpacity
+                    style={styles.boletoCopiarBotao}
+                    onPress={() => copiarParaClipboard(assets.boleto_digitable!, 'Linha digitável')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="copy-outline" size={20} color={colors.surface} />
+                    <Text style={styles.boletoCopiarBotaoTexto}>Copiar</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+            {assets.boleto_url && (
+              <TouchableOpacity
+                style={styles.modalBotao}
+                onPress={() => baixarBoleto(assets.boleto_url!)}
+                activeOpacity={0.8}
+              >
+                <Ionicons style={styles.modalAcaoIcone} name="download-outline" size={22} color={colors.primary} />
+                <Text style={[styles.modalBotaoTitulo, { color: colors.primary }]}>Baixar boleto</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
+        {/* Estado sem assets */}
+        {!temBoleto && !temPix && (
+          <View style={styles.modalErro}>
+            <Ionicons name="alert-circle-outline" size={22} color={colors.muted} />
+            <Text style={styles.modalErroTexto}>
+              Dados de pagamento ainda não disponíveis. Aguarde e consulte o status.
             </Text>
           </View>
         )}
-
-        {!isPix && assets.boleto_digitable && (
-          <View style={styles.boletoLinhaBox}>
-            <View style={styles.boletoLinhaTextWrap}>
-              <Text style={styles.boletoLinhaLabel}>Linha digitável</Text>
-              <Text style={styles.boletoLinhaValor} selectable>
-                {assets.boleto_digitable}
-              </Text>
-            </View>
-            {actions.can_copy_boleto_line && (
-              <TouchableOpacity
-                style={styles.boletoCopiarBotao}
-                onPress={() => copiarParaClipboard(assets.boleto_digitable!, 'Linha digitável')}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="copy-outline" size={20} color={colors.surface} />
-                <Text style={styles.boletoCopiarBotaoTexto}>Copiar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {!isPix && assets.boleto_url && (
-          <TouchableOpacity
-            style={styles.modalBotao}
-            onPress={() => baixarBoleto(assets.boleto_url!)}
-            activeOpacity={0.8}
-          >
-            <Ionicons style={styles.modalAcaoIcone} name="download-outline" size={22} color={colors.primary} />
-            <Text style={[styles.modalBotaoTitulo, { color: colors.primary }]}>Baixar boleto</Text>
-          </TouchableOpacity>
-        )}
-
       </View>
     );
   };
 
   const renderCardCobranca = (cobranca: Cobranca, tipo: 'atrasada' | 'atual' | 'paga') => {
-    const corFundo = tipo === 'atrasada' ? '#FEF2F2' : tipo === 'atual' ? '#FFF7ED' : '#ECFDF5';
-    const corBorda = tipo === 'atrasada' ? '#FECACA' : tipo === 'atual' ? '#FED7AA' : '#BBF7D0';
-    const corIcone = tipo === 'atrasada' ? colors.debit : tipo === 'atual' ? '#F97316' : colors.credit;
+    const corFundo = tipo === 'atrasada' ? '#FEF2F2' : tipo === 'atual' ? colors.soft : '#ECFDF5';
+    const corBorda = tipo === 'atrasada' ? '#FEE2E2' : tipo === 'atual' ? colors.border : '#D1FAE5';
+    const corIcone = tipo === 'atrasada' ? colors.debit : tipo === 'atual' ? colors.primary : colors.credit;
     const icone = tipo === 'atrasada' ? 'alert-circle-outline' : tipo === 'atual' ? 'time-outline' : 'checkmark-circle-outline';
     const statusLabel = tipo === 'atrasada' ? 'Atrasado' : tipo === 'atual' ? 'Aberto' : 'Pago';
 
@@ -595,8 +682,8 @@ export function FinanceiroScreen() {
           </View>
         </View>
 
-        <View style={styles.acoesBotoes}>
-          {tipo !== 'paga' && (
+        {tipo !== 'paga' && (
+          <View style={styles.acoesBotoes}>
             <TouchableOpacity
               style={[styles.botaoAcao, styles.botaoPagarPrimario]}
               onPress={() => abrirModalPagamento(cobranca)}
@@ -604,9 +691,8 @@ export function FinanceiroScreen() {
               <Ionicons name="card-outline" size={19} color={colors.surface} />
               <Text style={styles.botaoAcaoTexto}>Pagar</Text>
             </TouchableOpacity>
-          )}
-
-        </View>
+          </View>
+        )}
       </View>
     );
   };
@@ -668,7 +754,7 @@ export function FinanceiroScreen() {
     <Modal
       visible={modalPagamentoVisivel}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={fecharModalPagamento}
     >
       <View style={styles.modalOverlay}>
@@ -677,7 +763,6 @@ export function FinanceiroScreen() {
             styles.modalContent,
             {
               paddingBottom: Math.max(insets.bottom, 12),
-              opacity: modalAnimatedOpacity,
               transform: [{ translateY: modalTranslateY }],
             },
           ]}
@@ -741,47 +826,31 @@ export function FinanceiroScreen() {
               </TouchableOpacity>
             ) : (
               <>
-                {metodoPermitido('boleto') && (
-                  <TouchableOpacity
-                    style={styles.modalBotao}
-                    onPress={() => gerarCobranca('boleto')}
-                    activeOpacity={0.8}
-                    disabled={Boolean(generatingMethod)}
-                  >
-                    <View style={[styles.modalBotaoIcone, styles.modalBotaoIconeBoleto]}>
-                      <MaterialCommunityIcons name="barcode-scan" size={32} color="#2563EB" />
-                    </View>
-                    <View style={styles.modalBotaoTexto}>
-                      <Text style={styles.modalBotaoTitulo}>Boleto</Text>
-                    </View>
-                    {generatingMethod === 'boleto' ? (
-                      <ActivityIndicator color={colors.primary} />
-                    ) : (
-                      <Ionicons name="chevron-forward-outline" size={24} color="#94A3B8" />
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {metodoPermitido('pix') && (
-                  <TouchableOpacity
-                    style={styles.modalBotao}
-                    onPress={() => gerarCobranca('pix')}
-                    activeOpacity={0.8}
-                    disabled={Boolean(generatingMethod)}
-                  >
-                    <View style={[styles.modalBotaoIcone, styles.modalBotaoIconePix]}>
-                      <FontAwesome6 name="pix" size={30} color="#00A884" />
-                    </View>
-                    <View style={styles.modalBotaoTexto}>
-                      <Text style={styles.modalBotaoTitulo}>PIX</Text>
-                    </View>
-                    {generatingMethod === 'pix' ? (
-                      <ActivityIndicator color={colors.primary} />
-                    ) : (
-                      <Ionicons name="chevron-forward-outline" size={24} color="#94A3B8" />
-                    )}
-                  </TouchableOpacity>
-                )}
+                {/* Boleto com PIX embutido — único método disponível */}
+                <TouchableOpacity
+                  style={[styles.modalBotaoGerar, Boolean(generatingMethod) && styles.modalBotaoGerarDesabilitado]}
+                  onPress={() => gerarCobranca('boleto')}
+                  activeOpacity={0.8}
+                  disabled={Boolean(generatingMethod)}
+                >
+                  {generatingMethod ? (
+                    <ActivityIndicator color={colors.surface} />
+                  ) : (
+                    <>
+                      <View style={styles.modalBotaoGerarIconeWrap}>
+                        <MaterialCommunityIcons name="barcode-scan" size={24} color={colors.surface} />
+                      </View>
+                      <View style={styles.modalBotaoGerarTexto}>
+                        <Text style={styles.modalBotaoGerarTitulo}>Gerar boleto</Text>
+                        <Text style={styles.modalBotaoGerarSub}>Inclui PIX embutido</Text>
+                      </View>
+                      <View style={styles.modalBotaoGerarPixBadge}>
+                        <FontAwesome6 name="pix" size={13} color="#00A884" />
+                        <Text style={styles.modalBotaoGerarPixBadgeTexto}>PIX</Text>
+                      </View>
+                    </>
+                  )}
+                </TouchableOpacity>
               </>
             )}
 
@@ -900,35 +969,54 @@ export function FinanceiroScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Atrasados */}
         {data.atrasados.length > 0 && (
-          <>
+          <View style={styles.secaoCard}>
             <View style={styles.secaoHeader}>
-              <Ionicons name="alert-circle-outline" size={22} color={colors.debit} />
-              <Text style={styles.secaoTitulo}>Atrasados</Text>
+              <View style={[styles.secaoIcone, styles.secaoIconeAtrasada]}>
+                <Ionicons name="alert-circle-outline" size={18} color={colors.debit} />
+              </View>
+              <View style={styles.secaoTituloWrap}>
+                <Text style={styles.secaoTitulo}>Atrasados</Text>
+                <Text style={styles.secaoSubtitulo}>
+                  {data.atrasados.length} {data.atrasados.length === 1 ? 'cobrança pendente' : 'cobranças pendentes'}
+                </Text>
+              </View>
             </View>
             {data.atrasados.map((c) => renderCardCobranca(c, 'atrasada'))}
-          </>
+          </View>
         )}
 
         {/* Atual */}
         {data.atual && (
-          <>
+          <View style={styles.secaoCard}>
             <View style={styles.secaoHeader}>
-              <Ionicons name="calendar-outline" size={22} color="#F97316" />
-              <Text style={styles.secaoTitulo}>Cobrança atual</Text>
+              <View style={[styles.secaoIcone, styles.secaoIconeAtual]}>
+                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.secaoTituloWrap}>
+                <Text style={styles.secaoTitulo}>Cobrança atual</Text>
+                <Text style={styles.secaoSubtitulo}>Mensalidade em aberto</Text>
+              </View>
             </View>
             {renderCardCobranca(data.atual, 'atual')}
-          </>
+          </View>
         )}
 
         {/* Pagas */}
         {data.pagas.length > 0 && (
-          <>
+          <View style={styles.secaoCard}>
             <View style={styles.secaoHeader}>
-              <Ionicons name="checkmark-circle-outline" size={22} color={colors.credit} />
-              <Text style={styles.secaoTitulo}>Histórico de pagamentos</Text>
+              <View style={[styles.secaoIcone, styles.secaoIconePaga]}>
+                <Ionicons name="checkmark-circle-outline" size={18} color={colors.credit} />
+              </View>
+              <View style={styles.secaoTituloWrap}>
+                <Text style={styles.secaoTitulo}>Histórico de pagamentos</Text>
+                <Text style={styles.secaoSubtitulo}>
+                  {data.pagas.length} {data.pagas.length === 1 ? 'pagamento confirmado' : 'pagamentos confirmados'}
+                </Text>
+              </View>
             </View>
             {data.pagas.map((c) => renderCardCobranca(c, 'paga'))}
-          </>
+          </View>
         )}
       </ScrollView>
 
@@ -1034,17 +1122,53 @@ const styles = StyleSheet.create({
   divisorResumo: { display: 'none' },
   
   // Seções
+  secaoCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.ink,
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 1,
+  },
   secaoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-    marginTop: 12,
+    gap: 10,
+    marginBottom: 10,
+  },
+  secaoIcone: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secaoIconeAtrasada: {
+    backgroundColor: '#FEF2F2',
+  },
+  secaoIconeAtual: {
+    backgroundColor: colors.soft,
+  },
+  secaoIconePaga: {
+    backgroundColor: '#ECFDF5',
+  },
+  secaoTituloWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   secaoTitulo: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.ink,
+  },
+  secaoSubtitulo: {
+    fontSize: 12,
+    color: colors.muted,
+    marginTop: 1,
   },
   
   // Cards de cobrança
@@ -1052,8 +1176,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 10,
-    borderLeftWidth: 3,
+    marginBottom: 8,
+    borderLeftWidth: 2,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -1066,15 +1190,13 @@ const styles = StyleSheet.create({
   cobrancaIcone: {
     width: 38,
     height: 38,
-    borderRadius: 10,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.8)',
   },
   cobrancaInfo: { flex: 1, minWidth: 0 },
-  cobrancaDescricao: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 4, lineHeight: 19 },
-  cobrancaData: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+  cobrancaDescricao: { fontSize: 15, fontWeight: '700', color: colors.ink, marginBottom: 4, lineHeight: 19 },
+  cobrancaData: { fontSize: 12, color: colors.muted, fontWeight: '500' },
   cobrancaMeta: { alignItems: 'flex-end', marginLeft: 6 },
   cobrancaStatus: {
     overflow: 'hidden',
@@ -1082,54 +1204,53 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     marginBottom: 6,
   },
   cobrancaStatusPago: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    fontSize: 13,
+    fontSize: 12,
   },
-  cobrancaValor: { fontSize: 16, fontWeight: '900', color: '#111827' },
+  cobrancaValor: { fontSize: 16, fontWeight: '700', color: colors.ink },
   
   // Ações/Botões de cobrança
   acoesBotoes: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   botaoAcao: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  botaoPagarPrimario: { backgroundColor: '#F97316', flex: 1, justifyContent: 'center' },
+  botaoPagarPrimario: { backgroundColor: colors.primary, flex: 1, justifyContent: 'center' },
   botaoAcaoPrimario: { backgroundColor: colors.primary, flex: 1, justifyContent: 'center' },
   botaoAcaoSecundario: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
-  botaoAcaoTexto: { fontSize: 13, fontWeight: '800', color: colors.surface },
+  botaoAcaoTexto: { fontSize: 13, fontWeight: '700', color: colors.surface },
   
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+    backgroundColor: 'rgba(15, 23, 42, 0.34)',
     alignItems: 'stretch',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingTop: 10,
     paddingHorizontal: 16,
     paddingBottom: 22,
     maxHeight: '92%',
-    minHeight: 420,
   },
   modalHandle: {
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D8DEE9',
+    backgroundColor: '#CBD5E1',
     alignSelf: 'center',
-    marginBottom: 18,
+    marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 16,
   },
   modalTituloWrap: {
@@ -1142,26 +1263,28 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   modalTitulo: {
-    fontSize: 23,
+    fontSize: 22,
     fontWeight: '900',
     color: colors.ink,
     marginBottom: 4,
   },
   modalFecharBotao: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
   },
   modalInfoCobranca: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#F0ECFA',
+    borderColor: '#E8EDF5',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -1182,7 +1305,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalInfoValor: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '900',
     color: colors.primary,
   },
@@ -1202,10 +1325,115 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
+  modalBotaoPrincipalPix: {
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#00A884',
+    borderColor: '#00A884',
+  },
   modalBotaoPrincipalTexto: {
     fontSize: 18,
     fontWeight: '900',
     color: colors.surface,
+  },
+  // Abas Boleto / PIX no resultado
+  paymentTabRow: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.soft,
+    padding: 4,
+    gap: 4,
+    marginBottom: 14,
+  },
+  paymentTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  paymentTabAtiva: {
+    shadowColor: colors.ink,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  paymentTabAtivaBoleto: {
+    backgroundColor: colors.primary,
+  },
+  paymentTabAtivaPix: {
+    backgroundColor: colors.credit,
+  },
+  paymentTabTexto: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.muted,
+  },
+  paymentTabTextoAtivo: {
+    color: colors.surface,
+  },
+  paymentTabTextoAtivoPix: {
+    color: colors.surface,
+  },
+  // Botão único "Gerar boleto"
+  modalBotaoGerar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  modalBotaoGerarDesabilitado: {
+    opacity: 0.6,
+  },
+  modalBotaoGerarIconeWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBotaoGerarTexto: {
+    flex: 1,
+  },
+  modalBotaoGerarTitulo: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: colors.surface,
+  },
+  modalBotaoGerarSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.78)',
+    marginTop: 1,
+  },
+  modalBotaoGerarPixBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  modalBotaoGerarPixBadgeTexto: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#00A884',
   },
   modalBotaoIcone: {
     width: 44,
@@ -1369,13 +1597,14 @@ const styles = StyleSheet.create({
   modalAcoesFooter: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 6,
+    marginTop: 4,
   },
   modalBotaoConsultar: {
     flex: 1.45,
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
+    borderColor: colors.primary,
   },
   modalBotaoConsultarTexto: {
     fontSize: 15,

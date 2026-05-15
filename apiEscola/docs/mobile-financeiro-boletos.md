@@ -105,7 +105,36 @@ Resposta:
   - pix_copy_paste
   - pix_qr_image_url
 
-### Regra para cobrancas sincronizadas/importadas da Cora
+### Implementacao recomendada (passo a passo)
+
+1. Chamar `GET /api/aluno/cobrancas/{invoice}/payment-options` ao abrir a tela da cobranca.
+2. Ler `method_lock` e `allowed_methods` para decidir se o usuario pode trocar metodo.
+3. Se `method_lock.locked = true`, esconder seletor de metodo e manter somente `method_lock.method` como metodo principal.
+4. Renderizar canais de pagamento a partir de `payment_assets`:
+  - canal boleto: existe quando vier `boleto_digitable` ou `boleto_number` ou `boleto_url`
+  - canal pix: existe quando vier `pix_copy_paste` ou `pix_qr_image_url`
+5. Exibir os dois canais na mesma tela quando ambos existirem (boleto + pix da mesma cobranca).
+6. So chamar `POST /generate-charge` quando `actions.can_change_method = true` e o usuario escolher gerar.
+7. Se `POST /generate-charge` retornar `422` com `locked_reason`, tratar como regra de negocio e recarregar `payment-options`.
+
+### Regra de bloqueio de método
+
+Assim que qualquer cobrança é gerada para uma invoice (PIX **ou** boleto), o método fica travado permanentemente.
+
+- PIX gerado → somente PIX pode ser reutilizado ou consultado para aquela invoice.
+- Boleto gerado → somente boleto.
+- Essa regra vale para cobranças geradas pelo aluno **e** cobranças geradas/importadas pelo painel.
+
+Valores possíveis de `method_lock.reason`:
+| Valor | Significado |
+|---|---|
+| `method_already_charged` | Cobrança gerada normalmente — método não pode ser alterado |
+| `synced_charge_method_lock` | Cobrança importada/sincronizada da Cora — método original preservado |
+
+Quando `method_lock.locked = true`, o app deve:
+1. Exibir apenas o método indicado em `method_lock.method`.
+2. Ocultar ou desabilitar o seletor de método.
+3. Caso o backend retorne `422` com `locked_reason`, exibir mensagem amigável (não tratar como erro técnico).
 
 Quando a invoice vier de uma cobranca sincronizada da Cora, o mobile nao deve tentar gerar outro tipo de cobranca.
 
@@ -114,20 +143,22 @@ Nesses casos, o backend retorna no payment-options:
 - actions.can_change_method = false
 - method_lock.locked = true
 - method_lock.method = "boleto" ou "pix"
-- method_lock.reason = "synced_charge_method_lock"
+- method_lock.reason = "synced_charge_method_lock" ou "method_already_charged"
 
 Comportamento esperado no app:
 - esconder ou desabilitar o seletor de metodo
 - exibir somente o metodo retornado em method_lock.method
 - usar os assets retornados para pagar a cobranca como ela ja existe na Cora
-- nao tentar gerar pix a partir de boleto sincronizado
-- nao tentar gerar boleto a partir de pix sincronizado
+- nao tentar trocar o metodo
 
 Observacao:
-- para cobrancas normais criadas pelo proprio sistema, o backend pode continuar retornando allowed_methods com ["pix", "boleto"]
-- a trava vale somente para cobrancas sincronizadas/importadas
+- a trava vale para qualquer cobranca com charge gerado, independente de origem
+- uma vez gerado como PIX, nao pode mudar para boleto, e vice-versa
+- o backend retorna 422 com `locked_reason` se a troca for tentada
 
 ### Opcao conjunta boleto + PIX na mesma cobranca
+
+**Comportamento atual:** ao gerar uma cobranca com metodo `boleto`, o backend automaticamente solicita a geracao de PIX embutido na mesma cobranca Cora (`payment_forms: ["BANK_SLIP", "PIX"]`). Isso significa que a resposta de um boleto gerado pode conter tanto dados de boleto quanto de PIX.
 
 Quando a mesma invoice possuir assets de boleto e de PIX, o mobile pode exibir as duas formas de pagamento na mesma tela, sem gerar nova cobranca.
 
@@ -142,6 +173,17 @@ Regra pratica para a tela:
 - se vier apenas PIX, mostrar PIX
 - se vier boleto e PIX juntos, mostrar os dois como alternativas da mesma cobranca
 - se houver `method_lock`, respeitar o metodo travado como principal, mas continuar usando os assets ja existentes da invoice
+
+Matriz de renderizacao dos canais:
+- `boleto_*` presente e `pix_*` ausente -> mostrar somente boleto
+- `boleto_*` ausente e `pix_*` presente -> mostrar somente pix
+- `boleto_*` presente e `pix_*` presente -> mostrar botoes/abas para os dois canais (mesma invoice)
+- ambos ausentes -> mostrar estado "cobranca ainda sem dados de pagamento" e opcao de tentar novamente
+
+Observacao importante:
+- o metodo travado (`method_lock.method`) define o metodo de origem da cobranca
+- os canais em `payment_assets` definem o que pode ser pago na pratica
+- portanto, uma cobranca travada como `boleto` pode (e deve) exibir tambem o canal PIX quando o backend retornar os dados
 
 ## Endpoint para gerar cobranca com metodo escolhido
 
@@ -174,14 +216,56 @@ Resposta:
   - can_copy_boleto_line
   - can_copy_pix_code
 
+Exemplo de resposta com boleto + PIX juntos:
+
+```json
+{
+  "type": "success",
+  "message": "Cobrança gerada com sucesso.",
+  "body": {
+    "invoice_id": 45,
+    "method": "bank_slip",
+    "status": "OPEN",
+    "charge_id": "inv_abc123",
+    "reused_existing_charge": false,
+    "payment_assets": {
+      "boleto_number": "23790...",
+      "boleto_digitable": "23790...",
+      "boleto_url": "https://...",
+      "pix_copy_paste": "00020126...",
+      "pix_qr_image_url": "https://..."
+    },
+    "actions": {
+      "can_open_boleto_url": true,
+      "can_copy_boleto_line": true,
+      "can_copy_pix_code": true
+    }
+  }
+}
+```
+
 ### Respostas esperadas para cobrancas sincronizadas/importadas
 
-Caso o app tente trocar o metodo de uma cobranca sincronizada/importada, o backend retorna erro 422 com payload semelhante a:
+Caso o app tente trocar o metodo de uma cobranca ja gerada, o backend retorna erro 422 com payload semelhante a:
 
 ```json
 {
   "type": "error",
-  "message": "Esta cobrança foi sincronizada e deve manter o método original.",
+  "message": "N\u00e3o \u00e9 poss\u00edvel alterar o m\u00e9todo de pagamento de uma cobran\u00e7a j\u00e1 gerada.",
+  "body": {
+    "requested_method": "pix",
+    "locked_method": "bank_slip",
+    "locked_reason": "method_already_charged"
+  }
+}
+```
+
+Para cobrancas sincronizadas/importadas, a mensagem e o `locked_reason` diferem:
+
+```json
+{
+  "type": "error",
+  "message": "Esta cobran\u00e7a foi sincronizada e deve manter o m\u00e9todo original.",
   "body": {
     "requested_method": "pix",
     "locked_method": "bank_slip",
@@ -189,10 +273,6 @@ Caso o app tente trocar o metodo de uma cobranca sincronizada/importada, o backe
   }
 }
 ```
-
-Caso a cobranca sincronizada ja possua assets reutilizaveis, o backend responde sucesso sem gerar uma nova cobranca:
-- reused_existing_charge = true
-- method igual ao metodo original da cobranca sincronizada
 
 ## Servico mobile para QR Code do PIX
 
