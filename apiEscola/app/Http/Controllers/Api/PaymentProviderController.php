@@ -256,11 +256,24 @@ class PaymentProviderController extends Controller
     public function paymentOptions(Request $request, Invoice $invoice): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
+        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
 
         $pixQrImageUrl = data_get($invoice->cora_payload, 'pix.qr_code_image_url')
             ?? data_get($invoice->cora_payload, 'pix.qr_code_url')
             ?? data_get($invoice->cora_payload, 'payment_options.pix.qr_code_url')
             ?? data_get($invoice->cora_payload, 'qr_code_image_url');
+
+        $currentMethod = match (true) {
+            $invoice->payment_method === 'bank_slip' => 'boleto',
+            in_array($invoice->payment_method, ['pix', 'boleto'], true) => $invoice->payment_method,
+            $lockedSyncedMethod === 'bank_slip' => 'boleto',
+            in_array($lockedSyncedMethod, ['pix', 'boleto'], true) => $lockedSyncedMethod,
+            default => null,
+        };
+
+        $allowedMethods = $lockedSyncedMethod === 'bank_slip'
+            ? ['boleto']
+            : ($lockedSyncedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
 
         return $this->success([
             'invoice' => [
@@ -271,17 +284,19 @@ class PaymentProviderController extends Controller
                 'status'         => $invoice->status,
                 'payment_method' => $invoice->payment_method,
             ],
-            'allowed_methods' => ['pix', 'boleto'],
-            'current_method'  => match (true) {
-                $invoice->payment_method === 'bank_slip' => 'boleto',
-                in_array($invoice->payment_method, ['pix', 'boleto'], true) => $invoice->payment_method,
-                default => null,
-            },
+            'allowed_methods' => $allowedMethods,
+            'current_method'  => $currentMethod,
             'actions' => [
                 'can_generate_charge'  => ! in_array($invoice->status, ['paid', 'cancelled'], true),
+                'can_change_method'    => $lockedSyncedMethod === null,
                 'can_open_boleto_url'  => (bool) $invoice->cora_payment_url,
                 'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
                 'can_copy_pix_code'    => (bool) $invoice->cora_pix_copy_paste,
+            ],
+            'method_lock' => [
+                'locked' => $lockedSyncedMethod !== null,
+                'method' => $lockedSyncedMethod === 'bank_slip' ? 'boleto' : $lockedSyncedMethod,
+                'reason' => $lockedSyncedMethod !== null ? 'synced_charge_method_lock' : null,
             ],
             'payment_assets' => [
                 'charge_id'       => $invoice->cora_charge_id,
@@ -330,6 +345,29 @@ class PaymentProviderController extends Controller
             ? (in_array($requestedMethod, ['boleto', 'bank_slip'], true) ? 'bank_slip' : 'pix')
             : null;
         $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
+        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+
+        if ($lockedSyncedMethod !== null && $requestedStoredMethod !== null && $requestedStoredMethod !== $lockedSyncedMethod) {
+            Log::info('PaymentProviderController generateCharge blocked by synced method lock', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'requested_method' => $requestedStoredMethod,
+                'locked_method' => $lockedSyncedMethod,
+                'cora_charge_id' => $invoice->cora_charge_id,
+            ]);
+
+            return $this->error(
+                'Esta cobrança foi sincronizada e deve manter o método original.',
+                [
+                    'provider' => 'cora',
+                    'requested_method' => $requestedStoredMethod,
+                    'locked_method' => $lockedSyncedMethod,
+                    'locked_reason' => 'synced_charge_method_lock',
+                ],
+                422
+            );
+        }
+
         $reusableCharge = $this->resolveReusableCharge($invoice, $requestedStoredMethod);
 
         Log::info('PaymentProviderController generateCharge called', [
@@ -403,7 +441,7 @@ class PaymentProviderController extends Controller
             ]);
         }
 
-        $storedMethod = $requestedStoredMethod ?? $existingStoredMethod ?? 'pix';
+        $storedMethod = $lockedSyncedMethod ?? $requestedStoredMethod ?? $existingStoredMethod ?? 'pix';
         $coraMethod = $storedMethod === 'bank_slip' ? 'boleto' : 'pix';
 
         try {
@@ -643,6 +681,36 @@ class PaymentProviderController extends Controller
         $methodCharges = $payload['method_charges'] ?? [];
 
         return is_array($methodCharges) ? $methodCharges : [];
+    }
+
+    private function resolveLockedMethodForSyncedInvoice(Invoice $invoice): ?string
+    {
+        if (! $invoice->cora_charge_id) {
+            return null;
+        }
+
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $origin = strtolower(trim((string) data_get($payload, 'integration.origin')));
+        $methodLocked = (bool) data_get($payload, 'integration.method_locked', false);
+        $originalMethod = strtolower(trim((string) data_get($payload, 'integration.original_method')));
+
+        if ($origin === 'cora_sync' && $methodLocked) {
+            if (in_array($originalMethod, ['pix', 'bank_slip'], true)) {
+                return $originalMethod;
+            }
+
+            return $this->resolveStoredMethodForExistingCharge($invoice);
+        }
+
+        // Regra de compatibilidade para registros sincronizados legados.
+        $hasLocalInvoiceMetadata = data_get($payload, 'metadata.invoice_id') !== null;
+        $looksLikeImported = str_contains(strtolower((string) $invoice->description), 'importada');
+
+        if (! $hasLocalInvoiceMetadata && $looksLikeImported) {
+            return $this->resolveStoredMethodForExistingCharge($invoice);
+        }
+
+        return null;
     }
 
     private function isReusableChargeStatus(?string $status): bool

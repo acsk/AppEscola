@@ -348,6 +348,7 @@ class CoraEnrollmentInvoiceSyncService
      */
     private function buildLocalInvoiceAttributes(Enrollment $enrollment, array $externalInvoice, string $chargeId): array
     {
+        $storedMethod = $this->resolveStoredMethodForExternalInvoice($externalInvoice);
         $status = $this->mapExternalStatusToLocal((string) ($externalInvoice['status'] ?? ''));
         $paidAt = $this->parseDateTime(
             (string) (
@@ -379,15 +380,15 @@ class CoraEnrollmentInvoiceSyncService
         $dueDate = $this->parseDate((string) ($externalInvoice['due_date'] ?? ''));
 
         $methodCharges = [
-            'bank_slip' => [
-                'method' => 'bank_slip',
+            $storedMethod => [
+                'method' => $storedMethod,
                 'charge_id' => $chargeId,
                 'status' => (string) ($externalInvoice['status'] ?? null),
                 'payment_url' => $this->extractPaymentUrl($externalInvoice),
-                'pix_copy_paste' => null,
-                'boleto_number' => $this->extractBoletoNumber($externalInvoice),
-                'boleto_digitable' => $this->extractBoletoDigitable($externalInvoice),
-                'qr_code_image_url' => null,
+                'pix_copy_paste' => $storedMethod === 'pix' ? $this->extractPixCopyPaste($externalInvoice) : null,
+                'boleto_number' => $storedMethod === 'bank_slip' ? $this->extractBoletoNumber($externalInvoice) : null,
+                'boleto_digitable' => $storedMethod === 'bank_slip' ? $this->extractBoletoDigitable($externalInvoice) : null,
+                'qr_code_image_url' => $storedMethod === 'pix' ? $this->extractPixQrImageUrl($externalInvoice) : null,
             ],
         ];
 
@@ -404,16 +405,51 @@ class CoraEnrollmentInvoiceSyncService
             'due_date' => $dueDate?->toDateString() ?? now()->toDateString(),
             'status' => $status,
             'paid_at' => $status === 'paid' ? $paidAt : null,
-            'payment_method' => 'bank_slip',
+            'payment_method' => $storedMethod,
             'cora_charge_id' => $chargeId,
             'cora_status' => (string) ($externalInvoice['status'] ?? null),
             'cora_payment_url' => $this->extractPaymentUrl($externalInvoice),
-            'cora_pix_copy_paste' => null,
-            'boleto_number' => $this->extractBoletoNumber($externalInvoice),
-            'boleto_digitable' => $this->extractBoletoDigitable($externalInvoice),
-            'cora_payload' => array_merge($externalInvoice, ['method_charges' => $methodCharges]),
+            'cora_pix_copy_paste' => $storedMethod === 'pix' ? $this->extractPixCopyPaste($externalInvoice) : null,
+            'boleto_number' => $storedMethod === 'bank_slip' ? $this->extractBoletoNumber($externalInvoice) : null,
+            'boleto_digitable' => $storedMethod === 'bank_slip' ? $this->extractBoletoDigitable($externalInvoice) : null,
+            'cora_payload' => array_merge($externalInvoice, [
+                'method_charges' => $methodCharges,
+                'integration' => [
+                    'origin' => 'cora_sync',
+                    'method_locked' => true,
+                    'original_method' => $storedMethod,
+                ],
+            ]),
             'cora_last_synced_at' => now(),
         ];
+    }
+
+    private function resolveStoredMethodForExternalInvoice(array $externalInvoice): string
+    {
+        if ($this->isBoletoInvoice($externalInvoice)) {
+            return 'bank_slip';
+        }
+
+        $methodCandidates = [
+            $externalInvoice['payment_form'] ?? null,
+            $externalInvoice['payment_method'] ?? null,
+            data_get($externalInvoice, 'payment.form'),
+            data_get($externalInvoice, 'payment.method'),
+            data_get($externalInvoice, 'payment_options.selected'),
+        ];
+
+        foreach ($methodCandidates as $method) {
+            $normalized = strtoupper(trim((string) $method));
+            if (in_array($normalized, ['PIX', 'INSTANT_PAYMENT'], true)) {
+                return 'pix';
+            }
+        }
+
+        if ($this->extractPixCopyPaste($externalInvoice) !== null || $this->extractPixQrImageUrl($externalInvoice) !== null) {
+            return 'pix';
+        }
+
+        return 'bank_slip';
     }
 
     private function resolveGuardianId(Enrollment $enrollment): ?int
@@ -576,6 +612,44 @@ class CoraEnrollmentInvoiceSyncService
             data_get($externalInvoice, 'payment_options.bank_slip.pdf'),
             data_get($externalInvoice, 'links.payment'),
             data_get($externalInvoice, 'link'),
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    private function extractPixCopyPaste(array $externalInvoice): ?string
+    {
+        $candidates = [
+            data_get($externalInvoice, 'pix.copy_paste'),
+            data_get($externalInvoice, 'pix.emv'),
+            $externalInvoice['pix_copy_paste'] ?? null,
+            $externalInvoice['emv'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    private function extractPixQrImageUrl(array $externalInvoice): ?string
+    {
+        $candidates = [
+            data_get($externalInvoice, 'pix.qr_code_image_url'),
+            data_get($externalInvoice, 'pix.qr_code_url'),
+            data_get($externalInvoice, 'payment_options.pix.url'),
+            data_get($externalInvoice, 'payment_options.pix.qr_code_url'),
+            $externalInvoice['qr_code_image_url'] ?? null,
+            $externalInvoice['qr_code_url'] ?? null,
         ];
 
         foreach ($candidates as $value) {
