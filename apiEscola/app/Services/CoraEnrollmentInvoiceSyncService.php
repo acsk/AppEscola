@@ -67,12 +67,7 @@ class CoraEnrollmentInvoiceSyncService
             'external_preview' => array_map(fn (array $inv) => [
                 'id' => $this->extractExternalChargeId($inv),
                 'status' => (string) ($inv['status'] ?? ''),
-                'customer_document' => $this->digitsOnly((string) (
-                    data_get($inv, 'customer.document.identity')
-                    ?? data_get($inv, 'customer.document')
-                    ?? data_get($inv, 'customer.identity')
-                    ?? ''
-                )),
+                'customer_document' => $this->extractCustomerDocument($inv),
                 'amount' => $this->extractAmount($inv),
                 'due_date' => (string) ($inv['due_date'] ?? ''),
             ], array_slice($externalInvoices, 0, 20)),
@@ -117,12 +112,7 @@ class CoraEnrollmentInvoiceSyncService
                 'is_boleto' => $isBoleto,
                 'belongs_to_enrollment' => $belongs,
                 'status' => (string) ($externalInvoice['status'] ?? ''),
-                'customer_document' => $this->digitsOnly((string) (
-                    data_get($externalInvoice, 'customer.document.identity')
-                    ?? data_get($externalInvoice, 'customer.document')
-                    ?? data_get($externalInvoice, 'customer.identity')
-                    ?? ''
-                )),
+                'customer_document' => $this->extractCustomerDocument($externalInvoice),
                 'amount' => $this->extractAmount($externalInvoice),
                 'due_date' => (string) ($externalInvoice['due_date'] ?? ''),
             ]);
@@ -489,6 +479,12 @@ class CoraEnrollmentInvoiceSyncService
     private function extractCustomerDocument(array $externalInvoice): string
     {
         $candidates = [
+            $externalInvoice['customer_document'] ?? null,
+            $externalInvoice['customer_cpf'] ?? null,
+            $externalInvoice['customer_tax_document'] ?? null,
+            data_get($externalInvoice, 'customer_document'),
+            data_get($externalInvoice, 'customer_cpf'),
+            data_get($externalInvoice, 'customer.tax_document'),
             data_get($externalInvoice, 'customer.document.identity'),
             data_get($externalInvoice, 'customer.document.number'),
             data_get($externalInvoice, 'customer.document.value'),
