@@ -230,6 +230,10 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     },
     []
   );
+  const closeChargeStatusModal = useCallback(
+    () => setChargeStatusModal((prev) => ({ ...prev, visible: false })),
+    []
+  );
 
   // Charge modal
   const [providers, setProviders] = useState<PaymentProvider[]>([]);
@@ -246,6 +250,12 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const [chargeStatusResult, setChargeStatusResult] = useState<ChargeStatusResponse | null>(null);
   const [paidChargeResult, setPaidChargeResult] = useState<PaidChargeResponse | null>(null);
   const [chargeActionError, setChargeActionError] = useState<string | null>(null);
+  const [chargeStatusModal, setChargeStatusModal] = useState<{
+    visible: boolean;
+    type: "success" | "info";
+    title: string;
+    message: string;
+  }>({ visible: false, type: "info", title: "", message: "" });
 
   const { user } = useAuth();
   const isProductionHost =
@@ -582,6 +592,18 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     try {
       const result = await getUnifiedChargeStatus(chargeInvoice.id);
       setChargeStatusResult(result);
+      const statusLabel = formatChargeStatusLabel(result.status);
+      const providerLabel = result.provider ? result.provider.charAt(0).toUpperCase() + result.provider.slice(1) : "—";
+      setChargeStatusModal({
+        visible: true,
+        type: result.status?.toUpperCase() === "PAID" ? "success" : "info",
+        title: result.status?.toUpperCase() === "PAID" ? "Pagamento confirmado" : "Status da cobrança",
+        message: [
+          `Operadora: ${providerLabel}`,
+          `Status: ${statusLabel}`,
+          `Pago em: ${fmtDateTime(result.paid_at)}`,
+        ].join("\n"),
+      });
       fetch();
     } catch (e: any) {
       setChargeStatusResult(null);
@@ -633,6 +655,20 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     } catch {
       return v;
     }
+  };
+
+  const formatChargeStatusLabel = (status?: string | null) => {
+    const normalized = (status ?? "").toUpperCase();
+    const labels: Record<string, string> = {
+      OPEN: "Em aberto",
+      PENDING: "Pendente",
+      PAID: "Pago",
+      CANCELLED: "Cancelado",
+      CANCELED: "Cancelado",
+      EXPIRED: "Expirado",
+    };
+
+    return labels[normalized] ?? status ?? "—";
   };
 
   const providerOptions = providers.map((item) => ({ value: item.slug, label: item.name }));
@@ -1582,25 +1618,6 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
 
         {chargeModalStep === "result" && !!chargeResult && (
           <View>
-            {/* ── Pago com sucesso ── */}
-            {chargeStatusResult?.status?.toUpperCase() === "PAID" ? (
-              <View className="items-center py-6 px-4 gap-3">
-                <View className="w-20 h-20 rounded-full bg-emerald-100 items-center justify-center mb-1">
-                  <Ionicons name="checkmark-circle" size={52} color="#059669" />
-                </View>
-                <Text className="text-xl font-bold text-emerald-700 text-center">Pagamento confirmado!</Text>
-                <Text className="text-sm text-gray-600 text-center">
-                  Esta cobrança já foi paga e não precisa de nenhuma ação adicional.
-                </Text>
-                {!!chargeStatusResult.paid_at && (
-                  <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 mt-1 w-full items-center">
-                    <Text className="text-xs text-emerald-600 font-semibold">Data do pagamento</Text>
-                    <Text className="text-sm font-bold text-emerald-800 mt-0.5">{fmtDateTime(chargeStatusResult.paid_at)}</Text>
-                  </View>
-                )}
-              </View>
-            ) : null}
-
             {/* ── PIX ── */}
             {chargeMethod === "pix" && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
               <>
@@ -1705,15 +1722,6 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
           <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 mt-3">
             <Text className="text-sm font-bold text-red-700">Atenção</Text>
             <Text className="text-xs text-red-700 mt-1">{chargeActionError}</Text>
-          </View>
-        )}
-
-        {!!chargeStatusResult && (
-          <View className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 mt-3">
-            <Text className="text-sm font-bold text-blue-700">Status atualizado</Text>
-            <Text className="text-xs text-blue-700 mt-1">Provider: {chargeStatusResult.provider || "—"}</Text>
-            <Text className="text-xs text-blue-700 mt-1">Status: {chargeStatusResult.status || "—"}</Text>
-            <Text className="text-xs text-blue-700 mt-1">Pago em: {fmtDateTime(chargeStatusResult.paid_at)}</Text>
           </View>
         )}
 
@@ -1840,6 +1848,13 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
         title={msgModal.title}
         message={msgModal.message}
         onClose={closeMsgModal}
+      />
+      <MessageModal
+        visible={chargeStatusModal.visible}
+        type={chargeStatusModal.type}
+        title={chargeStatusModal.title}
+        message={chargeStatusModal.message}
+        onClose={closeChargeStatusModal}
       />
     </View>
   );
