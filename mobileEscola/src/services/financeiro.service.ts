@@ -50,9 +50,16 @@ export type PaymentMethod = 'pix' | 'boleto';
 
 export interface PaymentActions {
   can_generate_charge?: boolean;
+  can_change_method?: boolean;
   can_open_boleto_url: boolean;
   can_copy_boleto_line: boolean;
   can_copy_pix_code: boolean;
+}
+
+export interface PaymentMethodLock {
+  locked: boolean;
+  method: PaymentMethod | string | null;
+  reason: string | null;
 }
 
 export interface PaymentAssets {
@@ -68,6 +75,7 @@ export interface PaymentOptionsResponse {
   allowed_methods: PaymentMethod[];
   current_method: PaymentMethod | string | null;
   actions: PaymentActions;
+  method_lock?: PaymentMethodLock | null;
   payment_assets: PaymentAssets;
 }
 
@@ -75,6 +83,8 @@ export interface GenerateChargeResponse {
   invoice_id: number;
   method: PaymentMethod;
   status: string;
+  charge_id?: number | string | null;
+  reused_existing_charge?: boolean;
   payment_assets: PaymentAssets;
   actions: PaymentActions;
 }

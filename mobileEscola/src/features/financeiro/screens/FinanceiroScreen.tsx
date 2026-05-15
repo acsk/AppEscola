@@ -143,6 +143,24 @@ export function FinanceiroScreen() {
     Alert.alert('Copiado', `${label} copiado com sucesso!`);
   };
 
+  const normalizarMetodoPagamento = (method: string | null | undefined): PaymentMethod | null => {
+    if (!method) return null;
+
+    const normalized = method.toLowerCase();
+    if (normalized === 'pix') return 'pix';
+    if (normalized === 'boleto' || normalized === 'bank_slip') return 'boleto';
+
+    return null;
+  };
+
+  const rotuloMetodoPagamento = (method: string | null | undefined): string => {
+    const normalized = normalizarMetodoPagamento(method);
+    if (normalized === 'pix') return 'PIX';
+    if (normalized === 'boleto') return 'Boleto';
+
+    return method ? String(method).toUpperCase() : 'Não definido';
+  };
+
   const baixarBoleto = async (url: string) => {
     try {
       await Linking.openURL(url);
@@ -177,6 +195,23 @@ export function FinanceiroScreen() {
         pagas: prev.pagas.map(atualizar),
       };
     });
+  };
+
+  const criarResultadoDeOpcoes = (options: PaymentOptionsResponse): GenerateChargeResponse | null => {
+    if (options.actions.can_generate_charge !== false) return null;
+
+    const metodo = normalizarMetodoPagamento(options.method_lock?.method ?? options.current_method);
+    if (!metodo) return null;
+
+    return {
+      invoice_id: options.invoice.id,
+      method: metodo,
+      status: options.invoice.status,
+      charge_id: null,
+      reused_existing_charge: true,
+      payment_assets: options.payment_assets,
+      actions: options.actions,
+    };
   };
 
   const atualizarCobrancaNoEstado = (updatedInvoice: Cobranca) => {
@@ -227,6 +262,10 @@ export function FinanceiroScreen() {
     try {
       const options = await getPaymentOptionsApi(cobranca.id);
       setPaymentOptions(options);
+      const resultadoReaproveitado = criarResultadoDeOpcoes(options);
+      if (resultadoReaproveitado) {
+        setPaymentResult(resultadoReaproveitado);
+      }
     } catch (err: any) {
       setPaymentError(err.response?.data?.message ?? err.message ?? 'Não foi possível carregar as formas de pagamento.');
     } finally {
@@ -286,6 +325,10 @@ export function FinanceiroScreen() {
       const options = response.body!;
       setPaymentOptions(options);
       atualizarCobrancaNoEstado(options.invoice);
+      const resultadoReaproveitado = criarResultadoDeOpcoes(options);
+      if (resultadoReaproveitado) {
+        setPaymentResult(resultadoReaproveitado);
+      }
 
       setConsultaStatusData({
         message: response.message,
@@ -359,8 +402,23 @@ export function FinanceiroScreen() {
     }
   };
 
-  const metodoPermitido = (method: PaymentMethod) =>
-    !paymentOptions || paymentOptions.allowed_methods.includes(method);
+  const metodoBloqueado = paymentOptions?.method_lock?.locked ?? false;
+  const metodoBloqueadoSelecionado = normalizarMetodoPagamento(paymentOptions?.method_lock?.method ?? null);
+  const podeAlterarMetodo = paymentOptions?.actions.can_change_method ?? true;
+  const mostrarBloqueioMetodo = Boolean(paymentOptions && (metodoBloqueado || !podeAlterarMetodo));
+
+  const metodoPermitido = (method: PaymentMethod) => {
+    if (!paymentOptions) return true;
+
+    if (!paymentOptions.allowed_methods.includes(method)) return false;
+
+    if (metodoBloqueado || !podeAlterarMetodo) {
+      const metodoAtivo = metodoBloqueadoSelecionado ?? normalizarMetodoPagamento(paymentOptions.current_method);
+      return !metodoAtivo || metodoAtivo === method;
+    }
+
+    return true;
+  };
 
   const formatarStatusCobranca = (status: string): string => {
     const normalized = status.toLowerCase();
@@ -407,7 +465,7 @@ export function FinanceiroScreen() {
   const renderResultadoPagamento = () => {
     if (!paymentResult) return null;
 
-    const { method, payment_assets: assets, actions } = paymentResult;
+    const { method, payment_assets: assets, actions, reused_existing_charge } = paymentResult;
     const isPix = method === 'pix';
     const pixQrUrl = isPix ? resolvePixQrImageUrl(assets, 320) : null;
 
@@ -425,6 +483,15 @@ export function FinanceiroScreen() {
             {isPix ? 'PIX gerado' : 'Boleto gerado'}
           </Text>
         </View>
+
+        {reused_existing_charge && (
+          <View style={styles.modalReusedChargeNotice}>
+            <Ionicons name="information-circle-outline" size={20} color="#92400E" />
+            <Text style={styles.modalReusedChargeNoticeText}>
+              A cobrança já existia no provedor e foi reaproveitada.
+            </Text>
+          </View>
+        )}
 
         {isPix && pixQrUrl && (
           <View style={styles.pixQrWrap}>
@@ -655,6 +722,18 @@ export function FinanceiroScreen() {
               </View>
             ) : paymentResult ? (
               renderResultadoPagamento()
+            ) : paymentOptions && paymentOptions.actions.can_generate_charge === false ? (
+              <View style={styles.modalBloqueioContainer}>
+                <Ionicons name="lock-closed-outline" size={22} color="#92400E" />
+                <View style={styles.modalBloqueioTextoWrap}>
+                  <Text style={styles.modalBloqueioTexto}>
+                    {paymentOptions.method_lock?.reason || 'Esta cobrança está com o método travado no servidor.'}
+                  </Text>
+                  <Text style={styles.modalBloqueioSubtexto}>
+                    Método atual: {rotuloMetodoPagamento(metodoBloqueadoSelecionado ?? paymentOptions.current_method)}
+                  </Text>
+                </View>
+              </View>
             ) : paymentError && !paymentOptions ? (
               <TouchableOpacity
                 style={[styles.modalBotao, styles.modalBotaoPrincipal]}
@@ -666,6 +745,21 @@ export function FinanceiroScreen() {
               </TouchableOpacity>
             ) : (
               <>
+                {mostrarBloqueioMetodo && (
+                  <View style={styles.modalBloqueioContainer}>
+                    <Ionicons name="lock-closed-outline" size={22} color="#92400E" />
+                    <View style={styles.modalBloqueioTextoWrap}>
+                      <Text style={styles.modalBloqueioTexto}>
+                        {paymentOptions?.method_lock?.reason || 'O método de pagamento desta cobrança não pode ser alterado.'}
+                      </Text>
+                      <Text style={styles.modalBloqueioSubtexto}>
+                        Método disponível:{' '}
+                        {rotuloMetodoPagamento(metodoBloqueadoSelecionado ?? paymentOptions?.current_method)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
                 {metodoPermitido('boleto') && (
                   <TouchableOpacity
                     style={styles.modalBotao}
@@ -1175,12 +1269,57 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginBottom: 3,
   },
+  modalBloqueioContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+    marginBottom: 10,
+  },
+  modalBloqueioTextoWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  modalBloqueioTexto: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400E',
+    lineHeight: 19,
+  },
+  modalBloqueioSubtexto: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#A16207',
+  },
   modalAcaoIcone: {
     marginRight: 10,
   },
   modalResultadoHeader: {
     alignItems: 'center',
     marginBottom: 18,
+  },
+  modalReusedChargeNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+  },
+  modalReusedChargeNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+    lineHeight: 18,
   },
   modalResultadoTitulo: {
     fontSize: 20,

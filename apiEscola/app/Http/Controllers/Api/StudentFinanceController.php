@@ -86,17 +86,31 @@ class StudentFinanceController extends Controller
             return $this->forbidden('Cobrança não pertence ao aluno autenticado.');
         }
 
+        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+
+        $allowedMethods = $lockedSyncedMethod === 'bank_slip'
+            ? ['boleto']
+            : ($lockedSyncedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
+
+        $currentMethod = in_array($invoice->payment_method, ['pix', 'bank_slip', 'boleto'], true)
+            ? ($invoice->payment_method === 'bank_slip' ? 'boleto' : $invoice->payment_method)
+            : ($lockedSyncedMethod === 'bank_slip' ? 'boleto' : $lockedSyncedMethod);
+
         return $this->success([
             'invoice' => $this->mapBoleto($invoice),
-            'allowed_methods' => ['pix', 'boleto'],
-            'current_method' => in_array($invoice->payment_method, ['pix', 'bank_slip', 'boleto'], true)
-                ? ($invoice->payment_method === 'bank_slip' ? 'boleto' : $invoice->payment_method)
-                : null,
+            'allowed_methods' => $allowedMethods,
+            'current_method' => $currentMethod,
             'actions' => [
                 'can_generate_charge' => ! in_array($invoice->status, ['paid', 'cancelled'], true),
+                'can_change_method' => $lockedSyncedMethod === null,
                 'can_open_boleto_url' => (bool) $invoice->cora_payment_url,
                 'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
                 'can_copy_pix_code' => (bool) $invoice->cora_pix_copy_paste,
+            ],
+            'method_lock' => [
+                'locked' => $lockedSyncedMethod !== null,
+                'method' => $lockedSyncedMethod === 'bank_slip' ? 'boleto' : $lockedSyncedMethod,
+                'reason' => $lockedSyncedMethod !== null ? 'synced_charge_method_lock' : null,
             ],
             'payment_assets' => [
                 'boleto_number' => $invoice->boleto_number,
@@ -136,6 +150,40 @@ class StudentFinanceController extends Controller
         $requestedMethod = strtolower((string) $data['method']);
         $coraMethod = in_array($requestedMethod, ['boleto', 'bank_slip'], true) ? 'boleto' : 'pix';
         $storedMethod = $coraMethod === 'boleto' ? 'bank_slip' : 'pix';
+
+        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+
+        if ($lockedSyncedMethod !== null) {
+            if ($storedMethod !== $lockedSyncedMethod) {
+                return $this->error(
+                    'Esta cobrança foi sincronizada e deve manter o método original.',
+                    [
+                        'requested_method' => $storedMethod,
+                        'locked_method' => $lockedSyncedMethod,
+                        'locked_reason' => 'synced_charge_method_lock',
+                    ],
+                    422
+                );
+            }
+
+            if ($this->shouldReuseExistingCharge($invoice, $lockedSyncedMethod)) {
+                $lockedMethod = $lockedSyncedMethod === 'bank_slip' ? 'boleto' : 'pix';
+
+                return $this->success(
+                    $this->buildChargeResponsePayload($invoice, $lockedMethod, true),
+                    'Cobrança sincronizada reutilizada com sucesso.'
+                );
+            }
+
+            return $this->error(
+                'Cobrança sincronizada sem dados reutilizáveis. A geração de nova cobrança está bloqueada para este título.',
+                [
+                    'locked_method' => $lockedSyncedMethod,
+                    'locked_reason' => 'synced_charge_method_lock',
+                ],
+                422
+            );
+        }
 
         if ($this->shouldReuseExistingCharge($invoice, $storedMethod)) {
             return $this->success(
@@ -216,6 +264,44 @@ class StudentFinanceController extends Controller
         }
 
         return (bool) ($invoice->boleto_digitable || $invoice->boleto_number || $invoice->cora_payment_url);
+    }
+
+    private function resolveLockedMethodForSyncedInvoice(Invoice $invoice): ?string
+    {
+        if (! $invoice->cora_charge_id) {
+            return null;
+        }
+
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $origin = strtolower(trim((string) data_get($payload, 'integration.origin')));
+        $methodLocked = (bool) data_get($payload, 'integration.method_locked', false);
+        $originalMethod = strtolower(trim((string) data_get($payload, 'integration.original_method')));
+
+        if ($origin === 'cora_sync' && $methodLocked) {
+            if (in_array($originalMethod, ['pix', 'bank_slip'], true)) {
+                return $originalMethod;
+            }
+
+            if ($invoice->payment_method === 'pix') {
+                return 'pix';
+            }
+
+            return 'bank_slip';
+        }
+
+        // Compatibilidade para sincronizações antigas sem metadata de integração.
+        $hasLocalInvoiceMetadata = data_get($payload, 'metadata.invoice_id') !== null;
+        $looksLikeImported = str_contains(strtolower((string) $invoice->description), 'importada');
+
+        if (! $hasLocalInvoiceMetadata && $looksLikeImported) {
+            if ($invoice->payment_method === 'pix') {
+                return 'pix';
+            }
+
+            return 'bank_slip';
+        }
+
+        return null;
     }
 
     private function buildChargeResponsePayload(
