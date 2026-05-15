@@ -66,8 +66,7 @@ class CoraPaymentService
             $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
         } else {
             $endpoint = '/v2/invoices';
-            $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
-            $payload['payment_forms'] = ['PIX'];
+            $payload = $this->buildPixPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
         }
 
         Log::info('Cora createCharge request prepared', [
@@ -425,6 +424,23 @@ class CoraPaymentService
                 'environment' => $environment,
             ],
         ];
+    }
+
+    private function buildPixPayload(
+        Invoice $invoice,
+        string $payerName,
+        string $payerDocument,
+        ?string $payerEmail,
+        string $environment
+    ): array {
+        $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
+
+        // Alguns ambientes da Cora ignoram apenas "payment_forms"; enviar ambos evita
+        // que a invoice seja processada como boleto e dispare erro REC-0030 (CIP).
+        $payload['payment_form'] = 'PIX';
+        $payload['payment_forms'] = ['PIX'];
+
+        return $payload;
     }
 
     private function resolveProviderDueDate(Invoice $invoice): string
