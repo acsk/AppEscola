@@ -385,7 +385,7 @@ export function FinanceiroScreen() {
 
     return {
       indicadorIcone: 'alert-circle',
-      indicadorTexto: 'Pagamento pendente',
+      indicadorTexto: 'Aguardando pagamento',
     };
   };
 
@@ -422,7 +422,7 @@ export function FinanceiroScreen() {
 
   const formatarStatusCobranca = (status: string): string => {
     const normalized = status.toLowerCase();
-    if (normalized === 'pending') return 'Pendente';
+    if (normalized === 'pending') return 'Aguardando';
     if (normalized === 'paid') return 'Paga';
     if (normalized === 'overdue') return 'Atrasada';
     if (normalized === 'canceled' || normalized === 'cancelled') return 'Cancelada';
@@ -465,33 +465,32 @@ export function FinanceiroScreen() {
   const renderResultadoPagamento = () => {
     if (!paymentResult) return null;
 
-    const { method, payment_assets: assets, actions, reused_existing_charge } = paymentResult;
+    const { method, payment_assets: assets, actions } = paymentResult;
     const isPix = method === 'pix';
     const pixQrUrl = isPix ? resolvePixQrImageUrl(assets, 320) : null;
 
     return (
       <View>
-        <View style={styles.modalResultadoHeader}>
-          <View style={[styles.modalBotaoIcone, isPix ? styles.modalBotaoIconePix : styles.modalBotaoIconeBoleto]}>
+        {/* Header compacto: ícone + título + valor */}
+        <View style={styles.modalResultadoHeaderRow}>
+          <View style={[styles.modalResultadoIcone, isPix ? styles.modalBotaoIconePix : styles.modalBotaoIconeBoleto]}>
             {isPix ? (
-              <FontAwesome6 name="pix" size={30} color="#00A884" />
+              <FontAwesome6 name="pix" size={24} color="#00A884" />
             ) : (
-              <MaterialCommunityIcons name="barcode-scan" size={32} color="#2563EB" />
+              <MaterialCommunityIcons name="barcode-scan" size={26} color="#2563EB" />
             )}
           </View>
-          <Text style={styles.modalResultadoTitulo}>
-            {isPix ? 'PIX gerado' : 'Boleto gerado'}
-          </Text>
-        </View>
-
-        {reused_existing_charge && (
-          <View style={styles.modalReusedChargeNotice}>
-            <Ionicons name="information-circle-outline" size={20} color="#92400E" />
-            <Text style={styles.modalReusedChargeNoticeText}>
-              A cobrança já existia no provedor e foi reaproveitada.
+          <View style={styles.modalResultadoHeaderTexto}>
+            <Text style={styles.modalResultadoTitulo}>
+              {isPix ? 'PIX gerado' : 'Boleto gerado'}
             </Text>
+            {cobrancaSelecionada && (
+              <Text style={styles.modalResultadoValor}>
+                {formatarMoeda(cobrancaSelecionada.amount)}
+              </Text>
+            )}
           </View>
-        )}
+        </View>
 
         {isPix && pixQrUrl && (
           <View style={styles.pixQrWrap}>
@@ -1262,33 +1261,36 @@ const styles = StyleSheet.create({
   modalAcaoIcone: {
     marginRight: 10,
   },
-  modalResultadoHeader: {
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  modalReusedChargeNotice: {
+  modalResultadoHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    backgroundColor: '#FFFBEB',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  modalReusedChargeNoticeText: {
+  modalResultadoIcone: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalResultadoHeaderTexto: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#92400E',
-    lineHeight: 18,
+    minWidth: 0,
   },
   modalResultadoTitulo: {
-    fontSize: 20,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.muted,
+    marginBottom: 2,
+  },
+  modalResultadoValor: {
+    fontSize: 22,
     fontWeight: '900',
     color: colors.ink,
-    marginTop: 10,
   },
   pixQrWrap: {
     alignSelf: 'center',
