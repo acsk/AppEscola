@@ -127,6 +127,22 @@ Observacao:
 - para cobrancas normais criadas pelo proprio sistema, o backend pode continuar retornando allowed_methods com ["pix", "boleto"]
 - a trava vale somente para cobrancas sincronizadas/importadas
 
+### Opcao conjunta boleto + PIX na mesma cobranca
+
+Quando a mesma invoice possuir assets de boleto e de PIX, o mobile pode exibir as duas formas de pagamento na mesma tela, sem gerar nova cobranca.
+
+Nesse caso:
+- `boleto_digitable` e/ou `boleto_number` representam a opcao de boleto
+- `pix_copy_paste` e/ou `pix_qr_image_url` representam a opcao de PIX
+- ambos pertencem a mesma invoice e ao mesmo `charge_id`
+- o app deve apenas escolher qual canal exibir/usar, sem chamar outra criacao de cobranca
+
+Regra pratica para a tela:
+- se vier apenas boleto, mostrar boleto
+- se vier apenas PIX, mostrar PIX
+- se vier boleto e PIX juntos, mostrar os dois como alternativas da mesma cobranca
+- se houver `method_lock`, respeitar o metodo travado como principal, mas continuar usando os assets ja existentes da invoice
+
 ## Endpoint para gerar cobranca com metodo escolhido
 
 POST /api/aluno/cobrancas/{invoice}/generate-charge

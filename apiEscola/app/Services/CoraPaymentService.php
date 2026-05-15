@@ -31,7 +31,7 @@ class CoraPaymentService
      */
     public function createCharge(Invoice $invoice, string $environment = 'stage', string $method = 'pix'): array
     {
-        $invoice->loadMissing(['tenant', 'student', 'guardian']);
+        $invoice->loadMissing(['tenant', 'student.guardians', 'guardian']);
 
         Log::info('Cora createCharge started', [
             'invoice_id' => $invoice->id,
@@ -53,9 +53,10 @@ class CoraPaymentService
             throw new RuntimeException('Integração Cora não configurada. Configure credenciais do tenant (certificado/chave/client_id) ou CORA_API_TOKEN.');
         }
 
-        $payerName = $invoice->guardian?->name ?? $invoice->student?->name ?? 'Responsável';
-        $payerDocument = $this->digitsOnly($invoice->guardian?->document ?? $invoice->student?->document ?? '');
-        $payerEmail = $invoice->guardian?->email ?? $invoice->student?->email;
+        $payerGuardian = $this->resolvePayerGuardian($invoice);
+        $payerName = $payerGuardian?->name ?? $invoice->student?->name ?? 'Responsável';
+        $payerDocument = $this->digitsOnly($payerGuardian?->document ?? $invoice->student?->document ?? '');
+        $payerEmail = $payerGuardian?->email ?? $invoice->student?->email;
 
         if ($normalizedMethod === 'boleto' && ! $invoice->due_date) {
             throw new RuntimeException('Não é possível emitir boleto sem data de vencimento na fatura.');
@@ -424,6 +425,26 @@ class CoraPaymentService
                 'environment' => $environment,
             ],
         ];
+    }
+
+    private function resolvePayerGuardian(Invoice $invoice): ?\App\Models\Guardian
+    {
+        if ($invoice->guardian) {
+            return $invoice->guardian;
+        }
+
+        $financialGuardian = $invoice->student?->guardians
+            ?->first(fn ($guardian) => (bool) data_get($guardian, 'pivot.is_financial_responsible', false));
+
+        if ($financialGuardian) {
+            return $financialGuardian;
+        }
+
+        if ($invoice->student?->is_minor) {
+            throw new RuntimeException('Aluno menor de idade sem responsável financeiro cadastrado. Não é possível gerar a cobrança.');
+        }
+
+        return null;
     }
 
     private function buildPixPayload(
