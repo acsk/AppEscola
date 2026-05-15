@@ -205,7 +205,7 @@ class CoraEnrollmentInvoiceSyncService
 
             $this->writeSyncDebug('sync-invoice-hydrated-details', [
                 'tenant_id' => $tenant->id,
-                'enrollment_id' => $this->toNullableInt($externalInvoice['metadata']['enrollment_id'] ?? null),
+                'enrollment_id' => $this->toNullableInt(data_get($externalInvoice, 'metadata.enrollment_id')),
                 'environment' => $environment,
                 'external_id' => $chargeId,
                 'had_boleto_before' => $this->extractBoletoNumber($externalInvoice) !== null || $this->extractBoletoDigitable($externalInvoice) !== null,
