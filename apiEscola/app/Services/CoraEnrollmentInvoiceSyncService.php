@@ -195,6 +195,8 @@ class CoraEnrollmentInvoiceSyncService
     private function writeSyncDebug(string $stage, array $context): void
     {
         try {
+            Log::debug('[CORA_SYNC_DEBUG] ' . $stage, $context);
+
             Log::build([
                 'driver' => 'single',
                 'path' => storage_path('logs/cora_sync_debug.log'),
