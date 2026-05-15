@@ -56,7 +56,7 @@ class SubjectController extends Controller
     )]
     public function store(StoreSubjectRequest $request): JsonResponse
     {
-        $tenantId = $this->getTenantId($request);
+        $tenantId = $this->requireTenantId($request);
 
         $subject = Subject::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
 
