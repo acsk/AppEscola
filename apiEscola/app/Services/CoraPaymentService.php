@@ -146,6 +146,42 @@ class CoraPaymentService
         ];
     }
 
+    /**
+     * Lista cobrancas/invoices existentes na Cora para um tenant.
+     *
+     * @return array<int, array<string, mixed>>
+     *
+     * @throws RuntimeException
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function listInvoices(Tenant $tenant, string $environment = 'prod', array $query = []): array
+    {
+        $token = $this->resolveBearerToken($tenant, $environment);
+        $baseUrl = $this->resolveApiBaseUrl($environment);
+
+        if ($token === '' || $baseUrl === '') {
+            throw new RuntimeException('Integracao Cora nao configurada para listar cobrancas.');
+        }
+
+        $httpOptions = $this->resolveHttpClientOptions($tenant, $environment);
+
+        $response = Http::timeout((int) config('services.cora.timeout', 20))
+            ->acceptJson()
+            ->withOptions($httpOptions)
+            ->withToken($token)
+            ->get($baseUrl . '/v2/invoices', $query)
+            ->throw();
+
+        $body = $response->json();
+
+        if (! is_array($body)) {
+            throw new RuntimeException('Resposta invalida da Cora ao listar cobrancas.');
+        }
+
+        return $this->extractInvoicesCollection($body);
+    }
+
     private function buildBoletoPayload(
         Invoice $invoice,
         string $payerName,
@@ -423,6 +459,51 @@ class CoraPaymentService
         }
 
         return rtrim((string) config('services.cora.api_base_url_stage', 'https://api.stage.cora.com.br'), '/');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function extractInvoicesCollection(array $body): array
+    {
+        $sources = [
+            $body['items'] ?? null,
+            $body['data'] ?? null,
+            $body['results'] ?? null,
+            $body['invoices'] ?? null,
+        ];
+
+        foreach ($sources as $source) {
+            if (! is_array($source)) {
+                continue;
+            }
+
+            $list = [];
+
+            foreach ($source as $item) {
+                if (is_array($item)) {
+                    $list[] = $item;
+                }
+            }
+
+            if ($list !== []) {
+                return $list;
+            }
+        }
+
+        $isList = array_is_list($body);
+        if ($isList) {
+            $list = [];
+            foreach ($body as $item) {
+                if (is_array($item)) {
+                    $list[] = $item;
+                }
+            }
+
+            return $list;
+        }
+
+        return [];
     }
 
     private function resolveHttpClientOptions(?Tenant $tenant, string $environment): array

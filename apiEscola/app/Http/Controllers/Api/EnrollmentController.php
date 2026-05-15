@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Jobs\SyncEnrollmentCoraChargesJob;
 use App\Http\Controllers\Controller;
 use OpenApi\Attributes as OA;
 use App\Http\Requests\StoreEnrollmentRequest;
@@ -20,8 +21,9 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class EnrollmentController extends Controller
 {
@@ -109,6 +111,77 @@ class EnrollmentController extends Controller
         ]);
 
         return response()->json(new EnrollmentResource($enrollment));
+    }
+
+    public function syncCoraCharges(Request $request, Enrollment $enrollment): JsonResponse
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+
+        $data = $request->validate([
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
+            'charge_ids' => ['nullable', 'array'],
+            'charge_ids.*' => ['string', 'max:255'],
+            'create_missing' => ['nullable', 'boolean'],
+            'async' => ['nullable', 'boolean'],
+        ]);
+
+        $requestedEnv = (string) ($data['environment'] ?? 'prod');
+        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
+
+        $environment = app()->environment('production') ? $requestedEnv : 'stage';
+
+        $chargeIds = array_values(array_filter(array_map(
+            static fn ($value) => trim((string) $value),
+            $data['charge_ids'] ?? []
+        )));
+
+        $createMissing = (bool) ($data['create_missing'] ?? true);
+        $async = (bool) ($data['async'] ?? false);
+
+        $job = new SyncEnrollmentCoraChargesJob(
+            enrollmentId: $enrollment->id,
+            environment: $environment,
+            chargeIds: $chargeIds,
+            createMissing: $createMissing,
+        );
+
+        if ($async) {
+            dispatch($job);
+
+            return $this->success([
+                'enrollment_id' => $enrollment->id,
+                'tenant_id' => $enrollment->tenant_id,
+                'environment' => $environment,
+                'queued' => true,
+                'charge_ids' => $chargeIds,
+                'create_missing' => $createMissing,
+            ], 'Sincronizacao de cobrancas da Cora enfileirada com sucesso.', 202);
+        }
+
+        // Executa sincronizacao de forma síncrona
+        try {
+            /** @var array<string, mixed> $result */
+            $result = Bus::dispatchSync($job);
+            
+            return $this->success([
+                'enrollment_id' => $result['enrollment_id'] ?? $enrollment->id,
+                'tenant_id' => $result['tenant_id'] ?? $enrollment->tenant_id,
+                'environment' => $result['environment'] ?? $environment,
+                'external_total' => $result['external_total'] ?? 0,
+                'created' => $result['created'] ?? 0,
+                'updated' => $result['updated'] ?? 0,
+                'ignored' => $result['ignored'] ?? 0,
+                'processed_charge_ids' => $result['processed_charge_ids'] ?? [],
+            ], 'Sincronizacao de cobrancas da Cora concluida com sucesso.');
+        } catch (\Throwable $e) {
+            Log::error('Erro ao sincronizar cobrancas Cora:', [
+                'enrollment_id' => $enrollment->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return $this->error('Erro ao sincronizar cobranças da Cora: ' . $e->getMessage(), null, 500);
+        }
     }
 
     #[OA\Put(

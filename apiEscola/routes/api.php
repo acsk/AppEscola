@@ -157,6 +157,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     // Matrículas
     Route::post('enrollments/subscribe',        [EnrollmentController::class, 'subscribe']);
     Route::post('enrollments/subscribe-bundle', [EnrollmentController::class, 'subscribeBundle']);
+    Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
     Route::apiResource('enrollments', EnrollmentController::class);
 
     // Cobranças

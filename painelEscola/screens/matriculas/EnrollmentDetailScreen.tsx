@@ -39,6 +39,7 @@ import {
   listPaymentProviders,
   payUnifiedCharge,
 } from "../../services/payments";
+import { syncEnrollmentCoraCharges, SyncCoraChargesResult } from "../../services/cora";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -207,6 +208,10 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const [auditInvoice, setAuditInvoice] = useState<Invoice | null>(null);
   const [auditVisible, setAuditVisible] = useState(false);
 
+  // Sync Cora charges
+  const [syncingCoraCharges, setSyncingCoraCharges] = useState(false);
+  const [syncCoraResult, setSyncCoraResult] = useState<SyncCoraChargesResult | null>(null);
+
   // Delete enrollment
   const [deleteEnrollmentVisible, setDeleteEnrollmentVisible] = useState(false);
   const [deletingEnrollment, setDeletingEnrollment] = useState(false);
@@ -361,6 +366,42 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       navigate("matriculas");
     } catch {}
     setDeletingEnrollment(false);
+  };
+
+  // ── Cora Sync ────────────────────────────────────────────────────────────────
+
+  const onSyncCoraCharges = async () => {
+    if (!enrollment) return;
+    
+    setSyncingCoraCharges(true);
+    setSyncCoraResult(null);
+    
+    try {
+      const environment = isProductionHost ? "prod" : "stage";
+      const result = await syncEnrollmentCoraCharges(enrollment.id, {
+        environment: environment as "stage" | "prod",
+        create_missing: true,
+        async: false,
+      });
+      
+      setSyncCoraResult(result);
+      
+      // Mostrar resultado com valores default se forem undefined
+      const created = result?.created ?? 0;
+      const updated = result?.updated ?? 0;
+      const ignored = result?.ignored ?? 0;
+      const message = `Sincronização concluída: ${created} criada${created !== 1 ? "s" : ""}, ${updated} atualizada${updated !== 1 ? "s" : ""}, ${ignored} ignorada${ignored !== 1 ? "s" : ""}`;
+      showToast("success", message, "✓ Boletos sincronizados");
+      
+      // Recarregar matrícula
+      await fetch();
+    } catch (error: any) {
+      const message = error?.message ?? "Erro ao sincronizar boletos da Cora";
+      showToast("error", message, "✗ Erro na sincronização");
+      console.error("Sync error:", error);
+    }
+    
+    setSyncingCoraCharges(false);
   };
 
   // ── Invoice actions ──────────────────────────────────────────────────────────
@@ -1001,14 +1042,40 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
             {invoices.length} cobrança{invoices.length !== 1 ? "s" : ""}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={openCreateInvoice}
-          className="flex-row items-center justify-center bg-violet-600 px-4 py-2 rounded-xl"
-          activeOpacity={0.85}
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
         >
-          <Ionicons name="add" size={16} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1">Nova Cobrança</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onSyncCoraCharges}
+            disabled={syncingCoraCharges}
+            className={`flex-row items-center justify-center px-4 py-2 rounded-xl ${
+              syncingCoraCharges ? "bg-gray-300" : "bg-blue-600"
+            }`}
+            activeOpacity={0.85}
+          >
+            {syncingCoraCharges ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons name="sync" size={16} color="white" />
+            )}
+            <Text className="text-white font-semibold text-sm ml-1">
+              {syncingCoraCharges ? "Sincronizando..." : "Sincronizar"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={openCreateInvoice}
+            className="flex-row items-center justify-center bg-violet-600 px-4 py-2 rounded-xl"
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={16} color="white" />
+            <Text className="text-white font-semibold text-sm ml-1">Nova Cobrança</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {invoices.length === 0 ? (
