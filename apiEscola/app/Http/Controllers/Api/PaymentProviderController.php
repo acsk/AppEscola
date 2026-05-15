@@ -12,6 +12,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -720,15 +721,185 @@ class PaymentProviderController extends Controller
         return in_array($providerStatus, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true);
     }
 
-    public function chargeStatus(Request $request, Invoice $invoice): JsonResponse
+    public function chargeStatus(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
+
+        if (! $invoice->cora_charge_id) {
+            return $this->success([
+                'provider' => null,
+                'status' => $invoice->cora_status,
+                'paid_at' => $invoice->paid_at?->toISOString(),
+            ], 'Status da cobrança carregado com sucesso.');
+        }
+
+        $data = $request->validate([
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
+        ]);
+
+        $requestedEnv = $data['environment'] ?? 'stage';
+        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
+
+        $user = $request->user();
+        if (! app()->environment('production')) {
+            $environment = 'stage';
+        } elseif ($user && $user->isSuperAdmin()) {
+            $environment = $requestedEnv ?: 'prod';
+        } else {
+            $environment = 'prod';
+        }
+
+        $invoice->loadMissing('tenant');
+
+        if (! $invoice->tenant) {
+            return $this->error('Tenant da fatura não encontrado para consulta no provedor.', null, 422);
+        }
+
+        try {
+            $externalInvoice = $cora->getInvoiceById(
+                $invoice->tenant,
+                (string) $invoice->cora_charge_id,
+                $environment
+            );
+        } catch (ConnectionException|RequestException $e) {
+            $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
+            $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';
+            $providerMessage = $e instanceof RequestException ? (string) ($e->response?->json('message') ?? '') : '';
+            $providerError = $e instanceof RequestException ? (string) ($e->response?->json('error') ?? '') : '';
+
+            $userMessage = 'Erro ao consultar status no provedor.';
+            $httpStatus = 502;
+
+            if ($status >= 400 && $status < 500) {
+                $httpStatus = 422;
+                $userMessage = $providerMessage !== ''
+                    ? $providerMessage
+                    : ($providerError !== '' ? $providerError : 'Falha de validação retornada pelo provedor.');
+            }
+
+            Log::warning('PaymentProviderController chargeStatus communication error', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'environment' => $environment,
+                'cora_charge_id' => $invoice->cora_charge_id,
+                'status' => $status,
+                'provider_code' => $providerCode,
+                'provider_message' => $providerMessage,
+                'provider_error' => $providerError,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($userMessage, [
+                'provider' => 'cora',
+                'environment' => $environment,
+                'provider_code' => $providerCode !== '' ? $providerCode : null,
+                'provider_message' => $providerMessage !== '' ? $providerMessage : null,
+                'provider_error' => $providerError !== '' ? $providerError : null,
+                'error' => $e->getMessage(),
+            ], $httpStatus);
+        } catch (\RuntimeException $e) {
+            Log::warning('PaymentProviderController chargeStatus runtime error', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'environment' => $environment,
+                'cora_charge_id' => $invoice->cora_charge_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($e->getMessage(), null, 422);
+        }
+
+        $providerStatus = strtoupper(trim((string) ($externalInvoice['status'] ?? $invoice->cora_status ?? '')));
+        $providerPaidAt = $this->extractProviderPaidAt($externalInvoice);
+        $localStatus = $this->mapProviderStatusToInvoiceStatus($providerStatus, $invoice->status);
+
+        $existingPayload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+
+        $updates = [
+            'cora_status' => $providerStatus !== '' ? $providerStatus : $invoice->cora_status,
+            'cora_payload' => array_merge($existingPayload, [
+                'latest_status_snapshot' => $externalInvoice,
+                'last_status_check' => [
+                    'environment' => $environment,
+                    'checked_at' => now()->toISOString(),
+                ],
+            ]),
+            'cora_last_synced_at' => now(),
+        ];
+
+        if ($localStatus === 'paid') {
+            $updates['status'] = 'paid';
+            $updates['paid_at'] = $providerPaidAt ?? $invoice->paid_at ?? now();
+        } elseif ($localStatus === 'cancelled' && $invoice->status !== 'paid') {
+            $updates['status'] = 'cancelled';
+        } elseif ($localStatus === 'pending' && ! in_array($invoice->status, ['paid', 'cancelled'], true)) {
+            $updates['status'] = 'pending';
+        }
+
+        $invoice->update($updates);
+        $invoice->refresh();
+
+        Log::info('PaymentProviderController chargeStatus synced', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'environment' => $environment,
+            'cora_charge_id' => $invoice->cora_charge_id,
+            'provider_status' => $providerStatus,
+            'local_status' => $invoice->status,
+            'paid_at' => $invoice->paid_at?->toISOString(),
+        ]);
 
         return $this->success([
             'provider' => $invoice->cora_charge_id ? 'cora' : null,
             'status' => $invoice->cora_status,
             'paid_at' => $invoice->paid_at?->toISOString(),
         ], 'Status da cobrança carregado com sucesso.');
+    }
+
+    /**
+     * @param array<string, mixed> $externalInvoice
+     */
+    private function extractProviderPaidAt(array $externalInvoice): ?Carbon
+    {
+        $candidates = [
+            $externalInvoice['paid_at'] ?? null,
+            data_get($externalInvoice, 'payment.paid_at'),
+            data_get($externalInvoice, 'payment_date'),
+            data_get($externalInvoice, 'paidAt'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            try {
+                return Carbon::parse($candidate);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    private function mapProviderStatusToInvoiceStatus(string $providerStatus, string $currentStatus): string
+    {
+        $normalized = strtoupper(trim($providerStatus));
+
+        if (in_array($normalized, ['PAID', 'IN_PAYMENT', 'COMPLETED', 'RECEIVED'], true)) {
+            return 'paid';
+        }
+
+        if (in_array($normalized, ['CANCELLED', 'CANCELED', 'VOIDED', 'EXPIRED'], true)) {
+            return 'cancelled';
+        }
+
+        if (in_array($normalized, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true)) {
+            return 'pending';
+        }
+
+        return $currentStatus;
     }
 
     public function payCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse

@@ -1446,22 +1446,24 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
                   </>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={onPayCharge}
-                disabled={payingCharge || !chargeInvoice || chargeEnvironment !== "stage"}
-                activeOpacity={0.8}
-                className="px-4 py-2.5 rounded-xl border border-emerald-300 bg-white items-center flex-row justify-center gap-2"
-                style={{ flex: isMobile ? undefined : 1 }}
-              >
-                {payingCharge ? (
-                  <ActivityIndicator size="small" color="#059669" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle-outline" size={15} color="#059669" />
-                    <Text className="text-xs font-bold text-emerald-700">Simular pagamento</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              {typeof window !== "undefined" && window.location.hostname === "localhost" && (
+                <TouchableOpacity
+                  onPress={onPayCharge}
+                  disabled={payingCharge || !chargeInvoice || chargeEnvironment !== "stage"}
+                  activeOpacity={0.8}
+                  className="px-4 py-2.5 rounded-xl border border-emerald-300 bg-white items-center flex-row justify-center gap-2"
+                  style={{ flex: isMobile ? undefined : 1 }}
+                >
+                  {payingCharge ? (
+                    <ActivityIndicator size="small" color="#059669" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle-outline" size={15} color="#059669" />
+                      <Text className="text-xs font-bold text-emerald-700">Simular pagamento</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </>
           ) : (
             <TouchableOpacity
