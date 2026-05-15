@@ -179,7 +179,19 @@ class CoraPaymentService
             throw new RuntimeException('Resposta invalida da Cora ao listar cobrancas.');
         }
 
-        return $this->extractInvoicesCollection($body);
+        $invoices = $this->extractInvoicesCollection($body);
+
+        Log::info('Cora listInvoices response parsed', [
+            'tenant_id' => $tenant->id,
+            'environment' => $environment,
+            'query' => $query,
+            'http_status' => $response->status(),
+            'body_keys' => array_keys($body),
+            'parsed_count' => count($invoices),
+            'raw_preview' => array_slice($body, 0, 3, true),
+        ]);
+
+        return $invoices;
     }
 
     private function buildBoletoPayload(
@@ -469,8 +481,15 @@ class CoraPaymentService
         $sources = [
             $body['items'] ?? null,
             $body['data'] ?? null,
+            $body['data']['items'] ?? null,
+            $body['data']['invoices'] ?? null,
             $body['results'] ?? null,
             $body['invoices'] ?? null,
+            $body['body'] ?? null,
+            $body['body']['items'] ?? null,
+            $body['body']['invoices'] ?? null,
+            $body['page']['items'] ?? null,
+            $body['page']['data'] ?? null,
         ];
 
         foreach ($sources as $source) {
@@ -503,7 +522,66 @@ class CoraPaymentService
             return $list;
         }
 
+        // Fallback: percorre a resposta procurando listas de objetos com "cara" de invoice.
+        $discovered = $this->findInvoiceLikeList($body);
+        if ($discovered !== []) {
+            return $discovered;
+        }
+
         return [];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<int, array<string, mixed>>
+     */
+    private function findInvoiceLikeList(array $payload): array
+    {
+        foreach ($payload as $value) {
+            if (! is_array($value)) {
+                continue;
+            }
+
+            // Caso seja uma lista de objetos.
+            if (array_is_list($value)) {
+                $list = [];
+                foreach ($value as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    if ($this->looksLikeInvoiceItem($item)) {
+                        $list[] = $item;
+                    }
+                }
+
+                if ($list !== []) {
+                    return $list;
+                }
+            }
+
+            // Caso seja um objeto aninhado, continua procurando recursivamente.
+            $nested = $this->findInvoiceLikeList($value);
+            if ($nested !== []) {
+                return $nested;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function looksLikeInvoiceItem(array $item): bool
+    {
+        return isset($item['id'])
+            || isset($item['invoice_id'])
+            || isset($item['charge_id'])
+            || isset($item['customer'])
+            || isset($item['services'])
+            || isset($item['payment_terms'])
+            || isset($item['payment_forms']);
     }
 
     private function resolveHttpClientOptions(?Tenant $tenant, string $environment): array

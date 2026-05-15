@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class CoraEnrollmentInvoiceSyncService
@@ -48,6 +49,19 @@ class CoraEnrollmentInvoiceSyncService
         $externalInvoices = $this->coraPaymentService->listInvoices($tenant, $environment, [
             'limit' => 200,
         ]);
+
+        if ($externalInvoices === []) {
+            Log::warning('Cora sync sem invoices retornadas', [
+                'tenant_id' => $tenant->id,
+                'enrollment_id' => $enrollment->id,
+                'environment' => $environment,
+                'student_document' => $this->digitsOnly((string) ($enrollment->student?->document ?? '')),
+                'guardian_documents' => array_values(array_filter(array_map(
+                    fn ($guardian) => $this->digitsOnly((string) ($guardian->document ?? '')),
+                    $enrollment->student?->guardians?->all() ?? []
+                ))),
+            ]);
+        }
 
         if ($chargeIds !== []) {
             $allowedChargeIds = array_values(array_unique(array_filter(array_map('strval', $chargeIds))));
