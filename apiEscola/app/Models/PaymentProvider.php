@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PaymentProvider extends Model
@@ -12,7 +11,6 @@ class PaymentProvider extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'tenant_id',
         'name',
         'slug',
         'description',
@@ -25,9 +23,4 @@ class PaymentProvider extends Model
         'is_active' => 'boolean',
         'order' => 'integer',
     ];
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
-    }
 }

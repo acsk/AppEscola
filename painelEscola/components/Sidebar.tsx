@@ -30,12 +30,6 @@ type NavItem = {
   hasSubmenu?: boolean;
 };
 
-type NavGroup = {
-  id: string;
-  title: string;
-  items: NavItem[];
-};
-
 type SidebarProps = {
   activeItem?: string;
   onSelectItem?: (id: string) => void;
@@ -59,51 +53,19 @@ export default function Sidebar({
   const [internalActive, setInternalActive] = useState("dashboard");
   const [versionCopied, setVersionCopied] = useState(false);
   const activeItem = externalActive ?? internalActive;
-  const menuGroups: NavGroup[] = [
-    {
-      id: "overview",
-      title: "Visão Geral",
-      items: [{ id: "dashboard", label: "Dashboard", icon: "home-outline" }],
-    },
-    {
-      id: "people",
-      title: "Pessoas",
-      items: [
-        { id: "alunos", label: "Alunos", icon: "people-outline" },
-        { id: "responsaveis", label: "Responsáveis", icon: "person-outline" },
-        ...(canManageUsers
-          ? [{ id: "users", label: "Usuários", icon: "people-circle-outline" as const }]
-          : []),
-      ],
-    },
-    {
-      id: "academic",
-      title: "Acadêmico",
-      items: [
-        { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
-        { id: "turmas", label: "Turmas", icon: "grid-outline" },
-        { id: "cursos", label: "Cursos", icon: "book-outline" },
-        { id: "simulados", label: "Simulados", icon: "document-text-outline" },
-      ],
-    },
-    {
-      id: "finance",
-      title: "Financeiro",
-      items: [
-        { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
-        { id: "cobrancas", label: "Pagamentos", icon: "cash-outline" },
-        { id: "pagamentos", label: "Bancos", icon: "business-outline" },
-      ],
-    },
-    ...(canManageTenants
-      ? [
-          {
-            id: "admin",
-            title: "Administração",
-            items: [{ id: "tenants", label: "Tenants", icon: "business-outline" }],
-          },
-        ]
-      : []),
+  const menuItems: NavItem[] = [
+    { id: "dashboard", label: "Dashboard", icon: "home-outline" as const },
+    { id: "alunos", label: "Alunos", icon: "people-outline" as const },
+    { id: "responsaveis", label: "Responsáveis", icon: "person-outline" as const },
+    ...(canManageUsers ? [{ id: "users", label: "Usuários", icon: "people-circle-outline" as const }] : []),
+    { id: "disciplinas", label: "Disciplinas", icon: "library-outline" as const },
+    { id: "turmas", label: "Turmas", icon: "grid-outline" as const },
+    { id: "cursos", label: "Cursos", icon: "book-outline" as const },
+    { id: "simulados", label: "Simulados", icon: "document-text-outline" as const },
+    { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" as const },
+    { id: "bancos_crud", label: "Cadastro de Bancos", icon: "add-circle-outline" as const },
+    { id: "pagamentos", label: "Configuração de Provedores", icon: "cog-outline" as const },
+    ...(canManageTenants ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }] : []),
   ];
 
   const handlePress = (id: string) => {
@@ -216,14 +178,7 @@ export default function Sidebar({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        {menuGroups.map((group, index) => (
-          <View key={group.id} className={index === 0 ? "" : "mt-2.5 pt-2.5 border-t border-gray-100"}>
-            <Text className="text-[10px] font-semibold text-gray-400 px-2.5 mb-1.5 tracking-[1.6px] uppercase">
-              {group.title}
-            </Text>
-            {group.items.map(renderItem)}
-          </View>
-        ))}
+        {menuItems.map(renderItem)}
       </ScrollView>
     </View>
   );

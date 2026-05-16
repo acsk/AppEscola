@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Student;
-use App\Services\CoraPaymentService;
+use App\Services\PaymentGatewayFactory;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -126,7 +126,7 @@ class StudentFinanceController extends Controller
         ], 'Opções de pagamento carregadas com sucesso.');
     }
 
-    public function generateCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    public function generateCharge(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
     {
         [$user, $student, $error] = $this->resolveAlunoAndStudent($request);
         if ($error) {
@@ -207,7 +207,7 @@ class StudentFinanceController extends Controller
         }
 
         try {
-            $result = $cora->createCharge($invoice, $environment, $coraMethod);
+            $result = $factory->resolve('cora')->createCharge($invoice, $environment, $coraMethod);
         } catch (ConnectionException|RequestException $e) {
             return $this->error('Erro ao comunicar com o provedor.', [
                 'error' => $e->getMessage(),

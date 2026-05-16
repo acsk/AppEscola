@@ -162,6 +162,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
     Route::apiResource('enrollments', EnrollmentController::class);
 
+    // Provedores de gateway (catálogo técnico para tela de configuração)
+    Route::get('payment-gateway-providers', [PaymentProviderController::class, 'index']);
+
     // Provedores de Pagamento (CRUD)
     Route::apiResource('payment-providers', PaymentProvidersController::class);
 

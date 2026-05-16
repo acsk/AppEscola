@@ -7,8 +7,6 @@ use App\Http\Requests\StorePaymentProviderRequest;
 use App\Http\Requests\UpdatePaymentProviderRequest;
 use App\Http\Resources\PaymentProviderResource;
 use App\Models\PaymentProvider;
-use App\Models\Tenant;
-use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -17,42 +15,20 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class PaymentProvidersController extends Controller
 {
-    use ScopedByTenant;
-
-    private function ensureCanManageTenant(Request $request, Tenant $tenant): void
+    private function ensureCanManagePaymentProviders(Request $request): void
     {
         $user = $request->user();
 
         if (! $user || ! in_array($user->role, ['super_admin', 'admin'], true)) {
             throw new AccessDeniedHttpException('Acesso permitido apenas para admin ou super admin.');
         }
-
-        if ($user->isSuperAdmin()) {
-            return;
-        }
-
-        if ((int) $user->tenant_id !== (int) $tenant->id) {
-            throw new AccessDeniedHttpException('Admin só pode acessar provedores do próprio tenant.');
-        }
     }
 
-    #[OA\Get(
-        path: '/api/payment-providers',
-        tags: ['Payment Providers'],
-        summary: 'Listar provedores de pagamento',
-        security: [['sanctum' => []]],
-        parameters: [
-            new OA\Parameter(name: 'is_active', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
-        ],
-        responses: [
-            new OA\Response(response: 200, description: 'Lista paginada de provedores'),
-            new OA\Response(response: 401, description: 'Não autenticado'),
-        ]
-    )]
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = PaymentProvider::query()->with('tenant');
-        $this->applyTenantScope($query, $request);
+        $this->ensureCanManagePaymentProviders($request);
+
+        $query = PaymentProvider::query();
 
         $query->when(
             $request->query('is_active') !== null,
@@ -75,9 +51,9 @@ class PaymentProvidersController extends Controller
     )]
     public function store(StorePaymentProviderRequest $request): JsonResponse
     {
-        $tenantId = $this->getTenantId($request);
+        $this->ensureCanManagePaymentProviders($request);
 
-        $provider = PaymentProvider::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
+        $provider = PaymentProvider::create($request->validated());
 
         return $this->created(
             new PaymentProviderResource($provider),
@@ -98,8 +74,7 @@ class PaymentProvidersController extends Controller
     )]
     public function show(Request $request, PaymentProvider $paymentProvider): JsonResponse
     {
-        $this->ensureCanManageTenant($request, $paymentProvider->tenant);
-        $paymentProvider->loadMissing('tenant');
+        $this->ensureCanManagePaymentProviders($request);
 
         return $this->success(
             new PaymentProviderResource($paymentProvider),
@@ -121,7 +96,7 @@ class PaymentProvidersController extends Controller
     )]
     public function update(UpdatePaymentProviderRequest $request, PaymentProvider $paymentProvider): JsonResponse
     {
-        $this->ensureCanManageTenant($request, $paymentProvider->tenant);
+        $this->ensureCanManagePaymentProviders($request);
 
         $paymentProvider->update($request->validated());
 
@@ -144,7 +119,7 @@ class PaymentProvidersController extends Controller
     )]
     public function destroy(Request $request, PaymentProvider $paymentProvider): JsonResponse
     {
-        $this->ensureCanManageTenant($request, $paymentProvider->tenant);
+        $this->ensureCanManagePaymentProviders($request);
 
         $paymentProvider->delete();
 

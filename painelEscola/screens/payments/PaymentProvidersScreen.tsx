@@ -467,9 +467,9 @@ export default function PaymentProvidersScreen() {
 
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Pagamentos Multi-Provedor</Text>
+          <Text className="text-2xl font-bold text-gray-800">Configuração de Provedores</Text>
           <Text className="text-sm text-gray-500">
-            Configure banco/provedor por tenant usando schema dinamico do backend.
+            Configure as credenciais de cada provedor por tenant e ambiente (teste/produção).
           </Text>
         </View>
       </View>

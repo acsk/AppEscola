@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Models\PaymentProvider;
 use App\Models\Tenant;
 use App\Models\TenantCoraCredential;
-use App\Services\CoraPaymentService;
+use App\Services\PaymentGatewayFactory;
 use App\Services\CoraTokenService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -55,7 +56,15 @@ class PaymentProviderController extends Controller
 
     private function ensureSupportedProvider(string $provider): void
     {
-        if ($provider !== 'cora') {
+        if ($provider === 'cora') {
+            return;
+        }
+
+        $exists = PaymentProvider::query()
+            ->where('slug', strtolower(trim($provider)))
+            ->exists();
+
+        if (! $exists) {
             abort(404, 'Provedor de pagamento não suportado.');
         }
     }
@@ -66,20 +75,66 @@ class PaymentProviderController extends Controller
             return $this->forbidden('Não autenticado.');
         }
 
-        return $this->success([
-            [
-                'slug' => 'cora',
-                'name' => 'Cora',
-                'status' => 'active',
-                'capabilities' => ['pix', 'boleto', 'webhook', 'mtls_cert_upload'],
-            ],
-        ], 'Provedores de pagamento carregados com sucesso.');
+            $providers = PaymentProvider::query()
+                ->select('slug', 'name')
+                ->selectRaw('MAX(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as is_active_flag')
+                ->whereNull('deleted_at')
+                ->groupBy('slug', 'name')
+                ->orderBy('name')
+                ->get()
+                ->map(function ($provider) {
+                    $slug = strtolower((string) $provider->slug);
+
+                    return [
+                        'slug' => $slug,
+                        'name' => (string) $provider->name,
+                        'status' => ((int) $provider->is_active_flag) === 1 ? 'active' : 'inactive',
+                        'capabilities' => $this->resolveCapabilitiesBySlug($slug),
+                    ];
+                })
+                ->values();
+
+            if ($providers->isEmpty() && TenantCoraCredential::query()->exists()) {
+                $providers = collect([
+                    [
+                        'slug' => 'cora',
+                        'name' => 'Cora',
+                        'status' => 'active',
+                        'capabilities' => $this->resolveCapabilitiesBySlug('cora'),
+                    ],
+                ]);
+            }
+
+            return $this->success($providers->all(), 'Provedores de pagamento carregados com sucesso.');
     }
+
+        /**
+         * @return array<int, string>
+         */
+        private function resolveCapabilitiesBySlug(string $slug): array
+        {
+            return match ($slug) {
+                'cora' => ['pix', 'boleto', 'webhook', 'mtls_cert_upload'],
+                default => ['pix', 'boleto'],
+            };
+        }
 
     public function settingsSchema(Request $request, Tenant $tenant, string $provider): JsonResponse
     {
         $this->ensureCanManageTenant($request, $tenant);
         $this->ensureSupportedProvider($provider);
+
+        if ($provider !== 'cora') {
+            return $this->success([
+                'provider' => $provider,
+                'configured' => false,
+                'environments' => [
+                    'stage' => false,
+                    'prod' => false,
+                ],
+                'fields' => [],
+            ], 'Schema do provedor carregado com sucesso.');
+        }
 
         $credentials = $tenant->coraCredentials()->orderBy('environment')->get();
 
@@ -153,6 +208,12 @@ class PaymentProviderController extends Controller
         $this->ensureCanManageTenant($request, $tenant);
         $this->ensureSupportedProvider($provider);
 
+        if ($provider !== 'cora') {
+            return $this->error('Configuração de credenciais ainda não implementada para este provedor.', [
+                'provider' => $provider,
+            ], 422);
+        }
+
         $data = $request->validate([
             'client_id' => ['required', 'string', 'max:255'],
             'environment' => ['required', 'string', 'in:stage,prod,production'],
@@ -212,6 +273,14 @@ class PaymentProviderController extends Controller
     {
         $this->ensureCanManageTenant($request, $tenant);
         $this->ensureSupportedProvider($provider);
+
+        if ($provider !== 'cora') {
+            return $this->error('Teste de conexão ainda não implementado para este provedor.', [
+                'provider' => $provider,
+                'ok' => false,
+                'provider_status' => 'not_implemented',
+            ], 422);
+        }
 
         $requestedEnv = (string) $request->input('environment', 'stage');
         $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
@@ -320,7 +389,7 @@ class PaymentProviderController extends Controller
         ], 'Opções de pagamento carregadas com sucesso.');
     }
 
-    public function generateCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    public function generateCharge(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
 
@@ -480,7 +549,7 @@ class PaymentProviderController extends Controller
         $coraMethod = $storedMethod === 'bank_slip' ? 'boleto' : 'pix';
 
         try {
-            $result = $cora->createCharge($invoice, $environment, $coraMethod);
+            $result = $factory->resolve('cora')->createCharge($invoice, $environment, $coraMethod);
         } catch (ConnectionException|RequestException $e) {
             $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
             $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';
@@ -755,7 +824,7 @@ class PaymentProviderController extends Controller
         return in_array($providerStatus, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true);
     }
 
-    public function chargeStatus(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    public function chargeStatus(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
 
@@ -790,7 +859,7 @@ class PaymentProviderController extends Controller
         }
 
         try {
-            $externalInvoice = $cora->getInvoiceById(
+            $externalInvoice = $factory->resolve('cora')->getInvoiceById(
                 $invoice->tenant,
                 (string) $invoice->cora_charge_id,
                 $environment
@@ -936,7 +1005,7 @@ class PaymentProviderController extends Controller
         return $currentStatus;
     }
 
-    public function payCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    public function payCharge(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
 
@@ -972,7 +1041,7 @@ class PaymentProviderController extends Controller
         }
 
         try {
-            $result = $cora->payCharge($invoice, $environment);
+            $result = $factory->resolve('cora')->payCharge($invoice, $environment);
         } catch (ConnectionException|RequestException $e) {
             $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
             $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';

@@ -9,7 +9,7 @@ use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
-use App\Services\CoraPaymentService;
+use App\Services\PaymentGatewayFactory;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -205,7 +205,7 @@ class InvoiceController extends Controller
             new OA\Response(response: 422, description: 'Já cancelada ou paga'),
         ]
     )]
-    public function cancel(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    public function cancel(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
@@ -236,7 +236,7 @@ class InvoiceController extends Controller
             $environment = $request->input('environment', 'prod');
 
             try {
-                $cora->cancelCharge($invoice->tenant, $invoice->cora_charge_id, $environment);
+                $factory->resolve('cora')->cancelCharge($invoice->tenant, $invoice->cora_charge_id, $environment);
             } catch (\Illuminate\Http\Client\ConnectionException $e) {
                 return $this->error(
                     'Não foi possível conectar à Cora para cancelar a cobrança. Tente novamente.',
@@ -272,7 +272,7 @@ class InvoiceController extends Controller
             new OA\Response(response: 502, description: 'Falha de comunicação com Cora'),
         ]
     )]
-    public function generateCoraCharge(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
+    public function generateCoraCharge(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
@@ -285,7 +285,7 @@ class InvoiceController extends Controller
         $invoice->loadMissing(['student', 'guardian']);
 
         try {
-            $result = $cora->createCharge($invoice);
+            $result = $factory->resolve('cora')->createCharge($invoice);
         } catch (ConnectionException|RequestException $e) {
             return response()->json([
                 'message' => 'Erro ao comunicar com Cora.',

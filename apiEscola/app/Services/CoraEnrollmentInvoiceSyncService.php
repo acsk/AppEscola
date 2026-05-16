@@ -14,7 +14,7 @@ use RuntimeException;
 
 class CoraEnrollmentInvoiceSyncService
 {
-    public function __construct(private readonly CoraPaymentService $coraPaymentService)
+    public function __construct(private readonly PaymentGatewayFactory $factory)
     {
     }
 
@@ -46,7 +46,7 @@ class CoraEnrollmentInvoiceSyncService
             throw new RuntimeException('Tenant da matricula nao encontrado para sincronizacao Cora.');
         }
 
-        $externalInvoices = $this->coraPaymentService->listInvoices($tenant, $environment, [
+        $externalInvoices = $this->factory->resolve('cora')->listInvoices($tenant, $environment, [
             'limit' => 200,
         ]);
 
@@ -195,7 +195,7 @@ class CoraEnrollmentInvoiceSyncService
         }
 
         try {
-            $detailed = $this->coraPaymentService->getInvoiceById($tenant, $chargeId, $environment);
+            $detailed = $this->factory->resolve('cora')->getInvoiceById($tenant, $chargeId, $environment);
 
             if ($detailed === []) {
                 return $externalInvoice;

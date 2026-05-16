@@ -93,7 +93,7 @@ O frontend já pode consumir os endpoints abaixo como contrato principal. Mesmo 
 
 ### 1. Listar provedores disponíveis
 
-`GET /api/payment-providers`
+`GET /api/payment-gateway-providers`
 
 ```json
 {
@@ -296,7 +296,7 @@ Retorno recomendado:
 
 Use esta ordem:
 
-1. consumir `GET /api/payment-providers`
+1. consumir `GET /api/payment-gateway-providers`
 2. carregar `settings-schema` para montar o formulário dinamicamente
 3. escolher `environment` (`stage` ou `prod`) na UI
 4. salvar configuração pelo endpoint genérico de `settings`

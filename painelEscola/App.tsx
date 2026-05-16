@@ -28,6 +28,7 @@ import EnrollmentFormScreen from "./screens/matriculas/EnrollmentFormScreen";
 import EnrollmentDetailScreen from "./screens/matriculas/EnrollmentDetailScreen";
 import InvoicesScreen from "./screens/InvoicesScreen";
 import PaymentProvidersScreen from "./screens/payments/PaymentProvidersScreen";
+import PaymentProvidersCrudScreen from "./screens/payments/PaymentProvidersCrudScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
@@ -86,7 +87,10 @@ const SCREEN_SLUGS = [
   "turmas",
   "matriculas",
   "cobrancas",
+  "bancos",
+  "bancos_crud",
   "pagamentos",
+  "configuracao-provedores",
   "dashboard",
   "pacotes",
   "simulados",
@@ -99,6 +103,14 @@ const SCREEN_SLUGS = [
 function hashToNav(hash: string): NavState {
   const path = hash.replace(/^#\/?/, "");
   const [seg0, seg1] = path.split("/").filter(Boolean);
+
+  if (seg0 === "bancos") {
+    return { screen: "bancos_crud" };
+  }
+
+  if (seg0 === "configuracao-provedores") {
+    return { screen: "pagamentos" };
+  }
 
   if (seg0 === "alunos") {
     if (!seg1) return { screen: "alunos" };
@@ -180,6 +192,8 @@ function hashToNav(hash: string): NavState {
 }
 
 function navToHash(nav: NavState): string {
+  if (nav.screen === "bancos_crud") return "#/bancos";
+  if (nav.screen === "pagamentos") return "#/configuracao-provedores";
   if (nav.screen === "alunos-form") {
     const id = nav.params?.studentId;
     return id != null ? `#/alunos/${id}` : "#/alunos/novo";
@@ -668,6 +682,7 @@ function AppContent() {
       case "matriculas-form": return <EnrollmentFormScreen navigate={navigate} />;
       case "matriculas-detail": return <EnrollmentDetailScreen navigate={navigate} enrollmentId={nav.params?.enrollmentId} />;
       case "cobrancas": return <InvoicesScreen />;
+      case "bancos_crud": return <PaymentProvidersCrudScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Platform,
   View,
   Text,
   TextInput,
@@ -16,6 +17,9 @@ type HeaderProps = {
 export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
   const [search, setSearch] = useState("");
   const { logout, user } = useAuth();
+  const headerShadowStyle = Platform.OS === "web"
+    ? ({ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)" } as any)
+    : { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 };
   const initials = user?.name
     ? user.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()
     : "?";
@@ -23,7 +27,7 @@ export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
   return (
     <View
       className="h-16 bg-white border-b border-gray-100 flex-row items-center"
-      style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}
+      style={headerShadowStyle}
     >
       <View style={{ width: isMobile ? 12 : 24 }} />
       {isMobile && (

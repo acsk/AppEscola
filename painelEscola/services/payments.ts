@@ -145,9 +145,49 @@ const unwrap = <T>(payload: ApiEnvelope<T> | T): T => {
 };
 
 export const listPaymentProviders = async (): Promise<PaymentProvider[]> => {
-  const { data } = await api.get<ApiEnvelope<PaymentProvider[]>>("/payment-providers");
-  const providers = unwrap<PaymentProvider[]>(data);
-  return Array.isArray(providers) ? providers : [];
+  const defaultProviders: PaymentProvider[] = [
+    {
+      slug: "cora",
+      name: "Cora",
+      status: "active",
+      capabilities: ["pix", "boleto", "webhook", "mtls_cert_upload"],
+    },
+  ];
+
+  try {
+    const { data } = await api.get<ApiEnvelope<PaymentProvider[]>>("/payment-gateway-providers");
+    const providers = unwrap<PaymentProvider[]>(data);
+    return Array.isArray(providers) && providers.length > 0 ? providers : defaultProviders;
+  } catch (error: any) {
+    // Fallback para versões antigas/ambientes sem o endpoint dedicado.
+    if (error?.response?.status !== 404) {
+      throw error;
+    }
+
+    try {
+      const { data } = await api.get<any>("/payment-providers");
+      const maybeCollection = Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.body?.data)
+        ? data.body.data
+        : Array.isArray(data?.body)
+        ? data.body
+        : [];
+
+      const mapped = maybeCollection
+        .map((item: any) => ({
+          slug: String(item?.slug ?? ""),
+          name: String(item?.name ?? ""),
+          status: item?.is_active === false ? "inactive" : "active",
+          capabilities: Array.isArray(item?.capabilities) ? item.capabilities : [],
+        }))
+        .filter((item: PaymentProvider) => item.slug !== "");
+
+      return mapped.length > 0 ? mapped : defaultProviders;
+    } catch {
+      return defaultProviders;
+    }
+  }
 };
 
 export const getPaymentProviderSettingsSchema = async (
