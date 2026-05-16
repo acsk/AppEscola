@@ -19,8 +19,8 @@ class PaymentProvidersController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, ['super_admin', 'admin'], true)) {
-            throw new AccessDeniedHttpException('Acesso permitido apenas para admin ou super admin.');
+        if (! $user || $user->role !== 'super_admin') {
+            throw new AccessDeniedHttpException('Acesso permitido apenas para super admin.');
         }
     }
 
