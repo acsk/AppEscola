@@ -76,6 +76,11 @@ class Tenant extends Model
         return $this->hasMany(Invoice::class);
     }
 
+    public function paymentProviders(): HasMany
+    {
+        return $this->hasMany(PaymentProvider::class);
+    }
+
     public function apiTokens(): HasMany
     {
         return $this->hasMany(TenantApiToken::class);

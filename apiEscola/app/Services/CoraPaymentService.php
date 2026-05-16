@@ -281,6 +281,76 @@ class CoraPaymentService
      * @throws ConnectionException
      * @throws RequestException
      */
+    /**
+     * Cancela uma cobrança na Cora via DELETE /v2/invoices/{id}.
+     *
+     * Lança RuntimeException se a cobrança não existir no Cora (404 é silenciado — considera cancelada).
+     * Lança RequestException para outros erros HTTP.
+     *
+     * @throws RuntimeException
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function cancelCharge(Tenant $tenant, string $chargeId, string $environment = 'prod'): void
+    {
+        $chargeId = trim($chargeId);
+
+        if ($chargeId === '') {
+            throw new RuntimeException('ID da cobrança Cora obrigatório para cancelamento.');
+        }
+
+        $token = $this->resolveBearerToken($tenant, $environment);
+        $baseUrl = $this->resolveApiBaseUrl($environment);
+
+        if ($token === '' || $baseUrl === '') {
+            throw new RuntimeException('Integração Cora não configurada para cancelar cobrança.');
+        }
+
+        $httpOptions = $this->resolveHttpClientOptions($tenant, $environment);
+
+        Log::info('Cora cancelCharge request', [
+            'tenant_id' => $tenant->id,
+            'charge_id' => $chargeId,
+            'environment' => $environment,
+        ]);
+
+        try {
+            Http::timeout((int) config('services.cora.timeout', 20))
+                ->acceptJson()
+                ->withOptions($httpOptions)
+                ->withToken($token)
+                ->delete($baseUrl . '/v2/invoices/' . $chargeId)
+                ->throw();
+
+            Log::info('Cora cancelCharge succeeded', [
+                'tenant_id' => $tenant->id,
+                'charge_id' => $chargeId,
+                'environment' => $environment,
+            ]);
+        } catch (RequestException $e) {
+            // 404 = cobrança já não existe na Cora (expirou ou já foi cancelada lá)
+            if ($e->response?->status() === 404) {
+                Log::info('Cora cancelCharge: charge not found on Cora (already cancelled/expired)', [
+                    'tenant_id' => $tenant->id,
+                    'charge_id' => $chargeId,
+                    'environment' => $environment,
+                ]);
+
+                return;
+            }
+
+            Log::warning('Cora cancelCharge failed', [
+                'tenant_id' => $tenant->id,
+                'charge_id' => $chargeId,
+                'environment' => $environment,
+                'http_status' => $e->response?->status(),
+                'provider_error' => $e->response?->json(),
+            ]);
+
+            throw $e;
+        }
+    }
+
     public function getInvoiceById(Tenant $tenant, string $chargeId, string $environment = 'prod'): array
     {
         $chargeId = trim($chargeId);

@@ -205,21 +205,59 @@ class InvoiceController extends Controller
             new OA\Response(response: 422, description: 'Já cancelada ou paga'),
         ]
     )]
-    public function cancel(Request $request, Invoice $invoice): JsonResponse
+    public function cancel(Request $request, Invoice $invoice, CoraPaymentService $cora): JsonResponse
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
         if ($invoice->status === 'cancelled') {
-            return response()->json(['message' => 'Cobrança já está cancelada.'], 422);
+            return $this->error('Cobrança já está cancelada.', null, 422);
         }
 
         if ($invoice->status === 'paid') {
-            return response()->json(['message' => 'Não é possível cancelar uma cobrança paga.'], 422);
+            return $this->error('Não é possível cancelar uma cobrança paga.', null, 422);
+        }
+
+        // PIX com cobrança ativa no Cora expira automaticamente — não cancelar manualmente.
+        $isPixWithActiveCharge = $invoice->cora_charge_id
+            && in_array($invoice->payment_method, ['pix'], true)
+            && in_array($invoice->cora_status, ['OPEN', 'PENDING', null], true);
+
+        if ($isPixWithActiveCharge) {
+            return $this->error(
+                'Cobranças PIX expiram automaticamente. Não é necessário cancelar manualmente.',
+                ['cora_charge_id' => $invoice->cora_charge_id],
+                422
+            );
+        }
+
+        // Se há cobrança ativa no Cora (boleto), cancela lá também.
+        if ($invoice->cora_charge_id) {
+            $invoice->loadMissing('tenant');
+            $environment = $request->input('environment', 'prod');
+
+            try {
+                $cora->cancelCharge($invoice->tenant, $invoice->cora_charge_id, $environment);
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                return $this->error(
+                    'Não foi possível conectar à Cora para cancelar a cobrança. Tente novamente.',
+                    ['detail' => $e->getMessage()],
+                    502
+                );
+            } catch (\Illuminate\Http\Client\RequestException $e) {
+                return $this->error(
+                    'A Cora recusou o cancelamento da cobrança.',
+                    [
+                        'http_status' => $e->response?->status(),
+                        'detail'      => $e->response?->json(),
+                    ],
+                    502
+                );
+            }
         }
 
         $invoice->update(['status' => 'cancelled']);
 
-        return response()->json(new InvoiceResource($invoice));
+        return $this->success(new InvoiceResource($invoice), 'Cobrança cancelada com sucesso.');
     }
 
     #[OA\Post(

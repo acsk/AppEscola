@@ -30,19 +30,11 @@ type NavItem = {
   hasSubmenu?: boolean;
 };
 
-const menuItems: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: "home-outline" },
-  { id: "alunos", label: "Alunos", icon: "people-outline" },
-  { id: "responsaveis", label: "Responsáveis", icon: "person-outline" },
-  { id: "cursos", label: "Cursos", icon: "book-outline" },
-  { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
-  { id: "turmas", label: "Turmas", icon: "grid-outline" },
-  { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
-  { id: "pagamentos", label: "Pagamentos", icon: "card-outline" },
-  { id: "simulados", label: "Simulados", icon: "document-text-outline" },
-];
-
-const otherItems: NavItem[] = [];
+type NavGroup = {
+  id: string;
+  title: string;
+  items: NavItem[];
+};
 
 type SidebarProps = {
   activeItem?: string;
@@ -67,10 +59,51 @@ export default function Sidebar({
   const [internalActive, setInternalActive] = useState("dashboard");
   const [versionCopied, setVersionCopied] = useState(false);
   const activeItem = externalActive ?? internalActive;
-  const visibleMenuItems = [
-    ...(canManageTenants ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }] : []),
-    ...(canManageUsers ? [{ id: "users", label: "Usuários", icon: "people-outline" as const }] : []),
-    ...menuItems,
+  const menuGroups: NavGroup[] = [
+    {
+      id: "overview",
+      title: "Visão Geral",
+      items: [{ id: "dashboard", label: "Dashboard", icon: "home-outline" }],
+    },
+    {
+      id: "people",
+      title: "Pessoas",
+      items: [
+        { id: "alunos", label: "Alunos", icon: "people-outline" },
+        { id: "responsaveis", label: "Responsáveis", icon: "person-outline" },
+        ...(canManageUsers
+          ? [{ id: "users", label: "Usuários", icon: "people-circle-outline" as const }]
+          : []),
+      ],
+    },
+    {
+      id: "academic",
+      title: "Acadêmico",
+      items: [
+        { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
+        { id: "turmas", label: "Turmas", icon: "grid-outline" },
+        { id: "cursos", label: "Cursos", icon: "book-outline" },
+        { id: "simulados", label: "Simulados", icon: "document-text-outline" },
+      ],
+    },
+    {
+      id: "finance",
+      title: "Financeiro",
+      items: [
+        { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
+        { id: "cobrancas", label: "Pagamentos", icon: "cash-outline" },
+        { id: "pagamentos", label: "Bancos", icon: "business-outline" },
+      ],
+    },
+    ...(canManageTenants
+      ? [
+          {
+            id: "admin",
+            title: "Administração",
+            items: [{ id: "tenants", label: "Tenants", icon: "business-outline" }],
+          },
+        ]
+      : []),
   ];
 
   const handlePress = (id: string) => {
@@ -98,18 +131,18 @@ export default function Sidebar({
       <TouchableOpacity
         key={item.id}
         onPress={() => handlePress(item.id)}
-        className={`flex-row items-center px-4 py-3 rounded-xl mb-1 ${
+        className={`flex-row items-center px-3 py-2 rounded-lg mb-0.5 ${
           isActive ? "bg-violet-100" : "bg-transparent"
         }`}
         activeOpacity={0.7}
       >
         <Ionicons
           name={item.icon}
-          size={20}
+          size={18}
           color={isActive ? "#7C3AED" : "#9CA3AF"}
         />
         <Text
-          className={`ml-3 text-sm font-medium flex-1 ${
+          className={`ml-2.5 text-[13px] font-medium flex-1 ${
             isActive ? "text-violet-700" : "text-gray-500"
           }`}
         >
@@ -124,16 +157,16 @@ export default function Sidebar({
 
   return (
     <View
-      className="bg-white pt-6 px-3 border-r border-gray-100"
+      className="bg-white pt-4 px-2.5 border-r border-gray-100"
       style={{
-        width: isMobile ? Math.min(300, width * 0.84) : 220,
+        width: isMobile ? Math.min(288, width * 0.84) : 214,
         height: "100%",
         boxShadow: isMobile ? "0px 8px 24px rgba(0, 0, 0, 0.16)" : "0px 4px 12px rgba(0, 0, 0, 0.04)",
         elevation: 8,
       }}
     >
       {/* Logo */}
-      <View className="flex-row items-center justify-between px-3 mb-6">
+      <View className="flex-row items-center justify-between px-2.5 mb-4">
         <View className="flex-1">
           <View className="flex-row items-center">
             <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
@@ -183,19 +216,14 @@ export default function Sidebar({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        <Text className="text-xs font-semibold text-gray-400 px-3 mb-2 tracking-widest uppercase">
-          Menu
-        </Text>
-        {visibleMenuItems.map(renderItem)}
-
-        {otherItems.length > 0 && (
-          <>
-            <Text className="text-xs font-semibold text-gray-400 px-3 mt-6 mb-2 tracking-widest uppercase">
-              Outros
+        {menuGroups.map((group, index) => (
+          <View key={group.id} className={index === 0 ? "" : "mt-2.5 pt-2.5 border-t border-gray-100"}>
+            <Text className="text-[10px] font-semibold text-gray-400 px-2.5 mb-1.5 tracking-[1.6px] uppercase">
+              {group.title}
             </Text>
-            {otherItems.map(renderItem)}
-          </>
-        )}
+            {group.items.map(renderItem)}
+          </View>
+        ))}
       </ScrollView>
     </View>
   );

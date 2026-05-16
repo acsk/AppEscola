@@ -93,6 +93,8 @@ type Invoice = {
   student?: Student;
   guardian?: Guardian;
   enrollment_id: number | null;
+  can_edit?: boolean;
+  can_delete?: boolean;
 };
 
 type Enrollment = {
@@ -1081,14 +1083,16 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       >
         <Ionicons name="information-circle-outline" size={15} color="#2563EB" />
       </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => openEditInvoice(item)}
-        className="items-center justify-center bg-violet-50 rounded-lg"
-        style={{ width: 30, height: 30 }}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
-      </TouchableOpacity>
+      {(item.can_edit ?? true) && (
+        <TouchableOpacity
+          onPress={() => openEditInvoice(item)}
+          className="items-center justify-center bg-violet-50 rounded-lg"
+          style={{ width: 30, height: 30 }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         onPress={() => openChargeModal(item)}
         disabled={!canGenerateChargeForInvoice(item)}
@@ -1114,14 +1118,16 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
           <Ionicons name="receipt-outline" size={15} color="#059669" />
         </TouchableOpacity>
       )}
-      <TouchableOpacity
-        onPress={() => setDeleteInvoiceId(item.id)}
-        className="items-center justify-center bg-red-50 rounded-lg"
-        style={{ width: 30, height: 30 }}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="trash-outline" size={15} color="#EF4444" />
-      </TouchableOpacity>
+      {(item.can_delete ?? true) && (
+        <TouchableOpacity
+          onPress={() => setDeleteInvoiceId(item.id)}
+          className="items-center justify-center bg-red-50 rounded-lg"
+          style={{ width: 30, height: 30 }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="trash-outline" size={15} color="#EF4444" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 

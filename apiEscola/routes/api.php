@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PaymentProviderController;
+use App\Http\Controllers\Api\PaymentProvidersController;
 use App\Http\Controllers\Api\PublicRegistrationController;
 use App\Http\Controllers\Api\ReceiptController;
 use App\Http\Controllers\Api\UserManagementController;
@@ -161,8 +162,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
     Route::apiResource('enrollments', EnrollmentController::class);
 
+    // Provedores de Pagamento (CRUD)
+    Route::apiResource('payment-providers', PaymentProvidersController::class);
+
     // Cobranças
-    Route::get('payment-providers', [PaymentProviderController::class, 'index']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
