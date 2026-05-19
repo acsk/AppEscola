@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Student;
+use App\Models\Tenant;
 use App\Services\PaymentGatewayFactory;
+use App\Services\TenantBillingSettingsService;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -15,10 +17,11 @@ use Illuminate\Http\Request;
 class StudentFinanceController extends Controller
 {
     /**
-    * Lista cobrancas do aluno autenticado em 3 grupos:
+    * Lista cobrancas do aluno autenticado em grupos para a tela financeira:
     * - pagas: cobrancas com status paid
     * - atrasadas: cobrancas em aberto com vencimento anterior a hoje
     * - atual: apenas a cobranca vigente do mes atual (mais proxima de hoje)
+    * - abertas: todas as cobrancas em aberto a partir de hoje
      */
     public function boletos(Request $request): JsonResponse
     {
@@ -47,6 +50,12 @@ class StudentFinanceController extends Controller
             ->orderBy('due_date')
             ->get();
 
+        $abertas = (clone $baseQuery)
+            ->whereNotIn('status', ['paid', 'cancelled'])
+            ->whereDate('due_date', '>=', $today->toDateString())
+            ->orderBy('due_date')
+            ->get();
+
         $atual = (clone $baseQuery)
             ->whereNotIn('status', ['paid', 'cancelled'])
             ->whereBetween('due_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
@@ -63,13 +72,16 @@ class StudentFinanceController extends Controller
             ],
             'pagas' => $pagas->map(fn (Invoice $invoice) => $this->mapBoleto($invoice))->values(),
             'atrasados' => $atrasados->map(fn (Invoice $invoice) => $this->mapBoleto($invoice))->values(),
+            'abertas' => $abertas->map(fn (Invoice $invoice) => $this->mapBoleto($invoice))->values(),
             'atual' => $atual ? $this->mapBoleto($atual) : null,
             'resumo' => [
                 'quantidade_pagas' => $pagas->count(),
                 'quantidade_atrasados' => $atrasados->count(),
+                'quantidade_abertas' => $abertas->count(),
                 'possui_atual' => (bool) $atual,
                 'valor_total_pagas' => $pagas->sum('amount'),
                 'valor_total_atrasados' => $atrasados->sum('amount'),
+                'valor_total_abertas' => $abertas->sum('amount'),
                 'valor_atual' => $atual?->amount,
             ],
         ], 'Cobrancas carregadas com sucesso.');
@@ -90,18 +102,48 @@ class StudentFinanceController extends Controller
         $lockedMethod = $methodLock['method'];
         $lockReason = $methodLock['reason'];
 
-        $allowedMethods = $lockedMethod === 'bank_slip'
-            ? ['boleto']
-            : ($lockedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
+        $paymentSettings = $this->paymentScope((int) $invoice->tenant_id);
+        $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
+        $enabledMethods = is_array($rawEnabledMethods)
+            ? array_values(array_unique(array_map(static function (string $method): string {
+                $normalized = strtolower(trim($method));
 
-        $currentMethod = in_array($invoice->payment_method, ['pix', 'bank_slip', 'boleto'], true)
+                return $normalized === 'bank_slip' ? 'boleto' : $normalized;
+            }, $rawEnabledMethods)))
+            : ['pix', 'boleto', 'hybrid'];
+
+        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+
+        $allowedMethods = match (true) {
+            $lockedMethod === 'hybrid' => ['hybrid'],
+            in_array($lockedMethod, ['bank_slip', 'boleto'], true) => ['boleto'],
+            $lockedMethod === 'pix' => ['pix'],
+            default => $enabledMethods,
+        };
+
+        if (! empty($allowedMethods)) {
+            $allowedMethods = array_values(array_intersect($allowedMethods, $enabledMethods));
+        }
+
+        $currentMethod = in_array($invoice->payment_method, ['pix', 'bank_slip', 'boleto', 'hybrid'], true)
             ? ($invoice->payment_method === 'bank_slip' ? 'boleto' : $invoice->payment_method)
             : ($lockedMethod === 'bank_slip' ? 'boleto' : $lockedMethod);
+
+        $configuredDefaultMethod = strtolower((string) ($paymentSettings['default_method'] ?? ''));
+        $configuredDefaultMethod = $configuredDefaultMethod === 'bank_slip' ? 'boleto' : $configuredDefaultMethod;
+        $configuredDefaultMethod = in_array($configuredDefaultMethod, ['pix', 'boleto', 'hybrid'], true)
+            ? $configuredDefaultMethod
+            : null;
+
+        if ($currentMethod === null && $configuredDefaultMethod !== null && in_array($configuredDefaultMethod, $allowedMethods, true)) {
+            $currentMethod = $configuredDefaultMethod;
+        }
 
         return $this->success([
             'invoice' => $this->mapBoleto($invoice),
             'allowed_methods' => $allowedMethods,
             'current_method' => $currentMethod,
+            'default_method' => $configuredDefaultMethod,
             'actions' => [
                 'can_generate_charge' => ! in_array($invoice->status, ['paid', 'cancelled'], true),
                 'can_change_method' => $lockedMethod === null,
@@ -138,7 +180,7 @@ class StudentFinanceController extends Controller
         }
 
         $data = $request->validate([
-            'method' => ['required', 'string', 'in:pix,boleto,bank_slip'],
+            'method' => ['required', 'string', 'in:pix,boleto,hybrid,bank_slip'],
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
         ]);
 
@@ -150,8 +192,39 @@ class StudentFinanceController extends Controller
         $environment = app()->environment('production') ? 'prod' : 'stage';
 
         $requestedMethod = strtolower((string) $data['method']);
-        $coraMethod = in_array($requestedMethod, ['boleto', 'bank_slip'], true) ? 'boleto' : 'pix';
-        $storedMethod = $coraMethod === 'boleto' ? 'bank_slip' : 'pix';
+        $paymentSettings = $this->paymentScope((int) $invoice->tenant_id);
+        $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
+        $enabledMethods = is_array($rawEnabledMethods)
+            ? array_values(array_unique(array_map(static function (string $method): string {
+                $normalized = strtolower(trim($method));
+
+                return $normalized === 'bank_slip' ? 'boleto' : $normalized;
+            }, $rawEnabledMethods)))
+            : ['pix', 'boleto', 'hybrid'];
+
+        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+        $requestedMethodForCheck = $requestedMethod === 'bank_slip' ? 'boleto' : $requestedMethod;
+
+        if (! in_array($requestedMethodForCheck, $enabledMethods, true)) {
+            return $this->error(
+                'Método de pagamento não habilitado para este tenant.',
+                [
+                    'requested_method' => $requestedMethodForCheck,
+                    'enabled_methods' => $enabledMethods,
+                ],
+                422
+            );
+        }
+
+        $coraMethod = match ($requestedMethod) {
+            'boleto', 'bank_slip' => 'boleto',
+            'hybrid' => 'hybrid',
+            default => 'pix',
+        };
+        $storedMethod = match ($requestedMethod) {
+            'boleto', 'bank_slip', 'hybrid' => 'bank_slip',
+            default => 'pix',
+        };
 
         $methodLock = $this->resolveMethodLock($invoice);
         $lockedMethod = $methodLock['method'];
@@ -175,7 +248,7 @@ class StudentFinanceController extends Controller
             }
 
             if ($this->shouldReuseExistingCharge($invoice, $lockedMethod)) {
-                $responseMethod = $lockedMethod === 'bank_slip' ? 'boleto' : 'pix';
+                $responseMethod = $lockedMethod === 'bank_slip' ? 'bank_slip' : 'pix';
 
                 $successMessage = $lockReason === 'synced_charge_method_lock'
                     ? 'Cobrança sincronizada reutilizada com sucesso.'
@@ -201,7 +274,7 @@ class StudentFinanceController extends Controller
 
         if ($this->shouldReuseExistingCharge($invoice, $storedMethod)) {
             return $this->success(
-                $this->buildChargeResponsePayload($invoice, $coraMethod, true),
+                $this->buildChargeResponsePayload($invoice, $storedMethod, true),
                 'Cobrança existente reutilizada com sucesso.'
             );
         }
@@ -231,7 +304,7 @@ class StudentFinanceController extends Controller
         $invoice->refresh();
 
         return $this->success(
-            $this->buildChargeResponsePayload($invoice, $coraMethod, false, $result['qr_code_image_url'] ?? null),
+            $this->buildChargeResponsePayload($invoice, $storedMethod, false, $result['qr_code_image_url'] ?? null),
             'Cobrança gerada com sucesso.'
         );
     }
@@ -292,6 +365,10 @@ class StudentFinanceController extends Controller
         $originalMethod = strtolower(trim((string) data_get($payload, 'integration.original_method')));
 
         if ($origin === 'cora_sync' && $methodLocked) {
+            if ($originalMethod === 'hybrid') {
+                return 'bank_slip';
+            }
+
             if (in_array($originalMethod, ['pix', 'bank_slip'], true)) {
                 return $originalMethod;
             }
@@ -405,5 +482,26 @@ class StudentFinanceController extends Controller
                 ?? data_get($invoice->cora_payload, 'payment_options.pix.qr_code_url'),
             'is_overdue' => $invoice->due_date?->isBefore(Carbon::today()) ?? false,
         ];
+    }
+
+    /**
+     * Retorna o escopo "payment" das configurações do tenant.
+     *
+     * @return array<string,mixed>
+     */
+    private function paymentScope(int $tenantId): array
+    {
+        static $cache = [];
+
+        if (isset($cache[$tenantId])) {
+            return $cache[$tenantId];
+        }
+
+        $tenant = Tenant::find($tenantId);
+        if (! $tenant) {
+            return $cache[$tenantId] = [];
+        }
+
+        return $cache[$tenantId] = app(TenantBillingSettingsService::class)->scope($tenant, 'payment');
     }
 }

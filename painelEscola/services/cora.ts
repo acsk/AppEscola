@@ -45,16 +45,16 @@ export async function syncEnrollmentCoraCharges(
     const result = data?.data ?? data?.body ?? data;
     
     // Garante que temos um objeto com os campos necessários
-    if (typeof result === "object" && result !== null) {
+    if (typeof result === "object" && result !== null && "enrollment_id" in result) {
       return {
-        enrollment_id: result.enrollment_id ?? 0,
-        tenant_id: result.tenant_id ?? 0,
-        environment: result.environment ?? "",
-        external_total: result.external_total ?? 0,
-        created: result.created ?? 0,
-        updated: result.updated ?? 0,
-        ignored: result.ignored ?? 0,
-        processed_charge_ids: result.processed_charge_ids ?? [],
+        enrollment_id: (result as SyncCoraChargesResult).enrollment_id ?? 0,
+        tenant_id: (result as SyncCoraChargesResult).tenant_id ?? 0,
+        environment: (result as SyncCoraChargesResult).environment ?? "",
+        external_total: (result as SyncCoraChargesResult).external_total ?? 0,
+        created: (result as SyncCoraChargesResult).created ?? 0,
+        updated: (result as SyncCoraChargesResult).updated ?? 0,
+        ignored: (result as SyncCoraChargesResult).ignored ?? 0,
+        processed_charge_ids: (result as SyncCoraChargesResult).processed_charge_ids ?? [],
       };
     }
     

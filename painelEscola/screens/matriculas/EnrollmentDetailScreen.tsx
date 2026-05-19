@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  Animated,
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -67,7 +66,7 @@ if (Platform.OS === "web" && pdfjs) {
 type Student = { id: number; name: string; enrollment_number?: string };
 type SchoolClass = { id: number; name: string; course?: { id: number; name: string } };
 type Guardian = { id: number; name: string };
-type CoursePlan = { id: number; name: string; billing_cycle: string; cycle_label: string; price: string };
+type CoursePlan = { id: number; name: string; billing_cycle: string; cycle_label: string; price: string; enrollment_fee_amount?: string | number; course?: { id: number; name: string } };
 
 type Invoice = {
   id: number;
@@ -112,6 +111,8 @@ type Enrollment = {
   course_plan?: CoursePlan;
   created_at?: string;
   invoices?: Invoice[];
+  charges_generated_at?: string | null;
+  charges_batch_generated?: boolean;
 };
 
 type EditForm = {
@@ -235,6 +236,18 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const [syncingCoraCharges, setSyncingCoraCharges] = useState(false);
   const [syncCoraResult, setSyncCoraResult] = useState<SyncCoraChargesResult | null>(null);
 
+  // Batch charges (one-shot por matrícula)
+  const [batchModalVisible, setBatchModalVisible] = useState(false);
+  const [batchInvoiceTypesFilter, setBatchInvoiceTypesFilter] = useState<string[]>([]);
+  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [batchResult, setBatchResult] = useState<{
+    status?: string;
+    generated_count: number;
+    failed_count: number;
+    failed?: any[];
+  } | null>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
+
   // Delete enrollment
   const [deleteEnrollmentVisible, setDeleteEnrollmentVisible] = useState(false);
   const [deletingEnrollment, setDeletingEnrollment] = useState(false);
@@ -267,6 +280,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const [chargeMethod, setChargeMethod] = useState("pix");
   const [chargeModalStep, setChargeModalStep] = useState<"select" | "result">("select");
   const [generatingCharge, setGeneratingCharge] = useState(false);
+  const [pendingChargeMethod, setPendingChargeMethod] = useState<"pix" | "boleto" | "hybrid" | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [payingCharge, setPayingCharge] = useState(false);
   const [chargeResult, setChargeResult] = useState<GeneratedCharge | null>(null);
@@ -395,29 +409,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     title: string;
     message: string;
   }>({ visible: false, type: "info", title: "", message: "" });
-  const chargeTabOpacity = useRef(new Animated.Value(1)).current;
-  const chargeTabTranslateY = useRef(new Animated.Value(0)).current;
-
   const { user } = useAuth();
-
-  useEffect(() => {
-    if (chargeModalStep !== "result") return;
-
-    chargeTabOpacity.setValue(0);
-    chargeTabTranslateY.setValue(8);
-    Animated.parallel([
-      Animated.timing(chargeTabOpacity, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(chargeTabTranslateY, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [chargeMethod, chargeModalStep, chargeTabOpacity, chargeTabTranslateY]);
   const isProductionHost =
     typeof window !== "undefined" && window.location.hostname !== "localhost";
   const isSuperAdmin = user?.role === "super_admin";
@@ -574,6 +566,62 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     setSyncingCoraCharges(false);
   };
 
+  // ── Batch charges (one-shot por matrícula) ───────────────────────────────────
+
+  const openBatchModal = () => {
+    if (!enrollment) return;
+    setBatchResult(null);
+    setBatchError(null);
+    setBatchInvoiceTypesFilter(["monthly"]);
+    setBatchModalVisible(true);
+  };
+
+  const onGenerateBatchCharges = async () => {
+    if (!enrollment) return;
+    setBatchGenerating(true);
+    setBatchError(null);
+    setBatchResult(null);
+    try {
+      const body: Record<string, any> = {};
+      if (batchInvoiceTypesFilter.length > 0) {
+        body.invoice_types = batchInvoiceTypesFilter;
+      }
+      const { data } = await api.post(
+        `/enrollments/${enrollment.id}/generate-charges`,
+        body
+      );
+      const payload = data?.body ?? data ?? {};
+      const generated = Number(payload.generated_count ?? 0);
+      const existing = Number(payload.existing_count ?? 0);
+      setBatchResult({
+        status: payload.status,
+        generated_count: generated,
+        failed_count: 0,
+        failed: [],
+      });
+      showToast(
+        "success",
+        `${generated} cobrança${generated !== 1 ? "s" : ""} criada${generated !== 1 ? "s" : ""}${existing > 0 ? `, ${existing} já existiam` : ""}.`,
+        "✓ Cobranças locais em lote"
+      );
+      await fetch();
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Falha ao gerar cobranças locais em lote.";
+      setBatchError(msg);
+      if (status === 409) {
+        showToast("warning", msg, "Lote já processado");
+        await fetch();
+      } else {
+        showToast("error", msg, "Falha na geração local");
+      }
+    }
+    setBatchGenerating(false);
+  };
+
   // ── Invoice actions ──────────────────────────────────────────────────────────
 
   const openCreateInvoice = () => {
@@ -669,9 +717,11 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
 
   // ── Charge actions ───────────────────────────────────────────────────────────
 
-  const openChargeModal = async (invoice: Invoice, preferredMethod?: "pix" | "boleto") => {
+  const openChargeModal = async (invoice: Invoice, preferredMethod?: "pix" | "boleto" | "hybrid") => {
     const normalizedMethod =
-      invoice.payment_method === "bank_slip" || invoice.payment_method === "boleto"
+      invoice.payment_method === "hybrid"
+        ? "hybrid"
+      : invoice.payment_method === "bank_slip" || invoice.payment_method === "boleto"
         ? "boleto"
         : "pix";
     const method = preferredMethod ?? normalizedMethod;
@@ -718,7 +768,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       const currentMethod = normalizeChargeMethod(options.current_method);
       const allowedMethods = (options.allowed_methods ?? [])
         .map((item) => normalizeChargeMethod(item))
-        .filter((item): item is "pix" | "boleto" => item === "pix" || item === "boleto");
+        .filter((item): item is "pix" | "boleto" | "hybrid" => item === "pix" || item === "boleto" || item === "hybrid");
 
       const selectedMethod =
         preferredMethod ?? lockedMethod ?? currentMethod ?? allowedMethods[0] ?? method;
@@ -753,6 +803,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     setChargeStatusResult(null);
     setPaidChargeResult(null);
     setChargeActionError(null);
+    setPendingChargeMethod(null);
     setChargeModalStep("select");
   };
 
@@ -771,9 +822,10 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     setPreviewModalVisible(true);
   };
 
-  const onGenerateCharge = async (methodOverride?: "pix" | "boleto") => {
+  const onGenerateCharge = async (methodOverride?: "pix" | "boleto" | "hybrid") => {
     if (!chargeInvoice || !chargeProvider) return;
-    const methodToGenerate = methodOverride ?? (chargeMethod as "pix" | "boleto");
+    const methodToGenerate =
+      methodOverride ?? (chargeMethod === "hybrid" ? "hybrid" : chargeMethod === "boleto" ? "boleto" : "pix");
 
     if (chargePaymentOptions && !chargePaymentOptions.actions.can_change_method) {
       setChargeActionError(null);
@@ -798,11 +850,13 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
         method: methodToGenerate,
         environment: chargeEnvironment,
       });
+      setChargeMethod(methodToGenerate);
       setChargeResult(result);
       setChargeModalStep("result");
       try {
         const options = await getInvoicePaymentOptions(chargeInvoice.id);
         setChargePaymentOptions(options);
+        setChargeMethod(methodToGenerate);
       } catch {
         // Sem bloquear a UX caso o endpoint ainda não esteja disponível.
       }
@@ -842,6 +896,26 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     }
     setGeneratingCharge(false);
   };
+
+  const requestGenerateCharge = (method: "pix" | "boleto" | "hybrid") => {
+    setPendingChargeMethod(method);
+  };
+
+  const confirmGenerateCharge = async () => {
+    if (!pendingChargeMethod) return;
+    const method = pendingChargeMethod;
+    await onGenerateCharge(method);
+    setPendingChargeMethod(null);
+  };
+
+  const pendingChargeMethodLabel =
+    pendingChargeMethod === "pix"
+      ? "PIX"
+      : pendingChargeMethod === "hybrid"
+      ? "Boleto + PIX"
+      : pendingChargeMethod === "boleto"
+      ? "Boleto"
+      : "";
 
   const onCheckChargeStatus = async () => {
     if (!chargeInvoice) return;
@@ -945,6 +1019,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       CANCELED: "Cancelado",
       EXPIRED: "Expirado",
     };
+     
 
     return labels[normalized] ?? status ?? "—";
   };
@@ -959,9 +1034,10 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     );
   };
 
-  const normalizeChargeMethod = (method?: string | null): "pix" | "boleto" | null => {
+  const normalizeChargeMethod = (method?: string | null): "pix" | "boleto" | "hybrid" | null => {
     if (!method) return null;
     if (method === "pix") return "pix";
+    if (method === "hybrid") return "hybrid";
     if (method === "boleto" || method === "bank_slip") return "boleto";
     return null;
   };
@@ -1002,6 +1078,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const chargeMethodOptions = [
     { value: "pix", label: "Pix" },
     { value: "boleto", label: "Boleto" },
+    { value: "hybrid", label: "Boleto + PIX" },
   ];
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -1036,29 +1113,81 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       : "—";
 
   const chargeAssets = chargePaymentOptions?.payment_assets;
-  const pixCopyPaste = chargeAssets?.pix_copy_paste ?? chargeResult?.pix_copy_paste ?? null;
-  const pixQrCodeImageUrl = chargeAssets?.pix_qr_image_url ?? chargeResult?.qr_code_image_url ?? null;
-  const boletoDigitable = chargeAssets?.boleto_digitable ?? chargeResult?.boleto_digitable ?? null;
-  const boletoPaymentUrl = chargeAssets?.boleto_url ?? chargeResult?.payment_url ?? null;
+  // Trata "" como ausente para que o fallback para chargeResult dispare corretamente.
+  const pickAsset = (...values: (string | null | undefined)[]): string | null => {
+    for (const v of values) {
+      if (typeof v === "string" && v.trim() !== "") return v;
+    }
+    return null;
+  };
+  const pixCopyPaste = pickAsset(chargeAssets?.pix_copy_paste, chargeResult?.pix_copy_paste);
+  const resultChargeMethod = normalizeChargeMethod(chargeResult?.method);
+  const resultPaymentUrl = pickAsset(chargeResult?.payment_url);
+  const resultPaymentUrlIsPix = resultChargeMethod === "pix" || (!chargeResult?.boleto_digitable && !!chargeResult?.pix_copy_paste);
+  const resultQrCodeImageUrl = pickAsset(chargeResult?.qr_code_image_url);
+  const pixQrCodeImageUrl = pickAsset(
+    chargeAssets?.pix_qr_image_url,
+    resultQrCodeImageUrl && isImagePreviewUrl(resultQrCodeImageUrl) ? resultQrCodeImageUrl : null
+  );
+  const boletoDigitable = pickAsset(chargeAssets?.boleto_digitable, chargeResult?.boleto_digitable);
+  const boletoPaymentUrl = pickAsset(
+    chargeAssets?.boleto_url,
+    resultPaymentUrlIsPix ? null : resultPaymentUrl
+  );
   const lockedChargeMethod = normalizeChargeMethod(chargePaymentOptions?.method_lock?.method);
   const isChargeMethodLocked = !!chargePaymentOptions?.method_lock?.locked;
   const canGenerateChargeAction = chargePaymentOptions?.actions?.can_generate_charge ?? true;
-  const allowedChargeMethods = (chargePaymentOptions?.allowed_methods ?? ["pix", "boleto"])
+  const allowedChargeMethods = (chargePaymentOptions?.allowed_methods ?? [])
     .map((item) => normalizeChargeMethod(item))
-    .filter((item): item is "pix" | "boleto" => item === "pix" || item === "boleto");
-  const canUsePix = allowedChargeMethods.includes("pix") || !!pixCopyPaste || !!pixQrCodeImageUrl;
-  const canUseBoleto = allowedChargeMethods.includes("boleto") || !!boletoDigitable || !!boletoPaymentUrl;
+    .filter((item): item is "pix" | "boleto" | "hybrid" => item === "pix" || item === "boleto" || item === "hybrid");
+  const canUsePix = allowedChargeMethods.includes("pix");
+  const canUseBoleto = allowedChargeMethods.includes("boleto");
+  const canUseHybrid = allowedChargeMethods.includes("hybrid");
+  const canGenerateBoleto = canUseBoleto || canUseHybrid;
   const hasPixAssets = !!(pixCopyPaste || pixQrCodeImageUrl);
   const hasBoletoAssets = !!(boletoDigitable || boletoPaymentUrl);
   const hasDualPaymentAssets = hasPixAssets && hasBoletoAssets;
+  const selectedChargeMethod = normalizeChargeMethod(chargeMethod);
+  const resultDisplayMethod: "pix" | "boleto" | "hybrid" | null = (() => {
+    if (chargeModalStep === "result" && (chargeResult || chargePaymentOptions?.payment_assets)) {
+      if (hasDualPaymentAssets) return "hybrid";
+      if (hasPixAssets) return "pix";
+      if (hasBoletoAssets) return "boleto";
+    }
+    return resultChargeMethod ?? selectedChargeMethod;
+  })();
+  const showPixResult =
+    resultDisplayMethod === "pix" ||
+    resultDisplayMethod === "hybrid" ||
+    (!resultDisplayMethod && hasPixAssets);
+  const showBoletoResult =
+    resultDisplayMethod === "boleto" ||
+    resultDisplayMethod === "hybrid" ||
+    (!resultDisplayMethod && hasBoletoAssets);
   const activeChargeMethod: "pix" | "boleto" = (() => {
+    if (chargeModalStep === "result" && chargeResult) {
+      if (resultDisplayMethod === "pix") return "pix";
+      if (resultDisplayMethod === "boleto") return "boleto";
+      if (resultDisplayMethod === "hybrid") {
+        if (chargeMethod === "pix" && showPixResult && hasPixAssets) return "pix";
+        if (chargeMethod === "boleto" && showBoletoResult && hasBoletoAssets) return "boleto";
+        return showBoletoResult ? "boleto" : "pix";
+      }
+    }
+    // Quando o asset existe, o canal já pode ser usado para pagar — independente de allowed_methods.
     if (chargeMethod === "pix" && hasPixAssets) return "pix";
+    if (chargeMethod === "hybrid" && hasBoletoAssets) return "boleto";
     if (chargeMethod === "boleto" && hasBoletoAssets) return "boleto";
-    return hasBoletoAssets ? "boleto" : "pix";
+    if (hasDualPaymentAssets) return "boleto";
+    if (hasBoletoAssets) return "boleto";
+    if (hasPixAssets) return "pix";
+    // Sem assets ainda — respeita o que o backend permite gerar.
+    return canGenerateBoleto ? "boleto" : "pix";
   })();
   const checkoutQrSize = isMobile ? 176 : 148;
   const checkoutActionHeight = isMobile ? 48 : 42;
   const checkoutActionBasis = isMobile ? "100%" : 132;
+  const checkoutMethodCardsStacked = isMobile || width < 720;
 
   const renderInvoiceActions = (item: Invoice) => (
     <View className="flex-row justify-end gap-1">
@@ -1425,6 +1554,12 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
           <View style={{ flexDirection: isMobile ? "column" : "row", gap: 10 }}>
             {renderFinanceBlock("Mensalidade", money(enrollment.monthly_amount))}
             {renderFinanceBlock(
+              "Taxa de matrícula",
+              enrollment.course_plan?.enrollment_fee_amount
+                ? money(String(enrollment.course_plan.enrollment_fee_amount))
+                : "—"
+            )}
+            {renderFinanceBlock(
               "Desconto",
               enrollment.discount_amount && parseFloat(enrollment.discount_amount) > 0
                 ? money(enrollment.discount_amount)
@@ -1455,6 +1590,13 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
           <Text className="text-sm text-gray-500">
             {invoices.length} cobrança{invoices.length !== 1 ? "s" : ""}
           </Text>
+          {enrollment.charges_batch_generated && (
+            <View className="mt-1 self-start rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5">
+              <Text className="text-[11px] font-semibold text-emerald-700">
+                Lote gerado em {fmtDateTime(enrollment.charges_generated_at ?? null)}
+              </Text>
+            </View>
+          )}
         </View>
         <View
           style={{
@@ -1464,30 +1606,86 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
             flexWrap: "wrap",
           }}
         >
+          {enrollment.charges_batch_generated ? (
+            <View
+              className="flex-row items-center justify-center px-4 py-2 rounded-xl bg-gray-200"
+              style={{ opacity: 0.85 }}
+            >
+              <Ionicons name="lock-closed" size={14} color="#6B7280" />
+              <Text className="text-gray-600 font-semibold text-sm ml-1">
+                Lote já gerado
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={openBatchModal}
+              disabled={batchGenerating || invoices.length === 0}
+              className={`flex-row items-center justify-center px-4 py-2.5 rounded-xl border ${
+                batchGenerating || invoices.length === 0
+                  ? "bg-gray-100 border-gray-200"
+                  : "bg-emerald-50 border-emerald-200"
+              }`}
+              activeOpacity={0.85}
+              style={{ minHeight: 44 }}
+            >
+              {batchGenerating ? (
+                <ActivityIndicator size="small" color="#6B7280" />
+              ) : (
+                <Ionicons
+                  name="flash"
+                  size={16}
+                  color={batchGenerating || invoices.length === 0 ? "#9CA3AF" : "#059669"}
+                />
+              )}
+              <Text
+                className={`font-bold text-sm ml-1 ${
+                  batchGenerating || invoices.length === 0 ? "text-gray-500" : "text-emerald-700"
+                }`}
+              >
+                {batchGenerating ? "Gerando..." : "Gerar cobranças em lote"}
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             onPress={onSyncCoraCharges}
             disabled={syncingCoraCharges}
-            className={`flex-row items-center justify-center px-4 py-2 rounded-xl ${
-              syncingCoraCharges ? "bg-gray-300" : "bg-blue-600"
+            className={`flex-row items-center justify-center px-4 py-2.5 rounded-xl border ${
+              syncingCoraCharges ? "bg-gray-100 border-gray-200" : "bg-white border-violet-200"
             }`}
             activeOpacity={0.85}
+            style={{
+              minHeight: 44,
+              shadowColor: "#111827",
+              shadowOpacity: syncingCoraCharges ? 0 : 0.04,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 3 },
+              elevation: syncingCoraCharges ? 0 : 1,
+            }}
           >
             {syncingCoraCharges ? (
-              <ActivityIndicator size="small" color="white" />
+              <ActivityIndicator size="small" color="#6B7280" />
             ) : (
-              <Ionicons name="sync" size={16} color="white" />
+              <Ionicons name="sync" size={16} color="#7C3AED" />
             )}
-            <Text className="text-white font-semibold text-sm ml-1">
+            <Text className={`font-bold text-sm ml-1 ${syncingCoraCharges ? "text-gray-500" : "text-violet-700"}`}>
               {syncingCoraCharges ? "Sincronizando..." : "Sincronizar"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={openCreateInvoice}
-            className="flex-row items-center justify-center bg-violet-600 px-4 py-2 rounded-xl"
+            className="flex-row items-center justify-center bg-violet-600 px-4 py-2.5 rounded-xl"
             activeOpacity={0.85}
+            style={{
+              minHeight: 44,
+              shadowColor: "#6D28D9",
+              shadowOpacity: 0.2,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 2,
+            }}
           >
             <Ionicons name="add" size={16} color="white" />
-            <Text className="text-white font-semibold text-sm ml-1">Nova Cobrança</Text>
+            <Text className="text-white font-bold text-sm ml-1">Nova Cobrança</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1913,7 +2111,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
                   <Text className="text-xs text-gray-600">Carregando opções de pagamento...</Text>
                 </View>
               )}
-              {hasDualPaymentAssets && (
+              {resultDisplayMethod === "hybrid" && hasDualPaymentAssets && (
                 <View className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 mb-2">
                   <Text className="text-xs font-bold text-blue-700">Boleto + PIX disponíveis</Text>
                   <Text className="text-xs text-blue-700 mt-1">
@@ -1922,52 +2120,152 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
                 </View>
               )}
               <View
-                className="gap-2"
-                style={{ flexDirection: isMobile ? "column" : "row" }}
+                className="gap-3"
+                style={{ flexDirection: checkoutMethodCardsStacked ? "column" : "row" }}
               >
-                <TouchableOpacity
-                  onPress={() => {
-                    void onGenerateCharge("boleto");
-                  }}
-                  disabled={
+                {(() => {
+                  const baseDisabled =
                     generatingCharge ||
                     loadingChargeOptions ||
                     !chargeInvoice ||
                     !chargeProvider ||
-                    !canGenerateChargeForInvoice(chargeInvoice) ||
-                    !canGenerateChargeAction ||
-                    !canUseBoleto ||
-                    (isChargeMethodLocked && lockedChargeMethod !== "boleto")
-                  }
-                  activeOpacity={0.85}
-                  className={`flex-1 flex-row items-center rounded-2xl border px-4 py-4 ${
-                    canUseBoleto ? "border-gray-200 bg-white" : "border-gray-100 bg-gray-100"
-                  }`}
-                  style={{
-                    shadowColor: "#111827",
-                    shadowOpacity: 0.04,
-                    shadowRadius: 8,
-                    shadowOffset: { width: 0, height: 3 },
-                    elevation: 1,
-                  }}
-                >
-                  <View className="w-12 h-12 rounded-2xl items-center justify-center" style={{ backgroundColor: "#EEF2FF" }}>
-                    <Ionicons name="barcode-outline" size={24} color="#2563EB" />
-                  </View>
-                  <View className="ml-3 flex-1">
-                    <Text className="text-sm font-bold text-gray-900">Gerar cobrança (boleto + PIX)</Text>
-                    <Text className="text-xs text-gray-500" numberOfLines={1}>
-                      {hasBoletoAssets ? "Cobrança já disponível" : "Gera boleto e também canal PIX"}
-                    </Text>
-                  </View>
-                  {generatingCharge && chargeMethod === "boleto" ? (
-                    <ActivityIndicator size="small" color="#6B7280" />
-                  ) : (
-                    <View className="w-8 h-8 rounded-full bg-gray-50 items-center justify-center">
-                      <Ionicons name="chevron-forward-outline" size={18} color="#94A3B8" />
-                    </View>
-                  )}
-                </TouchableOpacity>
+                    (chargeInvoice ? !canGenerateChargeForInvoice(chargeInvoice) : true) ||
+                    !canGenerateChargeAction;
+
+                  const methods: Array<{
+                    key: "boleto" | "pix";
+                    generateMethod?: "boleto" | "hybrid";
+                    title: string;
+                    subtitle: string;
+                    actionLabel: string;
+                    icon: keyof typeof Ionicons.glyphMap;
+                    iconColor: string;
+                    iconBg: string;
+                    enabled: boolean;
+                    hasAssets: boolean;
+                  }> = [
+                    {
+                      key: "boleto",
+                      title: canUseHybrid ? "Boleto + PIX" : "Boleto",
+                      subtitle: hasBoletoAssets ? "Cobrança disponível" : "Boleto bancário com linha digitável",
+                      actionLabel: hasBoletoAssets ? "Usar boleto" : canUseHybrid ? "Gerar boleto + PIX" : "Gerar boleto",
+                      icon: "barcode-outline",
+                      iconColor: "#2563EB",
+                      iconBg: "#EEF2FF",
+                      enabled: canGenerateBoleto,
+                      hasAssets: hasBoletoAssets,
+                      generateMethod: canUseHybrid ? "hybrid" : "boleto",
+                    },
+                    {
+                      key: "pix",
+                      title: "PIX",
+                      subtitle: hasPixAssets ? "Cobrança disponível" : "QR Code e código copia e cola",
+                      actionLabel: hasPixAssets ? "Usar PIX" : "Gerar PIX",
+                      icon: "qr-code-outline",
+                      iconColor: "#0F766E",
+                      iconBg: "#ECFDF5",
+                      enabled: canUsePix,
+                      hasAssets: hasPixAssets,
+                    },
+                  ];
+
+                  return methods.map((m) => {
+                    const lockedOut =
+                      isChargeMethodLocked && lockedChargeMethod !== m.key;
+                    const disabled = baseDisabled || !m.enabled || lockedOut;
+                    return (
+                      <TouchableOpacity
+                        key={m.key}
+                        onPress={() => {
+                          requestGenerateCharge(m.generateMethod ?? m.key);
+                        }}
+                        disabled={disabled}
+                        activeOpacity={0.85}
+                        className={`rounded-2xl border px-4 py-4 ${
+                          disabled
+                            ? "border-gray-200 bg-gray-100 opacity-60"
+                            : "border-gray-200 bg-white"
+                        }`}
+                        style={{
+                          flexGrow: 1,
+                          flexBasis: checkoutMethodCardsStacked ? "100%" : 0,
+                          minHeight: checkoutMethodCardsStacked ? undefined : 164,
+                          minWidth: 0,
+                          shadowColor: "#111827",
+                          shadowOpacity: disabled ? 0 : 0.04,
+                          shadowRadius: 8,
+                          shadowOffset: { width: 0, height: 3 },
+                          elevation: disabled ? 0 : 1,
+                        }}
+                      >
+                        <View className="flex-row items-start justify-between gap-3">
+                          <View
+                            className="w-12 h-12 rounded-2xl items-center justify-center"
+                            style={{ backgroundColor: disabled ? "#F3F4F6" : m.iconBg }}
+                          >
+                            {m.key === "pix" ? (
+                              <PixLogoIcon
+                                size={25}
+                                color={disabled ? "#9CA3AF" : m.iconColor}
+                                weight="fill"
+                              />
+                            ) : (
+                              <Ionicons
+                                name={m.icon}
+                                size={24}
+                                color={disabled ? "#9CA3AF" : m.iconColor}
+                              />
+                            )}
+                          </View>
+                          {m.hasAssets && m.enabled && !lockedOut && (
+                            <View className="rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
+                              <Text className="text-[11px] font-bold text-emerald-700">Disponível</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View className="mt-3 flex-1">
+                          <Text
+                            className={`text-base font-bold ${
+                              disabled ? "text-gray-500" : "text-gray-900"
+                            }`}
+                            numberOfLines={1}
+                          >
+                            {m.title}
+                          </Text>
+                          <Text
+                            className={`text-xs mt-1 leading-4 ${disabled ? "text-gray-400" : "text-gray-500"}`}
+                            numberOfLines={2}
+                          >
+                            {!m.enabled
+                              ? "Método não habilitado para este tenant"
+                              : lockedOut
+                              ? "Método bloqueado para esta cobrança"
+                              : m.subtitle}
+                          </Text>
+                        </View>
+                        <View className="mt-4 flex-row items-center justify-between gap-2">
+                          <Text
+                            className={`text-xs font-bold ${
+                              disabled ? "text-gray-400" : "text-violet-700"
+                            }`}
+                            numberOfLines={1}
+                          >
+                            {m.actionLabel}
+                          </Text>
+                          {generatingCharge && chargeMethod === m.key ? (
+                            <ActivityIndicator size="small" color="#6B7280" />
+                          ) : (
+                            <Ionicons
+                              name="chevron-forward-outline"
+                              size={18}
+                              color={disabled ? "#CBD5E1" : "#94A3B8"}
+                            />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  });
+                })()}
               </View>
             </View>
           </>
@@ -1975,53 +2273,53 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
 
         {chargeModalStep === "result" && (!!chargeResult || hasPixAssets || hasBoletoAssets) && (
           <View className="gap-2.5">
-            {hasDualPaymentAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
-              <View className="rounded-2xl border border-slate-200 bg-slate-50 p-1 flex-row gap-1">
-                <TouchableOpacity
-                  onPress={() => setChargeMethod("boleto")}
-                  activeOpacity={0.85}
-                  className={`flex-1 rounded-xl py-2.5 flex-row items-center justify-center gap-2 ${
-                    activeChargeMethod === "boleto" ? "bg-violet-600" : "bg-white"
-                  }`}
-                  style={activeChargeMethod === "boleto" ? { shadowColor: "#4F46E5", shadowOpacity: 0.16, shadowRadius: 8, elevation: 1 } : undefined}
-                >
-                  <Ionicons
-                    name="barcode-outline"
-                    size={16}
-                    color={activeChargeMethod === "boleto" ? "white" : "#64748B"}
-                  />
-                  <Text className={`text-xs font-bold ${activeChargeMethod === "boleto" ? "text-white" : "text-slate-600"}`}>
-                    Boleto
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setChargeMethod("pix")}
-                  activeOpacity={0.85}
-                  className={`flex-1 rounded-xl py-2.5 flex-row items-center justify-center gap-2 ${
-                    activeChargeMethod === "pix" ? "bg-violet-600" : "bg-white"
-                  }`}
-                  style={activeChargeMethod === "pix" ? { shadowColor: "#4F46E5", shadowOpacity: 0.16, shadowRadius: 8, elevation: 1 } : undefined}
-                >
-                  <PixLogoIcon
-                    size={17}
-                    color={activeChargeMethod === "pix" ? "white" : "#64748B"}
-                    weight="fill"
-                  />
-                  <Text className={`text-xs font-bold ${activeChargeMethod === "pix" ? "text-white" : "text-slate-600"}`}>
-                    PIX
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            {(() => {
+              // No checkout, basta o asset existir para oferecer a aba — o tenant já permitiu gerar.
+              const resultTabs = [
+                showBoletoResult && hasBoletoAssets ? "boleto" : null,
+                showPixResult && hasPixAssets ? "pix" : null,
+              ].filter((item): item is "pix" | "boleto" => !!item);
+              const showToggle =
+                resultTabs.length > 1 &&
+                chargeStatusResult?.status?.toUpperCase() !== "PAID";
+              if (!showToggle) return null;
+              return (
+                <View className="rounded-2xl border border-slate-200 bg-slate-50 p-1 flex-row gap-1">
+                  {resultTabs.map((tab) => (
+                    <TouchableOpacity
+                      key={tab}
+                      onPress={() => setChargeMethod(tab)}
+                      activeOpacity={0.85}
+                      className={`flex-1 rounded-xl py-2.5 flex-row items-center justify-center gap-1.5 ${
+                        activeChargeMethod === tab ? "bg-violet-600" : "bg-white"
+                      }`}
+                      style={activeChargeMethod === tab ? { shadowColor: "#4F46E5", shadowOpacity: 0.16, shadowRadius: 8, elevation: 1 } : undefined}
+                    >
+                      {tab === "pix" ? (
+                        <PixLogoIcon
+                          size={17}
+                          color={activeChargeMethod === tab ? "white" : "#64748B"}
+                          weight="fill"
+                        />
+                      ) : (
+                        <Ionicons
+                          name="barcode-outline"
+                          size={16}
+                          color={activeChargeMethod === tab ? "white" : "#64748B"}
+                        />
+                      )}
+                      <Text className={`text-xs font-bold ${activeChargeMethod === tab ? "text-white" : "text-slate-600"}`}>
+                        {tab === "boleto" ? "Boleto" : "PIX"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              );
+            })()}
 
-            <Animated.View
-              style={{
-                opacity: chargeTabOpacity,
-                transform: [{ translateY: chargeTabTranslateY }],
-              }}
-            >
+            <View>
               {/* ── PIX ── */}
-              {activeChargeMethod === "pix" && hasPixAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+              {activeChargeMethod === "pix" && showPixResult && hasPixAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
                 <View
                   className="rounded-2xl border border-gray-200 bg-white p-3"
                   style={{
@@ -2088,7 +2386,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
               )}
 
               {/* ── BOLETO ── */}
-              {activeChargeMethod === "boleto" && hasBoletoAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+              {activeChargeMethod === "boleto" && showBoletoResult && hasBoletoAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
                 <View className="gap-2.5">
                   {!!boletoDigitable && (
                     <View className="bg-slate-50 rounded-2xl border border-slate-200 px-3 py-2.5 flex-row items-center gap-3">
@@ -2121,7 +2419,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
                   )}
                 </View>
               )}
-            </Animated.View>
+            </View>
           </View>
         )}
         {!!chargeActionError && !shouldHideMethodLockedNotice(chargeActionError) && (
@@ -2315,6 +2613,23 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       </Modal>
 
       {/* ── Confirm Modals ───────────────────────────────────────────────────── */}
+      <ConfirmModal
+        visible={!!pendingChargeMethod}
+        title="Confirmar forma de pagamento"
+        message={
+          chargeInvoice
+            ? `Gerar cobrança de ${money(chargeInvoice.amount)} via ${pendingChargeMethodLabel}? Após gerar, o método desta cobrança ficará bloqueado.`
+            : `Gerar cobrança via ${pendingChargeMethodLabel}?`
+        }
+        onConfirm={confirmGenerateCharge}
+        onCancel={() => {
+          if (!generatingCharge) setPendingChargeMethod(null);
+        }}
+        loading={generatingCharge}
+        confirmLabel="Confirmar"
+        iconName={pendingChargeMethod === "pix" ? "qr-code-outline" : pendingChargeMethod === "hybrid" ? "layers-outline" : "barcode-outline"}
+        tone="primary"
+      />
       <ConfirmModal
         visible={!!cancelInvoiceId}
         title="Cancelar Cobrança"
@@ -2513,6 +2828,91 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
             </View>
           </ScrollView>
         )}
+      </Modal>
+
+      {/* ── Batch Charges Modal ───────────────────────────────────────────────── */}
+      <Modal
+        visible={batchModalVisible}
+        title="Gerar cobranças locais em lote"
+        onClose={() => (batchGenerating ? undefined : setBatchModalVisible(false))}
+        size="md"
+        footer={
+          <>
+            <TouchableOpacity
+              onPress={() => setBatchModalVisible(false)}
+              disabled={batchGenerating}
+              className="px-5 py-2.5 rounded-xl border border-gray-200"
+            >
+              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+            {!batchResult && (
+              <TouchableOpacity
+                onPress={onGenerateBatchCharges}
+                disabled={batchGenerating}
+                className={`px-5 py-2.5 rounded-xl ${batchGenerating ? "bg-emerald-300" : "bg-emerald-600"}`}
+              >
+                {batchGenerating ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text className="text-sm font-bold text-white">Gerar agora</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
+        }
+      >
+        <View className="gap-3">
+          <View className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <Text className="text-xs font-bold text-amber-800">
+              Ação única por matrícula
+            </Text>
+            <Text className="text-xs text-amber-700 mt-1">
+              Após gerar em lote, esta ação ficará bloqueada para esta matrícula.
+              Cobranças avulsas individuais continuarão disponíveis nas invoices.
+            </Text>
+          </View>
+
+          <View className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+            <Text className="text-xs font-bold text-slate-700">Padrão do lote</Text>
+            <Text className="text-xs text-slate-600 mt-1">
+              O painel gera apenas invoices locais em lote. A taxa de matrícula é obrigatória na matrícula e as mensalidades são opcionais.
+            </Text>
+          </View>
+
+          {!!batchError && (
+            <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
+              <Text className="text-sm font-bold text-red-700">Erro</Text>
+              <Text className="text-xs text-red-700 mt-1">{batchError}</Text>
+            </View>
+          )}
+
+          {!!batchResult && (
+            <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+              <Text className="text-sm font-bold text-emerald-700">
+                Resultado
+              </Text>
+              <Text className="text-xs text-emerald-700 mt-1">
+                Status: {batchResult.status ?? "—"}
+              </Text>
+              <Text className="text-xs text-emerald-700">
+                Geradas: {batchResult.generated_count} · Falhas:{" "}
+                {batchResult.failed_count}
+              </Text>
+              {!!batchResult.failed && batchResult.failed.length > 0 && (
+                <View className="mt-2 gap-1">
+                  <Text className="text-[11px] font-bold text-red-700">
+                    Invoices com falha:
+                  </Text>
+                  {batchResult.failed.map((f: any, i: number) => (
+                    <Text key={i} className="text-[11px] text-red-700">
+                      • Invoice #{f.invoice_id ?? "?"} — {f.error ?? f.message ?? "erro"}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+        </View>
       </Modal>
     </View>
   );

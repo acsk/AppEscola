@@ -36,6 +36,7 @@ export interface CobrancasResponse {
   referencia: Referencia;
   pagas: Cobranca[];
   atrasados: Cobranca[];
+  abertas: Cobranca[];
   atual: Cobranca | null;
   resumo: Resumo;
 }
@@ -123,7 +124,12 @@ export async function getCobrancasApi(): Promise<CobrancasResponse> {
   if (data.type === 'error') {
     throw new Error(data.message);
   }
-  return data.body!;
+
+  const body = data.body!;
+  return {
+    ...body,
+    abertas: body.abertas ?? (body.atual ? [body.atual] : []),
+  };
 }
 
 export async function getPaymentOptionsApi(invoiceId: number): Promise<PaymentOptionsResponse> {

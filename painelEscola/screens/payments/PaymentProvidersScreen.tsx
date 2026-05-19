@@ -56,7 +56,7 @@ type EnvironmentDraft = {
 const PAYMENT_METHOD_OPTIONS = [
   { value: "pix", label: "Pix" },
   { value: "boleto", label: "Boleto" },
-  { value: "credit_card", label: "Cartao de credito" },
+  { value: "", label: "Cartao de credito" },
   { value: "debit_card", label: "Cartao de debito" },
   { value: "bank_transfer", label: "Transferencia" },
 ];

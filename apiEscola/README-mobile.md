@@ -158,9 +158,10 @@ GET /api/aluno/boletos
 Authorization: Bearer {token}
 ```
 
-Retorna as cobrancas do aluno em tres grupos:
+Retorna as cobrancas do aluno em grupos:
 - `pagas`: cobrancas com status `paid`
 - `atrasados`: cobrancas em aberto com vencimento anterior a hoje
+- `abertas`: cobrancas em aberto com vencimento maior ou igual a hoje
 - `atual`: apenas uma cobranca em aberto do mes atual (mais proxima de hoje)
 
 **Resposta `200`:**

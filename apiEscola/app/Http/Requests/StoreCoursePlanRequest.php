@@ -19,6 +19,7 @@ class StoreCoursePlanRequest extends FormRequest
             'name'          => ['required', 'string', 'max:255'],
             'billing_cycle' => ['required', Rule::in(array_keys(CoursePlan::CYCLE_MONTHS))],
             'price'         => ['required', 'numeric', 'min:0.01'],
+            'enrollment_fee_amount' => ['nullable', 'numeric', 'min:0'],
             'status'        => ['nullable', Rule::in(['active', 'inactive'])],
         ];
     }

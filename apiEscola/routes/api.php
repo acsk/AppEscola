@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\SupportMaterialController;
 use App\Http\Controllers\Api\StudentDashboardController;
 use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\TenantApiTokenController;
+use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
@@ -103,6 +104,13 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('tenants/{tenant}/cora-settings/upload', [TenantCoraSettingsController::class, 'upload']);
     Route::post('tenants/{tenant}/cora-settings/token', [TenantCoraSettingsController::class, 'token']);
 
+    // Configurações de cobrança por tenant (escopos: billing, payment, enrollment)
+    Route::get('tenant-billing-settings/schema',          [TenantBillingSettingsController::class, 'schema']);
+    Route::get('tenant-billing-settings',                 [TenantBillingSettingsController::class, 'index']);
+    Route::get('tenant-billing-settings/{scope}',         [TenantBillingSettingsController::class, 'show']);
+    Route::put('tenant-billing-settings/{scope}',         [TenantBillingSettingsController::class, 'update']);
+    Route::post('tenant-billing-settings/{scope}/reset',  [TenantBillingSettingsController::class, 'reset']);
+
     // Administração de usuários (super_admin e admin)
     Route::apiResource('users', UserManagementController::class);
 
@@ -160,6 +168,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('enrollments/subscribe',        [EnrollmentController::class, 'subscribe']);
     Route::post('enrollments/subscribe-bundle', [EnrollmentController::class, 'subscribeBundle']);
     Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
+    Route::post('enrollments/{enrollment}/generate-charges',  [EnrollmentController::class, 'generateCharges']);
     Route::apiResource('enrollments', EnrollmentController::class);
 
     // Provedores de gateway (catálogo técnico para tela de configuração)

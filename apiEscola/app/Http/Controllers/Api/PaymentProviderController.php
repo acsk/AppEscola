@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\TenantCoraCredential;
 use App\Services\PaymentGatewayFactory;
 use App\Services\CoraTokenService;
+use App\Services\TenantBillingSettingsService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
@@ -114,8 +115,8 @@ class PaymentProviderController extends Controller
         private function resolveCapabilitiesBySlug(string $slug): array
         {
             return match ($slug) {
-                'cora' => ['pix', 'boleto', 'webhook', 'mtls_cert_upload'],
-                default => ['pix', 'boleto'],
+                'cora' => ['pix', 'boleto', 'hybrid', 'webhook', 'mtls_cert_upload'],
+                default => ['pix', 'boleto', 'hybrid'],
             };
         }
 
@@ -326,6 +327,18 @@ class PaymentProviderController extends Controller
     public function paymentOptions(Request $request, Invoice $invoice): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
+        $paymentSettings = $this->paymentScope($invoice->tenant_id);
+        $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
+        $enabledMethods = is_array($rawEnabledMethods)
+            ? array_values(array_unique(array_map(static function (string $method): string {
+                $normalized = strtolower(trim($method));
+
+                return $normalized === 'bank_slip' ? 'boleto' : $normalized;
+            }, $rawEnabledMethods)))
+            : ['pix', 'boleto', 'hybrid'];
+
+        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+
         $lockedSyncedMethod  = $this->resolveLockedMethodForSyncedInvoice($invoice);
         $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
 
@@ -342,16 +355,35 @@ class PaymentProviderController extends Controller
             ?? data_get($invoice->cora_payload, 'qr_code_image_url');
 
         $currentMethod = match (true) {
-            $invoice->payment_method === 'bank_slip' => 'boleto',
-            in_array($invoice->payment_method, ['pix', 'boleto'], true) => $invoice->payment_method,
-            $lockedMethod === 'bank_slip' => 'boleto',
-            in_array($lockedMethod, ['pix', 'boleto'], true) => $lockedMethod,
+            $invoice->payment_method === 'hybrid' => 'hybrid',
+            in_array($invoice->payment_method, ['bank_slip', 'boleto'], true) => 'boleto',
+            $invoice->payment_method === 'pix' => 'pix',
+            $lockedMethod === 'hybrid' => 'hybrid',
+            in_array($lockedMethod, ['bank_slip', 'boleto'], true) => 'boleto',
+            $lockedMethod === 'pix' => 'pix',
             default => null,
         };
 
-        $allowedMethods = $lockedMethod === 'bank_slip'
-            ? ['boleto']
-            : ($lockedMethod === 'pix' ? ['pix'] : ['pix', 'boleto']);
+        $allowedMethods = match (true) {
+            $lockedMethod === 'hybrid' => ['hybrid'],
+            in_array($lockedMethod, ['bank_slip', 'boleto'], true) => ['boleto'],
+            $lockedMethod === 'pix' => ['pix'],
+            default => $enabledMethods,
+        };
+
+        if (! empty($allowedMethods)) {
+            $allowedMethods = array_values(array_intersect($allowedMethods, $enabledMethods));
+        }
+
+        $configuredDefaultMethod = strtolower((string) ($paymentSettings['default_method'] ?? ''));
+        $configuredDefaultMethod = $configuredDefaultMethod === 'bank_slip' ? 'boleto' : $configuredDefaultMethod;
+        $configuredDefaultMethod = in_array($configuredDefaultMethod, ['pix', 'boleto', 'hybrid'], true)
+            ? $configuredDefaultMethod
+            : null;
+
+        if ($currentMethod === null && $configuredDefaultMethod !== null && in_array($configuredDefaultMethod, $allowedMethods, true)) {
+            $currentMethod = $configuredDefaultMethod;
+        }
 
         return $this->success([
             'invoice' => [
@@ -364,6 +396,7 @@ class PaymentProviderController extends Controller
             ],
             'allowed_methods' => $allowedMethods,
             'current_method'  => $currentMethod,
+            'default_method'  => $configuredDefaultMethod,
             'actions' => [
                 'can_generate_charge'  => ! in_array($invoice->status, ['paid', 'cancelled'], true),
                 'can_change_method'    => $lockedMethod === null,
@@ -395,9 +428,41 @@ class PaymentProviderController extends Controller
 
         $data = $request->validate([
             'provider' => ['required', 'string', 'in:cora'],
-            'method' => ['nullable', 'string', 'in:pix,boleto,bank_slip'],
+            'method' => ['nullable', 'string', 'in:pix,boleto,hybrid,bank_slip'],
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
         ]);
+
+        // Aplica configurações de pagamento do tenant (métodos habilitados / método default)
+        $paymentSettings = $this->paymentScope($invoice->tenant_id);
+        $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
+        $enabledMethods = is_array($rawEnabledMethods)
+            ? array_values(array_unique(array_map(static function (string $method): string {
+                $normalized = strtolower(trim($method));
+
+                return $normalized === 'bank_slip' ? 'boleto' : $normalized;
+            }, $rawEnabledMethods)))
+            : ['pix', 'boleto', 'hybrid'];
+        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+
+        $requestedMethodInput = strtolower((string) ($data['method'] ?? ''));
+        if ($requestedMethodInput === '') {
+            $requestedMethodInput = strtolower((string) ($paymentSettings['default_method'] ?? ''));
+            if ($requestedMethodInput !== '') {
+                $data['method'] = $requestedMethodInput;
+            }
+        }
+
+        $normalizedMethodForCheck = $requestedMethodInput === 'bank_slip' ? 'boleto' : $requestedMethodInput;
+        if ($normalizedMethodForCheck !== '' && ! in_array($normalizedMethodForCheck, $enabledMethods, true)) {
+            return $this->error(
+                'Método de pagamento não habilitado para este tenant.',
+                [
+                    'requested_method' => $normalizedMethodForCheck,
+                    'enabled_methods'  => $enabledMethods,
+                ],
+                422
+            );
+        }
 
         $requestedEnv = $data['environment'] ?? 'stage';
         $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
@@ -416,12 +481,21 @@ class PaymentProviderController extends Controller
         }
 
         $requestedMethodRaw = strtolower((string) ($data['method'] ?? ''));
-        $requestedMethod = in_array($requestedMethodRaw, ['pix', 'boleto', 'bank_slip'], true)
+        $requestedMethod = in_array($requestedMethodRaw, ['pix', 'boleto', 'bank_slip', 'hybrid'], true)
             ? $requestedMethodRaw
             : '';
         $requestedStoredMethod = $requestedMethod !== ''
-            ? (in_array($requestedMethod, ['boleto', 'bank_slip'], true) ? 'bank_slip' : 'pix')
+            ? match ($requestedMethod) {
+                'boleto', 'bank_slip', 'hybrid' => 'bank_slip',
+                default => 'pix',
+            }
             : null;
+        $requestedCoraMethod = match ($requestedMethod) {
+            'boleto', 'bank_slip' => 'boleto',
+            'hybrid' => 'hybrid',
+            'pix' => 'pix',
+            default => null,
+        };
         $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
         $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
 
@@ -546,7 +620,10 @@ class PaymentProviderController extends Controller
         }
 
         $storedMethod = $lockedSyncedMethod ?? $requestedStoredMethod ?? $existingStoredMethod ?? 'pix';
-        $coraMethod = $storedMethod === 'bank_slip' ? 'boleto' : 'pix';
+        $coraMethod = $requestedCoraMethod ?? match ($storedMethod) {
+            'bank_slip' => 'boleto',
+            default => 'pix',
+        };
 
         try {
             $result = $factory->resolve('cora')->createCharge($invoice, $environment, $coraMethod);
@@ -653,7 +730,7 @@ class PaymentProviderController extends Controller
             'invoice_id' => $invoice->id,
             'provider' => 'cora',
             'environment' => $environment,
-            'method' => $storedMethod,
+            'method' => $requestedMethod === 'hybrid' ? 'hybrid' : $storedMethod,
             'charge_id' => $invoice->fresh()->cora_charge_id,
             'status' => $invoice->fresh()->cora_status,
             'payment_url' => $invoice->fresh()->cora_payment_url,
@@ -799,6 +876,10 @@ class PaymentProviderController extends Controller
         $originalMethod = strtolower(trim((string) data_get($payload, 'integration.original_method')));
 
         if ($origin === 'cora_sync' && $methodLocked) {
+            if ($originalMethod === 'hybrid') {
+                return 'bank_slip';
+            }
+
             if (in_array($originalMethod, ['pix', 'bank_slip'], true)) {
                 return $originalMethod;
             }
@@ -1114,5 +1195,26 @@ class PaymentProviderController extends Controller
             'status' => $invoice->fresh()->cora_status,
             'paid_at' => $invoice->fresh()->paid_at?->toISOString(),
         ], 'Cobrança paga com sucesso.');
+    }
+
+    /**
+     * Retorna o escopo "payment" das configurações do tenant (com defaults aplicados).
+     *
+     * @return array<string,mixed>
+     */
+    private function paymentScope(int $tenantId): array
+    {
+        static $cache = [];
+
+        if (isset($cache[$tenantId])) {
+            return $cache[$tenantId];
+        }
+
+        $tenant = Tenant::find($tenantId);
+        if (! $tenant) {
+            return $cache[$tenantId] = [];
+        }
+
+        return $cache[$tenantId] = app(TenantBillingSettingsService::class)->scope($tenant, 'payment');
     }
 }

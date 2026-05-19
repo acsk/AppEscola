@@ -95,5 +95,8 @@ class DatabaseSeeder extends Seeder
 
         // Alunos adicionais matriculados na turma 1 (id 5)
         $this->call(TurmaUmStudentsSeeder::class);
+
+        // Configurações de cobrança por tenant (preset hybrid por padrão)
+        $this->call(TenantBillingSettingsSeeder::class);
     }
 }

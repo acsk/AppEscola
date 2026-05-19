@@ -275,7 +275,9 @@ export default function InvoicesScreen() {
 
   const openChargeModal = (invoice: Invoice) => {
     const normalizedMethod =
-      invoice.payment_method === "bank_slip" || invoice.payment_method === "boleto"
+      invoice.payment_method === "hybrid"
+        ? "hybrid"
+      : invoice.payment_method === "bank_slip" || invoice.payment_method === "boleto"
         ? "boleto"
         : "pix";
 
@@ -427,6 +429,7 @@ export default function InvoicesScreen() {
   const chargeMethodOptions = [
     { value: "pix", label: "Pix" },
     { value: "boleto", label: "Boleto" },
+    { value: "hybrid", label: "Boleto + PIX" },
   ];
   const allStatusOptions = [{ value: "", label: "Todos" }, ...statusOptions];
   const fmt = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";

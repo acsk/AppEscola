@@ -19,6 +19,7 @@ import {
 import { displayToISO, isoToDisplay } from "../../utils/masks";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import { useBillingSettings } from "../../hooks/useBillingSettings";
 
 const WEEKDAY_SHORT: Record<string, string> = {
   monday: "Seg",
@@ -41,20 +42,27 @@ const classScheduleLabel = (sc: SchoolClass): string => {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Student = { id: number; name: string; enrollment_number?: string };
+type Student = {
+  id: number;
+  name: string;
+  enrollment_number?: string;
+  document?: string | null;
+  birth_date?: string | null;
+};
 type SchoolClass = {
   id: number;
   name: string;
   course?: { id: number; name: string };
   schedules?: { id: number; weekday: string; start_time: string; end_time: string }[];
 };
-type Course = { id: number; name: string };
+type Course = { id: number; name: string; enrollment_fee_amount?: string | number };
 type CoursePlan = {
   id: number;
   name: string;
   billing_cycle: string;
   cycle_label: string;
   price: string;
+  enrollment_fee_amount?: string | number;
   monthly_equivalent: string;
 };
 type Bundle = {
@@ -66,7 +74,7 @@ type Bundle = {
   monthly_equivalent: string;
   courses: { id: number; name: string }[];
 };
-type Guardian = { id: number; name: string };
+type Guardian = { id: number; name: string; document?: string | null };
 
 type InvoiceResult = {
   id: number;
@@ -105,6 +113,21 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
   const { contentPadding } = useResponsiveLayout();
   const scrollRef = useRef<ScrollView>(null);
 
+  // ── Billing/Enrollment rules (source of truth: backend) ────────────────────
+  const {
+    billing: billingRules,
+    enrollment: enrollmentRules,
+  } = useBillingSettings();
+
+  const chargesEnrollmentFee = billingRules.charges_enrollment_fee !== false; // default true
+  const enrollmentFeeCoversFirstMonth = billingRules.enrollment_fee_covers_first_month === true;
+  const allowMonthliesBeforeFeePaid = billingRules.allow_monthlies_before_fee_paid !== false;
+  const defaultPaymentDueDay = Number.isFinite(Number(billingRules.default_payment_due_day))
+    ? Number(billingRules.default_payment_due_day)
+    : null;
+  const requireCpfToEnroll = enrollmentRules.require_cpf_to_enroll === true;
+  const requireGuardianForMinors = enrollmentRules.require_guardian_for_minors === true;
+
   // ── Mode ────────────────────────────────────────────────────────────────────
   const [mode, setMode] = useState<"plan" | "bundle">("plan");
 
@@ -124,6 +147,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
 
   // ── Form fields ─────────────────────────────────────────────────────────────
   const [studentId, setStudentId] = useState("");
+  const [studentDetail, setStudentDetail] = useState<Student | null>(null);
   const [guardianId, setGuardianId] = useState("");
 
   // Plan mode
@@ -141,7 +165,8 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
   const [endDate, setEndDate] = useState("");
   const [overrideDates, setOverrideDates] = useState(false);
   const [discount, setDiscount] = useState("0");
-  const [dueDay, setDueDay] = useState("10");
+  const [dueDay, setDueDay] = useState("");
+  const [dueDayTouched, setDueDayTouched] = useState(false);
 
   // Payment toggle
   const [payNow, setPayNow] = useState(false);
@@ -151,6 +176,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
 
   // ── State ────────────────────────────────────────────────────────────────────
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [businessError, setBusinessError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<null | {
     enrollmentNumbers: string[];
@@ -177,19 +203,39 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
 
   // Load guardians when student changes
   useEffect(() => {
-    if (!studentId) { setGuardians([]); setGuardianId(""); return; }
+    if (!studentId) {
+      setGuardians([]);
+      setGuardianId("");
+      setStudentDetail(null);
+      return;
+    }
     (async () => {
       try {
         const { data } = await api.get(`/students/${studentId}`);
         const g = (data.guardians ?? []).map((r: any) => ({
           id: r.guardian.id,
           name: r.guardian.name,
+          document: r.guardian.document ?? null,
         }));
         setGuardians(g);
         setGuardianId(g.length > 0 ? String(g[0].id) : "");
+        setStudentDetail({
+          id: data.id,
+          name: data.name,
+          enrollment_number: data.enrollment_number,
+          document: data.document ?? null,
+          birth_date: data.birth_date ?? null,
+        });
       } catch {}
     })();
   }, [studentId]);
+
+  // Pré-preencher vencimento com o default do tenant (regra do backend)
+  useEffect(() => {
+    if (dueDayTouched) return;
+    if (defaultPaymentDueDay == null) return;
+    setDueDay(String(defaultPaymentDueDay));
+  }, [defaultPaymentDueDay, dueDayTouched]);
 
   // Load plans when course changes
   useEffect(() => {
@@ -237,6 +283,25 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
   const classesForCourse = (cId: number) =>
     classes.filter((cl) => cl.course?.id === cId);
 
+  // ── Derived: idade / menor ───────────────────────────────────────────────────
+  const isMinor = (() => {
+    const bd = studentDetail?.birth_date;
+    if (!bd) return false;
+    const d = new Date(bd + "T00:00:00");
+    if (Number.isNaN(d.getTime())) return false;
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return age < 18;
+  })();
+
+  const onlyDigits = (s: string) => s.replace(/\D+/g, "");
+  const hasCpfStudent = !!studentDetail?.document && onlyDigits(studentDetail.document).length >= 11;
+  const selectedGuardian = guardians.find((g) => String(g.id) === guardianId);
+  const hasCpfGuardian = !!selectedGuardian?.document && onlyDigits(selectedGuardian.document).length >= 11;
+  const hasPayerCpf = guardianId ? hasCpfGuardian : hasCpfStudent;
+
   // ── Monthly equivalent preview ───────────────────────────────────────────────
   const baseEquivalent = () => {
     if (mode === "plan" && selectedPlan)
@@ -272,6 +337,17 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
       }
     }
 
+    // Regras vindas do backend
+    if (requireGuardianForMinors && isMinor && !guardianId) {
+      e.guardian_id =
+        "Aluno menor de idade: selecione um responsável financeiro.";
+    }
+    if (requireCpfToEnroll && studentId && !hasPayerCpf) {
+      e.cpf = guardianId
+        ? "CPF do responsável financeiro é obrigatório para concluir a matrícula."
+        : "CPF do aluno (pagador) é obrigatório para concluir a matrícula.";
+    }
+
     if (payNow && !payMethod) e.payment_method = "Selecione o método de pagamento.";
     return e;
   };
@@ -287,6 +363,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
 
     setSaving(true);
     setErrors({});
+    setBusinessError(null);
 
     try {
       const enrollmentPayment = payNow
@@ -341,10 +418,30 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
         });
       }
     } catch (e: any) {
-      if (e.response?.status === 422) {
-        setErrors(parseApiErrors(e.response.data.errors ?? {}));
-        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      const status = e.response?.status;
+      const data = e.response?.data;
+      if (status === 422) {
+        const fieldErrors = data?.errors ?? {};
+        if (Object.keys(fieldErrors).length > 0) {
+          setErrors(parseApiErrors(fieldErrors));
+        }
+        // Mensagem de regra de negócio (ex.: bloqueio por taxa pendente
+        // quando allow_monthlies_before_fee_paid = false).
+        if (data?.message) {
+          setBusinessError(data.message);
+        }
+      } else if (status === 403) {
+        setBusinessError(
+          data?.message || "Sem permissão para realizar esta matrícula."
+        );
+      } else if (status === 404) {
+        setBusinessError(data?.message || "Recurso não encontrado.");
+      } else {
+        setBusinessError(
+          data?.message || "Falha ao realizar matrícula. Tente novamente."
+        );
       }
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
     }
 
     setSaving(false);
@@ -448,8 +545,12 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
               setResult(null);
               setStudentId(""); setCourseId(""); setPlanId(""); setClassId("");
               setBundleId(""); setBundleClassMap({}); setGuardianId("");
-              setDiscount("0"); setDueDay("10"); setPayNow(false);
+              setDiscount("0");
+              setDueDay(defaultPaymentDueDay != null ? String(defaultPaymentDueDay) : "");
+              setDueDayTouched(false);
+              setPayNow(false);
               setStartDate(""); setEndDate(""); setOverrideDates(false); setPayNotes("");
+              setBusinessError(null);
             }}
             className="flex-row items-center gap-2 px-6 py-3 rounded-xl border border-violet-200 bg-violet-50"
             activeOpacity={0.8}
@@ -501,6 +602,16 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
           Matrícula por plano individual ou pacote de cursos
         </Text>
       </View>
+
+      {businessError && (
+        <View className="flex-row items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+          <Ionicons name="alert-circle" size={18} color="#DC2626" />
+          <Text className="flex-1 text-sm text-red-700">{businessError}</Text>
+          <TouchableOpacity onPress={() => setBusinessError(null)} activeOpacity={0.7}>
+            <Ionicons name="close" size={16} color="#DC2626" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* ── Mode selector ── */}
       <View className="flex-row gap-3 mb-5">
@@ -587,7 +698,36 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
                 </option>
               ))}
             </select>
+            {errors.guardian_id && (
+              <Text className="text-xs text-red-500 mt-1">{errors.guardian_id}</Text>
+            )}
           </View>
+        )}
+
+        {/* Aviso: menor de idade exige responsável (regra do backend) */}
+        {studentId && requireGuardianForMinors && isMinor && !guardianId && (
+          <View className="flex-row items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+            <Ionicons name="warning-outline" size={14} color="#B45309" />
+            <Text className="flex-1 text-xs text-amber-700">
+              Aluno menor de idade. Selecione um <Text className="font-bold">responsável financeiro</Text> para concluir a matrícula.
+            </Text>
+          </View>
+        )}
+
+        {/* Aviso: CPF obrigatório (regra do backend) */}
+        {studentId && requireCpfToEnroll && !hasPayerCpf && (
+          <View className="flex-row items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+            <Ionicons name="warning-outline" size={14} color="#B45309" />
+            <Text className="flex-1 text-xs text-amber-700">
+              {guardianId
+                ? "CPF do responsável financeiro é obrigatório para concluir a matrícula. Atualize o cadastro do responsável."
+                : "CPF do aluno (pagador) é obrigatório para concluir a matrícula. Atualize o cadastro do aluno ou vincule um responsável financeiro."}
+            </Text>
+          </View>
+        )}
+
+        {errors.cpf && (
+          <Text className="text-xs text-red-500 mb-2">{errors.cpf}</Text>
         )}
 
         {/* ── PLAN mode fields ── */}
@@ -666,12 +806,24 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
             </View>
 
             {selectedPlan && (
-              <View className="flex-row items-center gap-2 bg-violet-50 rounded-lg px-3 py-2 mb-3">
-                <Ionicons name="information-circle-outline" size={14} color="#7C3AED" />
-                <Text className="text-xs text-violet-600">
-                  {selectedPlan.cycle_label} · {fmtBRL(selectedPlan.price)} · equivalente a{" "}
-                  <Text className="font-bold">{fmtBRL(selectedPlan.monthly_equivalent)}/mês</Text>
-                </Text>
+              <View className="space-y-2 mb-3">
+                <View className="flex-row items-center gap-2 bg-violet-50 rounded-lg px-3 py-2">
+                  <Ionicons name="information-circle-outline" size={14} color="#7C3AED" />
+                  <Text className="text-xs text-violet-600">
+                    {selectedPlan.cycle_label} · {fmtBRL(selectedPlan.price)} · equivalente a{" "}
+                    <Text className="font-bold">{fmtBRL(selectedPlan.monthly_equivalent)}/mês</Text>
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                  <Ionicons name="pricetag-outline" size={14} color="#B45309" />
+                  <Text className="text-xs text-amber-700">
+                    Taxa de matrícula do plano: <Text className="font-bold">
+                      {selectedPlan.enrollment_fee_amount
+                        ? fmtBRL(selectedPlan.enrollment_fee_amount)
+                        : "não definida"}
+                    </Text>
+                  </Text>
+                </View>
               </View>
             )}
 
@@ -845,7 +997,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
             <FormInput
               label="Vencimento (dia do mês)"
               value={dueDay}
-              onChangeText={setDueDay}
+              onChangeText={(t) => { setDueDay(t); setDueDayTouched(true); }}
               error={errors.payment_due_day}
               placeholder="1–28"
               keyboardType="numeric"
@@ -854,7 +1006,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
         </View>
 
         {/* Price preview */}
-        {discountedEquivalent() !== null && (
+        {chargesEnrollmentFee && discountedEquivalent() !== null && (
           <View className="flex-row items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2 mt-3">
             <Ionicons name="cash-outline" size={14} color="#16A34A" />
             <Text className="text-xs text-green-700">
@@ -868,9 +1020,37 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
             </Text>
           </View>
         )}
+
+        {chargesEnrollmentFee && enrollmentFeeCoversFirstMonth && (
+          <View className="flex-row items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mt-3">
+            <Ionicons name="information-circle-outline" size={14} color="#2563EB" />
+            <Text className="text-xs text-blue-700">
+              A taxa de matrícula equivale ao primeiro mês. As mensalidades serão geradas <Text className="font-bold">a partir do 2º mês</Text>.
+            </Text>
+          </View>
+        )}
+
+        {!chargesEnrollmentFee && (
+          <View className="flex-row items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-3">
+            <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
+            <Text className="text-xs text-gray-600">
+              Este tenant não cobra taxa de matrícula. Apenas as mensalidades serão geradas conforme o plano.
+            </Text>
+          </View>
+        )}
+
+        {!allowMonthliesBeforeFeePaid && chargesEnrollmentFee && (
+          <View className="flex-row items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
+            <Ionicons name="alert-circle-outline" size={14} color="#B45309" />
+            <Text className="flex-1 text-xs text-amber-700">
+              Mensalidades só serão geradas após a quitação da taxa de matrícula.
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* ── Card: Taxa de Matrícula ── */}
+      {chargesEnrollmentFee && (
       <View
         className="bg-white rounded-2xl p-6 mb-5"
         style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
@@ -963,6 +1143,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
           </View>
         )}
       </View>
+      )}
 
       {/* ── Actions ── */}
       <View className="flex-row justify-end gap-3">

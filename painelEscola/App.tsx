@@ -33,6 +33,7 @@ import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simul
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
+import { BillingSettingsScreen } from "./screens/configuracoes";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 
 type NavState = { screen: string; params?: Record<string, any> };
@@ -98,6 +99,7 @@ const SCREEN_SLUGS = [
   "tenants",
   "users",
   "matriculas-detail",
+  "configuracoes-cobranca",
 ];
 
 function hashToNav(hash: string): NavState {
@@ -187,6 +189,11 @@ function hashToNav(hash: string): NavState {
     return { screen: "users" };
   }
 
+  if (seg0 === "configuracoes") {
+    if (seg1 === "cobranca") return { screen: "configuracoes-cobranca" };
+    return { screen: "configuracoes-cobranca" };
+  }
+
   if (seg0 && SCREEN_SLUGS.includes(seg0)) return { screen: seg0 };
   return { screen: "dashboard" };
 }
@@ -235,6 +242,7 @@ function navToHash(nav: NavState): string {
     const id = nav.params?.userId;
     return id != null ? `#/users/${id}` : "#/users/novo";
   }
+  if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   return `#/${nav.screen}`;
 }
 
@@ -580,6 +588,8 @@ function AppContent() {
     ? "matriculas"
     : nav.screen.startsWith("turmas")
     ? "turmas"
+    : nav.screen.startsWith("configuracoes")
+    ? "configuracoes-cobranca"
     : nav.screen.startsWith("simulados")
     ? "simulados"
     : nav.screen.startsWith("tenants")
@@ -685,6 +695,7 @@ function AppContent() {
       case "bancos_crud": return <PaymentProvidersCrudScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
+      case "configuracoes-cobranca": return <BillingSettingsScreen />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
       case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;

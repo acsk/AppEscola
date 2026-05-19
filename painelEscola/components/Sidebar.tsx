@@ -65,6 +65,7 @@ export default function Sidebar({
     { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" as const },
     { id: "bancos_crud", label: "Cadastro de Bancos", icon: "add-circle-outline" as const },
     { id: "pagamentos", label: "Configuração de Provedores", icon: "cog-outline" as const },
+    { id: "configuracoes-cobranca", label: "Configurações de Cobrança", icon: "settings-outline" as const },
     ...(canManageTenants ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }] : []),
   ];
 

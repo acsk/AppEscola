@@ -19,6 +19,7 @@ class CoursePlanResource extends JsonResource
             'cycle_label'    => $this->cycleLabel(),
             'months_in_cycle'=> $this->monthsInCycle(),
             'price'          => $this->price,
+            'enrollment_fee_amount' => $this->enrollment_fee_amount,
             'monthly_equivalent' => $this->monthlyEquivalent(),
             'status'         => $this->status,
             'created_at'     => $this->created_at?->toISOString(),

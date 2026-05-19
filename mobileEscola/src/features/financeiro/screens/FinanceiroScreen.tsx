@@ -203,6 +203,7 @@ export function FinanceiroScreen() {
       return {
         ...prev,
         atual: prev.atual ? atualizar(prev.atual) : null,
+        abertas: prev.abertas.map(atualizar),
         atrasados: prev.atrasados.map(atualizar),
         pagas: prev.pagas.map(atualizar),
       };
@@ -255,6 +256,7 @@ export function FinanceiroScreen() {
           prev.atual && prev.atual.id === updatedInvoice.id
             ? updatedInvoice
             : prev.atual,
+        abertas: prev.abertas.map(atualizar),
         atrasados: prev.atrasados.map(atualizar),
         pagas: prev.pagas.map(atualizar),
       };
@@ -741,7 +743,18 @@ export function FinanceiroScreen() {
     );
   }
 
-  if (!data || (!data.atrasados.length && !data.atual && !data.pagas.length)) {
+  if (!data) {
+    return (
+      <View style={styles.container}>
+        <HeaderFinanceiro topInset={insets.top} />
+        {renderTelaVazia()}
+      </View>
+    );
+  }
+
+  const cobrancasAbertas = data.abertas.length ? data.abertas : data.atual ? [data.atual] : [];
+
+  if (!data.atrasados.length && !cobrancasAbertas.length && !data.pagas.length) {
     return (
       <View style={styles.container}>
         <HeaderFinanceiro topInset={insets.top} />
@@ -985,19 +998,21 @@ export function FinanceiroScreen() {
           </View>
         )}
 
-        {/* Atual */}
-        {data.atual && (
+        {/* Abertas */}
+        {cobrancasAbertas.length > 0 && (
           <View style={styles.secaoCard}>
             <View style={styles.secaoHeader}>
               <View style={[styles.secaoIcone, styles.secaoIconeAtual]}>
                 <Ionicons name="calendar-outline" size={18} color={colors.primary} />
               </View>
               <View style={styles.secaoTituloWrap}>
-                <Text style={styles.secaoTitulo}>Cobrança atual</Text>
-                <Text style={styles.secaoSubtitulo}>Mensalidade em aberto</Text>
+                <Text style={styles.secaoTitulo}>Cobranças em aberto</Text>
+                <Text style={styles.secaoSubtitulo}>
+                  {cobrancasAbertas.length} {cobrancasAbertas.length === 1 ? 'mensalidade em aberto' : 'mensalidades em aberto'}
+                </Text>
               </View>
             </View>
-            {renderCardCobranca(data.atual, 'atual')}
+            {cobrancasAbertas.map((c) => renderCardCobranca(c, 'atual'))}
           </View>
         )}
 

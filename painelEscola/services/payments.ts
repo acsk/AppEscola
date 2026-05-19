@@ -71,6 +71,7 @@ export type GeneratedCharge = {
   invoice_id: number;
   provider: string;
   environment?: string;
+  method?: string;
   charge_id: string;
   status: string;
   payment_url: string | null;
@@ -150,7 +151,7 @@ export const listPaymentProviders = async (): Promise<PaymentProvider[]> => {
       slug: "cora",
       name: "Cora",
       status: "active",
-      capabilities: ["pix", "boleto", "webhook", "mtls_cert_upload"],
+      capabilities: ["pix", "boleto", "hybrid", "webhook", "mtls_cert_upload"],
     },
   ];
 

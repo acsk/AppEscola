@@ -28,6 +28,8 @@ class EnrollmentResource extends JsonResource
             'monthly_amount' => $this->monthly_amount,
             'discount_amount' => $this->discount_amount,
             'payment_due_day' => $this->payment_due_day,
+            'charges_generated_at' => $this->charges_generated_at?->toISOString(),
+            'charges_batch_generated' => $this->charges_generated_at !== null,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
             'invoices'   => InvoiceResource::collection($this->whenLoaded('invoices')),

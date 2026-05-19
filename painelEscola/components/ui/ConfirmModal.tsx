@@ -16,6 +16,10 @@ type Props = {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  iconName?: keyof typeof Ionicons.glyphMap;
+  tone?: "danger" | "primary";
 };
 
 export default function ConfirmModal({
@@ -25,10 +29,18 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   loading,
+  confirmLabel = "Excluir",
+  cancelLabel = "Cancelar",
+  iconName = "trash-outline",
+  tone = "danger",
 }: Props) {
   const { width } = useWindowDimensions();
   const isMobile = width < 520;
   const horizontalPadding = isMobile ? 16 : width < 1024 ? 24 : 40;
+  const isDanger = tone === "danger";
+  const iconBg = isDanger ? "bg-red-100" : "bg-violet-100";
+  const iconColor = isDanger ? "#EF4444" : "#7C3AED";
+  const confirmBg = isDanger ? "bg-red-500" : "bg-violet-600";
 
   if (!visible) return null;
 
@@ -55,8 +67,8 @@ export default function ConfirmModal({
           }}
         >
           <View className="items-center mb-5">
-            <View className="w-14 h-14 bg-red-100 rounded-full items-center justify-center mb-3">
-              <Ionicons name="trash-outline" size={26} color="#EF4444" />
+            <View className={`w-14 h-14 ${iconBg} rounded-full items-center justify-center mb-3`}>
+              <Ionicons name={iconName} size={26} color={iconColor} />
             </View>
             <Text className="text-lg font-bold text-gray-800 text-center">
               {title}
@@ -74,19 +86,19 @@ export default function ConfirmModal({
               activeOpacity={0.7}
             >
               <Text className="text-sm font-semibold text-gray-700">
-                Cancelar
+                {cancelLabel}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onConfirm}
               disabled={loading}
-              className="flex-1 py-3 rounded-xl bg-red-500 items-center"
+              className={`flex-1 py-3 rounded-xl ${confirmBg} items-center`}
               activeOpacity={0.8}
             >
               {loading ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text className="text-sm font-bold text-white">Excluir</Text>
+                <Text className="text-sm font-bold text-white">{confirmLabel}</Text>
               )}
             </TouchableOpacity>
           </View>

@@ -37,11 +37,13 @@ class CoursePlan extends Model
         'name',
         'billing_cycle',
         'price',
+        'enrollment_fee_amount',
         'status',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
+        'enrollment_fee_amount' => 'decimal:2',
     ];
 
     // -------------------------------------------------------------------------

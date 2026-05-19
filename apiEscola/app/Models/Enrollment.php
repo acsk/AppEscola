@@ -29,6 +29,7 @@ class Enrollment extends Model
         'created_by',
         'updated_by',
         'deleted_by',
+        'charges_generated_at',
     ];
 
     protected $casts = [
@@ -36,6 +37,7 @@ class Enrollment extends Model
         'end_date' => 'date',
         'monthly_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
+        'charges_generated_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo

@@ -49,6 +49,7 @@ type Plan = {
   billing_cycle: string;
   cycle_label: string;
   price: string;
+  enrollment_fee_amount?: string;
   monthly_equivalent: number;
   status: string;
 };
@@ -57,6 +58,7 @@ type PlanForm = {
   name: string;
   billing_cycle: string;
   price: string;
+  enrollment_fee_amount: string;
   status: string;
 };
 
@@ -65,6 +67,7 @@ const EMPTY_PLAN: PlanForm = {
   name: "",
   billing_cycle: "monthly",
   price: "",
+  enrollment_fee_amount: "",
   status: "active",
 };
 
@@ -231,6 +234,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
       name: plan.name,
       billing_cycle: plan.billing_cycle,
       price: plan.price,
+      enrollment_fee_amount: plan.enrollment_fee_amount ?? "",
       status: plan.status,
     });
     setPlanErrors({});
@@ -255,6 +259,9 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
         name: planForm.name,
         billing_cycle: planForm.billing_cycle,
         price: parseFloat(planForm.price.replace(",", ".")),
+        enrollment_fee_amount: planForm.enrollment_fee_amount.trim()
+          ? parseFloat(planForm.enrollment_fee_amount.replace(",", "."))
+          : undefined,
         status: planForm.status,
       };
       if (editPlanId) {
@@ -473,6 +480,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                             <Text className="text-violet-500">
                               (equiv. {fmtBRL(monthly)}/mês)
                             </Text>
+                            {plan.enrollment_fee_amount ? (
+                              <Text className="text-amber-600">
+                                {"  "}· taxa matrícula {fmtBRL(parseFloat(plan.enrollment_fee_amount))}
+                              </Text>
+                            ) : null}
                           </Text>
                         </View>
                         <View className="flex-row gap-2">
@@ -616,6 +628,20 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           />
         </View>
 
+        <View className="mt-2">
+          <FormInput
+            label="Taxa de matrícula (R$)"
+            value={planForm.enrollment_fee_amount}
+            onChangeText={(v) => setPlanForm({ ...planForm, enrollment_fee_amount: v })}
+            error={planErrors.enrollment_fee_amount}
+            placeholder="Ex: 100,00"
+            keyboardType="decimal-pad"
+          />
+          <Text className="text-xs text-gray-500 mt-1">
+            Esse valor será usado na invoice da matrícula vinculada a este plano.
+          </Text>
+        </View>
+
         {cycleMonthly !== null && (
           <View className="flex-row items-center gap-2 bg-violet-50 rounded-lg px-3 py-2 mt-1">
             <Ionicons name="trending-down-outline" size={14} color="#7C3AED" />
@@ -625,6 +651,20 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             </Text>
           </View>
         )}
+
+        <View className="mt-2">
+          <FormInput
+            label="Taxa de matrícula (R$)"
+            value={planForm.enrollment_fee_amount}
+            onChangeText={(v) => setPlanForm({ ...planForm, enrollment_fee_amount: v })}
+            error={planErrors.enrollment_fee_amount}
+            placeholder="Ex: 150,00"
+            keyboardType="decimal-pad"
+          />
+          <Text className="text-xs text-gray-500 mt-1">
+            Valor usado para a invoice da matrícula vinculada a este plano.
+          </Text>
+        </View>
 
         <View className="mt-2">
           <Text className="text-xs font-medium text-gray-600 mb-1.5">

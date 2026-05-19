@@ -45,7 +45,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
         $token = $this->resolveBearerToken($invoice->tenant, $environment);
         $normalizedMethod = strtolower(trim($method));
 
-        if (! in_array($normalizedMethod, ['pix', 'boleto'], true)) {
+        if (! in_array($normalizedMethod, ['pix', 'boleto', 'hybrid'], true)) {
             throw new RuntimeException('Método de pagamento Cora não suportado. Use pix ou boleto.');
         }
 
@@ -60,16 +60,18 @@ class CoraPaymentGateway implements PaymentGatewayContract
         $payerDocument = $this->digitsOnly($payerGuardian?->document ?? $invoice->student?->document ?? '');
         $payerEmail = $payerGuardian?->email ?? $invoice->student?->email;
 
-        if ($normalizedMethod === 'boleto' && ! $invoice->due_date) {
-            throw new RuntimeException('Não é possível emitir boleto sem data de vencimento na fatura.');
+        if (in_array($normalizedMethod, ['boleto', 'hybrid'], true) && ! $invoice->due_date) {
+            throw new RuntimeException('Não é possível emitir boleto/hybrid sem data de vencimento na fatura.');
         }
 
+        $endpoint = '/v2/invoices';
         if ($normalizedMethod === 'boleto') {
-            $endpoint = '/v2/invoices';
-            $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
+            $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment, 'boleto');
+        } elseif ($normalizedMethod === 'pix') {
+            $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment, 'pix');
         } else {
-            $endpoint = '/v2/invoices';
-            $payload = $this->buildPixPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
+            // hybrid: envia ambos os formatos
+            $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment, 'hybrid');
         }
 
         Log::info('Cora createCharge request prepared', [
@@ -564,12 +566,21 @@ class CoraPaymentGateway implements PaymentGatewayContract
         string $payerName,
         string $payerDocument,
         ?string $payerEmail,
-        string $environment
+        string $environment,
+        string $method = 'boleto'
     ): array {
         $identity = $payerDocument !== '' ? $payerDocument : '';
         $docType = strlen($identity) > 11 ? 'CNPJ' : 'CPF';
         $description = trim((string) $invoice->description) !== '' ? (string) $invoice->description : 'Cobrança escolar';
         $providerDueDate = $this->resolveProviderDueDate($invoice);
+
+        // Define payment_forms baseado no método solicitado
+        $paymentForms = match ($method) {
+            'boleto' => ['BANK_SLIP'],
+            'pix' => ['PIX'],
+            'hybrid' => ['BANK_SLIP', 'PIX'],
+            default => ['BANK_SLIP', 'PIX'],
+        };
 
         return [
             'code' => 'invoice-' . $invoice->id . '-' . now()->format('YmdHis'),
@@ -591,7 +602,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
             'payment_terms' => [
                 'due_date' => $providerDueDate,
             ],
-            'payment_forms' => ['BANK_SLIP', 'PIX'],
+            'payment_forms' => $paymentForms,
             'metadata' => [
                 'tenant_id' => $invoice->tenant_id,
                 'invoice_id' => $invoice->id,
@@ -628,14 +639,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
         ?string $payerEmail,
         string $environment
     ): array {
-        $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment);
-
-        // Alguns ambientes da Cora ignoram apenas "payment_forms"; enviar ambos evita
-        // que a invoice seja processada como boleto e dispare erro REC-0030 (CIP).
-        $payload['payment_form'] = 'PIX';
-        $payload['payment_forms'] = ['PIX'];
-
-        return $payload;
+        return $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment, 'pix');
     }
 
     private function resolveProviderDueDate(Invoice $invoice): string

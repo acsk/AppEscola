@@ -5,6 +5,7 @@
 Este documento define o contrato do endpoint usado no app mobile para exibir:
 - cobrancas pagas
 - cobrancas atrasadas
+- cobrancas abertas a partir de hoje
 - somente a cobranca atual (vigente no mes)
 
 Endpoint pensado para a tela de Financeiro do aluno.
@@ -36,6 +37,7 @@ Body para gerar cobranca:
 3. Agrupamento:
   - pagas: invoices com status paid
   - atrasados: invoices em aberto com due_date menor que hoje
+  - abertas: invoices em aberto com due_date maior ou igual a hoje
   - atual: apenas uma invoice em aberto do mes atual (a mais proxima de hoje)
 
 ## Formato de resposta
@@ -53,13 +55,16 @@ Body retornado:
   - fim_mes
 - pagas: lista de cobrancas pagas
 - atrasados: lista de cobrancas atrasadas
+- abertas: lista de cobrancas em aberto a partir de hoje
 - atual: objeto da cobranca atual (ou null)
 - resumo
   - quantidade_pagas
   - quantidade_atrasados
+  - quantidade_abertas
   - possui_atual
   - valor_total_pagas
   - valor_total_atrasados
+  - valor_total_abertas
   - valor_atual
 
 ## Campos de cada cobranca

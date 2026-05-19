@@ -1,12 +1,14 @@
 # Fluxo de Matrícula com Criação Automática de Invoice
 
-> Atualizado em 13/05/2026
+> Atualizado em 17/05/2026
 
 ---
 
 ## Visão Geral
 
-Ao realizar uma matrícula (plano ou pacote), o sistema **cria automaticamente uma invoice** de `enrollment_fee` (Taxa de Matrícula). O frontend pode informar o pagamento no próprio ato da matrícula via o campo `enrollment_payment`, ou deixar a cobrança como **pendente** para ser paga depois.
+Ao realizar uma matrícula (plano ou pacote), o sistema **cria automaticamente uma invoice** de `enrollment_fee` (Taxa de Matrícula). O valor da taxa vem do curso cadastrado e é importado para a matrícula. O frontend pode informar o pagamento no próprio ato da matrícula via o campo `enrollment_payment`, ou deixar a cobrança como **pendente** para ser paga depois.
+
+> No cadastro do plano, preencha `enrollment_fee_amount`. Esse valor é levado para a invoice da matrícula quando o aluno se inscreve no plano.
 
 ---
 
@@ -91,6 +93,8 @@ Tipos de cobrança disponíveis.
   "start_date": "2026-05-01",
   "monthly_amount": "150.00",
   "discount_amount": "0.00",
+  "charges_generated_at": null,
+  "charges_batch_generated": false,
   "student": { "id": 1, "name": "João Silva" },
   "school_class": {
     "id": 2,
@@ -123,6 +127,8 @@ Tipos de cobrança disponíveis.
 ```
 
 > Se `enrollment_payment` for **omitido**, o invoice terá `"status": "pending"` e `"paid_at": null`.
+
+> O valor da taxa de matrícula vem de `course_plan.enrollment_fee_amount`. Se o plano não tiver esse campo preenchido, o backend usa o equivalente mensal do plano como fallback.
 
 > O campo `financial_guardian_id` identifica o responsável financeiro principal usado na matrícula e nas cobranças. O aluno pode ter mais de um responsável marcado como financeiro, mas o fluxo de matrícula resolve um responsável principal para a invoice.
 
@@ -256,13 +262,105 @@ O campo `type` foi adicionado às invoices para distinguir o tipo de cobrança:
 
 6. Na resposta, exibir:
    - Número(s) da matrícula
-   - Invoice da taxa de matrícula com status (paga/pendente)
+  - Invoice da taxa de matrícula com status (paga/pendente)
+  - Valor da taxa vindo do plano (`enrollment_fee_amount`)
   - Dados do responsável financeiro principal detectado
+  - Campos `charges_batch_generated` e `charges_generated_at` indicam se
+    cobranças já foram geradas em lote nesta matrícula
 ```
 
 ---
 
-## Fluxo de Cobrança (Painel Admin + Mobile Aluno)
+## Fluxo de Cobranças (Geração)
+
+### Opção A — Geração em lote (one-shot)
+
+Use para gerar cobranças de **todas as invoices pendentes** de uma matrícula de uma vez.
+
+> **Regra:** Após a execução bem-sucedida, o campo `charges_generated_at` é preenchido e a ação em lote **não pode mais ser repetida**. Por padrão, o lote gera apenas invoices do tipo `monthly`, para não recriar a taxa de matrícula. Cobranças individuais continuam disponíveis.
+
+```
+POST /api/enrollments/{id}/generate-charges
+```
+
+Body:
+
+```json
+{
+  "provider": "cora",
+  "method": "pix",
+  "environment": "prod",
+  "invoice_types": ["monthly", "enrollment_fee"]
+}
+```
+
+| Campo | Obrigatório | Descrição |
+|---|---|---|
+| `provider` | ✅ | Slug do provedor. Ex: `"cora"` |
+| `method` | ✅ | `"pix"` ou `"boleto"` |
+| `environment` | ❌ | `"stage"` ou `"prod"`. Padrão: `"prod"` (ou `"stage"` fora de produção) |
+| `invoice_types` | ❌ | Filtrar tipos. Ex: `["monthly"]`. Omitir = todas as pendentes |
+
+**Resposta (200 — todas geradas):**
+
+```json
+{
+  "type": "success",
+  "message": "Cobranças geradas em lote com sucesso.",
+  "body": {
+    "enrollment_id": 10,
+    "provider": "cora",
+    "method": "pix",
+    "environment": "prod",
+    "status": "success",
+    "generated_count": 6,
+    "failed_count": 0,
+    "charges_generated_at": "2026-05-17T14:00:00.000000Z",
+    "generated": [
+      {
+        "invoice_id": 5,
+        "type": "enrollment_fee",
+        "due_date": "2026-05-01",
+        "amount": "150.00",
+        "charge_id": "inv_abc123",
+        "status": "PENDING",
+        "payment_url": "https://..."
+      }
+    ],
+    "failed": []
+  }
+}
+```
+
+**Resposta (207 — parcial):** `"status": "partial"`, `failed` contém os IDs com erro.
+
+**Resposta (409 — já foi gerado em lote):**
+
+```json
+{
+  "type": "error",
+  "message": "As cobranças em lote já foram geradas para esta matrícula em 17/05/2026 14:00.",
+  "body": {
+    "charges_generated_at": "2026-05-17T14:00:00.000000Z"
+  }
+}
+```
+
+### Fluxo recomendado no painel
+
+```
+1. Ao abrir detalhes da matrícula, verificar `charges_batch_generated`:
+   - false → mostrar botão "Gerar cobranças em lote"
+   - true  → exibir data de `charges_generated_at`, botão desabilitado
+
+2. Após gerar em lote, recarregar a matrícula para atualizar status das invoices
+
+3. Para invoices adicionais (criadas depois do lote), usar geração individual
+```
+
+---
+
+## Fluxo de Cobrança Individual (Painel Admin + Mobile Aluno)
 
 Depois que a matrícula gera a invoice, o fluxo recomendado para front é:
 
@@ -287,7 +385,13 @@ Depois que a matrícula gera a invoice, o fluxo recomendado para front é:
 
 ### Endpoints de Cobrança para o Front
 
-#### 1) Gerar cobrança por provedor/método
+#### 1) Gerar cobranças em lote (one-shot por matrícula)
+
+`POST /api/enrollments/{id}/generate-charges`
+
+> Ver seção **Opção A — Geração em lote** acima para body e respostas completas.
+
+#### 2) Gerar cobrança individual por invoice
 
 `POST /api/invoices/{invoice}/generate-charge`
 
@@ -321,7 +425,7 @@ Resposta esperada:
 }
 ```
 
-#### 2) Consultar status da cobrança
+#### 3) Consultar status da cobrança
 
 `GET /api/invoices/{invoice}/charge-status`
 
@@ -368,7 +472,9 @@ Resposta esperada:
 
 ### Regras para UX no Front
 
-- Painel admin: mostrar ações de gerar cobrança (`generate-charge`) e simular pagamento em stage (`pay-charge`).
+- Painel admin: mostrar botão **"Gerar cobranças em lote"** quando `charges_batch_generated = false`. Após geração, exibir data e desabilitar o botão.
+- Para invoices avulsas criadas após o lote, usar geração individual (`generate-charge` na invoice).
+- Painel admin: mostrar ações de gerar cobrança individual (`generate-charge`) e simular pagamento em stage (`pay-charge`).
 - Mobile do aluno: exibir dados da cobrança (link/PIX/status), sem ação administrativa.
 - Em stage: habilitar botão de simulação de pagamento.
 - Em produção: não usar `pay-charge`; acompanhar status por atualização da cobrança.
