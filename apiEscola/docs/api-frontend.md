@@ -814,6 +814,60 @@ POST /api/invoices/{id}/cancel
 Authorization: Bearer {token}
 ```
 
+Invalida a cobrança no provedor (boleto/híbrido com `cora_charge_id` ativo) e define `status=cancelled` no sistema. PIX ativo na Cora **não** pode ser cancelado manualmente (expira no provedor).
+
+**Resposta de sucesso (`body`):**
+```json
+{
+  "invoice": { "...": "InvoiceResource" },
+  "cancelled_on_gateway": true,
+  "environment": "stage"
+}
+```
+
+### Excluir cobrança
+```http
+DELETE /api/invoices/{id}
+Authorization: Bearer {token}
+```
+
+Só permitido quando `can_delete=true` (ex.: cobrança cancelada, pendente local sem charge ativo). Cobrança **paga** ou com charge ativo no provedor retorna `422` com `body` contendo as flags de lifecycle.
+
+### Flags de lifecycle (em cada `InvoiceResource`)
+
+| Campo | Descrição |
+|-------|-----------|
+| `can_edit` | Edição permitida |
+| `can_cancel` | `POST .../cancel` permitido |
+| `can_delete` | `DELETE` permitido |
+| `requires_cora_cancel_before_delete` | Há charge ativo; cancelar antes de excluir |
+| `cancel_block_reason` | Motivo quando `can_cancel=false` |
+| `delete_block_reason` | Motivo quando `can_delete=false` |
+| `lifecycle_hint` | Texto para UI (modais/tooltips) |
+
+### Excluir matrícula
+```http
+DELETE /api/enrollments/{id}
+```
+
+Antes de remover, o backend cancela em lote todas as invoices pendentes no provedor (quando aplicável). Se alguma falhar (ex.: PIX ativo), retorna `422` e **não** remove a matrícula. Em sucesso, `body.invoice_cancellation` resume o lote.
+
+### Aproveitamento do aluno (evolução por disciplina)
+
+**Aluno autenticado:**
+```http
+GET /api/aluno/performance?months=6
+Authorization: Bearer {token}
+```
+
+**Painel (admin/professor):**
+```http
+GET /api/students/{student_id}/performance?months=6&subject_id=1
+Authorization: Bearer {token}
+```
+
+Retorna médias de `percentage` das tentativas concluídas, agrupadas por disciplina do simulado e evolução mês a mês (`monthly_evolution`).
+
 ### Fluxo recomendado para o frontend
 
 1. Criar matrícula por `subscribe` ou `subscribe-bundle`.

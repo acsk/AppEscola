@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Contracts\PaymentGatewayContract;
-use App\Services\Gateways\CoraPaymentGateway;
 use RuntimeException;
 
 /**
@@ -18,11 +17,21 @@ class PaymentGatewayFactory
      * Mapeamento de slugs/nomes para classes implementadoras.
      * Adicione novos provedores aqui conforme forem implementados.
      */
-    private const GATEWAYS = [
-        'cora' => CoraPaymentGateway::class,
-        // 'stripe' => StripePaymentGateway::class,
-        // 'pagseguro' => PagSeguroPaymentGateway::class,
-    ];
+    /**
+     * @return array<string, class-string>
+     */
+    private static function gatewayMap(): array
+    {
+        $map = [];
+        foreach (PaymentProviderRegistry::providers() as $slug => $config) {
+            $class = $config['gateway_class'] ?? null;
+            if (is_string($class) && $class !== '') {
+                $map[$slug] = $class;
+            }
+        }
+
+        return $map;
+    }
 
     /**
      * Resolve e retorna uma instância do gateway de pagamento.
@@ -37,16 +46,18 @@ class PaymentGatewayFactory
     {
         $providerSlug = strtolower(trim($providerSlug));
 
-        if (! isset(self::GATEWAYS[$providerSlug])) {
-            $available = implode(', ', array_keys(self::GATEWAYS));
+        $gateways = self::gatewayMap();
+
+        if (! isset($gateways[$providerSlug])) {
+            $available = implode(', ', array_keys($gateways));
 
             throw new RuntimeException(
-                "Provedor de pagamento '$providerSlug' não é suportado. "
-                . "Provedores disponíveis: $available"
+                "Provedor de pagamento '$providerSlug' não possui gateway integrado. "
+                . "Provedores com API: $available"
             );
         }
 
-        $className = self::GATEWAYS[$providerSlug];
+        $className = $gateways[$providerSlug];
 
         return app($className);
     }
@@ -58,7 +69,7 @@ class PaymentGatewayFactory
      */
     public static function supportedProviders(): array
     {
-        return array_keys(self::GATEWAYS);
+        return array_keys(self::gatewayMap());
     }
 
     /**
@@ -70,6 +81,6 @@ class PaymentGatewayFactory
      */
     public static function isSupported(string $providerSlug): bool
     {
-        return isset(self::GATEWAYS[strtolower(trim($providerSlug))]);
+        return isset(self::gatewayMap()[strtolower(trim($providerSlug))]);
     }
 }

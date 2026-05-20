@@ -20,6 +20,16 @@ import { displayToISO, isoToDisplay } from "../../utils/masks";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useBillingSettings } from "../../hooks/useBillingSettings";
+import type {
+  BundleSummary,
+  CoursePlanSummary,
+  CourseSummary,
+  EnrollmentFormScreenProps,
+  SchoolClassWithSchedules,
+  StudentPickerItem,
+  SubscribeInvoiceResult,
+} from "../../types/matriculas";
+import type { GuardianRef } from "../../types/entities";
 
 const WEEKDAY_SHORT: Record<string, string> = {
   monday: "Seg",
@@ -33,57 +43,11 @@ const WEEKDAY_SHORT: Record<string, string> = {
 
 const fmtTime = (t: string) => t.slice(0, 5);
 
-const classScheduleLabel = (sc: SchoolClass): string => {
+const classScheduleLabel = (sc: SchoolClassWithSchedules): string => {
   if (!sc.schedules || sc.schedules.length === 0) return "";
   return sc.schedules
     .map((s) => `${WEEKDAY_SHORT[s.weekday] ?? s.weekday} ${fmtTime(s.start_time)}\u2013${fmtTime(s.end_time)}`)
     .join(" · ");
-};
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Student = {
-  id: number;
-  name: string;
-  enrollment_number?: string;
-  document?: string | null;
-  birth_date?: string | null;
-};
-type SchoolClass = {
-  id: number;
-  name: string;
-  course?: { id: number; name: string };
-  schedules?: { id: number; weekday: string; start_time: string; end_time: string }[];
-};
-type Course = { id: number; name: string; enrollment_fee_amount?: string | number };
-type CoursePlan = {
-  id: number;
-  name: string;
-  billing_cycle: string;
-  cycle_label: string;
-  price: string;
-  enrollment_fee_amount?: string | number;
-  monthly_equivalent: string;
-};
-type Bundle = {
-  id: number;
-  name: string;
-  billing_cycle: string;
-  cycle_label: string;
-  price: string;
-  monthly_equivalent: string;
-  courses: { id: number; name: string }[];
-};
-type Guardian = { id: number; name: string; document?: string | null };
-
-type InvoiceResult = {
-  id: number;
-  description: string;
-  amount: string;
-  status: string;
-  due_date: string;
-  paid_at: string | null;
-  payment_method: string | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -101,15 +65,7 @@ const todayDisplay = () => {
   return `${dd}/${mm}/${d.getFullYear()}`;
 };
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-interface Props {
-  navigate: (screen: string, params?: Record<string, any>) => void;
-}
-
-// ── Main Component ────────────────────────────────────────────────────────────
-
-export default function EnrollmentFormScreen({ navigate }: Props) {
+export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenProps) {
   const { contentPadding } = useResponsiveLayout();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -132,12 +88,12 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
   const [mode, setMode] = useState<"plan" | "bundle">("plan");
 
   // ── Lookup data ─────────────────────────────────────────────────────────────
-  const [students, setStudents] = useState<Student[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [plans, setPlans] = useState<CoursePlan[]>([]);
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [bundles, setBundles] = useState<Bundle[]>([]);
-  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [students, setStudents] = useState<StudentPickerItem[]>([]);
+  const [courses, setCourses] = useState<CourseSummary[]>([]);
+  const [plans, setPlans] = useState<CoursePlanSummary[]>([]);
+  const [classes, setClasses] = useState<SchoolClassWithSchedules[]>([]);
+  const [bundles, setBundles] = useState<BundleSummary[]>([]);
+  const [guardians, setGuardians] = useState<GuardianRef[]>([]);
 
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [loadingBundles, setLoadingBundles] = useState(false);
@@ -147,7 +103,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
 
   // ── Form fields ─────────────────────────────────────────────────────────────
   const [studentId, setStudentId] = useState("");
-  const [studentDetail, setStudentDetail] = useState<Student | null>(null);
+  const [studentDetail, setStudentDetail] = useState<StudentPickerItem | null>(null);
   const [guardianId, setGuardianId] = useState("");
 
   // Plan mode
@@ -180,7 +136,7 @@ export default function EnrollmentFormScreen({ navigate }: Props) {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<null | {
     enrollmentNumbers: string[];
-    invoice: InvoiceResult;
+    invoice: SubscribeInvoiceResult;
     bundleName?: string;
   }>(null);
 

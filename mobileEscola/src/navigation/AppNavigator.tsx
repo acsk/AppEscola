@@ -3,6 +3,7 @@ import { TouchableOpacity, Alert } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeScreen } from '../features/home/screens/HomeScreen';
+import { PerformanceScreen } from '../features/desempenho/screens/PerformanceScreen';
 import { SimuladosScreen } from '../features/simulados/screens/SimuladosScreen';
 import { FinanceiroScreen } from '../features/financeiro/screens/FinanceiroScreen';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +11,7 @@ import { colors } from '../theme';
 
 export type AppTabParamList = {
   Home: undefined;
+  Desempenho: undefined;
   Simulados: undefined;
   Financeiro: undefined;
 };
@@ -19,9 +21,10 @@ const Tab = createBottomTabNavigator<AppTabParamList>();
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }> = {
-  Home:       { active: 'home',          inactive: 'home-outline' },
-  Simulados:  { active: 'clipboard',     inactive: 'clipboard-outline' },
-  Financeiro: { active: 'wallet',        inactive: 'wallet-outline' },
+  Home:        { active: 'home',           inactive: 'home-outline' },
+  Desempenho:  { active: 'stats-chart',    inactive: 'stats-chart-outline' },
+  Simulados:   { active: 'clipboard',      inactive: 'clipboard-outline' },
+  Financeiro:  { active: 'wallet',         inactive: 'wallet-outline' },
 };
 
 export function AppNavigator() {
@@ -65,8 +68,9 @@ export function AppNavigator() {
         ),
       })}
     >
-      <Tab.Screen name="Home"      component={HomeScreen}       options={{ title: 'Home', headerShown: false }} />
-      <Tab.Screen name="Simulados"  component={SimuladosScreen}  options={{ title: 'Simulados' }} />
+      <Tab.Screen name="Home"       component={HomeScreen}        options={{ title: 'Home', headerShown: false }} />
+      <Tab.Screen name="Desempenho" component={PerformanceScreen} options={{ title: 'Desempenho', headerShown: false }} />
+      <Tab.Screen name="Simulados"  component={SimuladosScreen}   options={{ title: 'Simulados' }} />
       <Tab.Screen name="Financeiro" component={FinanceiroScreen} options={{ title: 'Financeiro', headerShown: false }} />
     </Tab.Navigator>
   );

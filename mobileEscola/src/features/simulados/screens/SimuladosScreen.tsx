@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,13 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import {
-  listarSimulados,
   SimuladoListItem,
   AttemptStatus,
   subjectIconName,
 } from '../../../services/simulados.service';
+import { getApiErrorMessage } from '../../../lib/apiError';
+import { useSimuladosList } from '../hooks';
+import { MenuButton } from '../../../components/navigation/MenuButton';
 import { colors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'SimuladosList'>;
@@ -74,28 +76,24 @@ export function SimuladosScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
 
-  const [simulados, setSimulados]   = useState<SimuladoListItem[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [atualizando, setAtualizando] = useState(false);
-  const [erro, setErro]             = useState<string | null>(null);
+  const {
+    data: simulados = [],
+    isLoading: carregando,
+    isRefetching: atualizando,
+    isError,
+    error,
+    refetch,
+  } = useSimuladosList();
 
-  const carregarDisponiveis = useCallback(async (refreshing = false) => {
-    if (refreshing) setAtualizando(true);
-    else setCarregando(true);
-    setErro(null);
-    try {
-      setSimulados(await listarSimulados());
-    } catch (e: any) {
-      setErro(e?.response?.data?.message ?? 'Não foi possível carregar os simulados.');
-    } finally {
-      setCarregando(false);
-      setAtualizando(false);
-    }
-  }, []);
+  const erro = isError
+    ? getApiErrorMessage(error, 'Não foi possível carregar os simulados.')
+    : null;
 
-  useFocusEffect(useCallback(() => {
-    carregarDisponiveis();
-  }, [carregarDisponiveis]));
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
 
   // ── Render: card disponível ────────────────────────────────────────────────
   function renderDisponivel({ item }: { item: SimuladoListItem }) {
@@ -209,7 +207,10 @@ export function SimuladosScreen() {
     <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
       <View style={styles.headerGlowPrimary} />
       <View style={styles.headerGlowSecondary} />
-      <Text style={styles.headerTitulo}>Simulados</Text>
+      <View style={styles.headerTituloRow}>
+        <MenuButton />
+        <Text style={styles.headerTitulo}>Simulados</Text>
+      </View>
     </View>
   );
 
@@ -231,7 +232,7 @@ export function SimuladosScreen() {
         <View style={styles.centrado}>
           <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
           <Text style={styles.erroTexto}>{erro}</Text>
-          <TouchableOpacity style={styles.botaoTentar} onPress={() => carregarDisponiveis()} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.botaoTentar} onPress={() => refetch()} activeOpacity={0.8}>
             <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
           </TouchableOpacity>
         </View>
@@ -249,7 +250,7 @@ export function SimuladosScreen() {
         contentContainerStyle={simulados.length === 0 ? styles.listaVazia : styles.lista}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={() => carregarDisponiveis(true)} colors={[colors.primary]} tintColor={colors.primary} />
+          <RefreshControl refreshing={atualizando} onRefresh={() => refetch()} colors={[colors.primary]} tintColor={colors.primary} />
         }
         ListHeaderComponent={simulados.length > 0 ? (
           <Text style={styles.cabecalho}>{simulados.length} simulado{simulados.length !== 1 ? 's' : ''}</Text>
@@ -299,7 +300,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F2FF',
     opacity: 0.98,
   },
-  headerTitulo: { fontSize: 22, fontWeight: '800', color: '#111827', paddingTop: 18, paddingBottom: 14 },
+  headerTituloRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 18,
+    paddingBottom: 14,
+  },
+  headerTitulo: { flex: 1, fontSize: 22, fontWeight: '800', color: '#111827' },
   lista:      { padding: 16, paddingTop: 12 },
   listaVazia: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   cabecalho:  { fontSize: 13, color: colors.muted, marginBottom: 12 },

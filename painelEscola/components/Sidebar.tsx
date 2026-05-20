@@ -23,22 +23,7 @@ const formatBuildDateTime = (isoDate: string): string => {
   }
 };
 
-type NavItem = {
-  id: string;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  hasSubmenu?: boolean;
-};
-
-type SidebarProps = {
-  activeItem?: string;
-  onSelectItem?: (id: string) => void;
-  canManageTenants?: boolean;
-  canManageUsers?: boolean;
-  isMobile?: boolean;
-  onClose?: () => void;
-  apiVersion?: string;
-};
+import type { NavItem, SidebarProps } from "../types/components";
 
 export default function Sidebar({
   activeItem: externalActive,

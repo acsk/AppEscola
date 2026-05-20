@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\TenantCoraCredential;
 use App\Services\PaymentGatewayFactory;
 use App\Services\CoraTokenService;
+use App\Services\PaymentProviderRegistry;
 use App\Services\TenantBillingSettingsService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -57,12 +58,14 @@ class PaymentProviderController extends Controller
 
     private function ensureSupportedProvider(string $provider): void
     {
-        if ($provider === 'cora') {
+        $slug = strtolower(trim($provider));
+
+        if (PaymentProviderRegistry::exists($slug)) {
             return;
         }
 
         $exists = PaymentProvider::query()
-            ->where('slug', strtolower(trim($provider)))
+            ->where('slug', $slug)
             ->exists();
 
         if (! $exists) {
@@ -78,31 +81,23 @@ class PaymentProviderController extends Controller
 
             $providers = PaymentProvider::query()
                 ->select('slug', 'name')
+                ->selectRaw('MAX(logo_url) as logo_url')
                 ->selectRaw('MAX(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as is_active_flag')
                 ->whereNull('deleted_at')
                 ->groupBy('slug', 'name')
                 ->orderBy('name')
                 ->get()
-                ->map(function ($provider) {
-                    $slug = strtolower((string) $provider->slug);
-
-                    return [
-                        'slug' => $slug,
-                        'name' => (string) $provider->name,
-                        'status' => ((int) $provider->is_active_flag) === 1 ? 'active' : 'inactive',
-                        'capabilities' => $this->resolveCapabilitiesBySlug($slug),
-                    ];
-                })
+                ->map(fn ($provider) => $this->mapProviderListItem(
+                    strtolower((string) $provider->slug),
+                    (string) $provider->name,
+                    ((int) $provider->is_active_flag) === 1,
+                    $provider->logo_url ? (string) $provider->logo_url : null
+                ))
                 ->values();
 
             if ($providers->isEmpty() && TenantCoraCredential::query()->exists()) {
                 $providers = collect([
-                    [
-                        'slug' => 'cora',
-                        'name' => 'Cora',
-                        'status' => 'active',
-                        'capabilities' => $this->resolveCapabilitiesBySlug('cora'),
-                    ],
+                    $this->mapProviderListItem('cora', 'Cora', true, null),
                 ]);
             }
 
@@ -114,10 +109,27 @@ class PaymentProviderController extends Controller
          */
         private function resolveCapabilitiesBySlug(string $slug): array
         {
-            return match ($slug) {
-                'cora' => ['pix', 'boleto', 'hybrid', 'webhook', 'mtls_cert_upload'],
-                default => ['pix', 'boleto', 'hybrid'],
-            };
+            if (PaymentProviderRegistry::exists($slug)) {
+                return PaymentProviderRegistry::capabilities($slug);
+            }
+
+            return ['pix', 'boleto', 'hybrid'];
+        }
+
+        /**
+         * @return array{slug: string, name: string, logo_url: ?string, status: string, capabilities: array<int, string>}
+         */
+        private function mapProviderListItem(string $slug, string $name, bool $isActive, ?string $logoUrl): array
+        {
+            $registryLogo = config("payment_providers.providers.{$slug}.logo_url");
+
+            return [
+                'slug' => $slug,
+                'name' => $name,
+                'logo_url' => $logoUrl ?: (is_string($registryLogo) && $registryLogo !== '' ? $registryLogo : null),
+                'status' => $isActive ? 'active' : 'inactive',
+                'capabilities' => $this->resolveCapabilitiesBySlug($slug),
+            ];
         }
 
     public function settingsSchema(Request $request, Tenant $tenant, string $provider): JsonResponse
@@ -125,15 +137,33 @@ class PaymentProviderController extends Controller
         $this->ensureCanManageTenant($request, $tenant);
         $this->ensureSupportedProvider($provider);
 
-        if ($provider !== 'cora') {
+        if ($provider === 'manual') {
             return $this->success([
-                'provider' => $provider,
-                'configured' => false,
+                'provider' => 'manual',
+                'configured' => true,
+                'requires_credentials' => false,
+                'supports_gateway_charge' => false,
                 'environments' => [
                     'stage' => false,
                     'prod' => false,
                 ],
                 'fields' => [],
+                'message' => 'Nenhuma credencial necessária. Confirme pagamentos em Financeiro → Marcar como paga.',
+            ], 'Schema do provedor carregado com sucesso.');
+        }
+
+        if ($provider !== 'cora') {
+            return $this->success([
+                'provider' => $provider,
+                'configured' => false,
+                'requires_credentials' => PaymentProviderRegistry::requiresCredentials($provider),
+                'supports_gateway_charge' => PaymentProviderRegistry::supportsGatewayCharge($provider),
+                'environments' => [
+                    'stage' => false,
+                    'prod' => false,
+                ],
+                'fields' => [],
+                'message' => 'Configuração de credenciais ainda não implementada para este provedor.',
             ], 'Schema do provedor carregado com sucesso.');
         }
 
@@ -328,6 +358,7 @@ class PaymentProviderController extends Controller
     {
         $this->ensureCanAccessInvoice($request, $invoice);
         $paymentSettings = $this->paymentScope($invoice->tenant_id);
+        $defaultProvider = strtolower((string) ($paymentSettings['default_provider'] ?? 'cora'));
         $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
         $enabledMethods = is_array($rawEnabledMethods)
             ? array_values(array_unique(array_map(static function (string $method): string {
@@ -335,9 +366,15 @@ class PaymentProviderController extends Controller
 
                 return $normalized === 'bank_slip' ? 'boleto' : $normalized;
             }, $rawEnabledMethods)))
-            : ['pix', 'boleto', 'hybrid'];
+            : PaymentProviderRegistry::defaultEnabledMethods($defaultProvider);
 
-        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+        $providerMethods = PaymentProviderRegistry::supportedMethods($defaultProvider);
+        $enabledMethods = array_values(array_intersect($enabledMethods, $providerMethods));
+        if ($enabledMethods === []) {
+            $enabledMethods = PaymentProviderRegistry::defaultEnabledMethods($defaultProvider);
+        }
+
+        $supportsGateway = PaymentProviderRegistry::supportsGatewayCharge($defaultProvider);
 
         $lockedSyncedMethod  = $this->resolveLockedMethodForSyncedInvoice($invoice);
         $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
@@ -377,7 +414,7 @@ class PaymentProviderController extends Controller
 
         $configuredDefaultMethod = strtolower((string) ($paymentSettings['default_method'] ?? ''));
         $configuredDefaultMethod = $configuredDefaultMethod === 'bank_slip' ? 'boleto' : $configuredDefaultMethod;
-        $configuredDefaultMethod = in_array($configuredDefaultMethod, ['pix', 'boleto', 'hybrid'], true)
+        $configuredDefaultMethod = in_array($configuredDefaultMethod, $enabledMethods, true)
             ? $configuredDefaultMethod
             : null;
 
@@ -398,7 +435,8 @@ class PaymentProviderController extends Controller
             'current_method'  => $currentMethod,
             'default_method'  => $configuredDefaultMethod,
             'actions' => [
-                'can_generate_charge'  => ! in_array($invoice->status, ['paid', 'cancelled'], true),
+                'can_generate_charge'  => $supportsGateway
+                    && ! in_array($invoice->status, ['paid', 'cancelled'], true),
                 'can_change_method'    => $lockedMethod === null,
                 'can_open_boleto_url'  => (bool) $invoice->cora_payment_url,
                 'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
@@ -427,13 +465,35 @@ class PaymentProviderController extends Controller
         $this->ensureCanAccessInvoice($request, $invoice);
 
         $data = $request->validate([
-            'provider' => ['required', 'string', 'in:cora'],
+            'provider' => ['nullable', 'string'],
             'method' => ['nullable', 'string', 'in:pix,boleto,hybrid,bank_slip'],
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
         ]);
 
         // Aplica configurações de pagamento do tenant (métodos habilitados / método default)
         $paymentSettings = $this->paymentScope($invoice->tenant_id);
+        $resolvedProvider = strtolower(trim((string) ($data['provider'] ?? $paymentSettings['default_provider'] ?? 'cora')));
+
+        if ($resolvedProvider === 'manual' || ! PaymentProviderRegistry::supportsGatewayCharge($resolvedProvider)) {
+            return $this->error(
+                'Este tenant usa cobrança manual. Registre o pagamento em Financeiro → Marcar como paga.',
+                [
+                    'default_provider' => $resolvedProvider,
+                    'hint' => 'Altere o provedor padrão para Cora em Configurações de cobrança se desejar gerar PIX/boleto automaticamente.',
+                ],
+                422
+            );
+        }
+
+        if (! PaymentGatewayFactory::isSupported($resolvedProvider)) {
+            return $this->error(
+                "Provedor '$resolvedProvider' ainda não possui integração de cobrança.",
+                ['supported_gateways' => PaymentGatewayFactory::supportedProviders()],
+                422
+            );
+        }
+
+        $data['provider'] = $resolvedProvider;
         $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
         $enabledMethods = is_array($rawEnabledMethods)
             ? array_values(array_unique(array_map(static function (string $method): string {
@@ -441,8 +501,12 @@ class PaymentProviderController extends Controller
 
                 return $normalized === 'bank_slip' ? 'boleto' : $normalized;
             }, $rawEnabledMethods)))
-            : ['pix', 'boleto', 'hybrid'];
-        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+            : PaymentProviderRegistry::defaultEnabledMethods($resolvedProvider);
+        $providerMethods = PaymentProviderRegistry::supportedMethods($resolvedProvider);
+        $enabledMethods = array_values(array_intersect($enabledMethods, $providerMethods));
+        if ($enabledMethods === []) {
+            $enabledMethods = PaymentProviderRegistry::defaultEnabledMethods($resolvedProvider);
+        }
 
         $requestedMethodInput = strtolower((string) ($data['method'] ?? ''));
         if ($requestedMethodInput === '') {
@@ -626,7 +690,7 @@ class PaymentProviderController extends Controller
         };
 
         try {
-            $result = $factory->resolve('cora')->createCharge($invoice, $environment, $coraMethod);
+            $result = $factory->resolve($resolvedProvider)->createCharge($invoice, $environment, $coraMethod);
         } catch (ConnectionException|RequestException $e) {
             $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
             $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';

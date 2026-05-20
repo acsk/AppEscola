@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import PaymentProviderLogo from "../../components/payments/PaymentProviderLogo";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
@@ -451,10 +452,61 @@ export default function PaymentProvidersScreen() {
     }
   };
 
-  const providerOptions = providers.map((item) => ({
-    value: item.slug,
-    label: item.name,
-  }));
+  const renderProviderPicker = () => (
+    <View className="mb-4">
+      <Text className="text-sm font-semibold text-gray-700 mb-2">
+        Provedor <Text className="text-red-500">*</Text>
+      </Text>
+      <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+        {providers.map((item) => {
+          const selected = provider === item.slug;
+          return (
+            <TouchableOpacity
+              key={item.slug}
+              onPress={() => setProvider(item.slug)}
+              activeOpacity={0.85}
+              className={`rounded-2xl border px-3 py-3 ${
+                selected ? "border-violet-400 bg-violet-50" : "border-gray-200 bg-white"
+              }`}
+              style={{
+                minWidth: isMobile ? "100%" : 200,
+                flexGrow: 1,
+                flexBasis: isMobile ? "100%" : "30%",
+              }}
+            >
+              <View className="flex-row items-center gap-3">
+                <PaymentProviderLogo uri={item.logo_url ?? null} size={52} rounded={14} />
+                <View className="flex-1 min-w-0">
+                  <Text
+                    className={`text-sm font-bold ${selected ? "text-violet-700" : "text-gray-800"}`}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+                  <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+                    {item.slug}
+                  </Text>
+                  <View className="flex-row flex-wrap mt-1.5" style={{ gap: 4 }}>
+                    {(item.capabilities ?? []).slice(0, 3).map((cap) => (
+                      <View
+                        key={`${item.slug}-${cap}`}
+                        className="rounded-full bg-gray-100 px-2 py-0.5"
+                      >
+                        <Text className="text-[10px] font-semibold text-gray-600">{cap}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                {selected ? (
+                  <Ionicons name="checkmark-circle" size={20} color="#7C3AED" />
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
@@ -494,23 +546,29 @@ export default function PaymentProvidersScreen() {
                   disabled={user?.role !== "super_admin"}
                 />
               </View>
-              <View style={{ flex: 1 }}>
-                <FormSelect
-                  label="Provedor"
-                  required
-                  value={provider}
-                  onChange={setProvider}
-                  options={providerOptions}
-                  placeholder="Selecione o provedor"
-                />
-              </View>
             </View>
+
+            {providers.length > 0 ? renderProviderPicker() : (
+              <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <Text className="text-sm text-amber-800">
+                  Nenhum provedor ativo. Cadastre bancos em Cadastro de Bancos.
+                </Text>
+              </View>
+            )}
 
             {!!selectedProviderInfo && (
               <View className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 mb-4">
-                <Text className="text-sm font-semibold text-violet-700">
-                  Capacidades: {selectedProviderInfo.capabilities.join(", ") || "Nenhuma informada"}
-                </Text>
+                <View className="flex-row items-center gap-3">
+                  <PaymentProviderLogo uri={selectedProviderInfo.logo_url ?? null} size={44} rounded={12} />
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-violet-700">
+                      {selectedProviderInfo.name}
+                    </Text>
+                    <Text className="text-xs text-violet-600 mt-1">
+                      Capacidades: {selectedProviderInfo.capabilities.join(", ") || "Nenhuma informada"}
+                    </Text>
+                  </View>
+                </View>
               </View>
             )}
 

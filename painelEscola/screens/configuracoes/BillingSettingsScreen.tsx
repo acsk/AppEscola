@@ -14,6 +14,7 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import PaymentProviderSelectField from "../../components/payments/PaymentProviderSelectField";
 import ToastBanner from "../../components/ui/ToastBanner";
 import {
   BillingSettingsField,
@@ -23,6 +24,10 @@ import {
   BillingSettingsValues,
   enrichSchemaWithPersisted,
   getBillingSettingsSchema,
+  applyProviderCapabilitiesToSchema,
+  normalizePaymentDraftForProvider,
+  PAYMENT_SETTINGS_FIELD_ORDER,
+  ProviderCapabilities,
   resetBillingSettingsScope,
   updateBillingSettingsScope,
 } from "../../services/settings";
@@ -109,6 +114,8 @@ const formatKey = (key: string) =>
 
 const optionLabel = (value: string) => {
   const labels: Record<string, string> = {
+    cora: "Cora (gateway PIX/boleto)",
+    manual: "Manual (secretaria / caixa)",
     pix: "PIX",
     boleto: "Boleto",
     bank_slip: "Boleto",
@@ -120,6 +127,20 @@ const optionLabel = (value: string) => {
   };
 
   return labels[value] ?? formatKey(value);
+};
+
+const sortPaymentFields = (
+  entries: [string, BillingSettingsField][]
+): [string, BillingSettingsField][] => {
+  const order = PAYMENT_SETTINGS_FIELD_ORDER as readonly string[];
+  return [...entries].sort(([a], [b]) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 };
 
 const inferFieldFromValue = (value: any): BillingSettingsField => {
@@ -168,6 +189,8 @@ export default function BillingSettingsScreen() {
   const [loadingTenants, setLoadingTenants] = useState(false);
 
   const [schema, setSchema] = useState<BillingSettingsSchema | null>(null);
+  const [providerCapabilities, setProviderCapabilities] =
+    useState<ProviderCapabilities>({});
   const [scopeDescriptions, setScopeDescriptions] =
     useState<BillingSettingsScopeDescriptions>({});
   const [loadingSchema, setLoadingSchema] = useState(false);
@@ -262,14 +285,21 @@ export default function BillingSettingsScreen() {
         persisted
       );
 
-      setSchema(effectiveSchema);
-      setScopeDescriptions(schemaResp?.scope_descriptions ?? {});
-
       const merged: BillingSettingsValues = {
         billing: mergeScopeValues(effectiveSchema.billing, values.billing),
         payment: mergeScopeValues(effectiveSchema.payment, values.payment),
         enrollment: mergeScopeValues(effectiveSchema.enrollment, values.enrollment),
       };
+
+      const capabilities = schemaResp?.provider_capabilities ?? {};
+      const paymentProvider = String(merged.payment?.default_provider ?? "cora").toLowerCase();
+
+      setProviderCapabilities(capabilities);
+      setSchema(
+        applyProviderCapabilitiesToSchema(effectiveSchema, paymentProvider, capabilities)
+      );
+      setScopeDescriptions(schemaResp?.scope_descriptions ?? {});
+
       setDrafts(merged);
       setOriginal(merged);
       setErrors({ billing: {}, payment: {}, enrollment: {} });
@@ -291,6 +321,25 @@ export default function BillingSettingsScreen() {
   const updateField = (scope: BillingSettingsScope, key: string, value: any) => {
     setDrafts((current) => {
       if (!current) return current;
+
+      if (scope === "payment" && key === "default_provider") {
+        const provider = String(value).toLowerCase();
+        const normalized = normalizePaymentDraftForProvider(
+          provider,
+          current.payment,
+          providerCapabilities
+        );
+
+        setSchema((prev) =>
+          prev ? applyProviderCapabilitiesToSchema(prev, provider, providerCapabilities) : prev
+        );
+
+        return {
+          ...current,
+          payment: normalized,
+        };
+      }
+
       return {
         ...current,
         [scope]: { ...current[scope], [key]: value },
@@ -479,12 +528,42 @@ export default function BillingSettingsScreen() {
 
     if (field.type === "string") {
       if (field.options && field.options.length > 0) {
+        if (scope === "payment" && key === "default_provider") {
+          return (
+            <View key={key}>
+              <PaymentProviderSelectField
+                label={label}
+                description={description}
+                required
+                value={String(value ?? "")}
+                options={field.options}
+                onChange={(slug) => updateField(scope, key, slug)}
+                error={error}
+              />
+            </View>
+          );
+        }
+
+        const provider = String(drafts?.payment?.default_provider ?? "cora").toLowerCase();
+        let selectOptions = field.options;
+
+        if (scope === "payment" && key === "default_method") {
+          const enabled: string[] = Array.isArray(drafts?.payment?.enabled_methods)
+            ? drafts.payment.enabled_methods
+            : [];
+          const pool = providerCapabilities[provider] ?? field.options;
+          selectOptions = pool.filter((opt) => enabled.includes(opt));
+          if (selectOptions.length === 0) {
+            selectOptions = pool;
+          }
+        }
+
         return (
           <View key={key}>
             <FormSelect
               label={label}
               value={String(value ?? "")}
-              options={field.options.map((opt) => ({ value: opt, label: optionLabel(opt) }))}
+              options={selectOptions.map((opt) => ({ value: opt, label: optionLabel(opt) }))}
               onChange={(v) => updateField(scope, key, v)}
               error={error}
             />
@@ -510,7 +589,11 @@ export default function BillingSettingsScreen() {
     }
 
     if (field.type === "array") {
-      const options = field.options ?? [];
+      const provider = String(drafts?.payment?.default_provider ?? "cora").toLowerCase();
+      const options =
+        scope === "payment" && key === "enabled_methods" && providerCapabilities[provider]
+          ? providerCapabilities[provider]
+          : field.options ?? [];
       const arr: string[] = Array.isArray(value) ? value : [];
       return (
         <View key={key} className="mb-4">
@@ -563,7 +646,17 @@ export default function BillingSettingsScreen() {
   const renderActiveScope = () => {
     if (!schema || !drafts) return null;
     const scopeSchema = schema[activeScope] || {};
-    const entries = Object.entries(scopeSchema);
+    let entries = Object.entries(scopeSchema);
+
+    if (activeScope === "payment") {
+      const provider = String(drafts.payment?.default_provider ?? "cora").toLowerCase();
+      const dynamicSchema = applyProviderCapabilitiesToSchema(
+        schema,
+        provider,
+        providerCapabilities
+      ).payment;
+      entries = sortPaymentFields(Object.entries(dynamicSchema));
+    }
 
     return (
       <View>

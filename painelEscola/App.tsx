@@ -14,6 +14,7 @@ import LoginScreen from "./screens/LoginScreen";
 import DashboardScreen from "./screens/DashboardScreen";
 import StudentsScreen from "./screens/alunos";
 import StudentFormScreen from "./screens/alunos/StudentFormScreen";
+import StudentPerformanceScreen from "./screens/alunos/StudentPerformanceScreen";
 import GuardiansScreen from "./screens/GuardiansScreen";
 import CoursesScreen from "./screens/cursos";
 import CourseFormScreen from "./screens/cursos/CourseFormScreen";
@@ -36,7 +37,7 @@ import { UsersScreen, UserFormScreen } from "./screens/users";
 import { BillingSettingsScreen } from "./screens/configuracoes";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 
-type NavState = { screen: string; params?: Record<string, any> };
+import type { NavState } from "./types/navigation";
 
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
 
@@ -679,6 +680,14 @@ function AppContent() {
     switch (nav.screen) {
       case "alunos": return <StudentsScreen navigate={navigate} />;
       case "alunos-form": return <StudentFormScreen navigate={navigate} studentId={nav.params?.studentId ?? null} />;
+      case "alunos-performance":
+        return (
+          <StudentPerformanceScreen
+            navigate={navigate}
+            studentId={Number(nav.params?.studentId)}
+            studentName={nav.params?.studentName}
+          />
+        );
       case "responsaveis": return <GuardiansScreen />;
       case "cursos": return <CoursesScreen navigate={navigate} />;
       case "cursos-form": return <CourseFormScreen navigate={navigate} courseId={nav.params?.courseId ?? null} />;

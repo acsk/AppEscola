@@ -48,21 +48,8 @@ if (Platform.OS === "web" && pdfjs) {
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 }
 
-type Student = { id: number; name: string };
-type Guardian = { id: number; name: string };
-
-type Invoice = {
-  id: number;
-  description: string;
-  amount: string;
-  due_date: string;
-  status: string;
-  payment_method: string | null;
-  notes: string | null;
-  student?: Student;
-  guardian?: Guardian;
-  enrollment_id: number | null;
-};
+import type { GuardianRef, StudentRef } from "../types/entities";
+import type { Invoice, InvoiceFormValues, InvoicesScreenProps } from "../types/invoices";
 
 const canGenerateChargeForInvoice = (invoice: Invoice | null) => {
   if (!invoice) return false;
@@ -70,19 +57,7 @@ const canGenerateChargeForInvoice = (invoice: Invoice | null) => {
   return invoice.status !== "paid" && invoice.status !== "cancelled";
 };
 
-type Form = {
-  student_id: string;
-  description: string;
-  amount: string;
-  due_date: string;
-  enrollment_id: string;
-  guardian_id: string;
-  status: string;
-  payment_method: string;
-  notes: string;
-};
-
-const EMPTY: Form = {
+const EMPTY: InvoiceFormValues = {
   student_id: "",
   description: "",
   amount: "",
@@ -110,7 +85,7 @@ const METHOD_LABELS: Record<string, string> = {
   bank_transfer: "Transferência",
 };
 
-export default function InvoicesScreen() {
+export default function InvoicesScreen(_props: InvoicesScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -120,12 +95,15 @@ export default function InvoicesScreen() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState<Form>(EMPTY);
+  const [form, setForm] = useState<InvoiceFormValues>(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [cancelId, setCancelId] = useState<number | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [providers, setProviders] = useState<PaymentProvider[]>([]);
   const [chargeModalVisible, setChargeModalVisible] = useState(false);
@@ -145,8 +123,8 @@ export default function InvoicesScreen() {
   const [pdfPageCount, setPdfPageCount] = useState(0);
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [students, setStudents] = useState<StudentRef[]>([]);
+  const [guardians, setGuardians] = useState<GuardianRef[]>([]);
 
   const invoiceStatuses = useInvoiceStatuses();
   const paymentMethods = usePaymentMethods();
@@ -262,14 +240,35 @@ export default function InvoicesScreen() {
     try { await api.post(`/invoices/${id}/mark-as-paid`); fetch(); } catch {}
   };
 
-  const cancelInvoice = async (id: number) => {
-    try { await api.post(`/invoices/${id}/cancel`); fetch(); } catch {}
+  const confirmCancelInvoice = async () => {
+    if (!cancelId) return;
+    setCancelling(true);
+    setActionError(null);
+    try {
+      await api.post(`/invoices/${cancelId}/cancel`);
+      setCancelId(null);
+      fetch();
+    } catch (e: any) {
+      const msg = e.response?.data?.message ?? "Não foi possível cancelar a cobrança.";
+      setActionError(msg);
+      setCancelId(null);
+    }
+    setCancelling(false);
   };
 
   const remove = async () => {
     if (!deleteId) return;
     setDeleting(true);
-    try { await api.delete(`/invoices/${deleteId}`); setDeleteId(null); fetch(); } catch {}
+    setActionError(null);
+    try {
+      await api.delete(`/invoices/${deleteId}`);
+      setDeleteId(null);
+      fetch();
+    } catch (e: any) {
+      const msg = e.response?.data?.message ?? "Não foi possível excluir a cobrança.";
+      setActionError(msg);
+      setDeleteId(null);
+    }
     setDeleting(false);
   };
 
@@ -498,8 +497,8 @@ export default function InvoicesScreen() {
                     <Ionicons name="checkmark-circle-outline" size={15} color="#22C55E" />
                   </TouchableOpacity>
                 ) : null}
-                {item.status !== "cancelled" && item.status !== "paid" ? (
-                  <TouchableOpacity onPress={() => cancelInvoice(item.id)} className="p-1.5 bg-orange-50 rounded-lg" style={{ marginRight: 2 }}>
+                {(item.can_cancel ?? (item.status !== "cancelled" && item.status !== "paid")) ? (
+                  <TouchableOpacity onPress={() => setCancelId(item.id)} className="p-1.5 bg-orange-50 rounded-lg" style={{ marginRight: 2 }}>
                     <Ionicons name="close-circle-outline" size={15} color="#F97316" />
                   </TouchableOpacity>
                 ) : null}
@@ -515,9 +514,11 @@ export default function InvoicesScreen() {
                     <Ionicons name="qr-code-outline" size={15} color="#9CA3AF" />
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                </TouchableOpacity>
+                {(item.can_delete ?? item.status !== "paid") ? (
+                  <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
+                    <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           ))
@@ -793,7 +794,40 @@ export default function InvoicesScreen() {
         )}
       </Modal>
 
-      <ConfirmModal visible={!!deleteId} title="Excluir Cobrança" message="Esta ação não pode ser desfeita." onConfirm={remove} onCancel={() => setDeleteId(null)} loading={deleting} />
+      {!!actionError && (
+        <View className="mx-4 mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <Text className="text-sm font-semibold text-red-700">{actionError}</Text>
+        </View>
+      )}
+      <ConfirmModal
+        visible={!!cancelId}
+        title="Cancelar Cobrança"
+        message={
+          rows.find((i) => i.id === cancelId)?.lifecycle_hint ??
+          (rows.find((i) => i.id === cancelId)?.requires_cora_cancel_before_delete
+            ? "A cobrança será invalidada no provedor e permanecerá no histórico como cancelada."
+            : "Deseja cancelar esta cobrança?")
+        }
+        onConfirm={confirmCancelInvoice}
+        onCancel={() => setCancelId(null)}
+        loading={cancelling}
+        confirmLabel="Sim, cancelar"
+        iconName="close-circle-outline"
+        tone="primary"
+      />
+      <ConfirmModal
+        visible={!!deleteId}
+        title="Excluir Cobrança"
+        message={
+          rows.find((i) => i.id === deleteId)?.delete_block_reason ??
+          rows.find((i) => i.id === deleteId)?.lifecycle_hint ??
+          "Remove o registro da listagem. Cobranças ativas no provedor devem ser canceladas antes."
+        }
+        onConfirm={remove}
+        onCancel={() => setDeleteId(null)}
+        loading={deleting}
+        confirmDisabled={rows.find((i) => i.id === deleteId)?.can_delete === false}
+      />
     </ScrollView>
   );
 }

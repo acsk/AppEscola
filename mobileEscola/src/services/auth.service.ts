@@ -2,6 +2,27 @@ import { api } from './api';
 
 export type UserRole = 'admin' | 'super_admin' | 'professor' | 'aluno';
 
+export interface AuthTenant {
+  id: number;
+  name: string;
+  trade_name: string | null;
+  corporate_name: string | null;
+  slug: string;
+  cnpj: string | null;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  photo_url: string | null;
+  address: string | null;
+}
+
+export interface AuthStudent {
+  id: number;
+  enrollment_number: string | null;
+  document: string | null;
+  phone: string | null;
+}
+
 export interface AuthUser {
   id: number;
   student_id: number | null;
@@ -15,6 +36,8 @@ export interface AuthUser {
   email_verified_at: string | null;
   created_at: string;
   updated_at: string;
+  tenant?: AuthTenant | null;
+  student?: AuthStudent | null;
 }
 
 export interface LoginResponse {

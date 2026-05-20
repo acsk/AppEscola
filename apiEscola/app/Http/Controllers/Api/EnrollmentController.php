@@ -15,6 +15,7 @@ use App\Models\Enrollment;
 use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Tenant;
+use App\Services\InvoiceLifecycleService;
 use App\Services\TenantBillingSettingsService;
 use App\Traits\ScopedByTenant;
 use Carbon\Carbon;
@@ -30,6 +31,10 @@ use Illuminate\Support\Facades\Log;
 class EnrollmentController extends Controller
 {
     use ScopedByTenant;
+
+    public function __construct(private readonly InvoiceLifecycleService $invoiceLifecycle)
+    {
+    }
 
     #[OA\Get(
         path: '/api/enrollments',
@@ -459,14 +464,26 @@ class EnrollmentController extends Controller
     {
         $this->authorizeTenant($request, $enrollment->tenant_id);
 
+        $cancelSummary = $this->invoiceLifecycle->cancelEnrollmentInvoicesBeforeRemoval($enrollment, $request);
+
+        if ($cancelSummary['failures'] !== [] || $cancelSummary['skipped'] > 0) {
+            return $this->error(
+                'Não foi possível encerrar todas as cobranças no provedor. A matrícula não foi removida.',
+                ['invoice_cancellation' => $cancelSummary],
+                422
+            );
+        }
+
         $enrollment->update(['status' => 'cancelled']);
 
-        // Remove todas as cobranças da matrícula (soft delete)
         $enrollment->invoices()->delete();
 
         $enrollment->delete();
 
-        return response()->json(['message' => 'Matrícula removida com sucesso.']);
+        return $this->success([
+            'message' => 'Matrícula removida com sucesso.',
+            'invoice_cancellation' => $cancelSummary,
+        ], 'Matrícula removida com sucesso.');
     }
 
     #[OA\Post(

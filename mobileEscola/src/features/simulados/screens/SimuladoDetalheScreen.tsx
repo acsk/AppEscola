@@ -15,17 +15,19 @@ import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import {
-  detalharSimulado,
-  iniciarSimulado,
-  buscarRevisao,
-  listarMateriaisApoio,
   AttemptStatus,
   SimuladoDetail,
-  AttemptReview,
   SupportMaterial,
   subjectIconName,
 } from '../../../services/simulados.service';
 import { gerarPdfSimulado } from '../../../services/pdf-simulado.service';
+import { getApiErrorMessage } from '../../../lib/apiError';
+import {
+  useSimuladoDetail,
+  useSimuladoMateriais,
+  useAttemptReview,
+  useStartSimulado,
+} from '../hooks';
 import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoDetalhe'>;
@@ -116,6 +118,15 @@ function statusInfo(status: AttemptStatus, awaitingRelease: boolean) {
 function tint(hex?: string, alpha = '18'): string {
   if (!hex || !hex.startsWith('#')) return colors.soft;
   return `${hex}${alpha}`;
+}
+
+function needsReview(detalhe: SimuladoDetail): boolean {
+  const efetivo = (detalhe.attempt_status || (detalhe.can_start ? 'not_started' : '')) as AttemptStatus;
+  return (
+    efetivo === 'completed' ||
+    efetivo === 'pending_review' ||
+    efetivo === 'awaiting_release'
+  );
 }
 
 interface QuestionImageProps {
@@ -241,17 +252,34 @@ function SupportMaterialsSection({ materiais, carregando, accentColor }: Support
 export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const { examId } = route.params;
   const { width } = useWindowDimensions();
-  const [detalhe, setDetalhe]         = useState<SimuladoDetail | null>(null);
-  const [carregando, setCarregando]   = useState(true);
-  const [erroMsg, setErroMsg]         = useState<string | null>(null);
-  const [iniciando, setIniciando]     = useState(false);
-  const [erroAcao, setErroAcao]       = useState<string | null>(null);
-  const [revisao, setRevisao]         = useState<AttemptReview | null>(null);
-  const [carregandoRevisao, setCarregandoRevisao] = useState(false);
-  const [materiais, setMateriais] = useState<SupportMaterial[]>([]);
-  const [carregandoMateriais, setCarregandoMateriais] = useState(false);
+  const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [erroPdf, setErroPdf] = useState<string | null>(null);
+
+  const {
+    data: detalhe,
+    isLoading: carregando,
+    isError: detalheErro,
+    error: detalheError,
+    refetch: refetchDetalhe,
+  } = useSimuladoDetail(examId);
+
+  const { data: materiais = [], isLoading: carregandoMateriais } = useSimuladoMateriais(examId);
+
+  const precisaRevisao = detalhe != null && needsReview(detalhe);
+
+  const {
+    data: revisao,
+    isLoading: carregandoRevisao,
+    isError: revisaoErro,
+  } = useAttemptReview(detalhe?.attempt_id, precisaRevisao);
+
+  const startMutation = useStartSimulado();
+  const iniciando = startMutation.isPending;
+
+  const erroMsg = detalheErro
+    ? getApiErrorMessage(detalheError, 'Não foi possível carregar o simulado.')
+    : null;
 
   useEffect(() => {
     navigation.setOptions({
@@ -274,79 +302,23 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     });
   }, [navigation]);
 
-  useEffect(() => { carregar(); }, [examId]);
-
   useEffect(() => {
-    let active = true;
-    setCarregandoMateriais(true);
-    listarMateriaisApoio(examId)
-      .then((lista) => { if (active) setMateriais(lista); })
-      .catch(() => { if (active) setMateriais([]); })
-      .finally(() => { if (active) setCarregandoMateriais(false); });
-    return () => { active = false; };
-  }, [examId]);
-
-  useEffect(() => {
-    if (revisao?.questions?.length) {
-      console.log('🎯 Renderizando', revisao.questions.length, 'questões');
-    } else if (revisao && !revisao.questions?.length) {
-      console.log('⚠️ Nenhuma questão para exibir. Revisão:', revisao);
+    if (detalhe?.title) {
+      navigation.setOptions({ title: detalhe.title });
     }
-  }, [revisao]);
-
-  async function carregar() {
-    setCarregando(true);
-    setErroMsg(null);
-    try {
-      const d = await detalharSimulado(examId);
-      setDetalhe(d);
-      navigation.setOptions({ title: d.title });
-      console.log('📋 Simulado carregado:', d.title, 'Attempt ID:', d.attempt_id, 'Status:', d.attempt_status);
-
-      const efetivo = (d.attempt_status || (d.can_start ? 'not_started' : '')) as AttemptStatus;
-      const precisaRevisao =
-        efetivo === 'completed' ||
-        efetivo === 'pending_review' ||
-        efetivo === 'awaiting_release';
-
-      console.log('✅ Efetivo status:', efetivo, 'Precisa revisão:', precisaRevisao);
-
-      if (precisaRevisao && d.attempt_id) {
-        setCarregandoRevisao(true);
-        try {
-          console.log('🔄 Carregando revisão para attemptId:', d.attempt_id);
-          const rev = await buscarRevisao(d.attempt_id);
-          console.log('📊 Revisão carregada:', rev);
-          console.log('❓ Questões na revisão:', rev.questions?.length ?? 0);
-          setRevisao(rev);
-        } catch (e: any) {
-          console.log('❌ Erro ao carregar revisão:', e);
-          // falha silenciosa — visualização ficará sem dados de correção
-        } finally {
-          setCarregandoRevisao(false);
-        }
-      }
-    } catch (e: any) {
-      setErroMsg(e?.response?.data?.message ?? 'Não foi possível carregar o simulado.');
-    } finally {
-      setCarregando(false);
-    }
-  }
+  }, [detalhe?.title, navigation]);
 
   async function handleIniciar() {
     if (!detalhe) return;
-    setIniciando(true);
     setErroAcao(null);
     try {
-      const attempt = await iniciarSimulado(detalhe.id);
+      const attempt = await startMutation.mutateAsync({ examId: detalhe.id });
       navigation.replace('SimuladoExam', {
         examId: detalhe.id,
         attemptId: attempt.id,
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       setErroAcao(parseStartErrorMessage(e));
-    } finally {
-      setIniciando(false);
     }
   }
 
@@ -388,7 +360,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
       <View style={styles.centrado}>
         <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
         <Text style={styles.erroTexto}>{erroMsg ?? 'Simulado não encontrado.'}</Text>
-        <TouchableOpacity style={styles.botaoTentar} onPress={carregar} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.botaoTentar} onPress={() => refetchDetalhe()} activeOpacity={0.8}>
           <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
         </TouchableOpacity>
       </View>
@@ -757,9 +729,9 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                 </View>
                 );
               })
-            ) : (
+            ) : revisaoErro ? (
               <Text style={styles.previewNaoRespondida}>Não foi possível carregar a revisão.</Text>
-            )}
+            ) : null}
           </View>
         )}
       </View>

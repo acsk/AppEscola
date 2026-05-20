@@ -1,73 +1,120 @@
 import api from "./api";
+import { unwrapApi } from "../types/api";
 
-export type BillingSettingsScope = "billing" | "payment" | "enrollment";
-
-export type BillingSettingsFieldType = "bool" | "int" | "string" | "array";
-
-export type BillingSettingsField = {
-  type: BillingSettingsFieldType;
-  default: any;
-  label?: string;
-  description?: string;
-  min?: number;
-  max?: number;
-  options?: string[];
-};
-
-export type BillingSettingsSchema = Record<
+export type {
+  BillingSettingsField,
+  BillingSettingsFieldType,
+  BillingSettingsPersisted,
+  BillingSettingsPersistedField,
+  BillingSettingsResponse,
+  BillingSettingsSchema,
+  BillingSettingsSchemaResponse,
   BillingSettingsScope,
-  Record<string, BillingSettingsField>
->;
-
-export type BillingSettingsValues = Record<
+  BillingSettingsScopeDescriptions,
+  BillingSettingsScopeResponse,
+  BillingSettingsValues,
+  ProviderCapabilities,
+} from "../types/settings";
+import type {
+  BillingSettingsPersisted,
+  BillingSettingsPersistedField,
+  BillingSettingsResponse,
+  BillingSettingsSchema,
+  BillingSettingsSchemaResponse,
   BillingSettingsScope,
-  Record<string, any>
->;
+  BillingSettingsScopeResponse,
+  BillingSettingsValues,
+  ProviderCapabilities,
+} from "../types/settings";
 
-export type BillingSettingsScopeDescriptions = Partial<
-  Record<BillingSettingsScope, string>
->;
-
-export type BillingSettingsSchemaResponse = {
-  schema: BillingSettingsSchema;
-  defaults: BillingSettingsValues;
-  scope_descriptions?: BillingSettingsScopeDescriptions;
-  // V2: o endpoint /schema agora também devolve os valores persistidos,
-  // permitindo carregar tudo em uma única chamada.
-  tenant_id?: number;
-  mode?: string;
-  settings?: BillingSettingsValues;
-  persisted_settings?: BillingSettingsPersisted;
+const DEFAULT_ENABLED_BY_PROVIDER: Record<string, string[]> = {
+  cora: ["pix", "boleto", "hybrid"],
+  manual: ["pix", "boleto", "cash", "transfer"],
 };
 
-export type BillingSettingsPersistedField = {
-  value: any;
-  description?: string | null;
-  updated_at?: string | null;
+const DEFAULT_METHOD_BY_PROVIDER: Record<string, string> = {
+  cora: "hybrid",
+  manual: "cash",
 };
 
-export type BillingSettingsPersisted = Record<
-  BillingSettingsScope,
-  Record<string, BillingSettingsPersistedField>
->;
+/**
+ * Ajusta formas de pagamento ao trocar o provedor (espelha o backend).
+ */
+export function normalizePaymentDraftForProvider(
+  provider: string,
+  current: Record<string, any>,
+  capabilities: ProviderCapabilities
+): Record<string, any> {
+  const slug = provider.trim().toLowerCase();
+  const allowed = capabilities[slug] ?? [];
+  const next: Record<string, any> = { ...current, default_provider: slug };
 
-export type BillingSettingsResponse = {
-  tenant_id: number;
-  mode?: string;
-  settings: BillingSettingsValues;
-  persisted_settings?: BillingSettingsPersisted;
-};
+  if (slug === "manual") {
+    next.auto_sync_charges = false;
+  }
 
-export type BillingSettingsScopeResponse = {
-  tenant_id: number;
-  scope: BillingSettingsScope;
-  values: Record<string, any>;
-  values_meta?: Record<string, BillingSettingsPersistedField>;
-};
+  let enabled: string[] = Array.isArray(current.enabled_methods)
+    ? current.enabled_methods.map(String)
+    : DEFAULT_ENABLED_BY_PROVIDER[slug] ?? allowed.slice(0, 3);
 
-const unwrap = <T>(data: any): T => {
-  return (data?.body ?? data) as T;
-};
+  enabled = enabled.map((m) => (m === "bank_slip" ? "boleto" : m));
+  enabled = Array.from(new Set(enabled.filter((m) => allowed.includes(m))));
+
+  if (enabled.length === 0) {
+    const fallback = DEFAULT_ENABLED_BY_PROVIDER[slug] ?? allowed;
+    enabled = fallback.filter((m) => allowed.includes(m));
+  }
+
+  next.enabled_methods = enabled;
+
+  let defaultMethod = String(current.default_method ?? "");
+  defaultMethod = defaultMethod === "bank_slip" ? "boleto" : defaultMethod;
+
+  if (!defaultMethod || !enabled.includes(defaultMethod)) {
+    const preferred = DEFAULT_METHOD_BY_PROVIDER[slug] ?? enabled[0] ?? "pix";
+    next.default_method = enabled.includes(preferred) ? preferred : enabled[0];
+  } else {
+    next.default_method = defaultMethod;
+  }
+
+  return next;
+}
+
+export const PAYMENT_SETTINGS_FIELD_ORDER = [
+  "default_provider",
+  "enabled_methods",
+  "default_method",
+  "auto_sync_charges",
+] as const;
+
+export function applyProviderCapabilitiesToSchema(
+  baseSchema: BillingSettingsSchema,
+  provider: string,
+  capabilities: ProviderCapabilities
+): BillingSettingsSchema {
+  const methods = capabilities[provider] ?? [];
+  const payment = { ...(baseSchema.payment || {}) };
+
+  if (payment.enabled_methods) {
+    payment.enabled_methods = {
+      ...payment.enabled_methods,
+      options: methods.length > 0 ? methods : payment.enabled_methods.options,
+    };
+  }
+
+  if (payment.default_method) {
+    payment.default_method = {
+      ...payment.default_method,
+      options: methods.length > 0 ? methods : payment.default_method.options,
+    };
+  }
+
+  if (provider === "manual") {
+    delete payment.auto_sync_charges;
+  }
+
+  return { ...baseSchema, payment };
+}
 
 const tenantParams = (tenantId?: number | null) =>
   tenantId != null ? { tenant_id: tenantId } : undefined;
@@ -103,7 +150,7 @@ export async function getBillingSettingsSchema(
   const { data } = await api.get("/tenant-billing-settings/schema", {
     params: tenantParams(tenantId),
   });
-  return unwrap<BillingSettingsSchemaResponse>(data);
+  return unwrapApi<BillingSettingsSchemaResponse>(data);
 }
 
 export async function getBillingSettings(
@@ -112,7 +159,7 @@ export async function getBillingSettings(
   const { data } = await api.get("/tenant-billing-settings", {
     params: tenantParams(tenantId),
   });
-  return unwrap<BillingSettingsResponse>(data);
+  return unwrapApi<BillingSettingsResponse>(data);
 }
 
 export async function updateBillingSettingsScope(
@@ -125,7 +172,7 @@ export async function updateBillingSettingsScope(
     { values },
     { params: tenantParams(tenantId) }
   );
-  return unwrap<BillingSettingsScopeResponse>(data);
+  return unwrapApi<BillingSettingsScopeResponse>(data);
 }
 
 export async function resetBillingSettingsScope(
@@ -137,5 +184,5 @@ export async function resetBillingSettingsScope(
     {},
     { params: tenantParams(tenantId) }
   );
-  return unwrap<BillingSettingsScopeResponse>(data);
+  return unwrapApi<BillingSettingsScopeResponse>(data);
 }

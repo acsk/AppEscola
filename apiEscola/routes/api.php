@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ExamQuestionController;
 use App\Http\Controllers\Api\SupportMaterialController;
 use App\Http\Controllers\Api\StudentDashboardController;
 use App\Http\Controllers\Api\StudentExamController;
+use App\Http\Controllers\Api\StudentPerformanceController;
 use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\TenantCoraSettingsController;
@@ -116,6 +117,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Alunos
     Route::apiResource('students', StudentController::class);
+    Route::get('students/{student}/performance', [StudentPerformanceController::class, 'forStudent']);
     Route::post('students/{student}/upload-photo', [StudentController::class, 'uploadPhoto']);
 
     // Responsáveis de um aluno (nested)
@@ -199,6 +201,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Simulados do aluno autenticado (role: aluno)
     Route::get('aluno/dashboard',                [StudentDashboardController::class, 'index']);
+    Route::get('aluno/performance',              [StudentPerformanceController::class, 'forAuthenticatedStudent']);
     Route::get('aluno/boletos',                  [StudentFinanceController::class, 'boletos']);
     Route::get('aluno/cobrancas/{invoice}/payment-options', [StudentFinanceController::class, 'paymentOptions']);
     Route::post('aluno/cobrancas/{invoice}/generate-charge', [StudentFinanceController::class, 'generateCharge']);

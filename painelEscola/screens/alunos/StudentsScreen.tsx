@@ -15,33 +15,10 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useStatuses, domainToOptions } from "../../hooks/useDomains";
 import { maskPhone, maskCPF, isoToDisplay } from "../../utils/masks";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import type { CourseOption } from "../../types/entities";
+import type { StudentListItem, StudentsScreenProps } from "../../types/alunos";
 
-type Student = {
-  id: number;
-  enrollment_number: string | null;
-  name: string;
-  birth_date: string | null;
-  document: string | null;
-  email: string | null;
-  phone: string | null;
-  is_minor: boolean;
-  status: string;
-  desired_courses?: Array<{ id: number; name: string }>;
-  desired_course_id?: number | null;
-  desired_course?: { id: number; name: string } | null;
-  guardians?: Array<{ id: number; name: string }>;
-};
-
-type CourseOption = {
-  id: number;
-  name: string;
-};
-
-interface Props {
-  navigate: (screen: string, params?: Record<string, any>) => void;
-}
-
-export default function StudentsScreen({ navigate }: Props) {
+export default function StudentsScreen({ navigate }: StudentsScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const statuses = useStatuses();
   const statusOptions = statuses.length
@@ -50,7 +27,7 @@ export default function StudentsScreen({ navigate }: Props) {
         { value: "active", label: "Ativo" },
         { value: "inactive", label: "Inativo" },
       ];
-  const [rows, setRows] = useState<Student[]>([]);
+  const [rows, setRows] = useState<StudentListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -402,6 +379,17 @@ export default function StudentsScreen({ navigate }: Props) {
                       </Text>
                     </View>
                     <View className="flex-row gap-2">
+                      <TouchableOpacity
+                        onPress={() =>
+                          navigate("alunos-performance", {
+                            studentId: item.id,
+                            studentName: item.name,
+                          })
+                        }
+                        className="p-1.5 bg-blue-50 rounded-lg"
+                      >
+                        <Ionicons name="stats-chart-outline" size={15} color="#2563EB" />
+                      </TouchableOpacity>
                       <TouchableOpacity onPress={() => navigate("alunos-form", { studentId: item.id })} className="p-1.5 bg-violet-50 rounded-lg">
                         <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
                       </TouchableOpacity>
@@ -470,7 +458,7 @@ export default function StudentsScreen({ navigate }: Props) {
                 />
               </View>
               <View
-                style={{ width: 112 }}
+                style={{ width: 148 }}
                 className="flex-row justify-end gap-2"
               >
                 {item.status === "inactive" && (
@@ -486,6 +474,17 @@ export default function StudentsScreen({ navigate }: Props) {
                     )}
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  onPress={() =>
+                    navigate("alunos-performance", {
+                      studentId: item.id,
+                      studentName: item.name,
+                    })
+                  }
+                  className="p-1.5 bg-blue-50 rounded-lg"
+                >
+                  <Ionicons name="stats-chart-outline" size={15} color="#2563EB" />
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() =>
                     navigate("alunos-form", { studentId: item.id })

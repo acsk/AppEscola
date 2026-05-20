@@ -14,6 +14,8 @@
 |
 | Tipos suportados: bool, int, string, array<string>
 |
+| Ordem das chaves no escopo `payment`: provedor primeiro, depois métodos.
+|
 */
 
 return [
@@ -51,34 +53,36 @@ return [
     ],
 
     'payment' => [
+        'default_provider' => [
+            'type' => 'string',
+            'default' => 'cora',
+            'options' => \App\Services\PaymentProviderRegistry::billingProviderSlugs(),
+            'label' => 'Provedor de pagamento padrão',
+            'description' => 'Cora: cobrança automática (PIX/boleto). Manual: confirmação pela secretaria, sem gateway.',
+        ],
+
         'enabled_methods' => [
             'type' => 'array',
             'default' => ['pix', 'boleto', 'hybrid'],
             'options' => ['pix', 'boleto', 'hybrid', 'credit_card', 'debit_card', 'cash', 'transfer'],
-            'label' => 'Métodos de pagamento habilitados',
-            'description' => 'Restringe os métodos que podem ser passados ao gerar cobranças. boleto e bank_slip são equivalentes. hybrid = pix com QR code do boleto.',
-        ],
-
-        'default_provider' => [
-            'type' => 'string',
-            'default' => 'cora',
-            'options' => ['cora', 'manual'],
-            'label' => 'Provedor padrão',
-            'description' => 'Provedor usado quando o front não informa explicitamente.',
+            'label' => 'Formas de pagamento aceitas',
+            'description' => 'Opções disponíveis dependem do provedor selecionado acima. Com Manual, inclui dinheiro e transferência.',
         ],
 
         'default_method' => [
             'type' => 'string',
             'default' => 'hybrid',
             'options' => ['pix', 'boleto', 'hybrid'],
-            'label' => 'Método padrão de cobrança',
+            'label' => 'Forma de pagamento padrão',
+            'description' => 'Usada ao gerar cobrança quando o operador não escolher outra forma.',
         ],
 
         'auto_sync_charges' => [
             'type' => 'bool',
             'default' => true,
             'label' => 'Sincronizar cobranças automaticamente',
-            'description' => 'Habilita jobs/agendamentos que consultam o provedor para atualizar status das invoices.',
+            'description' => 'Consulta o gateway para atualizar status das faturas. Disponível apenas com provedor Cora.',
+            'visible_when' => ['default_provider' => ['cora']],
         ],
     ],
 

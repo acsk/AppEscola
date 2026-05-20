@@ -1,29 +1,14 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import api from "../services/api";
 import appJson from "../app.json";
+import type { AuthContextValue, AuthUser } from "../types/auth";
+
+export type { AuthUser } from "../types/auth";
 
 const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
 const STORAGE_APP_VERSION_KEY = "app_version";
 
-export type AuthUser = {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  tenant_id: number | null;
-  password_change_required?: boolean;
-};
-
-type AuthContextType = {
-  user: AuthUser | null;
-  isLoading: boolean;
-  mustChangePassword: boolean;
-  login: (email: string, password: string, tenantId?: number | null) => Promise<void>;
-  completeFirstAccess: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
-  logout: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);

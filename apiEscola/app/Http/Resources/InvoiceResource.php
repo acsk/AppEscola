@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\InvoiceLifecycleService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +10,8 @@ class InvoiceResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $lifecycle = app(InvoiceLifecycleService::class)->permissions($this->resource);
+
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
@@ -50,8 +53,13 @@ class InvoiceResource extends JsonResource
             ],
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
-            'can_edit'   => ! in_array($this->status, ['paid', 'cancelled']),
-            'can_delete' => $this->status !== 'paid',
+            'can_edit' => $lifecycle['can_edit'],
+            'can_cancel' => $lifecycle['can_cancel'],
+            'can_delete' => $lifecycle['can_delete'],
+            'requires_cora_cancel_before_delete' => $lifecycle['requires_cora_cancel_before_delete'],
+            'cancel_block_reason' => $lifecycle['cancel_block_reason'],
+            'delete_block_reason' => $lifecycle['delete_block_reason'],
+            'lifecycle_hint' => $lifecycle['lifecycle_hint'],
         ];
     }
 }

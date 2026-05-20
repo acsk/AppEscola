@@ -19,42 +19,13 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import { isoToDisplay } from "../../utils/masks";
 import { useEnrollmentStatuses, domainToOptions } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import type {
+  EnrollmentEditFormValues,
+  EnrollmentSummary,
+  EnrollmentsScreenProps,
+} from "../../types/matriculas";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Student = { id: number; name: string; enrollment_number?: string };
-type SchoolClass = { id: number; name: string; course?: { id: number; name: string } };
-type Guardian = { id: number; name: string };
-type CoursePlan = { id: number; name: string; billing_cycle: string; cycle_label: string; price: string };
-
-type Enrollment = {
-  id: number;
-  enrollment_number: string | null;
-  start_date: string;
-  end_date: string | null;
-  status: string;
-  monthly_amount: string | null;
-  discount_amount: string | null;
-  payment_due_day: number | null;
-  student?: Student;
-  school_class?: SchoolClass;
-  guardian?: Guardian;
-  course_plan?: CoursePlan;
-  created_at?: string;
-};
-
-type EditForm = {
-  student_id: string;
-  school_class_id: string;
-  start_date: string;
-  end_date: string;
-  status: string;
-  monthly_amount: string;
-  discount_amount: string;
-  payment_due_day: string;
-};
-
-const EMPTY_EDIT: EditForm = {
+const EMPTY_EDIT: EnrollmentEditFormValues = {
   student_id: "",
   school_class_id: "",
   start_date: "",
@@ -72,17 +43,9 @@ const STATUS_LABELS: Record<string, string> = {
   concluded: "Concluído",
 };
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-interface Props {
-  navigate: (screen: string, params?: Record<string, any>) => void;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
-export default function EnrollmentsScreen({ navigate }: Props) {
+export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
-  const [rows, setRows] = useState<Enrollment[]>([]);
+  const [rows, setRows] = useState<EnrollmentSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -96,7 +59,7 @@ export default function EnrollmentsScreen({ navigate }: Props) {
 
   // Edit modal
   const [editId, setEditId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
+  const [editForm, setEditForm] = useState<EnrollmentEditFormValues>(EMPTY_EDIT);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
   const [editVisible, setEditVisible] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -111,7 +74,7 @@ export default function EnrollmentsScreen({ navigate }: Props) {
 
   // View modal
   const [viewVisible, setViewVisible] = useState(false);
-  const [viewData, setViewData] = useState<Enrollment | null>(null);
+  const [viewData, setViewData] = useState<EnrollmentSummary | null>(null);
   const [loadingView, setLoadingView] = useState(false);
 
   const enrollmentStatuses = useEnrollmentStatuses();
@@ -159,7 +122,7 @@ export default function EnrollmentsScreen({ navigate }: Props) {
     setLoadingView(false);
   };
 
-  const openEdit = async (row: Enrollment) => {    await fetchLookups();
+  const openEdit = async (row: EnrollmentSummary) => {    await fetchLookups();
     setEditId(row.id);
     setEditForm({
       student_id: String(row.student?.id ?? ""),

@@ -32,6 +32,7 @@ class TenantBillingSettingsController extends Controller
             'schema' => $this->service->schemaForTenant($tenant),
             'defaults' => $this->service->defaultsForTenant($tenant),
             'scope_descriptions' => $this->service->scopeDescriptions(),
+            'provider_capabilities' => $this->service->providerCapabilities(),
             'tenant_id' => $tenant->id,
             'mode' => 'persisted',
             'settings' => $this->service->persistedAllValues($tenant),

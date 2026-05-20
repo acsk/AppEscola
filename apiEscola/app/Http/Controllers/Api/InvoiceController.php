@@ -9,17 +9,22 @@ use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
-use App\Services\PaymentGatewayFactory;
+use App\Services\InvoiceLifecycleService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use RuntimeException;
 
 class InvoiceController extends Controller
 {
     use ScopedByTenant;
+
+    public function __construct(private readonly InvoiceLifecycleService $lifecycle)
+    {
+    }
 
     #[OA\Get(
         path: '/api/invoices',
@@ -142,8 +147,10 @@ class InvoiceController extends Controller
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
-        if ($invoice->status === 'paid') {
-            return $this->error('Não é possível excluir uma cobrança paga.', null, 422);
+        try {
+            $this->lifecycle->assertCanDelete($invoice);
+        } catch (RuntimeException $e) {
+            return $this->error($e->getMessage(), $this->lifecycle->permissions($invoice), 422);
         }
 
         $invoice->delete();
@@ -205,59 +212,42 @@ class InvoiceController extends Controller
             new OA\Response(response: 422, description: 'Já cancelada ou paga'),
         ]
     )]
-    public function cancel(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
+    public function cancel(Request $request, Invoice $invoice): JsonResponse
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
-        if ($invoice->status === 'cancelled') {
-            return $this->error('Cobrança já está cancelada.', null, 422);
-        }
-
-        if ($invoice->status === 'paid') {
-            return $this->error('Não é possível cancelar uma cobrança paga.', null, 422);
-        }
-
-        // PIX com cobrança ativa no Cora expira automaticamente — não cancelar manualmente.
-        $isPixWithActiveCharge = $invoice->cora_charge_id
-            && in_array($invoice->payment_method, ['pix'], true)
-            && in_array($invoice->cora_status, ['OPEN', 'PENDING', null], true);
-
-        if ($isPixWithActiveCharge) {
+        try {
+            $result = $this->lifecycle->cancelInvoice($invoice, $request);
+        } catch (RuntimeException $e) {
+            return $this->error($e->getMessage(), $this->lifecycle->permissions($invoice), 422);
+        } catch (ConnectionException $e) {
             return $this->error(
-                'Cobranças PIX expiram automaticamente. Não é necessário cancelar manualmente.',
-                ['cora_charge_id' => $invoice->cora_charge_id],
-                422
+                'Não foi possível conectar ao provedor para cancelar a cobrança. Tente novamente.',
+                ['detail' => $e->getMessage()],
+                502
+            );
+        } catch (RequestException $e) {
+            return $this->error(
+                'O provedor recusou o cancelamento da cobrança.',
+                [
+                    'http_status' => $e->response?->status(),
+                    'detail' => $e->response?->json(),
+                ],
+                502
             );
         }
 
-        // Se há cobrança ativa no Cora (boleto), cancela lá também.
-        if ($invoice->cora_charge_id) {
-            $invoice->loadMissing('tenant');
-            $environment = $request->input('environment', 'prod');
+        $invoice->refresh();
 
-            try {
-                $factory->resolve('cora')->cancelCharge($invoice->tenant, $invoice->cora_charge_id, $environment);
-            } catch (\Illuminate\Http\Client\ConnectionException $e) {
-                return $this->error(
-                    'Não foi possível conectar à Cora para cancelar a cobrança. Tente novamente.',
-                    ['detail' => $e->getMessage()],
-                    502
-                );
-            } catch (\Illuminate\Http\Client\RequestException $e) {
-                return $this->error(
-                    'A Cora recusou o cancelamento da cobrança.',
-                    [
-                        'http_status' => $e->response?->status(),
-                        'detail'      => $e->response?->json(),
-                    ],
-                    502
-                );
-            }
-        }
+        $message = $result['cancelled_on_gateway']
+            ? 'Cobrança cancelada no provedor e no sistema.'
+            : 'Cobrança cancelada no sistema.';
 
-        $invoice->update(['status' => 'cancelled']);
-
-        return $this->success(new InvoiceResource($invoice), 'Cobrança cancelada com sucesso.');
+        return $this->success([
+            'invoice' => new InvoiceResource($invoice),
+            'cancelled_on_gateway' => $result['cancelled_on_gateway'],
+            'environment' => $result['environment'],
+        ], $message);
     }
 
     #[OA\Post(

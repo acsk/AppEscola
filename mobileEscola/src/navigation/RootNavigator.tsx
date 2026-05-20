@@ -27,6 +27,7 @@ const linking: LinkingOptions<any> = {
       AlunoTabs: {
         screens: {
           Home:       'home',
+          Desempenho: 'desempenho',
           Simulados: {
             path: 'simulados',
             screens: {

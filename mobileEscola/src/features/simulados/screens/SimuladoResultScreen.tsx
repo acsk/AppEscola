@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
-import {
-  buscarTentativaDetalhada,
-  AttemptReview,
-  subjectIconName,
-} from '../../../services/simulados.service';
+import { subjectIconName } from '../../../services/simulados.service';
+import { getApiErrorMessage } from '../../../lib/apiError';
+import { useAttemptResult } from '../hooks';
 import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoResult'>;
@@ -45,9 +43,17 @@ function calcularDuracao(startedAt: string, finishedAt: string): string {
 export function SimuladoResultScreen({ route, navigation }: Props) {
   const { attemptId } = route.params;
 
-  const [resultado, setResultado]   = useState<AttemptReview | null>(null);
-  const [carregando, setCarregando]  = useState(true);
-  const [erroMsg, setErroMsg]        = useState<string | null>(null);
+  const {
+    data: resultado,
+    isLoading: carregando,
+    isError,
+    error,
+    refetch,
+  } = useAttemptResult(attemptId);
+
+  const erroMsg = isError
+    ? getApiErrorMessage(error, 'Não foi possível carregar o resultado.')
+    : null;
 
   useEffect(() => {
     navigation.setOptions({
@@ -70,28 +76,11 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
     });
   }, [navigation]);
 
-  useEffect(() => { carregar(); }, [attemptId]);
-
-  async function carregar() {
-    setCarregando(true);
-    setErroMsg(null);
-    try {
-      const res = await buscarTentativaDetalhada(attemptId);
-      console.log('🎯 Resultado carregado:', JSON.stringify(res, null, 2));
-      console.log('📊 Score:', res.score, 'Max:', res.max_score, 'Display:', res.score_display);
-      console.log('❓ Questões:', res.questions?.length ?? 0, 'items');
-      console.log('🔒 Result release pending:', res.result_release_pending);
-      console.log('✅ Status:', res.status);
-      setResultado(res);
-      navigation.setOptions({ title: res.exam?.title ?? 'Resultado' });
-    } catch (e: any) {
-      console.log('❌ Erro ao carregar resultado:', e);
-      console.log('Response:', e?.response?.data);
-      setErroMsg(e?.response?.data?.message ?? 'Não foi possível carregar o resultado.');
-    } finally {
-      setCarregando(false);
+  useEffect(() => {
+    if (resultado?.exam?.title) {
+      navigation.setOptions({ title: resultado.exam.title });
     }
-  }
+  }, [resultado?.exam?.title, navigation]);
 
   // ── Carregando ──────────────────────────────────────────────────────────────
   if (carregando) {
@@ -109,7 +98,7 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
       <View style={styles.centrado}>
         <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
         <Text style={styles.erroTexto}>{erroMsg ?? 'Resultado não encontrado.'}</Text>
-        <TouchableOpacity style={styles.botaoTentar} onPress={carregar} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.botaoTentar} onPress={() => refetch()} activeOpacity={0.8}>
           <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
         </TouchableOpacity>
       </View>

@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Tenant;
 use App\Models\TenantSetting;
-use App\Models\DomainPaymentMethod;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 
@@ -46,37 +45,39 @@ class TenantBillingSettingsService
     public function schemaForTenant(Tenant $tenant): array
     {
         $schema = $this->schema();
-        $selectedProvider = strtolower((string) ($this->get($tenant, 'payment', 'default_provider') ?? 'cora'));
-        $providerMethods = $this->providerSupportedMethods($selectedProvider);
+        $selectedProvider = $this->resolvePaymentProviderSlug($tenant);
+        $providerMethods = PaymentProviderRegistry::supportedMethods($selectedProvider);
 
-        if (
-            isset($schema['payment']['enabled_methods']['options'])
-            && is_array($schema['payment']['enabled_methods']['options'])
-        ) {
-            $current = array_values(array_map('strval', $schema['payment']['enabled_methods']['options']));
-            $filtered = array_values(array_intersect($current, $providerMethods));
-            if (! empty($filtered)) {
-                $schema['payment']['enabled_methods']['options'] = $filtered;
-            }
+        if (isset($schema['payment']['enabled_methods'])) {
+            $schema['payment']['enabled_methods']['options'] = $providerMethods;
+            $schema['payment']['enabled_methods']['default'] = PaymentProviderRegistry::defaultEnabledMethods($selectedProvider);
         }
 
-        if (
-            isset($schema['payment']['default_method']['options'])
-            && is_array($schema['payment']['default_method']['options'])
-        ) {
-            $current = array_values(array_map('strval', $schema['payment']['default_method']['options']));
-            $filtered = array_values(array_intersect($current, $providerMethods));
-            if (! empty($filtered)) {
-                $schema['payment']['default_method']['options'] = $filtered;
-
-                $default = (string) ($schema['payment']['default_method']['default'] ?? '');
-                if ($default === '' || ! in_array($default, $filtered, true)) {
-                    $schema['payment']['default_method']['default'] = $filtered[0];
-                }
-            }
+        if (isset($schema['payment']['default_method'])) {
+            $schema['payment']['default_method']['options'] = $providerMethods;
+            $preferred = PaymentProviderRegistry::defaultMethod($selectedProvider);
+            $schema['payment']['default_method']['default'] = in_array($preferred, $providerMethods, true)
+                ? $preferred
+                : ($providerMethods[0] ?? $preferred);
         }
+
+        if (isset($schema['payment']['default_provider']['options'])) {
+            $schema['payment']['default_provider']['options'] = PaymentProviderRegistry::billingProviderSlugs();
+        }
+
+        $schema['payment'] = $this->applyPaymentFieldVisibility($schema['payment'], $selectedProvider);
 
         return $schema;
+    }
+
+    /**
+     * Mapa de métodos por provedor para o front ajustar a UI antes de salvar.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function providerCapabilities(): array
+    {
+        return PaymentProviderRegistry::methodsByProvider();
     }
 
     /**
@@ -253,6 +254,10 @@ class TenantBillingSettingsService
     public function updateScope(Tenant $tenant, string $scope, array $values): array
     {
         $this->assertScope($scope);
+
+        if ($scope === 'payment') {
+            $values = $this->preparePaymentScopeUpdate($tenant, $values);
+        }
 
         foreach ($values as $key => $value) {
             $this->assertKey($scope, $key);
@@ -436,6 +441,9 @@ class TenantBillingSettingsService
                 if ($scope === 'payment' && $key === 'default_method' && $str === 'bank_slip') {
                     $str = 'boleto';
                 }
+                if ($scope === 'payment' && in_array($key, ['default_provider', 'default_method'], true)) {
+                    return $str;
+                }
                 if (isset($meta['options']) && is_array($meta['options']) && ! in_array($str, $meta['options'], true)) {
                     throw new InvalidArgumentException(
                         "{$scope}.{$key} deve estar em: " . implode(', ', $meta['options'])
@@ -455,6 +463,9 @@ class TenantBillingSettingsService
 
                     return $str;
                 }, $value)));
+                if ($scope === 'payment' && $key === 'enabled_methods') {
+                    return $list;
+                }
                 if (isset($meta['options']) && is_array($meta['options'])) {
                     $invalid = array_diff($list, $meta['options']);
                     if (! empty($invalid)) {
@@ -489,31 +500,53 @@ class TenantBillingSettingsService
         return "tenant:{$tenantId}:billing-settings";
     }
 
-    /**
-     * @return array<int, string>
-     */
-    private function providerSupportedMethods(string $providerSlug): array
+    private function resolvePaymentProviderSlug(Tenant $tenant): string
     {
-        return match ($providerSlug) {
-            'cora' => ['pix', 'boleto', 'hybrid'],
-            // Manual e outros provedores herdam métodos de domínio disponíveis.
-            'manual' => $this->domainPaymentMethodSlugs(),
-            default => $this->domainPaymentMethodSlugs(),
-        };
+        $slug = strtolower((string) ($this->get($tenant, 'payment', 'default_provider') ?? 'cora'));
+
+        return PaymentProviderRegistry::exists($slug) ? $slug : 'cora';
     }
 
     /**
-     * @return array<int, string>
+     * @param  array<string, array<string, mixed>>  $paymentSchema
+     * @return array<string, array<string, mixed>>
      */
-    private function domainPaymentMethodSlugs(): array
+    private function applyPaymentFieldVisibility(array $paymentSchema, string $providerSlug): array
     {
-        return Cache::remember('domain:payment-methods:slugs', self::CACHE_TTL_SECONDS, static function (): array {
-            return DomainPaymentMethod::query()
-                ->orderBy('name')
-                ->pluck('slug')
-                ->map(static fn ($slug) => (string) $slug)
-                ->values()
-                ->all();
-        });
+        foreach ($paymentSchema as $key => $definition) {
+            $visibleWhen = $definition['visible_when'] ?? null;
+            if (! is_array($visibleWhen)) {
+                continue;
+            }
+
+            foreach ($visibleWhen as $field => $allowedValues) {
+                if ($field === 'default_provider' && ! in_array($providerSlug, (array) $allowedValues, true)) {
+                    unset($paymentSchema[$key]);
+                    break;
+                }
+            }
+        }
+
+        return $paymentSchema;
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    private function preparePaymentScopeUpdate(Tenant $tenant, array $values): array
+    {
+        $current = $this->scope($tenant, 'payment');
+        $provider = array_key_exists('default_provider', $values)
+            ? strtolower((string) $values['default_provider'])
+            : $this->resolvePaymentProviderSlug($tenant);
+
+        if (! PaymentProviderRegistry::exists($provider)) {
+            throw new InvalidArgumentException("Provedor de pagamento inválido: {$provider}.");
+        }
+
+        $values['default_provider'] = $provider;
+
+        return PaymentProviderRegistry::normalizePaymentValues($provider, $values, $current);
     }
 }

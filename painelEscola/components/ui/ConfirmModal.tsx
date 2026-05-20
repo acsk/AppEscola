@@ -8,19 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
-type Props = {
-  visible: boolean;
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  loading?: boolean;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  iconName?: keyof typeof Ionicons.glyphMap;
-  tone?: "danger" | "primary";
-};
+import type { ConfirmModalProps } from "../../types/components";
 
 export default function ConfirmModal({
   visible,
@@ -29,11 +17,12 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   loading,
+  confirmDisabled,
   confirmLabel = "Excluir",
   cancelLabel = "Cancelar",
   iconName = "trash-outline",
   tone = "danger",
-}: Props) {
+}: ConfirmModalProps) {
   const { width } = useWindowDimensions();
   const isMobile = width < 520;
   const horizontalPadding = isMobile ? 16 : width < 1024 ? 24 : 40;
@@ -91,8 +80,8 @@ export default function ConfirmModal({
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onConfirm}
-              disabled={loading}
-              className={`flex-1 py-3 rounded-xl ${confirmBg} items-center`}
+              disabled={loading || confirmDisabled}
+              className={`flex-1 py-3 rounded-xl ${confirmBg} items-center ${loading || confirmDisabled ? "opacity-50" : ""}`}
               activeOpacity={0.8}
             >
               {loading ? (

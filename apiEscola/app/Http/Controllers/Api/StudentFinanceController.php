@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Student;
-use App\Models\Tenant;
+use App\Services\InvoicePaymentSettingsResolver;
 use App\Services\PaymentGatewayFactory;
-use App\Services\TenantBillingSettingsService;
+use App\Services\PaymentProviderRegistry;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -16,6 +16,10 @@ use Illuminate\Http\Request;
 
 class StudentFinanceController extends Controller
 {
+    public function __construct(private readonly InvoicePaymentSettingsResolver $paymentResolver)
+    {
+    }
+
     /**
     * Lista cobrancas do aluno autenticado em grupos para a tela financeira:
     * - pagas: cobrancas com status paid
@@ -98,21 +102,12 @@ class StudentFinanceController extends Controller
             return $this->forbidden('Cobrança não pertence ao aluno autenticado.');
         }
 
-        $methodLock = $this->resolveMethodLock($invoice);
+        $tenantId = (int) $invoice->tenant_id;
+        $methodLock = $this->paymentResolver->resolveMethodLock($invoice);
         $lockedMethod = $methodLock['method'];
         $lockReason = $methodLock['reason'];
-
-        $paymentSettings = $this->paymentScope((int) $invoice->tenant_id);
-        $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
-        $enabledMethods = is_array($rawEnabledMethods)
-            ? array_values(array_unique(array_map(static function (string $method): string {
-                $normalized = strtolower(trim($method));
-
-                return $normalized === 'bank_slip' ? 'boleto' : $normalized;
-            }, $rawEnabledMethods)))
-            : ['pix', 'boleto', 'hybrid'];
-
-        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+        $supportsGateway = $this->paymentResolver->supportsGatewayCharge($tenantId);
+        $enabledMethods = $this->paymentResolver->gatewayChargeMethodsForTenant($tenantId);
 
         $allowedMethods = match (true) {
             $lockedMethod === 'hybrid' => ['hybrid'],
@@ -129,11 +124,10 @@ class StudentFinanceController extends Controller
             ? ($invoice->payment_method === 'bank_slip' ? 'boleto' : $invoice->payment_method)
             : ($lockedMethod === 'bank_slip' ? 'boleto' : $lockedMethod);
 
-        $configuredDefaultMethod = strtolower((string) ($paymentSettings['default_method'] ?? ''));
-        $configuredDefaultMethod = $configuredDefaultMethod === 'bank_slip' ? 'boleto' : $configuredDefaultMethod;
-        $configuredDefaultMethod = in_array($configuredDefaultMethod, ['pix', 'boleto', 'hybrid'], true)
-            ? $configuredDefaultMethod
-            : null;
+        $configuredDefaultMethod = $this->paymentResolver->configuredDefaultMethod($tenantId);
+        if ($configuredDefaultMethod !== null && ! in_array($configuredDefaultMethod, ['pix', 'boleto', 'hybrid'], true)) {
+            $configuredDefaultMethod = null;
+        }
 
         if ($currentMethod === null && $configuredDefaultMethod !== null && in_array($configuredDefaultMethod, $allowedMethods, true)) {
             $currentMethod = $configuredDefaultMethod;
@@ -145,7 +139,8 @@ class StudentFinanceController extends Controller
             'current_method' => $currentMethod,
             'default_method' => $configuredDefaultMethod,
             'actions' => [
-                'can_generate_charge' => ! in_array($invoice->status, ['paid', 'cancelled'], true),
+                'can_generate_charge' => $supportsGateway
+                    && ! in_array($invoice->status, ['paid', 'cancelled'], true),
                 'can_change_method' => $lockedMethod === null,
                 'can_open_boleto_url' => (bool) $invoice->cora_payment_url,
                 'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
@@ -188,21 +183,30 @@ class StudentFinanceController extends Controller
             return $this->error('Não é possível gerar cobrança para fatura paga ou cancelada.', null, 422);
         }
 
+        $tenantId = (int) $invoice->tenant_id;
+        $defaultProvider = $this->paymentResolver->defaultProviderSlug($tenantId);
+
+        if ($defaultProvider === 'manual' || ! PaymentProviderRegistry::supportsGatewayCharge($defaultProvider)) {
+            return $this->error(
+                'Os pagamentos desta escola são confirmados pela secretaria. Entre em contato com a instituição.',
+                ['default_provider' => $defaultProvider],
+                422
+            );
+        }
+
+        if (! PaymentGatewayFactory::isSupported($defaultProvider)) {
+            return $this->error(
+                'Geração de cobrança online indisponível no momento.',
+                ['supported_gateways' => PaymentGatewayFactory::supportedProviders()],
+                422
+            );
+        }
+
         // Enforce environment: outside production always stage; in production always prod
         $environment = app()->environment('production') ? 'prod' : 'stage';
 
         $requestedMethod = strtolower((string) $data['method']);
-        $paymentSettings = $this->paymentScope((int) $invoice->tenant_id);
-        $rawEnabledMethods = $paymentSettings['enabled_methods'] ?? null;
-        $enabledMethods = is_array($rawEnabledMethods)
-            ? array_values(array_unique(array_map(static function (string $method): string {
-                $normalized = strtolower(trim($method));
-
-                return $normalized === 'bank_slip' ? 'boleto' : $normalized;
-            }, $rawEnabledMethods)))
-            : ['pix', 'boleto', 'hybrid'];
-
-        $enabledMethods = array_values(array_intersect($enabledMethods, ['pix', 'boleto', 'hybrid']));
+        $enabledMethods = $this->paymentResolver->gatewayChargeMethodsForTenant($tenantId);
         $requestedMethodForCheck = $requestedMethod === 'bank_slip' ? 'boleto' : $requestedMethod;
 
         if (! in_array($requestedMethodForCheck, $enabledMethods, true)) {
@@ -226,7 +230,7 @@ class StudentFinanceController extends Controller
             default => 'pix',
         };
 
-        $methodLock = $this->resolveMethodLock($invoice);
+        $methodLock = $this->paymentResolver->resolveMethodLock($invoice);
         $lockedMethod = $methodLock['method'];
         $lockReason = $methodLock['reason'];
 
@@ -280,7 +284,7 @@ class StudentFinanceController extends Controller
         }
 
         try {
-            $result = $factory->resolve('cora')->createCharge($invoice, $environment, $coraMethod);
+            $result = $factory->resolve($defaultProvider)->createCharge($invoice, $environment, $coraMethod);
         } catch (ConnectionException|RequestException $e) {
             return $this->error('Erro ao comunicar com o provedor.', [
                 'error' => $e->getMessage(),
@@ -353,86 +357,6 @@ class StudentFinanceController extends Controller
         return (bool) ($invoice->boleto_digitable || $invoice->boleto_number || $invoice->cora_payment_url);
     }
 
-    private function resolveLockedMethodForSyncedInvoice(Invoice $invoice): ?string
-    {
-        if (! $invoice->cora_charge_id) {
-            return null;
-        }
-
-        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
-        $origin = strtolower(trim((string) data_get($payload, 'integration.origin')));
-        $methodLocked = (bool) data_get($payload, 'integration.method_locked', false);
-        $originalMethod = strtolower(trim((string) data_get($payload, 'integration.original_method')));
-
-        if ($origin === 'cora_sync' && $methodLocked) {
-            if ($originalMethod === 'hybrid') {
-                return 'bank_slip';
-            }
-
-            if (in_array($originalMethod, ['pix', 'bank_slip'], true)) {
-                return $originalMethod;
-            }
-
-            if ($invoice->payment_method === 'pix') {
-                return 'pix';
-            }
-
-            return 'bank_slip';
-        }
-
-        // Compatibilidade para sincronizações antigas sem metadata de integração.
-        $hasLocalInvoiceMetadata = data_get($payload, 'metadata.invoice_id') !== null;
-        $looksLikeImported = str_contains(strtolower((string) $invoice->description), 'importada');
-
-        if (! $hasLocalInvoiceMetadata && $looksLikeImported) {
-            if ($invoice->payment_method === 'pix') {
-                return 'pix';
-            }
-
-            return 'bank_slip';
-        }
-
-        return null;
-    }
-
-    private function resolveMethodLock(Invoice $invoice): array
-    {
-        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
-
-        if ($lockedSyncedMethod !== null) {
-            return [
-                'method' => $lockedSyncedMethod,
-                'reason' => 'synced_charge_method_lock',
-            ];
-        }
-
-        if (! $invoice->cora_charge_id) {
-            return [
-                'method' => null,
-                'reason' => null,
-            ];
-        }
-
-        if ($invoice->payment_method === 'pix') {
-            return [
-                'method' => 'pix',
-                'reason' => 'method_already_charged',
-            ];
-        }
-
-        if (in_array($invoice->payment_method, ['bank_slip', 'boleto'], true)) {
-            return [
-                'method' => 'bank_slip',
-                'reason' => 'method_already_charged',
-            ];
-        }
-
-        return [
-            'method' => null,
-            'reason' => null,
-        ];
-    }
-
     private function buildChargeResponsePayload(
         Invoice $invoice,
         string $method,
@@ -484,24 +408,4 @@ class StudentFinanceController extends Controller
         ];
     }
 
-    /**
-     * Retorna o escopo "payment" das configurações do tenant.
-     *
-     * @return array<string,mixed>
-     */
-    private function paymentScope(int $tenantId): array
-    {
-        static $cache = [];
-
-        if (isset($cache[$tenantId])) {
-            return $cache[$tenantId];
-        }
-
-        $tenant = Tenant::find($tenantId);
-        if (! $tenant) {
-            return $cache[$tenantId] = [];
-        }
-
-        return $cache[$tenantId] = app(TenantBillingSettingsService::class)->scope($tenant, 'payment');
-    }
 }

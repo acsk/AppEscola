@@ -139,12 +139,9 @@ interface ApiEnvelope<T> {
 
 function unwrapBody<T>(payload: T | ApiEnvelope<T>): T {
   const maybeEnvelope = payload as ApiEnvelope<T>;
-  console.log('🔍 unwrapBody - payload keys:', Object.keys(payload as any));
   if (maybeEnvelope && typeof maybeEnvelope === 'object' && 'body' in maybeEnvelope) {
-    console.log('✅ Found envelope body');
     return (maybeEnvelope.body ?? ({} as T)) as T;
   }
-  console.log('⚠️ No envelope, returning payload as-is');
   return payload as T;
 }
 

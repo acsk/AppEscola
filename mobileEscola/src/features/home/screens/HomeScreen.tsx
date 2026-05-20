@@ -10,7 +10,6 @@ import {
   Alert,
   Platform,
   useWindowDimensions,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,8 +17,11 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
 import { compressImageToMaxSize } from '../../../services/image-compression.service';
-import { listarSimulados, SimuladoListItem, AttemptStatus, subjectIconName } from '../../../services/simulados.service';
+import { SimuladoListItem, AttemptStatus, subjectIconName } from '../../../services/simulados.service';
+import { useSimuladosList } from '../../simulados/hooks';
 import { uploadStudentPhoto } from '../../../services/student-photo.service';
+import { MenuButton } from '../../../components/navigation/MenuButton';
+import { platformShadow } from '../../../lib/shadow';
 import { colors } from '../../../theme';
 
 function getInitials(name: string): string {
@@ -114,23 +116,18 @@ function getSimuladoDayCounter(simulado: SimuladoListItem): string | null {
 }
 
 export function HomeScreen() {
-  const { user, signOut, refreshUserProfile } = useAuth();
+  const { user, refreshUserProfile } = useAuth();
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
   const isCompact = width < 390;
   const simColumns = width >= 600 ? 3 : 2;
   const simCardWidth = (width - 32 - 12 * (simColumns - 1)) / simColumns;
 
-  const [simuladosRecentes, setSimuladosRecentes] = useState<SimuladoListItem[]>([]);
+  const { data: simuladosLista = [] } = useSimuladosList();
+  const simuladosRecentes = user?.role === 'aluno' ? simuladosLista : [];
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('month');
   const [dashboard, setDashboard] = useState<AlunoDashboardMetrics | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
-
-  useEffect(() => {
-    if (user?.role === 'aluno') {
-      listarSimulados().then(setSimuladosRecentes).catch(() => {});
-    }
-  }, [user?.role]);
 
   useEffect(() => {
     let active = true;
@@ -165,9 +162,6 @@ export function HomeScreen() {
     };
   }, [dashboardPeriod, user?.role]);
 
-  const [painelAberto, setPainelAberto]         = useState(false);
-  const [confirmandoSaida, setConfirmandoSaida] = useState(false);
-  const [saindo, setSaindo]                     = useState(false);
   const [avatarUploading, setAvatarUploading]   = useState(false);
   const [avatarFeedback, setAvatarFeedback]     = useState<string | null>(null);
   const [avatarOverrideUrl, setAvatarOverrideUrl] = useState<string | null>(null);
@@ -176,8 +170,6 @@ export function HomeScreen() {
   useEffect(() => {
     setAvatarFeedback(null);
   }, [user?.id]);
-
-  async function handleSair() { setSaindo(true); await signOut(); }
 
   async function processarUploadFoto(uri: string, fileName: string, mimeType: string) {
     console.log('[Foto] processarUploadFoto', { uri, fileName, mimeType, student_id: user?.student_id });
@@ -331,6 +323,7 @@ export function HomeScreen() {
         <View style={styles.headerGlowPrimary} />
         <View style={styles.headerGlowSecondary} />
         <View style={[styles.headerProfileRow, isCompact && styles.headerProfileRowCompact]}>
+          <MenuButton style={isCompact ? styles.menuBtnCompact : undefined} />
           <View style={[styles.studentBlock, isCompact && styles.studentBlockCompact]}>
             <TouchableOpacity
               style={[styles.avatarWrap, isCompact && styles.avatarWrapCompact]}
@@ -379,40 +372,10 @@ export function HomeScreen() {
               <Ionicons name="notifications-outline" size={isCompact ? 20 : 22} color={colors.ink} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconBtn, isCompact && styles.iconBtnCompact]} onPress={() => setPainelAberto(!painelAberto)}>
-              <Ionicons name="settings-outline" size={isCompact ? 20 : 22} color={colors.ink} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}
-              onPress={() => setConfirmandoSaida(true)}
-              disabled={saindo}
-            >
-              <Ionicons name="log-out-outline" size={isCompact ? 20 : 22} color={colors.ink} />
-            </TouchableOpacity>
           </View>
         </View>
 
       </View>
-
-      {/* ── Painel de configurações ────────────────────────────────────── */}
-      {painelAberto && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Configurações</Text>
-
-          <TouchableOpacity
-            style={styles.acaoLinha}
-            onPress={() => {
-              setPainelAberto(false);
-              navigation.navigate('AlterarSenha');
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="key-outline" size={20} color={colors.muted} />
-            <Text style={styles.acaoTexto}>Alterar senha</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* ── Resumo de desempenho ───────────────────────────────────────── */}
       {user?.role === 'aluno' && (
@@ -473,6 +436,16 @@ export function HomeScreen() {
               {' '}em relação ao {comparativoLabel}.
             </Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.performanceLink}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('Desempenho')}
+          >
+            <Ionicons name="stats-chart-outline" size={18} color={colors.primary} />
+            <Text style={styles.performanceLinkText}>Ver evolução por disciplina</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -541,7 +514,7 @@ export function HomeScreen() {
                       width: simCardWidth,
                       backgroundColor: accent.soft,
                       borderColor: accent.border,
-                      shadowColor: accent.shadow,
+                      ...platformShadow({ color: accent.shadow, opacity: 0.1, radius: 14, elevation: 3 }),
                     },
                   ]}
                   activeOpacity={0.85}
@@ -628,54 +601,18 @@ export function HomeScreen() {
           </ScrollView>
         </>
       )}
-      <Modal
-        visible={confirmandoSaida}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          if (!saindo) setConfirmandoSaida(false);
-        }}
-      >
-        <View style={styles.logoutModalOverlay}>
-          <View style={styles.logoutModalCard}>
-            <View style={styles.logoutModalIcon}>
-              <Ionicons name="log-out-outline" size={24} color={colors.debit} />
-            </View>
-            <Text style={styles.logoutModalTitle}>Sair da conta?</Text>
-            <Text style={styles.logoutModalText}>
-              Você precisará entrar novamente para acessar o aplicativo.
-            </Text>
-            <View style={styles.logoutModalActions}>
-              <TouchableOpacity
-                style={styles.logoutCancelButton}
-                onPress={() => setConfirmandoSaida(false)}
-                disabled={saindo}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.logoutCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.logoutConfirmButton, saindo && styles.botaoDisabled]}
-                onPress={handleSair}
-                disabled={saindo}
-                activeOpacity={0.85}
-              >
-                {saindo ? (
-                  <ActivityIndicator color={colors.surface} size="small" />
-                ) : (
-                  <Text style={styles.logoutConfirmText}>Sair</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-
       <View style={{ height: 24 }} />
     </ScrollView>
   );
 }
+
+const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
+const cardShadow = platformShadow({ color: '#000000', opacity: 0.04, radius: 8, elevation: 2 });
+const cardShadowMd = platformShadow({ color: '#000000', opacity: 0.12, radius: 8, elevation: 2 });
+const cardShadowLg = platformShadow({ color: '#000000', opacity: 0.12, radius: 18, elevation: 4 });
+const simCardShadow = platformShadow({ color: '#6D4DE6', opacity: 0.08, radius: 16, elevation: 2 });
+const avatarEditShadow = platformShadow({ color: '#000000', opacity: 0.14, radius: 8, elevation: 2 });
+const simIconShadow = platformShadow({ color: '#000000', opacity: 0.12, radius: 8, elevation: 2 });
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
@@ -690,7 +627,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     overflow: 'hidden',
-    shadowColor: '#7C3AED', shadowOpacity: 0.08, shadowRadius: 18, elevation: 3,
+    ...(headerShadow as object),
   },
   headerCompact: {
     paddingHorizontal: 16,
@@ -731,6 +668,10 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: 0,
     marginBottom: 18,
+  },
+  menuBtnCompact: {
+    alignSelf: 'flex-start',
+    marginBottom: 8,
   },
   studentBlock: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   studentBlockCompact: { width: '100%', alignItems: 'center' },
@@ -779,7 +720,7 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center',
     borderWidth: 1, borderColor: '#EEE8FF',
-    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, elevation: 2,
+    ...(avatarEditShadow as object),
   },
   avatarEditBtnCompact: {
     width: 26,
@@ -837,7 +778,7 @@ const styles = StyleSheet.create({
     borderRadius: 18, padding: 18,
     borderWidth: 1,
     borderColor: '#F0ECFA',
-    shadowColor: '#6D4DE6', shadowOpacity: 0.08, shadowRadius: 16, elevation: 2,
+    ...(simCardShadow as object),
   },
   cardCompact: {
     marginHorizontal: 16,
@@ -880,6 +821,25 @@ const styles = StyleSheet.create({
   },
   insightBoxCompact: { padding: 11 },
   insightTexto: { flex: 1, fontSize: 13, color: colors.text, lineHeight: 18 },
+  performanceLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#F5F0FF',
+    borderWidth: 1,
+    borderColor: '#E4DAFF',
+  },
+  performanceLinkText: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+  },
 
   // Section headers
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginTop: 20, marginBottom: 10 },
@@ -891,7 +851,6 @@ const styles = StyleSheet.create({
   simCard: {
     minHeight: 246, backgroundColor: colors.surface, borderRadius: 16, padding: 16,
     borderWidth: 1, borderColor: colors.border,
-    shadowOpacity: 0.1, shadowRadius: 14, elevation: 3,
     flexDirection: 'column',
   },
   simCardCompact: {
@@ -901,7 +860,7 @@ const styles = StyleSheet.create({
   simCardVazio: {
     width: 220, backgroundColor: colors.surface, borderRadius: 18, padding: 20,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    ...(cardShadow as object),
   },
   simCardVazioTexto: { fontSize: 13, color: colors.muted, textAlign: 'center' },
   simTopo: {
@@ -913,7 +872,7 @@ const styles = StyleSheet.create({
   simIconWrap: {
     width: 48, height: 48, borderRadius: 10, backgroundColor: colors.soft,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 2,
+    ...(simIconShadow as object),
   },
   simTopoInfo: {
     flex: 1,
@@ -1023,7 +982,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surface, marginHorizontal: 16, marginTop: 16,
     borderRadius: 18, padding: 16, gap: 12,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    ...(cardShadow as object),
   },
   metaIconWrap: {
     width: 52, height: 52, borderRadius: 26,
@@ -1088,10 +1047,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#F0ECFA',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    elevation: 4,
+    ...(cardShadowLg as object),
   },
   logoutModalIcon: {
     width: 52,

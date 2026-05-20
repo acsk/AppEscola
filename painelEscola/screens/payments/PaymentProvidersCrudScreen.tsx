@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -15,6 +14,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { parseApiErrors } from "../../utils/apiErrors";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import PaymentProviderLogo from "../../components/payments/PaymentProviderLogo";
 
 type PaymentProviderCrud = {
   id?: number;
@@ -47,63 +47,6 @@ const INITIAL_FORM: PaymentProviderCrud = {
   is_active: true,
   order: 0,
 };
-
-const resolveLogoUrl = (value?: string | null) => {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return null;
-  if (/^(data:|blob:|https?:\/\/)/i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("//")) {
-    if (typeof window !== "undefined") {
-      return `${window.location.protocol}${trimmed}`;
-    }
-    return `https:${trimmed}`;
-  }
-
-  const apiBase = String(api.defaults.baseURL ?? "").replace(/\/api\/?$/, "");
-  const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  return apiBase ? `${apiBase}${normalizedPath}` : normalizedPath;
-};
-
-type LogoPreviewProps = {
-  uri?: string | null;
-  size?: number;
-  rounded?: number;
-};
-
-function LogoPreview({ uri, size = 72, rounded = 18 }: LogoPreviewProps) {
-  const [hasError, setHasError] = useState(false);
-  const resolvedUri = resolveLogoUrl(uri);
-
-  useEffect(() => {
-    setHasError(false);
-  }, [resolvedUri]);
-
-  return (
-    <View
-      className="items-center justify-center overflow-hidden border border-gray-100 bg-white"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: rounded,
-      }}
-    >
-      {!!resolvedUri && !hasError ? (
-        <Image
-          source={{ uri: resolvedUri }}
-          style={{ width: size - 14, height: size - 14 }}
-          resizeMode="contain"
-          onError={() => {
-            setHasError(true);
-          }}
-        />
-      ) : (
-        <View className="items-center justify-center px-2">
-          <Ionicons name="image-outline" size={size > 56 ? 24 : 18} color="#7C3AED" />
-        </View>
-      )}
-    </View>
-  );
-}
 
 export default function PaymentProvidersCrudScreen() {
   const { width, isMobile, contentPadding } = useResponsiveLayout();
@@ -413,7 +356,7 @@ export default function PaymentProvidersCrudScreen() {
 
         <View className="mb-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3">
           <View className="flex-row items-center gap-3">
-            <LogoPreview uri={form.logo_url || null} size={64} rounded={18} />
+            <PaymentProviderLogo uri={form.logo_url || null} size={64} rounded={18} />
             <View style={{ flex: 1 }}>
               <Text className="text-sm font-bold text-gray-700">Pré-visualização do logo</Text>
               <Text className="text-xs text-gray-500 mt-1">
@@ -515,7 +458,7 @@ export default function PaymentProvidersCrudScreen() {
                     </View>
                   )}
                   <View className="flex-row items-start gap-3">
-                    <LogoPreview uri={item.logo_url || null} size={92} rounded={20} />
+                    <PaymentProviderLogo uri={item.logo_url || null} size={92} rounded={20} />
                     <View className="flex-1 min-w-0">
                       <View className="flex-row items-start justify-between gap-2">
                         <View className="flex-1 min-w-0">

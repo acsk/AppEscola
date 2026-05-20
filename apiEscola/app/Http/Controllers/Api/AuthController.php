@@ -80,6 +80,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('api-token', $abilities)->plainTextToken;
 
+        $user->loadMissing(['tenant', 'student']);
+
         return response()->json([
             'user'                     => new UserResource($user),
             'token'                    => $token,
@@ -100,7 +102,10 @@ class AuthController extends Controller
     )]
     public function me(Request $request): JsonResponse
     {
-        return response()->json(new UserResource($request->user()));
+        $user = $request->user();
+        $user->loadMissing(['tenant', 'student']);
+
+        return response()->json(new UserResource($user));
     }
 
     #[OA\Post(

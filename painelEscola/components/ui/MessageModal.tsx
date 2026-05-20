@@ -7,18 +7,9 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import type { MessageModalProps, MessageModalType } from "../../types/components";
 
-type MessageType = "error" | "success" | "warning" | "info";
-
-type Props = {
-  visible: boolean;
-  type?: MessageType;
-  title?: string;
-  message: string;
-  onClose: () => void;
-};
-
-const config: Record<MessageType, { icon: any; iconColor: string; bg: string; titleColor: string; msgColor: string; btnBg: string; btnText: string }> = {
+const config: Record<MessageModalType, { icon: any; iconColor: string; bg: string; titleColor: string; msgColor: string; btnBg: string; btnText: string }> = {
   error: {
     icon: "alert-circle-outline",
     iconColor: "#EF4444",
@@ -63,7 +54,7 @@ export default function MessageModal({
   title,
   message,
   onClose,
-}: Props) {
+}: MessageModalProps) {
   const { width } = useWindowDimensions();
   const isMobile = width < 520;
   const horizontalPadding = isMobile ? 16 : 40;

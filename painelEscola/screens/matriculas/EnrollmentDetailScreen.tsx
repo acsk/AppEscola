@@ -46,6 +46,14 @@ import {
   payUnifiedCharge,
 } from "../../services/payments";
 import { syncEnrollmentCoraCharges, SyncCoraChargesResult } from "../../services/cora";
+import type {
+  EnrollmentDetail,
+  EnrollmentDetailScreenProps,
+  EnrollmentEditFormValues,
+  InvoiceFormValues,
+  InvoiceListItem,
+} from "../../types/matriculas";
+import type { SchoolClassRef, StudentRef } from "../../types/entities";
 
 const reactPdf = Platform.OS === "web" ? require("react-pdf") : null;
 const PdfDocument = reactPdf?.Document as React.ComponentType<any> | null;
@@ -61,83 +69,12 @@ if (Platform.OS === "web" && pdfjs) {
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+type Invoice = InvoiceListItem;
+type Enrollment = EnrollmentDetail;
+type EditForm = EnrollmentEditFormValues;
+type InvoiceForm = InvoiceFormValues;
 
-type Student = { id: number; name: string; enrollment_number?: string };
-type SchoolClass = { id: number; name: string; course?: { id: number; name: string } };
-type Guardian = { id: number; name: string };
-type CoursePlan = { id: number; name: string; billing_cycle: string; cycle_label: string; price: string; enrollment_fee_amount?: string | number; course?: { id: number; name: string } };
-
-type Invoice = {
-  id: number;
-  description: string;
-  amount: string;
-  due_date: string;
-  status: string;
-  payment_method: string | null;
-  notes: string | null;
-  type: string | null;
-  edit_reason?: string | null;
-  created_by_user?: { id: number; name: string } | null;
-  updated_by_user?: { id: number; name: string } | null;
-  cora?: {
-    charge_id?: string;
-    status?: string;
-    payment_url?: string;
-    pix_copy_paste?: string;
-    qr_code_image_url?: string;
-    boleto_number?: string;
-    boleto_digitable?: string;
-  };
-  student?: Student;
-  guardian?: Guardian;
-  enrollment_id: number | null;
-  can_edit?: boolean;
-  can_delete?: boolean;
-};
-
-type Enrollment = {
-  id: number;
-  enrollment_number: string | null;
-  start_date: string;
-  end_date: string | null;
-  status: string;
-  monthly_amount: string | null;
-  discount_amount: string | null;
-  payment_due_day: number | null;
-  student?: Student;
-  school_class?: SchoolClass;
-  guardian?: Guardian;
-  course_plan?: CoursePlan;
-  created_at?: string;
-  invoices?: Invoice[];
-  charges_generated_at?: string | null;
-  charges_batch_generated?: boolean;
-};
-
-type EditForm = {
-  student_id: string;
-  school_class_id: string;
-  start_date: string;
-  end_date: string;
-  status: string;
-  monthly_amount: string;
-  discount_amount: string;
-  payment_due_day: string;
-};
-
-type InvoiceForm = {
-  description: string;
-  amount: string;
-  due_date: string;
-  status: string;
-  type: string;
-  payment_method: string;
-  notes: string;
-  edit_reason: string;
-};
-
-const EMPTY_EDIT: EditForm = {
+const EMPTY_EDIT: EnrollmentEditFormValues = {
   student_id: "",
   school_class_id: "",
   start_date: "",
@@ -197,16 +134,10 @@ const canGenerateChargeForInvoice = (invoice: Invoice | null) => {
   return invoice.status !== "paid" && invoice.status !== "cancelled";
 };
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-interface Props {
-  navigate: (screen: string, params?: Record<string, any>) => void;
-  enrollmentId: number;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
-export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props) {
+export default function EnrollmentDetailScreen({
+  navigate,
+  enrollmentId,
+}: EnrollmentDetailScreenProps) {
   const { width, isMobile, contentPadding } = useResponsiveLayout();
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [loading, setLoading] = useState(true);
@@ -216,8 +147,8 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [students, setStudents] = useState<StudentRef[]>([]);
+  const [classes, setClasses] = useState<SchoolClassRef[]>([]);
 
   // Invoice CRUD
   const [invoiceModalVisible, setInvoiceModalVisible] = useState(false);
@@ -525,8 +456,20 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
     setDeletingEnrollment(true);
     try {
       await api.delete(`/enrollments/${enrollmentId}`);
+      setDeleteEnrollmentVisible(false);
       navigate("matriculas");
-    } catch {}
+    } catch (e: any) {
+      const data = e.response?.data;
+      const msg = data?.message ?? "Não foi possível remover a matrícula.";
+      const cancellation = data?.body?.invoice_cancellation ?? data?.invoice_cancellation;
+      const failures = cancellation?.failures as Array<{ invoice_id: number; message: string }> | undefined;
+      const detail =
+        failures && failures.length > 0
+          ? `${msg}\n\n${failures.map((f) => `• Cobrança #${f.invoice_id}: ${f.message}`).join("\n")}`
+          : msg;
+      setDeleteEnrollmentVisible(false);
+      setMsgModal({ visible: true, type: "error", title: "Não foi possível excluir a matrícula", message: detail });
+    }
     setDeletingEnrollment(false);
   };
 
@@ -1189,9 +1132,16 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
   const checkoutActionBasis = isMobile ? "100%" : 132;
   const checkoutMethodCardsStacked = isMobile || width < 720;
 
+  const cancelInvoiceTarget = cancelInvoiceId
+    ? invoices.find((i) => i.id === cancelInvoiceId) ?? null
+    : null;
+  const deleteInvoiceTarget = deleteInvoiceId
+    ? invoices.find((i) => i.id === deleteInvoiceId) ?? null
+    : null;
+
   const renderInvoiceActions = (item: Invoice) => (
     <View className="flex-row justify-end gap-1">
-      {item.status !== "cancelled" && item.status !== "paid" && (
+      {(item.can_cancel ?? (item.status !== "cancelled" && item.status !== "paid")) && (
         <TouchableOpacity
           onPress={() => setCancelInvoiceId(item.id)}
           className="items-center justify-center bg-orange-50 rounded-lg"
@@ -1247,7 +1197,7 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
           <Ionicons name="receipt-outline" size={15} color="#059669" />
         </TouchableOpacity>
       )}
-      {(item.can_delete ?? true) && (
+      {(item.can_delete ?? item.status !== "paid") && (
         <TouchableOpacity
           onPress={() => setDeleteInvoiceId(item.id)}
           className="items-center justify-center bg-red-50 rounded-lg"
@@ -2633,23 +2583,37 @@ export default function EnrollmentDetailScreen({ navigate, enrollmentId }: Props
       <ConfirmModal
         visible={!!cancelInvoiceId}
         title="Cancelar Cobrança"
-        message="Deseja realmente cancelar esta cobrança?"
+        message={
+          cancelInvoiceTarget?.lifecycle_hint ??
+          (cancelInvoiceTarget?.requires_cora_cancel_before_delete
+            ? "A cobrança será invalidada no provedor (Cora) e permanecerá no histórico como cancelada. Deseja continuar?"
+            : "Deseja cancelar esta cobrança no sistema?")
+        }
         onConfirm={cancelInvoice}
         onCancel={() => setCancelInvoiceId(null)}
         loading={cancellingInvoice}
+        confirmLabel="Sim, cancelar"
+        iconName="close-circle-outline"
+        tone="primary"
       />
       <ConfirmModal
         visible={!!deleteInvoiceId}
         title="Excluir Cobrança"
-        message="Esta ação não pode ser desfeita."
+        message={
+          deleteInvoiceTarget?.delete_block_reason
+            ? deleteInvoiceTarget.delete_block_reason
+            : deleteInvoiceTarget?.lifecycle_hint ??
+              "Remove o registro da listagem. Use apenas após cancelar cobranças ativas no provedor, quando houver."
+        }
         onConfirm={removeInvoice}
         onCancel={() => setDeleteInvoiceId(null)}
         loading={deletingInvoice}
+        confirmDisabled={deleteInvoiceTarget?.can_delete === false}
       />
       <ConfirmModal
         visible={deleteEnrollmentVisible}
         title="Excluir Matrícula"
-        message="A matrícula e todas as cobranças vinculadas serão removidas. Esta ação não pode ser desfeita."
+        message="Todas as cobranças pendentes serão canceladas no provedor quando aplicável. Se alguma cobrança PIX estiver ativa na Cora, a exclusão será bloqueada. Em seguida, a matrícula e os registros locais serão removidos."
         onConfirm={removeEnrollment}
         onCancel={() => setDeleteEnrollmentVisible(false)}
         loading={deletingEnrollment}

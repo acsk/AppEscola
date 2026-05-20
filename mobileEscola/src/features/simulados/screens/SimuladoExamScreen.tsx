@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ConfirmModal from '../../../components/ConfirmModal';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   detalharSimulado,
   enviarResposta,
@@ -23,6 +24,7 @@ import {
   Question,
   AttemptFinish,
 } from '../../../services/simulados.service';
+import { invalidateSimuladosQueries } from '../hooks';
 import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoExam'>;
@@ -208,6 +210,7 @@ const qStyles = StyleSheet.create({
 
 export function SimuladoExamScreen({ route, navigation }: Props) {
   const { examId, attemptId } = route.params;
+  const queryClient = useQueryClient();
 
   const [fase, setFase]           = useState<Fase>('carregando');
   const [detalhe, setDetalhe]     = useState<SimuladoDetail | null>(null);
@@ -332,6 +335,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
         }
       }
       const res = await finalizarSimulado(attemptId);
+      invalidateSimuladosQueries(queryClient, { examId, attemptId });
       setResultado(res);
       setFase('resultado');
     } catch (e: any) {

@@ -32,48 +32,17 @@ import {
 } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { prepareImageForUpload } from "../../utils/imageCompression";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Form = {
-  name: string;
-  birth_date: string; // DD/MM/AAAA
-  document: string;
-  email: string;
-  phone: string;
-  is_minor: string;
-  status: string;
-};
-
-type GuardianForm = {
-  mode: "new" | "existing";
-  guardian_id: number | null;
-  name: string;
-  document: string;
-  email: string;
-  phone: string;
-  relationship: string;
-  is_financial_responsible: boolean;
-  is_pedagogical_responsible: boolean;
-  can_access_portal: boolean;
-};
-
-type GuardianOption = {
-  value: string;
-  label: string;
-  sublabel?: string;
-  document?: string;
-  email?: string;
-};
-
-type DesiredCourse = {
-  id: number;
-  name: string;
-};
+import type {
+  GuardianFormValues,
+  GuardianSelectOption,
+  StudentFormScreenProps,
+  StudentFormValues,
+} from "../../types/alunos";
+import type { DesiredCourseRef } from "../../types/entities";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const EMPTY: Form = {
+const EMPTY: StudentFormValues = {
   name: "",
   birth_date: "",
   document: "",
@@ -83,7 +52,7 @@ const EMPTY: Form = {
   status: "active",
 };
 
-const EMPTY_GUARDIAN: GuardianForm = {
+const EMPTY_GUARDIAN: GuardianFormValues = {
   mode: "new",
   guardian_id: null,
   name: "",
@@ -103,7 +72,7 @@ const STATUS_OPTIONS = [
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
-function validateForm(form: Form): Record<string, string> {
+function validateForm(form: StudentFormValues): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.name.trim()) errs.name = "Nome é obrigatório.";
   if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
@@ -155,16 +124,9 @@ function CheckToggle({
   );
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-interface Props {
-  studentId: number | null;
-  navigate: (screen: string, params?: Record<string, any>) => void;
-}
-
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function StudentFormScreen({ studentId, navigate }: Props) {
+export default function StudentFormScreen({ studentId, navigate }: StudentFormScreenProps) {
   const { contentPadding } = useResponsiveLayout();
   const isEdit = studentId !== null;
   const scrollRef = useRef<ScrollView>(null);
@@ -179,10 +141,10 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
   const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
   const photoInputRef = useRef<any>(null);
 
-  const [form, setForm] = useState<Form>(EMPTY);
-  const [guardians, setGuardians] = useState<GuardianForm[]>([]);
-  const [guardianOptions, setGuardianOptions] = useState<GuardianOption[]>([]);
-  const [desiredCourses, setDesiredCourses] = useState<DesiredCourse[]>([]);
+  const [form, setForm] = useState<StudentFormValues>(EMPTY);
+  const [guardians, setGuardians] = useState<GuardianFormValues[]>([]);
+  const [guardianOptions, setGuardianOptions] = useState<GuardianSelectOption[]>([]);
+  const [desiredCourses, setDesiredCourses] = useState<DesiredCourseRef[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [approving, setApproving] = useState(false);
   const [deleteGuardianIndex, setDeleteGuardianIndex] = useState<number | null>(
@@ -208,7 +170,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
 
   const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
-  const mapApiGuardiansToForm = useCallback((items: any[]): GuardianForm[] => {
+  const mapApiGuardiansToForm = useCallback((items: any[]): GuardianFormValues[] => {
     const seen = new Set<number>();
     return (items ?? [])
       .filter((g: any) => {
@@ -352,7 +314,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
     [isEdit, studentId]
   );
 
-  const updateGuardian = (idx: number, partial: Partial<GuardianForm>) => {
+  const updateGuardian = (idx: number, partial: Partial<GuardianFormValues>) => {
     setGuardians((prev) =>
       prev.map((g, i) => (i === idx ? { ...g, ...partial } : g))
     );
@@ -616,7 +578,7 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
       </View>
 
       <View className="flex-row items-center justify-between mb-6">
-        <View>
+        <View className="flex-1">
           <Text className="text-2xl font-bold text-gray-800">
             {isEdit ? "Editar Aluno" : "Novo Aluno"}
           </Text>
@@ -626,6 +588,21 @@ export default function StudentFormScreen({ studentId, navigate }: Props) {
               : "Preencha os dados para cadastrar um novo aluno"}
           </Text>
         </View>
+        {isEdit && studentId ? (
+          <TouchableOpacity
+            onPress={() =>
+              navigate("alunos-performance", {
+                studentId,
+                studentName: form.name,
+              })
+            }
+            className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-100"
+            activeOpacity={0.85}
+          >
+            <Ionicons name="stats-chart-outline" size={16} color="#2563EB" />
+            <Text className="text-sm font-semibold text-blue-700">Aproveitamento</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {loading ? (
