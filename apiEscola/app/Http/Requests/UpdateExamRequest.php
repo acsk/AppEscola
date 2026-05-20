@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ExamPublishValidator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -42,6 +43,13 @@ class UpdateExamRequest extends FormRequest
 
             if ($releaseResultsAfterEnd && ! $endsAt) {
                 $validator->errors()->add('ends_at', 'Informe a data final para liberar o resultado somente após o fechamento do período.');
+            }
+
+            $exam = $this->route('exam');
+
+            if ($exam) {
+                $targetStatus = $this->input('status', $exam->examStatus?->slug);
+                app(ExamPublishValidator::class)->validate($validator, $exam, (string) $targetStatus);
             }
         });
     }

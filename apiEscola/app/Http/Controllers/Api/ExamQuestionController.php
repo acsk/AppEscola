@@ -10,6 +10,7 @@ use App\Http\Resources\ExamQuestionResource;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
+use App\Services\ExamAccessService;
 use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ class ExamQuestionController extends Controller
     public function index(Request $request, Exam $exam): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         $questions = $exam->questions()->with(['subject', 'options'])->get();
 
@@ -61,6 +63,7 @@ class ExamQuestionController extends Controller
     public function uploadImage(Request $request, Exam $exam, TenantUploadSettingsService $uploadSettings): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         $request->validate([
             'question_id' => [
@@ -130,6 +133,7 @@ class ExamQuestionController extends Controller
     public function store(StoreExamQuestionRequest $request, Exam $exam): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         $tenantId = $this->getTenantId($request) ?? $exam->tenant_id;
 
@@ -173,6 +177,7 @@ class ExamQuestionController extends Controller
     public function show(Request $request, Exam $exam, ExamQuestion $question): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         $question->load(['subject', 'options']);
 
@@ -214,6 +219,7 @@ class ExamQuestionController extends Controller
     public function update(UpdateExamQuestionRequest $request, Exam $exam, ExamQuestion $question): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         DB::transaction(function () use ($request, $question) {
             $question->update($request->except('options'));
@@ -241,6 +247,7 @@ class ExamQuestionController extends Controller
     public function destroy(Request $request, Exam $exam, ExamQuestion $question): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         $question->options()->delete();
         $question->delete();

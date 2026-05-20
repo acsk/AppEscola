@@ -20,6 +20,7 @@ class ExamAttempt extends Model
         'student_id',
         'attempt_status_id',
         'started_at',
+        'expires_at',
         'finished_at',
         'score',
         'max_score',
@@ -29,6 +30,7 @@ class ExamAttempt extends Model
 
     protected $casts = [
         'started_at'  => 'datetime',
+        'expires_at'  => 'datetime',
         'finished_at' => 'datetime',
         'score'       => 'decimal:2',
         'max_score'   => 'decimal:2',
@@ -87,6 +89,24 @@ class ExamAttempt extends Model
         }
 
         return $this->status;
+    }
+
+    public function hasDurationLimit(): bool
+    {
+        return $this->expires_at !== null;
+    }
+
+    public function remainingSeconds(): ?int
+    {
+        if ($this->expires_at === null) {
+            return null;
+        }
+
+        if ($this->expires_at->isPast()) {
+            return 0;
+        }
+
+        return (int) now()->diffInSeconds($this->expires_at);
     }
 
     public function setStatusAttribute(?string $value): void

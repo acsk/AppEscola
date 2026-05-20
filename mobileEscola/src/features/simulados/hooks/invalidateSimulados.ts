@@ -13,7 +13,7 @@ export function invalidateSimuladosQueries(
   const resolved =
     typeof options === 'number' ? { examId: options } : (options ?? {});
 
-  queryClient.invalidateQueries({ queryKey: simuladosKeys.list() });
+  queryClient.invalidateQueries({ queryKey: simuladosKeys.all });
 
   if (resolved.examId != null) {
     queryClient.invalidateQueries({ queryKey: simuladosKeys.detail(resolved.examId) });

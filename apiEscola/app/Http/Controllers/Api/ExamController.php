@@ -9,6 +9,7 @@ use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Models\ExamStatus;
 use App\Models\ExamType;
+use App\Services\ExamAttemptIntegrityService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,41 +91,49 @@ class ExamController extends Controller
     }
 
     /** Estatísticas agregadas para gráficos: por questão, por matéria, por aluno */
-    public function stats(Request $request, Exam $exam): JsonResponse
+    public function stats(Request $request, Exam $exam, ExamAttemptIntegrityService $integrity): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
 
-        $exam->load(['questions.subject', 'questions.answers']);
+        $tenantId = $this->getTenantId($request);
+        $exam->load(['questions.subject']);
 
-        $totalAttempts    = $exam->attempts()->whereStatus('completed')->count();
-        $avgScore         = $exam->attempts()->whereStatus('completed')->avg('percentage');
-        $passCount        = $exam->attempts()
-            ->whereStatus('completed')
-            ->where('percentage', '>=', $exam->passing_score ?? 0)
-            ->count();
+        $bestAttempts = $integrity->bestCompletedAttemptsForExam($exam->id, $tenantId);
+        $totalAttempts = $bestAttempts->count();
+        $avgScore = $totalAttempts > 0 ? $bestAttempts->avg('percentage') : null;
+        $passingScore = $exam->passing_score ?? 0;
+        $passCount = $bestAttempts->filter(
+            fn ($a) => (float) $a->percentage >= (float) $passingScore
+        )->count();
 
-        // Acertos por questão
-        $questionStats = $exam->questions->map(function ($question) use ($totalAttempts) {
-            $correctCount = $question->answers()->where('is_correct', true)->count();
+        $questionStats = $exam->questions->map(function ($question) {
+            $answersQuery = $question->answers()
+                ->whereHas('attempt', fn ($q) => $q->whereStatus('completed'));
+
+            $totalAnswers = (clone $answersQuery)->whereNotNull('is_correct')->count();
+            $correctCount = (clone $answersQuery)->where('is_correct', true)->count();
+            $previewText = $question->question_text
+                ? mb_substr($question->question_text, 0, 80) . (mb_strlen($question->question_text) > 80 ? '…' : '')
+                : '[Enunciado em imagem]';
+
             return [
                 'question_id'    => $question->id,
-                'question_text'  => substr($question->question_text, 0, 80) . '…',
+                'question_text'  => $previewText,
                 'subject'        => $question->subject?->name,
                 'correct_count'  => $correctCount,
-                'total_answers'  => $question->answers()->count(),
-                'hit_rate'       => $totalAttempts > 0
-                    ? round(($correctCount / $totalAttempts) * 100, 1)
+                'total_answers'  => $totalAnswers,
+                'hit_rate'       => $totalAnswers > 0
+                    ? round(($correctCount / $totalAnswers) * 100, 1)
                     : null,
             ];
         });
 
-        // Desempenho por matéria
         $subjectStats = $questionStats
             ->groupBy('subject')
             ->map(fn ($qs, $subject) => [
-                'subject'   => $subject,
+                'subject'      => $subject,
                 'avg_hit_rate' => round($qs->avg('hit_rate'), 1),
-                'questions' => $qs->count(),
+                'questions'    => $qs->count(),
             ])->values();
 
         return response()->json([

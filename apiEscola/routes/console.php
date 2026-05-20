@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('exams:release-pending-results')->everyFiveMinutes();
+Schedule::command('exams:abandon-timed-out')->everyMinute();

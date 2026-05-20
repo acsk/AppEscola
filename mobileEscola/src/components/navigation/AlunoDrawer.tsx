@@ -28,14 +28,20 @@ const drawerShadow = platformShadow({ color: '#000000', opacity: 0.15, radius: 2
 type Nav = NativeStackNavigationProp<AlunoStackParamList>;
 type TabName = keyof AlunoTabParamList;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
+type NavigationStateSnapshot = Partial<ReturnType<Nav['getState']>> | undefined;
 
 const DRAWER_WIDTH = 312;
 
-const MENU_ITEMS: Array<{ label: string; screen: TabName; icon: IconName }> = [
-  { label: 'Início', screen: 'Home', icon: 'home-outline' },
-  { label: 'Desempenho', screen: 'Desempenho', icon: 'stats-chart-outline' },
-  { label: 'Simulados', screen: 'Simulados', icon: 'clipboard-outline' },
-  { label: 'Financeiro', screen: 'Financeiro', icon: 'wallet-outline' },
+type MenuItem =
+  | { label: string; icon: IconName; tab: TabName }
+  | { label: string; icon: IconName; stack: keyof Pick<AlunoStackParamList, 'Calendario'> };
+
+const MENU_ITEMS: MenuItem[] = [
+  { label: 'Início', tab: 'Home', icon: 'home-outline' },
+  { label: 'Calendário', stack: 'Calendario', icon: 'calendar-outline' },
+  { label: 'Desempenho', tab: 'Desempenho', icon: 'stats-chart-outline' },
+  { label: 'Simulados', tab: 'Simulados', icon: 'clipboard-outline' },
+  { label: 'Financeiro', tab: 'Financeiro', icon: 'wallet-outline' },
 ];
 
 function getInitials(name: string): string {
@@ -46,14 +52,24 @@ function getInitials(name: string): string {
     .join('');
 }
 
-function getActiveTabName(state: ReturnType<Nav['getState']>): TabName | null {
-  const stackRoute = state.routes[state.index];
+function isAlunoTabName(name: string | undefined): name is TabName {
+  return name === 'Home' || name === 'Desempenho' || name === 'Simulados' || name === 'Financeiro';
+}
+
+function getActiveTabName(state: NavigationStateSnapshot): TabName | null {
+  const routes = state?.routes;
+  if (!routes?.length) return null;
+
+  const stackRoute = routes[state?.index ?? 0] ?? routes[0];
   if (stackRoute?.name !== 'AlunoTabs') return null;
 
-  const tabState = stackRoute.state as { index?: number; routes?: Array<{ name: string }> } | undefined;
-  const tabRoute = tabState?.routes?.[tabState.index ?? 0];
+  const tabState = stackRoute.state as { index?: number; routes?: Array<{ name?: string }> } | undefined;
+  const tabRoutes = tabState?.routes;
+  if (!tabRoutes?.length) return 'Home';
 
-  return (tabRoute?.name as TabName | undefined) ?? 'Home';
+  const tabRoute = tabRoutes[tabState?.index ?? 0] ?? tabRoutes[0];
+
+  return isAlunoTabName(tabRoute?.name) ? tabRoute.name : 'Home';
 }
 
 export function AlunoDrawer() {
@@ -135,18 +151,23 @@ export function AlunoDrawer() {
     navigation.navigate('AlterarSenha');
   }
 
-  function handleNavigate(screen: TabName) {
+  function handleMenuPress(item: MenuItem) {
     close();
 
-    if (screen === 'Simulados') {
+    if ('stack' in item) {
+      navigation.navigate(item.stack);
+      return;
+    }
+
+    if (item.tab === 'Simulados') {
       navigation.navigate('AlunoTabs', {
-        screen,
+        screen: item.tab,
         params: { screen: 'SimuladosList' },
       });
       return;
     }
 
-    navigation.navigate('AlunoTabs', { screen });
+    navigation.navigate('AlunoTabs', { screen: item.tab });
   }
 
   function handleSair() {
@@ -215,13 +236,15 @@ export function AlunoDrawer() {
               <Text style={styles.secaoLabel}>Navegação</Text>
               <View style={styles.menuPrincipal}>
                 {MENU_ITEMS.map((item) => {
-                  const active = activeTab === item.screen;
+                  const active =
+                    ('tab' in item && activeTab === item.tab) ||
+                    ('stack' in item && item.stack === 'Calendario' && false);
 
                   return (
                     <TouchableOpacity
-                      key={item.screen}
+                      key={'tab' in item ? item.tab : item.stack}
                       style={[styles.navItem, active && styles.navItemAtivo]}
-                      onPress={() => handleNavigate(item.screen)}
+                      onPress={() => handleMenuPress(item)}
                       activeOpacity={0.75}
                     >
                       <View style={[styles.navIcone, active && styles.navIconeAtivo]}>

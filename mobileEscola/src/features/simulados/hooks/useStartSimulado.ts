@@ -14,7 +14,7 @@ export function useStartSimulado() {
     mutationFn: ({ examId, studentId }: StartSimuladoVariables) =>
       iniciarSimulado(examId, studentId),
     onSuccess: (_attempt, { examId }) => {
-      queryClient.invalidateQueries({ queryKey: simuladosKeys.list() });
+      queryClient.invalidateQueries({ queryKey: simuladosKeys.all });
       queryClient.invalidateQueries({ queryKey: simuladosKeys.detail(examId) });
     },
   });

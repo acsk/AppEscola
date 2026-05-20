@@ -34,6 +34,11 @@ use App\Http\Controllers\Api\PaymentProvidersController;
 use App\Http\Controllers\Api\PublicRegistrationController;
 use App\Http\Controllers\Api\ReceiptController;
 use App\Http\Controllers\Api\UserManagementController;
+use App\Http\Controllers\Api\NotificationBroadcastController;
+use App\Http\Controllers\Api\TenantNotificationSettingsController;
+use App\Http\Controllers\Api\StudentNotificationController;
+use App\Http\Controllers\Api\CalendarEventController;
+use App\Http\Controllers\Api\StudentCalendarController;
 use Illuminate\Support\Facades\Route;
 
 // Health check (público)
@@ -198,6 +203,32 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('tenant-api-tokens', [TenantApiTokenController::class, 'index']);
     Route::post('tenant-api-tokens', [TenantApiTokenController::class, 'store']);
     Route::delete('tenant-api-tokens/{tenantApiToken}', [TenantApiTokenController::class, 'destroy']);
+
+    // Calendário / eventos
+    Route::get('calendar-events/types', [CalendarEventController::class, 'types']);
+    Route::get('calendar-events', [CalendarEventController::class, 'index']);
+    Route::post('calendar-events', [CalendarEventController::class, 'store']);
+    Route::put('calendar-events/{calendarEvent}', [CalendarEventController::class, 'update']);
+    Route::delete('calendar-events/{calendarEvent}', [CalendarEventController::class, 'destroy']);
+
+    Route::get('aluno/calendar-events/types', [StudentCalendarController::class, 'types']);
+    Route::get('aluno/calendar-events', [StudentCalendarController::class, 'index']);
+
+    // Notificações do aluno (mobile — sino)
+    Route::get('aluno/notifications/unread-count', [StudentNotificationController::class, 'unreadCount']);
+    Route::post('aluno/notifications/read-all',   [StudentNotificationController::class, 'markAllAsRead']);
+    Route::get('aluno/notifications',             [StudentNotificationController::class, 'index']);
+    Route::get('aluno/notifications/{notification}', [StudentNotificationController::class, 'show']);
+    Route::patch('aluno/notifications/{notification}/read', [StudentNotificationController::class, 'markAsRead']);
+
+    // Notificações — painel admin
+    Route::get('notifications/settings',                 [TenantNotificationSettingsController::class, 'show']);
+    Route::put('notifications/settings',                 [TenantNotificationSettingsController::class, 'update']);
+    Route::get('notifications/types',                    [NotificationBroadcastController::class, 'types']);
+    Route::post('notifications/preview',                 [NotificationBroadcastController::class, 'preview']);
+    Route::post('notifications/send',                    [NotificationBroadcastController::class, 'send']);
+    Route::get('notifications/broadcasts',               [NotificationBroadcastController::class, 'index']);
+    Route::get('notifications/broadcasts/{broadcast}',   [NotificationBroadcastController::class, 'show']);
 
     // Simulados do aluno autenticado (role: aluno)
     Route::get('aluno/dashboard',                [StudentDashboardController::class, 'index']);

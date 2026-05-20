@@ -10,11 +10,17 @@ export type NavItem = {
   hasSubmenu?: boolean;
 };
 
+export type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
 export type SidebarProps = {
   activeItem?: string;
   onSelectItem?: (id: string) => void;
   canManageTenants?: boolean;
   canManageUsers?: boolean;
+  canSendNotifications?: boolean;
   isMobile?: boolean;
   onClose?: () => void;
   apiVersion?: string;

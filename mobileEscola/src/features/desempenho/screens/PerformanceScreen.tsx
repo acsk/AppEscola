@@ -23,6 +23,7 @@ import { platformShadow } from '../../../lib/shadow';
 import { colors } from '../../../theme';
 
 const MONTH_OPTIONS = [6, 12] as const;
+const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
 
 function formatPct(value: number | null | undefined, fractionDigits = 1): string {
   if (value == null) return '—';
@@ -323,10 +324,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#7C3AED',
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 3,
+    ...(headerShadow as object),
   },
   headerGlowPrimary: {
     position: 'absolute',

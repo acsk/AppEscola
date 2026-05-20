@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreExamAnswerRequest;
 use App\Http\Resources\ExamAttemptResource;
 use App\Models\Exam;
 use App\Models\ExamAnswer;
 use App\Models\ExamAttempt;
 use App\Models\Student;
+use App\Services\ExamAccessService;
+use App\Services\ExamAttemptIntegrityService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,12 +21,20 @@ class ExamAttemptController extends Controller
 {
     use ScopedByTenant;
 
+    public function __construct(
+        private readonly ExamAccessService $examAccess,
+        private readonly ExamAttemptIntegrityService $integrity,
+    ) {
+    }
+
     /**
      * Resumo de tentativas agrupadas por status — para o painel administrativo.
      * Útil para mostrar contadores de ação rápida (pendentes de correção, aguardando liberação etc.).
      */
     public function summary(Request $request): JsonResponse
     {
+        $this->examAccess->authorizeStaff($request);
+
         $tenantId = $this->getTenantId($request);
 
         $counts = ExamAttempt::query()
@@ -38,6 +49,7 @@ class ExamAttemptController extends Controller
             'pending_review'   => (int) ($counts['pending_review']   ?? 0),
             'awaiting_release' => (int) ($counts['awaiting_release'] ?? 0),
             'completed'        => (int) ($counts['completed']        ?? 0),
+            'abandoned'        => (int) ($counts['abandoned']        ?? 0),
             'total'            => $counts->sum(),
         ]);
     }
@@ -53,6 +65,16 @@ class ExamAttemptController extends Controller
             ->when($request->query('exam_id'),    fn ($q, $v) => $q->where('exam_id', $v))
             ->when($request->query('student_id'), fn ($q, $v) => $q->where('student_id', $v))
             ->when($request->query('status'),     fn ($q, $v) => $q->whereStatus($v));
+
+        if ($user?->role === 'aluno') {
+            $student = $this->examAccess->resolveActiveStudent($user);
+
+            if (! $student) {
+                return $this->forbidden('Aluno não encontrado ou inativo.');
+            }
+
+            $query->where('student_id', $student->id);
+        }
 
         return ExamAttemptResource::collection($query->orderByDesc('started_at')->paginate(20));
     }
@@ -76,6 +98,12 @@ class ExamAttemptController extends Controller
             $student = Student::findOrFail($data['student_id']);
         }
 
+        $this->examAccess->assertTenantMatch($request, $exam->tenant_id);
+
+        if ($user->role === 'aluno') {
+            $this->examAccess->assertActiveEnrollmentForExam($student, $exam->course_id);
+        }
+
         if (!$exam->isPublished()) {
             throw ValidationException::withMessages([
                 'exam_id' => ['Este simulado não está disponível para realização.'],
@@ -97,6 +125,8 @@ class ExamAttemptController extends Controller
         }
 
         $tenantId = $this->getTenantId($request) ?? $exam->tenant_id;
+
+        $this->integrity->abandonExpiredInProgressFor($exam->id, $student->id);
 
         // Impede múltiplas tentativas em andamento
         $inProgress = ExamAttempt::where('exam_id', $exam->id)
@@ -165,10 +195,15 @@ class ExamAttemptController extends Controller
             }
         }
 
+        $startedAt = now();
+        $expiresAt = $this->integrity->resolveExpiresAt($exam, $startedAt);
+
         $attempt = ExamAttempt::create([
             'tenant_id'  => $tenantId,
             'exam_id'    => $exam->id,
             'student_id' => $student->id,
+            'started_at' => $startedAt,
+            'expires_at' => $expiresAt,
             'max_score'  => $exam->totalPoints(),
             'status'     => 'in_progress',
         ]);
@@ -180,19 +215,11 @@ class ExamAttemptController extends Controller
     }
 
     /** Salva ou atualiza uma resposta dentro da tentativa */
-    public function answer(Request $request, ExamAttempt $attempt): JsonResponse
+    public function answer(StoreExamAnswerRequest $request, ExamAttempt $attempt): JsonResponse
     {
-        if ($attempt->status !== 'in_progress') {
-            throw ValidationException::withMessages([
-                'attempt_id' => ['Esta tentativa já foi finalizada.'],
-            ]);
-        }
+        $this->integrity->ensureAttemptActive($attempt);
 
-        $data = $request->validate([
-            'question_id'  => ['required', 'exists:exam_questions,id'],
-            'option_id'    => ['nullable', 'exists:exam_question_options,id'],
-            'text_answer'  => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         ExamAnswer::updateOrCreate(
             ['attempt_id' => $attempt->id, 'question_id' => $data['question_id']],
@@ -206,14 +233,12 @@ class ExamAttemptController extends Controller
     /** Finaliza a tentativa e calcula a pontuação (questões objetivas) */
     public function finish(Request $request, ExamAttempt $attempt): JsonResponse
     {
-        if ($attempt->status !== 'in_progress') {
-            throw ValidationException::withMessages([
-                'attempt_id' => ['Esta tentativa já foi finalizada.'],
-            ]);
-        }
+        $this->examAccess->authorizeAttemptAnswer($request, $attempt);
+        $this->integrity->ensureAttemptActive($attempt);
 
         DB::transaction(function () use ($attempt) {
             $totalScore = 0;
+            $maxScore   = $this->integrity->syncMaxScoreFromExam($attempt);
             $exam = $attempt->exam()
                 ->with([
                     'questions:id,exam_id,type,allow_text_answer,points',
@@ -277,7 +302,7 @@ class ExamAttemptController extends Controller
             // Verifica se há respostas pendentes de correção manual
             $hasPending = $attempt->answers()->whereNull('is_correct')->exists();
 
-            $maxScore   = (float) $attempt->max_score ?: 1;
+            $maxScore   = $maxScore > 0 ? $maxScore : 1;
             $percentage = round(($totalScore / $maxScore) * 100, 2);
 
             $attempt->update([
@@ -296,6 +321,9 @@ class ExamAttemptController extends Controller
     /** Corrige manualmente uma resposta de questão discursiva ou allow_text_answer (admin) */
     public function correctAnswer(Request $request, ExamAttempt $attempt, ExamAnswer $answer): JsonResponse
     {
+        $this->examAccess->authorizeStaff($request);
+        $this->examAccess->assertTenantMatch($request, $attempt->tenant_id);
+
         if ($attempt->status !== 'pending_review') {
             throw ValidationException::withMessages([
                 'attempt_id' => ['Esta tentativa não está aguardando correção.'],
@@ -330,7 +358,7 @@ class ExamAttemptController extends Controller
         if ($pendingCount === 0) {
             // Todas corrigidas → recalcula e libera resultado
             $totalScore = (float) $attempt->answers()->sum('points_earned');
-            $maxScore   = (float) $attempt->max_score ?: 1;
+            $maxScore   = $this->integrity->syncMaxScoreFromExam($attempt) ?: 1;
             $percentage = round(($totalScore / $maxScore) * 100, 2);
             $exam = $attempt->exam()->first(['id', 'ends_at', 'release_results_after_end']);
 
@@ -349,6 +377,8 @@ class ExamAttemptController extends Controller
     /** Exibe resultado detalhado de uma tentativa */
     public function show(Request $request, ExamAttempt $attempt): JsonResponse
     {
+        $this->examAccess->authorizeAttemptView($request, $attempt);
+
         $attempt->load(['exam.questions.options', 'student', 'answers', 'attemptStatus']);
 
         return response()->json(new ExamAttemptResource($attempt));
@@ -357,26 +387,24 @@ class ExamAttemptController extends Controller
     /** Ranking dos alunos no simulado (para gráficos) */
     public function ranking(Request $request, Exam $exam): JsonResponse
     {
+        $this->examAccess->assertTenantMatch($request, $exam->tenant_id);
+
         $tenantId = $this->getTenantId($request);
 
-        $attempts = ExamAttempt::with('student:id,name,enrollment_number')
-            ->where('exam_id', $exam->id)
-            ->whereStatus('completed')
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->orderByDesc('percentage')
-            ->get(['id', 'student_id', 'score', 'max_score', 'percentage', 'finished_at']);
+        $attempts = $this->integrity->bestCompletedAttemptsForExam($exam->id, $tenantId);
 
         return response()->json([
             'exam_id' => $exam->id,
             'ranking' => $attempts->map(fn ($a, $i) => [
-                'position'         => $i + 1,
-                'student_id'       => $a->student_id,
-                'student_name'     => $a->student?->name,
-                'enrollment_number'=> $a->student?->enrollment_number,
-                'score'            => (float) $a->score,
-                'max_score'        => (float) $a->max_score,
-                'percentage'       => (float) $a->percentage,
-                'finished_at'      => $a->finished_at?->toISOString(),
+                'position'          => $i + 1,
+                'attempt_id'        => $a->id,
+                'student_id'        => $a->student_id,
+                'student_name'      => $a->student?->name,
+                'enrollment_number' => $a->student?->enrollment_number,
+                'score'             => (float) $a->score,
+                'max_score'         => (float) $a->max_score,
+                'percentage'        => (float) $a->percentage,
+                'finished_at'       => $a->finished_at?->toISOString(),
             ]),
         ]);
     }

@@ -38,7 +38,12 @@ class ExamAttemptResource extends JsonResource
                 'name'              => $this->student->name,
                 'enrollment_number' => $this->student->enrollment_number ?? null,
             ] : null),
-            'started_at'  => $this->started_at?->toISOString(),
+            'started_at'          => $this->started_at?->toISOString(),
+            'expires_at'          => $this->expires_at?->toISOString(),
+            'time_remaining_seconds' => $this->when(
+                $visibleStatus === 'in_progress' && $this->expires_at !== null,
+                fn () => $this->remainingSeconds()
+            ),
             'finished_at' => $this->finished_at?->toISOString(),
             'status'               => $visibleStatus,
             'score'                => $score,

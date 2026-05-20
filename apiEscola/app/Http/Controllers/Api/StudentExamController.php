@@ -8,13 +8,20 @@ use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Student;
+use App\Services\ExamAttemptIntegrityService;
+use App\Services\StudentEnrollmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class StudentExamController extends Controller
 {
+    public function __construct(
+        private readonly StudentEnrollmentService $enrollmentService,
+        private readonly ExamAttemptIntegrityService $integrity,
+    ) {
+    }
+
     /**
      * Lista os simulados disponíveis para o aluno autenticado.
      *
@@ -25,7 +32,14 @@ class StudentExamController extends Controller
      *    start_date <= hoje, end_date >= hoje ou nulo)
      *  - Apenas simulados publicados (exam_status.slug = 'published')
      *  - Apenas simulados do(s) curso(s) da matrícula ativa
-     *  - Simulados cujo prazo ainda não encerrou (ends_at >= agora ou nulo)
+     *  - Retorna todos os simulados publicados do curso; use query params para filtrar.
+     *
+     *  Query params (todos opcionais):
+     *  - period: open | closed | all — prazo do simulado (default: all)
+     *  - subject_id: filtra por disciplina
+     *  - attempt_status: status da tentativa do aluno
+     *
+     *  Campos extras: period_closed (prazo vencido), total_questions, total_points
      *
     * Cada item da resposta inclui o campo `attempt_status` com o status
     * da tentativa do aluno ('not_started' | 'in_progress' | 'pending_review' | 'awaiting_release' | 'completed').
@@ -47,58 +61,80 @@ class StudentExamController extends Controller
             return $this->forbidden('Aluno não encontrado ou inativo.');
         }
 
-        // Matrículas ativas dentro do período vigente
-        $today = now()->toDateString();
-
-        $courseIds = DB::table('enrollments')
-            ->leftJoin('course_plans', 'enrollments.course_plan_id', '=', 'course_plans.id')
-            ->leftJoin('school_classes', 'enrollments.school_class_id', '=', 'school_classes.id')
-            ->where('enrollments.student_id', $student->id)
-            ->where('enrollments.status', 'active')
-            ->where('enrollments.start_date', '<=', $today)
-            ->where(function ($q) use ($today) {
-                $q->whereNull('enrollments.end_date')
-                  ->orWhere('enrollments.end_date', '>=', $today);
-            })
-            ->whereNull('enrollments.deleted_at')
-            ->selectRaw('COALESCE(course_plans.course_id, school_classes.course_id) as course_id')
-            ->whereNotNull(DB::raw('COALESCE(course_plans.course_id, school_classes.course_id)'))
-            ->pluck('course_id')
-            ->unique()
-            ->values();
+        $courseIds = $this->enrollmentService->activeCourseIdsForStudent($student);
 
         if ($courseIds->isEmpty()) {
             return $this->success([], 'Nenhuma matrícula ativa encontrada.');
         }
 
-        $exams = Exam::with(['course', 'subject', 'examStatus', 'examType'])
+        $period = $request->query('period', 'all');
+        if (! in_array($period, ['open', 'closed', 'all'], true)) {
+            $period = 'all';
+        }
+
+        // Retrocompat: include_expired=0 restringe ao período aberto
+        if ($request->has('include_expired') && ! $request->boolean('include_expired')) {
+            $period = 'open';
+        }
+
+        $examsQuery = Exam::with(['course', 'subject', 'examStatus', 'examType'])
+            ->withCount('questions')
+            ->withSum('questions as total_points_sum', 'points')
             ->where('tenant_id', $user->tenant_id)
             ->whereIn('course_id', $courseIds)
-            ->whereHas('examStatus', fn ($q) => $q->where('slug', 'published'))
-            ->orderBy('starts_at')
-            ->get();
+            ->whereHas('examStatus', fn ($q) => $q->where('slug', 'published'));
+
+        if ($period === 'open') {
+            $examsQuery->where(function ($q) {
+                $q->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', now());
+            });
+        } elseif ($period === 'closed') {
+            $examsQuery->whereNotNull('ends_at')
+                ->where('ends_at', '<', now());
+        }
+
+        if ($request->filled('subject_id')) {
+            $examsQuery->where('subject_id', (int) $request->query('subject_id'));
+        }
+
+        $exams = $examsQuery->orderBy('starts_at')->get();
 
         // Enriquecer com status e nota da tentativa mais recente do aluno por simulado
         $attemptStatuses = ExamAttempt::with(['attemptStatus:id,slug', 'exam:id,release_results_after_end,ends_at'])
             ->where('student_id', $student->id)
             ->whereIn('exam_id', $exams->pluck('id'))
             ->orderByDesc('started_at')
-            ->get(['id', 'exam_id', 'attempt_status_id', 'score', 'max_score', 'percentage', 'started_at'])
+            ->get(['id', 'exam_id', 'attempt_status_id', 'score', 'max_score', 'percentage', 'started_at', 'expires_at'])
             ->unique('exam_id')
             ->keyBy('exam_id');
 
         $statusPriority = [
-            'in_progress'     => 0,
-            'not_started'     => 1,
-            'pending_review'  => 2,
-            'awaiting_release'=> 3,
-            'completed'       => 4,
+            'in_progress'      => 0,
+            'not_started'      => 1,
+            'abandoned'        => 1,
+            'pending_review'   => 2,
+            'awaiting_release' => 3,
+            'completed'        => 4,
         ];
+
+        $attemptStatusFilter = $request->query('attempt_status');
 
         $result = $exams->map(function (Exam $exam) use ($attemptStatuses, $statusPriority, $user) {
             $resource = (new ExamResource($exam))->resolve(request());
             $attempt  = $attemptStatuses->get($exam->id);
+
+            if ($attempt?->status === 'in_progress') {
+                $this->integrity->abandonIfTimedOut($attempt);
+                $attempt->refresh();
+            }
+
             $visibleStatus = $attempt?->visibleStatusFor($user->role) ?? 'not_started';
+            $periodClosed = $exam->ends_at !== null && $exam->ends_at->lt(now());
+
+            $resource['total_questions'] = (int) ($exam->questions_count ?? 0);
+            $resource['total_points']    = (float) ($exam->total_points_sum ?? 0);
+            $resource['period_closed']   = $periodClosed;
             $score = ($visibleStatus === 'awaiting_release')
                 ? null
                 : ($attempt?->score !== null ? (float) $attempt->score : null);
@@ -117,6 +153,12 @@ class StudentExamController extends Controller
 
             return $resource;
         })
+            ->when(
+                $attemptStatusFilter,
+                fn ($collection) => $collection->filter(
+                    fn (array $item) => ($item['attempt_status'] ?? null) === $attemptStatusFilter
+                )
+            )
             ->sortBy([
                 ['_sort_can_start', 'desc'],
                 ['_sort_status_rank', 'asc'],
@@ -159,27 +201,7 @@ class StudentExamController extends Controller
             return $this->forbidden();
         }
 
-        // Verificar se o aluno tem matrícula ativa no curso do simulado
-        $today = now()->toDateString();
-
-        $hasEnrollment = DB::table('enrollments')
-            ->leftJoin('course_plans', 'enrollments.course_plan_id', '=', 'course_plans.id')
-            ->leftJoin('school_classes', 'enrollments.school_class_id', '=', 'school_classes.id')
-            ->where('enrollments.student_id', $student->id)
-            ->where(function ($q) use ($exam) {
-                $q->where('course_plans.course_id', $exam->course_id)
-                  ->orWhere('school_classes.course_id', $exam->course_id);
-            })
-            ->where('enrollments.status', 'active')
-            ->where('enrollments.start_date', '<=', $today)
-            ->where(function ($q) use ($today) {
-                $q->whereNull('enrollments.end_date')
-                  ->orWhere('enrollments.end_date', '>=', $today);
-            })
-            ->whereNull('enrollments.deleted_at')
-            ->exists();
-
-        if (! $hasEnrollment) {
+        if ($exam->course_id && ! $this->enrollmentService->hasActiveEnrollmentInCourse($student, $exam->course_id)) {
             return $this->forbidden('Você não possui matrícula ativa neste curso.');
         }
 
@@ -191,6 +213,11 @@ class StudentExamController extends Controller
             ->latest('started_at')
             ->first();
 
+        if ($attempt?->status === 'in_progress') {
+            $this->integrity->abandonIfTimedOut($attempt);
+            $attempt->refresh();
+        }
+
         // Respostas do aluno nesta tentativa, indexadas por question_id
         $answers = $attempt
             ? $attempt->answers()->get(['question_id', 'option_id', 'text_answer'])->keyBy('question_id')
@@ -199,6 +226,10 @@ class StudentExamController extends Controller
         $resource                   = (new ExamResource($exam))->resolve($request);
         $resource['attempt_status'] = $attempt?->visibleStatusFor($user->role) ?? 'not_started';
         $resource['attempt_id']     = $attempt?->id;
+        $resource['expires_at']     = $attempt?->expires_at?->toISOString();
+        $resource['time_remaining_seconds'] = ($attempt?->status === 'in_progress')
+            ? $attempt->remainingSeconds()
+            : null;
         $resource['can_start']      = $this->canStart($exam);
 
         // Injetar student_answer em cada questão

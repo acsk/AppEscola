@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import type { SimuladoDetail, Question } from './simulados.service';
+import { formatExamDuration, type SimuladoDetail, type Question } from './simulados.service';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -128,7 +128,7 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
   if (detalhe.course?.name) meta.push(['Curso', detalhe.course.name]);
   if (detalhe.subject?.name) meta.push(['Disciplina', detalhe.subject.name]);
   if (detalhe.exam_type_label) meta.push(['Tipo', detalhe.exam_type_label]);
-  meta.push(['Duração', `${detalhe.duration_minutes} min`]);
+  meta.push(['Duração', formatExamDuration(detalhe.duration_minutes)]);
   meta.push(['Questões', String(detalhe.total_questions)]);
   meta.push(['Pontuação total', String(detalhe.total_points)]);
   if (detalhe.starts_at) meta.push(['Início', formatDate(detalhe.starts_at)]);

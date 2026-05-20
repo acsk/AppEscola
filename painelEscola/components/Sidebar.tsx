@@ -23,13 +23,14 @@ const formatBuildDateTime = (isoDate: string): string => {
   }
 };
 
-import type { NavItem, SidebarProps } from "../types/components";
+import type { NavGroup, NavItem, SidebarProps } from "../types/components";
 
 export default function Sidebar({
   activeItem: externalActive,
   onSelectItem,
   canManageTenants = false,
   canManageUsers = false,
+  canSendNotifications = false,
   isMobile = false,
   onClose,
   apiVersion = "-",
@@ -38,21 +39,63 @@ export default function Sidebar({
   const [internalActive, setInternalActive] = useState("dashboard");
   const [versionCopied, setVersionCopied] = useState(false);
   const activeItem = externalActive ?? internalActive;
-  const menuItems: NavItem[] = [
-    { id: "dashboard", label: "Dashboard", icon: "home-outline" as const },
-    { id: "alunos", label: "Alunos", icon: "people-outline" as const },
-    { id: "responsaveis", label: "Responsáveis", icon: "person-outline" as const },
-    ...(canManageUsers ? [{ id: "users", label: "Usuários", icon: "people-circle-outline" as const }] : []),
-    { id: "disciplinas", label: "Disciplinas", icon: "library-outline" as const },
-    { id: "turmas", label: "Turmas", icon: "grid-outline" as const },
-    { id: "cursos", label: "Cursos", icon: "book-outline" as const },
-    { id: "simulados", label: "Simulados", icon: "document-text-outline" as const },
-    { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" as const },
-    { id: "bancos_crud", label: "Cadastro de Bancos", icon: "add-circle-outline" as const },
-    { id: "pagamentos", label: "Configuração de Provedores", icon: "cog-outline" as const },
-    { id: "configuracoes-cobranca", label: "Configurações de Cobrança", icon: "settings-outline" as const },
-    ...(canManageTenants ? [{ id: "tenants", label: "Tenants", icon: "business-outline" as const }] : []),
-  ];
+  const menuGroups: NavGroup[] = [
+    {
+      title: "Início",
+      items: [{ id: "dashboard", label: "Dashboard", icon: "home-outline" }],
+    },
+    {
+      title: "Pessoas",
+      items: [
+        { id: "alunos", label: "Alunos", icon: "people-outline" },
+        { id: "responsaveis", label: "Responsáveis", icon: "person-outline" },
+        ...(canManageUsers
+          ? [{ id: "users", label: "Usuários", icon: "people-circle-outline" as const }]
+          : []),
+      ],
+    },
+    {
+      title: "Acadêmico",
+      items: [
+        { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
+        { id: "turmas", label: "Turmas", icon: "grid-outline" },
+        { id: "cursos", label: "Cursos", icon: "book-outline" },
+        { id: "simulados", label: "Simulados", icon: "document-text-outline" },
+        { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
+      ],
+    },
+    ...(canSendNotifications
+      ? [
+          {
+            title: "Comunicação",
+            items: [
+              { id: "notificacoes", label: "Notificações", icon: "notifications-outline" },
+              { id: "calendario", label: "Calendário", icon: "calendar-outline" },
+            ],
+          },
+        ]
+      : []),
+    {
+      title: "Financeiro",
+      items: [
+        { id: "bancos_crud", label: "Cadastro de Bancos", icon: "add-circle-outline" },
+        { id: "pagamentos", label: "Configuração de Provedores", icon: "cog-outline" },
+        {
+          id: "configuracoes-cobranca",
+          label: "Configurações de Cobrança",
+          icon: "settings-outline",
+        },
+      ],
+    },
+    ...(canManageTenants
+      ? [
+          {
+            title: "Administração",
+            items: [{ id: "tenants", label: "Tenants", icon: "business-outline" }],
+          },
+        ]
+      : []),
+  ].filter((group) => group.items.length > 0);
 
   const handlePress = (id: string) => {
     setInternalActive(id);
@@ -79,18 +122,18 @@ export default function Sidebar({
       <TouchableOpacity
         key={item.id}
         onPress={() => handlePress(item.id)}
-        className={`flex-row items-center px-3 py-2 rounded-lg mb-0.5 ${
+        className={`flex-row items-center px-2.5 py-1.5 rounded-lg mb-0.5 ${
           isActive ? "bg-violet-100" : "bg-transparent"
         }`}
         activeOpacity={0.7}
       >
         <Ionicons
           name={item.icon}
-          size={18}
+          size={17}
           color={isActive ? "#7C3AED" : "#9CA3AF"}
         />
         <Text
-          className={`ml-2.5 text-[13px] font-medium flex-1 ${
+          className={`ml-2 text-[13px] font-medium flex-1 ${
             isActive ? "text-violet-700" : "text-gray-500"
           }`}
         >
@@ -105,7 +148,7 @@ export default function Sidebar({
 
   return (
     <View
-      className="bg-white pt-4 px-2.5 border-r border-gray-100"
+      className="bg-white pt-3 px-2 border-r border-gray-100"
       style={{
         width: isMobile ? Math.min(288, width * 0.84) : 214,
         height: "100%",
@@ -114,7 +157,7 @@ export default function Sidebar({
       }}
     >
       {/* Logo */}
-      <View className="flex-row items-center justify-between px-2.5 mb-4">
+      <View className="flex-row items-center justify-between px-2 mb-2">
         <View className="flex-1">
           <View className="flex-row items-center">
             <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
@@ -132,7 +175,7 @@ export default function Sidebar({
           <TouchableOpacity
             onPress={copyVersionInfo}
             activeOpacity={0.7}
-            className="mt-3 ml-0"
+            className="mt-1.5 ml-0"
           >
             <Text className="text-[10px] font-medium text-violet-600">
               API v{apiVersion}
@@ -164,7 +207,14 @@ export default function Sidebar({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        {menuItems.map(renderItem)}
+        {menuGroups.map((group, groupIndex) => (
+          <View key={group.title} className={groupIndex > 0 ? "mt-2.5" : ""}>
+            <Text className="px-2.5 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+              {group.title}
+            </Text>
+            {group.items.map(renderItem)}
+          </View>
+        ))}
       </ScrollView>
     </View>
   );

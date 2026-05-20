@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -17,44 +17,48 @@ import {
   SimuladoListItem,
   AttemptStatus,
   subjectIconName,
+  formatExamDuration,
+  filtrarSimulados,
+  extrairDisciplinasDosSimulados,
 } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { useSimuladosList } from '../hooks';
+import {
+  SimuladosFilters,
+  DEFAULT_SIMULADOS_FILTERS,
+  type SimuladosFilterState,
+} from '../components/SimuladosFilters';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { colors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'SimuladosList'>;
 
 const STATUS_LABEL: Record<AttemptStatus, string> = {
-  not_started:    'Disponível',
-  in_progress:    'Em andamento',
-  pending_review: 'Aguardando correção',
+  not_started:      'Disponível',
+  in_progress:      'Em andamento',
+  pending_review:   'Aguardando correção',
   awaiting_release: 'Aguardando liberação',
-  completed:      'Concluído',
+  completed:        'Concluído',
+  abandoned:        'Tempo esgotado',
 };
 
 const STATUS_COLOR: Record<AttemptStatus, string> = {
-  not_started:    '#22C55E',
-  in_progress:    '#F97316',
-  pending_review: '#F97316',
+  not_started:      '#22C55E',
+  in_progress:      '#F97316',
+  pending_review:   '#F97316',
   awaiting_release: '#F97316',
-  completed:      '#22C55E',
+  completed:        '#22C55E',
+  abandoned:        '#94A3B8',
 };
 
 const STATUS_ICON: Record<AttemptStatus, React.ComponentProps<typeof Ionicons>['name']> = {
-  not_started:    'play-circle-outline',
-  in_progress:    'time-outline',
-  pending_review: 'hourglass-outline',
+  not_started:      'play-circle-outline',
+  in_progress:      'time-outline',
+  pending_review:   'hourglass-outline',
   awaiting_release: 'lock-closed-outline',
-  completed:      'checkmark-circle-outline',
+  completed:        'checkmark-circle-outline',
+  abandoned:        'timer-outline',
 };
-
-function formatMinutes(min: number): string {
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR', {
@@ -75,15 +79,31 @@ function tint(hex?: string, alpha = '18'): string {
 export function SimuladosScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
+  const [filtros, setFiltros] = useState<SimuladosFilterState>(DEFAULT_SIMULADOS_FILTERS);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
 
   const {
-    data: simulados = [],
+    data: todosSimulados = [],
     isLoading: carregando,
     isRefetching: atualizando,
     isError,
     error,
     refetch,
   } = useSimuladosList();
+
+  const disciplinas = useMemo(
+    () => extrairDisciplinasDosSimulados(todosSimulados),
+    [todosSimulados],
+  );
+
+  const simulados = useMemo(
+    () => filtrarSimulados(todosSimulados, {
+      period: filtros.period,
+      subject_id: filtros.subject_id ?? undefined,
+      attempt_status: filtros.attempt_status ?? undefined,
+    }),
+    [todosSimulados, filtros],
+  );
 
   const erro = isError
     ? getApiErrorMessage(error, 'Não foi possível carregar os simulados.')
@@ -150,21 +170,29 @@ export function SimuladosScreen() {
             <Text style={styles.badgeTexto}>{label}</Text>
           </View>
         </View>
-        {!item.can_start && item.attempt_status === 'not_started' && (
+        {item.period_closed ? (
+          <View style={styles.periodoEncerrado}>
+            <Ionicons name="calendar-outline" size={12} color="#64748B" />
+            <Text style={styles.periodoEncerradoTexto}>Período encerrado</Text>
+          </View>
+        ) : null}
+        {!item.can_start && item.attempt_status === 'not_started' && !item.period_closed && (
           <View style={styles.foraPeriodo}>
             <Ionicons name="lock-closed-outline" size={12} color={colors.muted} />
-            <Text style={styles.foraPeriodoTexto}>Fora do período</Text>
+            <Text style={styles.foraPeriodoTexto}>Fora do período de início</Text>
           </View>
         )}
         <Text style={styles.cardTitulo} numberOfLines={2}>{item.title}</Text>
         <View style={styles.cardRodape}>
           <View style={styles.infoItem}>
             <Ionicons name="help-circle-outline" size={14} color={colors.muted} />
-            <Text style={styles.infoTexto}>{item.total_questions} questões</Text>
+            <Text style={styles.infoTexto}>
+              {item.total_questions ?? 0} questão{(item.total_questions ?? 0) !== 1 ? 'ões' : ''}
+            </Text>
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="time-outline" size={14} color={colors.muted} />
-            <Text style={styles.infoTexto}>{formatMinutes(item.duration_minutes)}</Text>
+            <Text style={styles.infoTexto}>{formatExamDuration(item.duration_minutes)}</Text>
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="ribbon-outline" size={14} color={colors.muted} />
@@ -247,19 +275,47 @@ export function SimuladosScreen() {
         keyExtractor={(item) => String(item.id)}
         renderItem={renderDisponivel}
         style={{ flex: 1 }}
-        contentContainerStyle={simulados.length === 0 ? styles.listaVazia : styles.lista}
+        contentContainerStyle={[styles.lista, simulados.length === 0 && styles.listaComVazio]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={atualizando} onRefresh={() => refetch()} colors={[colors.primary]} tintColor={colors.primary} />
         }
-        ListHeaderComponent={simulados.length > 0 ? (
-          <Text style={styles.cabecalho}>{simulados.length} simulado{simulados.length !== 1 ? 's' : ''}</Text>
-        ) : null}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={styles.cabecalho}>
+              {simulados.length} de {todosSimulados.length} simulado{todosSimulados.length !== 1 ? 's' : ''}
+            </Text>
+            <SimuladosFilters
+              expanded={filtrosAbertos}
+              onToggleExpanded={() => setFiltrosAbertos((v) => !v)}
+              filters={filtros}
+              onChange={setFiltros}
+              subjects={disciplinas}
+            />
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.vazio}>
-            <Ionicons name="clipboard-outline" size={56} color={colors.border} />
-            <Text style={styles.vazioTitulo}>Nenhum simulado disponível</Text>
-            <Text style={styles.vazioSub}>Verifique sua matrícula ou tente mais tarde.</Text>
+            <Ionicons name="filter-outline" size={56} color={colors.border} />
+            <Text style={styles.vazioTitulo}>
+              {todosSimulados.length === 0
+                ? 'Nenhum simulado disponível'
+                : 'Nenhum simulado com esses filtros'}
+            </Text>
+            <Text style={styles.vazioSub}>
+              {todosSimulados.length === 0
+                ? 'Verifique sua matrícula ou tente mais tarde.'
+                : 'Ajuste período, disciplina ou status da tentativa.'}
+            </Text>
+            {todosSimulados.length > 0 ? (
+              <TouchableOpacity
+                style={styles.botaoTentar}
+                onPress={() => setFiltros({ ...DEFAULT_SIMULADOS_FILTERS })}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.botaoTentarTexto}>Limpar filtros</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         }
       />
@@ -308,9 +364,12 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   headerTitulo: { flex: 1, fontSize: 22, fontWeight: '800', color: '#111827' },
-  lista:      { padding: 16, paddingTop: 12 },
-  listaVazia: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  cabecalho:  { fontSize: 13, color: colors.muted, marginBottom: 12 },
+  lista: { padding: 16, paddingTop: 12 },
+  listaComVazio: { flexGrow: 1 },
+  listHeader: { marginBottom: 12, gap: 10 },
+  cabecalho:  { fontSize: 13, color: colors.muted },
+  periodoEncerrado: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+  periodoEncerradoTexto: { fontSize: 11, color: '#64748B', fontWeight: '600' },
 
   card: {
     backgroundColor: colors.surface, borderRadius: 18, padding: 16, paddingLeft: 20,

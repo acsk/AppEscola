@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
 import { compressImageToMaxSize } from '../../../services/image-compression.service';
@@ -23,6 +23,8 @@ import { uploadStudentPhoto } from '../../../services/student-photo.service';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { platformShadow } from '../../../lib/shadow';
 import { colors } from '../../../theme';
+import { useUnreadNotificationsCount } from '../../notifications/hooks';
+import { WeeklyCalendarWidget } from '../../calendar/components/WeeklyCalendarWidget';
 
 function getInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
@@ -69,16 +71,18 @@ function formatPct(value: number, fractionDigits = 1): string {
 const SIM_STATUS_COLOR: Record<AttemptStatus, string> = {
   not_started: '#22C55E',
   in_progress: '#F97316',
-  completed:   '#22C55E',
+  completed: '#22C55E',
   pending_review: '#F97316',
   awaiting_release: '#F97316',
+  abandoned: '#94A3B8',
 };
 const SIM_STATUS_LABEL: Record<AttemptStatus, string> = {
   not_started: 'Disponível',
   in_progress: 'Em andamento',
-  completed:   'Concluído',
+  completed: 'Concluído',
   pending_review: 'Aguardando correção',
   awaiting_release: 'Aguardando liberação',
+  abandoned: 'Tempo esgotado',
 };
 
 const SIM_CARD_ACCENTS = [
@@ -125,6 +129,18 @@ export function HomeScreen() {
 
   const { data: simuladosLista = [] } = useSimuladosList();
   const simuladosRecentes = user?.role === 'aluno' ? simuladosLista : [];
+  const {
+    data: unreadNotifications = 0,
+    refetch: refetchUnreadNotifications,
+  } = useUnreadNotificationsCount(user?.role === 'aluno');
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.role === 'aluno') {
+        refetchUnreadNotifications();
+      }
+    }, [user?.role, refetchUnreadNotifications])
+  );
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('month');
   const [dashboard, setDashboard] = useState<AlunoDashboardMetrics | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -368,14 +384,28 @@ export function HomeScreen() {
           </View>
 
           <View style={[styles.headerIcons, isCompact && styles.headerIconsCompact]}>
-            <TouchableOpacity style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}>
-              <Ionicons name="notifications-outline" size={isCompact ? 20 : 22} color={colors.ink} />
-              <View style={styles.notifDot} />
-            </TouchableOpacity>
+            {user?.role === 'aluno' ? (
+              <TouchableOpacity
+                style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}
+                onPress={() => navigation.navigate('Notificacoes')}
+                accessibilityLabel="Notificações"
+              >
+                <Ionicons name="notifications-outline" size={isCompact ? 24 : 27} color={colors.ink} />
+                {unreadNotifications > 0 ? (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
 
       </View>
+
+      {user?.role === 'aluno' && <WeeklyCalendarWidget />}
 
       {/* ── Resumo de desempenho ───────────────────────────────────────── */}
       {user?.role === 'aluno' && (
@@ -682,7 +712,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   iconBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.72)',
     borderWidth: 1,
@@ -690,14 +720,29 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   iconBtnCompact: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
-  notifDot: {
-    position: 'absolute', top: 8, right: 8,
-    width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary,
-    borderWidth: 1, borderColor: colors.surface,
+  notifBadge: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.debit,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.surface,
+    lineHeight: 12,
   },
   avatarWrap:    { position: 'relative', marginRight: 18 },
   avatarWrapCompact: { marginRight: 12 },

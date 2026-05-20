@@ -2,7 +2,13 @@ import { api } from './api';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-export type AttemptStatus = 'not_started' | 'in_progress' | 'pending_review' | 'awaiting_release' | 'completed';
+export type AttemptStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'pending_review'
+  | 'awaiting_release'
+  | 'completed'
+  | 'abandoned';
 
 export interface SimuladoSubject {
   id: number;
@@ -40,13 +46,14 @@ export interface SimuladoListItem {
   exam_type: string;
   exam_type_label: string;
   status: string;
-  duration_minutes: number;
+  duration_minutes: number | null;
   passing_score: number;
   starts_at: string | null;
   ends_at: string | null;
   total_questions: number;
   total_points: number;
   attempt_status: AttemptStatus;
+  period_closed?: boolean;
   can_start: boolean;
   nota?: number | null;
   score_display?: string | null;
@@ -91,7 +98,7 @@ export interface SimuladoDetail {
   exam_type_label: string;
   status: string;
   status_label: string;
-  duration_minutes: number;
+  duration_minutes: number | null;
   passing_score: number;
   starts_at: string | null;
   ends_at: string | null;
@@ -99,6 +106,8 @@ export interface SimuladoDetail {
   total_points: number;
   attempt_status: AttemptStatus;
   attempt_id: number | null;
+  expires_at?: string | null;
+  time_remaining_seconds?: number | null;
   can_start: boolean;
   release_results_after_end?: boolean;
   allow_retake?: boolean;
@@ -115,12 +124,14 @@ export interface AttemptStart {
   student_id: number;
   status: string;
   started_at: string;
-  exam: { id: number; title: string };
+  expires_at?: string | null;
+  time_remaining_seconds?: number | null;
+  exam: { id: number; title: string; duration_minutes?: number | null };
 }
 
 export interface AttemptFinish {
   id: number;
-  status: 'completed' | 'pending_review' | 'awaiting_release';
+  status: 'completed' | 'pending_review' | 'awaiting_release' | 'abandoned';
   score: number | null;
   max_score: number;
   percentage: number | null;
@@ -147,10 +158,106 @@ function unwrapBody<T>(payload: T | ApiEnvelope<T>): T {
 
 // ── API calls ─────────────────────────────────────────────────────────────────
 
-export async function listarSimulados(): Promise<SimuladoListItem[]> {
-  const { data } = await api.get<SimuladoListItem[] | ApiEnvelope<SimuladoListItem[]>>('/api/aluno/exams');
+export type SimuladoPeriodFilter = 'open' | 'closed' | 'all';
+
+export interface SimuladosListFilters {
+  period?: SimuladoPeriodFilter;
+  subject_id?: number;
+  attempt_status?: AttemptStatus;
+}
+
+export interface SimuladosListParams {
+  /** Busca completa para filtrar no app (recomendado). */
+  fetchAll?: boolean;
+  filters?: SimuladosListFilters;
+}
+
+export async function listarSimulados(params?: SimuladosListParams): Promise<SimuladoListItem[]> {
+  const query: Record<string, string | number> = {};
+
+  if (params?.fetchAll || !params?.filters) {
+    query.period = 'all';
+  } else {
+    const { period = 'all', subject_id, attempt_status } = params.filters;
+    if (period !== 'all') {
+      query.period = period;
+    }
+    if (subject_id != null) {
+      query.subject_id = subject_id;
+    }
+    if (attempt_status) {
+      query.attempt_status = attempt_status;
+    }
+  }
+
+  const { data } = await api.get<SimuladoListItem[] | ApiEnvelope<SimuladoListItem[]>>(
+    '/api/aluno/exams',
+    { params: Object.keys(query).length > 0 ? query : undefined },
+  );
   const parsed = unwrapBody<SimuladoListItem[]>(data);
   return Array.isArray(parsed) ? parsed : [];
+}
+
+export function filtrarSimulados(
+  items: SimuladoListItem[],
+  filters: SimuladosListFilters,
+): SimuladoListItem[] {
+  return items.filter((item) => {
+    const period = filters.period ?? 'open';
+
+    if (period === 'open' && item.period_closed) {
+      return false;
+    }
+    if (period === 'closed' && !item.period_closed) {
+      return false;
+    }
+    if (filters.subject_id != null && item.subject?.id !== filters.subject_id) {
+      return false;
+    }
+    if (filters.attempt_status != null && item.attempt_status !== filters.attempt_status) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+export function extrairDisciplinasDosSimulados(
+  items: SimuladoListItem[],
+): SimuladoSubject[] {
+  const map = new Map<number, SimuladoSubject>();
+
+  for (const item of items) {
+    if (item.subject) {
+      map.set(item.subject.id, item.subject);
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+/** Duração formatada; null/0 = sem limite de tempo na API. */
+export function formatExamDuration(minutes: number | null | undefined): string {
+  if (minutes == null || minutes <= 0) {
+    return 'Sem limite';
+  }
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
+export function formatTimerSeconds(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 export async function detalharSimulado(id: number): Promise<SimuladoDetail> {

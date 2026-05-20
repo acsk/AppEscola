@@ -23,8 +23,10 @@ import {
   SimuladoDetail,
   Question,
   AttemptFinish,
+  formatTimerSeconds,
 } from '../../../services/simulados.service';
 import { invalidateSimuladosQueries } from '../hooks';
+import { getApiErrorMessage } from '../../../lib/apiError';
 import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoExam'>;
@@ -218,8 +220,10 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   const [resultado, setResultado] = useState<AttemptFinish | null>(null);
   const [erroMsg, setErroMsg]     = useState<string>('');
   const [verificando, setVerificando] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const scrollRef                 = useRef<ScrollView>(null);
   const bypassRemoveRef            = useRef(false);
+  const tempoEsgotadoRef            = useRef(false);
 
   // Modal de confirmação de saída
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -282,15 +286,91 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
   useEffect(() => { carregarQuestoes(); }, [examId]);
 
+  useEffect(() => {
+    if (fase !== 'realizando' && fase !== 'finalizando') {
+      return;
+    }
+
+    if (secondsLeft === null) {
+      return;
+    }
+
+    if (secondsLeft > 0) {
+      const tick = setInterval(() => {
+        setSecondsLeft((prev) => (prev === null || prev <= 1 ? 0 : prev - 1));
+      }, 1000);
+      return () => clearInterval(tick);
+    }
+
+    if (!tempoEsgotadoRef.current) {
+      tempoEsgotadoRef.current = true;
+      handleTempoEsgotado();
+    }
+  }, [fase, secondsLeft]);
+
   async function carregarQuestoes() {
     setFase('carregando');
+    tempoEsgotadoRef.current = false;
     try {
       const d = await detalharSimulado(examId);
       setDetalhe(d);
       navigation.setOptions({ title: d.title });
+
+      if (d.attempt_status === 'abandoned') {
+        setErroMsg('O tempo desta tentativa expirou. Volte e inicie uma nova tentativa, se permitido.');
+        setFase('erro');
+        return;
+      }
+
+      if (d.attempt_status !== 'in_progress') {
+        setErroMsg('Esta tentativa não está mais em andamento.');
+        setFase('erro');
+        return;
+      }
+
+      const remaining = d.time_remaining_seconds ?? null;
+      setSecondsLeft(remaining);
+
+      if (remaining === 0) {
+        setErroMsg('O tempo desta tentativa expirou.');
+        setFase('erro');
+        return;
+      }
+
       setFase('realizando');
-    } catch (e: any) {
-      setErroMsg(e?.response?.data?.message ?? 'Não foi possível carregar as questões.');
+    } catch (e: unknown) {
+      setErroMsg(getApiErrorMessage(e, 'Não foi possível carregar as questões.'));
+      setFase('erro');
+    }
+  }
+
+  async function handleTempoEsgotado() {
+    if (!detalhe || fase === 'finalizando' || fase === 'resultado') {
+      return;
+    }
+
+    setErroMsg('');
+    setFase('finalizando');
+
+    try {
+      for (const questao of detalhe.questions) {
+        const resp = respostas[questao.id];
+        if (!resp) continue;
+        if (questao.type === 'essay') {
+          if (resp.textAnswer?.trim()) {
+            await enviarResposta(attemptId, questao.id, undefined, resp.textAnswer);
+          }
+        } else if (resp.optionId !== undefined) {
+          await enviarResposta(attemptId, questao.id, resp.optionId, resp.textAnswer);
+        }
+      }
+
+      const res = await finalizarSimulado(attemptId);
+      invalidateSimuladosQueries(queryClient, { examId, attemptId });
+      setResultado(res);
+      setFase('resultado');
+    } catch (e: unknown) {
+      setErroMsg(getApiErrorMessage(e, 'O tempo do simulado expirou. A tentativa foi encerrada.'));
       setFase('erro');
     }
   }
@@ -338,8 +418,8 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
       invalidateSimuladosQueries(queryClient, { examId, attemptId });
       setResultado(res);
       setFase('resultado');
-    } catch (e: any) {
-      setErroMsg(e?.response?.data?.message ?? 'Erro ao finalizar. Tente novamente.');
+    } catch (e: unknown) {
+      setErroMsg(getApiErrorMessage(e, 'Erro ao finalizar. Tente novamente.'));
       setFase('realizando');
     }
   }
@@ -398,6 +478,30 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
   // ── Resultado ───────────────────────────────────────────────────────────────
   if (fase === 'resultado' && resultado) {
+    if (resultado.status === 'abandoned') {
+      return (
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+          <View style={[styles.resultadoCard, { borderTopColor: '#94A3B8' }]}>
+            <View style={[styles.resultadoIconCircle, { backgroundColor: '#F1F5F9' }]}>
+              <Ionicons name="timer-outline" size={64} color="#64748B" />
+            </View>
+            <Text style={styles.resultadoTitulo}>Tempo esgotado</Text>
+            <Text style={styles.resultadoSub}>
+              A tentativa foi encerrada automaticamente. Se o simulado permitir, você pode tentar novamente na listagem.
+            </Text>
+            <TouchableOpacity
+              style={styles.botaoVoltar}
+              onPress={() => navigation.navigate('SimuladosList')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="list-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+              <Text style={styles.botaoVoltarTexto}>Ver todos os simulados</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      );
+    }
+
     // Aguardando correção manual ou aguardando liberação automática
     if (resultado.status === 'pending_review' || resultado.status === 'awaiting_release') {
       const aguardandoLiberacao = resultado.status === 'awaiting_release';
@@ -544,7 +648,22 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
         <View style={styles.progressoContainer}>
           <View style={styles.progressoTexto}>
             <Text style={styles.progressoLabel}>{respondidas} de {total} respondidas</Text>
-            <Text style={styles.progressoPct}>{Math.round(pct)}%</Text>
+            <View style={styles.progressoDireita}>
+              {secondsLeft !== null ? (
+                <View style={[styles.timerPill, secondsLeft <= 60 && styles.timerPillUrgente]}>
+                  <Ionicons
+                    name="timer-outline"
+                    size={14}
+                    color={secondsLeft <= 60 ? '#DC2626' : colors.primary}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={[styles.timerTexto, secondsLeft <= 60 && styles.timerTextoUrgente]}>
+                    {formatTimerSeconds(secondsLeft)}
+                  </Text>
+                </View>
+              ) : null}
+              <Text style={styles.progressoPct}>{Math.round(pct)}%</Text>
+            </View>
           </View>
           <View style={styles.progressoBar}>
             <View style={[styles.progressoFill, { width: `${pct}%` as any }]} />
@@ -650,9 +769,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  progressoTexto: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressoLabel: { fontSize: 13, color: colors.muted },
+  progressoTexto: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  progressoDireita: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressoLabel: { fontSize: 13, color: colors.muted, flex: 1 },
   progressoPct:   { fontSize: 13, fontWeight: '700', color: colors.primary },
+  timerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.soft,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  timerPillUrgente: {
+    backgroundColor: '#FEF2F2',
+  },
+  timerTexto: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  timerTextoUrgente: { color: '#DC2626' },
   progressoBar:   { height: 6, backgroundColor: '#E0E7FF', borderRadius: 3, overflow: 'hidden' },
   progressoFill:  { height: '100%', backgroundColor: colors.primary, borderRadius: 3 },
   questoesScroll: { flex: 1 },

@@ -19,6 +19,8 @@ import {
   SimuladoDetail,
   SupportMaterial,
   subjectIconName,
+  formatExamDuration,
+  formatTimerSeconds,
 } from '../../../services/simulados.service';
 import { gerarPdfSimulado } from '../../../services/pdf-simulado.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
@@ -31,13 +33,6 @@ import {
 import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoDetalhe'>;
-
-function formatMinutes(min: number): string {
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR', {
@@ -109,6 +104,13 @@ function statusInfo(status: AttemptStatus, awaitingRelease: boolean) {
       text: 'Sua tentativa foi concluída e está disponível para consulta.',
       bg: '#ECFDF5',
       color: '#059669',
+    },
+    abandoned: {
+      icon: 'timer-outline',
+      label: 'Tempo esgotado',
+      text: 'A tentativa anterior foi encerrada por tempo. Você pode iniciar novamente se o simulado permitir.',
+      bg: '#F1F5F9',
+      color: '#64748B',
     },
   };
 
@@ -372,12 +374,14 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     detalhe.attempt_status || (detalhe.can_start ? 'not_started' : 'in_progress')
   ) as AttemptStatus;
   const emAndamento   = statusEfetivo === 'in_progress';
+  const abandonado    = statusEfetivo === 'abandoned';
   const pendingReview = statusEfetivo === 'pending_review';
   const awaitingRelease =
     statusEfetivo === 'awaiting_release' ||
     revisao?.status === 'awaiting_release' ||
     revisao?.result_release_pending === true;
-  const podeComecar   = detalhe.can_start && statusEfetivo === 'not_started';
+  const podeIniciar   = detalhe.can_start && (statusEfetivo === 'not_started' || abandonado);
+  const tempoRestante = emAndamento ? detalhe.time_remaining_seconds : null;
   const concluido     = statusEfetivo === 'completed';
   const concluidoComVisualizacao =
     statusEfetivo === 'completed' ||
@@ -447,6 +451,15 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
               <Text style={styles.metaValue}>{dataResumo}</Text>
             </View>
           ) : null}
+          {emAndamento && tempoRestante != null ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="timer-outline" size={16} color={tempoRestante <= 60 ? '#DC2626' : colors.muted} />
+              <Text style={styles.metaLabel}>Tempo</Text>
+              <Text style={[styles.metaValue, tempoRestante <= 60 && styles.metaValueUrgente]}>
+                {formatTimerSeconds(tempoRestante)} restantes
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.grid}>
@@ -457,7 +470,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
             <Ionicons name="time-outline" size={22} color={subjectColor} />
-            <Text style={styles.gridValor}>{formatMinutes(detalhe.duration_minutes)}</Text>
+            <Text style={styles.gridValor}>{formatExamDuration(detalhe.duration_minutes)}</Text>
             <Text style={styles.gridLabel}>duração</Text>
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
@@ -543,7 +556,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
             <Ionicons name="play-forward" size={18} color={colors.surface} style={{ marginRight: 8 }} />
             <Text style={styles.botaoAcaoTexto}>Continuar simulado</Text>
           </TouchableOpacity>
-        ) : podeComecar ? (
+        ) : podeIniciar ? (
           <TouchableOpacity
             style={[styles.botaoAcao, { backgroundColor: subjectColor }, iniciando && styles.botaoDisabled]}
             onPress={handleIniciar}
@@ -554,14 +567,16 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
               ? <ActivityIndicator color={colors.surface} size="small" />
               : <>
                   <Ionicons
-                    name="play"
+                    name={abandonado ? 'refresh' : 'play'}
                     size={18} color={colors.surface}
                     style={{ marginRight: 8 }}
                   />
-                  <Text style={styles.botaoAcaoTexto}>Iniciar simulado</Text>
+                  <Text style={styles.botaoAcaoTexto}>
+                    {abandonado ? 'Tentar novamente' : 'Iniciar simulado'}
+                  </Text>
                 </>}
           </TouchableOpacity>
-        ) : (!concluido && !pendingReview && !awaitingRelease) ? (
+        ) : (!concluido && !pendingReview && !awaitingRelease && !abandonado) ? (
           <View style={[styles.banner, { backgroundColor: '#FEF9C3' }]}>
             <Ionicons name="lock-closed-outline" size={18} color="#B45309" style={{ marginRight: 8 }} />
             <Text style={[styles.bannerTexto, { color: '#B45309' }]}>Fora do período permitido</Text>
@@ -840,6 +855,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text,
     lineHeight: 18,
+  },
+  metaValueUrgente: {
+    color: '#DC2626',
+    fontWeight: '700',
   },
 
   grid: {

@@ -81,4 +81,9 @@ class User extends Authenticatable
     {
         return $this->role === 'super_admin';
     }
+
+    public function canViewExamAnswerKeys(): bool
+    {
+        return \App\Services\ExamAccessService::canViewAnswerKeys($this);
+    }
 }

@@ -35,6 +35,8 @@ import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
 import { BillingSettingsScreen } from "./screens/configuracoes";
+import { NotificationsScreen } from "./screens/notificacoes";
+import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 
 import type { NavState } from "./types/navigation";
@@ -101,6 +103,8 @@ const SCREEN_SLUGS = [
   "users",
   "matriculas-detail",
   "configuracoes-cobranca",
+  "notificacoes",
+  "calendario",
 ];
 
 function hashToNav(hash: string): NavState {
@@ -579,6 +583,10 @@ function AppContent() {
 
   const canManageTenants = user?.role === "super_admin";
   const canManageUsers = user?.role === "super_admin" || user?.role === "admin";
+  const canSendNotifications =
+    user?.role === "super_admin" ||
+    user?.role === "admin" ||
+    user?.role === "professor";
 
   // determina item ativo na sidebar (sem sub-rota)
   const activeItem = nav.screen.startsWith("alunos")
@@ -591,6 +599,10 @@ function AppContent() {
     ? "turmas"
     : nav.screen.startsWith("configuracoes")
     ? "configuracoes-cobranca"
+    : nav.screen.startsWith("notificacoes")
+    ? "notificacoes"
+    : nav.screen.startsWith("calendario")
+    ? "calendario"
     : nav.screen.startsWith("simulados")
     ? "simulados"
     : nav.screen.startsWith("tenants")
@@ -705,6 +717,24 @@ function AppContent() {
       case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
       case "configuracoes-cobranca": return <BillingSettingsScreen />;
+      case "notificacoes":
+        if (!canSendNotifications) {
+          return (
+            <View className="flex-1 items-center justify-center px-6">
+              <Text className="text-sm text-amber-700">Sem permissão para notificações.</Text>
+            </View>
+          );
+        }
+        return <NotificationsScreen navigate={navigate} />;
+      case "calendario":
+        if (!canSendNotifications) {
+          return (
+            <View className="flex-1 items-center justify-center px-6">
+              <Text className="text-sm text-amber-700">Sem permissão para o calendário.</Text>
+            </View>
+          );
+        }
+        return <CalendarScreen navigate={navigate} />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
       case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
@@ -724,6 +754,7 @@ function AppContent() {
             onSelectItem={(s) => navigate(s)}
             canManageTenants={canManageTenants}
             canManageUsers={canManageUsers}
+            canSendNotifications={canSendNotifications}
             apiVersion={apiVersion}
           />
         )}
@@ -742,6 +773,7 @@ function AppContent() {
               onSelectItem={(s) => navigate(s)}
               canManageTenants={canManageTenants}
               canManageUsers={canManageUsers}
+              canSendNotifications={canSendNotifications}
               apiVersion={apiVersion}
               isMobile
               onClose={() => setIsSidebarOpen(false)}

@@ -8,6 +8,9 @@ import { AlterarSenhaScreen } from '../../features/home/screens/AlterarSenhaScre
 import { SimuladosNavigator } from './SimuladosStack';
 import type { SimuladosStackParamList } from './SimuladosStack';
 import { FinanceiroScreen } from '../../features/financeiro/screens/FinanceiroScreen';
+import { NotificationsListScreen } from '../../features/notifications/screens/NotificationsListScreen';
+import { NotificationDetailScreen } from '../../features/notifications/screens/NotificationDetailScreen';
+import { CalendarScreen } from '../../features/calendar/screens/CalendarScreen';
 import { AlunoDrawerProvider } from '../../context/AlunoDrawerContext';
 import { AlunoDrawer } from '../../components/navigation/AlunoDrawer';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +26,9 @@ export type AlunoTabParamList = {
 export type AlunoStackParamList = {
   AlunoTabs: NavigatorScreenParams<AlunoTabParamList> | undefined;
   AlterarSenha: undefined;
+  Notificacoes: undefined;
+  NotificacaoDetalhe: { notificationId: number };
+  Calendario: { selectedDate?: string } | undefined;
 };
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -90,6 +96,9 @@ export function AlunoStack() {
       >
         <Stack.Screen name="AlunoTabs" component={AlunoTabs} />
         <Stack.Screen name="AlterarSenha" component={AlterarSenhaScreen} />
+        <Stack.Screen name="Notificacoes" component={NotificationsListScreen} />
+        <Stack.Screen name="NotificacaoDetalhe" component={NotificationDetailScreen} />
+        <Stack.Screen name="Calendario" component={CalendarScreen} />
       </Stack.Navigator>
       <AlunoDrawer />
     </AlunoDrawerProvider>
