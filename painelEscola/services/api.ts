@@ -28,7 +28,29 @@ const dispatchNetworkIssue = (message: string) => {
   window.dispatchEvent(new CustomEvent("api:network-issue", { detail: { message } }));
 };
 
-// Injeta o token em toda requisição autenticada
+const resolveSuperAdminTenantId = (): number | null => {
+  if (typeof localStorage === "undefined") return null;
+
+  const fromStorage = localStorage.getItem("selected_tenant_id");
+  if (fromStorage) {
+    const parsed = Number(fromStorage);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+
+  const rawUser = localStorage.getItem("auth_user");
+  if (!rawUser) return null;
+
+  try {
+    const user = JSON.parse(rawUser) as { role?: string; selected_tenant_id?: number | null };
+    if (user?.role !== "super_admin") return null;
+    const id = user.selected_tenant_id;
+    return typeof id === "number" && id > 0 ? id : null;
+  } catch {
+    return null;
+  }
+};
+
+// Injeta o token e tenant (super_admin) em toda requisição autenticada
 api.interceptors.request.use((config) => {
   const token =
     typeof localStorage !== "undefined"
@@ -36,6 +58,11 @@ api.interceptors.request.use((config) => {
       : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  const tenantId = resolveSuperAdminTenantId();
+  if (tenantId != null) {
+    config.params = { ...(config.params ?? {}), tenant_id: tenantId };
   }
   if (["post", "put", "patch"].includes(config.method ?? "")) {
     if (isFormDataPayload(config.data)) {
@@ -63,6 +90,7 @@ api.interceptors.response.use(
       if (typeof localStorage !== "undefined") {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
+        localStorage.removeItem("selected_tenant_id");
       }
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("auth:expired", { detail: { message } }));

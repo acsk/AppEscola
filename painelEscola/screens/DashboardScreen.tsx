@@ -49,7 +49,8 @@ export default function DashboardScreen() {
     setError(null);
     try {
       const payload = await fetchDashboard(
-        schoolClassId ? { school_class_id: schoolClassId } : undefined
+        schoolClassId ? { school_class_id: schoolClassId } : undefined,
+        user
       );
       setData(payload);
     } catch (e: unknown) {
@@ -60,7 +61,7 @@ export default function DashboardScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     load(classId);

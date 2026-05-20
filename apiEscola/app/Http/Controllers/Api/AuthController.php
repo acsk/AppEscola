@@ -8,6 +8,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -105,7 +106,15 @@ class AuthController extends Controller
         $user = $request->user();
         $user->loadMissing(['tenant', 'student']);
 
-        return response()->json(new UserResource($user));
+        $payload = (new UserResource($user))->resolve($request);
+
+        if ($user->isSuperAdmin()) {
+            $payload['selected_tenant_id'] = TenantContext::tenantIdFromAccessToken(
+                $user->currentAccessToken()
+            );
+        }
+
+        return response()->json($payload);
     }
 
     #[OA\Post(

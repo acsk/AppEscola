@@ -7,6 +7,24 @@ export type { AuthUser } from "../types/auth";
 
 const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
 const STORAGE_APP_VERSION_KEY = "app_version";
+const STORAGE_SELECTED_TENANT_KEY = "selected_tenant_id";
+
+const readStoredSelectedTenantId = (): number | null => {
+  if (typeof localStorage === "undefined") return null;
+  const raw = localStorage.getItem(STORAGE_SELECTED_TENANT_KEY);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const persistSelectedTenantId = (tenantId: number | null | undefined) => {
+  if (typeof localStorage === "undefined") return;
+  if (tenantId != null && tenantId > 0) {
+    localStorage.setItem(STORAGE_SELECTED_TENANT_KEY, String(tenantId));
+  } else {
+    localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
+  }
+};
 
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 
@@ -43,6 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (storedToken && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser) as AuthUser;
+        const storedTenantId = readStoredSelectedTenantId();
+        if (
+          parsedUser.role === "super_admin" &&
+          storedTenantId != null &&
+          parsedUser.selected_tenant_id == null
+        ) {
+          parsedUser.selected_tenant_id = storedTenantId;
+        }
         setUser(parsedUser);
         setMustChangePassword(!!parsedUser.password_change_required);
         api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
@@ -56,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof localStorage !== "undefined") {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
+        localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
       }
       lastKnownTokenRef.current = null;
       lastKnownUserRef.current = null;
@@ -119,10 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data } = await api.post("/login", payload);
     const body = data?.body ?? data;
-    const authUser: AuthUser = body?.user;
+    const authUser: AuthUser = {
+      ...body?.user,
+      selected_tenant_id:
+        body?.selected_tenant_id ??
+        (tenantId != null && tenantId > 0 ? tenantId : null),
+    };
     const mustReset = !!(body?.password_change_required || authUser?.password_change_required);
 
     localStorage.setItem("auth_token", body?.token);
+    persistSelectedTenantId(authUser.selected_tenant_id);
     const serializedUser = JSON.stringify(authUser);
     localStorage.setItem("auth_user", serializedUser);
     localStorage.setItem(STORAGE_APP_VERSION_KEY, APP_VERSION);
@@ -161,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
+    localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
     lastKnownTokenRef.current = null;
     lastKnownUserRef.current = null;
     delete api.defaults.headers.common["Authorization"];

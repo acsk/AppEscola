@@ -1,4 +1,6 @@
 import api from "./api";
+import { getActiveTenantId } from "../utils/tenantContext";
+import type { AuthUser } from "../types/auth";
 
 export type DashboardStat = {
   key: string;
@@ -60,9 +62,17 @@ export type DashboardPayload = {
   }>;
 };
 
-export async function fetchDashboard(params?: {
-  school_class_id?: number;
-}): Promise<DashboardPayload> {
-  const { data } = await api.get("/dashboard", { params });
+export async function fetchDashboard(
+  params?: { school_class_id?: number },
+  user?: AuthUser | null
+): Promise<DashboardPayload> {
+  const tenantId = getActiveTenantId(user ?? null);
+  const query: Record<string, number> = {};
+  if (params?.school_class_id) query.school_class_id = params.school_class_id;
+  if (tenantId != null) query.tenant_id = tenantId;
+
+  const { data } = await api.get("/dashboard", {
+    params: Object.keys(query).length > 0 ? query : undefined,
+  });
   return data.body ?? data;
 }

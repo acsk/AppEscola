@@ -35,7 +35,14 @@ class AdminDashboardController extends Controller
             return $denied;
         }
 
-        $tenantId = $this->requireTenantId($request);
+        $tenantId = $this->getTenantId($request);
+
+        if ($tenantId === null) {
+            return $this->validationError(
+                ['tenant_id' => ['Informe o tenant no login ou envie ?tenant_id= na requisição.']],
+                'tenant_id é obrigatório para esta operação.'
+            );
+        }
 
         $schoolClassId = $request->filled('school_class_id')
             ? (int) $request->query('school_class_id')

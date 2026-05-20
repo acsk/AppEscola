@@ -49,4 +49,47 @@ class AdminDashboardTest extends TestCase
             ->getJson('/api/dashboard')
             ->assertForbidden();
     }
+
+    public function test_dashboard_requires_tenant_for_super_admin_without_context(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create(['status' => 'active']);
+
+        $this->actingAs($superAdmin, abilities: ['*'])
+            ->getJson('/api/dashboard')
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'tenant_id é obrigatório para esta operação.');
+    }
+
+    public function test_dashboard_returns_metrics_for_super_admin_with_tenant_token(): void
+    {
+        $tenant = Tenant::factory()->create(['status' => 'active']);
+        $superAdmin = User::factory()->superAdmin()->create(['status' => 'active']);
+
+        Student::factory()->count(2)->create([
+            'tenant_id' => $tenant->id,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($superAdmin, abilities: ["tenant:{$tenant->id}"])
+            ->getJson('/api/dashboard')
+            ->assertOk()
+            ->assertJsonPath('type', 'success')
+            ->assertJsonPath('body.stats.0.value', 2);
+    }
+
+    public function test_dashboard_accepts_tenant_id_query_for_super_admin(): void
+    {
+        $tenant = Tenant::factory()->create(['status' => 'active']);
+        $superAdmin = User::factory()->superAdmin()->create(['status' => 'active']);
+
+        Student::factory()->create([
+            'tenant_id' => $tenant->id,
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($superAdmin, abilities: ['*'])
+            ->getJson("/api/dashboard?tenant_id={$tenant->id}")
+            ->assertOk()
+            ->assertJsonPath('body.stats.0.value', 1);
+    }
 }

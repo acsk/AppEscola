@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 
 trait ScopedByTenant
@@ -19,16 +20,7 @@ trait ScopedByTenant
         }
 
         if ($user->isSuperAdmin()) {
-            // Super admin pode filtrar por tenant via query param
-            if ($request->query('tenant_id')) {
-                return (int) $request->query('tenant_id');
-            }
-
-            if ($request->filled('tenant_id')) {
-                return (int) $request->input('tenant_id');
-            }
-
-            return null;
+            return TenantContext::selectedTenantIdForSuperAdmin($request, $user);
         }
 
         return $user->tenant_id ? (int) $user->tenant_id : null;

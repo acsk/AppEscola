@@ -937,6 +937,8 @@ GET /api/dashboard?school_class_id=12
 Authorization: Bearer {token}
 ```
 
+**Super admin:** informe `tenant_id` no `POST /login` (grava ability `tenant:{id}` no token) **ou** envie `?tenant_id=` em cada requisição. Sem tenant em contexto, a API responde `422`.
+
 **Papéis:** `admin`, `super_admin`, `manager`, `financial`, `secretaria`, `professor`.
 
 **Body (envelope `success`):**

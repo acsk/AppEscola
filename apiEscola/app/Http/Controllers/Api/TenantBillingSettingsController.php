@@ -162,7 +162,7 @@ class TenantBillingSettingsController extends Controller
         $user = $request->user();
 
         if ($user && $user->isSuperAdmin() && $request->filled('tenant_id')) {
-            return Tenant::findOrFail((int) $request->query('tenant_id'));
+            return Tenant::findOrFail((int) $request->input('tenant_id'));
         }
 
         $tenantId = $this->getTenantId($request);

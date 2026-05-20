@@ -4,6 +4,8 @@ export type AuthUser = {
   email: string;
   role: string;
   tenant_id: number | null;
+  /** Tenant escolhido no login (super_admin com tenant_id no POST /login). */
+  selected_tenant_id?: number | null;
   password_change_required?: boolean;
 };
 
