@@ -205,8 +205,8 @@ class EnrollmentController extends Controller
         $netAmount = max((float) ($enrollment->monthly_amount ?? $plan->monthlyEquivalent()) - (float) ($enrollment->discount_amount ?? 0), 0);
         $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan);
 
-        // Se a escola não cobra taxa de matrícula, remove esse tipo do lote
-        if (empty($billing['charges_enrollment_fee'])) {
+        // Sem taxa no plano ou escola não cobra → remove enrollment_fee do lote
+        if (empty($billing['charges_enrollment_fee']) || $enrollmentFeeAmount === null) {
             $invoiceTypes = array_values(array_filter(
                 $invoiceTypes,
                 static fn ($t) => $t !== 'enrollment_fee'
@@ -259,7 +259,7 @@ class EnrollmentController extends Controller
             &$created,
             &$existing
         ) {
-            if (in_array('enrollment_fee', $invoiceTypes, true)) {
+            if (in_array('enrollment_fee', $invoiceTypes, true) && $enrollmentFeeAmount !== null) {
                 $invoice = Invoice::firstOrCreate(
                     [
                         'tenant_id' => $enrollment->tenant_id,
@@ -351,15 +351,17 @@ class EnrollmentController extends Controller
         ], $created > 0 ? 'Cobranças locais geradas em lote com sucesso.' : 'Cobranças locais já existiam e o lote foi marcado como processado.', 200);
     }
 
-    private function resolveEnrollmentFeeAmount(CoursePlan $plan): float
+    private function resolveEnrollmentFeeAmount(CoursePlan $plan): ?float
     {
         $planFee = $plan->enrollment_fee_amount;
 
-        if ($planFee !== null) {
-            return (float) $planFee;
+        if ($planFee === null) {
+            return null;
         }
 
-        return (float) $plan->monthlyEquivalent();
+        $amount = (float) $planFee;
+
+        return $amount > 0 ? $amount : null;
     }
 
     public function contractChargesPreview(Request $request, Enrollment $enrollment): JsonResponse
@@ -690,8 +692,8 @@ class EnrollmentController extends Controller
                 'payment_due_day'   => $dueDay,
             ]);
 
-            // Taxa de matrícula — só cria se a escola cobra essa taxa
-            if (! empty($billing['charges_enrollment_fee'])) {
+            // Taxa de matrícula — só cria se a escola cobra e o plano tem valor cadastrado
+            if (! empty($billing['charges_enrollment_fee']) && $enrollmentFeeAmount !== null) {
                 $paymentData = $request->input('enrollment_payment', []);
                 $isPaid      = ! empty($paymentData['payment_method']);
 

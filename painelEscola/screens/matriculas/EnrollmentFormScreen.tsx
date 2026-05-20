@@ -58,6 +58,19 @@ const fmtBRL = (v: string | number) => {
   return isNaN(n) ? "—" : n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
+/** Taxa cadastrada no plano (vazio/zero = sem taxa). */
+const parseEnrollmentFeeAmount = (
+  value: string | number | undefined | null
+): number | null => {
+  if (value === undefined || value === null || value === "") return null;
+  const n =
+    typeof value === "string"
+      ? parseFloat(value.replace(",", "."))
+      : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+};
+
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const todayDisplay = () => {
   const d = new Date();
@@ -238,6 +251,16 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
   const selectedPlan = plans.find((p) => String(p.id) === planId);
   const selectedBundle = bundles.find((b) => String(b.id) === bundleId);
 
+  const planEnrollmentFeeAmount =
+    mode === "plan" && selectedPlan
+      ? parseEnrollmentFeeAmount(selectedPlan.enrollment_fee_amount)
+      : null;
+
+  /** Exibe pagamento da taxa só se o tenant cobra e o plano/pacote tem valor a cobrar. */
+  const showEnrollmentFeePayment =
+    chargesEnrollmentFee &&
+    (mode === "bundle" || planEnrollmentFeeAmount !== null);
+
   const classesForCourse = (cId: number) =>
     classes.filter((cl) => cl.course?.id === cId);
 
@@ -269,12 +292,25 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
     return null;
   };
 
-  const discountedEquivalent = () => {
-    const base = baseEquivalent();
-    if (base === null) return null;
+  const discountedEnrollmentFee = () => {
     const disc = parseFloat(discount.replace(",", ".")) || 0;
-    return Math.max(0, base - disc);
+    if (mode === "bundle") {
+      const base = baseEquivalent();
+      if (base === null) return null;
+      return Math.max(0, base - disc);
+    }
+    if (planEnrollmentFeeAmount === null) return null;
+    return Math.max(0, planEnrollmentFeeAmount - disc);
   };
+
+  useEffect(() => {
+    if (!showEnrollmentFeePayment) {
+      setPayNow(false);
+      setPayMethod("");
+      setPayReference("");
+      setPayNotes("");
+    }
+  }, [showEnrollmentFeePayment, planId, bundleId, mode]);
 
   // ── Validation ───────────────────────────────────────────────────────────────
   const validate = () => {
@@ -306,8 +342,15 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         : "CPF do aluno (pagador) é obrigatório para concluir a matrícula.";
     }
 
-    if (payNow && !payMethod) e.payment_method = "Selecione o método de pagamento.";
-    if (payNow && requiresCardPaymentReference(payMethod) && !payReference.trim()) {
+    if (showEnrollmentFeePayment && payNow && !payMethod) {
+      e.payment_method = "Selecione o método de pagamento.";
+    }
+    if (
+      showEnrollmentFeePayment &&
+      payNow &&
+      requiresCardPaymentReference(payMethod) &&
+      !payReference.trim()
+    ) {
       e.payment_reference = "Informe o identificador da transação no cartão.";
     }
     return e;
@@ -327,14 +370,15 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
     setBusinessError(null);
 
     try {
-      const enrollmentPayment = payNow
-        ? {
-            payment_method: payMethod,
-            paid_at: displayToISO(paidAt) ?? todayISO(),
-            payment_reference: payReference.trim() || undefined,
-            notes: payNotes.trim() || undefined,
-          }
-        : undefined;
+      const enrollmentPayment =
+        showEnrollmentFeePayment && payNow
+          ? {
+              payment_method: payMethod,
+              paid_at: displayToISO(paidAt) ?? todayISO(),
+              payment_reference: payReference.trim() || undefined,
+              notes: payNotes.trim() || undefined,
+            }
+          : undefined;
 
       if (mode === "plan") {
         const payload: Record<string, any> = {
@@ -968,12 +1012,12 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         </View>
 
         {/* Price preview */}
-        {chargesEnrollmentFee && discountedEquivalent() !== null && (
+        {showEnrollmentFeePayment && discountedEnrollmentFee() !== null && (
           <View className="flex-row items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2 mt-3">
             <Ionicons name="cash-outline" size={14} color="#16A34A" />
             <Text className="text-xs text-green-700">
               Taxa de matrícula estimada:{" "}
-              <Text className="font-bold">{fmtBRL(discountedEquivalent()!)}</Text>
+              <Text className="font-bold">{fmtBRL(discountedEnrollmentFee()!)}</Text>
               {parseFloat(discount) > 0 && (
                 <Text className="text-green-500">
                   {" "}(desconto de {fmtBRL(parseFloat(discount.replace(",", ".")) || 0)})
@@ -983,7 +1027,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           </View>
         )}
 
-        {chargesEnrollmentFee && enrollmentFeeCoversFirstMonth && (
+        {showEnrollmentFeePayment && enrollmentFeeCoversFirstMonth && (
           <View className="flex-row items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mt-3">
             <Ionicons name="information-circle-outline" size={14} color="#2563EB" />
             <Text className="text-xs text-blue-700">
@@ -1001,7 +1045,19 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           </View>
         )}
 
-        {!allowMonthliesBeforeFeePaid && chargesEnrollmentFee && (
+        {chargesEnrollmentFee &&
+          mode === "plan" &&
+          selectedPlan &&
+          planEnrollmentFeeAmount === null && (
+          <View className="flex-row items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-3">
+            <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
+            <Text className="text-xs text-gray-600">
+              Este plano não possui taxa de matrícula cadastrada. Não será exibida cobrança de taxa nesta matrícula.
+            </Text>
+          </View>
+        )}
+
+        {!allowMonthliesBeforeFeePaid && showEnrollmentFeePayment && (
           <View className="flex-row items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
             <Ionicons name="alert-circle-outline" size={14} color="#B45309" />
             <Text className="flex-1 text-xs text-amber-700">
@@ -1011,8 +1067,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         )}
       </View>
 
-      {/* ── Card: Taxa de Matrícula ── */}
-      {chargesEnrollmentFee && (
+      {/* ── Card: Taxa de Matrícula (pagamento) ── */}
+      {showEnrollmentFeePayment && (
       <View
         className="bg-white rounded-2xl p-6 mb-5"
         style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}

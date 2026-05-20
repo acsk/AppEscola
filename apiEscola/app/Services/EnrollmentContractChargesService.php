@@ -263,7 +263,7 @@ class EnrollmentContractChargesService
         $batchBlocked = $blocked['contract_batch_generated'] ?? false;
         $monthliesBlocked = $blocked['monthlies_blocked_by_fee'] ?? false;
 
-        if (in_array('enrollment_fee', $invoiceTypes, true)) {
+        if (in_array('enrollment_fee', $invoiceTypes, true) && $feeAmount !== null) {
             $dueDate = $startDate->toDateString();
             $exists = $enrollment->invoices->contains(
                 fn (Invoice $inv) => $inv->type === 'enrollment_fee' && $inv->due_date?->toDateString() === $dueDate
@@ -273,7 +273,7 @@ class EnrollmentContractChargesService
                 'key' => self::generateKey('enrollment_fee', $dueDate),
                 'type' => 'enrollment_fee',
                 'due_date' => $dueDate,
-                'amount' => number_format(max($feeAmount, 0), 2, '.', ''),
+                'amount' => number_format($feeAmount, 2, '.', ''),
                 'description' => 'Taxa de Matrícula — ' . $courseName,
                 'already_exists' => $exists,
                 'disabled' => $batchBlocked || $exists,
@@ -395,8 +395,11 @@ class EnrollmentContractChargesService
                 ];
 
                 if ($type === 'enrollment_fee') {
+                    if ($feeAmount === null) {
+                        throw new RuntimeException('Este plano não possui taxa de matrícula cadastrada.');
+                    }
                     $defaults['description'] = 'Taxa de Matrícula — ' . $courseName;
-                    $defaults['amount'] = max($feeAmount, 0);
+                    $defaults['amount'] = $feeAmount;
                 } else {
                     $defaults['description'] = 'Mensalidade ' . Carbon::parse($dueDate)->format('m/Y') . ' — ' . $courseName;
                     $defaults['amount'] = $netAmount;
@@ -437,15 +440,17 @@ class EnrollmentContractChargesService
         ];
     }
 
-    private function resolveEnrollmentFeeAmount(CoursePlan $plan): float
+    private function resolveEnrollmentFeeAmount(CoursePlan $plan): ?float
     {
         $planFee = $plan->enrollment_fee_amount;
 
-        if ($planFee !== null) {
-            return (float) $planFee;
+        if ($planFee === null) {
+            return null;
         }
 
-        return (float) $plan->monthlyEquivalent();
+        $amount = (float) $planFee;
+
+        return $amount > 0 ? $amount : null;
     }
 
     private function resolveGuardianId(Enrollment $enrollment): ?int
