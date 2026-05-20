@@ -1,7 +1,8 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '../../../theme';
+import type { ThemeColors } from '../../../theme';
 
-export const styles = StyleSheet.create({
+export function createFinanceiroStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6F7FB' },
   content: { padding: 14, paddingTop: 16, paddingBottom: 32 },
   headerWrap: {
@@ -803,4 +804,5 @@ export const styles = StyleSheet.create({
     marginTop: 24,
   },
   botaoTentarNovamenteTexto: { color: colors.surface, fontWeight: '800', textAlign: 'center' },
-});
+  });
+}

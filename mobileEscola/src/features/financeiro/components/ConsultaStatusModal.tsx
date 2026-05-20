@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ConsultaStatusModalData } from '../hooks/usePaymentModal';
@@ -9,8 +9,8 @@ import {
   statusEhPago,
 } from '../utils/payment';
 import { formatarData, formatarMoeda } from '../utils/formatters';
-import { colors } from '../../../theme';
-import { styles } from '../styles/financeiro.styles';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import { useFinanceiroStyles } from '../FinanceiroStylesContext';
 
 interface ConsultaStatusModalProps {
   visible: boolean;
@@ -18,34 +18,40 @@ interface ConsultaStatusModalProps {
   onClose: () => void;
 }
 
-const BADGE_STYLES = {
-  pendente: {
-    container: styles.consultaStatusBadgePendente,
-    texto: styles.consultaStatusBadgeTextoPendente,
-  },
-  paga: {
-    container: styles.consultaStatusBadgePaga,
-    texto: styles.consultaStatusBadgeTextoPaga,
-  },
-  atrasada: {
-    container: styles.consultaStatusBadgeAtrasada,
-    texto: styles.consultaStatusBadgeTextoAtrasada,
-  },
-  cancelada: {
-    container: styles.consultaStatusBadgeCancelada,
-    texto: styles.consultaStatusBadgeTextoCancelada,
-  },
-  default: {
-    container: styles.consultaStatusBadgeDefault,
-    texto: styles.consultaStatusBadgeTextoDefault,
-  },
-} as const;
-
 export function ConsultaStatusModal({ visible, data, onClose }: ConsultaStatusModalProps) {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
+
+  const badgeStyles = useMemo(
+    () => ({
+      pendente: {
+        container: styles.consultaStatusBadgePendente,
+        texto: styles.consultaStatusBadgeTextoPendente,
+      },
+      paga: {
+        container: styles.consultaStatusBadgePaga,
+        texto: styles.consultaStatusBadgeTextoPaga,
+      },
+      atrasada: {
+        container: styles.consultaStatusBadgeAtrasada,
+        texto: styles.consultaStatusBadgeTextoAtrasada,
+      },
+      cancelada: {
+        container: styles.consultaStatusBadgeCancelada,
+        texto: styles.consultaStatusBadgeTextoCancelada,
+      },
+      default: {
+        container: styles.consultaStatusBadgeDefault,
+        texto: styles.consultaStatusBadgeTextoDefault,
+      },
+    }),
+    [styles],
+  );
+
   const isPago = Boolean(data && statusEhPago(data.invoice.status));
   const tema = data ? obterTemaModalStatus(data.invoice.status) : null;
   const badgeKey = data ? obterEstiloBadgeStatus(data.invoice.status).badge : null;
-  const badgeStyle = badgeKey ? BADGE_STYLES[badgeKey] : null;
+  const badgeStyle = badgeKey ? badgeStyles[badgeKey] : null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\PublicRegistrationController;
 use App\Http\Controllers\Api\ReceiptController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\NotificationBroadcastController;
+use App\Http\Controllers\Api\TenantMobileThemeController;
 use App\Http\Controllers\Api\TenantNotificationSettingsController;
 use App\Http\Controllers\Api\StudentNotificationController;
 use App\Http\Controllers\Api\CalendarEventController;
@@ -118,6 +119,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('tenant-billing-settings/{scope}',         [TenantBillingSettingsController::class, 'show']);
     Route::put('tenant-billing-settings/{scope}',         [TenantBillingSettingsController::class, 'update']);
     Route::post('tenant-billing-settings/{scope}/reset',  [TenantBillingSettingsController::class, 'reset']);
+
+    // Tema / cores do app mobile por tenant (painel)
+    Route::get('tenant-mobile-theme',        [TenantMobileThemeController::class, 'show']);
+    Route::put('tenant-mobile-theme',        [TenantMobileThemeController::class, 'update']);
+    Route::post('tenant-mobile-theme/reset', [TenantMobileThemeController::class, 'reset']);
 
     // Administração de usuários (super_admin e admin)
     Route::apiResource('users', UserManagementController::class);
@@ -236,6 +242,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('notifications/broadcasts/{broadcast}',   [NotificationBroadcastController::class, 'show']);
 
     // Simulados do aluno autenticado (role: aluno)
+    Route::get('aluno/mobile-theme',             [TenantMobileThemeController::class, 'forStudent']);
     Route::get('aluno/dashboard',                [StudentDashboardController::class, 'index']);
     Route::get('aluno/performance',              [StudentPerformanceController::class, 'forAuthenticatedStudent']);
     Route::get('aluno/boletos',                  [StudentFinanceController::class, 'boletos']);

@@ -10,10 +10,14 @@ import { CobrancasList } from '../components/CobrancasList';
 import { FinanceiroEmpty, FinanceiroError, FinanceiroLoading } from '../components/FinanceiroFeedback';
 import { PaymentModal } from '../components/PaymentModal';
 import { ConsultaStatusModal } from '../components/ConsultaStatusModal';
-import { styles } from '../styles/financeiro.styles';
+import {
+  FinanceiroStylesProvider,
+  useFinanceiroStyles,
+} from '../FinanceiroStylesContext';
 
-export function FinanceiroScreen() {
+function FinanceiroScreenContent() {
   const insets = useSafeAreaInsets();
+  const styles = useFinanceiroStyles();
   const { data, isLoading, isError, error, refetch } = useCobrancas();
 
   useFocusEffect(
@@ -119,5 +123,13 @@ export function FinanceiroScreen() {
         onClose={payment.fecharConsultaStatus}
       />
     </View>
+  );
+}
+
+export function FinanceiroScreen() {
+  return (
+    <FinanceiroStylesProvider>
+      <FinanceiroScreenContent />
+    </FinanceiroStylesProvider>
   );
 }

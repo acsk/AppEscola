@@ -1,10 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../../theme';
-import { styles } from '../styles/financeiro.styles';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import { useFinanceiroStyles } from '../FinanceiroStylesContext';
 
 export function FinanceiroLoading() {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
+
   return (
     <View style={styles.telaVaziaContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
@@ -14,6 +17,9 @@ export function FinanceiroLoading() {
 }
 
 export function FinanceiroEmpty() {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
+
   return (
     <View style={styles.telaVaziaContainer}>
       <Ionicons name="document-text-outline" size={64} color={colors.muted} />
@@ -29,6 +35,9 @@ interface FinanceiroErrorProps {
 }
 
 export function FinanceiroError({ message, onRetry }: FinanceiroErrorProps) {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
+
   return (
     <View style={styles.telaVaziaContainer}>
       <Ionicons name="alert-circle-outline" size={64} color={colors.debit} />

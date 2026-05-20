@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,8 @@ import {
 import { subjectIconName } from '../../../services/simulados.service';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { platformShadow } from '../../../lib/shadow';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 const MONTH_OPTIONS = [6, 12] as const;
 const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
@@ -33,7 +34,7 @@ function formatPct(value: number | null | undefined, fractionDigits = 1): string
   })}%`;
 }
 
-function trendColor(change: number | null | undefined): string {
+function trendColor(change: number | null | undefined, colors: ThemeColors): string {
   if (change == null || change === 0) return colors.muted;
   return change > 0 ? '#22C55E' : '#EF4444';
 }
@@ -41,10 +42,14 @@ function trendColor(change: number | null | undefined): string {
 function BarChart({
   values,
   labels,
+  colors,
+  styles,
   maxHeight = 120,
 }: {
   values: Array<number | null>;
   labels: string[];
+  colors: ThemeColors;
+  styles: ReturnType<typeof createPerformanceStyles>;
   maxHeight?: number;
 }) {
   const max = Math.max(100, ...values.filter((v): v is number => v != null));
@@ -78,7 +83,15 @@ function BarChart({
   );
 }
 
-function SubjectCard({ item }: { item: PerformanceBySubject }) {
+function SubjectCard({
+  item,
+  colors,
+  styles,
+}: {
+  item: PerformanceBySubject;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createPerformanceStyles>;
+}) {
   const subjectColor = item.subject.color || colors.primary;
   const approved =
     item.avg_percentage != null && item.passing_score_avg != null
@@ -128,9 +141,9 @@ function SubjectCard({ item }: { item: PerformanceBySubject }) {
             <Ionicons
               name={item.month_change >= 0 ? 'arrow-up' : 'arrow-down'}
               size={12}
-              color={trendColor(item.month_change)}
+              color={trendColor(item.month_change, colors)}
             />
-            <Text style={[styles.trendText, { color: trendColor(item.month_change) }]}>
+            <Text style={[styles.trendText, { color: trendColor(item.month_change, colors) }]}>
               {item.month_change > 0 ? '+' : ''}
               {item.month_change.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pp vs mês ant.
             </Text>
@@ -142,6 +155,8 @@ function SubjectCard({ item }: { item: PerformanceBySubject }) {
 }
 
 export function PerformanceScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createPerformanceStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isCompact = width < 390;
@@ -238,7 +253,7 @@ export function PerformanceScreen() {
                 <Text style={styles.overviewLabel}>Este mês</Text>
                 <Text style={styles.overviewValue}>{formatPct(overview?.month_avg_percentage)}</Text>
                 {overview?.month_change != null && (
-                  <Text style={[styles.overviewChange, { color: trendColor(overview.month_change) }]}>
+                  <Text style={[styles.overviewChange, { color: trendColor(overview.month_change, colors) }]}>
                     {overview.month_change > 0 ? '+' : ''}
                     {overview.month_change} pp
                   </Text>
@@ -268,7 +283,7 @@ export function PerformanceScreen() {
             <Text style={styles.sectionTitle}>Evolução mensal</Text>
             <View style={[styles.card, platformShadow({ color: '#111827', opacity: 0.05, radius: 10, elevation: 2 })]}>
               {chartValues.some((v) => v != null) ? (
-                <BarChart values={chartValues} labels={chartLabels} />
+                <BarChart values={chartValues} labels={chartLabels} colors={colors} styles={styles} />
               ) : (
                 <Text style={styles.emptyText}>Sem simulados concluídos no período.</Text>
               )}
@@ -280,7 +295,14 @@ export function PerformanceScreen() {
                 <Text style={styles.emptyText}>Conclua simulados para ver o desempenho por disciplina.</Text>
               </View>
             ) : (
-              data.by_subject.map((item) => <SubjectCard key={String(item.subject_id ?? 'general')} item={item} />)
+              data.by_subject.map((item) => (
+                <SubjectCard
+                  key={String(item.subject_id ?? 'general')}
+                  item={item}
+                  colors={colors}
+                  styles={styles}
+                />
+              ))
             )}
 
             <Text style={styles.sectionTitle}>Detalhe mês a mês</Text>
@@ -314,7 +336,8 @@ export function PerformanceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createPerformanceStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6F7FB' },
   scroll: { flex: 1 },
   headerWrap: {
@@ -478,3 +501,4 @@ const styles = StyleSheet.create({
   monthSubjectName: { flex: 1, fontSize: 13, color: colors.ink },
   monthSubjectMeta: { fontSize: 12, fontWeight: '600', color: colors.muted },
 });
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { useSimuladosList } from '../../simulados/hooks';
 import { uploadStudentPhoto } from '../../../services/student-photo.service';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { platformShadow } from '../../../lib/shadow';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 import { useUnreadNotificationsCount } from '../../notifications/hooks';
 import { WeeklyCalendarWidget } from '../../calendar/components/WeeklyCalendarWidget';
 
@@ -120,6 +121,8 @@ function getSimuladoDayCounter(simulado: SimuladoListItem): string | null {
 }
 
 export function HomeScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createHomeStyles(colors), [colors]);
   const { user, refreshUserProfile } = useAuth();
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
@@ -644,7 +647,8 @@ const simCardShadow = platformShadow({ color: '#6D4DE6', opacity: 0.08, radius: 
 const avatarEditShadow = platformShadow({ color: '#000000', opacity: 0.14, radius: 8, elevation: 2 });
 const simIconShadow = platformShadow({ color: '#000000', opacity: 0.12, radius: 8, elevation: 2 });
 
-const styles = StyleSheet.create({
+function createHomeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content:   { paddingBottom: 16 },
 
@@ -1147,4 +1151,5 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '800',
   },
-});
+  });
+}

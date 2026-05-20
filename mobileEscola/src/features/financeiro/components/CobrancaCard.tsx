@@ -2,9 +2,9 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Cobranca } from '../../../services/financeiro.service';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
 import { formatarData, formatarMoeda } from '../utils/formatters';
-import { styles } from '../styles/financeiro.styles';
+import { useFinanceiroStyles } from '../FinanceiroStylesContext';
 
 export type CobrancaCardTipo = 'atrasada' | 'atual' | 'paga';
 
@@ -15,6 +15,8 @@ interface CobrancaCardProps {
 }
 
 export function CobrancaCard({ cobranca, tipo, onPagar }: CobrancaCardProps) {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
   const corFundo = tipo === 'atrasada' ? '#FEF2F2' : tipo === 'atual' ? colors.soft : '#ECFDF5';
   const corBorda = tipo === 'atrasada' ? '#FEE2E2' : tipo === 'atual' ? colors.border : '#D1FAE5';
   const corIcone = tipo === 'atrasada' ? colors.debit : tipo === 'atual' ? colors.primary : colors.credit;

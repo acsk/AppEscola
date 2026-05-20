@@ -14,6 +14,13 @@ class AdminDashboardTest extends TestCase
     use RefreshDatabase;
     use SeedsDomainLookups;
 
+    private function actingAsSanctum(User $user, array $abilities = ['*']): static
+    {
+        $plainTextToken = $user->createToken('test', $abilities)->plainTextToken;
+
+        return $this->withHeader('Authorization', 'Bearer '.$plainTextToken);
+    }
+
     public function test_dashboard_returns_metrics_for_tenant_admin(): void
     {
         $tenant = Tenant::factory()->create();
@@ -54,7 +61,7 @@ class AdminDashboardTest extends TestCase
     {
         $superAdmin = User::factory()->superAdmin()->create(['status' => 'active']);
 
-        $this->actingAs($superAdmin, abilities: ['*'])
+        $this->actingAsSanctum($superAdmin, ['*'])
             ->getJson('/api/dashboard')
             ->assertUnprocessable()
             ->assertJsonPath('message', 'tenant_id é obrigatório para esta operação.');
@@ -70,7 +77,7 @@ class AdminDashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->actingAs($superAdmin, abilities: ["tenant:{$tenant->id}"])
+        $this->actingAsSanctum($superAdmin, ["tenant:{$tenant->id}"])
             ->getJson('/api/dashboard')
             ->assertOk()
             ->assertJsonPath('type', 'success')
@@ -87,7 +94,7 @@ class AdminDashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->actingAs($superAdmin, abilities: ['*'])
+        $this->actingAsSanctum($superAdmin, ['*'])
             ->getJson("/api/dashboard?tenant_id={$tenant->id}")
             ->assertOk()
             ->assertJsonPath('body.stats.0.value', 1);

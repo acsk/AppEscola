@@ -144,6 +144,11 @@ export default function Sidebar({
           label: "Configurações de Cobrança",
           icon: "settings-outline",
         },
+        {
+          id: "configuracoes-tema-mobile",
+          label: "Tema do app mobile",
+          icon: "color-palette-outline",
+        },
       ],
     },
     ...(canManageTenants

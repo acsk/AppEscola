@@ -30,3 +30,7 @@ export function useAlunoDrawer(): AlunoDrawerContextData {
   }
   return context;
 }
+
+export function useOptionalAlunoDrawer(): AlunoDrawerContextData | null {
+  return useContext(AlunoDrawerContext);
+}

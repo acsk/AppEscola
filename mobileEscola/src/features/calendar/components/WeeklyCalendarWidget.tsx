@@ -9,7 +9,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 import { platformShadow } from '../../../lib/shadow';
 import {
   CalendarEventItem,
@@ -30,6 +31,8 @@ type Props = {
 };
 
 export function WeeklyCalendarWidget({ enabled = true }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createWeeklyCalendarStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<AlunoStackParamList>>();
   const [weekAnchor, setWeekAnchor] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => new Date());
@@ -182,7 +185,8 @@ export function WeeklyCalendarWidget({ enabled = true }: Props) {
 
 const cardShadow = platformShadow({ color: '#6D4DE6', opacity: 0.06, radius: 12, elevation: 2 });
 
-const styles = StyleSheet.create({
+function createWeeklyCalendarStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   wrap: {
     marginHorizontal: 16,
     marginTop: 16,
@@ -266,3 +270,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+}

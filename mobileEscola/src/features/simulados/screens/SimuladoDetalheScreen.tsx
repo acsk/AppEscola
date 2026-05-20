@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,8 @@ import {
   useAttemptReview,
   useStartSimulado,
 } from '../hooks';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoDetalhe'>;
 
@@ -58,7 +59,7 @@ function parseStartErrorMessage(e: any): string {
   return e?.response?.data?.message ?? 'Não foi possível iniciar o simulado.';
 }
 
-function statusInfo(status: AttemptStatus, awaitingRelease: boolean) {
+function statusInfo(status: AttemptStatus, awaitingRelease: boolean, colors: ThemeColors) {
   if (awaitingRelease) {
     return {
       icon: 'lock-closed-outline',
@@ -117,8 +118,8 @@ function statusInfo(status: AttemptStatus, awaitingRelease: boolean) {
   return map[status];
 }
 
-function tint(hex?: string, alpha = '18'): string {
-  if (!hex || !hex.startsWith('#')) return colors.soft;
+function tint(hex: string | undefined, alpha: string, fallback: string): string {
+  if (!hex || !hex.startsWith('#')) return fallback;
   return `${hex}${alpha}`;
 }
 
@@ -203,9 +204,15 @@ interface SupportMaterialsSectionProps {
   materiais: SupportMaterial[];
   carregando: boolean;
   accentColor: string;
+  styles: ReturnType<typeof createSimuladoDetalheStyles>;
 }
 
-function SupportMaterialsSection({ materiais, carregando, accentColor }: SupportMaterialsSectionProps) {
+function SupportMaterialsSection({
+  materiais,
+  carregando,
+  accentColor,
+  styles,
+}: SupportMaterialsSectionProps) {
   if (carregando) {
     return (
       <View style={styles.materiaisWrap}>
@@ -252,6 +259,8 @@ function SupportMaterialsSection({ materiais, carregando, accentColor }: Support
 }
 
 export function SimuladoDetalheScreen({ route, navigation }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createSimuladoDetalheStyles(colors), [colors]);
   const { examId } = route.params;
   const { width } = useWindowDimensions();
   const [erroAcao, setErroAcao] = useState<string | null>(null);
@@ -392,7 +401,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     detalhe.starts_at ? `Início: ${formatDate(detalhe.starts_at)}` : null,
     detalhe.ends_at ? `Prazo: ${formatDate(detalhe.ends_at)}` : null,
   ].filter(Boolean).join('  •  ');
-  const statusAtual = statusInfo(statusEfetivo, awaitingRelease);
+  const statusAtual = statusInfo(statusEfetivo, awaitingRelease, colors);
   const metricWidth = width < 390 ? '48%' : '23%';
 
   return (
@@ -401,18 +410,18 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
         style={[
           styles.card,
           {
-            backgroundColor: tint(subjectColor, '0D'),
-            borderColor: tint(subjectColor, '35'),
+            backgroundColor: tint(subjectColor, '0D', colors.soft),
+            borderColor: tint(subjectColor, '35', colors.soft),
             borderTopColor: subjectColor,
             shadowColor: subjectColor,
           },
         ]}
       >
-        <View style={[styles.cardGlow, { backgroundColor: tint(subjectColor, '18') }]} />
+        <View style={[styles.cardGlow, { backgroundColor: tint(subjectColor, '18', colors.soft) }]} />
         <View style={styles.headerBlock}>
           <View style={styles.titleGroup}>
             {detalhe.subject ? (
-              <View style={[styles.subjectBadge, { backgroundColor: tint(subjectColor, '18') }]}>
+              <View style={[styles.subjectBadge, { backgroundColor: tint(subjectColor, '18', colors.soft) }]}>
                 <Ionicons name={subjectIconName(detalhe.subject.icon) as any} size={15} color={subjectColor} />
                 <Text style={[styles.subjectBadgeText, { color: subjectColor }]}>{detalhe.subject.name}</Text>
               </View>
@@ -510,6 +519,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           materiais={materiais}
           carregando={carregandoMateriais}
           accentColor={subjectColor}
+          styles={styles}
         />
 
         {/* Gerar PDF para impressão */}
@@ -754,7 +764,8 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createSimuladoDetalheStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   headerBackButton: {
     marginLeft: -6,
     paddingRight: 12,
@@ -1234,3 +1245,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+}

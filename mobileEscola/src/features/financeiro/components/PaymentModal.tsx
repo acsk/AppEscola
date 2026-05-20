@@ -15,11 +15,11 @@ import type {
   PaymentMethod,
   PaymentOptionsResponse,
 } from '../../../services/financeiro.service';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
 import { formatarData, formatarMoeda } from '../utils/formatters';
 import { textoLockMetodo } from '../utils/payment';
 import { PaymentResultView } from './PaymentResultView';
-import { styles } from '../styles/financeiro.styles';
+import { useFinanceiroStyles } from '../FinanceiroStylesContext';
 
 interface PaymentModalProps {
   visible: boolean;
@@ -62,6 +62,9 @@ export function PaymentModal({
   onCopy,
   onDownloadBoleto,
 }: PaymentModalProps) {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
+
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>

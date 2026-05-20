@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { AttemptStatus, SimuladoPeriodFilter, SimuladoSubject } from '../../../services/simulados.service';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 export interface SimuladosFilterState {
   period: SimuladoPeriodFilter;
@@ -52,10 +53,12 @@ function FilterChip({
   label,
   active,
   onPress,
+  styles,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  styles: ReturnType<typeof createSimuladosFiltersStyles>;
 }) {
   return (
     <TouchableOpacity
@@ -77,6 +80,8 @@ export function SimuladosFilters({
   onChange,
   subjects,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createSimuladosFiltersStyles(colors), [colors]);
   const activeCount = countActiveFilters(filters);
 
   function limpar() {
@@ -118,6 +123,7 @@ export function SimuladosFilters({
                 label={opt.label}
                 active={filters.period === opt.value}
                 onPress={() => onChange({ ...filters, period: opt.value })}
+                styles={styles}
               />
             ))}
           </View>
@@ -128,6 +134,7 @@ export function SimuladosFilters({
               label="Todas"
               active={filters.subject_id == null}
               onPress={() => onChange({ ...filters, subject_id: null })}
+              styles={styles}
             />
             {subjects.map((s) => (
               <FilterChip
@@ -135,6 +142,7 @@ export function SimuladosFilters({
                 label={s.name}
                 active={filters.subject_id === s.id}
                 onPress={() => onChange({ ...filters, subject_id: s.id })}
+                styles={styles}
               />
             ))}
           </View>
@@ -147,6 +155,7 @@ export function SimuladosFilters({
                 label={opt.label}
                 active={filters.attempt_status === opt.value}
                 onPress={() => onChange({ ...filters, attempt_status: opt.value })}
+                styles={styles}
               />
             ))}
           </View>
@@ -156,7 +165,8 @@ export function SimuladosFilters({
   );
 }
 
-const styles = StyleSheet.create({
+function createSimuladosFiltersStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   wrap: { marginBottom: 12, gap: 8 },
   toolbar: {
     flexDirection: 'row',
@@ -223,3 +233,4 @@ const styles = StyleSheet.create({
   chipTexto: { fontSize: 13, fontWeight: '600', color: colors.muted, flexShrink: 1 },
   chipTextoAtivo: { color: colors.primary },
 });
+}

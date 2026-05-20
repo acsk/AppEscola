@@ -1,8 +1,8 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAlunoDrawer } from '../../context/AlunoDrawerContext';
-import { colors } from '../../theme';
+import { useOptionalAlunoDrawer } from '../../context/AlunoDrawerContext';
+import { useThemeColors } from '../../context/TenantThemeContext';
 
 interface MenuButtonProps {
   color?: string;
@@ -10,18 +10,24 @@ interface MenuButtonProps {
   style?: ViewStyle;
 }
 
-export function MenuButton({ color = colors.ink, size = 24, style }: MenuButtonProps) {
-  const { open } = useAlunoDrawer();
+export function MenuButton({ color, size = 24, style }: MenuButtonProps) {
+  const colors = useThemeColors();
+  const drawer = useOptionalAlunoDrawer();
+  const iconColor = color ?? colors.ink;
+
+  if (!drawer) {
+    return null;
+  }
 
   return (
     <TouchableOpacity
       style={[styles.btn, style]}
-      onPress={open}
+      onPress={drawer.open}
       activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel="Abrir menu"
     >
-      <Ionicons name="menu" size={size} color={color} />
+      <Ionicons name="menu" size={size} color={iconColor} />
     </TouchableOpacity>
   );
 }

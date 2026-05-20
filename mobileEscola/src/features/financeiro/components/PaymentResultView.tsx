@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { FontAwesome6, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { Cobranca, GenerateChargeResponse } from '../../../services/financeiro.service';
 import { resolvePixQrImageUrl } from '../../../services/financeiro.service';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
 import { formatarMoeda } from '../utils/formatters';
-import { styles } from '../styles/financeiro.styles';
+import { useFinanceiroStyles } from '../FinanceiroStylesContext';
 
 interface PaymentResultViewProps {
   paymentResult: GenerateChargeResponse;
@@ -24,6 +24,8 @@ export function PaymentResultView({
   onCopy,
   onDownloadBoleto,
 }: PaymentResultViewProps) {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
   const { payment_assets: assets, actions } = paymentResult;
 
   const temBoleto = Boolean(assets.boleto_digitable || assets.boleto_number || assets.boleto_url);

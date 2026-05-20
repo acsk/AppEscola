@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 import { platformShadow } from '../../../lib/shadow';
 import {
   fetchNotificationDetail,
@@ -39,7 +40,7 @@ function formatDate(iso: string): string {
   }
 }
 
-function getNotificationTone(item: StudentNotificationItem) {
+function getNotificationTone(item: StudentNotificationItem, colors: ThemeColors) {
   if (item.type === 'billing_due') {
     return { color: colors.debit, bg: '#FEF2F2', border: '#FECACA' };
   }
@@ -56,6 +57,8 @@ function getNotificationTone(item: StudentNotificationItem) {
 }
 
 export function NotificationDetailScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createNotificationDetailStyles(colors), [colors]);
   const navigation =
     useNavigation<NativeStackNavigationProp<AlunoStackParamList>>();
   const route = useRoute<Route>();
@@ -130,7 +133,7 @@ export function NotificationDetailScreen() {
     );
   }
 
-  const tone = getNotificationTone(notification);
+  const tone = getNotificationTone(notification, colors);
 
   return (
     <View style={styles.container}>
@@ -214,7 +217,8 @@ export function NotificationDetailScreen() {
 const cardShadow = platformShadow({ color: '#000000', opacity: 0.06, radius: 12, elevation: 2 });
 const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
 
-const styles = StyleSheet.create({
+function createNotificationDetailStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   errorText: { fontSize: 15, color: colors.muted, textAlign: 'center', marginBottom: 16 },
@@ -343,3 +347,4 @@ const styles = StyleSheet.create({
   },
   actionBtnText: { fontSize: 15, fontWeight: '800', color: colors.surface },
 });
+}

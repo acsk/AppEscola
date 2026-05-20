@@ -12,9 +12,9 @@ import { NotificationsListScreen } from '../../features/notifications/screens/No
 import { NotificationDetailScreen } from '../../features/notifications/screens/NotificationDetailScreen';
 import { CalendarScreen } from '../../features/calendar/screens/CalendarScreen';
 import { AlunoDrawerProvider } from '../../context/AlunoDrawerContext';
+import { TenantThemeProvider, useThemeColors } from '../../context/TenantThemeContext';
 import { AlunoDrawer } from '../../components/navigation/AlunoDrawer';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme';
 
 export type AlunoTabParamList = {
   Home: undefined;
@@ -44,6 +44,8 @@ const Tab = createBottomTabNavigator<AlunoTabParamList>();
 const Stack = createNativeStackNavigator<AlunoStackParamList>();
 
 function AlunoTabs() {
+  const colors = useThemeColors();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -51,7 +53,7 @@ function AlunoTabs() {
         headerTintColor: colors.surface,
         headerTitleStyle: { fontWeight: '600' },
         tabBarActiveTintColor: colors.surface,
-        tabBarInactiveTintColor: '#C7D2FE',
+        tabBarInactiveTintColor: colors.tab_bar_inactive,
         tabBarStyle: {
           backgroundColor: colors.primary,
           borderTopWidth: 0,
@@ -86,21 +88,23 @@ function AlunoTabs() {
 
 export function AlunoStack() {
   return (
-    <AlunoDrawerProvider>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-          animationTypeForReplace: 'push',
-        }}
-      >
-        <Stack.Screen name="AlunoTabs" component={AlunoTabs} />
-        <Stack.Screen name="AlterarSenha" component={AlterarSenhaScreen} />
-        <Stack.Screen name="Notificacoes" component={NotificationsListScreen} />
-        <Stack.Screen name="NotificacaoDetalhe" component={NotificationDetailScreen} />
-        <Stack.Screen name="Calendario" component={CalendarScreen} />
-      </Stack.Navigator>
-      <AlunoDrawer />
-    </AlunoDrawerProvider>
+    <TenantThemeProvider>
+      <AlunoDrawerProvider>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            animationTypeForReplace: 'push',
+          }}
+        >
+          <Stack.Screen name="AlunoTabs" component={AlunoTabs} />
+          <Stack.Screen name="AlterarSenha" component={AlterarSenhaScreen} />
+          <Stack.Screen name="Notificacoes" component={NotificationsListScreen} />
+          <Stack.Screen name="NotificacaoDetalhe" component={NotificationDetailScreen} />
+          <Stack.Screen name="Calendario" component={CalendarScreen} />
+        </Stack.Navigator>
+        <AlunoDrawer />
+      </AlunoDrawerProvider>
+    </TenantThemeProvider>
   );
 }

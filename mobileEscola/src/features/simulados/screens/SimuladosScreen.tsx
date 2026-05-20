@@ -29,7 +29,8 @@ import {
   type SimuladosFilterState,
 } from '../components/SimuladosFilters';
 import { MenuButton } from '../../../components/navigation/MenuButton';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'SimuladosList'>;
 
@@ -67,16 +68,18 @@ function formatDate(iso: string): string {
   });
 }
 
-function statusColor(status: AttemptStatus): string {
+function statusColor(status: AttemptStatus, colors: ThemeColors): string {
   return STATUS_COLOR[status] ?? colors.muted;
 }
 
-function tint(hex?: string, alpha = '18'): string {
-  if (!hex || !hex.startsWith('#')) return colors.soft;
+function tint(hex: string | undefined, alpha: string, fallback: string): string {
+  if (!hex || !hex.startsWith('#')) return fallback;
   return `${hex}${alpha}`;
 }
 
 export function SimuladosScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createSimuladosStyles(colors), [colors]);
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const [filtros, setFiltros] = useState<SimuladosFilterState>(DEFAULT_SIMULADOS_FILTERS);
@@ -117,7 +120,7 @@ export function SimuladosScreen() {
 
   // ── Render: card disponível ────────────────────────────────────────────────
   function renderDisponivel({ item }: { item: SimuladoListItem }) {
-    const cor   = statusColor(item.attempt_status);
+    const cor   = statusColor(item.attempt_status, colors);
     const label = STATUS_LABEL[item.attempt_status];
     const icon  = STATUS_ICON[item.attempt_status];
     const subjectColor = item.subject?.color ?? colors.primary;
@@ -140,8 +143,8 @@ export function SimuladosScreen() {
         style={[
           styles.card,
           {
-            backgroundColor: tint(subjectColor, '10'),
-            borderColor: tint(subjectColor, '35'),
+            backgroundColor: tint(subjectColor, '10', colors.soft),
+            borderColor: tint(subjectColor, '35', colors.soft),
             shadowColor: subjectColor,
           },
         ]}
@@ -154,7 +157,7 @@ export function SimuladosScreen() {
         <View style={styles.cardTopo}>
           <View style={styles.cardTopoEsq}>
             {item.subject && (
-              <View style={[styles.subjectChip, { backgroundColor: tint(subjectColor, '18') }]}>
+              <View style={[styles.subjectChip, { backgroundColor: tint(subjectColor, '18', colors.soft) }]}>
                 <Ionicons name={subjectIconName(item.subject.icon) as any} size={12} color={subjectColor} />
                 <Text style={[styles.subjectNome, { color: subjectColor }]}>{item.subject.name}</Text>
               </View>
@@ -323,7 +326,8 @@ export function SimuladosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createSimuladosStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6F7FB' },
 
   // Header
@@ -449,3 +453,4 @@ const styles = StyleSheet.create({
   vazioTitulo: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 16, textAlign: 'center' },
   vazioSub: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 18 },
 });
+}

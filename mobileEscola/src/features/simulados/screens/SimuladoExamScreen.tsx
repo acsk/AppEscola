@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,8 @@ import {
 } from '../../../services/simulados.service';
 import { invalidateSimuladosQueries } from '../hooks';
 import { getApiErrorMessage } from '../../../lib/apiError';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoExam'>;
 
@@ -45,11 +46,15 @@ function ItemQuestao({
   numero,
   resposta,
   onChange,
+  colors,
+  styles,
 }: {
   questao: Question;
   numero: number;
   resposta: Resposta;
   onChange: (r: Resposta) => void;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createQuestionStyles>;
 }) {
   const opcaoSelecionada = questao.options.find((o) => o.id === resposta.optionId);
   const exigeTexto =
@@ -78,34 +83,34 @@ function ItemQuestao({
   }, [questao.image_url, imagemLargura]);
 
   return (
-    <View style={qStyles.container}>
-      <View style={qStyles.header}>
-        <View style={qStyles.headerEsq}>
-          <View style={qStyles.numeroBadge}>
-            <Text style={qStyles.numeroTexto}>{numero}</Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerEsq}>
+          <View style={styles.numeroBadge}>
+            <Text style={styles.numeroTexto}>{numero}</Text>
           </View>
           {questao.subject && (
-            <View style={qStyles.subjectPill}>
-              <Text style={qStyles.subjectTexto}>{questao.subject.name}</Text>
+            <View style={styles.subjectPill}>
+              <Text style={styles.subjectTexto}>{questao.subject.name}</Text>
             </View>
           )}
-          <View style={qStyles.tipoPill}>
-            <Text style={qStyles.tipoTexto}>
+          <View style={styles.tipoPill}>
+            <Text style={styles.tipoTexto}>
               {questao.type === 'essay' ? 'Discursiva' : 'Objetiva'}
             </Text>
           </View>
         </View>
-        <View style={qStyles.pontos}>
-          <Text style={qStyles.pontosTexto}>{questao.points} pt{questao.points !== 1 ? 's' : ''}</Text>
+        <View style={styles.pontos}>
+          <Text style={styles.pontosTexto}>{questao.points} pt{questao.points !== 1 ? 's' : ''}</Text>
         </View>
       </View>
 
-      <Text style={qStyles.enunciado}>{questao.question_text}</Text>
+      <Text style={styles.enunciado}>{questao.question_text}</Text>
 
       {questao.image_url && !imagemErro ? (
         <Image
           source={{ uri: questao.image_url }}
-          style={[qStyles.imagem, { height: imagemAltura }]}
+          style={[styles.imagem, { height: imagemAltura }]}
           resizeMode="contain"
           accessibilityLabel="Imagem da questão"
           onError={() => setImagemErro(true)}
@@ -117,7 +122,7 @@ function ItemQuestao({
         return (
           <TouchableOpacity
             key={op.id}
-            style={[qStyles.opcao, selecionada && qStyles.opcaoSelecionada]}
+            style={[styles.opcao, selecionada && styles.opcaoSelecionada]}
             onPress={() => {
               const deveExibirTexto = op.triggers_text_input || questao.allow_text_answer;
               onChange({
@@ -128,10 +133,10 @@ function ItemQuestao({
             }}
             activeOpacity={0.75}
           >
-            <View style={[qStyles.radio, selecionada && qStyles.radioSelecionado]}>
-              {selecionada && <View style={qStyles.radioPonto} />}
+            <View style={[styles.radio, selecionada && styles.radioSelecionado]}>
+              {selecionada && <View style={styles.radioPonto} />}
             </View>
-            <Text style={[qStyles.opcaoTexto, selecionada && qStyles.opcaoTextoSelecionado]}>
+            <Text style={[styles.opcaoTexto, selecionada && styles.opcaoTextoSelecionado]}>
               {op.option_text}
             </Text>
           </TouchableOpacity>
@@ -140,7 +145,7 @@ function ItemQuestao({
 
       {exigeTexto && (
         <TextInput
-          style={qStyles.textInput}
+          style={styles.textInput}
           placeholder={
             questao.type === 'essay'
               ? 'Digite sua resposta…'
@@ -160,57 +165,12 @@ function ItemQuestao({
   );
 }
 
-const qStyles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 12,
-    borderWidth: 1, borderColor: colors.border,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
-  },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  headerEsq:   { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  numeroBadge: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center',
-  },
-  numeroTexto:  { fontSize: 14, fontWeight: '700', color: colors.primary },
-  subjectPill:  { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  subjectTexto: { fontSize: 11, fontWeight: '600', color: colors.primary },
-  tipoPill:     { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  tipoTexto:    { fontSize: 11, color: colors.muted },
-  pontos:       { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  pontosTexto:  { fontSize: 12, color: colors.muted, fontWeight: '500' },
-  enunciado:    { fontSize: 15, color: colors.ink, lineHeight: 22, marginBottom: 14 },
-  imagem: {
-    width: '100%',
-    borderRadius: 12,
-    marginBottom: 14,
-    backgroundColor: '#F1F5F9',
-  },
-  opcao: {
-    flexDirection: 'row', alignItems: 'flex-start', padding: 12,
-    borderRadius: 10, borderWidth: 1, borderColor: colors.border,
-    marginBottom: 8, gap: 10,
-  },
-  opcaoSelecionada:      { borderColor: colors.primary, backgroundColor: colors.soft },
-  radio: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 2,
-    borderColor: colors.border, justifyContent: 'center', alignItems: 'center',
-    marginTop: 1, flexShrink: 0,
-  },
-  radioSelecionado:      { borderColor: colors.primary },
-  radioPonto:            { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-  opcaoTexto:            { flex: 1, fontSize: 14, color: colors.text, lineHeight: 20 },
-  opcaoTextoSelecionado: { color: colors.primary, fontWeight: '600' },
-  textInput: {
-    marginTop: 10, backgroundColor: colors.soft,
-    borderWidth: 1, borderColor: colors.border, borderRadius: 10,
-    padding: 12, fontSize: 14, color: colors.ink, minHeight: 100,
-  },
-});
-
 // ── Tela principal ────────────────────────────────────────────────────────────
 
 export function SimuladoExamScreen({ route, navigation }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createSimuladoExamStyles(colors), [colors]);
+  const questionStyles = useMemo(() => createQuestionStyles(colors), [colors]);
   const { examId, attemptId } = route.params;
   const queryClient = useQueryClient();
 
@@ -686,6 +646,8 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
                 numero={i + 1}
                 resposta={respostas[q.id] ?? {}}
                 onChange={(r) => setResposta(q.id, r)}
+                colors={colors}
+                styles={questionStyles}
               />
             ))}
 
@@ -733,7 +695,58 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   return null;
 }
 
-const styles = StyleSheet.create({
+function createQuestionStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 12,
+      borderWidth: 1, borderColor: colors.border,
+      shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    },
+    header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    headerEsq:   { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+    numeroBadge: {
+      width: 32, height: 32, borderRadius: 16,
+      backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center',
+    },
+    numeroTexto:  { fontSize: 14, fontWeight: '700', color: colors.primary },
+    subjectPill:  { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+    subjectTexto: { fontSize: 11, fontWeight: '600', color: colors.primary },
+    tipoPill:     { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+    tipoTexto:    { fontSize: 11, color: colors.muted },
+    pontos:       { backgroundColor: colors.soft, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+    pontosTexto:  { fontSize: 12, color: colors.muted, fontWeight: '500' },
+    enunciado:    { fontSize: 15, color: colors.ink, lineHeight: 22, marginBottom: 14 },
+    imagem: {
+      width: '100%',
+      borderRadius: 12,
+      marginBottom: 14,
+      backgroundColor: '#F1F5F9',
+    },
+    opcao: {
+      flexDirection: 'row', alignItems: 'flex-start', padding: 12,
+      borderRadius: 10, borderWidth: 1, borderColor: colors.border,
+      marginBottom: 8, gap: 10,
+    },
+    opcaoSelecionada:      { borderColor: colors.primary, backgroundColor: colors.soft },
+    radio: {
+      width: 20, height: 20, borderRadius: 10, borderWidth: 2,
+      borderColor: colors.border, justifyContent: 'center', alignItems: 'center',
+      marginTop: 1, flexShrink: 0,
+    },
+    radioSelecionado:      { borderColor: colors.primary },
+    radioPonto:            { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+    opcaoTexto:            { flex: 1, fontSize: 14, color: colors.text, lineHeight: 20 },
+    opcaoTextoSelecionado: { color: colors.primary, fontWeight: '600' },
+    textInput: {
+      marginTop: 10, backgroundColor: colors.soft,
+      borderWidth: 1, borderColor: colors.border, borderRadius: 10,
+      padding: 12, fontSize: 14, color: colors.ink, minHeight: 100,
+    },
+  });
+}
+
+function createSimuladoExamStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   headerBackButton: {
     marginLeft: -6,
     paddingRight: 12,
@@ -846,3 +859,4 @@ const styles = StyleSheet.create({
   },
   botaoAguardoTexto: { color: '#B45309', fontWeight: '600', fontSize: 15 },
 });
+}

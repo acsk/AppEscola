@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import type { SimuladosStackParamList } from '../../../navigation/stacks/Simulad
 import { subjectIconName } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { useAttemptResult } from '../hooks';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoResult'>;
 
@@ -41,6 +42,8 @@ function calcularDuracao(startedAt: string, finishedAt: string): string {
 }
 
 export function SimuladoResultScreen({ route, navigation }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createSimuladoResultStyles(colors), [colors]);
   const { attemptId } = route.params;
 
   const {
@@ -372,7 +375,8 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createSimuladoResultStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   headerBackButton: {
     marginLeft: -6,
     paddingRight: 12,
@@ -646,3 +650,4 @@ const styles = StyleSheet.create({
     color: '#DC2626',
   },
 });
+}

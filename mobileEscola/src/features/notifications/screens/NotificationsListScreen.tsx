@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuButton } from '../../../components/navigation/MenuButton';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 import { platformShadow } from '../../../lib/shadow';
 import {
   type StudentNotificationItem,
@@ -38,6 +39,8 @@ function formatDate(iso: string): string {
 }
 
 export function NotificationsListScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createNotificationsListStyles(colors), [colors]);
   const navigation =
     useNavigation<NativeStackNavigationProp<AlunoStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -230,7 +233,8 @@ export function NotificationsListScreen() {
 
 const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
 
-const styles = StyleSheet.create({
+function createNotificationsListStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   headerWrap: {
     backgroundColor: '#FBFAFF',
@@ -385,3 +389,4 @@ const styles = StyleSheet.create({
   pageBtnText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   pageInfo: { fontSize: 13, color: colors.muted, fontWeight: '600' },
 });
+}

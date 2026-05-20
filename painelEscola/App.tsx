@@ -34,7 +34,7 @@ import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simul
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
-import { BillingSettingsScreen } from "./screens/configuracoes";
+import { BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/configuracoes";
 import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
@@ -103,6 +103,7 @@ const SCREEN_SLUGS = [
   "users",
   "matriculas-detail",
   "configuracoes-cobranca",
+  "configuracoes-tema-mobile",
   "notificacoes",
   "calendario",
 ];
@@ -210,6 +211,7 @@ function hashToNav(hash: string): NavState {
   }
 
   if (seg0 === "configuracoes") {
+    if (seg1 === "tema-mobile") return { screen: "configuracoes-tema-mobile" };
     if (seg1 === "cobranca") return { screen: "configuracoes-cobranca" };
     return { screen: "configuracoes-cobranca" };
   }
@@ -266,6 +268,7 @@ function navToHash(nav: NavState): string {
     const id = nav.params?.userId;
     return id != null ? `#/users/${id}` : "#/users/novo";
   }
+  if (nav.screen === "configuracoes-tema-mobile") return "#/configuracoes/tema-mobile";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   return `#/${nav.screen}`;
 }
@@ -755,6 +758,7 @@ function AppContent() {
       case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
       case "configuracoes-cobranca": return <BillingSettingsScreen />;
+      case "configuracoes-tema-mobile": return <MobileThemeSettingsScreen />;
       case "notificacoes":
         if (!canSendNotifications) {
           return (

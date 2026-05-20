@@ -16,7 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { platformShadow } from '../../../lib/shadow';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 import {
   CalendarEventItem,
   calendarIconName,
@@ -85,8 +86,8 @@ function formatFoundEvents(count: number): string {
   return `${formatEventCount(count)} ${count === 1 ? 'encontrado' : 'encontrados'}`;
 }
 
-function tint(hex?: string, alpha = '16'): string {
-  if (!hex || !hex.startsWith('#')) return colors.soft;
+function tint(hex: string | undefined, alpha: string, fallback: string): string {
+  if (!hex || !hex.startsWith('#')) return fallback;
   return `${hex}${alpha}`;
 }
 
@@ -101,6 +102,8 @@ function eventActionLabel(event: CalendarEventItem): string | null {
 }
 
 export function CalendarScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createCalendarStyles(colors), [colors]);
   const navigation = useNavigation<NativeStackNavigationProp<AlunoStackParamList>>();
   const route = useRoute<Route>();
   const insets = useSafeAreaInsets();
@@ -347,15 +350,15 @@ export function CalendarScreen() {
                   style={[
                     styles.eventCard,
                     {
-                      borderColor: tint(event.type_color, '34'),
-                      backgroundColor: tint(event.type_color, '0D'),
+                      borderColor: tint(event.type_color, '34', colors.soft),
+                      backgroundColor: tint(event.type_color, '0D', colors.soft),
                     },
                   ]}
                   activeOpacity={pressable ? 0.85 : 1}
                   onPress={() => openEvent(event)}
                   disabled={!pressable}
                 >
-                  <View style={[styles.eventIcon, { backgroundColor: tint(event.type_color, '18') }]}>
+                  <View style={[styles.eventIcon, { backgroundColor: tint(event.type_color, '18', colors.soft) }]}>
                     <Ionicons
                       name={calendarIconName(event.type_icon) as any}
                       size={21}
@@ -400,7 +403,8 @@ export function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createCalendarStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   headerWrap: {
     backgroundColor: '#FBFAFF',
@@ -648,3 +652,4 @@ const styles = StyleSheet.create({
   eventMeta: { fontSize: 13, color: colors.muted, lineHeight: 18, marginTop: 5 },
   eventAction: { fontSize: 13, color: colors.primary, fontWeight: '900', marginTop: 8 },
 });
+}

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 export const CALENDAR_LEGEND_ORDER = [
   'exam',
@@ -23,6 +24,9 @@ type Props = {
 };
 
 export function CalendarColorLegend({ items }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createCalendarLegendStyles(colors), [colors]);
+
   if (items.length === 0) return null;
 
   return (
@@ -42,7 +46,8 @@ export function CalendarColorLegend({ items }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createCalendarLegendStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   wrap: {
     marginTop: 12,
     paddingTop: 12,
@@ -77,4 +82,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     flexShrink: 1,
   },
-});
+  });
+}

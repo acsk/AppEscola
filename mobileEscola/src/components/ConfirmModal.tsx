@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
+import { platformShadow } from '../lib/shadow';
 
 interface Props {
   visible: boolean;
@@ -99,10 +100,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
+    ...platformShadow({ color: '#000000', opacity: 0.15, radius: 20, elevation: 10, offsetY: 4 }),
   },
   iconCircle: {
     width: 64,

@@ -4,7 +4,7 @@ import { SimuladosScreen }       from '../../features/simulados/screens/Simulado
 import { SimuladoDetalheScreen } from '../../features/simulados/screens/SimuladoDetalheScreen';
 import { SimuladoExamScreen }    from '../../features/simulados/screens/SimuladoExamScreen';
 import { SimuladoResultScreen }  from '../../features/simulados/screens/SimuladoResultScreen';
-import { colors } from '../../theme';
+import { useThemeColors } from '../../context/TenantThemeContext';
 
 export type SimuladosStackParamList = {
   SimuladosList: undefined;
@@ -16,6 +16,8 @@ export type SimuladosStackParamList = {
 const Stack = createNativeStackNavigator<SimuladosStackParamList>();
 
 export function SimuladosNavigator() {
+  const colors = useThemeColors();
+
   return (
     <Stack.Navigator
       screenOptions={{

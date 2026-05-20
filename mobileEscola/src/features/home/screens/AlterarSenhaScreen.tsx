@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../../../services/api';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
+import type { ThemeColors } from '../../../theme';
 
 export function AlterarSenhaScreen() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createAlterarSenhaStyles(colors), [colors]);
   const navigation = useNavigation<any>();
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
@@ -202,7 +205,8 @@ export function AlterarSenhaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createAlterarSenhaStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { paddingBottom: 28 },
   headerCard: {
@@ -316,3 +320,4 @@ const styles = StyleSheet.create({
   botaoDisabled: { opacity: 0.6 },
   botaoSalvarTexto: { color: colors.surface, fontSize: 15, fontWeight: '800' },
 });
+}

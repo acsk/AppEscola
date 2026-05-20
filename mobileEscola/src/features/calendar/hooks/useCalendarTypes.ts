@@ -18,9 +18,11 @@ export function buildCalendarLegendItems(
 ): CalendarLegendItem[] {
   if (!types) return [];
 
-  return CALENDAR_LEGEND_ORDER.map((key) => {
+  return CALENDAR_LEGEND_ORDER.reduce<CalendarLegendItem[]>((items, key) => {
     const meta = types[key];
-    if (!meta) return null;
-    return { key, label: meta.label, color: meta.color };
-  }).filter((item): item is CalendarLegendItem => item !== null);
+    if (meta) {
+      items.push({ key, label: meta.label, color: meta.color });
+    }
+    return items;
+  }, []);
 }

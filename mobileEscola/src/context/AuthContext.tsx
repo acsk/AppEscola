@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { mobileThemeQueryKey } from './TenantThemeContext';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { storage, STORAGE_KEYS, clearAuthStorage } from '../services/storage';
@@ -49,6 +51,7 @@ interface AuthContextData {
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser]                           = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading]                 = useState(true);
   const [requirePasswordChange, setRequirePasswordChange] = useState(false);
@@ -184,76 +187,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validateStoredToken();
   }, [clearSession, enforceForceReloginFromMeta]);
 
-  // ── Login ──────────────────────────────────────────────────────────────
-  async function signIn(login: string, password: string) {
-    logAuthDebug('Tentativa de login iniciada', {
-      loginType: login.includes('@') ? 'email' : 'matricula',
-    });
-    const response = await loginApi(login, password);
+  const signIn = useCallback(
+    async (login: string, password: string) => {
+      logAuthDebug('Tentativa de login iniciada', {
+        loginType: login.includes('@') ? 'email' : 'matricula',
+      });
+      const response = await loginApi(login, password);
 
-    await Promise.all([
-      storage.setItem(STORAGE_KEYS.TOKEN, response.token),
-      storage.setItem(STORAGE_KEYS.ROLE, response.user.role),
-      storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user)),
-    ]);
+      await Promise.all([
+        storage.setItem(STORAGE_KEYS.TOKEN, response.token),
+        storage.setItem(STORAGE_KEYS.ROLE, response.user.role),
+        storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user)),
+      ]);
 
-    const forceRelogin = await enforceForceReloginFromMeta('post-login');
-    if (forceRelogin) {
+      const forceRelogin = await enforceForceReloginFromMeta('post-login');
+      if (forceRelogin) {
+        resetUnauthorizedNotice();
+        return;
+      }
+
+      setRequirePasswordChange(response.password_change_required);
+      setUser(response.user);
+      setSessionExpired(false);
       resetUnauthorizedNotice();
-      return;
-    }
+      logAuthDebug('Login concluido', {
+        userId: response.user.id,
+        role: response.user.role,
+        requirePasswordChange: response.password_change_required,
+      });
 
-    setRequirePasswordChange(response.password_change_required);
-    setUser(response.user);
-    setSessionExpired(false);
-    resetUnauthorizedNotice();
-    logAuthDebug('Login concluido', {
-      userId: response.user.id,
-      role: response.user.role,
-      requirePasswordChange: response.password_change_required,
-    });
-  }
+      if (response.user.role === 'aluno') {
+        void queryClient.invalidateQueries({ queryKey: mobileThemeQueryKey });
+      }
+    },
+    [enforceForceReloginFromMeta, queryClient],
+  );
 
-  // ── Logout ─────────────────────────────────────────────────────────────
-  async function signOut() {
+  const signOut = useCallback(async () => {
     logAuthDebug('Logout iniciado');
     try {
       await logoutApi();
     } catch {
       // Ignora erros de rede no logout; limpeza local sempre ocorre
     } finally {
+      queryClient.removeQueries({ queryKey: mobileThemeQueryKey });
       await clearSession();
       setSessionExpired(false);
       resetUnauthorizedNotice();
       logAuthDebug('Logout finalizado');
     }
-  }
+  }, [clearSession, queryClient]);
 
-  function clearPasswordChangeFlag() {
+  const clearPasswordChangeFlag = useCallback(() => {
     setRequirePasswordChange(false);
-  }
+  }, []);
 
-  async function refreshUserProfile() {
+  const refreshUserProfile = useCallback(async () => {
     const me = await getMeApi();
     await Promise.all([
       storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(me)),
       storage.setItem(STORAGE_KEYS.ROLE, me.role),
     ]);
     setUser(me);
-  }
+  }, []);
+
+  const authContextValue = useMemo(
+    () => ({
+      user,
+      isLoading,
+      requirePasswordChange,
+      signIn,
+      signOut,
+      clearPasswordChangeFlag,
+      refreshUserProfile,
+    }),
+    [
+      user,
+      isLoading,
+      requirePasswordChange,
+      signIn,
+      signOut,
+      clearPasswordChangeFlag,
+      refreshUserProfile,
+    ],
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        requirePasswordChange,
-        signIn,
-        signOut,
-        clearPasswordChangeFlag,
-        refreshUserProfile,
-      }}
-    >
+    <AuthContext.Provider value={authContextValue}>
       {children}
 
       <Modal

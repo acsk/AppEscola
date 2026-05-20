@@ -76,13 +76,8 @@ function isForceReloginEnabled(headers: any): boolean {
 
   const enabled = normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
 
-  if (__DEV__) {
-    logAuthDebug('Header x-force-relogin lido', {
-      raw,
-      normalized,
-      enabled,
-      headerKeys: headers ? Object.keys(headers) : [],
-    });
+  if (__DEV__ && enabled) {
+    logAuthDebug('Header x-force-relogin ativo', { raw, normalized });
   }
 
   return enabled;
@@ -129,11 +124,6 @@ export function resetUnauthorizedNotice() {
 
 api.interceptors.response.use(
   (response) => {
-    logAuthDebug('Resposta recebida', {
-      url: response.config?.url,
-      status: response.status,
-    });
-
     if (isForceReloginEnabled(response.headers)) {
       logAuthDebug('Force relogin detectado em resposta de sucesso');
       void notifySessionLost('force_relogin');

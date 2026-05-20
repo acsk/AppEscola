@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,8 @@ import { useAlunoDrawer } from '../../context/AlunoDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import type { AlunoStackParamList, AlunoTabParamList } from '../../navigation/stacks/AlunoStack';
 import { platformShadow } from '../../lib/shadow';
-import { colors } from '../../theme';
+import { useThemeColors } from '../../context/TenantThemeContext';
+import type { ThemeColors } from '../../theme';
 
 const drawerShadow = platformShadow({ color: '#000000', opacity: 0.15, radius: 24, elevation: 12 });
 
@@ -73,6 +74,8 @@ function getActiveTabName(state: NavigationStateSnapshot): TabName | null {
 }
 
 export function AlunoDrawer() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => createAlunoDrawerStyles(colors), [colors]);
   const { visible, close } = useAlunoDrawer();
   const { user, signOut, refreshUserProfile } = useAuth();
   const navigation = useNavigation<Nav>();
@@ -87,8 +90,11 @@ export function AlunoDrawer() {
   const translateX = useRef(new Animated.Value(-drawerWidth)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
+  const wasVisibleRef = useRef(false);
   useEffect(() => {
-    if (visible) {
+    const justOpened = visible && !wasVisibleRef.current;
+    wasVisibleRef.current = visible;
+    if (justOpened) {
       void refreshUserProfile();
     }
   }, [visible, refreshUserProfile]);
@@ -202,7 +208,7 @@ export function AlunoDrawer() {
               <Text style={styles.drawerSubtitulo}>Acesso rápido</Text>
             </View>
             <TouchableOpacity onPress={close} style={styles.fecharBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={22} color={colors.surface} />
+              <Ionicons name="close" size={22} color={colors.drawer_header_icon} />
             </TouchableOpacity>
           </View>
 
@@ -248,12 +254,20 @@ export function AlunoDrawer() {
                       activeOpacity={0.75}
                     >
                       <View style={[styles.navIcone, active && styles.navIconeAtivo]}>
-                        <Ionicons name={item.icon} size={19} color={active ? colors.surface : colors.primary} />
+                        <Ionicons
+                          name={item.icon}
+                          size={19}
+                          color={active ? colors.menu_button_active_icon : colors.menu_button_icon}
+                        />
                       </View>
                       <View style={styles.navTextoWrap}>
                         <Text style={[styles.navTitulo, active && styles.navTituloAtivo]}>{item.label}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={17} color={active ? colors.surface : colors.primary} />
+                      <Ionicons
+                        name="chevron-forward"
+                        size={17}
+                        color={active ? colors.menu_button_active_chevron : colors.menu_button_chevron}
+                      />
                     </TouchableOpacity>
                   );
                 })}
@@ -264,9 +278,9 @@ export function AlunoDrawer() {
           <View style={styles.menu}>
             <Text style={styles.secaoLabel}>Conta</Text>
             <TouchableOpacity style={styles.menuItem} onPress={handleAlterarSenha} activeOpacity={0.75}>
-              <Ionicons name="key-outline" size={19} color={colors.primary} />
+              <Ionicons name="key-outline" size={19} color={colors.menu_button_icon} />
               <Text style={styles.menuItemTexto}>Trocar senha</Text>
-              <Ionicons name="chevron-forward" size={17} color={colors.primary} />
+              <Ionicons name="chevron-forward" size={17} color={colors.menu_button_chevron} />
             </TouchableOpacity>
 
             <TouchableOpacity style={[styles.menuItem, styles.menuItemSair]} onPress={handleSair} activeOpacity={0.75}>
@@ -280,7 +294,8 @@ export function AlunoDrawer() {
   );
 }
 
-const styles = StyleSheet.create({
+function createAlunoDrawerStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1 },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -303,8 +318,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.16)',
   },
-  drawerTitulo: { fontSize: 18, fontWeight: '800', color: colors.surface },
-  drawerSubtitulo: { fontSize: 11, color: '#C7D2FE', marginTop: 2, fontWeight: '600' },
+  drawerTitulo: { fontSize: 18, fontWeight: '800', color: colors.drawer_header_title },
+  drawerSubtitulo: { fontSize: 11, color: colors.drawer_header_subtitle, marginTop: 2, fontWeight: '600' },
   fecharBtn: {
     width: 34,
     height: 34,
@@ -324,7 +339,7 @@ const styles = StyleSheet.create({
   secaoLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#C7D2FE',
+    color: colors.drawer_section_label,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -350,9 +365,9 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%' },
   avatarInitials: { color: colors.primary, fontSize: 20, fontWeight: '800' },
   perfilInfo: { flex: 1, minWidth: 0 },
-  perfilNome: { fontSize: 15, fontWeight: '800', color: colors.surface, marginBottom: 1 },
-  perfilRole: { fontSize: 11, fontWeight: '700', color: '#C7D2FE', marginBottom: 3 },
-  perfilMeta: { fontSize: 11, color: '#E0E7FF', marginTop: 1 },
+  perfilNome: { fontSize: 15, fontWeight: '800', color: colors.drawer_header_title, marginBottom: 1 },
+  perfilRole: { fontSize: 11, fontWeight: '700', color: colors.drawer_header_subtitle, marginBottom: 3 },
+  perfilMeta: { fontSize: 11, color: colors.drawer_header_subtitle, marginTop: 1 },
   matriculaBadge: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -379,26 +394,26 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
     borderRadius: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.menu_button_background,
     borderWidth: 1,
-    borderColor: colors.surface,
+    borderColor: colors.menu_button_background,
   },
   navItemAtivo: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: colors.menu_button_active_background,
+    borderColor: colors.menu_button_active_background,
   },
   navIcone: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: colors.soft,
+    backgroundColor: colors.menu_button_icon_background,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navIconeAtivo: { backgroundColor: 'rgba(255,255,255,0.14)' },
+  navIconeAtivo: { backgroundColor: colors.menu_button_active_icon_background },
   navTextoWrap: { flex: 1, minWidth: 0 },
-  navTitulo: { fontSize: 13, fontWeight: '800', color: colors.primary },
-  navTituloAtivo: { color: colors.surface },
+  navTitulo: { fontSize: 13, fontWeight: '800', color: colors.menu_button_text },
+  navTituloAtivo: { color: colors.menu_button_active_text },
   menu: {
     paddingHorizontal: 14,
     paddingTop: 10,
@@ -414,11 +429,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.menu_button_background,
     borderWidth: 1,
-    borderColor: colors.surface,
+    borderColor: colors.menu_button_background,
   },
-  menuItemTexto: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.primary },
-  menuItemSair: { backgroundColor: colors.surface, borderColor: colors.surface },
+  menuItemTexto: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.menu_button_text },
+  menuItemSair: { backgroundColor: colors.menu_button_background, borderColor: colors.menu_button_background },
   menuItemSairTexto: { color: colors.debit },
 });
+}

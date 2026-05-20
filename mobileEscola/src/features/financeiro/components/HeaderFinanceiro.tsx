@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { CobrancasResponse } from '../../../services/financeiro.service';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { formatarMoeda, formatarReferenciaMes } from '../utils/formatters';
-import { styles } from '../styles/financeiro.styles';
+import { useFinanceiroStyles } from '../FinanceiroStylesContext';
 
 interface HeaderFinanceiroProps {
   topInset: number;
@@ -14,6 +14,8 @@ interface HeaderFinanceiroProps {
 }
 
 export function HeaderFinanceiro({ topInset, resumo, referencia }: HeaderFinanceiroProps) {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
   const periodoAtual = referencia ? formatarReferenciaMes(referencia) : null;
 
   return (

@@ -2,9 +2,9 @@ import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Cobranca, CobrancasResponse } from '../../../services/financeiro.service';
-import { colors } from '../../../theme';
+import { useThemeColors } from '../../../context/TenantThemeContext';
 import { CobrancaCard } from './CobrancaCard';
-import { styles } from '../styles/financeiro.styles';
+import { useFinanceiroStyles } from '../FinanceiroStylesContext';
 
 interface CobrancasListProps {
   data: CobrancasResponse;
@@ -12,6 +12,8 @@ interface CobrancasListProps {
 }
 
 export function CobrancasList({ data, onPagar }: CobrancasListProps) {
+  const colors = useThemeColors();
+  const styles = useFinanceiroStyles();
   const cobrancasAbertas = data.abertas.length ? data.abertas : data.atual ? [data.atual] : [];
 
   return (
