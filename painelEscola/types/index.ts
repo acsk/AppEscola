@@ -8,4 +8,5 @@ export * from "./invoices";
 export * from "./performance";
 export * from "./payments";
 export * from "./settings";
+export * from "./simulados";
 export * from "./components";

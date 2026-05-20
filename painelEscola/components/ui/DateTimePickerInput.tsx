@@ -7,7 +7,8 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { maskDateTime, displayDateTimeToISO, isoToDisplayDateTime } from "../../utils/masks";
+import { maskDateTime, displayDateTimeToISO } from "../../utils/masks";
+import { useRestrictTextInput } from "../../hooks/useRestrictTextInput";
 
 type Props = {
   label: string;
@@ -28,8 +29,10 @@ export default function DateTimePickerInput({
   required,
   disabled = false,
 }: Props) {
-  // Ref para o input nativo oculto (somente web)
-  const hiddenRef = useRef<any>(null);
+  const inputRef = useRef<TextInput>(null);
+  const hiddenRef = useRef<HTMLInputElement | null>(null);
+
+  useRestrictTextInput(inputRef, "digits", !disabled);
 
   const openCalendar = () => {
     if (disabled || !hiddenRef.current) return;
@@ -40,9 +43,8 @@ export default function DateTimePickerInput({
     }
   };
 
-  const handleNativeChange = (e: any) => {
-    // datetime-local retorna "YYYY-MM-DDTHH:MM"
-    const raw: string = e.target.value;
+  const handleNativeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
     if (!raw) return;
     const [datePart, timePart] = raw.split("T");
     if (!datePart) return;
@@ -51,10 +53,9 @@ export default function DateTimePickerInput({
     onChangeText(`${day}/${month}/${year} ${time}`);
   };
 
-  // Valor para o input nativo: "YYYY-MM-DDTHH:MM"
   const isoValue = (() => {
-    const full = displayDateTimeToISO(value); // "YYYY-MM-DDTHH:MM:00"
-    return full ? full.slice(0, 16) : ""; // "YYYY-MM-DDTHH:MM"
+    const full = displayDateTimeToISO(value);
+    return full ? full.slice(0, 16) : "";
   })();
 
   return (
@@ -67,12 +68,11 @@ export default function DateTimePickerInput({
       <View
         className={`flex-row items-center border rounded-xl px-4 ${
           disabled ? "bg-gray-100" : "bg-gray-50"
-        } ${
-          error ? "border-red-400" : "border-gray-200"
-        }`}
+        } ${error ? "border-red-400" : "border-gray-200"}`}
         style={{ height: 44 }}
       >
         <TextInput
+          ref={inputRef}
           value={value}
           onChangeText={(v) => onChangeText(maskDateTime(v))}
           placeholder="DD/MM/AAAA HH:MM"
@@ -81,13 +81,21 @@ export default function DateTimePickerInput({
           maxLength={16}
           keyboardType="numeric"
           editable={!disabled}
+          autoComplete="off"
+          autoCorrect={false}
+          spellCheck={false}
+          {...(Platform.OS === "web" ? ({ inputMode: "numeric" } as object) : {})}
         />
 
-        <TouchableOpacity onPress={openCalendar} className="pl-2" activeOpacity={disabled ? 1 : 0.7} disabled={disabled}>
+        <TouchableOpacity
+          onPress={openCalendar}
+          className="pl-2"
+          activeOpacity={disabled ? 1 : 0.7}
+          disabled={disabled}
+        >
           <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
         </TouchableOpacity>
 
-        {/* Input nativo oculto — usado apenas na web para abrir o seletor do SO */}
         {Platform.OS === "web" && (
           <input
             ref={hiddenRef}
@@ -108,9 +116,7 @@ export default function DateTimePickerInput({
         )}
       </View>
 
-      {error ? (
-        <Text className="text-xs text-red-500 mt-1">{error}</Text>
-      ) : null}
+      {error ? <Text className="text-xs text-red-500 mt-1">{error}</Text> : null}
     </View>
   );
 }

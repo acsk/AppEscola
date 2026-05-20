@@ -12,41 +12,11 @@ import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import Modal from "../../components/ui/Modal";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Attempt = {
-  id: number;
-  status: "in_progress" | "pending_review" | "awaiting_release" | "completed";
-  started_at: string;
-  finished_at: string | null;
-  score: number | null;
-  max_score: number;
-  percentage: number | null;
-  passed: boolean | null;
-  pending_answers_count?: number;
-  exam: { id: number; title: string } | null;
-  student: { id: number; name: string; enrollment_number: string | null };
-};
-
-type AttemptDetail = Attempt & {
-  answers: {
-    id: number;
-    question_id: number;
-    question_text: string;
-    type: "multiple_choice" | "essay";
-    option_id: number | null;
-    option_text: string | null;
-    text_answer: string | null;
-    is_correct: boolean | null;
-    points_earned: number | null;
-  }[];
-};
-
-interface Props {
-  navigate: (screen: string, params?: Record<string, any>) => void;
-  initialStatusFilter?: string;
-}
+import type {
+  ExamAttempt,
+  ExamAttemptDetail,
+  ExamAttemptsScreenProps,
+} from "../../types/simulados";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -82,9 +52,9 @@ function fmtPct(v: number | null) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" }: Props) {
+export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" }: ExamAttemptsScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
-  const [rows, setRows] = useState<Attempt[]>([]);
+  const [rows, setRows] = useState<ExamAttempt[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [page, setPage] = useState(1);
@@ -97,7 +67,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
 
   // Detail modal
   const [detailId, setDetailId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<AttemptDetail | null>(null);
+  const [detail, setDetail] = useState<ExamAttemptDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   // Correction state

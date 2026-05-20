@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
 import FormInput from "../../components/ui/FormInput";
-import FormSelect from "../../components/ui/FormSelect";
+import FormSelect, { type SelectOption } from "../../components/ui/FormSelect";
 import SearchableSelect, { SearchableOption } from "../../components/ui/SearchableSelect";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -20,90 +20,23 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { useExamStatuses, useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import DateTimePickerInput from "../../components/ui/DateTimePickerInput";
-import { displayToISO, isoToDisplay, displayDateTimeToISO, isoToDisplayDateTime } from "../../utils/masks";
+import {
+  displayDateTimeToISO,
+  displayDateTimeToMs,
+  isoToDisplayDateTime,
+  isValidDisplayDateTime,
+} from "../../utils/masks";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type ExamForm = {
-  title: string;
-  exam_type: string;
-  status: string;
-  course_id: string;
-  subject_id: string;
-  description: string;
-  duration_minutes: string;
-  passing_score: string;
-  starts_at: string;
-  ends_at: string;
-  release_results_after_end: string;
-  allow_retake: string;
-  max_attempts: string;
-  min_score_to_retake: string;
-};
-
-type Question = {
-  id: number;
-  type: "multiple_choice" | "essay";
-  question_text: string | null;
-  points: number;
-  order: number;
-  image_url: string | null;
-  video_url: string | null;
-  explanation: string | null;
-  subject: { id: number; name: string } | null;
-  options: Option[];
-};
-
-type Option = {
-  id?: number;
-  option_text: string;
-  is_correct: boolean;
-  order: number;
-  triggers_text_input: boolean;
-};
-
-type QuestionForm = {
-  type: "multiple_choice" | "essay";
-  question_text: string;
-  subject_id: string;
-  points: string;
-  order: string;
-  image_url: string;
-  video_url: string;
-  explanation: string;
-  options: OptionForm[];
-};
-
-type OptionForm = {
-  option_text: string;
-  is_correct: boolean;
-  order: number;
-  triggers_text_input: boolean;
-};
-
-type SelectOption = { value: string | number; label: string };
-
-type SupportMaterial = {
-  id: number;
-  exam_id: number;
-  title: string;
-  description: string | null;
-  type: "link" | "file";
-  content: string;
-  file_type: string | null;
-  file_size: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type SupportMaterialForm = {
-  title: string;
-  description: string;
-  type: "link" | "file";
-  content: string;
-};
+import type {
+  ExamForm,
+  ExamFormScreenProps,
+  ExamOptionForm,
+  ExamQuestion,
+  ExamQuestionForm,
+  ExamSupportMaterial,
+  ExamSupportMaterialForm,
+} from "../../types/simulados";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -124,7 +57,7 @@ const EMPTY_EXAM: ExamForm = {
   min_score_to_retake: "",
 };
 
-const EMPTY_QUESTION: QuestionForm = {
+const EMPTY_QUESTION: ExamQuestionForm = {
   type: "multiple_choice",
   question_text: "",
   subject_id: "",
@@ -141,7 +74,7 @@ const EMPTY_QUESTION: QuestionForm = {
   ],
 };
 
-const EMPTY_SUPPORT_MATERIAL: SupportMaterialForm = {
+const EMPTY_SUPPORT_MATERIAL: ExamSupportMaterialForm = {
   title: "",
   description: "",
   type: "link",
@@ -153,15 +86,35 @@ const EMPTY_SUPPORT_MATERIAL: SupportMaterialForm = {
 function validateExam(form: ExamForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.title.trim()) errs.title = "Título é obrigatório.";
-  if (form.duration_minutes && isNaN(Number(form.duration_minutes)))
-    errs.duration_minutes = "Duração deve ser um número inteiro.";
-  if (form.passing_score && isNaN(Number(form.passing_score)))
-    errs.passing_score = "Nota mínima deve ser um número.";
+  if (form.duration_minutes) {
+    const dur = Number(form.duration_minutes);
+    if (!Number.isInteger(dur) || dur < 1)
+      errs.duration_minutes = "Duração deve ser um número inteiro maior que 0.";
+  }
   if (form.passing_score) {
     const score = Number(form.passing_score);
-    if (score < 0 || score > 100) errs.passing_score = "Nota mínima deve estar entre 0 e 100.";
+    if (Number.isNaN(score)) errs.passing_score = "Nota mínima deve ser um número.";
+    else if (score < 0 || score > 100) errs.passing_score = "Nota mínima deve estar entre 0 e 100.";
   }
-  if (form.release_results_after_end === "true" && !form.ends_at) {
+  if (form.starts_at.trim() && !isValidDisplayDateTime(form.starts_at.trim())) {
+    errs.starts_at = "Data de início inválida. Use DD/MM/AAAA HH:MM.";
+  }
+  if (form.ends_at.trim() && !isValidDisplayDateTime(form.ends_at.trim())) {
+    errs.ends_at = "Data de encerramento inválida. Use DD/MM/AAAA HH:MM.";
+  }
+  if (
+    form.starts_at.trim() &&
+    form.ends_at.trim() &&
+    isValidDisplayDateTime(form.starts_at.trim()) &&
+    isValidDisplayDateTime(form.ends_at.trim())
+  ) {
+    const startMs = displayDateTimeToMs(form.starts_at);
+    const endMs = displayDateTimeToMs(form.ends_at);
+    if (startMs != null && endMs != null && endMs <= startMs) {
+      errs.ends_at = "A data de encerramento deve ser posterior à data de início.";
+    }
+  }
+  if (form.release_results_after_end === "true" && !form.ends_at.trim()) {
     errs.ends_at = "Informe a data final para liberar o resultado só após o fechamento do período.";
   }
   if (form.allow_retake === "true") {
@@ -172,21 +125,28 @@ function validateExam(form: ExamForm): Record<string, string> {
     }
     if (form.min_score_to_retake) {
       const minScore = Number(form.min_score_to_retake);
-      if (isNaN(minScore) || minScore < 0 || minScore > 100)
+      if (Number.isNaN(minScore) || minScore < 0 || minScore > 100)
         errs.min_score_to_retake = "Nota para nova tentativa deve estar entre 0 e 100.";
     }
   }
   return errs;
 }
 
-function validateQuestion(form: QuestionForm): Record<string, string> {
+function validateQuestion(form: ExamQuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.question_text.trim() && !form.image_url.trim()) {
     const message = "Informe o texto do enunciado, a imagem, ou ambos.";
     errs.question_text = message;
     errs.image_url = message;
   }
-  if (form.points && isNaN(Number(form.points))) errs.points = "Pontuação deve ser um número.";
+  if (form.points) {
+    const pts = Number(form.points);
+    if (Number.isNaN(pts) || pts <= 0) errs.points = "Pontuação deve ser um número maior que 0.";
+  }
+  if (form.order) {
+    const ord = Number(form.order);
+    if (!Number.isInteger(ord) || ord < 1) errs.order = "Ordem deve ser um número inteiro maior que 0.";
+  }
   if (form.type === "multiple_choice") {
     const filled = form.options.filter((o) => o.option_text.trim());
     if (filled.length < 2) errs.options = "Informe pelo menos 2 opções.";
@@ -196,16 +156,9 @@ function validateQuestion(form: QuestionForm): Record<string, string> {
   return errs;
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-interface Props {
-  examId: number | null;
-  navigate: (screen: string, params?: Record<string, any>) => void;
-}
-
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function ExamFormScreen({ examId, navigate }: Props) {
+export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps) {
   const { contentPadding } = useResponsiveLayout();
   const isEdit = examId !== null;
   const scrollRef = useRef<ScrollView>(null);
@@ -237,11 +190,11 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const [subjectOptions, setSubjectOptions] = useState<SearchableOption[]>([]);
 
   // Questions state
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionModal, setQuestionModal] = useState(false);
   const [editQuestionId, setEditQuestionId] = useState<number | null>(null);
-  const [qForm, setQForm] = useState<QuestionForm>(EMPTY_QUESTION);
+  const [qForm, setQForm] = useState<ExamQuestionForm>(EMPTY_QUESTION);
   const [qErrors, setQErrors] = useState<Record<string, string>>({});
   const [savingQuestion, setSavingQuestion] = useState(false);
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
@@ -251,10 +204,10 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
   const [questionImageRatios, setQuestionImageRatios] = useState<Record<string, number>>({});
 
   // Support materials state
-  const [supportMaterials, setSupportMaterials] = useState<SupportMaterial[]>([]);
+  const [supportMaterials, setSupportMaterials] = useState<ExamSupportMaterial[]>([]);
   const [loadingSupportMaterials, setLoadingSupportMaterials] = useState(false);
   const [supportMaterialModal, setSupportMaterialModal] = useState(false);
-  const [supportMaterialForm, setSupportMaterialForm] = useState<SupportMaterialForm>(
+  const [supportMaterialForm, setSupportMaterialForm] = useState<ExamSupportMaterialForm>(
     EMPTY_SUPPORT_MATERIAL
   );
   const [supportMaterialErrors, setSupportMaterialErrors] = useState<Record<string, string>>({});
@@ -451,7 +404,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setQuestionModal(true);
   };
 
-  const openEditQuestion = (q: Question) => {
+  const openEditQuestion = (q: ExamQuestion) => {
     setEditQuestionId(q.id);
     setQForm({
       type: q.type,
@@ -476,7 +429,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setQuestionModal(true);
   };
 
-  const setQField = (k: keyof QuestionForm, v: any) =>
+  const setQField = (k: keyof ExamQuestionForm, v: any) =>
     setQForm((prev) => ({ ...prev, [k]: v }));
 
   const uploadQuestionImage = async (file: File) => {
@@ -516,7 +469,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     }
   };
 
-  const setOptionField = (idx: number, k: keyof OptionForm, v: any) => {
+  const setOptionField = (idx: number, k: keyof ExamOptionForm, v: any) => {
     setQForm((prev) => {
       const opts = prev.options.map((o, i) => (i === idx ? { ...o, [k]: v } : o));
       return { ...prev, options: opts };
@@ -632,7 +585,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setDeletingQuestion(false);
   };
 
-  const setSupportMaterialField = (key: keyof SupportMaterialForm, value: string) => {
+  const setSupportMaterialField = (key: keyof ExamSupportMaterialForm, value: string) => {
     setSupportMaterialForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -644,7 +597,7 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
     setSupportMaterialModal(true);
   };
 
-  const openEditSupportMaterial = (material: SupportMaterial) => {
+  const openEditSupportMaterial = (material: ExamSupportMaterial) => {
     setEditSupportMaterialId(material.id);
     setSupportMaterialForm({
       title: material.title ?? "",
@@ -959,8 +912,9 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               label="Duração (minutos)"
               value={form.duration_minutes}
               onChangeText={(v) => setField("duration_minutes", v)}
+              valueFormat="integer"
+              maxDigits={4}
               placeholder="Ex.: 90"
-              keyboardType="numeric"
               error={errors.duration_minutes}
             />
           </View>
@@ -972,8 +926,9 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               label="Nota mínima (%)"
               value={form.passing_score}
               onChangeText={(v) => setField("passing_score", v)}
+              valueFormat="decimal"
+              decimalPlaces={2}
               placeholder="Ex.: 60"
-              keyboardType="numeric"
               error={errors.passing_score}
             />
           </View>
@@ -1024,8 +979,9 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               label="Máximo de tentativas"
               value={form.max_attempts}
               onChangeText={(v) => setField("max_attempts", v)}
+              valueFormat="integer"
+              maxDigits={3}
               placeholder="Ex.: 3"
-              keyboardType="numeric"
               editable={form.allow_retake === "true"}
               error={errors.max_attempts}
             />
@@ -1044,8 +1000,9 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               label="Nota mínima para nova tentativa (%)"
               value={form.min_score_to_retake}
               onChangeText={(v) => setField("min_score_to_retake", v)}
+              valueFormat="decimal"
+              decimalPlaces={2}
               placeholder="Ex.: 70 (vazio usa nota mínima do simulado)"
-              keyboardType="numeric"
               editable={form.allow_retake === "true"}
               error={errors.min_score_to_retake}
             />
@@ -1582,8 +1539,9 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               label="Pontuação"
               value={qForm.points}
               onChangeText={(v) => setQField("points", v)}
+              valueFormat="decimal"
+              decimalPlaces={2}
               placeholder="1.0"
-              keyboardType="numeric"
               error={qErrors.points}
             />
           </View>
@@ -1592,8 +1550,10 @@ export default function ExamFormScreen({ examId, navigate }: Props) {
               label="Ordem"
               value={qForm.order}
               onChangeText={(v) => setQField("order", v)}
+              valueFormat="integer"
+              maxDigits={4}
               placeholder="Auto"
-              keyboardType="numeric"
+              error={qErrors.order}
             />
           </View>
         </View>

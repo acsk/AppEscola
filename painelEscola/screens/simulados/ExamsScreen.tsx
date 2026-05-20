@@ -22,6 +22,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import Modal from "../../components/ui/Modal";
 import { useExamStatuses, useExamTypes } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import type { ExamListItem, ExamPreviewQuestion, ExamsScreenProps } from "../../types/simulados";
 
 // ── Subject icon helpers ──────────────────────────────────────────────────────
 
@@ -43,47 +44,14 @@ function SubjectIcon({ icon, color, size = 18 }: { icon?: string | null; color?:
   );
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Exam = {
-  id: number;
-  title: string;
-  exam_type: string;
-  exam_type_label: string;
-  status: string;
-  status_label: string;
-  duration_minutes: number | null;
-  passing_score: number | null;
-  release_results_after_end?: boolean;
-  total_questions: number;
-  total_points: number;
-  course: { id: number; name: string } | null;
-  subject: { id: number; name: string; icon: string | null; color: string | null } | null;
-};
-
-type PreviewQuestion = {
-  id: number;
-  type: "multiple_choice" | "essay";
-  question_text: string;
-  image_url: string | null;
-  video_url: string | null;
-  points: number;
-  order: number;
-  options: { id: number; option_text: string; order: number; triggers_text_input: boolean }[];
-};
-
-interface Props {
-  navigate: (screen: string, params?: Record<string, any>) => void;
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ExamsScreen({ navigate }: Props) {
+export default function ExamsScreen({ navigate }: ExamsScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const examStatuses = useExamStatuses();
   const examTypes = useExamTypes();
 
-  const [rows, setRows] = useState<Exam[]>([]);
+  const [rows, setRows] = useState<ExamListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -113,14 +81,14 @@ export default function ExamsScreen({ navigate }: Props) {
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
   // Preview
-  const [previewExam, setPreviewExam] = useState<Exam | null>(null);
-  const [previewQuestions, setPreviewQuestions] = useState<PreviewQuestion[]>([]);
+  const [previewExam, setPreviewExam] = useState<ExamListItem | null>(null);
+  const [previewQuestions, setPreviewQuestions] = useState<ExamPreviewQuestion[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewSelected, setPreviewSelected] = useState<Record<number, number | null>>({});
   const [previewTexts, setPreviewTexts] = useState<Record<number, string>>({});
   const [previewBrokenImages, setPreviewBrokenImages] = useState<Record<number, boolean>>({});
 
-  const openPreview = async (exam: Exam) => {
+  const openPreview = async (exam: ExamListItem) => {
     setPreviewExam(exam);
     setPreviewSelected({});
     setPreviewTexts({});

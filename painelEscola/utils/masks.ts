@@ -146,8 +146,61 @@ export function maskDateTime(value: string): string {
   if (d.length <= 2) return d;
   if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
   if (d.length <= 8) return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
-  if (d.length <= 10) return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)} ${d.slice(8)}`;
-  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)} ${d.slice(8, 10)}:${d.slice(10)}`;
+  const datePart = `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)}`;
+  if (d.length <= 10) return `${datePart} ${d.slice(8, 10)}`;
+  const h = Math.min(parseInt(d.slice(8, 10), 10) || 0, 23);
+  const mRaw = d.slice(10, 12);
+  const hStr = String(h).padStart(2, "0");
+  if (mRaw.length === 0) return `${datePart} ${hStr}:`;
+  const mNum = parseInt(mRaw, 10);
+  const mStr = mRaw.length === 2 ? String(Math.min(Number.isNaN(mNum) ? 0 : mNum, 59)).padStart(2, "0") : mRaw;
+  return `${datePart} ${hStr}:${mStr}`;
+}
+
+/** Mantém apenas dígitos (números inteiros). */
+export function onlyIntegerInput(value: string, maxLength?: number): string {
+  const digits = value.replace(/\D/g, "");
+  return maxLength != null ? digits.slice(0, maxLength) : digits;
+}
+
+/** Mantém número decimal com até `maxDecimals` casas. */
+export function onlyDecimalInput(value: string, maxDecimals = 2): string {
+  const normalized = value.replace(",", ".").replace(/[^\d.]/g, "");
+  const dotIndex = normalized.indexOf(".");
+  if (dotIndex === -1) return normalized;
+  const intPart = normalized.slice(0, dotIndex);
+  const decPart = normalized.slice(dotIndex + 1).replace(/\./g, "");
+  return decPart.length > 0 ? `${intPart}.${decPart.slice(0, maxDecimals)}` : intPart;
+}
+
+/** Valida DD/MM/AAAA HH:MM completo. */
+export function isValidDisplayDateTime(display: string): boolean {
+  const trimmed = display.trim();
+  if (!trimmed || trimmed.length < 16) return false;
+  const iso = displayDateTimeToISO(trimmed);
+  if (!iso) return false;
+  const [datePart, timePart] = trimmed.split(" ");
+  if (!datePart || !timePart || timePart.length !== 5) return false;
+  const [day, month, year] = datePart.split("/").map((p) => parseInt(p, 10));
+  const [hh, mm] = timePart.split(":").map((p) => parseInt(p, 10));
+  if ([day, month, year, hh, mm].some((n) => Number.isNaN(n))) return false;
+  if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return false;
+  const d = new Date(year, month - 1, day, hh, mm, 0, 0);
+  return (
+    d.getFullYear() === year &&
+    d.getMonth() === month - 1 &&
+    d.getDate() === day &&
+    d.getHours() === hh &&
+    d.getMinutes() === mm
+  );
+}
+
+export function displayDateTimeToMs(display: string): number | null {
+  const iso = displayDateTimeToISO(display.trim());
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? null : ms;
 }
 
 // DD/MM/AAAA HH:MM → YYYY-MM-DDTHH:MM:00 (para enviar à API)
