@@ -5,29 +5,58 @@ export type DomainItem = { slug: string; label: string };
 
 const cache: Record<string, DomainItem[]> = {};
 
+function unwrapDomainList(res: unknown): unknown[] {
+  if (Array.isArray(res)) return res;
+  if (res && typeof res === "object") {
+    const envelope = res as { body?: unknown; data?: unknown };
+    if (Array.isArray(envelope.body)) return envelope.body;
+    if (Array.isArray(envelope.data)) return envelope.data;
+  }
+  return [];
+}
+
 export function useDomain(endpoint: string): DomainItem[] {
   const [data, setData] = useState<DomainItem[]>(cache[endpoint] ?? []);
 
   useEffect(() => {
-    if (cache[endpoint]) {
-      setData(cache[endpoint]);
-      return;
-    }
+    let cancelled = false;
+
     api
       .get(endpoint)
       .then(({ data: res }) => {
-        // normaliza: API pode retornar { slug, name } ou { slug, label }
-        const normalized: DomainItem[] = (res as any[]).map((item) => ({
-          slug: item.slug,
-          label: item.label ?? item.name ?? item.slug,
-        }));
+        if (cancelled) return;
+
+        const normalized: DomainItem[] = unwrapDomainList(res)
+          .map((item: any) => ({
+            slug: String(item?.slug ?? ""),
+            label: String(item?.label ?? item?.name ?? item?.slug ?? ""),
+          }))
+          .filter((item) => item.slug !== "");
+
         cache[endpoint] = normalized;
         setData(normalized);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled && cache[endpoint]) {
+          setData(cache[endpoint]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [endpoint]);
 
   return data;
+}
+
+/** Limpa cache de domínios (ex.: após deploy que adiciona novos tipos). */
+export function clearDomainCache(endpoint?: string): void {
+  if (endpoint) {
+    delete cache[endpoint];
+    return;
+  }
+  Object.keys(cache).forEach((key) => delete cache[key]);
 }
 
 export const useStatuses = () => useDomain("/domains/statuses");

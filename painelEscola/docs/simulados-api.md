@@ -54,8 +54,9 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 | 3 | `vestibular` | Vestibular |
 | 4 | `fuvest` | FUVEST |
 | 5 | `concurso` | Concurso |
+| 6 | `presencial` | Presencial |
 
-> Novos tipos podem ser inseridos diretamente na tabela `exam_types` sem alteração de código.
+> O painel carrega a lista via `GET /api/exam-types` (hook `useExamTypes`). Novos tipos podem ser inseridos na tabela `exam_types` sem alterar o front — recarregue a página após `php artisan migrate`.
 
 ### `exam_attempt_statuses`
 
@@ -123,7 +124,7 @@ Lista os simulados do tenant com paginação (20 por página).
 | Param | Tipo | Descrição |
 |---|---|---|
 | `status` | string | slug: `draft`, `published`, `archived` |
-| `exam_type` | string | slug: `custom`, `enem`, `vestibular`, `fuvest`, `concurso` |
+| `exam_type` | string | slug vindo de `GET /api/exam-types` (ex.: `custom`, `enem`, `vestibular`, `presencial`, …) |
 | `course_id` | integer | Filtra por curso |
 | `subject_id` | integer | Filtra por matéria |
 | `search` | string | Busca parcial no título |

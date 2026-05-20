@@ -249,7 +249,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Domínios de simulados (lookup tables — read-only)
     Route::get('exam-statuses', fn () => response()->json(\App\Models\ExamStatus::orderBy('order')->get(['id', 'slug', 'label'])));
-    Route::get('exam-types',    fn () => response()->json(\App\Models\ExamType::get(['id', 'slug', 'label'])));
+    Route::get('exam-types', fn () => response()->json(
+        \App\Models\ExamType::query()->orderBy('label')->get(['id', 'slug', 'label'])
+    ));
 
     // Questões de um simulado (nested)
     Route::get('exams/{exam}/questions',               [ExamQuestionController::class, 'index']);

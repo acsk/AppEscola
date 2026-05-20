@@ -81,7 +81,8 @@ INSERT IGNORE INTO exam_types (id, slug, label, created_at, updated_at) VALUES
 (2, 'enem', 'ENEM', NOW(), NOW()),
 (3, 'vestibular', 'Vestibular', NOW(), NOW()),
 (4, 'fuvest', 'FUVEST', NOW(), NOW()),
-(5, 'concurso', 'Concurso', NOW(), NOW());
+(5, 'concurso', 'Concurso', NOW(), NOW()),
+(6, 'presencial', 'Presencial', NOW(), NOW());
 
 INSERT IGNORE INTO exam_attempt_statuses (id, slug, label, `order`, created_at, updated_at) VALUES
 (1, 'in_progress', 'Em andamento', 1, NOW(), NOW()),
