@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Services\InvoiceSettlementService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SubscribeEnrollmentRequest extends FormRequest
 {
@@ -41,9 +43,10 @@ class SubscribeEnrollmentRequest extends FormRequest
             'guardian_id'     => ['nullable', 'exists:guardians,id'],
             // Pagamento da taxa de matrícula (cobrada no ato da matrícula)
             'enrollment_payment'                 => ['nullable', 'array'],
-            'enrollment_payment.payment_method'  => ['nullable', 'string', 'exists:domain_payment_methods,slug'],
-            'enrollment_payment.paid_at'         => ['nullable', 'date'],
-            'enrollment_payment.notes'           => ['nullable', 'string', 'max:500'],
+            'enrollment_payment.payment_method'     => ['nullable', 'string', 'exists:domain_payment_methods,slug'],
+            'enrollment_payment.paid_at'            => ['nullable', 'date'],
+            'enrollment_payment.payment_reference'  => ['nullable', 'string', 'max:120'],
+            'enrollment_payment.notes'              => ['nullable', 'string', 'max:500'],
         ];
     }
 
@@ -79,5 +82,26 @@ class SubscribeEnrollmentRequest extends FormRequest
         }
 
         return $value;
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $payment = $this->input('enrollment_payment');
+
+            if (! is_array($payment) || empty($payment['payment_method'])) {
+                return;
+            }
+
+            $method = (string) $payment['payment_method'];
+            $reference = trim((string) ($payment['payment_reference'] ?? ''));
+
+            if (app(InvoiceSettlementService::class)->requiresPaymentReference($method) && $reference === '') {
+                $validator->errors()->add(
+                    'enrollment_payment.payment_reference',
+                    'Informe o identificador da transação no cartão de crédito.'
+                );
+            }
+        });
     }
 }

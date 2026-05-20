@@ -24,6 +24,7 @@ class Invoice extends Model
         'paid_at',
         'status',
         'payment_method',
+        'payment_reference',
         'notes',
         'edit_reason',
         'cora_charge_id',

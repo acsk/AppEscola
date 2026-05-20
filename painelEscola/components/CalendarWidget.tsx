@@ -15,11 +15,24 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
-export default function CalendarWidget() {
+type CalendarWidgetProps = {
+  eventDays?: number[];
+  initialYear?: number;
+  initialMonth?: number;
+};
+
+export default function CalendarWidget({
+  eventDays = [],
+  initialYear,
+  initialMonth,
+}: CalendarWidgetProps) {
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
+  const [year, setYear] = useState(initialYear ?? today.getFullYear());
+  const [month, setMonth] = useState(
+    initialMonth !== undefined ? initialMonth - 1 : today.getMonth()
+  );
   const [selectedDay, setSelectedDay] = useState(today.getDate());
+  const eventDaySet = new Set(eventDays);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
@@ -84,6 +97,7 @@ export default function CalendarWidget() {
               month === today.getMonth() &&
               year === today.getFullYear();
             const isSelected = day === selectedDay;
+            const hasEvent = day !== null && eventDaySet.has(day);
             return (
               <TouchableOpacity
                 key={i}
@@ -114,6 +128,11 @@ export default function CalendarWidget() {
                   >
                     {day ?? ""}
                   </Text>
+                  {hasEvent && !isSelected && (
+                    <View
+                      className="absolute bottom-0 w-1 h-1 rounded-full bg-amber-400"
+                    />
+                  )}
                 </View>
               </TouchableOpacity>
             );

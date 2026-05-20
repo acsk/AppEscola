@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClassScheduleController;
 use App\Http\Controllers\Api\CourseBundleController;
@@ -98,6 +99,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Auth
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/dashboard', [AdminDashboardController::class, 'show']);
     Route::match(['post', 'put', 'patch'], '/me/password', [AuthController::class, 'updatePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
@@ -174,6 +176,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     // Matrículas
     Route::post('enrollments/subscribe',        [EnrollmentController::class, 'subscribe']);
     Route::post('enrollments/subscribe-bundle', [EnrollmentController::class, 'subscribeBundle']);
+    Route::get('enrollments/{enrollment}/contract-charges/preview', [EnrollmentController::class, 'contractChargesPreview']);
+    Route::post('enrollments/{enrollment}/contract-charges/apply', [EnrollmentController::class, 'contractChargesApply']);
     Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
     Route::post('enrollments/{enrollment}/generate-charges',  [EnrollmentController::class, 'generateCharges']);
     Route::apiResource('enrollments', EnrollmentController::class);
@@ -185,6 +189,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::apiResource('payment-providers', PaymentProvidersController::class);
 
     // Cobranças
+    Route::get('invoices/summary', [InvoiceController::class, 'summary']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);

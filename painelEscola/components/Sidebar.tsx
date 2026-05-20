@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -23,7 +23,55 @@ const formatBuildDateTime = (isoDate: string): string => {
   }
 };
 
-import type { NavGroup, NavItem, SidebarProps } from "../types/components";
+import type { IoniconName, NavItem, SidebarProps } from "../types/components";
+
+type SidebarGroup = {
+  title: string;
+  icon: IoniconName;
+  tone: "violet" | "blue" | "emerald" | "amber" | "slate";
+  items: NavItem[];
+};
+
+const groupToneStyles: Record<
+  SidebarGroup["tone"],
+  { iconBg: string; icon: string; activeBg: string; activeBorder: string; label: string }
+> = {
+  violet: {
+    iconBg: "bg-violet-100",
+    icon: "#7C3AED",
+    activeBg: "bg-violet-50",
+    activeBorder: "border-violet-200",
+    label: "text-violet-700",
+  },
+  blue: {
+    iconBg: "bg-blue-100",
+    icon: "#2563EB",
+    activeBg: "bg-blue-50",
+    activeBorder: "border-blue-200",
+    label: "text-blue-700",
+  },
+  emerald: {
+    iconBg: "bg-emerald-100",
+    icon: "#059669",
+    activeBg: "bg-emerald-50",
+    activeBorder: "border-emerald-200",
+    label: "text-emerald-700",
+  },
+  amber: {
+    iconBg: "bg-amber-100",
+    icon: "#D97706",
+    activeBg: "bg-amber-50",
+    activeBorder: "border-amber-200",
+    label: "text-amber-700",
+  },
+  slate: {
+    iconBg: "bg-slate-100",
+    icon: "#64748B",
+    activeBg: "bg-slate-50",
+    activeBorder: "border-slate-200",
+    label: "text-slate-700",
+  },
+};
 
 export default function Sidebar({
   activeItem: externalActive,
@@ -39,13 +87,17 @@ export default function Sidebar({
   const [internalActive, setInternalActive] = useState("dashboard");
   const [versionCopied, setVersionCopied] = useState(false);
   const activeItem = externalActive ?? internalActive;
-  const menuGroups: NavGroup[] = [
+  const menuGroups: SidebarGroup[] = [
     {
       title: "Início",
+      icon: "home-outline",
+      tone: "violet",
       items: [{ id: "dashboard", label: "Dashboard", icon: "home-outline" }],
     },
     {
       title: "Pessoas",
+      icon: "people-outline",
+      tone: "blue",
       items: [
         { id: "alunos", label: "Alunos", icon: "people-outline" },
         { id: "responsaveis", label: "Responsáveis", icon: "person-outline" },
@@ -56,6 +108,8 @@ export default function Sidebar({
     },
     {
       title: "Acadêmico",
+      icon: "school-outline",
+      tone: "emerald",
       items: [
         { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
         { id: "turmas", label: "Turmas", icon: "grid-outline" },
@@ -68,6 +122,8 @@ export default function Sidebar({
       ? [
           {
             title: "Comunicação",
+            icon: "chatbubbles-outline" as const,
+            tone: "amber" as const,
             items: [
               { id: "notificacoes", label: "Notificações", icon: "notifications-outline" },
               { id: "calendario", label: "Calendário", icon: "calendar-outline" },
@@ -77,7 +133,10 @@ export default function Sidebar({
       : []),
     {
       title: "Financeiro",
+      icon: "wallet-outline",
+      tone: "violet",
       items: [
+        { id: "cobrancas", label: "Gestão de Pagamentos", icon: "wallet-outline" },
         { id: "bancos_crud", label: "Cadastro de Bancos", icon: "add-circle-outline" },
         { id: "pagamentos", label: "Configuração de Provedores", icon: "cog-outline" },
         {
@@ -91,15 +150,44 @@ export default function Sidebar({
       ? [
           {
             title: "Administração",
+            icon: "business-outline" as const,
+            tone: "slate" as const,
             items: [{ id: "tenants", label: "Tenants", icon: "business-outline" }],
           },
         ]
       : []),
   ].filter((group) => group.items.length > 0);
+  const activeGroupTitle = useMemo(
+    () => menuGroups.find((group) => group.items.some((item) => item.id === activeItem))?.title,
+    [activeItem, menuGroups]
+  );
+  const [openGroups, setOpenGroups] = useState<Set<string>>(
+    () => new Set(activeGroupTitle ? [activeGroupTitle] : ["Início"])
+  );
+
+  useEffect(() => {
+    if (!activeGroupTitle) return;
+    setOpenGroups((prev) => {
+      if (prev.has(activeGroupTitle)) return prev;
+      const next = new Set(prev);
+      next.add(activeGroupTitle);
+      return next;
+    });
+  }, [activeGroupTitle]);
 
   const handlePress = (id: string) => {
     setInternalActive(id);
     onSelectItem?.(id);
+    if (isMobile) onClose?.();
+  };
+
+  const toggleGroup = (title: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
   };
 
   const copyVersionInfo = async () => {
@@ -116,48 +204,96 @@ export default function Sidebar({
     }
   };
 
-  const renderItem = (item: NavItem) => {
+  const renderItem = (item: NavItem, groupTone: SidebarGroup["tone"]) => {
     const isActive = activeItem === item.id;
+    const tone = groupToneStyles[groupTone];
     return (
       <TouchableOpacity
         key={item.id}
         onPress={() => handlePress(item.id)}
-        className={`flex-row items-center px-2.5 py-1.5 rounded-lg mb-0.5 ${
-          isActive ? "bg-violet-100" : "bg-transparent"
+        className={`flex-row items-center px-2.5 py-2 rounded-lg mb-1 border ${
+          isActive ? "bg-white border-violet-200" : "bg-transparent border-transparent"
         }`}
+        style={isActive ? { shadowColor: "#7C3AED", shadowOpacity: 0.08, shadowRadius: 8 } : undefined}
         activeOpacity={0.7}
       >
         <Ionicons
           name={item.icon}
-          size={17}
-          color={isActive ? "#7C3AED" : "#9CA3AF"}
+          size={16}
+          color={isActive ? tone.icon : "#94A3B8"}
         />
         <Text
-          className={`ml-2 text-[13px] font-medium flex-1 ${
-            isActive ? "text-violet-700" : "text-gray-500"
+          className={`ml-2 text-[13px] flex-1 ${
+            isActive ? `font-bold ${tone.label}` : "font-medium text-gray-600"
           }`}
+          numberOfLines={2}
         >
           {item.label}
         </Text>
-        {item.hasSubmenu && (
-          <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
-        )}
+        {isActive ? <View className="w-1.5 h-1.5 rounded-full bg-violet-500" /> : null}
       </TouchableOpacity>
+    );
+  };
+
+  const renderGroup = (group: SidebarGroup) => {
+    const isOpen = openGroups.has(group.title);
+    const hasActiveItem = group.items.some((item) => item.id === activeItem);
+    const tone = groupToneStyles[group.tone];
+
+    return (
+      <View
+        key={group.title}
+        className={`mb-2 rounded-2xl border px-2 py-2 ${
+          hasActiveItem ? `${tone.activeBg} ${tone.activeBorder}` : "bg-gray-50/80 border-gray-100"
+        }`}
+      >
+        <TouchableOpacity
+          onPress={() => toggleGroup(group.title)}
+          className="flex-row items-center gap-2"
+          activeOpacity={0.78}
+        >
+          <View className={`w-8 h-8 rounded-xl items-center justify-center ${tone.iconBg}`}>
+            <Ionicons name={group.icon} size={16} color={tone.icon} />
+          </View>
+          <View className="flex-1">
+            <Text className={`text-[11px] font-extrabold uppercase tracking-wide ${hasActiveItem ? tone.label : "text-gray-600"}`}>
+              {group.title}
+            </Text>
+            <Text className="text-[10px] text-gray-400 mt-0.5">
+              {group.items.length} {group.items.length === 1 ? "item" : "itens"}
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            {hasActiveItem ? <View className="w-2 h-2 rounded-full bg-violet-500" /> : null}
+            <Ionicons
+              name={isOpen ? "chevron-up" : "chevron-down"}
+              size={15}
+              color={hasActiveItem ? tone.icon : "#94A3B8"}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {isOpen ? (
+          <View className="mt-2 pt-2 border-t border-white/70">
+            {group.items.map((item) => renderItem(item, group.tone))}
+          </View>
+        ) : null}
+      </View>
     );
   };
 
   return (
     <View
-      className="bg-white pt-3 px-2 border-r border-gray-100"
+      className="bg-white pt-3 px-2.5 border-r border-gray-100"
       style={{
-        width: isMobile ? Math.min(288, width * 0.84) : 214,
+        width: isMobile ? Math.min(304, width * 0.86) : 244,
         height: "100%",
         boxShadow: isMobile ? "0px 8px 24px rgba(0, 0, 0, 0.16)" : "0px 4px 12px rgba(0, 0, 0, 0.04)",
         elevation: 8,
       }}
     >
       {/* Logo */}
-      <View className="flex-row items-center justify-between px-2 mb-2">
+      <View className="flex-row items-center justify-between px-1.5 mb-3">
         <View className="flex-1">
           <View className="flex-row items-center">
             <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
@@ -207,14 +343,7 @@ export default function Sidebar({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        {menuGroups.map((group, groupIndex) => (
-          <View key={group.title} className={groupIndex > 0 ? "mt-2.5" : ""}>
-            <Text className="px-2.5 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-              {group.title}
-            </Text>
-            {group.items.map(renderItem)}
-          </View>
-        ))}
+        {menuGroups.map(renderGroup)}
       </ScrollView>
     </View>
   );

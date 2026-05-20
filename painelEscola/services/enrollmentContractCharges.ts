@@ -1,0 +1,129 @@
+import api from "./api";
+
+type ApiEnvelope<T> = {
+  type?: string;
+  message?: string;
+  body?: T;
+};
+
+export type ContractChargePreviewRow = {
+  key: string;
+  type?: string;
+  due_date?: string | null;
+  amount?: string | null;
+  description?: string;
+  already_exists?: boolean;
+  disabled?: boolean;
+  selected_by_default?: boolean;
+  action: string;
+};
+
+export type ContractExternalChargeRow = {
+  key: string;
+  charge_id: string;
+  status: string;
+  amount: string | null;
+  due_date: string | null;
+  description: string;
+  linked_invoice_id: number | null;
+  link_status: "new" | "linked" | "updatable";
+  selected_by_default?: boolean;
+  action: string;
+};
+
+export type ContractChargesPreview = {
+  enrollment_id: number;
+  title: string;
+  environment: string;
+  charges_generated_at: string | null;
+  charges_batch_generated: boolean;
+  summary: {
+    local_count: number;
+    local_with_gateway: number;
+    to_generate_count: number;
+    to_sync_count: number;
+    external_total: number;
+    external_for_enrollment: number;
+    provider_fetch_error: string | null;
+  };
+  warnings: string[];
+  blocked: {
+    contract_batch_generated: boolean;
+    monthlies_blocked_by_fee: boolean;
+  };
+  local_invoices: Array<{
+    invoice_id: number;
+    type: string;
+    description: string;
+    due_date: string;
+    amount: string;
+    status: string;
+    payment_method: string | null;
+    cora_charge_id: string | null;
+    cora_status: string | null;
+    has_active_gateway_charge: boolean;
+    source: string;
+  }>;
+  to_generate: ContractChargePreviewRow[];
+  external_charges: ContractExternalChargeRow[];
+};
+
+export type ContractChargesApplyResult = {
+  enrollment_id: number;
+  environment: string;
+  generated: {
+    created: number;
+    existing: number;
+    items: Array<Record<string, unknown>>;
+  };
+  sync: {
+    created: number;
+    updated: number;
+    ignored: number;
+    external_total: number;
+    processed_charge_ids: string[];
+  } | null;
+  charges_generated_at: string | null;
+};
+
+function unwrapBody<T>(data: ApiEnvelope<T> | T): T {
+  if (data && typeof data === "object" && "body" in (data as ApiEnvelope<T>)) {
+    return (data as ApiEnvelope<T>).body as T;
+  }
+
+  return data as T;
+}
+
+export async function fetchContractChargesPreview(
+  enrollmentId: number,
+  params?: { environment?: "stage" | "prod"; invoice_types?: string[] }
+): Promise<ContractChargesPreview> {
+  const { data } = await api.get<ApiEnvelope<ContractChargesPreview>>(
+    `/enrollments/${enrollmentId}/contract-charges/preview`,
+    { params }
+  );
+
+  return unwrapBody(data);
+}
+
+export async function applyContractCharges(
+  enrollmentId: number,
+  payload: {
+    environment?: "stage" | "prod";
+    generate_keys?: string[];
+    sync_charge_ids?: string[];
+    create_missing?: boolean;
+  }
+): Promise<{ result: ContractChargesApplyResult; message: string }> {
+  const { data } = await api.post<ApiEnvelope<ContractChargesApplyResult>>(
+    `/enrollments/${enrollmentId}/contract-charges/apply`,
+    payload
+  );
+
+  const envelope = data as ApiEnvelope<ContractChargesApplyResult>;
+
+  return {
+    result: unwrapBody(data),
+    message: envelope?.message ?? "Operação concluída.",
+  };
+}

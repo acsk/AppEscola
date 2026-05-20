@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
 use App\Services\InvoiceLifecycleService;
+use App\Services\InvoiceSettlementService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,8 +23,10 @@ class InvoiceController extends Controller
 {
     use ScopedByTenant;
 
-    public function __construct(private readonly InvoiceLifecycleService $lifecycle)
-    {
+    public function __construct(
+        private readonly InvoiceLifecycleService $lifecycle,
+        private readonly InvoiceSettlementService $settlement,
+    ) {
     }
 
     #[OA\Get(
@@ -37,6 +40,11 @@ class InvoiceController extends Controller
             new OA\Parameter(name: 'enrollment_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'due_date_from', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'due_date_to', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'paid_at_from', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'paid_at_to', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'payment_method', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'view', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['open', 'paid', 'all'])),
+            new OA\Parameter(name: 'search', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Lista paginada de cobranças'),
@@ -48,14 +56,63 @@ class InvoiceController extends Controller
         $query = Invoice::query()->with(['student', 'guardian']);
         $this->applyTenantScope($query, $request);
 
+        $view = $request->query('view', 'all');
+
+        if ($view === 'open') {
+            $query->whereIn('status', ['pending', 'overdue']);
+        } elseif ($view === 'paid') {
+            $query->where('status', 'paid');
+        }
+
         $query
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
             ->when($request->query('student_id'), fn ($q, $v) => $q->where('student_id', $v))
             ->when($request->query('enrollment_id'), fn ($q, $v) => $q->where('enrollment_id', $v))
+            ->when($request->query('payment_method'), fn ($q, $v) => $q->where('payment_method', $v))
             ->when($request->query('due_date_from'), fn ($q, $v) => $q->whereDate('due_date', '>=', $v))
-            ->when($request->query('due_date_to'), fn ($q, $v) => $q->whereDate('due_date', '<=', $v));
+            ->when($request->query('due_date_to'), fn ($q, $v) => $q->whereDate('due_date', '<=', $v))
+            ->when($request->query('paid_at_from'), fn ($q, $v) => $q->whereDate('paid_at', '>=', $v))
+            ->when($request->query('paid_at_to'), fn ($q, $v) => $q->whereDate('paid_at', '<=', $v))
+            ->when($request->query('search'), function ($q, $v) {
+                $term = '%' . trim((string) $v) . '%';
+                $q->where(function ($inner) use ($term) {
+                    $inner->where('description', 'like', $term)
+                        ->orWhereHas('student', fn ($s) => $s->where('name', 'like', $term));
+                });
+            });
 
-        return InvoiceResource::collection($query->orderBy('due_date')->paginate(20));
+        $orderColumn = $view === 'paid' ? 'paid_at' : 'due_date';
+
+        return InvoiceResource::collection(
+            $query->orderByDesc($orderColumn)->paginate((int) $request->query('per_page', 20))
+        );
+    }
+
+    #[OA\Get(
+        path: '/api/invoices/summary',
+        tags: ['Invoices'],
+        summary: 'Resumo financeiro de cobranças',
+        security: [['sanctum' => []]],
+        parameters: [
+            new OA\Parameter(name: 'paid_at_from', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'paid_at_to', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Totais de cobranças em aberto, vencidas e baixadas no período'),
+        ]
+    )]
+    public function summary(Request $request): JsonResponse
+    {
+        $query = Invoice::query();
+        $this->applyTenantScope($query, $request);
+
+        return response()->json(
+            $this->settlement->summary(
+                $query,
+                $request->query('paid_at_from'),
+                $request->query('paid_at_to'),
+            )
+        );
     }
 
     #[OA\Post(
@@ -169,7 +226,8 @@ class InvoiceController extends Controller
             content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'paid_at', type: 'string', format: 'date-time', example: '2026-04-28 10:00:00'),
-                    new OA\Property(property: 'payment_method', type: 'string', example: 'pix'),
+                    new OA\Property(property: 'payment_method', type: 'string', example: 'cash'),
+                    new OA\Property(property: 'payment_reference', type: 'string', description: 'Obrigatório para cartão de crédito (NSU, autorização, etc.)'),
                     new OA\Property(property: 'notes', type: 'string'),
                 ]
             )
@@ -183,22 +241,21 @@ class InvoiceController extends Controller
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
-        if ($invoice->status === 'paid') {
-            return response()->json(['message' => 'Cobrança já está paga.'], 422);
+        try {
+            $result = $this->settlement->settle($invoice, $request->validated(), $request);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        if ($invoice->status === 'cancelled') {
-            return response()->json(['message' => 'Não é possível marcar uma cobrança cancelada como paga.'], 422);
-        }
+        $invoice = $result['invoice'];
+        $invoice->load(['student', 'guardian', 'updatedByUser']);
 
-        $invoice->update([
-            'status' => 'paid',
-            'paid_at' => $request->input('paid_at') ?? now(),
-            'payment_method' => $request->input('payment_method'),
-            'notes' => $request->input('notes', $invoice->notes),
-        ]);
-
-        return response()->json(new InvoiceResource($invoice));
+        return $this->success([
+            'invoice' => new InvoiceResource($invoice),
+            'cancelled_on_gateway' => $result['cancelled_on_gateway'],
+        ], $result['cancelled_on_gateway']
+            ? 'Baixa registrada. Cobrança no provedor foi cancelada.'
+            : 'Baixa registrada com sucesso.');
     }
 
     #[OA\Post(

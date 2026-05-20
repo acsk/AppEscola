@@ -21,7 +21,9 @@ class InvoiceFactory extends Factory
             'due_date' => fake()->dateTimeThisYear()->format('Y-m-d'),
             'paid_at' => null,
             'status' => 'pending',
+            'type' => 'other',
             'payment_method' => null,
+            'payment_reference' => null,
             'notes' => null,
         ];
     }

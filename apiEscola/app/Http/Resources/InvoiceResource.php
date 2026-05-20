@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Services\InvoiceLifecycleService;
+use App\Services\InvoiceSettlementService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,7 +11,8 @@ class InvoiceResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $lifecycle = app(InvoiceLifecycleService::class)->permissions($this->resource);
+        $lifecycleService = app(InvoiceLifecycleService::class);
+        $lifecycle = $lifecycleService->permissions($this->resource);
 
         return [
             'id' => $this->id,
@@ -28,6 +30,7 @@ class InvoiceResource extends JsonResource
             'paid_at' => $this->paid_at?->toISOString(),
             'status' => $this->status,
             'payment_method' => $this->payment_method,
+            'payment_reference' => $this->payment_reference,
             'notes' => $this->notes,
             'edit_reason' => $this->edit_reason,
             'created_by_user' => [
@@ -60,6 +63,9 @@ class InvoiceResource extends JsonResource
             'cancel_block_reason' => $lifecycle['cancel_block_reason'],
             'delete_block_reason' => $lifecycle['delete_block_reason'],
             'lifecycle_hint' => $lifecycle['lifecycle_hint'],
+            'has_active_gateway_charge' => $lifecycleService->hasActiveGatewayCharge($this->resource),
+            'will_cancel_gateway_on_settlement' => $lifecycleService->shouldCancelOnGateway($this->resource),
+            'settlement_hint' => app(InvoiceSettlementService::class)->settlementHint($this->resource),
         ];
     }
 }

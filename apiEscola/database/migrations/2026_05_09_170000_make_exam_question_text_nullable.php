@@ -1,17 +1,22 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('ALTER TABLE exam_questions MODIFY question_text TEXT NULL');
+        Schema::table('exam_questions', function (Blueprint $table) {
+            $table->text('question_text')->nullable()->change();
+        });
     }
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE exam_questions MODIFY question_text TEXT NOT NULL');
+        Schema::table('exam_questions', function (Blueprint $table) {
+            $table->text('question_text')->nullable(false)->change();
+        });
     }
 };

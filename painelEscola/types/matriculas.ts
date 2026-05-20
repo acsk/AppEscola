@@ -71,6 +71,8 @@ export type InvoiceListItem = {
   due_date: string;
   status: string;
   payment_method: string | null;
+  payment_reference?: string | null;
+  paid_at?: string | null;
   notes: string | null;
   type: string | null;
   edit_reason?: string | null;
@@ -87,6 +89,9 @@ export type InvoiceListItem = {
   cancel_block_reason?: string | null;
   delete_block_reason?: string | null;
   lifecycle_hint?: string | null;
+  has_active_gateway_charge?: boolean;
+  will_cancel_gateway_on_settlement?: boolean;
+  settlement_hint?: string | null;
 };
 
 export type EnrollmentEditFormValues = {

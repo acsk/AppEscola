@@ -15,7 +15,9 @@ use App\Models\Enrollment;
 use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Tenant;
+use App\Services\EnrollmentContractChargesService;
 use App\Services\InvoiceLifecycleService;
+use App\Services\InvoiceSettlementService;
 use App\Services\TenantBillingSettingsService;
 use App\Traits\ScopedByTenant;
 use Carbon\Carbon;
@@ -24,6 +26,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,8 +36,10 @@ class EnrollmentController extends Controller
 {
     use ScopedByTenant;
 
-    public function __construct(private readonly InvoiceLifecycleService $invoiceLifecycle)
-    {
+    public function __construct(
+        private readonly InvoiceLifecycleService $invoiceLifecycle,
+        private readonly EnrollmentContractChargesService $contractCharges,
+    ) {
     }
 
     #[OA\Get(
@@ -356,6 +362,121 @@ class EnrollmentController extends Controller
         return (float) $plan->monthlyEquivalent();
     }
 
+    public function contractChargesPreview(Request $request, Enrollment $enrollment): JsonResponse
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+
+        $data = $request->validate([
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
+            'invoice_types' => ['nullable', 'array'],
+            'invoice_types.*' => ['string', 'in:enrollment_fee,monthly'],
+        ]);
+
+        $environment = $this->resolveContractChargesEnvironment($request, $data['environment'] ?? null);
+        $invoiceTypes = $data['invoice_types'] ?? ['monthly'];
+
+        try {
+            $preview = $this->contractCharges->preview($enrollment, $environment, $invoiceTypes);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), ['enrollment_id' => $enrollment->id], 422);
+        }
+
+        return $this->success($preview, 'Pré-visualização das cobranças do contrato.');
+    }
+
+    public function contractChargesApply(Request $request, Enrollment $enrollment): JsonResponse
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+
+        $data = $request->validate([
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
+            'generate_keys' => ['nullable', 'array'],
+            'generate_keys.*' => ['string', 'max:80'],
+            'sync_charge_ids' => ['nullable', 'array'],
+            'sync_charge_ids.*' => ['string', 'max:255'],
+            'create_missing' => ['nullable', 'boolean'],
+        ]);
+
+        $environment = $this->resolveContractChargesEnvironment($request, $data['environment'] ?? null);
+        $generateKeys = $data['generate_keys'] ?? [];
+        $syncChargeIds = $data['sync_charge_ids'] ?? [];
+
+        if ($generateKeys === [] && $syncChargeIds === []) {
+            $generateKeys = array_values(array_filter(array_map(
+                static fn ($key) => str_starts_with((string) $key, 'generate:') ? (string) $key : null,
+                $request->input('selected_keys', [])
+            )));
+            $syncChargeIds = array_values(array_filter(array_map(
+                static function ($key) {
+                    $key = (string) $key;
+                    if (! str_starts_with($key, 'sync:')) {
+                        return null;
+                    }
+
+                    return substr($key, 5);
+                },
+                $request->input('selected_keys', [])
+            )));
+        }
+
+        try {
+            $result = $this->contractCharges->apply(
+                $enrollment,
+                $environment,
+                $generateKeys,
+                $syncChargeIds,
+                (bool) ($data['create_missing'] ?? true),
+            );
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), ['enrollment_id' => $enrollment->id], 422);
+        } catch (ConnectionException $e) {
+            return $this->error(
+                'Não foi possível conectar ao provedor para sincronizar cobranças.',
+                ['detail' => $e->getMessage()],
+                502
+            );
+        } catch (RequestException $e) {
+            return $this->error(
+                'O provedor recusou a sincronização das cobranças.',
+                [
+                    'http_status' => $e->response?->status(),
+                    'detail' => $e->response?->json(),
+                ],
+                502
+            );
+        }
+
+        $created = (int) ($result['generated']['created'] ?? 0);
+        $syncCreated = (int) ($result['sync']['created'] ?? 0);
+        $syncUpdated = (int) ($result['sync']['updated'] ?? 0);
+
+        $message = match (true) {
+            $created > 0 && $syncCreated + $syncUpdated > 0 => "Contrato: {$created} cobrança(s) gerada(s). Cora: {$syncCreated} criada(s), {$syncUpdated} atualizada(s).",
+            $created > 0 => "Cobranças do contrato geradas: {$created}.",
+            $syncCreated + $syncUpdated > 0 => "Sincronização concluída: {$syncCreated} criada(s), {$syncUpdated} atualizada(s).",
+            default => 'Operação concluída.',
+        };
+
+        return $this->success($result, $message);
+    }
+
+    private function resolveContractChargesEnvironment(Request $request, ?string $requested): string
+    {
+        $requestedEnv = (string) ($requested ?? 'prod');
+        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
+
+        if (! app()->environment('production')) {
+            return 'stage';
+        }
+
+        $user = $request->user();
+        if ($user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+            return $requestedEnv ?: 'prod';
+        }
+
+        return 'prod';
+    }
+
     public function syncCoraCharges(Request $request, Enrollment $enrollment): JsonResponse
     {
         $this->authorizeTenant($request, $enrollment->tenant_id);
@@ -586,6 +707,7 @@ class EnrollmentController extends Controller
                     'status'         => $isPaid ? 'paid' : 'pending',
                     'paid_at'        => $isPaid ? ($paymentData['paid_at'] ?? now()) : null,
                     'payment_method' => $paymentData['payment_method'] ?? null,
+                    'payment_reference' => $paymentData['payment_reference'] ?? null,
                     'notes'          => $paymentData['notes'] ?? null,
                 ]);
             }
@@ -744,10 +866,22 @@ class EnrollmentController extends Controller
             'payment_due_day'                    => ['nullable', 'integer', 'min:1', 'max:28'],
             'guardian_id'                        => ['nullable', 'integer', 'exists:guardians,id'],
             'enrollment_payment'                 => ['nullable', 'array'],
-            'enrollment_payment.payment_method'  => ['nullable', 'string', 'exists:domain_payment_methods,slug'],
-            'enrollment_payment.paid_at'         => ['nullable', 'date'],
-            'enrollment_payment.notes'           => ['nullable', 'string', 'max:500'],
+            'enrollment_payment.payment_method'     => ['nullable', 'string', 'exists:domain_payment_methods,slug'],
+            'enrollment_payment.paid_at'            => ['nullable', 'date'],
+            'enrollment_payment.payment_reference'  => ['nullable', 'string', 'max:120'],
+            'enrollment_payment.notes'              => ['nullable', 'string', 'max:500'],
         ]);
+
+        $paymentMethod = (string) ($data['enrollment_payment']['payment_method'] ?? '');
+        $paymentReference = trim((string) ($data['enrollment_payment']['payment_reference'] ?? ''));
+        if ($paymentMethod !== '' && app(InvoiceSettlementService::class)->requiresPaymentReference($paymentMethod) && $paymentReference === '') {
+            return response()->json([
+                'message' => 'Informe o identificador da transação no cartão de crédito.',
+                'errors' => [
+                    'enrollment_payment.payment_reference' => ['Informe o identificador da transação no cartão de crédito.'],
+                ],
+            ], 422);
+        }
 
         $tenantId = $this->getTenantId($request);
 
@@ -823,6 +957,7 @@ class EnrollmentController extends Controller
                     'status'         => $isPaid ? 'paid' : 'pending',
                     'paid_at'        => $isPaid ? ($paymentData['paid_at'] ?? now()) : null,
                     'payment_method' => $paymentData['payment_method'] ?? null,
+                    'payment_reference' => $paymentData['payment_reference'] ?? null,
                     'notes'          => $paymentData['notes'] ?? null,
                 ]);
             }

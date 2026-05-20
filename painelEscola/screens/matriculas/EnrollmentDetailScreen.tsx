@@ -45,7 +45,10 @@ import {
   listPaymentProviders,
   payUnifiedCharge,
 } from "../../services/payments";
-import { syncEnrollmentCoraCharges, SyncCoraChargesResult } from "../../services/cora";
+import MarkInvoicePaidModal from "../../components/finance/MarkInvoicePaidModal";
+import InvoiceActionsModal, { type InvoiceActionKey } from "../../components/finance/InvoiceActionsModal";
+import ContractChargesModal from "../../components/finance/ContractChargesModal";
+import { paymentMethodLabel } from "../../utils/paymentMethods";
 import type {
   EnrollmentDetail,
   EnrollmentDetailScreenProps,
@@ -157,27 +160,15 @@ export default function EnrollmentDetailScreen({
   const [invoiceErrors, setInvoiceErrors] = useState<Record<string, string>>({});
   const [savingInvoice, setSavingInvoice] = useState(false);
   const [cancelInvoiceId, setCancelInvoiceId] = useState<number | null>(null);
+  const [actionsInvoice, setActionsInvoice] = useState<Invoice | null>(null);
+  const [settleInvoice, setSettleInvoice] = useState<Invoice | null>(null);
   const [cancellingInvoice, setCancellingInvoice] = useState(false);
   const [deleteInvoiceId, setDeleteInvoiceId] = useState<number | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [auditInvoice, setAuditInvoice] = useState<Invoice | null>(null);
   const [auditVisible, setAuditVisible] = useState(false);
 
-  // Sync Cora charges
-  const [syncingCoraCharges, setSyncingCoraCharges] = useState(false);
-  const [syncCoraResult, setSyncCoraResult] = useState<SyncCoraChargesResult | null>(null);
-
-  // Batch charges (one-shot por matrícula)
-  const [batchModalVisible, setBatchModalVisible] = useState(false);
-  const [batchInvoiceTypesFilter, setBatchInvoiceTypesFilter] = useState<string[]>([]);
-  const [batchGenerating, setBatchGenerating] = useState(false);
-  const [batchResult, setBatchResult] = useState<{
-    status?: string;
-    generated_count: number;
-    failed_count: number;
-    failed?: any[];
-  } | null>(null);
-  const [batchError, setBatchError] = useState<string | null>(null);
+  const [contractModalVisible, setContractModalVisible] = useState(false);
 
   // Delete enrollment
   const [deleteEnrollmentVisible, setDeleteEnrollmentVisible] = useState(false);
@@ -471,98 +462,6 @@ export default function EnrollmentDetailScreen({
       setMsgModal({ visible: true, type: "error", title: "Não foi possível excluir a matrícula", message: detail });
     }
     setDeletingEnrollment(false);
-  };
-
-  // ── Cora Sync ────────────────────────────────────────────────────────────────
-
-  const onSyncCoraCharges = async () => {
-    if (!enrollment) return;
-    
-    setSyncingCoraCharges(true);
-    setSyncCoraResult(null);
-    
-    try {
-      const environment = isProductionHost ? "prod" : "stage";
-      const result = await syncEnrollmentCoraCharges(enrollment.id, {
-        environment: environment as "stage" | "prod",
-        create_missing: true,
-        async: false,
-      });
-      
-      setSyncCoraResult(result);
-      
-      // Mostrar resultado com valores default se forem undefined
-      const created = result?.created ?? 0;
-      const updated = result?.updated ?? 0;
-      const ignored = result?.ignored ?? 0;
-      const message = `Sincronização concluída: ${created} criada${created !== 1 ? "s" : ""}, ${updated} atualizada${updated !== 1 ? "s" : ""}, ${ignored} ignorada${ignored !== 1 ? "s" : ""}`;
-      showToast("success", message, "✓ Boletos sincronizados");
-      
-      // Recarregar matrícula
-      await fetch();
-    } catch (error: any) {
-      const message = error?.message ?? "Erro ao sincronizar boletos da Cora";
-      showToast("error", message, "✗ Erro na sincronização");
-      console.error("Sync error:", error);
-    }
-    
-    setSyncingCoraCharges(false);
-  };
-
-  // ── Batch charges (one-shot por matrícula) ───────────────────────────────────
-
-  const openBatchModal = () => {
-    if (!enrollment) return;
-    setBatchResult(null);
-    setBatchError(null);
-    setBatchInvoiceTypesFilter(["monthly"]);
-    setBatchModalVisible(true);
-  };
-
-  const onGenerateBatchCharges = async () => {
-    if (!enrollment) return;
-    setBatchGenerating(true);
-    setBatchError(null);
-    setBatchResult(null);
-    try {
-      const body: Record<string, any> = {};
-      if (batchInvoiceTypesFilter.length > 0) {
-        body.invoice_types = batchInvoiceTypesFilter;
-      }
-      const { data } = await api.post(
-        `/enrollments/${enrollment.id}/generate-charges`,
-        body
-      );
-      const payload = data?.body ?? data ?? {};
-      const generated = Number(payload.generated_count ?? 0);
-      const existing = Number(payload.existing_count ?? 0);
-      setBatchResult({
-        status: payload.status,
-        generated_count: generated,
-        failed_count: 0,
-        failed: [],
-      });
-      showToast(
-        "success",
-        `${generated} cobrança${generated !== 1 ? "s" : ""} criada${generated !== 1 ? "s" : ""}${existing > 0 ? `, ${existing} já existiam` : ""}.`,
-        "✓ Cobranças locais em lote"
-      );
-      await fetch();
-    } catch (e: any) {
-      const status = e?.response?.status;
-      const msg =
-        e?.response?.data?.message ||
-        e?.message ||
-        "Falha ao gerar cobranças locais em lote.";
-      setBatchError(msg);
-      if (status === 409) {
-        showToast("warning", msg, "Lote já processado");
-        await fetch();
-      } else {
-        showToast("error", msg, "Falha na geração local");
-      }
-    }
-    setBatchGenerating(false);
   };
 
   // ── Invoice actions ──────────────────────────────────────────────────────────
@@ -1139,18 +1038,31 @@ export default function EnrollmentDetailScreen({
     ? invoices.find((i) => i.id === deleteInvoiceId) ?? null
     : null;
 
+  const handleInvoiceAction = (action: InvoiceActionKey) => {
+    const inv = actionsInvoice;
+    if (!inv) return;
+
+    switch (action) {
+      case "settle":
+        setSettleInvoice(inv);
+        break;
+      case "generate_charge":
+        openChargeModal(inv);
+        break;
+      case "edit":
+        openEditInvoice(inv);
+        break;
+      case "cancel":
+        setCancelInvoiceId(inv.id);
+        break;
+      case "delete":
+        setDeleteInvoiceId(inv.id);
+        break;
+    }
+  };
+
   const renderInvoiceActions = (item: Invoice) => (
     <View className="flex-row justify-end gap-1">
-      {(item.can_cancel ?? (item.status !== "cancelled" && item.status !== "paid")) && (
-        <TouchableOpacity
-          onPress={() => setCancelInvoiceId(item.id)}
-          className="items-center justify-center bg-orange-50 rounded-lg"
-          style={{ width: 30, height: 30 }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="close-circle-outline" size={15} color="#F97316" />
-        </TouchableOpacity>
-      )}
       <TouchableOpacity
         onPress={() => {
           setAuditInvoice(item);
@@ -1162,32 +1074,7 @@ export default function EnrollmentDetailScreen({
       >
         <Ionicons name="information-circle-outline" size={15} color="#2563EB" />
       </TouchableOpacity>
-      {(item.can_edit ?? true) && (
-        <TouchableOpacity
-          onPress={() => openEditInvoice(item)}
-          className="items-center justify-center bg-violet-50 rounded-lg"
-          style={{ width: 30, height: 30 }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity
-        onPress={() => openChargeModal(item)}
-        disabled={!canGenerateChargeForInvoice(item)}
-        className={`items-center justify-center rounded-lg ${
-          canGenerateChargeForInvoice(item) ? "bg-blue-50" : "bg-gray-100"
-        }`}
-        style={{ width: 30, height: 30 }}
-        activeOpacity={0.8}
-      >
-        <Ionicons
-          name="card-outline"
-          size={15}
-          color={canGenerateChargeForInvoice(item) ? "#2563EB" : "#9CA3AF"}
-        />
-      </TouchableOpacity>
-      {item.status === "paid" && (
+      {item.status === "paid" ? (
         <TouchableOpacity
           onPress={() => openReceiptModal(item)}
           className="items-center justify-center bg-emerald-50 rounded-lg"
@@ -1196,17 +1083,15 @@ export default function EnrollmentDetailScreen({
         >
           <Ionicons name="receipt-outline" size={15} color="#059669" />
         </TouchableOpacity>
-      )}
-      {(item.can_delete ?? item.status !== "paid") && (
-        <TouchableOpacity
-          onPress={() => setDeleteInvoiceId(item.id)}
-          className="items-center justify-center bg-red-50 rounded-lg"
-          style={{ width: 30, height: 30 }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="trash-outline" size={15} color="#EF4444" />
-        </TouchableOpacity>
-      )}
+      ) : null}
+      <TouchableOpacity
+        onPress={() => setActionsInvoice(item)}
+        className="items-center justify-center bg-gray-100 rounded-lg"
+        style={{ width: 30, height: 30 }}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+      </TouchableOpacity>
     </View>
   );
 
@@ -1252,8 +1137,13 @@ export default function EnrollmentDetailScreen({
         <View className="items-end">
           <Text className="text-xs text-gray-400 uppercase font-semibold">Forma</Text>
           <Text className="text-sm text-gray-600">
-            {item.payment_method ? (METHOD_LABELS[item.payment_method] ?? item.payment_method) : "—"}
+            {paymentMethodLabel(item.payment_method)}
           </Text>
+          {item.status === "paid" && item.payment_reference ? (
+            <Text className="text-xs text-gray-400 mt-0.5" numberOfLines={1}>
+              Ref: {item.payment_reference}
+            </Text>
+          ) : null}
         </View>
       </View>
       {!!item.cora?.charge_id && (
@@ -1556,69 +1446,15 @@ export default function EnrollmentDetailScreen({
             flexWrap: "wrap",
           }}
         >
-          {enrollment.charges_batch_generated ? (
-            <View
-              className="flex-row items-center justify-center px-4 py-2 rounded-xl bg-gray-200"
-              style={{ opacity: 0.85 }}
-            >
-              <Ionicons name="lock-closed" size={14} color="#6B7280" />
-              <Text className="text-gray-600 font-semibold text-sm ml-1">
-                Lote já gerado
-              </Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              onPress={openBatchModal}
-              disabled={batchGenerating || invoices.length === 0}
-              className={`flex-row items-center justify-center px-4 py-2.5 rounded-xl border ${
-                batchGenerating || invoices.length === 0
-                  ? "bg-gray-100 border-gray-200"
-                  : "bg-emerald-50 border-emerald-200"
-              }`}
-              activeOpacity={0.85}
-              style={{ minHeight: 44 }}
-            >
-              {batchGenerating ? (
-                <ActivityIndicator size="small" color="#6B7280" />
-              ) : (
-                <Ionicons
-                  name="flash"
-                  size={16}
-                  color={batchGenerating || invoices.length === 0 ? "#9CA3AF" : "#059669"}
-                />
-              )}
-              <Text
-                className={`font-bold text-sm ml-1 ${
-                  batchGenerating || invoices.length === 0 ? "text-gray-500" : "text-emerald-700"
-                }`}
-              >
-                {batchGenerating ? "Gerando..." : "Gerar cobranças em lote"}
-              </Text>
-            </TouchableOpacity>
-          )}
           <TouchableOpacity
-            onPress={onSyncCoraCharges}
-            disabled={syncingCoraCharges}
-            className={`flex-row items-center justify-center px-4 py-2.5 rounded-xl border ${
-              syncingCoraCharges ? "bg-gray-100 border-gray-200" : "bg-white border-violet-200"
-            }`}
+            onPress={() => setContractModalVisible(true)}
+            className="flex-row items-center justify-center px-4 py-2.5 rounded-xl border bg-violet-50 border-violet-200"
             activeOpacity={0.85}
-            style={{
-              minHeight: 44,
-              shadowColor: "#111827",
-              shadowOpacity: syncingCoraCharges ? 0 : 0.04,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: 3 },
-              elevation: syncingCoraCharges ? 0 : 1,
-            }}
+            style={{ minHeight: 44 }}
           >
-            {syncingCoraCharges ? (
-              <ActivityIndicator size="small" color="#6B7280" />
-            ) : (
-              <Ionicons name="sync" size={16} color="#7C3AED" />
-            )}
-            <Text className={`font-bold text-sm ml-1 ${syncingCoraCharges ? "text-gray-500" : "text-violet-700"}`}>
-              {syncingCoraCharges ? "Sincronizando..." : "Sincronizar"}
+            <Ionicons name="document-text-outline" size={16} color="#7C3AED" />
+            <Text className="font-bold text-sm ml-1 text-violet-700">
+              Cobranças do contrato
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -2563,6 +2399,21 @@ export default function EnrollmentDetailScreen({
       </Modal>
 
       {/* ── Confirm Modals ───────────────────────────────────────────────────── */}
+      <InvoiceActionsModal
+        visible={!!actionsInvoice}
+        invoice={actionsInvoice}
+        canGenerateCharge={canGenerateChargeForInvoice(actionsInvoice)}
+        onClose={() => setActionsInvoice(null)}
+        onSelect={handleInvoiceAction}
+      />
+
+      <MarkInvoicePaidModal
+        visible={!!settleInvoice}
+        invoice={settleInvoice}
+        onClose={() => setSettleInvoice(null)}
+        onSuccess={() => fetch()}
+      />
+
       <ConfirmModal
         visible={!!pendingChargeMethod}
         title="Confirmar forma de pagamento"
@@ -2794,90 +2645,16 @@ export default function EnrollmentDetailScreen({
         )}
       </Modal>
 
-      {/* ── Batch Charges Modal ───────────────────────────────────────────────── */}
-      <Modal
-        visible={batchModalVisible}
-        title="Gerar cobranças locais em lote"
-        onClose={() => (batchGenerating ? undefined : setBatchModalVisible(false))}
-        size="md"
-        footer={
-          <>
-            <TouchableOpacity
-              onPress={() => setBatchModalVisible(false)}
-              disabled={batchGenerating}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
-            >
-              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
-            </TouchableOpacity>
-            {!batchResult && (
-              <TouchableOpacity
-                onPress={onGenerateBatchCharges}
-                disabled={batchGenerating}
-                className={`px-5 py-2.5 rounded-xl ${batchGenerating ? "bg-emerald-300" : "bg-emerald-600"}`}
-              >
-                {batchGenerating ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text className="text-sm font-bold text-white">Gerar agora</Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </>
-        }
-      >
-        <View className="gap-3">
-          <View className="rounded-xl bg-amber-50 border border-amber-200 p-3">
-            <Text className="text-xs font-bold text-amber-800">
-              Ação única por matrícula
-            </Text>
-            <Text className="text-xs text-amber-700 mt-1">
-              Após gerar em lote, esta ação ficará bloqueada para esta matrícula.
-              Cobranças avulsas individuais continuarão disponíveis nas invoices.
-            </Text>
-          </View>
-
-          <View className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-            <Text className="text-xs font-bold text-slate-700">Padrão do lote</Text>
-            <Text className="text-xs text-slate-600 mt-1">
-              O painel gera apenas invoices locais em lote. A taxa de matrícula é obrigatória na matrícula e as mensalidades são opcionais.
-            </Text>
-          </View>
-
-          {!!batchError && (
-            <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
-              <Text className="text-sm font-bold text-red-700">Erro</Text>
-              <Text className="text-xs text-red-700 mt-1">{batchError}</Text>
-            </View>
-          )}
-
-          {!!batchResult && (
-            <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-              <Text className="text-sm font-bold text-emerald-700">
-                Resultado
-              </Text>
-              <Text className="text-xs text-emerald-700 mt-1">
-                Status: {batchResult.status ?? "—"}
-              </Text>
-              <Text className="text-xs text-emerald-700">
-                Geradas: {batchResult.generated_count} · Falhas:{" "}
-                {batchResult.failed_count}
-              </Text>
-              {!!batchResult.failed && batchResult.failed.length > 0 && (
-                <View className="mt-2 gap-1">
-                  <Text className="text-[11px] font-bold text-red-700">
-                    Invoices com falha:
-                  </Text>
-                  {batchResult.failed.map((f: any, i: number) => (
-                    <Text key={i} className="text-[11px] text-red-700">
-                      • Invoice #{f.invoice_id ?? "?"} — {f.error ?? f.message ?? "erro"}
-                    </Text>
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-      </Modal>
+      <ContractChargesModal
+        visible={contractModalVisible}
+        enrollmentId={enrollmentId}
+        environment={defaultChargeEnvironment}
+        onClose={() => setContractModalVisible(false)}
+        onSuccess={(message) => {
+          showToast("success", message, "Cobranças do contrato");
+          fetch();
+        }}
+      />
     </View>
   );
 }

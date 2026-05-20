@@ -37,18 +37,19 @@ const variants: Record<
 type StatCardProps = {
   title: string;
   value: string;
-  percentage: number;
+  percentage?: number | null;
   variant?: Variant;
 };
 
 export default function StatCard({
   title,
   value,
-  percentage,
+  percentage = null,
   variant = "purple",
 }: StatCardProps) {
   const style = variants[variant];
-  const isPositive = percentage >= 0;
+  const showTrend = percentage !== null && percentage !== undefined;
+  const isPositive = (percentage ?? 0) >= 0;
   const isWhiteText = variant === "purple" || variant === "sky" || variant === "teal";
 
   return (
@@ -58,22 +59,26 @@ export default function StatCard({
     >
       {/* Top row */}
       <View className="flex-row items-center justify-between mb-3">
-        <View
-          className="flex-row items-center px-2.5 py-1 rounded-full"
-          style={{ backgroundColor: getBadgeBg(variant) }}
-        >
-          <Ionicons
-            name={isPositive ? "arrow-up" : "arrow-down"}
-            size={10}
-            color={isWhiteText ? "white" : isPositive ? "#92400E" : "#B91C1C"}
-          />
-          <Text
-            className="text-xs font-bold ml-0.5"
-            style={{ color: isWhiteText ? "white" : isPositive ? "#92400E" : "#B91C1C" }}
+        {showTrend ? (
+          <View
+            className="flex-row items-center px-2.5 py-1 rounded-full"
+            style={{ backgroundColor: getBadgeBg(variant) }}
           >
-            {Math.abs(percentage)}%
-          </Text>
-        </View>
+            <Ionicons
+              name={isPositive ? "arrow-up" : "arrow-down"}
+              size={10}
+              color={isWhiteText ? "white" : isPositive ? "#92400E" : "#B91C1C"}
+            />
+            <Text
+              className="text-xs font-bold ml-0.5"
+              style={{ color: isWhiteText ? "white" : isPositive ? "#92400E" : "#B91C1C" }}
+            >
+              {Math.abs(percentage ?? 0)}%
+            </Text>
+          </View>
+        ) : (
+          <View />
+        )}
         <TouchableOpacity activeOpacity={0.7}>
           <Ionicons
             name="ellipsis-horizontal"

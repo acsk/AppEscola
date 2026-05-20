@@ -140,6 +140,10 @@ class CoraEnrollmentInvoiceSyncService
             $result = DB::transaction(function () use ($enrollment, $externalInvoice, $chargeId, $createMissing): string {
                 $localInvoice = $this->findLocalInvoiceForExternal($enrollment, $externalInvoice, $chargeId);
 
+                if ($localInvoice && (int) $localInvoice->enrollment_id !== (int) $enrollment->id) {
+                    return 'ignored';
+                }
+
                 if (! $localInvoice && ! $createMissing) {
                     return 'ignored';
                 }
@@ -178,6 +182,89 @@ class CoraEnrollmentInvoiceSyncService
             'updated' => $updated,
             'ignored' => $ignored,
             'processed_charge_ids' => array_values(array_unique($processedCharges)),
+        ];
+    }
+
+    /**
+     * Lista boletos da Cora vinculáveis à matrícula (somente leitura, sem persistir).
+     *
+     * @return array{items: array<int, array<string, mixed>>, external_total: int, external_for_enrollment: int, fetch_error: null|string}
+     */
+    public function previewExternalBoletoCharges(Enrollment $enrollment, string $environment = 'prod'): array
+    {
+        $enrollment->loadMissing([
+            'tenant',
+            'student',
+            'student.guardians',
+            'invoices' => fn ($query) => $query->withTrashed()->orderBy('due_date'),
+        ]);
+
+        /** @var Tenant|null $tenant */
+        $tenant = $enrollment->tenant;
+
+        if (! $tenant) {
+            throw new RuntimeException('Tenant da matricula nao encontrado para consulta Cora.');
+        }
+
+        $externalInvoices = $this->factory->resolve('cora')->listInvoices($tenant, $environment, [
+            'limit' => 200,
+        ]);
+
+        $items = [];
+
+        foreach ($externalInvoices as $externalInvoice) {
+            if (! $this->isBoletoInvoice($externalInvoice)) {
+                continue;
+            }
+
+            if (! $this->belongsToEnrollment($enrollment, $externalInvoice)) {
+                continue;
+            }
+
+            $chargeId = $this->extractExternalChargeId($externalInvoice);
+            if ($chargeId === '') {
+                continue;
+            }
+
+            $localInvoice = $this->findLocalInvoiceForExternal($enrollment, $externalInvoice, $chargeId);
+
+            if ($localInvoice && (int) $localInvoice->enrollment_id !== (int) $enrollment->id) {
+                continue;
+            }
+
+            $amount = $this->extractAmount($externalInvoice);
+            $dueDate = $this->parseDate((string) ($externalInvoice['due_date'] ?? ''));
+
+            $linkStatus = 'new';
+            if ($localInvoice) {
+                $linkStatus = strtolower((string) $localInvoice->cora_charge_id) === strtolower($chargeId)
+                    ? 'linked'
+                    : 'updatable';
+            }
+
+            $items[] = [
+                'key' => EnrollmentContractChargesService::syncKey($chargeId),
+                'charge_id' => $chargeId,
+                'status' => (string) ($externalInvoice['status'] ?? ''),
+                'amount' => $amount !== null ? number_format($amount, 2, '.', '') : null,
+                'due_date' => $dueDate?->toDateString(),
+                'description' => (string) (
+                    $externalInvoice['description']
+                    ?? data_get($externalInvoice, 'services.0.description')
+                    ?? 'Boleto Cora'
+                ),
+                'linked_invoice_id' => $localInvoice?->id,
+                'link_status' => $linkStatus,
+                'selected_by_default' => $linkStatus === 'new',
+                'action' => 'sync_from_provider',
+            ];
+        }
+
+        return [
+            'items' => $items,
+            'external_total' => count($externalInvoices),
+            'external_for_enrollment' => count($items),
+            'fetch_error' => null,
         ];
     }
 
@@ -248,7 +335,7 @@ class CoraEnrollmentInvoiceSyncService
 
     private function belongsToEnrollment(Enrollment $enrollment, array $externalInvoice): bool
     {
-        $metadata = $this->extractMetadata($externalInvoice);
+        $metadata = $this->extractProviderLinkMetadata($externalInvoice);
 
         $metadataTenantId = $this->toNullableInt($metadata['tenant_id'] ?? null);
         if ($metadataTenantId !== null && $metadataTenantId !== (int) $enrollment->tenant_id) {
@@ -286,6 +373,10 @@ class CoraEnrollmentInvoiceSyncService
             return true;
         }
 
+        if (! $this->hasStrongEnrollmentMetadataLink($enrollment, $metadata)) {
+            return false;
+        }
+
         foreach ($enrollment->student?->guardians ?? [] as $guardian) {
             $guardianDocument = $this->digitsOnly((string) ($guardian->document ?? ''));
             if ($guardianDocument !== '' && $customerDocument === $guardianDocument) {
@@ -296,10 +387,40 @@ class CoraEnrollmentInvoiceSyncService
         return false;
     }
 
+    /**
+     * Vínculo explícito na metadata do provedor (Cora ou outros) — necessário para aceitar CPF do responsável.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    private function hasStrongEnrollmentMetadataLink(Enrollment $enrollment, array $metadata): bool
+    {
+        $metadataEnrollmentId = $this->toNullableInt($metadata['enrollment_id'] ?? null);
+        if ($metadataEnrollmentId !== null) {
+            return $metadataEnrollmentId === (int) $enrollment->id;
+        }
+
+        $metadataStudentId = $this->toNullableInt($metadata['student_id'] ?? null);
+        if ($metadataStudentId !== null) {
+            return $metadataStudentId === (int) $enrollment->student_id;
+        }
+
+        $metadataInvoiceId = $this->toNullableInt($metadata['invoice_id'] ?? null);
+        if ($metadataInvoiceId !== null) {
+            return Invoice::withTrashed()
+                ->where('tenant_id', $enrollment->tenant_id)
+                ->where('id', $metadataInvoiceId)
+                ->where('enrollment_id', $enrollment->id)
+                ->exists();
+        }
+
+        return false;
+    }
+
     private function findLocalInvoiceForExternal(Enrollment $enrollment, array $externalInvoice, string $chargeId): ?Invoice
     {
         $byCharge = Invoice::withTrashed()
             ->where('tenant_id', $enrollment->tenant_id)
+            ->where('enrollment_id', $enrollment->id)
             ->where('cora_charge_id', $chargeId)
             ->first();
 
@@ -307,7 +428,7 @@ class CoraEnrollmentInvoiceSyncService
             return $byCharge;
         }
 
-        $metadata = $this->extractMetadata($externalInvoice);
+        $metadata = $this->extractProviderLinkMetadata($externalInvoice);
         $metadataInvoiceId = $this->toNullableInt($metadata['invoice_id'] ?? null);
 
         if ($metadataInvoiceId !== null) {
@@ -488,6 +609,44 @@ class CoraEnrollmentInvoiceSyncService
         $metadata = $externalInvoice['metadata'] ?? [];
 
         return is_array($metadata) ? $metadata : [];
+    }
+
+    /**
+     * Metadados de vínculo unificados (Cora e demais provedores).
+     *
+     * @return array<string, mixed>
+     */
+    private function extractProviderLinkMetadata(array $externalInvoice): array
+    {
+        $chunks = [
+            $this->extractMetadata($externalInvoice),
+            $externalInvoice['custom_metadata'] ?? null,
+            $externalInvoice['provider_metadata'] ?? null,
+            data_get($externalInvoice, 'integration.metadata'),
+            data_get($externalInvoice, 'integration.custom_fields'),
+            data_get($externalInvoice, 'additional_data.metadata'),
+            data_get($externalInvoice, 'additional_data'),
+            data_get($externalInvoice, 'custom_fields'),
+            data_get($externalInvoice, 'external_reference'),
+        ];
+
+        $merged = [];
+
+        foreach ($chunks as $chunk) {
+            if (! is_array($chunk)) {
+                continue;
+            }
+
+            foreach ($chunk as $key => $value) {
+                if ($value === null || $value === '') {
+                    continue;
+                }
+
+                $merged[$key] = $value;
+            }
+        }
+
+        return $merged;
     }
 
     private function extractAmount(array $externalInvoice): ?float

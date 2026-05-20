@@ -20,6 +20,7 @@
 11. [Horários de turma](#11-horários-de-turma)
 12. [Matrículas](#12-matrículas)
 13. [Cobranças (Invoices)](#13-cobranças-invoices)
+14. [Dashboard (painel)](#14-dashboard-painel)
 
 ---
 
@@ -646,6 +647,15 @@ Content-Type: application/json
 
 > Esse endpoint cria uma matrícula por curso do pacote e uma invoice de taxa de matrícula do pacote.
 
+### Cobranças do contrato (análise + gerar / sincronizar)
+
+```http
+GET  /api/enrollments/{id}/contract-charges/preview
+POST /api/enrollments/{id}/contract-charges/apply
+```
+
+O painel usa esses endpoints para mostrar o que já existe no sistema, o que será gerado no contrato e os boletos encontrados na Cora, com checkboxes por item. Na mesma execução é possível **gerar parcelas locais** (`generate_keys`) e **sincronizar boletos** (`sync_charge_ids`).
+
 ### Exibir / Atualizar / Excluir
 ```http
 GET    /api/enrollments/{id}
@@ -802,11 +812,46 @@ Content-Type: application/json
 
 > Disponível apenas para ambiente de teste (`stage`).
 
-### Marcar como pago
+### Marcar como pago (baixa manual)
 ```http
 POST /api/invoices/{id}/mark-as-paid
 Authorization: Bearer {token}
+Content-Type: application/json
 ```
+
+**Body:**
+```json
+{
+  "payment_method": "cash",
+  "paid_at": "2026-05-20",
+  "payment_reference": "NSU 123456",
+  "notes": "Pago na recepção"
+}
+```
+
+| Campo | Obrigatório | Observação |
+|-------|-------------|------------|
+| `payment_method` | ✅ | slug de `/api/domains/payment-methods` |
+| `paid_at` | ❌ | data do pagamento (padrão: agora) |
+| `payment_reference` | Condicional | **Obrigatório** para `credit_card` (NSU, autorização, etc.) |
+| `notes` | ❌ | observações |
+| `environment` | ❌ | `stage` ou `prod` — usado ao cancelar boleto ativo na Cora antes da baixa |
+
+**Comportamento com boleto na Cora:** se a invoice tiver cobrança ativa de boleto/híbrido (`cora_charge_id`), a API **cancela no provedor** e em seguida marca como paga com a forma informada (mesma invoice, sem clone). Cobrança só local: baixa direta. PIX ativo: baixa local; PIX expira no provedor.
+
+**Resposta:** envelope `{ type, message, body: { invoice, cancelled_on_gateway } }`.
+
+### Resumo financeiro
+```http
+GET /api/invoices/summary?paid_at_from=2026-05-01&paid_at_to=2026-05-31
+Authorization: Bearer {token}
+```
+
+Retorna totais de cobranças em aberto, vencidas, baixadas no período e breakdown por `payment_method`.
+
+### Listar cobranças (filtros adicionais)
+
+Query params: `view=open|paid|all`, `payment_method`, `paid_at_from`, `paid_at_to`, `search` (aluno ou descrição).
 
 ### Cancelar cobrança
 ```http
@@ -876,6 +921,33 @@ Retorna médias de `percentage` das tentativas concluídas, agrupadas por discip
 4. Exibir no painel/mobile do aluno os dados retornados (`payment_url` e/ou `pix_copy_paste`).
 5. Consultar `charge-status` para atualização de estado.
 6. Em stage, usar `pay-charge` para simulação de pagamento.
+
+---
+
+## 14. Dashboard (painel)
+
+Agregações por tenant via view SQL (`vw_dashboard_tenant_summary`) + consultas leves (frequência, calendário).
+
+```http
+GET /api/dashboard?school_class_id=12
+Authorization: Bearer {token}
+```
+
+**Papéis:** `admin`, `super_admin`, `manager`, `financial`, `secretaria`, `professor`.
+
+**Body (envelope `success`):**
+
+| Campo | Descrição |
+|-------|-----------|
+| `stats` | Cards: alunos ativos, professores, turmas, cobranças em aberto (com `trend_percent` quando aplicável) |
+| `students_breakdown` | Donut: ativos vs inativos |
+| `finance` | Recebido no mês, em aberto, vencidas, aprovações 30d |
+| `attendance` | Frequência seg–sex da semana atual (`school_class_id` opcional) |
+| `school_classes` | Turmas para filtro no widget |
+| `calendar` | `event_days` do mês corrente |
+| `upcoming_events` | Próximos eventos (agenda) |
+
+**Migration:** `php artisan migrate` (cria a view).
 
 ---
 

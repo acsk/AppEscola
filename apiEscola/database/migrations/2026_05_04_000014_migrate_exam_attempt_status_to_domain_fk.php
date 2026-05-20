@@ -29,12 +29,22 @@ return new class extends Migration
             $table->foreign('attempt_status_id')->references('id')->on('exam_attempt_statuses')->restrictOnDelete();
         });
 
-        DB::statement("
-            UPDATE exam_attempts ea
-            JOIN exam_attempt_statuses eas ON eas.slug = ea.status
-            SET ea.attempt_status_id = eas.id
-            WHERE ea.attempt_status_id IS NULL
-        ");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement('
+                UPDATE exam_attempts ea
+                JOIN exam_attempt_statuses eas ON eas.slug = ea.status
+                SET ea.attempt_status_id = eas.id
+                WHERE ea.attempt_status_id IS NULL
+            ');
+        } else {
+            DB::statement('
+                UPDATE exam_attempts
+                SET attempt_status_id = (
+                    SELECT id FROM exam_attempt_statuses WHERE slug = exam_attempts.status
+                )
+                WHERE attempt_status_id IS NULL AND status IS NOT NULL
+            ');
+        }
 
         DB::statement("
             UPDATE exam_attempts
@@ -53,11 +63,21 @@ return new class extends Migration
             $table->string('status')->default('in_progress')->after('percentage');
         });
 
-        DB::statement("
-            UPDATE exam_attempts ea
-            JOIN exam_attempt_statuses eas ON eas.id = ea.attempt_status_id
-            SET ea.status = eas.slug
-        ");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement('
+                UPDATE exam_attempts ea
+                JOIN exam_attempt_statuses eas ON eas.id = ea.attempt_status_id
+                SET ea.status = eas.slug
+            ');
+        } else {
+            DB::statement('
+                UPDATE exam_attempts
+                SET status = (
+                    SELECT slug FROM exam_attempt_statuses WHERE id = exam_attempts.attempt_status_id
+                )
+                WHERE attempt_status_id IS NOT NULL
+            ');
+        }
 
         Schema::table('exam_attempts', function (Blueprint $table) {
             $table->dropForeign(['attempt_status_id']);

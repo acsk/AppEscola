@@ -12,10 +12,11 @@ import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
 import FormInput from "../../components/ui/FormInput";
 import DatePickerInput from "../../components/ui/DatePickerInput";
+import { usePaymentMethods } from "../../hooks/useDomains";
 import {
-  usePaymentMethods,
-  domainToOptions,
-} from "../../hooks/useDomains";
+  manualPaymentMethodOptions,
+  requiresCardPaymentReference,
+} from "../../utils/paymentMethods";
 import { displayToISO, isoToDisplay } from "../../utils/masks";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
@@ -99,7 +100,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
   const [loadingBundles, setLoadingBundles] = useState(false);
 
   const paymentMethods = usePaymentMethods();
-  const paymentMethodOptions = domainToOptions(paymentMethods);
+  const paymentMethodOptions = manualPaymentMethodOptions(paymentMethods);
 
   // ── Form fields ─────────────────────────────────────────────────────────────
   const [studentId, setStudentId] = useState("");
@@ -127,6 +128,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
   // Payment toggle
   const [payNow, setPayNow] = useState(false);
   const [payMethod, setPayMethod] = useState("");
+  const [payReference, setPayReference] = useState("");
   const [paidAt, setPaidAt] = useState(todayDisplay());
   const [payNotes, setPayNotes] = useState("");
 
@@ -305,6 +307,9 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
     }
 
     if (payNow && !payMethod) e.payment_method = "Selecione o método de pagamento.";
+    if (payNow && requiresCardPaymentReference(payMethod) && !payReference.trim()) {
+      e.payment_reference = "Informe o identificador da transação no cartão.";
+    }
     return e;
   };
 
@@ -326,6 +331,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         ? {
             payment_method: payMethod,
             paid_at: displayToISO(paidAt) ?? todayISO(),
+            payment_reference: payReference.trim() || undefined,
             notes: payNotes.trim() || undefined,
           }
         : undefined;
@@ -1075,6 +1081,17 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                 <Text className="text-xs text-red-500 mt-1">{errors.payment_method}</Text>
               )}
             </View>
+
+            {requiresCardPaymentReference(payMethod) ? (
+              <FormInput
+                label="Identificador da transação"
+                required
+                value={payReference}
+                onChangeText={setPayReference}
+                error={errors.payment_reference}
+                placeholder="NSU, autorização ou comprovante"
+              />
+            ) : null}
 
             <DatePickerInput
               label="Data do Pagamento"

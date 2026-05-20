@@ -605,6 +605,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
             'payment_forms' => $paymentForms,
             'metadata' => [
                 'tenant_id' => $invoice->tenant_id,
+                'enrollment_id' => $invoice->enrollment_id,
                 'invoice_id' => $invoice->id,
                 'student_id' => $invoice->student_id,
                 'environment' => $environment,

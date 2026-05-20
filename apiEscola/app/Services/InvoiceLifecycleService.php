@@ -265,10 +265,39 @@ class InvoiceLifecycleService
         return strtolower((string) $invoice->payment_method) === 'pix';
     }
 
-    private function shouldCancelOnGateway(Invoice $invoice): bool
+    public function shouldCancelOnGateway(Invoice $invoice): bool
     {
         return $this->hasActiveGatewayCharge($invoice)
             && ! $this->isPixOnlyActiveCharge($invoice);
+    }
+
+    /**
+     * Invalida boleto/híbrido ativo na Cora antes de baixa manual (não altera status da invoice).
+     *
+     * @return bool true quando cancelou no provedor
+     */
+    public function invalidateGatewayChargeBeforeSettlement(Invoice $invoice, Request $request): bool
+    {
+        if (! $this->shouldCancelOnGateway($invoice)) {
+            return false;
+        }
+
+        $invoice->loadMissing('tenant');
+        $tenant = $invoice->tenant;
+
+        if (! $tenant instanceof Tenant) {
+            throw new RuntimeException('Tenant da cobrança não encontrado.');
+        }
+
+        $environment = $this->resolveCoraEnvironment($request);
+        $this->cancelChargeOnGateway($tenant, (string) $invoice->cora_charge_id, $environment);
+
+        $invoice->update([
+            'cora_status' => 'CANCELLED',
+            'cora_last_synced_at' => now(),
+        ]);
+
+        return true;
     }
 
     private function cancelChargeOnGateway(Tenant $tenant, string $chargeId, string $environment): void
