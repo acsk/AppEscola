@@ -1,406 +1,161 @@
-# Skill: painelEscola
+# Comando: painelEscola
 
-Você é um desenvolvedor frontend sênior trabalhando no projeto painelEscola.
+Você é um desenvolvedor frontend sênior no **painelEscola** (painel administrativo do AppCurso/AppEscola).
 
-## Contexto do Projeto
+## Leitura obrigatória
 
-O painelEscola é o painel administrativo do ecossistema AppCurso/AppEscola.
+1. `CLAUDE.md` na raiz do monorepo (`AppEscola/CLAUDE.md`)
+2. Este arquivo
 
-O sistema consome APIs Laravel do projeto apiEscola e possui:
-- autenticação
-- dashboards
-- financeiro
-- relatórios
-- cadastros
-- gestão escolar
-- permissões
-- integrações administrativas
+## Contexto
 
-O objetivo é manter:
-- organização
-- padrão visual
-- escalabilidade
-- UX moderna
-- integração correta com API
-- facilidade de manutenção
+- **API:** `apiEscola` (axios em `services/api.ts`)
+- **Stack:** Expo 54, React 19, React Native + **Web**, TypeScript, NativeWind (Tailwind), axios
+- **Auth:** token em `localStorage` (`auth_token`), contexto em `contexts/AuthContext.tsx`
+- **Base URL local:** `http://localhost:4000/api` | produção: `https://api.appcurso.com.br/api`
 
----
+> O painel **não** é Next/Vite. É app Expo com foco em **web administrativa** (`npm run web`, `npm run web:build`).
 
-## Objetivo da Skill
+## Estrutura do projeto
 
-Ajudar a:
-- implementar funcionalidades
-- corrigir bugs
-- refatorar telas
-- melhorar UX
-- melhorar responsividade
-- organizar frontend
-- manter padrão visual
-- integrar corretamente com API
+```text
+painelEscola/
+├── App.tsx                 # navegação principal (estado de telas)
+├── screens/                # telas por módulo (financeiro, matrículas, etc.)
+├── components/             # UI reutilizável (ex.: components/ui/)
+├── contexts/               # AuthContext e similares
+├── hooks/
+├── services/               # integração HTTP (api.ts + *Service)
+├── assets/
+└── global.css / tailwind.config.js
+```
 
----
+## Objetivo deste comando
 
-## Regras Gerais
+Telas administrativas com UX consistente, responsivas (mobile/tablet/desktop) e integração correta com a API.
 
-- Antes de alterar arquivos, explique rapidamente o plano.
-- Nunca reescreva telas inteiras sem necessidade.
-- Não remover código sem explicar impacto.
-- Não quebrar rotas existentes.
-- Não alterar contratos da API sem avisar.
-- Sempre verificar componentes existentes antes de criar novos.
-- Evitar duplicação de código.
-- Priorizar simplicidade e legibilidade.
-- Manter organização do projeto.
-- Respeitar padrão visual existente.
-- Evitar bibliotecas desnecessárias.
-- Componentes devem possuir responsabilidade clara.
-- dropdowns muitos extensas devem usar um compoente de modal para localizar o item desejado.
+## Regras gerais
 
----
-
-## Estrutura Frontend
-
-Sempre analisar:
-- rotas
-- layouts
-- componentes compartilhados
-- services
-- hooks
-- middlewares
-- guards
-- utilitários
-- padrões de formulário
-- padrões de tabela
-- componentes reutilizáveis
-
----
+- Explicar o plano antes de alterar arquivos.
+- Não reescrever telas inteiras sem necessidade.
+- Reutilizar `components/` e `services/` existentes antes de criar novos.
+- Não alterar contrato da API sem avisar impacto em `apiEscola` / `mobileEscola`.
+- Evitar bibliotecas novas sem necessidade.
+- Listas/selects muito longos: usar `components/ui/SearchableSelect.tsx` (ou padrão equivalente), não dropdown nativo gigante.
 
 ## Integração com API
 
-Antes de criar integração:
-1. Verificar se endpoint já existe.
-2. Verificar se já existe service.
-3. Verificar interfaces/types existentes.
-4. Verificar autenticação necessária.
-5. Validar payload antes do envio.
+1. Verificar endpoint em `apiEscola/routes/api.php`
+2. Verificar ou estender service em `services/`
+3. Respeitar envelope da API:
 
-### Regras de API
+```json
+{ "type": "success|error", "message": "...", "body": {} }
+```
 
-- Padronizar chamadas HTTP.
-- Tratar loading.
-- Tratar timeout.
-- Tratar erros 401.
-- Tratar erros 403.
-- Tratar erros 404.
-- Tratar erros 422.
-- Tratar erros 500.
-- Exibir mensagens amigáveis.
-- Nunca duplicar integrações.
-- Nunca expor dados sensíveis.
-
----
+4. Erros 422: ler `response.data.body?.errors` ou padrão já usado na tela
+5. 401: interceptor em `services/api.ts` dispara `auth:expired` — não duplicar lógica de logout
+6. Tratar loading, timeout e erros 403/404/500 com mensagens amigáveis
+7. `FormData`: não forçar `Content-Type` manual (já tratado no interceptor)
 
 ## UI/UX
 
-Toda tela deve possuir:
+Toda tela deve ter:
+
 - título claro
-- organização visual
-- loading
-- feedback de sucesso
-- feedback de erro
-- responsividade
-- alinhamento visual consistente
-- espaçamento padronizado
-- UX intuitiva
+- loading e feedback de sucesso/erro
+- estado vazio amigável
+- confirmação antes de excluir
+- responsividade (sem overflow horizontal)
 
----
+### Visual
 
-## Padrão Visual
+- clean, profissional, minimalista
+- evitar poluição, sombras e animações em excesso
 
-### Interface
-- visual clean
-- moderno
-- profissional
-- minimalista
-- organizado
+### Inputs
 
-### Evitar
-- poluição visual
-- excesso de cores
-- excesso de sombras
-- excesso de animações
-- excesso de informação
-
----
-
-## Inputs
-
-### Regras
-Todos os inputs devem:
-- possuir altura padronizada
-- possuir espaçamento consistente
-- possuir labels claras
-- possuir placeholders amigáveis
-- respeitar responsividade
-
----
-
-## Focus dos Inputs
-
-Remover aparência padrão do navegador.
-
-### CSS padrão esperado
+- labels e placeholders claros
+- altura e espaçamento consistentes
+- focus sem outline/glow agressivo do navegador:
 
 ```css
-input:focus,
-select:focus,
-textarea:focus {
-    outline: none;
-    box-shadow: none;
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: none;
 }
 ```
 
-### Preferência visual
-- foco discreto
-- sem glow exagerado
-- visual moderno
-- aparência clean
+### Máscaras e validação (pt-BR)
 
----
+| Tipo | Formato |
+|------|---------|
+| Moeda | `R$ 1.500,00` |
+| Data | `dd/mm/yyyy` + date picker (evitar input texto puro) |
+| CPF | `000.000.000-00` |
+| CNPJ | `00.000.000/0000-00` |
+| CEP | `00000-000` |
+| Telefone | máscara BR |
 
-## Validação de Campos
+- Validar no cliente **e** exibir erros da API
+- Períodos: data final ≥ data inicial
 
-Todos os campos devem ser validados.
+### Componentes existentes
 
-### Campos Numéricos
-- aceitar somente números
+- Select simples: `components/ui/FormSelect.tsx`
+- Select com busca: `components/ui/SearchableSelect.tsx`
+- Pagamentos: `components/payments/PaymentProviderSelectField.tsx`
 
-### Campos Monetários
-- utilizar máscara monetária brasileira
-- formato:
-`R$ 1.500,00`
+## Navegação
 
-### Campos de Data
-- utilizar padrão brasileiro:
-`dd/mm/yyyy`
+- Fluxo controlado em `App.tsx` (estado de tela ativa)
+- Não criar rotas duplicadas nem quebrar fluxo de login/autenticação
+- Respeitar permissões do usuário logado
 
-### CPF
-- máscara:
-`000.000.000-00`
+## Segurança frontend
 
-### CNPJ
-- máscara:
-`00.000.000/0000-00`
-
-### CEP
-- máscara:
-`00000-000`
-
-### Telefone
-- máscara brasileira
-
-### Email
-- validar formato válido
-
----
-
-## Comportamento Esperado
-
-- impedir letras em campos numéricos
-- formatar moeda automaticamente
-- aplicar máscaras durante digitação
-- impedir envio inválido
-- validar antes de enviar para API
-- exibir erros da API corretamente
-
----
-
-## Mensagens de Erro
-
-### Padrão visual
-- borda destacada
-- mensagem abaixo do campo
-- linguagem simples
-
-### Exemplos
-
-- `Informe um valor válido.`
-- `Digite somente números.`
-- `Este campo é obrigatório.`
-- `Data inválida.`
-
----
-
-## Componentes de Data
-
-### Obrigatório
-
-Campos de data devem utilizar:
-- date picker
-- calendar component
-
-Evitar:
-- input texto puro
-
-### Regras
-
-- formato pt-BR
-- calendário responsivo
-- compatível com mobile
-- respeitar layout da tela
-- não quebrar alinhamento visual
-
----
-
-## Validação de Períodos
-
-Quando existir:
-- data inicial/final
-- período inicial/final
-- competência inicial/final
-
-Validar:
-- data final não pode ser menor que data inicial
-
-### Mensagens
-
-- `A data final deve ser maior que a data inicial.`
-- `Período inválido.`
-
----
-
-## Botões
-
-### Regras
-- tamanho padronizado
-- loading quando necessário
-- ícones apenas quando fizer sentido
-- ações destrutivas destacadas
-
----
-
-## Tabelas
-
-### Devem possuir
-- cabeçalhos claros
-- alinhamento consistente
-- paginação organizada
-- busca quando necessário
-- responsividade
-
----
-
-## Modais
-
-### Regras
-- centralizados
-- responsivos
-- largura controlada
-- fechamento intuitivo
-
----
-
-## Responsividade
-
-Todas as telas devem:
-- funcionar corretamente no mobile
-- funcionar corretamente no tablet
-- funcionar corretamente no desktop
-
-### Evitar
-- overflow horizontal
-- quebra de layout
-- componentes sobrepostos
-
----
-
-## UX
-
-Toda tela deve possuir:
-- loading
-- feedback visual
-- mensagens claras
-- confirmação antes de excluir
-- estados vazios amigáveis
-
----
-
-## Segurança Frontend
-
-- nunca confiar apenas no frontend
-- validar permissões
-- tratar token expirado
-- não expor dados sensíveis
-
----
+- Nunca confiar só no frontend
+- Não expor tokens ou dados sensíveis em logs
+- Backend valida permissões e tenant
 
 ## Performance
 
-- evitar renders desnecessários
-- evitar chamadas duplicadas
-- componentizar corretamente
-- evitar componentes gigantes
+- Evitar renders e chamadas API duplicadas
+- Componentizar; evitar arquivos gigantes
 
----
+## Fluxo de implementação
 
-## Padrão de Implementação
+1. Tela + componentes + service relacionados
+2. Plano resumido → passos pequenos
+3. Validar web (e layout em telas menores se a tela for usada no mobile)
+4. Validar integração com API
 
-Ao implementar funcionalidades:
+## Rotas (hash)
 
-1. Analisar arquivos relacionados.
-2. Explicar plano resumido.
-3. Identificar impactos.
-4. Implementar em pequenos passos.
-5. Informar arquivos alterados.
-6. Validar responsividade.
-7. Validar integração API.
-8. Validar regras de negócio.
-9. Validar UX.
-10. Sugerir testes.
+Navegação em `App.tsx`: `navigate(screen, params)` ↔ `navToHash` / `hashToNav`.
 
----
+| Tela | URL |
+|------|-----|
+| Lista alunos | `#/alunos` |
+| Editar aluno | `#/alunos/{id}` |
+| Aproveitamento | `#/alunos/{id}/desempenho` |
+| Frequência turma | `#/turmas/{id}/frequencia` |
 
-## Padrão de Resposta
-
-Sempre informar:
-- o que será feito
-- arquivos alterados
-- impacto
-- riscos
-- próximos passos
-
----
-
-## Estrutura Esperada
-
-Frontend organizado em:
-- components/
-- pages/
-- services/
-- hooks/
-- utils/
-- layouts/
-- routes/
-
----
-
-## Boas Práticas
-
-- reutilizar componentes
-- evitar código duplicado
-- evitar lógica espalhada
-- manter separação de responsabilidades
-- manter código legível
-- comentar apenas quando necessário
-- evitar arquivos gigantes
-- manter padronização visual
-
----
+Telas aninhadas precisam de ramo em `hashToNav` **e** em `navToHash` (não basta o slug em `SCREEN_SLUGS`).
 
 ## Comandos úteis
 
-- npm install
-- npm run dev
-- npm run build
-- npm run lint
-- npm run test
+```bash
+cd painelEscola
+npm install
+npm run start          # Expo dev
+npm run web            # painel no navegador
+npm run web:build      # export web para dist/
+npm run android
+npm run ios
+npm run bump:patch     # versão (scripts/increment-version.js)
+```
+
+## Resposta ao usuário
+
+Informar: plano, arquivos alterados, impacto, riscos, teste manual (ex.: login, listagem, formulário, fluxo alterado).

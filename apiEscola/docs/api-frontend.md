@@ -913,6 +913,10 @@ Authorization: Bearer {token}
 
 Retorna médias de `percentage` das tentativas concluídas, agrupadas por disciplina do simulado e evolução mês a mês (`monthly_evolution`).
 
+**`body` inclui também `student`** (dados para montar o cabeçalho da tela): `id`, `name`, `enrollment_number`, `email`, `phone`, `document`, `birth_date`, `photo_url`, `status`, `is_minor`, `desired_courses`, `active_enrollments` (turma/curso/plano das matrículas ativas).
+
+`student_id` permanece no topo por compatibilidade.
+
 ### Fluxo recomendado para o frontend
 
 1. Criar matrícula por `subscribe` ou `subscribe-bundle`.

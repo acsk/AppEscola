@@ -46,8 +46,29 @@ export interface PerformanceOverview {
   } | null;
 }
 
+export interface PerformanceStudent {
+  id: number;
+  enrollment_number: string | null;
+  name: string;
+  birth_date: string | null;
+  email: string | null;
+  phone: string | null;
+  photo_url: string | null;
+  status: string;
+  is_minor: boolean;
+  desired_courses: Array<{ id: number; name: string }>;
+  active_enrollments: Array<{
+    id: number;
+    status: string;
+    school_class: { id: number; name: string } | null;
+    course: { id: number; name: string } | null;
+    course_plan: { id: number; name: string } | null;
+  }>;
+}
+
 export interface StudentPerformance {
   student_id: number;
+  student: PerformanceStudent;
   months: number;
   overview: PerformanceOverview;
   by_subject: PerformanceBySubject[];

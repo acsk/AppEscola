@@ -44,8 +44,33 @@ export type PerformanceOverview = {
   } | null;
 };
 
+export type PerformanceStudentEnrollment = {
+  id: number;
+  status: string;
+  school_class: { id: number; name: string } | null;
+  course: { id: number; name: string } | null;
+  course_plan: { id: number; name: string } | null;
+};
+
+export type PerformanceStudent = {
+  id: number;
+  tenant_id: number;
+  enrollment_number: string | null;
+  name: string;
+  birth_date: string | null;
+  document: string | null;
+  email: string | null;
+  phone: string | null;
+  photo_url: string | null;
+  is_minor: boolean;
+  status: string;
+  desired_courses: Array<{ id: number; name: string }>;
+  active_enrollments: PerformanceStudentEnrollment[];
+};
+
 export type StudentPerformance = {
   student_id: number;
+  student: PerformanceStudent;
   months: number;
   overview: PerformanceOverview;
   by_subject: PerformanceBySubject[];

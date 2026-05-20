@@ -1,5 +1,15 @@
 # CLAUDE.md — apiEscola
 
+## Comando detalhado
+
+Para implementações neste projeto, ler também o arquivo em:
+
+```text
+apiEscola/.claude/commands/api-escola.md
+```
+
+E o `CLAUDE.md` na raiz do monorepo.
+
 ## Contexto do projeto
 Este projeto é uma API Laravel para o sistema AppCurso/AppEscola.
 A aplicação deve seguir arquitetura limpa, segura e fácil de manter.

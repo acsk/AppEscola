@@ -16,39 +16,22 @@ Todos os projetos possuem integração entre si.
 
 ---
 
-## Skills específicas
+## Comandos por projeto (`.claude/commands`)
 
-As diretrizes específicas de cada projeto ficam em arquivos de skill dentro de `.claude/commands`.
+As diretrizes específicas de cada projeto ficam em arquivos Markdown em `.claude/commands`, **dentro da pasta do projeto** (não na raiz do monorepo):
 
-Arquivos esperados:
-
-- `.claude/commands/api-escola.md`
-- `.claude/commands/painel-escola.md`
-- `.claude/commands/mobile-escola.md`
+| Projeto | Comando |
+|---------|---------|
+| apiEscola | `apiEscola/.claude/commands/api-escola.md` |
+| painelEscola | `painelEscola/.claude/commands/painel-escola.md` |
+| mobileEscola | `mobileEscola/.claude/commands/mobile-escola.md` |
 
 Antes de implementar alterações, sempre considerar:
 
 1. Este `CLAUDE.md` da raiz.
-2. A skill específica do projeto em `.claude/commands`.
-3. O padrão real encontrado nos arquivos do projeto.
-
-Para alterações no painel administrativo, ler:
-
-```text
-.claude/commands/painel-escola.md
-```
-
-Para alterações na API Laravel, ler:
-
-```text
-.claude/commands/api-escola.md
-```
-
-Para alterações no projeto mobile-escola, ler:
-
-```text
-.claude/commands/mobile-escola.md
-```
+2. O comando do projeto em que você está trabalhando (caminhos acima).
+3. O `CLAUDE.md` local do projeto, quando existir (ex.: `apiEscola/CLAUDE.md`).
+4. O padrão real encontrado nos arquivos do projeto.
 
 ---
 

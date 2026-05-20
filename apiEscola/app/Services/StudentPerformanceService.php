@@ -12,6 +12,7 @@ class StudentPerformanceService
     /**
      * @return array{
      *   student_id: int,
+     *   student: array<string, mixed>,
      *   months: int,
      *   overview: array<string, mixed>,
      *   by_subject: array<int, array<string, mixed>>,
@@ -22,7 +23,21 @@ class StudentPerformanceService
     {
         $months = max(1, min(24, $months));
 
-        $rows = $this->fetchCompletedAttempts($student->id, $subjectId);
+        if ($student->exists) {
+            $student->loadMissing([
+                'desiredCourses:id,name',
+                'enrollments' => function ($query) {
+                    $query->where('status', 'active')
+                        ->with([
+                            'schoolClass:id,name',
+                            'coursePlan:id,name,course_id',
+                            'coursePlan.course:id,name',
+                        ]);
+                },
+            ]);
+        }
+
+        $rows = $this->fetchCompletedAttempts((int) $student->id, $subjectId);
 
         $monthKeys = $this->monthKeys($months);
         $bySubject = $this->aggregateBySubject($rows);
@@ -30,11 +45,64 @@ class StudentPerformanceService
         $overview = $this->buildOverview($rows, $bySubject, $monthKeys);
 
         return [
-            'student_id' => $student->id,
+            'student_id' => (int) $student->id,
+            'student' => $this->studentSummary($student),
             'months' => $months,
             'overview' => $overview,
             'by_subject' => array_values($bySubject),
             'monthly_evolution' => $monthlyEvolution,
+        ];
+    }
+
+    /**
+     * Dados do aluno para o cabeçalho da tela de aproveitamento (painel / mobile).
+     *
+     * @return array<string, mixed>
+     */
+    private function studentSummary(Student $student): array
+    {
+        $enrollments = $student->relationLoaded('enrollments')
+            ? $student->enrollments
+            : collect();
+
+        $desiredCourses = $student->relationLoaded('desiredCourses')
+            ? $student->desiredCourses
+            : collect();
+
+        $activeEnrollments = $enrollments
+            ->map(fn ($enrollment) => [
+                'id' => $enrollment->id,
+                'status' => $enrollment->status,
+                'school_class' => $enrollment->schoolClass
+                    ? ['id' => $enrollment->schoolClass->id, 'name' => $enrollment->schoolClass->name]
+                    : null,
+                'course' => $enrollment->coursePlan?->course
+                    ? ['id' => $enrollment->coursePlan->course->id, 'name' => $enrollment->coursePlan->course->name]
+                    : null,
+                'course_plan' => $enrollment->coursePlan
+                    ? ['id' => $enrollment->coursePlan->id, 'name' => $enrollment->coursePlan->name]
+                    : null,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'id' => (int) $student->id,
+            'tenant_id' => $student->tenant_id,
+            'enrollment_number' => $student->enrollment_number,
+            'name' => $student->name,
+            'birth_date' => $student->birth_date?->toDateString(),
+            'document' => $student->document,
+            'email' => $student->email,
+            'phone' => $student->phone,
+            'photo_url' => $student->photo_url,
+            'is_minor' => (bool) $student->is_minor,
+            'status' => $student->status,
+            'desired_courses' => $desiredCourses
+                ->map(fn ($course) => ['id' => $course->id, 'name' => $course->name])
+                ->values()
+                ->all(),
+            'active_enrollments' => $activeEnrollments,
         ];
     }
 

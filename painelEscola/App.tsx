@@ -119,11 +119,26 @@ function hashToNav(hash: string): NavState {
     return { screen: "pagamentos" };
   }
 
+  // URL legada (#/alunos-performance) — redireciona para lista ou desempenho com id
+  if (seg0 === "alunos-performance") {
+    const legacyId = seg1 ? parseInt(seg1, 10) : NaN;
+    if (!isNaN(legacyId) && legacyId > 0) {
+      return { screen: "alunos-performance", params: { studentId: legacyId } };
+    }
+    return { screen: "alunos" };
+  }
+
   if (seg0 === "alunos") {
     if (!seg1) return { screen: "alunos" };
     if (seg1 === "novo") return { screen: "alunos-form", params: { studentId: null } };
     const id = parseInt(seg1, 10);
-    if (!isNaN(id)) return { screen: "alunos-form", params: { studentId: id } };
+    if (!isNaN(id)) {
+      const [, , seg2] = path.split("/").filter(Boolean);
+      if (seg2 === "desempenho") {
+        return { screen: "alunos-performance", params: { studentId: id } };
+      }
+      return { screen: "alunos-form", params: { studentId: id } };
+    }
     return { screen: "alunos" };
   }
 
@@ -209,6 +224,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "alunos-form") {
     const id = nav.params?.studentId;
     return id != null ? `#/alunos/${id}` : "#/alunos/novo";
+  }
+  if (nav.screen === "alunos-performance") {
+    const id = nav.params?.studentId;
+    return id != null ? `#/alunos/${id}/desempenho` : "#/alunos";
   }
   if (nav.screen === "cursos-form") {
     const id = nav.params?.courseId;
@@ -692,14 +711,33 @@ function AppContent() {
     switch (nav.screen) {
       case "alunos": return <StudentsScreen navigate={navigate} />;
       case "alunos-form": return <StudentFormScreen navigate={navigate} studentId={nav.params?.studentId ?? null} />;
-      case "alunos-performance":
+      case "alunos-performance": {
+        const studentId = Number(nav.params?.studentId);
+        if (!Number.isFinite(studentId) || studentId <= 0) {
+          return (
+            <View className="flex-1 items-center justify-center px-6">
+              <Text className="text-sm text-gray-600 mb-4">Aluno inválido ou não informado.</Text>
+              <TouchableOpacity
+                onPress={() => navigate("alunos")}
+                className="px-4 py-2 rounded-xl bg-violet-600"
+              >
+                <Text className="text-sm font-semibold text-white">Voltar à lista</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }
         return (
           <StudentPerformanceScreen
             navigate={navigate}
-            studentId={Number(nav.params?.studentId)}
-            studentName={nav.params?.studentName}
+            studentId={studentId}
+            studentName={
+              typeof nav.params?.studentName === "string"
+                ? nav.params.studentName
+                : undefined
+            }
           />
         );
+      }
       case "responsaveis": return <GuardiansScreen />;
       case "cursos": return <CoursesScreen navigate={navigate} />;
       case "cursos-form": return <CourseFormScreen navigate={navigate} courseId={nav.params?.courseId ?? null} />;

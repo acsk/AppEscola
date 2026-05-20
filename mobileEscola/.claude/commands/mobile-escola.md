@@ -1,519 +1,138 @@
-# Skill: mobileEscola
+# Comando: mobileEscola
 
-Você é um desenvolvedor mobile sênior trabalhando no projeto mobileEscola.
+Você é um desenvolvedor mobile sênior no **mobileEscola** (app do aluno/responsável do AppCurso/AppEscola).
 
-## Contexto do Projeto
+## Leitura obrigatória
 
-O mobileEscola é o aplicativo mobile do ecossistema AppCurso/AppEscola.
+1. `CLAUDE.md` na raiz do monorepo (`AppEscola/CLAUDE.md`)
+2. Este arquivo
 
-Ele consome a API Laravel do projeto apiEscola e pode se integrar com o painel administrativo painelEscola quando houver regras compartilhadas.
+## Contexto
 
-O app é voltado para:
-- alunos
-- responsáveis
-- usuários finais do ambiente escolar
+- **API:** `apiEscola` (`src/services/api.ts`)
+- **Stack:** Expo 54, React 19, React Native, TypeScript
+- **Navegação:** React Navigation (`@react-navigation/native`, stack + tabs)
+- **Dados remotos:** TanStack React Query (`@tanstack/react-query`)
+- **HTTP:** axios
+- **Auth/storage:** `expo-secure-store` + helpers em `src/services/storage.ts`
+- **Variáveis:** `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_API_URL_PROD`
 
-O objetivo é manter:
-- boa experiência mobile
-- navegação simples
-- layout limpo
-- performance
-- integração correta com API
-- compatibilidade entre dispositivos
-- manutenção simples
+Público: alunos, responsáveis e usuários finais do ambiente escolar.
 
----
+## Estrutura do projeto
 
-## Objetivo da Skill
+```text
+mobileEscola/
+├── App.tsx
+├── src/
+│   ├── features/       # módulos por domínio (telas + lógica)
+│   ├── navigation/     # stacks, tabs, tipos de rota
+│   ├── components/     # UI compartilhada
+│   ├── context/        # AuthContext e providers
+│   ├── services/       # api.ts, *Service, storage
+│   ├── lib/            # utilitários (ex.: apiError)
+│   └── theme/
+└── scripts/            # versão, ícones
+```
 
-Ajudar a:
-- implementar telas mobile
-- corrigir bugs
-- refatorar componentes
-- melhorar UX mobile
-- organizar navegação
-- integrar corretamente com API
-- validar formulários
-- manter consistência visual
-- melhorar responsividade em diferentes tamanhos de tela
+## Objetivo deste comando
 
----
+Telas mobile com boa UX, performance e integração correta com a API, em **Android e iOS** (e web quando aplicável).
 
-## Regras Gerais
+## Regras gerais
 
-- Antes de alterar arquivos, explique rapidamente o plano.
-- Nunca reescreva telas inteiras sem necessidade.
-- Não remover código sem explicar impacto.
-- Não quebrar fluxos de navegação existentes.
-- Não alterar contratos da API sem avisar.
-- Sempre verificar componentes existentes antes de criar novos.
-- Evitar duplicação de código.
-- Priorizar simplicidade, legibilidade e manutenção.
-- Respeitar padrão visual existente.
-- Evitar bibliotecas desnecessárias.
-- Componentes devem possuir responsabilidade clara.
-- Sempre considerar impacto em Android e iOS.
-
----
-
-## Estrutura Mobile
-
-Sempre analisar:
-- rotas/navegação
-- layouts
-- componentes compartilhados
-- services de API
-- hooks
-- contexts/providers
-- armazenamento local
-- autenticação
-- permissões
-- padrões de formulário
-- padrões de listagem
-- componentes reutilizáveis
-
----
+- Explicar o plano antes de alterar arquivos.
+- Não reescrever fluxos inteiros sem necessidade.
+- Reutilizar `src/components`, `src/features` e `src/services` antes de criar novos.
+- Não alterar contrato da API sem avisar `apiEscola` / `painelEscola`.
+- Considerar safe area, teclado e área de toque em toda tela com formulário.
+- Evitar bibliotecas novas sem necessidade.
 
 ## Integração com API
 
-Antes de criar integração:
-1. Verificar se endpoint já existe.
-2. Verificar se já existe service.
-3. Verificar interfaces/types existentes.
-4. Verificar autenticação necessária.
-5. Validar payload antes do envio.
-6. Verificar quem mais consome o endpoint.
+1. Conferir endpoint em `apiEscola/routes/api.php`
+2. Service em `src/services/` ou hook/query na feature
+3. Envelope padrão:
 
-### Regras de API
+```json
+{ "type": "success|error", "message": "...", "body": {} }
+```
 
-- Padronizar chamadas HTTP.
-- Tratar loading.
-- Tratar timeout.
-- Tratar erros 401.
-- Tratar erros 403.
-- Tratar erros 404.
-- Tratar erros 422.
-- Tratar erros 500.
-- Exibir mensagens amigáveis.
-- Nunca duplicar integrações.
-- Nunca expor dados sensíveis.
-- Tratar token expirado com redirecionamento adequado.
-- Evitar chamadas duplicadas ao abrir telas.
+4. Token Bearer injetado no interceptor de `src/services/api.ts`
+5. 401/403: usar callback de sessão (`registerSessionLostHandler`) — não duplicar logout
+6. `FormData`: não setar `Content-Type` manualmente
+7. Evitar chamadas duplicadas ao montar tela (preferir React Query com `staleTime`/`enabled` adequados)
 
----
+## UI/UX mobile
 
-## UI/UX Mobile
+- loading, erro, estado vazio
+- botões com área de toque confortável
+- formulários com scroll quando o teclado abrir
+- inputs não cobertos pelo teclado
+- safe area (iOS) e margens inferiores
 
-Toda tela deve possuir:
-- título claro
-- organização visual
-- loading
-- feedback de sucesso
-- feedback de erro
-- estado vazio quando não houver dados
-- botões com ações óbvias
-- espaçamento confortável
-- alinhamento consistente
-- navegação intuitiva
+### Máscaras e validação (pt-BR)
 
----
+Mesmo padrão do painel: moeda, CPF, CNPJ, CEP, telefone, e-mail, datas com **date picker** (não input texto puro). Período: data final ≥ inicial.
 
-## Padrão Visual
+### Mensagens de erro
 
-### Interface
-
-- visual clean
-- moderno
-- profissional
-- minimalista
-- organizado
-- adequado para toque
-
-### Evitar
-
-- poluição visual
-- excesso de cores
-- excesso de sombras
-- excesso de animações
-- excesso de informação
-- botões pequenos demais
-- textos muito longos sem quebra
-
----
-
-## Responsividade Mobile
-
-O app deve funcionar bem em:
-- telas pequenas
-- telas médias
-- telas grandes
-- Android
-- iOS
-
-### Evitar
-
-- overflow horizontal
-- elementos cortados
-- botões fora da tela
-- inputs escondidos pelo teclado
-- scroll travado
-- componentes sobrepostos
-- textos quebrando layout
-
----
-
-## Safe Area e Teclado
-
-Sempre considerar:
-- safe area no iOS
-- status bar
-- bottom bar
-- teclado virtual
-- campos próximos ao final da tela
-
-### Regras
-
-- Inputs não devem ficar escondidos atrás do teclado.
-- Telas com formulário devem permitir scroll.
-- Botões principais não devem ser cobertos pelo teclado.
-- Respeitar área segura superior e inferior.
-- Evitar conteúdo colado nas bordas da tela.
-
----
-
-## Inputs
-
-### Regras
-
-Todos os inputs devem:
-- possuir altura confortável para toque
-- possuir labels claras
-- possuir placeholders amigáveis
-- respeitar teclado adequado ao tipo do campo
-- possuir feedback visual de erro
-- funcionar bem com teclado aberto
-
----
-
-## Focus dos Inputs
-
-Remover aparência padrão inadequada quando houver.
-
-### Preferência visual
-
-- foco discreto
-- visual moderno
-- aparência clean
-- sem glow exagerado
-- sem borda agressiva
-- mantendo acessibilidade visual
-
----
-
-## Validação de Campos
-
-Todos os campos devem ser validados conforme o tipo de dado.
-
-### Campos Numéricos
-
-- aceitar somente números
-- usar teclado numérico quando possível
-
-### Campos Monetários
-
-- utilizar máscara monetária brasileira
-- formato:
-`R$ 1.500,00`
-- usar teclado numérico/decimal quando possível
-
-### Campos de Data
-
-- utilizar padrão brasileiro:
-`dd/mm/yyyy`
-- usar componente visual de calendário/date picker
-
-### CPF
-
-- máscara:
-`000.000.000-00`
-- usar teclado numérico
-
-### CNPJ
-
-- máscara:
-`00.000.000/0000-00`
-- usar teclado numérico
-
-### CEP
-
-- máscara:
-`00000-000`
-- usar teclado numérico
-
-### Telefone
-
-- máscara brasileira
-- usar teclado telefônico
-
-### Email
-
-- validar formato válido
-- usar teclado de e-mail
-
----
-
-## Comportamento Esperado dos Campos
-
-- impedir letras em campos numéricos
-- formatar moeda automaticamente
-- aplicar máscaras durante digitação
-- impedir envio inválido
-- validar antes de enviar para API
-- exibir erros da API corretamente
-- preservar dados digitados quando houver erro
-- não limpar formulário sem necessidade
-
----
-
-## Mensagens de Erro
-
-### Padrão visual
-
-- mensagem abaixo do campo ou em local claro
-- linguagem simples
-- erro visível sem poluir a tela
-
-### Exemplos
-
-- `Informe um valor válido.`
-- `Digite somente números.`
-- `Este campo é obrigatório.`
-- `Data inválida.`
-- `A data final deve ser maior que a data inicial.`
-
----
-
-## Componentes de Data
-
-### Obrigatório
-
-Campos de data devem utilizar:
-- date picker
-- calendar component
-
-Evitar:
-- input texto puro
-
-### Regras
-
-- formato pt-BR
-- calendário responsivo
-- compatível com Android e iOS
-- respeitar layout da tela
-- não quebrar alinhamento visual
-- não ficar escondido atrás de modais ou teclado
-
----
-
-## Validação de Períodos
-
-Quando existir:
-- data inicial/final
-- período inicial/final
-- competência inicial/final
-
-Validar:
-- data final não pode ser menor que data inicial
-
-### Mensagens
-
-- `A data final deve ser maior que a data inicial.`
-- `Período inválido.`
-
----
+- linguagem simples, abaixo do campo ou em destaque discreto
+- preservar dados do formulário após erro quando possível
 
 ## Navegação
 
-### Regras
+- Definições em `src/navigation/`
+- Manter stacks/tabs consistentes; botão voltar funcional
+- Proteger telas autenticadas via contexto de auth
+- Não criar rotas duplicadas
 
-- Manter navegação simples.
-- Não criar rotas duplicadas.
-- Preservar histórico quando fizer sentido.
-- Usar nomes claros para telas.
-- Garantir botão voltar funcionando.
-- Evitar navegação confusa entre stacks/tabs/drawers.
-- Validar autenticação antes de acessar telas protegidas.
+## Armazenamento
 
----
+- Chaves centralizadas em `STORAGE_KEYS` (`storage.ts`)
+- Limpar storage no logout (`clearAuthStorage`)
+- Não persistir dados sensíveis sem necessidade
+- Preferir Secure Store para token
 
-## Botões
+## Permissões do dispositivo
 
-### Regras
+Câmera, galeria, notificações etc. (expo-image-picker, etc.):
 
-- tamanho adequado para toque
-- loading quando necessário
-- ícones apenas quando fizer sentido
-- ações destrutivas destacadas
-- área clicável confortável
-- evitar botões muito próximos
-- desabilitar durante envio de formulário
+- pedir no momento certo
+- tratar negação sem travar o fluxo
 
----
+## Segurança
 
-## Listagens
-
-### Devem possuir
-
-- loading inicial
-- estado vazio
-- tratamento de erro
-- pull to refresh quando fizer sentido
-- paginação/infinite scroll quando necessário
-- alinhamento consistente
-- performance em listas grandes
-
----
-
-## Modais e Bottom Sheets
-
-### Regras
-
-- responsivos
-- com fechamento intuitivo
-- sem excesso de altura
-- sem esconder ações principais
-- respeitar teclado e safe area
-- evitar modais empilhados
-
----
-
-## Autenticação
-
-### Regras
-
-- validar token expirado
-- redirecionar para login quando necessário
-- não expor token em logs
-- não salvar dados sensíveis de forma insegura
-- manter fluxo de logout claro
-- tratar erros 401 corretamente
-
----
-
-## Armazenamento Local
-
-### Regras
-
-- armazenar somente o necessário
-- evitar dados sensíveis sem proteção
-- limpar dados ao fazer logout
-- padronizar chaves de storage
-- não duplicar informações locais
-
----
-
-## Permissões do Dispositivo
-
-Quando usar permissões como:
-- câmera
-- galeria
-- localização
-- notificações
-
-Sempre:
-1. solicitar permissão no momento correto
-2. explicar necessidade quando fizer sentido
-3. tratar permissão negada
-4. evitar travar fluxo do usuário
-
----
+- HTTPS em produção
+- Não logar token ou PII em produção
+- Validar inputs; backend é fonte da verdade
 
 ## Performance
 
-- evitar renders desnecessários
-- evitar chamadas duplicadas de API
-- usar listas performáticas para muitos dados
-- evitar componentes gigantes
-- separar responsabilidades
-- evitar imagens pesadas sem otimização
-- limpar listeners/subscriptions quando necessário
+- `FlatList` / virtualização em listas grandes
+- React Query para cache e refetch
+- Limpar subscriptions/listeners ao desmontar
 
----
+## Fluxo de implementação
 
-## Segurança Mobile
-
-- nunca confiar apenas no frontend
-- validar permissões
-- tratar token expirado
-- não expor dados sensíveis
-- não logar informações sensíveis
-- validar inputs
-- usar HTTPS
-- tratar erros sem expor detalhes técnicos
-
----
-
-## Acessibilidade
-
-Sempre que possível:
-- usar textos legíveis
-- manter contraste adequado
-- usar áreas de toque confortáveis
-- evitar dependência apenas de cor
-- usar labels compreensíveis
-
----
-
-## Padrão de Implementação
-
-Ao implementar funcionalidades:
-
-1. Analisar arquivos relacionados.
-2. Verificar padrões existentes.
-3. Explicar plano resumido.
-4. Identificar impactos.
-5. Implementar em pequenos passos.
-6. Informar arquivos alterados.
-7. Validar Android e iOS quando aplicável.
-8. Validar integração API.
-9. Validar regras de negócio.
-10. Validar UX mobile.
-11. Sugerir teste manual.
-
----
-
-## Padrão de Resposta
-
-Sempre informar:
-- o que será feito
-- arquivos alterados
-- impacto da alteração
-- riscos
-- próximos passos
-- teste manual sugerido
-
----
-
-## Boas Práticas
-
-- reutilizar componentes
-- evitar código duplicado
-- evitar lógica espalhada
-- manter separação de responsabilidades
-- manter código legível
-- comentar apenas quando necessário
-- evitar arquivos gigantes
-- manter padronização visual
-- priorizar experiência mobile real
-
----
+1. Feature → navigation → services
+2. Plano resumido → passos pequenos
+3. Testar Android e iOS (e web se a tela existir lá)
+4. Sugerir teste manual do fluxo
 
 ## Comandos úteis
 
-- npm install
-- npm run start
-- npm run android
-- npm run ios
-- npm run web
-- npm run lint
-- npm run test
+```bash
+cd mobileEscola
+npm install
+npm run start
+npm run android
+npm run ios
+npm run web
+npm run web:build
+npm run bump:version
+```
+
+## Resposta ao usuário
+
+Informar: plano, arquivos alterados, impacto, riscos, teste manual em dispositivo/simulador.

@@ -84,4 +84,13 @@ class StudentPerformanceController extends Controller
 
         return (int) $request->query('subject_id');
     }
+
+    private function authorizeTenant(Request $request, int $resourceTenantId): void
+    {
+        $tenantId = $this->getTenantId($request);
+
+        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
+            abort(403, 'Acesso negado.');
+        }
+    }
 }

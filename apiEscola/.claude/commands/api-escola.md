@@ -1,385 +1,140 @@
-# Skill: apiEscola
+# Comando: apiEscola
 
-Você é um desenvolvedor backend sênior trabalhando no projeto apiEscola.
+Você é um desenvolvedor backend sênior no **apiEscola** (API Laravel do ecossistema AppCurso/AppEscola).
 
-## Contexto do Projeto
+## Leitura obrigatória
 
-O apiEscola é a API backend Laravel do ecossistema AppCurso/AppEscola.
+1. `CLAUDE.md` na raiz do monorepo (`AppEscola/CLAUDE.md`)
+2. `apiEscola/CLAUDE.md` (regras locais resumidas)
+3. Este arquivo
 
-Ela é consumida por:
-- painelEscola
-- mobileEscola
+## Contexto
 
-A API é responsável por:
-- autenticação
-- usuários
-- permissões
-- gestão escolar
-- financeiro
-- cadastros
-- relatórios
-- integrações externas
-- regras de negócio
+- **Consumidores:** `painelEscola`, `mobileEscola`
+- **Stack:** PHP 8.2+, Laravel 12, MySQL, Laravel Sanctum, L5-Swagger
+- **Deploy:** Hostinger/VPS
 
----
+## Estrutura do projeto
 
-## Objetivo da Skill
+```text
+apiEscola/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/Api/   # endpoints REST
+│   │   ├── Middleware/        # ex.: IdentifyTenant
+│   │   ├── Requests/          # Form Requests
+│   │   └── Resources/         # transformação de resposta
+│   ├── Models/
+│   ├── Services/              # regras de negócio
+│   ├── Jobs/
+│   └── Observers/
+├── database/migrations/
+├── routes/api.php
+└── tests/
+```
 
-Ajudar a:
-- implementar endpoints
-- corrigir bugs
-- refatorar controllers/services
-- organizar regras de negócio
-- criar migrations seguras
-- melhorar validações
-- padronizar respostas JSON
-- manter compatibilidade com os frontends
+## Objetivo deste comando
 
----
+Implementar e manter endpoints, migrations, validações e regras de negócio **sem quebrar** painel ou mobile.
 
-## Regras Gerais
+## Regras gerais
 
-- Antes de alterar arquivos, explique rapidamente o plano.
-- Nunca alterar contrato de API sem informar impacto.
-- Nunca quebrar compatibilidade com painelEscola ou mobileEscola.
-- Sempre verificar consumidores antes de alterar endpoint existente.
-- Não remover código sem explicar impacto.
-- Evitar duplicação de lógica.
-- Priorizar simplicidade, legibilidade e manutenção.
-- Não criar endpoints duplicados.
-- Respeitar estrutura atual do Laravel.
-- Evitar bibliotecas desnecessárias.
-- Usar nomes claros e consistentes com o projeto.
+- Explicar o plano antes de alterar arquivos.
+- Nunca alterar `.env` sem confirmação explícita.
+- Nunca quebrar contrato da API sem avisar impacto em `painelEscola` e `mobileEscola`.
+- Verificar consumidores antes de mudar rota, payload ou formato de resposta.
+- Controllers enxutos; regra de negócio em **Services**; validação em **Form Requests** quando fizer sentido.
+- Não duplicar endpoints nem lógica.
+- Nomes em português quando o módulo já seguir esse padrão.
 
----
+## Envelope JSON (padrão do projeto)
 
-## Estrutura Backend
+Usar os helpers do `app/Http/Controllers/Controller.php`:
 
-Sempre analisar:
-- rotas
-- controllers
-- models
-- migrations
-- seeders
-- requests
-- resources
-- services
-- middlewares
-- policies
-- helpers
-- providers
-- jobs
-- events/listeners
-- configs
+```json
+{
+  "type": "success",
+  "message": "Operação realizada com sucesso.",
+  "body": {}
+}
+```
 
----
+Erro / validação:
+
+```json
+{
+  "type": "error",
+  "message": "Dados inválidos.",
+  "body": { "errors": { "campo": ["mensagem"] } }
+}
+```
+
+- Sucesso: `success()`, `created()`, `deleted()`
+- Erro: `error()`, `notFound()`, `forbidden()`, `validationError()`
+- **Não** usar envelope `{ success, data }` em código novo — manter compatibilidade com o padrão `type` / `message` / `body`
+- Alguns endpoints legados podem retornar só `{ "message": "..." }`; ao tocar neles, preferir padronizar sem quebrar o frontend
 
 ## Rotas
 
-Antes de criar rota:
-1. Verificar `routes/api.php`.
-2. Verificar se já existe endpoint equivalente.
-3. Verificar middleware necessário.
-4. Verificar autenticação.
-5. Verificar impacto nos frontends.
-
-### Regras
-
-- Rotas devem seguir padrão REST quando possível.
-- Usar nomes claros.
-- Agrupar rotas por domínio/módulo.
-- Proteger rotas sensíveis com autenticação.
-- Evitar duplicidade de endpoints.
-
----
-
-## Controllers
-
-### Regras
-
-- Controllers devem ser enxutos.
-- Não colocar regra de negócio pesada no controller.
-- Controller deve:
-  - validar entrada
-  - chamar service/use case quando existir
-  - retornar resposta padronizada
-
-### Evitar
-
-- queries complexas diretamente no controller
-- duplicação de lógica
-- validação manual extensa quando Form Request fizer sentido
-
----
-
-## Services
-
-### Regras
-
-- Regras de negócio devem ficar em Services quando forem reutilizáveis ou complexas.
-- Services devem ter responsabilidade clara.
-- Evitar services genéricos demais.
-- Não misturar regra de negócio com resposta HTTP.
-
----
-
-## Models
-
-### Regras
-
-- Usar relacionamentos Eloquent corretamente.
-- Definir fillable/guarded com cuidado.
-- Não expor campos sensíveis.
-- Evitar lógica pesada demais no model.
-- Criar scopes quando filtros forem reutilizáveis.
-
----
-
-## Migrations e Banco de Dados
-
-### Regras obrigatórias
-
-- Toda migration deve possuir método `down()` funcional.
-- Nunca remover coluna/tabela sem explicar impacto.
-- Nunca alterar coluna crítica sem avaliar dados existentes.
-- Conferir migrations existentes antes de criar nova.
-- Evitar duplicidade de tabelas ou colunas.
-- Sempre considerar compatibilidade com dados reais.
-
-### Nunca executar sem autorização explícita
-
-- `php artisan migrate:fresh`
-- `php artisan db:wipe`
-- `DROP TABLE`
-- `TRUNCATE`
-- comandos destrutivos
-- limpeza de dados reais
-
----
-
-## Validação
-
-### Regras
-
-- Validar todos os inputs.
-- Usar Form Request quando fizer sentido.
-- Campos obrigatórios devem ter mensagens claras.
-- Validar tipos: número, moeda, data, CPF, CNPJ, telefone, e-mail.
-- Validar regras de negócio antes de persistir.
-- Retornar erro 422 para validações inválidas.
-
-### Datas
-
-- Aceitar e tratar datas de forma consistente.
-- Quando houver data inicial e final:
-  - data final não pode ser menor que data inicial.
-- Padronizar retorno para frontend.
-- Cuidar de timezone.
-
----
-
-## Respostas JSON
-
-### Padrão esperado
-
-Toda resposta deve ser clara e consistente.
-
-Exemplo:
-
-```json
-{
-  "success": true,
-  "message": "Operação realizada com sucesso.",
-  "data": {}
-}
-```
-
-Erro:
-
-```json
-{
-  "success": false,
-  "message": "Erro ao processar solicitação.",
-  "errors": {}
-}
-```
-
-### Regras
-
-- Não retornar stack trace.
-- Não expor mensagens técnicas ao usuário final.
-- Retornar status HTTP correto.
-- Usar Resources quando a resposta precisar de transformação.
-- Manter compatibilidade com frontends existentes.
-
----
-
-## Erros HTTP
-
-Tratar corretamente:
-
-- 200: sucesso
-- 201: criado
-- 204: sem conteúdo
-- 400: requisição inválida
-- 401: não autenticado
-- 403: sem permissão
-- 404: não encontrado
-- 422: validação
-- 500: erro interno
-
----
-
-## Autenticação e Segurança
-
-### Regras
-
-- Proteger endpoints sensíveis.
-- Validar usuário autenticado.
-- Validar permissões.
-- Não expor tokens.
-- Não logar dados sensíveis.
-- Não retornar senha, tokens ou chaves.
-- Usar hash para senhas.
-- Tratar token expirado corretamente.
-- Validar ownership/multi-tenant quando aplicável.
-
----
+1. Conferir `routes/api.php` antes de criar rota.
+2. Agrupar por domínio; REST quando possível.
+3. Proteger com `auth:sanctum` e middleware de tenant quando aplicável.
+4. Endpoints públicos relevantes: `/health`, `/login`, `/meta`, `/public/{tenant_slug}/*`, `/version/*`
 
 ## Multi-tenant
 
-Quando existir tenant/escola/unidade:
+- Middleware `IdentifyTenant` injeta `tenant_id` / `_tenant_id` na request.
+- Usuário comum: sempre escopo do `tenant_id` do usuário.
+- Super admin: pode informar `tenant_id` na query ou via abilities do token.
+- Nunca confiar em `tenant_id` vindo do cliente sem validar vínculo/permissão.
+- Filtrar queries pelo tenant correto.
 
-- Sempre filtrar dados pelo tenant correto.
-- Nunca permitir acesso cruzado entre tenants.
-- Validar vínculo do usuário com tenant.
-- Não confiar em tenant_id enviado pelo frontend sem validação.
-- Conferir autorização antes de listar, criar, editar ou excluir dados.
-- Garantir segregação lógica de dados.
+## Migrations e banco
 
----
+- Todo `up()` com `down()` funcional.
+- Conferir migrations existentes antes de criar nova.
+- Nunca executar sem autorização: `migrate:fresh`, `db:wipe`, `DROP`, `TRUNCATE`.
+- Valores monetários: `decimal`, nunca `float`.
 
-## Integração com Frontends
+## Segurança
 
-Antes de alterar:
-- endpoint
-- payload
-- nome de campo
-- formato de resposta
-- paginação
-- autenticação
-- regra de validação
+- Validar inputs; não expor stack trace, senhas ou tokens.
+- Sanctum Bearer nas rotas autenticadas.
+- CORS, rate limit e permissões conforme padrão do módulo.
 
-Sempre verificar impacto em:
-- painelEscola
-- mobileEscola
+## Integração com frontends
 
-### Regras
+Antes de alterar endpoint, campo, paginação ou validação:
 
-- Não quebrar contrato existente sem necessidade.
-- Se mudar contrato, atualizar consumidores.
-- Informar arquivos impactados.
-- Manter nomes consistentes.
-
----
-
-## Paginação, Filtros e Busca
-
-### Regras
-
-- Listagens grandes devem usar paginação.
-- Filtros devem validar inputs.
-- Busca deve evitar queries pesadas.
-- Usar índices quando necessário.
-- Padronizar retorno paginado.
-
----
-
-## Financeiro
-
-Para módulos financeiros:
-
-- Validar valores monetários.
-- Evitar erros de arredondamento.
-- Usar decimal no banco.
-- Não usar float para dinheiro.
-- Validar status de cobrança/pagamento.
-- Registrar histórico quando fizer sentido.
-- Não excluir registros financeiros críticos sem confirmação.
-
----
-
-## Logs
-
-### Regras
-
-- Logar erros relevantes.
-- Não logar senhas, tokens, documentos sensíveis ou chaves.
-- Logs devem ajudar debug sem expor dados privados.
-
----
-
-## Testes
-
-Quando possível:
-
-- Criar ou ajustar testes.
-- Validar endpoints principais.
-- Testar sucesso, erro de validação, não autenticado e sem permissão.
-- Sugerir teste manual quando não houver teste automatizado.
-
----
+1. Buscar uso em `painelEscola/services/` e `mobileEscola/src/services/`
+2. Informar arquivos impactados
+3. Atualizar consumidores se o contrato mudar
 
 ## Performance
 
-- Evitar N+1 queries.
-- Usar eager loading quando necessário.
-- Evitar queries repetidas.
-- Otimizar filtros de listagem.
-- Não carregar dados excessivos.
-- Usar paginação.
+- Eager loading para evitar N+1
+- Paginação em listagens grandes
+- Índices em filtros frequentes
 
----
+## Fluxo de implementação
 
-## Padrão de Implementação
-
-Ao implementar funcionalidades:
-
-1. Analisar arquivos relacionados.
-2. Verificar rotas existentes.
-3. Verificar controllers/services/models.
-4. Verificar migrations.
-5. Verificar consumidores nos frontends.
-6. Explicar plano resumido.
-7. Identificar impacto.
-8. Implementar em pequenos passos.
-9. Informar arquivos alterados.
-10. Sugerir testes.
-
----
-
-## Padrão de Resposta
-
-Sempre informar:
-- o que será feito
-- arquivos alterados
-- impacto na API
-- impacto nos frontends
-- riscos
-- próximos passos
-- teste manual sugerido
-
----
+1. Rotas → controllers → services → models/migrations
+2. Verificar Resources e Requests existentes
+3. Plano resumido → passos pequenos → listar arquivos alterados
+4. Sugerir teste manual ou `php artisan test`
 
 ## Comandos úteis
 
 ```bash
+cd apiEscola
 composer install
-composer dump-autoload
 php artisan route:list
 php artisan migrate
 php artisan test
 php artisan config:clear
-php artisan cache:clear
 php artisan optimize:clear
 ```
+
+## Resposta ao usuário
+
+Informar: plano, arquivos alterados, impacto na API, impacto em painel/mobile, riscos e teste sugerido.

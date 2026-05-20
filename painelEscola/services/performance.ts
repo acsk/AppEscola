@@ -7,6 +7,8 @@ export type {
   PerformanceMonthSubject,
   PerformanceMonthlyEvolution,
   PerformanceOverview,
+  PerformanceStudent,
+  PerformanceStudentEnrollment,
   PerformanceSubject,
   StudentPerformance,
 } from "../types/performance";
