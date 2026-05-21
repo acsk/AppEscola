@@ -231,14 +231,17 @@ Na matrícula, o valor líquido das mensalidades usa `monthly_amount` (base) −
 Se o desconto foi ajustado depois que as invoices foram geradas:
 
 ```bash
-# Ver o que mudaria, sem gravar
+# Diagnóstico (lista cobranças e alerta se monthly_amount ≠ plano)
 php artisan enrollments:sync-invoice-amounts MAT-2-00003 --dry-run
 
-# Aplicar
-php artisan enrollments:sync-invoice-amounts MAT-2-00003
+# Corrigir base gravada errada (ex.: 125 quando o plano é 120) e sincronizar pendentes
+php artisan enrollments:sync-invoice-amounts MAT-2-00003 --fix-base-from-plan
+
+# Só simular a correção da base
+php artisan enrollments:sync-invoice-amounts MAT-2-00003 --fix-base-from-plan --dry-run
 ```
 
-Aceita ID numérico ou `enrollment_number`. Atualiza apenas invoices `pending` e `overdue` dos tipos `monthly` e `enrollment_fee`.
+Aceita ID numérico ou `enrollment_number`. Atualiza apenas invoices `pending` e `overdue` dos tipos `monthly` e `enrollment_fee`. Cobranças já pagas ou canceladas não são alteradas.
 
 ---
 
