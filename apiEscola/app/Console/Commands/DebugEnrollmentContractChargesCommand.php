@@ -55,7 +55,6 @@ class DebugEnrollmentContractChargesCommand extends Command
             'warnings' => $preview['warnings'] ?? [],
             'to_generate' => $preview['to_generate'] ?? [],
             'provider_boleto_list' => $preview['provider_boleto_list'] ?? [],
-            'provider_boleto_school_groups' => $preview['provider_boleto_school_groups'] ?? [],
             'debug' => $debug,
         ];
 
@@ -148,9 +147,7 @@ class DebugEnrollmentContractChargesCommand extends Command
             . ' | Sem CPF: ' . ($api['without_customer_document_in_list'] ?? '?'));
         $this->line('  Vinculados à matrícula: ' . ($summary['external_for_enrollment'] ?? $cora['summary']['external_for_enrollment'] ?? '?'));
         $this->line('  Mesmo CPF pagador: ' . ($summary['external_matches_payer'] ?? $cora['summary']['external_matches_payer'] ?? '?'));
-        $this->line('  Desta matrícula (provider_boleto_list): ' . count($payload['provider_boleto_list'] ?? []) . ' linha(s)');
-        $this->line('  Grupos outros na escola: ' . ($summary['external_boleto_school_groups']
-            ?? count($payload['provider_boleto_school_groups'] ?? [])));
+        $this->line('  Lista provider_boleto_list: ' . count($payload['provider_boleto_list'] ?? []) . ' linha(s)');
 
         if (! empty($api['payment_method_counts'])) {
             $this->line('  Métodos: ' . json_encode($api['payment_method_counts'], JSON_UNESCAPED_UNICODE));
@@ -186,21 +183,6 @@ class DebugEnrollmentContractChargesCommand extends Command
                 $reasonCounts[$reason] = ($reasonCounts[$reason] ?? 0) + 1;
             }
             $this->line('  Motivos (amostra): ' . json_encode($reasonCounts, JSON_UNESCAPED_UNICODE));
-        }
-
-        $schoolGroups = $payload['provider_boleto_school_groups'] ?? [];
-        if ($schoolGroups !== []) {
-            $this->newLine();
-            $this->info('── Outros na escola (agrupados) ──');
-            $this->table(
-                ['Vencimento', 'Valor', 'Qtd', 'Status'],
-                array_map(static fn (array $g) => [
-                    $g['due_date'] ?? '—',
-                    'R$ ' . ($g['amount'] ?? '—'),
-                    $g['count'] ?? 1,
-                    $g['status'] ?? '—',
-                ], $schoolGroups)
-            );
         }
 
         $hydrate = $cora['hydrate_samples'] ?? [];

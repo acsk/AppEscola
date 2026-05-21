@@ -86,7 +86,6 @@ class EnrollmentContractChargesService
         $externalPreview = [
             'items' => [],
             'provider_boleto_list' => [],
-            'provider_boleto_school_groups' => [],
             'external_total' => 0,
             'external_boleto_total' => 0,
             'external_for_enrollment' => 0,
@@ -106,21 +105,6 @@ class EnrollmentContractChargesService
 
         $syncCandidates = $externalPreview['items'];
         $providerBoletoList = $externalPreview['provider_boleto_list'] ?? $syncCandidates;
-        $providerSchoolGroups = $externalPreview['provider_boleto_school_groups'] ?? [];
-
-        if (
-            ($externalPreview['external_for_enrollment'] ?? 0) === 0
-            && ($externalPreview['external_boleto_total'] ?? 0) > 0
-            && $externalPreview['fetch_error'] === null
-        ) {
-            $groupLines = count($providerSchoolGroups);
-            $warnings[] = sprintf(
-                'A Cora retornou %d boleto(s) da escola; nenhum vinculado a esta matrícula (%d grupo(s) no resumo abaixo). '
-                . 'Datas e valores iguais costumam ser de outros alunos, não duplicata da API.',
-                (int) $externalPreview['external_boleto_total'],
-                $groupLines > 0 ? $groupLines : (int) $externalPreview['external_boleto_total']
-            );
-        }
 
         $toGenerate = $this->deferLocalGenerationWhenProviderHasBoleto($toGenerate, $providerBoletoList);
         $toGenerateSelectable = array_values(array_filter(
@@ -159,7 +143,6 @@ class EnrollmentContractChargesService
                 'external_boleto_total' => $externalPreview['external_boleto_total'] ?? 0,
                 'external_for_enrollment' => $externalPreview['external_for_enrollment'] ?? count($syncCandidates),
                 'external_matches_payer' => $externalPreview['external_matches_payer'] ?? 0,
-                'external_boleto_school_groups' => count($providerSchoolGroups),
                 'provider_fetch_error' => $externalPreview['fetch_error'],
             ],
             'warnings' => $warnings,
@@ -168,7 +151,6 @@ class EnrollmentContractChargesService
             'to_generate' => $toGenerate,
             'external_charges' => $syncCandidates,
             'provider_boleto_list' => $providerBoletoList,
-            'provider_boleto_school_groups' => $providerSchoolGroups,
         ];
 
         if ($includeDebug) {

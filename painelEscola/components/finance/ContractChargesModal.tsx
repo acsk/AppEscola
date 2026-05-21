@@ -15,7 +15,6 @@ import {
   type ContractChargePreviewRow,
   type ContractChargesPreview,
   type ContractExternalChargeRow,
-  type ProviderBoletoSchoolGroup,
 } from "../../services/enrollmentContractCharges";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
 import { useAuth } from "../../contexts/AuthContext";
@@ -443,74 +442,21 @@ function CompactTableHeader({
   );
 }
 
-function CoraSchoolGroupsSummary({ groups }: { groups: ProviderBoletoSchoolGroup[] }) {
-  if (groups.length === 0) return null;
-
-  const totalBoletos = groups.reduce((sum, g) => sum + (g.count ?? 0), 0);
-
-  return (
-    <View className="rounded-lg border border-gray-200 bg-gray-50/80 overflow-hidden">
-      <View className="px-2.5 py-2 border-b border-gray-100">
-        <Text className="text-[10px] font-bold uppercase text-gray-600">
-          Outros na escola ({totalBoletos} boleto{totalBoletos === 1 ? "" : "s"}, {groups.length}{" "}
-          {groups.length === 1 ? "grupo" : "grupos"})
-        </Text>
-        <Text className="text-[10px] text-gray-500 mt-0.5">
-          Agrupados por vencimento, valor e status — não pertencem a esta matrícula.
-        </Text>
-      </View>
-      <CompactTableHeader
-        columns={[
-          { label: "Venc.", width: 68 },
-          { label: "Valor", width: 82 },
-          { label: "Qtd", width: 40, align: "right" },
-          { label: "Status", flex: 1 },
-        ]}
-      />
-      {groups.map((group, index) => (
-        <View
-          key={`${group.due_date}-${group.amount}-${group.status}-${index}`}
-          className={`flex-row items-center px-2 py-1.5 ${
-            index < groups.length - 1 ? "border-b border-gray-100" : ""
-          }`}
-        >
-          <Text className="text-[11px] text-gray-700" style={{ width: 68 }}>
-            {fmtDate(group.due_date)}
-          </Text>
-          <Text className="text-[11px] font-semibold text-gray-900" style={{ width: 82 }}>
-            {fmtMoney(group.amount)}
-          </Text>
-          <Text className="text-[11px] font-bold text-gray-800 text-right" style={{ width: 40 }}>
-            ×{group.count}
-          </Text>
-          <Text className="flex-1 text-[10px] text-gray-600" numberOfLines={1}>
-            {getStatusDisplay(group.status).label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 function CoraChargesCompactList({
   rows,
   selectedKeys,
   onToggle,
-  emptyTitle = "Nenhum boleto desta matrícula na Cora",
-  emptyDescription = "Não há boleto vinculado à matrícula nem com o mesmo CPF do pagador.",
 }: {
   rows: ContractExternalChargeRow[];
   selectedKeys: Set<string>;
   onToggle: (key: string) => void;
-  emptyTitle?: string;
-  emptyDescription?: string;
 }) {
   if (rows.length === 0) {
     return (
       <EmptyState
         icon="cloud-offline-outline"
-        title={emptyTitle}
-        description={emptyDescription}
+        title="Nenhum boleto na Cora"
+        description="A API da Cora não retornou boletos para esta escola."
       />
     );
   }
@@ -554,14 +500,9 @@ function CoraChargesCompactList({
             <Text className="text-[11px] text-gray-700" style={{ width: 68 }}>
               {fmtDate(row.due_date)}
             </Text>
-            <View style={{ width: 82 }} className="flex-row items-center gap-1">
-              <Text className="text-[11px] font-semibold text-gray-900">
-                {fmtMoney(row.amount)}
-              </Text>
-              {(row.group_count ?? 0) > 1 ? (
-                <Pill label={`×${row.group_count}`} tone="gray" />
-              ) : null}
-            </View>
+            <Text className="text-[11px] font-semibold text-gray-900" style={{ width: 82 }}>
+              {fmtMoney(row.amount)}
+            </Text>
             <View style={{ width: 72 }}>
               <Pill label={providerLinkLabel(row)} tone={providerLinkTone(row)} />
             </View>
@@ -677,7 +618,7 @@ function ContractChargesDebugPanel({ debug }: { debug: Record<string, unknown> }
     `Matrícula #${local.enrollment_id} (${local.enrollment_number ?? "—"}) · ambiente ${local.environment}`,
     `Valores: base ${amounts.base_monthly_amount} − desconto ${amounts.discount_amount} = líquido ${amounts.net_monthly_amount}`,
     `Cora listagem: ${api.listed_count ?? "?"} cobranças, ${api.boleto_count ?? "?"} boletos, CPF na listagem: ${api.with_customer_document_in_list ?? "?"}/${api.listed_count ?? "?"}`,
-    `Vínculo: ${coraSummary.external_for_enrollment ?? 0} matrícula · ${coraSummary.external_matches_payer ?? 0} mesmo CPF · grupos escola: ${coraSummary.provider_boleto_school_groups_count ?? "?"}`,
+    `Vínculo: ${coraSummary.external_for_enrollment ?? 0} matrícula · ${coraSummary.external_matches_payer ?? 0} mesmo CPF`,
     (cora.fetch_error as string) ? `Erro: ${cora.fetch_error}` : null,
   ].filter(Boolean) as string[];
 
@@ -932,11 +873,6 @@ export default function ContractChargesModal({
     [preview]
   );
 
-  const providerSchoolGroups = useMemo(
-    () => preview?.provider_boleto_school_groups ?? [],
-    [preview]
-  );
-
   const selectableSync = useMemo(
     () => providerBoletoRows.filter((r) => r.syncable !== false && r.link_status !== "linked"),
     [providerBoletoRows]
@@ -1145,7 +1081,7 @@ export default function ContractChargesModal({
 
             <SectionPanel accent="emerald">
               <SectionHeader
-                title={`Cora — desta matrícula (${providerBoletoRows.length})`}
+                title={`Cora (${preview.summary.external_boleto_total ?? providerBoletoRows.length} boleto${(preview.summary.external_boleto_total ?? 0) === 1 ? "" : "s"})`}
                 action={
                   selectableSync.length > 0 ? (
                     <TouchableOpacity
@@ -1166,19 +1102,17 @@ export default function ContractChargesModal({
                   ) : null
                 }
               />
-              {providerBoletoRows.length === 0 &&
-              (preview.summary.external_boleto_total ?? 0) > 0 &&
-              providerSchoolGroups.length === 0 ? (
+              {providerBoletoRows.length === 0 && (preview.summary.external_total ?? 0) > 0 ? (
                 <Text className="text-xs text-amber-800">
                   {preview.summary.external_total} cobrança(s) na API, nenhuma como boleto.
                 </Text>
-              ) : null}
-              <CoraChargesCompactList
-                rows={providerBoletoRows}
-                selectedKeys={selectedKeys}
-                onToggle={toggleKey}
-              />
-              <CoraSchoolGroupsSummary groups={providerSchoolGroups} />
+              ) : (
+                <CoraChargesCompactList
+                  rows={providerBoletoRows}
+                  selectedKeys={selectedKeys}
+                  onToggle={toggleKey}
+                />
+              )}
             </SectionPanel>
 
             <SectionPanel accent="violet">

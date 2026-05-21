@@ -99,7 +99,6 @@ class ContractChargesPreviewDebugService
                 'external_for_enrollment' => $externalPreview['external_for_enrollment'] ?? null,
                 'external_matches_payer' => $externalPreview['external_matches_payer'] ?? null,
                 'provider_boleto_list_count' => count($externalPreview['provider_boleto_list'] ?? []),
-                'provider_boleto_school_groups_count' => count($externalPreview['provider_boleto_school_groups'] ?? []),
             ],
             'api' => null,
             'boleto_diagnosis' => [],
@@ -132,7 +131,6 @@ class ContractChargesPreviewDebugService
             'cora' => $coraDebug,
             'preview_payload_echo' => $externalPreview !== null ? [
                 'provider_boleto_list' => $externalPreview['provider_boleto_list'] ?? [],
-                'provider_boleto_school_groups' => $externalPreview['provider_boleto_school_groups'] ?? [],
             ] : null,
         ];
     }

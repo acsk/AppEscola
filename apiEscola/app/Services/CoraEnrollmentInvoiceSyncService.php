@@ -191,7 +191,6 @@ class CoraEnrollmentInvoiceSyncService
      * @return array{
      *     items: array<int, array<string, mixed>>,
      *     provider_boleto_list: array<int, array<string, mixed>>,
-     *     provider_boleto_school_groups: array<int, array<string, mixed>>,
      *     external_total: int,
      *     external_boleto_total: int,
      *     external_for_enrollment: int,
@@ -283,19 +282,9 @@ class CoraEnrollmentInvoiceSyncService
             }
         }
 
-        $relevantCatalog = array_values(array_filter(
-            $catalog,
-            static fn (array $row) => ! empty($row['for_this_enrollment']) || ! empty($row['matches_payer'])
-        ));
-        $otherCatalog = array_values(array_filter(
-            $catalog,
-            static fn (array $row) => empty($row['for_this_enrollment']) && empty($row['matches_payer'])
-        ));
-
         return [
             'items' => $items,
-            'provider_boleto_list' => $this->collapseProviderBoletoRows($relevantCatalog),
-            'provider_boleto_school_groups' => $this->summarizeSchoolBoletoGroups($otherCatalog),
+            'provider_boleto_list' => $catalog,
             'external_total' => count($externalInvoices),
             'external_boleto_total' => $boletoTotal,
             'external_for_enrollment' => count($items),
@@ -632,106 +621,6 @@ class CoraEnrollmentInvoiceSyncService
         }
 
         return '***' . substr($digits, -4);
-    }
-
-    /**
-     * Agrupa linhas com mesma data/valor/status para evitar lista repetitiva na UI.
-     *
-     * @param  array<int, array<string, mixed>>  $rows
-     * @return array<int, array<string, mixed>>
-     */
-    private function collapseProviderBoletoRows(array $rows): array
-    {
-        $groups = [];
-
-        foreach ($rows as $row) {
-            $groupKey = implode('|', [
-                (string) ($row['due_date'] ?? ''),
-                (string) ($row['amount'] ?? ''),
-                (string) ($row['link_status'] ?? 'other'),
-                ! empty($row['for_this_enrollment']) ? '1' : '0',
-                ! empty($row['matches_payer']) ? '1' : '0',
-                strtoupper((string) ($row['status'] ?? '')),
-            ]);
-
-            if (! isset($groups[$groupKey])) {
-                $groups[$groupKey] = array_merge($row, [
-                    'group_count' => 1,
-                    'charge_ids' => [(string) ($row['charge_id'] ?? '')],
-                ]);
-
-                continue;
-            }
-
-            $groups[$groupKey]['group_count'] = ((int) ($groups[$groupKey]['group_count'] ?? 1)) + 1;
-            $groups[$groupKey]['charge_ids'][] = (string) ($row['charge_id'] ?? '');
-        }
-
-        $collapsed = [];
-
-        foreach ($groups as $group) {
-            $count = (int) ($group['group_count'] ?? 1);
-            if ($count > 1) {
-                $description = trim((string) ($group['description'] ?? 'Boleto Cora'));
-                $suffix = ' (+' . ($count - 1) . ' similares)';
-                if (! str_contains($description, $suffix)) {
-                    $group['description'] = $description . $suffix;
-                }
-            }
-
-            $collapsed[] = $group;
-        }
-
-        usort($collapsed, static function (array $a, array $b): int {
-            return strcmp((string) ($a['due_date'] ?? ''), (string) ($b['due_date'] ?? ''));
-        });
-
-        return $collapsed;
-    }
-
-    /**
-     * Resumo de boletos da escola sem vínculo com a matrícula (outros alunos).
-     *
-     * @param  array<int, array<string, mixed>>  $rows
-     * @return array<int, array<string, mixed>>
-     */
-    private function summarizeSchoolBoletoGroups(array $rows): array
-    {
-        $groups = [];
-
-        foreach ($rows as $row) {
-            $groupKey = implode('|', [
-                (string) ($row['due_date'] ?? ''),
-                (string) ($row['amount'] ?? ''),
-                strtoupper((string) ($row['status'] ?? '')),
-            ]);
-
-            if (! isset($groups[$groupKey])) {
-                $groups[$groupKey] = [
-                    'due_date' => $row['due_date'] ?? null,
-                    'amount' => $row['amount'] ?? null,
-                    'status' => (string) ($row['status'] ?? ''),
-                    'count' => 1,
-                ];
-
-                continue;
-            }
-
-            $groups[$groupKey]['count'] = ((int) ($groups[$groupKey]['count'] ?? 1)) + 1;
-        }
-
-        $summary = array_values($groups);
-
-        usort($summary, static function (array $a, array $b): int {
-            $countCompare = ((int) ($b['count'] ?? 0)) <=> ((int) ($a['count'] ?? 0));
-            if ($countCompare !== 0) {
-                return $countCompare;
-            }
-
-            return strcmp((string) ($a['due_date'] ?? ''), (string) ($b['due_date'] ?? ''));
-        });
-
-        return $summary;
     }
 
     private function extractInvoiceDescription(array $externalInvoice): string
