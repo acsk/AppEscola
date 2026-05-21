@@ -17,12 +17,14 @@ type Props = {
   children: React.ReactNode;
   headerContent?: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   maxHeight?: ViewStyle["maxHeight"];
   footerStyle?: ViewStyle;
+  showScrollIndicator?: boolean;
+  scrollViewClassName?: string;
 };
 
-const widths = { sm: 560, md: 760, lg: 980 };
+const widths = { sm: 560, md: 760, lg: 980, xl: 1180 };
 
 export default function Modal({
   visible,
@@ -34,6 +36,8 @@ export default function Modal({
   size = "md",
   maxHeight = "94%",
   footerStyle,
+  showScrollIndicator = false,
+  scrollViewClassName = "",
 }: Props) {
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
@@ -81,8 +85,8 @@ export default function Modal({
 
           {/* Body */}
           <ScrollView
-            className={isMobile ? "px-4 py-4" : "px-6 py-4"}
-            showsVerticalScrollIndicator={false}
+            className={`${isMobile ? "px-4 py-4" : "px-6 py-4"} ${scrollViewClassName}`}
+            showsVerticalScrollIndicator={showScrollIndicator}
           >
             {children}
           </ScrollView>

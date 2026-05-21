@@ -8,3 +8,32 @@ textarea:focus {
   outline: none;
   box-shadow: none;
 }
+
+.app-scrollbar {
+  scrollbar-color: #7c3aed #ede9fe;
+  scrollbar-width: thin;
+}
+
+.app-scrollbar::-webkit-scrollbar,
+.app-scrollbar *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app-scrollbar::-webkit-scrollbar-track,
+.app-scrollbar *::-webkit-scrollbar-track {
+  background: #ede9fe;
+  border-radius: 999px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb,
+.app-scrollbar *::-webkit-scrollbar-thumb {
+  background: #7c3aed;
+  border: 2px solid #ede9fe;
+  border-radius: 999px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb:hover,
+.app-scrollbar *::-webkit-scrollbar-thumb:hover {
+  background: #6d28d9;
+}

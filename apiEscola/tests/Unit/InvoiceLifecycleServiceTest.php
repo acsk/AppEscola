@@ -60,7 +60,7 @@ class InvoiceLifecycleServiceTest extends TestCase
         $this->assertTrue($permissions['can_delete']);
     }
 
-    public function test_active_pix_blocks_cancel_and_delete(): void
+    public function test_active_pix_requires_cancel_before_delete(): void
     {
         $invoice = new Invoice([
             'status' => 'pending',
@@ -72,8 +72,10 @@ class InvoiceLifecycleServiceTest extends TestCase
         $service = new InvoiceLifecycleService(Mockery::mock(PaymentGatewayFactory::class));
         $permissions = $service->permissions($invoice);
 
-        $this->assertFalse($permissions['can_cancel']);
+        $this->assertTrue($permissions['can_cancel']);
         $this->assertFalse($permissions['can_delete']);
+        $this->assertTrue($permissions['requires_cora_cancel_before_delete']);
+        $this->assertTrue($service->shouldCancelOnGateway($invoice));
     }
 
     public function test_local_pending_without_gateway_can_delete(): void

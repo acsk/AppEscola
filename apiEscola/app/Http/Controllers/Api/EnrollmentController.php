@@ -364,6 +364,49 @@ class EnrollmentController extends Controller
         return $amount > 0 ? $amount : null;
     }
 
+    private function firstMonthlyDueDate(Carbon $startDate, int $dueDay): Carbon
+    {
+        $cursor = $startDate->copy()->day($dueDay);
+        if ($cursor->lt($startDate)) {
+            $cursor->addMonth();
+        }
+
+        return $cursor;
+    }
+
+    /**
+     * @param  array<string, mixed>  $paymentData
+     */
+    private function createEnrollmentInvoice(
+        int $tenantId,
+        int $enrollmentId,
+        int $studentId,
+        ?int $guardianId,
+        string $type,
+        string $description,
+        float $amount,
+        string $dueDate,
+        array $paymentData,
+    ): Invoice {
+        $isPaid = ! empty($paymentData['payment_method']);
+
+        return Invoice::create([
+            'tenant_id'         => $tenantId,
+            'enrollment_id'     => $enrollmentId,
+            'student_id'        => $studentId,
+            'guardian_id'       => $guardianId,
+            'type'              => $type,
+            'description'       => $description,
+            'amount'            => $amount,
+            'due_date'          => $dueDate,
+            'status'            => $isPaid ? 'paid' : 'pending',
+            'paid_at'           => $isPaid ? ($paymentData['paid_at'] ?? now()) : null,
+            'payment_method'    => $paymentData['payment_method'] ?? null,
+            'payment_reference' => $paymentData['payment_reference'] ?? null,
+            'notes'             => $paymentData['notes'] ?? null,
+        ]);
+    }
+
     public function contractChargesPreview(Request $request, Enrollment $enrollment): JsonResponse
     {
         $this->authorizeTenant($request, $enrollment->tenant_id);
@@ -692,26 +735,41 @@ class EnrollmentController extends Controller
                 'payment_due_day'   => $dueDay,
             ]);
 
+            $paymentData = $request->input('enrollment_payment', []);
+
             // Taxa de matrícula — só cria se a escola cobra e o plano tem valor cadastrado
             if (! empty($billing['charges_enrollment_fee']) && $enrollmentFeeAmount !== null) {
-                $paymentData = $request->input('enrollment_payment', []);
-                $isPaid      = ! empty($paymentData['payment_method']);
-
-                Invoice::create([
-                    'tenant_id'      => $effectiveTenantId,
-                    'enrollment_id'  => $enrollment->id,
-                    'student_id'     => $request->student_id,
-                    'guardian_id'    => $guardianId,
-                    'type'           => 'enrollment_fee',
-                    'description'    => 'Taxa de Matrícula — ' . $plan->course->name,
-                    'amount'         => max($enrollmentFeeAmount, 0),
-                    'due_date'       => $startDate->toDateString(),
-                    'status'         => $isPaid ? 'paid' : 'pending',
-                    'paid_at'        => $isPaid ? ($paymentData['paid_at'] ?? now()) : null,
-                    'payment_method' => $paymentData['payment_method'] ?? null,
-                    'payment_reference' => $paymentData['payment_reference'] ?? null,
-                    'notes'          => $paymentData['notes'] ?? null,
-                ]);
+                $this->createEnrollmentInvoice(
+                    tenantId: $effectiveTenantId,
+                    enrollmentId: $enrollment->id,
+                    studentId: $request->student_id,
+                    guardianId: $guardianId,
+                    type: 'enrollment_fee',
+                    description: 'Taxa de Matrícula — ' . $plan->course->name,
+                    amount: max($enrollmentFeeAmount, 0),
+                    dueDate: $startDate->toDateString(),
+                    paymentData: $paymentData,
+                );
+            } elseif (
+                ! empty($billing['charge_first_monthly_at_enrollment'])
+                && $enrollmentFeeAmount === null
+            ) {
+                // Plano sem taxa: 1ª mensalidade no ato da matrícula (ex.: curso de 30 dias)
+                $netMonthly = max($netAmount, 0);
+                if ($netMonthly > 0) {
+                    $firstDue = $this->firstMonthlyDueDate($startDate, $dueDay);
+                    $this->createEnrollmentInvoice(
+                        tenantId: $effectiveTenantId,
+                        enrollmentId: $enrollment->id,
+                        studentId: $request->student_id,
+                        guardianId: $guardianId,
+                        type: 'monthly',
+                        description: 'Mensalidade ' . $firstDue->format('m/Y') . ' — ' . $plan->course->name,
+                        amount: $netMonthly,
+                        dueDate: $firstDue->toDateString(),
+                        paymentData: $paymentData,
+                    );
+                }
             }
 
             return $enrollment;

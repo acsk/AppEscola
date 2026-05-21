@@ -17,8 +17,15 @@ class InvoiceLifecycleService
 
     private const TERMINAL_CORA_STATUSES = ['PAID', 'IN_PAYMENT', 'COMPLETED', 'RECEIVED', 'CANCELLED', 'CANCELED', 'VOIDED', 'EXPIRED'];
 
-    public function __construct(private readonly PaymentGatewayFactory $gatewayFactory)
-    {
+    private const PROVIDER_CANCELLED_STATUSES = [
+        'CANCELLED', 'CANCELED', 'VOIDED', 'EXPIRED',
+        'DELETED', 'REFUNDED',
+    ];
+
+    public function __construct(
+        private readonly PaymentGatewayFactory $gatewayFactory,
+        private readonly InvoicePaymentSettingsResolver $paymentSettingsResolver,
+    ) {
     }
 
     /**
@@ -36,7 +43,6 @@ class InvoiceLifecycleService
     {
         $status = strtolower((string) $invoice->status);
         $hasActiveGatewayCharge = $this->hasActiveGatewayCharge($invoice);
-        $isPixOnlyActive = $this->isPixOnlyActiveCharge($invoice);
 
         $canEdit = ! in_array($status, ['paid', 'cancelled'], true);
 
@@ -47,8 +53,6 @@ class InvoiceLifecycleService
             $cancelBlockReason = 'Cobrança já está paga.';
         } elseif ($status === 'cancelled') {
             $cancelBlockReason = 'Cobrança já está cancelada.';
-        } elseif ($isPixOnlyActive) {
-            $cancelBlockReason = 'Cobranças PIX ativas expiram automaticamente na Cora. Aguarde a expiração ou marque como paga.';
         } else {
             $canCancel = true;
         }
@@ -62,8 +66,6 @@ class InvoiceLifecycleService
             $deleteBlockReason = 'Não é possível excluir uma cobrança paga.';
         } elseif ($requiresCoraCancelBeforeDelete) {
             $deleteBlockReason = 'Cancele a cobrança no provedor antes de excluir do sistema.';
-        } elseif ($isPixOnlyActive) {
-            $deleteBlockReason = 'Cobrança PIX ativa na Cora. Aguarde expirar ou cancele/marque como paga antes de excluir.';
         } else {
             $canDelete = true;
         }
@@ -145,7 +147,9 @@ class InvoiceLifecycleService
                 throw new RuntimeException('Tenant da cobrança não encontrado.');
             }
 
-            $this->cancelChargeOnGateway($tenant, (string) $invoice->cora_charge_id, $environment);
+            $chargeId = (string) $invoice->cora_charge_id;
+            $this->cancelChargeOnGateway($tenant, $chargeId, $environment);
+            $this->assertGatewayChargeCancelledOnProvider($tenant, $chargeId, $environment);
             $cancelledOnGateway = true;
         }
 
@@ -267,12 +271,12 @@ class InvoiceLifecycleService
 
     public function shouldCancelOnGateway(Invoice $invoice): bool
     {
-        return $this->hasActiveGatewayCharge($invoice)
-            && ! $this->isPixOnlyActiveCharge($invoice);
+        return $this->hasActiveGatewayCharge($invoice);
     }
 
     /**
-     * Invalida boleto/híbrido ativo na Cora antes de baixa manual (não altera status da invoice).
+     * Cancela cobrança ativa na Cora e só retorna após confirmação no provedor.
+     * A baixa manual (status paid) deve ocorrer somente depois deste passo.
      *
      * @return bool true quando cancelou no provedor
      */
@@ -290,7 +294,10 @@ class InvoiceLifecycleService
         }
 
         $environment = $this->resolveCoraEnvironment($request);
-        $this->cancelChargeOnGateway($tenant, (string) $invoice->cora_charge_id, $environment);
+        $chargeId = (string) $invoice->cora_charge_id;
+
+        $this->cancelChargeOnGateway($tenant, $chargeId, $environment);
+        $this->assertGatewayChargeCancelledOnProvider($tenant, $chargeId, $environment);
 
         $invoice->update([
             'cora_status' => 'CANCELLED',
@@ -298,6 +305,46 @@ class InvoiceLifecycleService
         ]);
 
         return true;
+    }
+
+    private function assertGatewayChargeCancelledOnProvider(Tenant $tenant, string $chargeId, string $environment): void
+    {
+        try {
+            $provider = $this->resolveGatewayProviderForInvoice($tenant, $chargeId);
+            $external = $this->gatewayFactory->resolve($provider)->getInvoiceById($tenant, $chargeId, $environment);
+        } catch (RequestException $e) {
+            if ($e->response?->status() === 404) {
+                return;
+            }
+
+            throw new RuntimeException(
+                'Não foi possível confirmar o cancelamento no provedor. A baixa não foi registrada.',
+                0,
+                $e
+            );
+        } catch (ConnectionException $e) {
+            throw new RuntimeException(
+                'Não foi possível confirmar o cancelamento no provedor. A baixa não foi registrada.',
+                0,
+                $e
+            );
+        }
+
+        $localStatus = strtolower(trim((string) ($external['local_status'] ?? '')));
+
+        if ($localStatus === 'cancelled') {
+            return;
+        }
+
+        $status = strtoupper(trim((string) ($external['status'] ?? '')));
+
+        if (in_array($status, self::PROVIDER_CANCELLED_STATUSES, true)) {
+            return;
+        }
+
+        throw new RuntimeException(
+            "Cancelamento no provedor ainda não confirmado (status: {$status}). A baixa não foi registrada."
+        );
     }
 
     private function cancelChargeOnGateway(Tenant $tenant, string $chargeId, string $environment): void
@@ -308,6 +355,25 @@ class InvoiceLifecycleService
             throw new RuntimeException('ID da cobrança no provedor é obrigatório para cancelamento.');
         }
 
-        $this->gatewayFactory->resolve('cora')->cancelCharge($tenant, $chargeId, $environment);
+        $provider = $this->resolveGatewayProviderForInvoice($tenant, $chargeId);
+        $this->gatewayFactory->resolve($provider)->cancelCharge($tenant, $chargeId, $environment);
+    }
+
+    private function resolveGatewayProviderForInvoice(Tenant $tenant, string $chargeId): string
+    {
+        $invoice = Invoice::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('cora_charge_id', $chargeId)
+            ->first();
+
+        if ($invoice) {
+            $fromPayload = strtolower(trim((string) data_get($invoice->cora_payload, 'integration.provider', '')));
+
+            if ($fromPayload !== '' && PaymentGatewayFactory::isSupported($fromPayload)) {
+                return $fromPayload;
+            }
+        }
+
+        return $this->paymentSettingsResolver->defaultProviderSlug($tenant->id);
     }
 }

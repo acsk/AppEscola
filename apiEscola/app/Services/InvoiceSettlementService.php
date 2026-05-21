@@ -93,11 +93,7 @@ class InvoiceSettlementService
         }
 
         if ($this->lifecycle->shouldCancelOnGateway($invoice)) {
-            return 'Esta cobrança possui boleto ativo na Cora. Ao registrar a baixa manual, o boleto será cancelado no provedor e a forma de pagamento será atualizada.';
-        }
-
-        if ($this->lifecycle->isPixOnlyActiveCharge($invoice)) {
-            return 'Há um PIX ativo na Cora. A baixa manual registra o pagamento no sistema; o PIX no provedor expira automaticamente.';
+            return 'Cobrança ativa na Cora (boleto ou PIX). A baixa só é registrada após cancelamento confirmado no provedor.';
         }
 
         if (! $invoice->cora_charge_id) {

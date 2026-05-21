@@ -91,6 +91,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
   const chargesEnrollmentFee = billingRules.charges_enrollment_fee !== false; // default true
   const enrollmentFeeCoversFirstMonth = billingRules.enrollment_fee_covers_first_month === true;
+  const chargeFirstMonthlyAtEnrollment =
+    billingRules.charge_first_monthly_at_enrollment !== false;
   const allowMonthliesBeforeFeePaid = billingRules.allow_monthlies_before_fee_paid !== false;
   const defaultPaymentDueDay = Number.isFinite(Number(billingRules.default_payment_due_day))
     ? Number(billingRules.default_payment_due_day)
@@ -256,10 +258,27 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
       ? parseEnrollmentFeeAmount(selectedPlan.enrollment_fee_amount)
       : null;
 
-  /** Exibe pagamento da taxa só se o tenant cobra e o plano/pacote tem valor a cobrar. */
+  const planMonthlyEquivalent =
+    mode === "plan" && selectedPlan?.monthly_equivalent != null
+      ? parseFloat(String(selectedPlan.monthly_equivalent))
+      : null;
+
+  /** Taxa de matrícula no ato (plano com valor cadastrado ou pacote). */
   const showEnrollmentFeePayment =
     chargesEnrollmentFee &&
     (mode === "bundle" || planEnrollmentFeeAmount !== null);
+
+  /** Plano sem taxa: 1ª mensalidade na matrícula (ex. curso 30 dias). */
+  const showFirstMonthlyPayment =
+    mode === "plan" &&
+    chargeFirstMonthlyAtEnrollment &&
+    planEnrollmentFeeAmount === null &&
+    (planMonthlyEquivalent ?? 0) > 0;
+
+  const showInitialPayment = showEnrollmentFeePayment || showFirstMonthlyPayment;
+  const initialPaymentKind: "enrollment_fee" | "first_monthly" = showEnrollmentFeePayment
+    ? "enrollment_fee"
+    : "first_monthly";
 
   const classesForCourse = (cId: number) =>
     classes.filter((cl) => cl.course?.id === cId);
@@ -292,9 +311,14 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
     return null;
   };
 
-  const discountedEnrollmentFee = () => {
+  const discountedInitialCharge = () => {
     const disc = parseFloat(discount.replace(",", ".")) || 0;
     if (mode === "bundle") {
+      const base = baseEquivalent();
+      if (base === null) return null;
+      return Math.max(0, base - disc);
+    }
+    if (showFirstMonthlyPayment) {
       const base = baseEquivalent();
       if (base === null) return null;
       return Math.max(0, base - disc);
@@ -304,13 +328,13 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
   };
 
   useEffect(() => {
-    if (!showEnrollmentFeePayment) {
+    if (!showInitialPayment) {
       setPayNow(false);
       setPayMethod("");
       setPayReference("");
       setPayNotes("");
     }
-  }, [showEnrollmentFeePayment, planId, bundleId, mode]);
+  }, [showInitialPayment, planId, bundleId, mode]);
 
   // ── Validation ───────────────────────────────────────────────────────────────
   const validate = () => {
@@ -342,11 +366,11 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         : "CPF do aluno (pagador) é obrigatório para concluir a matrícula.";
     }
 
-    if (showEnrollmentFeePayment && payNow && !payMethod) {
+    if (showInitialPayment && payNow && !payMethod) {
       e.payment_method = "Selecione o método de pagamento.";
     }
     if (
-      showEnrollmentFeePayment &&
+      showInitialPayment &&
       payNow &&
       requiresCardPaymentReference(payMethod) &&
       !payReference.trim()
@@ -371,7 +395,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
     try {
       const enrollmentPayment =
-        showEnrollmentFeePayment && payNow
+        showInitialPayment && payNow
           ? {
               payment_method: payMethod,
               paid_at: displayToISO(paidAt) ?? todayISO(),
@@ -379,6 +403,16 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
               notes: payNotes.trim() || undefined,
             }
           : undefined;
+
+      const pickPrimaryInvoice = (invoices: any[] | undefined) => {
+        const list = invoices ?? [];
+        return (
+          list.find((i) => i.type === "enrollment_fee") ??
+          list.find((i) => i.type === "monthly") ??
+          list[0] ??
+          null
+        );
+      };
 
       if (mode === "plan") {
         const payload: Record<string, any> = {
@@ -396,7 +430,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         const { data } = await api.post("/enrollments/subscribe", payload);
         setResult({
           enrollmentNumbers: [data.enrollment_number].filter(Boolean),
-          invoice: data.invoices?.[0] ?? null,
+          invoice: pickPrimaryInvoice(data.invoices),
         });
       } else {
         const schoolClassIds = selectedBundle!.courses.map(
@@ -502,7 +536,9 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
             style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
           >
             <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              Taxa de Matrícula
+              {result.invoice.type === "monthly"
+                ? "Primeira mensalidade"
+                : "Taxa de Matrícula"}
             </Text>
             <View className="flex-row items-center justify-between mb-2">
               <Text className="text-sm text-gray-600">Valor</Text>
@@ -1012,12 +1048,15 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         </View>
 
         {/* Price preview */}
-        {showEnrollmentFeePayment && discountedEnrollmentFee() !== null && (
+        {showInitialPayment && discountedInitialCharge() !== null && (
           <View className="flex-row items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2 mt-3">
             <Ionicons name="cash-outline" size={14} color="#16A34A" />
             <Text className="text-xs text-green-700">
-              Taxa de matrícula estimada:{" "}
-              <Text className="font-bold">{fmtBRL(discountedEnrollmentFee()!)}</Text>
+              {initialPaymentKind === "first_monthly"
+                ? "Primeira mensalidade estimada"
+                : "Taxa de matrícula estimada"}
+              :{" "}
+              <Text className="font-bold">{fmtBRL(discountedInitialCharge()!)}</Text>
               {parseFloat(discount) > 0 && (
                 <Text className="text-green-500">
                   {" "}(desconto de {fmtBRL(parseFloat(discount.replace(",", ".")) || 0)})
@@ -1045,14 +1084,28 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           </View>
         )}
 
-        {chargesEnrollmentFee &&
-          mode === "plan" &&
+        {mode === "plan" &&
           selectedPlan &&
-          planEnrollmentFeeAmount === null && (
+          planEnrollmentFeeAmount === null &&
+          chargeFirstMonthlyAtEnrollment && (
+          <View className="flex-row items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mt-3">
+            <Ionicons name="information-circle-outline" size={14} color="#2563EB" />
+            <Text className="text-xs text-blue-700">
+              Este plano não cobra taxa de matrícula. A{" "}
+              <Text className="font-bold">primeira mensalidade</Text> será gerada na matrícula
+              (ideal para cursos curtos, ex. 30 dias).
+            </Text>
+          </View>
+        )}
+
+        {mode === "plan" &&
+          selectedPlan &&
+          planEnrollmentFeeAmount === null &&
+          !chargeFirstMonthlyAtEnrollment && (
           <View className="flex-row items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-3">
             <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
             <Text className="text-xs text-gray-600">
-              Este plano não possui taxa de matrícula cadastrada. Não será exibida cobrança de taxa nesta matrícula.
+              Este plano não possui taxa de matrícula. Gere as mensalidades depois em Cobranças.
             </Text>
           </View>
         )}
@@ -1067,8 +1120,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         )}
       </View>
 
-      {/* ── Card: Taxa de Matrícula (pagamento) ── */}
-      {showEnrollmentFeePayment && (
+      {/* ── Pagamento no ato (taxa ou 1ª mensalidade) ── */}
+      {showInitialPayment && (
       <View
         className="bg-white rounded-2xl p-6 mb-5"
         style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
@@ -1080,10 +1133,14 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
             </View>
             <View>
               <Text className="text-base font-semibold text-gray-800">
-                Taxa de Matrícula
+                {initialPaymentKind === "first_monthly"
+                  ? "Primeira mensalidade"
+                  : "Taxa de Matrícula"}
               </Text>
               <Text className="text-xs text-gray-400">
-                Uma invoice será criada automaticamente
+                {initialPaymentKind === "first_monthly"
+                  ? "Substitui a taxa de matrícula neste plano"
+                  : "Uma invoice será criada automaticamente"}
               </Text>
             </View>
           </View>

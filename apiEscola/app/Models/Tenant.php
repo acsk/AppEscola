@@ -90,4 +90,9 @@ class Tenant extends Model
     {
         return $this->hasMany(TenantCoraCredential::class);
     }
+
+    public function asaasCredentials(): HasMany
+    {
+        return $this->hasMany(TenantAsaasCredential::class);
+    }
 }

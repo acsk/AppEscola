@@ -35,6 +35,13 @@ return [
             'description' => 'Se ativo, a geração de mensalidades começa a partir do segundo mês do período.',
         ],
 
+        'charge_first_monthly_at_enrollment' => [
+            'type' => 'bool',
+            'default' => true,
+            'label' => 'Primeira mensalidade na matrícula (sem taxa)',
+            'description' => 'Quando o plano não tem taxa de matrícula, cria a 1ª mensalidade no ato da inscrição. O pagamento no ato usa o mesmo bloco enrollment_payment.',
+        ],
+
         'allow_monthlies_before_fee_paid' => [
             'type' => 'bool',
             'default' => true,
@@ -82,7 +89,7 @@ return [
             'default' => true,
             'label' => 'Sincronizar cobranças automaticamente',
             'description' => 'Consulta o gateway para atualizar status das faturas. Disponível apenas com provedor Cora.',
-            'visible_when' => ['default_provider' => ['cora']],
+            'visible_when' => ['default_provider' => ['cora', 'asaas']],
         ],
     ],
 

@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
+use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PaymentProviderController;
 use App\Http\Controllers\Api\PaymentProvidersController;
@@ -45,6 +46,10 @@ use Illuminate\Support\Facades\Route;
 
 // Health check (público)
 Route::get('/health', [HealthController::class, 'check']);
+
+// Webhook Asaas (público — validação por ASAAS_WEBHOOK_TOKEN)
+Route::post('/webhooks/asaas', [AsaasWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1');
 
 // Autenticação (pública)
 Route::post('/login', [AuthController::class, 'login']);

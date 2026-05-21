@@ -65,10 +65,11 @@ class TenantBillingSettingsSeeder extends Seeder
      * @var array<string, mixed>
      */
     private const BILLING_DEFAULTS = [
-        'charges_enrollment_fee'             => true,
-        'enrollment_fee_covers_first_month'  => false,
-        'allow_monthlies_before_fee_paid'    => true,
-        'default_payment_due_day'            => 10,
+        'charges_enrollment_fee'              => true,
+        'enrollment_fee_covers_first_month'   => false,
+        'charge_first_monthly_at_enrollment'  => true,
+        'allow_monthlies_before_fee_paid'     => true,
+        'default_payment_due_day'             => 10,
     ];
 
     public function run(): void

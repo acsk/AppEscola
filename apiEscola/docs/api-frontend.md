@@ -837,7 +837,7 @@ Content-Type: application/json
 | `notes` | ❌ | observações |
 | `environment` | ❌ | `stage` ou `prod` — usado ao cancelar boleto ativo na Cora antes da baixa |
 
-**Comportamento com boleto na Cora:** se a invoice tiver cobrança ativa de boleto/híbrido (`cora_charge_id`), a API **cancela no provedor** e em seguida marca como paga com a forma informada (mesma invoice, sem clone). Cobrança só local: baixa direta. PIX ativo: baixa local; PIX expira no provedor.
+**Comportamento com cobrança ativa na Cora (boleto, PIX ou híbrido):** a API **cancela no provedor**, **confirma** o cancelamento (consulta status) e **só então** marca como paga. Se o cancelamento falhar ou não for confirmado, a baixa **não** é registrada. Cobrança só local (`cora_charge_id` vazio): baixa direta.
 
 **Resposta:** envelope `{ type, message, body: { invoice, cancelled_on_gateway } }`.
 
@@ -859,7 +859,7 @@ POST /api/invoices/{id}/cancel
 Authorization: Bearer {token}
 ```
 
-Invalida a cobrança no provedor (boleto/híbrido com `cora_charge_id` ativo) e define `status=cancelled` no sistema. PIX ativo na Cora **não** pode ser cancelado manualmente (expira no provedor).
+Cancela no provedor (boleto, PIX ou híbrido com `cora_charge_id` ativo), confirma o cancelamento e define `status=cancelled` no sistema.
 
 **Resposta de sucesso (`body`):**
 ```json
@@ -895,7 +895,7 @@ Só permitido quando `can_delete=true` (ex.: cobrança cancelada, pendente local
 DELETE /api/enrollments/{id}
 ```
 
-Antes de remover, o backend cancela em lote todas as invoices pendentes no provedor (quando aplicável). Se alguma falhar (ex.: PIX ativo), retorna `422` e **não** remove a matrícula. Em sucesso, `body.invoice_cancellation` resume o lote.
+Antes de remover, o backend cancela em lote todas as invoices pendentes no provedor (quando aplicável). Se alguma falhar, retorna `422` e **não** remove a matrícula. Em sucesso, `body.invoice_cancellation` resume o lote.
 
 ### Aproveitamento do aluno (evolução por disciplina)
 

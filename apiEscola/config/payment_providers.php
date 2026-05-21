@@ -27,6 +27,19 @@ return [
             'capabilities' => ['pix', 'boleto', 'hybrid', 'webhook', 'mtls_cert_upload'],
         ],
 
+        'asaas' => [
+            'label' => 'Asaas',
+            'description' => 'Cobranças PIX, boleto e cartão via API Asaas (chave global no servidor + webhook).',
+            'requires_credentials' => true,
+            'supports_gateway_charge' => true,
+            'supports_auto_sync' => true,
+            'gateway_class' => \App\Services\Gateways\AsaasPaymentGateway::class,
+            'methods' => ['pix', 'boleto', 'credit_card'],
+            'default_enabled_methods' => ['pix', 'boleto'],
+            'default_method' => 'pix',
+            'capabilities' => ['pix', 'boleto', 'credit_card', 'webhook', 'customer_sync'],
+        ],
+
         'manual' => [
             'label' => 'Manual',
             'description' => 'Sem gateway: faturas no sistema e confirmação pela secretaria (caixa, transferência, etc.).',

@@ -76,9 +76,14 @@ class InvoicePaymentSettingsResolver
      */
     public function gatewayChargeMethodsForTenant(int $tenantId): array
     {
-        $gatewayMethods = ['pix', 'boleto', 'hybrid'];
+        $provider = $this->defaultProviderSlug($tenantId);
+        $providerMethods = PaymentProviderRegistry::supportedMethods($provider);
+        $chargeCapable = array_values(array_intersect(
+            $providerMethods,
+            ['pix', 'boleto', 'hybrid', 'credit_card', 'card', 'bank_slip']
+        ));
 
-        return array_values(array_intersect($this->enabledMethodsForTenant($tenantId), $gatewayMethods));
+        return array_values(array_intersect($this->enabledMethodsForTenant($tenantId), $chargeCapable));
     }
 
     public function configuredDefaultMethod(int $tenantId): ?string

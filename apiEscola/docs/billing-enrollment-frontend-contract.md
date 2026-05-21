@@ -140,6 +140,14 @@ Impacto no front:
 Impacto no front:
 - exibir aviso informativo no resumo financeiro da matricula.
 
+### billing.charge_first_monthly_at_enrollment
+- true (padrao): se o plano **nao** tem `enrollment_fee_amount`, `POST /enrollments/subscribe` cria a **primeira mensalidade** no ato;
+- false: matricula por plano sem taxa nao cria cobranca inicial (gerar mensalidades depois em lote).
+
+Impacto no front:
+- exibir bloco de pagamento como "Primeira mensalidade" (nao "Taxa de matricula");
+- reutilizar `enrollment_payment` para marcar essa mensalidade como paga no ato.
+
 ### billing.default_payment_due_day
 - aplicado quando payment_due_day nao e enviado no payload.
 

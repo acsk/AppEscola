@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\PaymentProvider;
 use App\Models\Tenant;
+use App\Models\TenantAsaasCredential;
 use App\Models\TenantCoraCredential;
+use App\Services\Asaas\AsaasCredentialService;
+use App\Services\Asaas\AsaasHttpClient;
 use App\Services\PaymentGatewayFactory;
 use App\Services\CoraTokenService;
 use App\Services\PaymentProviderRegistry;
@@ -95,10 +98,17 @@ class PaymentProviderController extends Controller
                 ))
                 ->values();
 
-            if ($providers->isEmpty() && TenantCoraCredential::query()->exists()) {
-                $providers = collect([
-                    $this->mapProviderListItem('cora', 'Cora', true, null),
-                ]);
+            if ($providers->isEmpty()) {
+                $fallback = collect();
+                if (TenantCoraCredential::query()->exists()) {
+                    $fallback->push($this->mapProviderListItem('cora', 'Cora', true, null));
+                }
+                if (TenantAsaasCredential::query()->exists()) {
+                    $fallback->push($this->mapProviderListItem('asaas', 'Asaas', true, null));
+                }
+                if ($fallback->isNotEmpty()) {
+                    $providers = $fallback;
+                }
             }
 
             return $this->success($providers->all(), 'Provedores de pagamento carregados com sucesso.');
@@ -149,6 +159,58 @@ class PaymentProviderController extends Controller
                 ],
                 'fields' => [],
                 'message' => 'Nenhuma credencial necessária. Confirme pagamentos em Financeiro → Marcar como paga.',
+            ], 'Schema do provedor carregado com sucesso.');
+        }
+
+        if ($provider === 'asaas') {
+            $credentials = $tenant->asaasCredentials()->orderBy('environment')->get();
+            $stage = $credentials->firstWhere('environment', 'stage');
+            $prod = $credentials->firstWhere('environment', 'prod');
+
+            return $this->success([
+                'provider' => 'asaas',
+                'configured' => $credentials->isNotEmpty(),
+                'requires_credentials' => true,
+                'supports_gateway_charge' => true,
+                'environments' => [
+                    'stage' => (bool) $stage?->active,
+                    'prod' => (bool) $prod?->active,
+                ],
+                'configured_at' => [
+                    'stage' => $stage?->configured_at?->toISOString(),
+                    'prod' => $prod?->configured_at?->toISOString(),
+                ],
+                'fields' => [
+                    [
+                        'name' => 'environment',
+                        'label' => 'Ambiente',
+                        'type' => 'select',
+                        'required' => true,
+                        'options' => ['stage', 'prod'],
+                    ],
+                    [
+                        'name' => 'api_key',
+                        'label' => 'API Key Asaas',
+                        'type' => 'password',
+                        'required' => true,
+                        'placeholder' => '$aact_...',
+                    ],
+                    [
+                        'name' => 'webhook_token',
+                        'label' => 'Token do webhook',
+                        'type' => 'password',
+                        'required' => false,
+                        'description' => 'Mesmo valor configurado no painel Asaas (header asaas-access-token).',
+                    ],
+                    [
+                        'name' => 'base_url',
+                        'label' => 'URL base (opcional)',
+                        'type' => 'text',
+                        'required' => false,
+                        'placeholder' => 'https://api-sandbox.asaas.com/v3',
+                    ],
+                ],
+                'message' => 'Credenciais por tenant e ambiente. A API key nunca é exibida após salvar.',
             ], 'Schema do provedor carregado com sucesso.');
         }
 
@@ -239,6 +301,10 @@ class PaymentProviderController extends Controller
         $this->ensureCanManageTenant($request, $tenant);
         $this->ensureSupportedProvider($provider);
 
+        if ($provider === 'asaas') {
+            return $this->saveAsaasSettings($request, $tenant);
+        }
+
         if ($provider !== 'cora') {
             return $this->error('Configuração de credenciais ainda não implementada para este provedor.', [
                 'provider' => $provider,
@@ -300,10 +366,116 @@ class PaymentProviderController extends Controller
         ], 'Configuração do provedor salva com sucesso.');
     }
 
+    private function saveAsaasSettings(Request $request, Tenant $tenant): JsonResponse
+    {
+        $credentialService = app(AsaasCredentialService::class);
+        $environment = $credentialService->normalizeEnvironment(
+            (string) $request->input('environment', 'stage')
+        );
+
+        $existing = TenantAsaasCredential::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('environment', $environment)
+            ->first();
+
+        $data = $request->validate([
+            'environment' => ['required', 'string', 'in:stage,prod,production'],
+            'api_key' => [$existing ? 'nullable' : 'required', 'string', 'min:20', 'max:500'],
+            'webhook_token' => ['nullable', 'string', 'min:8', 'max:255'],
+            'base_url' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $apiKey = trim((string) ($data['api_key'] ?? ''));
+
+        if ($apiKey === '' && $existing) {
+            $apiKey = (string) $existing->api_key;
+        }
+
+        if ($apiKey === '') {
+            return $this->error('API key do Asaas é obrigatória.', null, 422);
+        }
+
+        $webhookToken = array_key_exists('webhook_token', $data)
+            ? trim((string) ($data['webhook_token'] ?? ''))
+            : null;
+
+        if (($webhookToken === null || $webhookToken === '') && $existing?->webhook_token) {
+            $webhookToken = (string) $existing->webhook_token;
+        }
+
+        $baseUrl = isset($data['base_url']) ? trim((string) $data['base_url']) : null;
+        if ($baseUrl === '') {
+            $baseUrl = $existing?->base_url;
+        }
+
+        $credential = $credentialService->persist(
+            $tenant,
+            $environment,
+            $apiKey,
+            $webhookToken !== '' ? $webhookToken : null,
+            is_string($baseUrl) ? $baseUrl : null,
+        );
+
+        return $this->success([
+            'provider' => 'asaas',
+            'configured' => true,
+            'environment' => $environment,
+            'configured_at' => $credential->configured_at?->toISOString(),
+            'has_webhook_token' => (bool) $credential->webhook_token_hash,
+            'base_url' => $credential->base_url ?: $credentialService->defaultBaseUrlForEnvironment($environment),
+        ], 'Credenciais Asaas salvas com sucesso.');
+    }
+
+    private function testAsaasConnection(Request $request, Tenant $tenant): JsonResponse
+    {
+        $credentialService = app(AsaasCredentialService::class);
+        $requestedEnv = (string) $request->input('environment', 'stage');
+        $environment = $credentialService->normalizeEnvironment(
+            $requestedEnv === 'production' ? 'prod' : $requestedEnv
+        );
+
+        $user = $request->user();
+        if (! app()->environment('production')) {
+            $environment = 'stage';
+        } elseif (! ($user && $user->isSuperAdmin())) {
+            $environment = 'prod';
+        }
+
+        try {
+            app(AsaasHttpClient::class)->get($tenant, 'customers', $environment, ['limit' => 1]);
+        } catch (ConnectionException|RequestException $e) {
+            return $this->error('Erro de comunicação com o Asaas.', [
+                'provider' => 'asaas',
+                'environment' => $environment,
+                'ok' => false,
+                'provider_status' => 'error',
+                'error' => $e->getMessage(),
+            ], 502);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), [
+                'provider' => 'asaas',
+                'environment' => $environment,
+                'ok' => false,
+                'provider_status' => 'invalid_configuration',
+            ], 422);
+        }
+
+        return $this->success([
+            'provider' => 'asaas',
+            'environment' => $environment,
+            'ok' => true,
+            'provider_status' => 'connected',
+        ], 'Conexão com o Asaas validada com sucesso.');
+    }
+
     public function testConnection(Request $request, Tenant $tenant, string $provider, CoraTokenService $tokenService): JsonResponse
     {
         $this->ensureCanManageTenant($request, $tenant);
         $this->ensureSupportedProvider($provider);
+
+        if ($provider === 'asaas') {
+            return $this->testAsaasConnection($request, $tenant);
+        }
 
         if ($provider !== 'cora') {
             return $this->error('Teste de conexão ainda não implementado para este provedor.', [
@@ -466,7 +638,7 @@ class PaymentProviderController extends Controller
 
         $data = $request->validate([
             'provider' => ['nullable', 'string'],
-            'method' => ['nullable', 'string', 'in:pix,boleto,hybrid,bank_slip'],
+            'method' => ['nullable', 'string', 'in:pix,boleto,hybrid,bank_slip,credit_card,card'],
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
         ]);
 
@@ -479,7 +651,7 @@ class PaymentProviderController extends Controller
                 'Este tenant usa cobrança manual. Registre o pagamento em Financeiro → Marcar como paga.',
                 [
                     'default_provider' => $resolvedProvider,
-                    'hint' => 'Altere o provedor padrão para Cora em Configurações de cobrança se desejar gerar PIX/boleto automaticamente.',
+                    'hint' => 'Altere o provedor padrão (Cora ou Asaas) em Configurações de cobrança se desejar gerar cobrança automaticamente.',
                 ],
                 422
             );
@@ -686,6 +858,7 @@ class PaymentProviderController extends Controller
         $storedMethod = $lockedSyncedMethod ?? $requestedStoredMethod ?? $existingStoredMethod ?? 'pix';
         $coraMethod = $requestedCoraMethod ?? match ($storedMethod) {
             'bank_slip' => 'boleto',
+            'credit_card', 'card' => 'credit_card',
             default => 'pix',
         };
 
@@ -767,6 +940,13 @@ class PaymentProviderController extends Controller
 
         $payloadToPersist = is_array($result['payload']) ? $result['payload'] : [];
         $payloadToPersist['method_charges'] = $methodCharges;
+        $payloadToPersist['integration'] = array_merge(
+            (array) ($payloadToPersist['integration'] ?? []),
+            [
+                'provider' => $resolvedProvider,
+                'environment' => $environment,
+            ]
+        );
 
         $invoice->update([
             'payment_method' => $storedMethod,
@@ -792,7 +972,7 @@ class PaymentProviderController extends Controller
 
         return $this->success([
             'invoice_id' => $invoice->id,
-            'provider' => 'cora',
+            'provider' => $resolvedProvider,
             'environment' => $environment,
             'method' => $requestedMethod === 'hybrid' ? 'hybrid' : $storedMethod,
             'charge_id' => $invoice->fresh()->cora_charge_id,

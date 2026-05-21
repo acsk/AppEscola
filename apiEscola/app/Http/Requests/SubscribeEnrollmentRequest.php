@@ -41,7 +41,7 @@ class SubscribeEnrollmentRequest extends FormRequest
             'payment_due_day' => ['nullable', 'integer', 'min:1', 'max:28'],
             // Responsável financeiro para cobrança — se não informado, usa o marcado como financeiro na relação
             'guardian_id'     => ['nullable', 'exists:guardians,id'],
-            // Pagamento da taxa de matrícula (cobrada no ato da matrícula)
+            // Pagamento no ato: taxa de matrícula OU 1ª mensalidade (plano sem taxa)
             'enrollment_payment'                 => ['nullable', 'array'],
             'enrollment_payment.payment_method'     => ['nullable', 'string', 'exists:domain_payment_methods,slug'],
             'enrollment_payment.paid_at'            => ['nullable', 'date'],
