@@ -270,6 +270,26 @@ A resposta inclui `body.debug` com:
 No painel: botão **Debug** no modal “Cobranças do contrato” (admin/financeiro/super_admin).
 
 Log adicional: `storage/logs/cora_sync_debug.log` (mesmo canal das sincronizações Cora).
+
+### Artisan (SSH em produção)
+
+```bash
+php artisan enrollments:debug-contract-charges 5
+php artisan enrollments:debug-contract-charges MAT-2-00003 --environment=prod
+php artisan enrollments:debug-contract-charges 5 --json
+php artisan enrollments:debug-contract-charges 5 --save=relatorio.json
+```
+
+Opções:
+
+| Opção | Descrição |
+|--------|-----------|
+| `--environment=prod` | Ambiente Cora (padrão: prod) |
+| `--invoice-types=monthly` | Tipos do contrato (vírgula) |
+| `--json` | Saída só JSON no terminal |
+| `--save=` | Grava em `storage/logs/` (nome automático se só passar `relatorio.json`) |
+
+Não exige `CORA_CONTRACT_CHARGES_DEBUG` — roda com credenciais Cora do tenant no servidor.
 - Parcelas **locais** na mesma data de um boleto com vínculo **Matrícula** ou **Mesmo CPF** **não** vêm marcadas para gerar local. O usuário pode marcar manualmente se quiser criar no sistema mesmo assim.
 
 ---

@@ -148,8 +148,9 @@ class DebugEnrollmentContractChargesCommand extends Command
             . ' | Sem CPF: ' . ($api['without_customer_document_in_list'] ?? '?'));
         $this->line('  Vinculados à matrícula: ' . ($summary['external_for_enrollment'] ?? $cora['summary']['external_for_enrollment'] ?? '?'));
         $this->line('  Mesmo CPF pagador: ' . ($summary['external_matches_payer'] ?? $cora['summary']['external_matches_payer'] ?? '?'));
-        $this->line('  Lista sync (provider_boleto_list): ' . ($summary['external_boleto_school_groups'] ?? 0) . ' grupos escola, '
-            . count($payload['provider_boleto_list'] ?? []) . ' linha(s) desta matrícula');
+        $this->line('  Desta matrícula (provider_boleto_list): ' . count($payload['provider_boleto_list'] ?? []) . ' linha(s)');
+        $this->line('  Grupos outros na escola: ' . ($summary['external_boleto_school_groups']
+            ?? count($payload['provider_boleto_school_groups'] ?? [])));
 
         if (! empty($api['payment_method_counts'])) {
             $this->line('  Métodos: ' . json_encode($api['payment_method_counts'], JSON_UNESCAPED_UNICODE));
