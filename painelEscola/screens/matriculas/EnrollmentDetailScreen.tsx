@@ -20,7 +20,20 @@ import DatePickerInput from "../../components/ui/DatePickerInput";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import MessageModal from "../../components/ui/MessageModal";
-import { isoToDisplay, isoToDisplay as isoToDisplayDate, displayToISO, maskDate, maskCurrency, currencyToFloat, floatToCurrency } from "../../utils/masks";
+import {
+  isoToDisplay,
+  isoToDisplay as isoToDisplayDate,
+  displayToISO,
+  maskDate,
+  maskCurrency,
+  currencyToFloat,
+  floatToCurrency,
+  parsePaymentDueDay,
+} from "../../utils/masks";
+import {
+  enrollmentNetMonthlyPreview,
+  validateEnrollmentEditForm,
+} from "../../utils/enrollmentForm";
 import {
   useEnrollmentStatuses,
   useInvoiceStatuses,
@@ -411,32 +424,41 @@ export default function EnrollmentDetailScreen({
       start_date: isoToDisplay(enrollment.start_date ?? ""),
       end_date: isoToDisplay(enrollment.end_date ?? ""),
       status: enrollment.status,
-      monthly_amount: enrollment.monthly_amount ?? "",
-      discount_amount: enrollment.discount_amount ?? "",
-      payment_due_day: String(enrollment.payment_due_day ?? ""),
+      monthly_amount: floatToCurrency(enrollment.monthly_amount),
+      discount_amount: floatToCurrency(enrollment.discount_amount ?? 0),
+      payment_due_day: enrollment.payment_due_day ? String(enrollment.payment_due_day) : "",
     });
     setEditErrors({});
     setEditVisible(true);
   };
 
   const saveEdit = async () => {
+    const locked = !!enrollment?.financial_fields_locked;
+    const clientErrors = validateEnrollmentEditForm(editForm, { financialLocked: locked });
+    if (Object.keys(clientErrors).length > 0) {
+      setEditErrors(clientErrors);
+      return;
+    }
+
     setSaving(true);
     setEditErrors({});
     try {
-      const locked = !!enrollment?.financial_fields_locked;
       const payload: Record<string, any> = { status: editForm.status };
       if (!locked) {
-        payload.start_date = editForm.start_date;
-        if (editForm.end_date) payload.end_date = editForm.end_date;
-        if (editForm.monthly_amount !== "") {
-          payload.monthly_amount =
-            parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+        const startIso = displayToISO(editForm.start_date);
+        if (startIso) payload.start_date = startIso;
+        if (editForm.end_date.trim()) {
+          const endIso = displayToISO(editForm.end_date);
+          if (endIso) payload.end_date = endIso;
         }
-        payload.discount_amount =
-          parseFloat((editForm.discount_amount || "0").replace(",", ".")) || 0;
+        if (editForm.monthly_amount.trim()) {
+          payload.monthly_amount = currencyToFloat(editForm.monthly_amount);
+        }
+        payload.discount_amount = currencyToFloat(editForm.discount_amount || "0");
       }
-      if (editForm.payment_due_day) {
-        payload.payment_due_day = Number(editForm.payment_due_day);
+      const dueDay = parsePaymentDueDay(editForm.payment_due_day);
+      if (dueDay !== null) {
+        payload.payment_due_day = dueDay;
       }
 
       await api.put(`/enrollments/${enrollmentId}`, payload);
@@ -1647,24 +1669,24 @@ export default function EnrollmentDetailScreen({
           </View>
           <View className="flex-1">
             <FormInput
-              label="Vencimento (dia)"
+              label="Vencimento (dia do mês)"
               value={editForm.payment_due_day}
               onChangeText={(v) => setEditForm({ ...editForm, payment_due_day: v })}
               error={editErrors.payment_due_day}
-              placeholder="1-28"
-              keyboardType="numeric"
+              placeholder="1 a 28"
+              valueFormat="dueDay"
             />
           </View>
         </View>
         <View className="flex-row gap-4">
           <View className="flex-1">
             <FormInput
-              label="Mensalidade (R$)"
+              label="Mensalidade base (R$)"
               value={editForm.monthly_amount}
               onChangeText={(v) => setEditForm({ ...editForm, monthly_amount: v })}
               error={editErrors.monthly_amount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
+              placeholder="0,00"
+              valueFormat="currency"
               editable={!enrollment?.financial_fields_locked}
             />
           </View>
@@ -1674,12 +1696,28 @@ export default function EnrollmentDetailScreen({
               value={editForm.discount_amount}
               onChangeText={(v) => setEditForm({ ...editForm, discount_amount: v })}
               error={editErrors.discount_amount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
+              placeholder="0,00"
+              valueFormat="currency"
               editable={!enrollment?.financial_fields_locked}
             />
           </View>
         </View>
+        {!enrollment?.financial_fields_locked &&
+        (editForm.monthly_amount.trim() || editForm.discount_amount.trim()) ? (
+          <View className="flex-row items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 -mt-1 mb-2">
+            <Ionicons name="calculator-outline" size={14} color="#16A34A" />
+            <Text className="text-xs text-emerald-800">
+              Mensalidade líquida:{" "}
+              <Text className="font-bold">
+                {(enrollmentNetMonthlyPreview(editForm) ?? 0).toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </Text>
+              {" "}(base − desconto)
+            </Text>
+          </View>
+        ) : null}
       </Modal>
 
       {/* ── Invoice Modal ────────────────────────────────────────────────────── */}

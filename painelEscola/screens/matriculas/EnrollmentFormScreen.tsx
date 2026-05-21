@@ -17,7 +17,12 @@ import {
   manualPaymentMethodOptions,
   requiresCardPaymentReference,
 } from "../../utils/paymentMethods";
-import { displayToISO, isoToDisplay } from "../../utils/masks";
+import {
+  currencyToFloat,
+  displayToISO,
+  isoToDisplay,
+  parsePaymentDueDay,
+} from "../../utils/masks";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useBillingSettings } from "../../hooks/useBillingSettings";
@@ -330,7 +335,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
   };
 
   const discountedInitialCharge = () => {
-    const disc = parseFloat(discount.replace(",", ".")) || 0;
+    const disc = currencyToFloat(discount || "0");
     if (mode === "bundle") {
       const base = baseEquivalent();
       if (base === null) return null;
@@ -437,8 +442,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           student_id: Number(studentId),
           school_class_id: Number(classId),
           course_plan_id: Number(planId),
-          discount_amount: parseFloat(discount.replace(",", ".")) || 0,
-          payment_due_day: dueDay ? Number(dueDay) : undefined,
+          discount_amount: currencyToFloat(discount || "0"),
+          payment_due_day: parsePaymentDueDay(dueDay) ?? undefined,
           guardian_id: guardianId ? Number(guardianId) : undefined,
         };
         if (startDate) payload.start_date = displayToISO(startDate) ?? startDate;
@@ -458,8 +463,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           student_id: Number(studentId),
           bundle_id: Number(bundleId),
           school_class_ids: schoolClassIds,
-          discount_amount: parseFloat(discount.replace(",", ".")) || 0,
-          payment_due_day: dueDay ? Number(dueDay) : undefined,
+          discount_amount: currencyToFloat(discount || "0"),
+          payment_due_day: parsePaymentDueDay(dueDay) ?? undefined,
           guardian_id: guardianId ? Number(guardianId) : undefined,
         };
         if (startDate) payload.start_date = displayToISO(startDate) ?? startDate;
@@ -1055,8 +1060,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
               value={discount}
               onChangeText={setDiscount}
               error={errors.discount_amount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
+              placeholder="0,00"
+              valueFormat="currency"
             />
           </View>
           <View className="flex-1">
@@ -1065,8 +1070,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
               value={dueDay}
               onChangeText={(t) => { setDueDay(t); setDueDayTouched(true); }}
               error={errors.payment_due_day}
-              placeholder="1–28"
-              keyboardType="numeric"
+              placeholder="1 a 28"
+              valueFormat="dueDay"
             />
           </View>
         </View>
@@ -1081,9 +1086,9 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                 : "Taxa de matrícula estimada"}
               :{" "}
               <Text className="font-bold">{fmtBRL(discountedInitialCharge()!)}</Text>
-              {parseFloat(discount) > 0 && (
+              {currencyToFloat(discount || "0") > 0 && (
                 <Text className="text-green-500">
-                  {" "}(desconto de {fmtBRL(parseFloat(discount.replace(",", ".")) || 0)})
+                  {" "}(desconto de {fmtBRL(currencyToFloat(discount || "0"))})
                 </Text>
               )}
             </Text>

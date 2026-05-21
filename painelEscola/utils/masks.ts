@@ -242,6 +242,31 @@ export function floatToCurrency(value: string | number | null): string {
   return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** decimal(10,2) — valor máximo permitido no banco. */
+export const MAX_DB_DECIMAL_AMOUNT = 99_999_999.99;
+
+export function isWithinDbDecimalAmount(value: number): boolean {
+  return value >= 0 && value <= MAX_DB_DECIMAL_AMOUNT;
+}
+
+/** Dia de vencimento (1–28), conforme payment_due_day (tinyInteger). */
+export function maskPaymentDueDay(value: string): string {
+  const d = onlyIntegerInput(value, 2);
+  if (d === "") return "";
+  const n = parseInt(d, 10);
+  if (Number.isNaN(n)) return "";
+  if (n > 28) return "28";
+  return d;
+}
+
+export function parsePaymentDueDay(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const n = parseInt(trimmed, 10);
+  if (Number.isNaN(n) || n < 1 || n > 28) return null;
+  return n;
+}
+
 // YYYY-MM-DDTHH:MM:SS[.000Z] → DD/MM/AAAA HH:MM (para exibir no formulário)
 export function isoToDisplayDateTime(iso: string): string {
   if (!iso) return "";

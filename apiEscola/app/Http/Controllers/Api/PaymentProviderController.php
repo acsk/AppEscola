@@ -11,6 +11,7 @@ use App\Models\TenantCoraCredential;
 use App\Services\Asaas\AsaasCredentialService;
 use App\Services\Asaas\AsaasHttpClient;
 use App\Services\PaymentGatewayFactory;
+use App\Services\CoraCredentialService;
 use App\Services\CoraTokenService;
 use App\Services\PaymentProviderRegistry;
 use App\Services\TenantBillingSettingsService;
@@ -311,58 +312,22 @@ class PaymentProviderController extends Controller
             ], 422);
         }
 
-        $data = $request->validate([
-            'client_id' => ['required', 'string', 'max:255'],
-            'environment' => ['required', 'string', 'in:stage,prod,production'],
-            'certificate' => ['required', 'file', 'max:1024'],
-            'private_key' => ['required', 'file', 'max:1024'],
-            'test_account_main_cpf' => ['nullable', 'string', 'max:14'],
-            'test_account_main_password' => ['nullable', 'string', 'max:255'],
-            'test_account_secondary_cpf' => ['nullable', 'string', 'max:14'],
-            'test_account_secondary_password' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $normalizedClientId = trim((string) $data['client_id']);
-
-        if ($normalizedClientId === '') {
-            return $this->error('client_id inválido para o provedor.', null, 422);
+        try {
+            $result = app(CoraCredentialService::class)->persistFromRequest($tenant, $request);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), null, 422);
         }
 
-        $environment = $data['environment'] === 'production' ? 'prod' : $data['environment'];
-
-        $baseDir = 'secure/cora/tenants/' . $tenant->id;
-
-        $environmentDir = $environment === 'prod' ? 'production' : 'test';
-
-        $certPath = $request->file('certificate')->storeAs($baseDir . '/' . $environmentDir, 'certificate.pem', 'local');
-        $keyPath = $request->file('private_key')->storeAs($baseDir . '/' . $environmentDir, 'private-key.key', 'local');
-
-        TenantCoraCredential::updateOrCreate(
-            [
-                'tenant_id' => $tenant->id,
-                'environment' => $environment,
-            ],
-            [
-                'client_id' => $normalizedClientId,
-                'certificate_path' => $certPath,
-                'private_key_path' => $keyPath,
-                'environment' => $environment,
-                'active' => true,
-                'configured_at' => now(),
-                'test_account_main_cpf' => $data['test_account_main_cpf'] ?? null,
-                'test_account_main_password' => $data['test_account_main_password'] ?? null,
-                'test_account_secondary_cpf' => $data['test_account_secondary_cpf'] ?? null,
-                'test_account_secondary_password' => $data['test_account_secondary_password'] ?? null,
-            ]
-        );
+        $credential = $result['credential'];
+        $environment = $result['environment'];
 
         return $this->success([
             'provider' => 'cora',
             'configured' => true,
             'environment' => $environment,
-            'configured_at' => TenantCoraCredential::where('tenant_id', $tenant->id)->where('environment', $environment)->value('configured_at'),
-            'cert_uploaded' => Storage::disk('local')->exists($certPath),
-            'key_uploaded' => Storage::disk('local')->exists($keyPath),
+            'configured_at' => $credential->configured_at?->toISOString(),
+            'cert_uploaded' => $result['cert_uploaded'],
+            'key_uploaded' => $result['key_uploaded'],
         ], 'Configuração do provedor salva com sucesso.');
     }
 

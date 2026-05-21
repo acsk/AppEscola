@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\TenantCoraCredential;
+use App\Services\CoraCredentialService;
 use App\Services\CoraTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class TenantCoraSettingsController extends Controller
@@ -51,58 +51,24 @@ class TenantCoraSettingsController extends Controller
     {
         $this->ensureCanManageTenant($request, $tenant);
 
-        $data = $request->validate([
-            'client_id' => ['required', 'string', 'max:255'],
-            'environment' => ['required', 'string', 'in:stage,prod,production'],
-            'certificate' => ['required', 'file', 'max:1024'],
-            'private_key' => ['required', 'file', 'max:1024'],
-            'test_account_main_cpf' => ['nullable', 'string', 'max:14'],
-            'test_account_main_password' => ['nullable', 'string', 'max:255'],
-            'test_account_secondary_cpf' => ['nullable', 'string', 'max:14'],
-            'test_account_secondary_password' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $normalizedClientId = trim((string) $data['client_id']);
-
-        if ($normalizedClientId === '') {
-            return $this->error('client_id inválido para a Cora.', null, 422);
+        try {
+            $result = app(CoraCredentialService::class)->persistFromRequest($tenant, $request);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), null, 422);
         }
 
-        $environment = $data['environment'] === 'production' ? 'prod' : $data['environment'];
-
-        $baseDir = 'secure/cora/tenants/' . $tenant->id . '/' . ($environment === 'prod' ? 'production' : 'test');
-
-        $certPath = $request->file('certificate')->storeAs($baseDir, 'certificate.pem', 'local');
-        $keyPath = $request->file('private_key')->storeAs($baseDir, 'private-key.key', 'local');
-
-        TenantCoraCredential::updateOrCreate(
-            [
-                'tenant_id' => $tenant->id,
-                'environment' => $environment,
-            ],
-            [
-                'client_id' => $normalizedClientId,
-                'certificate_path' => $certPath,
-                'private_key_path' => $keyPath,
-                'environment' => $environment,
-                'active' => true,
-                'configured_at' => now(),
-                'test_account_main_cpf' => $data['test_account_main_cpf'] ?? null,
-                'test_account_main_password' => $data['test_account_main_password'] ?? null,
-                'test_account_secondary_cpf' => $data['test_account_secondary_cpf'] ?? null,
-                'test_account_secondary_password' => $data['test_account_secondary_password'] ?? null,
-            ]
-        );
+        $credential = $result['credential'];
+        $environment = $result['environment'];
 
         return $this->success([
             'tenant_id' => $tenant->id,
             'cora' => [
                 'environment' => $environment,
-                'client_id' => $normalizedClientId,
+                'client_id' => $credential->client_id,
                 'configured' => true,
-                'configured_at' => now()->toISOString(),
-                'cert_uploaded' => Storage::disk('local')->exists($certPath),
-                'key_uploaded' => Storage::disk('local')->exists($keyPath),
+                'configured_at' => $credential->configured_at?->toISOString(),
+                'cert_uploaded' => $result['cert_uploaded'],
+                'key_uploaded' => $result['key_uploaded'],
             ],
         ], 'Credenciais Cora salvas com sucesso.');
     }
@@ -162,8 +128,8 @@ class TenantCoraSettingsController extends Controller
             'client_id' => $credential->client_id,
             'configured' => (bool) $credential->active,
             'configured_at' => $credential->configured_at?->toISOString(),
-            'cert_uploaded' => ! empty($credential->certificate_path),
-            'key_uploaded' => ! empty($credential->private_key_path),
+            'cert_uploaded' => app(CoraCredentialService::class)->credentialHasStoredFiles($credential),
+            'key_uploaded' => app(CoraCredentialService::class)->credentialHasStoredFiles($credential),
             'test_account_main_cpf' => $credential->test_account_main_cpf,
             'test_account_main_password' => $credential->test_account_main_password,
             'test_account_secondary_cpf' => $credential->test_account_secondary_cpf,

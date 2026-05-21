@@ -1,21 +1,31 @@
 import React, { useRef } from "react";
 import { View, Text, TextInput, TextInputProps, Platform } from "react-native";
 import { useRestrictTextInput, type TextInputRestriction } from "../../hooks/useRestrictTextInput";
-import { onlyDecimalInput, onlyIntegerInput } from "../../utils/masks";
+import {
+  maskCurrency,
+  maskPaymentDueDay,
+  onlyDecimalInput,
+  onlyIntegerInput,
+} from "../../utils/masks";
 
 type Props = TextInputProps & {
   label: string;
   error?: string;
   required?: boolean;
   /** Filtra e bloqueia caracteres inválidos (necessário na web). */
-  valueFormat?: "integer" | "decimal";
+  valueFormat?: "integer" | "decimal" | "currency" | "dueDay";
   maxDigits?: number;
   decimalPlaces?: number;
 };
 
-const VALUE_FORMAT_TO_RESTRICTION: Record<NonNullable<Props["valueFormat"]>, TextInputRestriction> = {
+const VALUE_FORMAT_TO_RESTRICTION: Record<
+  NonNullable<Props["valueFormat"]>,
+  TextInputRestriction
+> = {
   integer: "integer",
   decimal: "decimal",
+  currency: "digits",
+  dueDay: "integer",
 };
 
 export default function FormInput({
@@ -48,15 +58,31 @@ export default function FormInput({
       onChangeText(onlyDecimalInput(text, decimalPlaces));
       return;
     }
+    if (valueFormat === "currency") {
+      onChangeText(maskCurrency(text));
+      return;
+    }
+    if (valueFormat === "dueDay") {
+      onChangeText(maskPaymentDueDay(text));
+      return;
+    }
     onChangeText(text);
   };
 
   const resolvedKeyboardType =
     keyboardType ??
-    (valueFormat === "integer" ? "number-pad" : valueFormat === "decimal" ? "decimal-pad" : undefined);
+    (valueFormat === "integer" || valueFormat === "dueDay"
+      ? "number-pad"
+      : valueFormat === "decimal" || valueFormat === "currency"
+        ? "decimal-pad"
+        : undefined);
 
   const webInputMode =
-    valueFormat === "integer" ? "numeric" : valueFormat === "decimal" ? "decimal" : undefined;
+    valueFormat === "integer" || valueFormat === "dueDay"
+      ? "numeric"
+      : valueFormat === "decimal" || valueFormat === "currency"
+        ? "decimal"
+        : undefined;
 
   return (
     <View className="mb-4">

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -106,6 +106,41 @@ const createDraft = (environment: EnvironmentKey, fields: PaymentProviderSchemaF
   };
 };
 
+const validateDraftFields = (
+  draft: EnvironmentDraft,
+  fields: PaymentProviderSchemaField[]
+): Record<string, string> => {
+  const nextErrors: Record<string, string> = {};
+
+  fields.forEach((field) => {
+    if (!field.required) return;
+
+    if (field.type === "file") {
+      const hasUploadedFile = !!draft.uploadedFiles[field.name];
+      const hasNewFile = !!draft.files[field.name];
+
+      if (!hasUploadedFile && !hasNewFile) {
+        nextErrors[field.name] = "Este campo e obrigatorio.";
+      }
+      return;
+    }
+
+    if (!String(draft.values[field.name] ?? "").trim()) {
+      nextErrors[field.name] = "Este campo e obrigatorio.";
+    }
+  });
+
+  return nextErrors;
+};
+
+const isEnvironmentConfigured = (draft: EnvironmentDraft): boolean => {
+  const hasClientId = !!String(draft.values.client_id ?? "").trim();
+  const hasCertificate = !!draft.uploadedFiles.certificate || !!draft.files.certificate;
+  const hasPrivateKey = !!draft.uploadedFiles.private_key || !!draft.files.private_key;
+
+  return hasClientId && hasCertificate && hasPrivateKey;
+};
+
 const mergeEnvironmentSettings = (
   draft: EnvironmentDraft,
   settings: CoraEnvironmentSettings | null | undefined
@@ -153,6 +188,7 @@ export default function PaymentProvidersScreen() {
     stage: createDraft("stage", []),
     prod: createDraft("prod", []),
   });
+  const draftsRef = useRef(drafts);
 
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -173,6 +209,10 @@ export default function PaymentProvidersScreen() {
   );
 
   const activeDraft = drafts[selectedEnvironment];
+
+  useEffect(() => {
+    draftsRef.current = drafts;
+  }, [drafts]);
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ visible: true, type, message });
@@ -275,149 +315,126 @@ export default function PaymentProvidersScreen() {
   };
 
   const onChangeFile = (fieldName: string, file: File | null) => {
-    updateActiveDraft((current) => ({
-      ...current,
-      files: { ...current.files, [fieldName]: file },
-      uploadedFiles: { ...current.uploadedFiles, [fieldName]: !!file ? true : current.uploadedFiles[fieldName] },
-      errors: { ...current.errors, [fieldName]: "" },
-    }));
-  };
-
-  const validateRequired = () => {
-    const nextErrors: Record<string, string> = {};
-
-    schemaFields.forEach((field) => {
-      if (!field.required) return;
-
-      if (field.type === "file") {
-        // Se o arquivo já foi enviado anteriormente, não valida como obrigatório
-        const hasUploadedFile = activeDraft.uploadedFiles[field.name];
-        const hasNewFile = !!activeDraft.files[field.name];
-        
-        if (!hasUploadedFile && !hasNewFile) {
-          nextErrors[field.name] = "Este campo e obrigatorio.";
-        }
-        return;
-      }
-
-      if (!String(activeDraft.values[field.name] ?? "").trim()) {
-        nextErrors[field.name] = "Este campo e obrigatorio.";
-      }
+    setDrafts((current) => {
+      const environmentDraft = current[selectedEnvironment];
+      const nextDraft: EnvironmentDraft = {
+        ...environmentDraft,
+        files: { ...environmentDraft.files, [fieldName]: file },
+        uploadedFiles: {
+          ...environmentDraft.uploadedFiles,
+          [fieldName]: file ? true : environmentDraft.uploadedFiles[fieldName],
+        },
+        errors: { ...environmentDraft.errors, [fieldName]: "" },
+      };
+      const next = { ...current, [selectedEnvironment]: nextDraft };
+      draftsRef.current = next;
+      return next;
     });
-
-    updateActiveDraft((current) => ({
-      ...current,
-      errors: nextErrors,
-    }));
-    return Object.keys(nextErrors).length === 0;
   };
 
-  const buildPayload = () => {
+  const buildPayload = (draft: EnvironmentDraft) => {
     const hasFile = schemaFields.some((field) => field.type === "file");
 
     if (hasFile) {
       const formData = new FormData();
       formData.append("environment", selectedEnvironment);
-      
+
       schemaFields.forEach((field) => {
-        // Para campos de arquivo, só adiciona se houver um novo arquivo
         if (field.type === "file") {
-          const file = activeDraft.files[field.name];
+          const file = draft.files[field.name];
           if (file) {
-            formData.append(field.name, file);
+            formData.append(field.name, file, file.name);
           }
           return;
         }
-        
-        // Para todos os outros campos (incluindo campos de teste), adiciona o valor
-        const value = activeDraft.values[field.name];
-        if (value !== undefined && value !== null) {
-          formData.append(field.name, String(value));
-        } else {
-          formData.append(field.name, "");
-        }
+
+        const value = draft.values[field.name];
+        formData.append(field.name, value !== undefined && value !== null ? String(value) : "");
       });
-      
-      // Adiciona campos de teste do draft se não estiverem no schema
-      const testAccountFields = ["test_account_main_cpf", "test_account_main_password", "test_account_secondary_cpf", "test_account_secondary_password"];
+
+      const testAccountFields = [
+        "test_account_main_cpf",
+        "test_account_main_password",
+        "test_account_secondary_cpf",
+        "test_account_secondary_password",
+      ];
       testAccountFields.forEach((fieldName) => {
-        if (!schemaFields.some((f) => f.name === fieldName) && activeDraft.values[fieldName]) {
-          formData.append(fieldName, String(activeDraft.values[fieldName]));
+        if (!schemaFields.some((f) => f.name === fieldName) && draft.values[fieldName]) {
+          formData.append(fieldName, String(draft.values[fieldName]));
         }
       });
-      
+
       return formData;
     }
 
     const payload: Record<string, string> = {};
     schemaFields.forEach((field) => {
-      payload[field.name] = activeDraft.values[field.name] ?? "";
+      payload[field.name] = draft.values[field.name] ?? "";
     });
-    
-    // Adiciona campos de teste do draft se não estiverem no schema
-    const testAccountFields = ["test_account_main_cpf", "test_account_main_password", "test_account_secondary_cpf", "test_account_secondary_password"];
+
+    const testAccountFields = [
+      "test_account_main_cpf",
+      "test_account_main_password",
+      "test_account_secondary_cpf",
+      "test_account_secondary_password",
+    ];
     testAccountFields.forEach((fieldName) => {
-      if (!schemaFields.some((f) => f.name === fieldName) && activeDraft.values[fieldName]) {
-        payload[fieldName] = String(activeDraft.values[fieldName]);
+      if (!schemaFields.some((f) => f.name === fieldName) && draft.values[fieldName]) {
+        payload[fieldName] = String(draft.values[fieldName]);
       }
     });
-    
+
     payload.environment = selectedEnvironment;
     return payload;
   };
 
   const onSave = async () => {
-    if (!tenantId || !provider) {
-      console.error("❌ onSave: tenantId ou provider ausente", { tenantId, provider });
-      return;
-    }
-    if (!validateRequired()) {
-      console.warn("⚠️ onSave: Validação de campos obrigatórios falhou");
+    if (!tenantId || !provider) return;
+
+    const draft = draftsRef.current[selectedEnvironment];
+    const nextErrors = validateDraftFields(draft, schemaFields);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setDrafts((current) => {
+        const next = {
+          ...current,
+          [selectedEnvironment]: { ...current[selectedEnvironment], errors: nextErrors },
+        };
+        draftsRef.current = next;
+        return next;
+      });
+      showToast("error", "Preencha os campos obrigatorios antes de salvar.");
       return;
     }
 
     setSaving(true);
-    updateActiveDraft((current) => ({ ...current, errors: {} }));
+    setDrafts((current) => {
+      const next = {
+        ...current,
+        [selectedEnvironment]: { ...current[selectedEnvironment], errors: {} },
+      };
+      draftsRef.current = next;
+      return next;
+    });
 
     try {
-      const payload = buildPayload();
-      
-      // Debug: log do payload
-      console.log("📤 onSave: Iniciando envio...", {
-        tenantId,
-        provider,
-        environment: selectedEnvironment,
-        hasFormData: payload instanceof FormData,
-      });
-      
-      if (payload instanceof FormData) {
-        const entries: Array<{ key: string; value: string }> = [];
-        payload.forEach((value, key) => {
-          entries.push({
-            key,
-            value: value instanceof File ? `File: ${value.name}` : String(value),
-          });
-        });
-        console.log("📦 FormData fields:", entries);
-      } else {
-        console.log("📦 Payload object:", payload);
-      }
-      
+      const payload = buildPayload(draft);
       await savePaymentProviderSettings(Number(tenantId), provider, payload);
-      console.log("✅ onSave: Configuracao salva com sucesso");
       showToast("success", "Configuracao salva com sucesso.");
+      await loadSchema();
     } catch (e: any) {
-      console.error("❌ onSave: Erro ao salvar", {
-        status: e?.response?.status,
-        message: e?.response?.data?.message,
-        errors: e?.response?.data?.errors,
-        errorFull: e,
-      });
       if (e?.response?.status === 422) {
-        updateActiveDraft((current) => ({
-          ...current,
-          errors: parseApiErrors(e.response?.data?.errors ?? {}),
-        }));
+        setDrafts((current) => {
+          const next = {
+            ...current,
+            [selectedEnvironment]: {
+              ...current[selectedEnvironment],
+              errors: parseApiErrors(e.response?.data?.errors ?? e.response?.data?.body?.errors ?? {}),
+            },
+          };
+          draftsRef.current = next;
+          return next;
+        });
       }
       showToast("error", e?.response?.data?.message || "Falha ao salvar configuracao.");
     } finally {
@@ -427,6 +444,15 @@ export default function PaymentProvidersScreen() {
 
   const onTestConnection = async () => {
     if (!tenantId || !provider) return;
+
+    const draft = draftsRef.current[selectedEnvironment];
+    if (!isEnvironmentConfigured(draft)) {
+      showToast(
+        "error",
+        "Salve as credenciais deste ambiente antes de testar a conexao (Client ID, certificado e chave privada)."
+      );
+      return;
+    }
 
     setTesting(true);
     updateActiveDraft((current) => ({ ...current, connectionStatus: null }));
@@ -707,9 +733,11 @@ export default function PaymentProvidersScreen() {
                           {field.required && <Text className="text-red-500"> *</Text>}
                         </Text>
                         <input
+                          key={`${selectedEnvironment}-${field.name}`}
                           type="file"
-                          onChange={(event: any) => {
-                            const file = event.target.files?.[0] ?? null;
+                          accept={(field.accept ?? []).join(",") || undefined}
+                          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                            const file = event.currentTarget.files?.[0] ?? null;
                             onChangeFile(field.name, file);
                           }}
                           style={{

@@ -16,7 +16,20 @@ import DatePickerInput from "../../components/ui/DatePickerInput";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
-import { isoToDisplay } from "../../utils/masks";
+import EnrollmentActionsModal, {
+  type EnrollmentActionKey,
+} from "../../components/matriculas/EnrollmentActionsModal";
+import {
+  currencyToFloat,
+  displayToISO,
+  floatToCurrency,
+  isoToDisplay,
+  parsePaymentDueDay,
+} from "../../utils/masks";
+import {
+  enrollmentNetMonthlyPreview,
+  validateEnrollmentEditForm,
+} from "../../utils/enrollmentForm";
 import { useEnrollmentStatuses, domainToOptions } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import type {
@@ -78,6 +91,9 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   const [viewData, setViewData] = useState<EnrollmentSummary | null>(null);
   const [loadingView, setLoadingView] = useState(false);
 
+  // Menu de ações (⋯)
+  const [menuEnrollment, setMenuEnrollment] = useState<EnrollmentSummary | null>(null);
+
   const enrollmentStatuses = useEnrollmentStatuses();
   const statusOptions = domainToOptions(enrollmentStatuses).map((o) => ({
     ...o,
@@ -138,9 +154,9 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         start_date: isoToDisplay(detail.start_date ?? ""),
         end_date: isoToDisplay(detail.end_date ?? ""),
         status: detail.status,
-        monthly_amount: detail.monthly_amount ?? "",
-        discount_amount: detail.discount_amount ?? "",
-        payment_due_day: String(detail.payment_due_day ?? ""),
+        monthly_amount: floatToCurrency(detail.monthly_amount),
+        discount_amount: floatToCurrency(detail.discount_amount ?? 0),
+        payment_due_day: detail.payment_due_day ? String(detail.payment_due_day) : "",
       });
     } catch {
       setEditVisible(false);
@@ -148,23 +164,54 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     }
   };
 
+  const handleEnrollmentAction = (action: EnrollmentActionKey) => {
+    const row = menuEnrollment;
+    if (!row) return;
+    if (action === "detail") {
+      navigate("matriculas-detail", { enrollmentId: row.id });
+      return;
+    }
+    if (action === "view") {
+      openView(row.id);
+      return;
+    }
+    if (action === "edit") {
+      openEdit(row);
+      return;
+    }
+    if (action === "delete") {
+      setDeleteId(row.id);
+    }
+  };
+
   const saveEdit = async () => {
+    const clientErrors = validateEnrollmentEditForm(editForm, {
+      financialLocked: financialFieldsLocked,
+    });
+    if (Object.keys(clientErrors).length > 0) {
+      setEditErrors(clientErrors);
+      return;
+    }
+
     setSaving(true);
     setEditErrors({});
     try {
       const payload: Record<string, any> = { status: editForm.status };
       if (!financialFieldsLocked) {
-        payload.start_date = editForm.start_date;
-        if (editForm.end_date) payload.end_date = editForm.end_date;
-        if (editForm.monthly_amount !== "") {
-          payload.monthly_amount =
-            parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+        const startIso = displayToISO(editForm.start_date);
+        if (startIso) payload.start_date = startIso;
+        if (editForm.end_date.trim()) {
+          const endIso = displayToISO(editForm.end_date);
+          if (endIso) payload.end_date = endIso;
         }
-        payload.discount_amount =
-          parseFloat((editForm.discount_amount || "0").replace(",", ".")) || 0;
+        if (editForm.monthly_amount.trim()) {
+          payload.monthly_amount = currencyToFloat(editForm.monthly_amount);
+        }
+        payload.discount_amount = currencyToFloat(editForm.discount_amount || "0");
       }
-      if (editForm.payment_due_day) {
-        payload.payment_due_day = Number(editForm.payment_due_day);
+      const dueDay = parsePaymentDueDay(editForm.payment_due_day);
+      if (dueDay !== null) {
+        payload.payment_due_day = dueDay;
       }
 
       await api.put(`/enrollments/${editId}`, payload);
@@ -332,7 +379,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           >
             Status
           </Text>
-          <View style={{ width: 96 }} />
+          <View style={{ width: 48 }} />
         </View>
 
         {loading ? (
@@ -382,27 +429,13 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                   label={STATUS_LABELS[item.status] ?? item.status}
                 />
               </View>
-              <View
-                style={{ width: 96 }}
-                className="flex-row justify-end gap-2"
-              >
+              <View style={{ width: 48 }} className="flex-row justify-end">
                 <TouchableOpacity
-                  onPress={() => navigate("matriculas-detail", { enrollmentId: item.id })}
-                  className="p-1.5 bg-blue-50 rounded-lg"
+                  onPress={() => setMenuEnrollment(item)}
+                  className="p-2 bg-gray-100 rounded-lg"
+                  activeOpacity={0.85}
                 >
-                  <Ionicons name="eye-outline" size={15} color="#3B82F6" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => openEdit(item)}
-                  className="p-1.5 bg-violet-50 rounded-lg"
-                >
-                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setDeleteId(item.id)}
-                  className="p-1.5 bg-red-50 rounded-lg"
-                >
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  <Ionicons name="ellipsis-horizontal" size={18} color="#4B5563" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -605,28 +638,28 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           </View>
           <View className="flex-1">
             <FormInput
-              label="Vencimento (dia)"
+              label="Vencimento (dia do mês)"
               value={editForm.payment_due_day}
               onChangeText={(v) =>
                 setEditForm({ ...editForm, payment_due_day: v })
               }
               error={editErrors.payment_due_day}
-              placeholder="1-28"
-              keyboardType="numeric"
+              placeholder="1 a 28"
+              valueFormat="dueDay"
             />
           </View>
         </View>
         <View className="flex-row gap-4">
           <View className="flex-1">
             <FormInput
-              label="Mensalidade (R$)"
+              label="Mensalidade base (R$)"
               value={editForm.monthly_amount}
               onChangeText={(v) =>
                 setEditForm({ ...editForm, monthly_amount: v })
               }
               error={editErrors.monthly_amount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
+              placeholder="0,00"
+              valueFormat="currency"
               editable={!financialFieldsLocked}
             />
           </View>
@@ -638,13 +671,36 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                 setEditForm({ ...editForm, discount_amount: v })
               }
               error={editErrors.discount_amount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
+              placeholder="0,00"
+              valueFormat="currency"
               editable={!financialFieldsLocked}
             />
           </View>
         </View>
+        {!financialFieldsLocked &&
+        (editForm.monthly_amount.trim() || editForm.discount_amount.trim()) ? (
+          <View className="flex-row items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 -mt-1 mb-2">
+            <Ionicons name="calculator-outline" size={14} color="#16A34A" />
+            <Text className="text-xs text-emerald-800">
+              Mensalidade líquida:{" "}
+              <Text className="font-bold">
+                {(enrollmentNetMonthlyPreview(editForm) ?? 0).toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </Text>
+              {" "}(base − desconto)
+            </Text>
+          </View>
+        ) : null}
       </Modal>
+
+      <EnrollmentActionsModal
+        visible={!!menuEnrollment}
+        enrollment={menuEnrollment}
+        onClose={() => setMenuEnrollment(null)}
+        onSelect={handleEnrollmentAction}
+      />
 
       <ConfirmModal
         visible={!!deleteId}
