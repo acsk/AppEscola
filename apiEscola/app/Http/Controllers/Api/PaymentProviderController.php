@@ -10,6 +10,7 @@ use App\Models\TenantAsaasCredential;
 use App\Models\TenantCoraCredential;
 use App\Services\Asaas\AsaasCredentialService;
 use App\Services\Asaas\AsaasHttpClient;
+use App\Services\InvoiceCoraChargeAssetsService;
 use App\Services\PaymentGatewayFactory;
 use App\Services\CoraCredentialService;
 use App\Services\CoraTokenService;
@@ -491,8 +492,12 @@ class PaymentProviderController extends Controller
         ], 'Conexão com o provedor validada com sucesso.');
     }
 
-    public function paymentOptions(Request $request, Invoice $invoice): JsonResponse
-    {
+    public function paymentOptions(
+        Request $request,
+        Invoice $invoice,
+        InvoiceCoraChargeAssetsService $chargeAssets,
+        PaymentGatewayFactory $factory,
+    ): JsonResponse {
         $this->ensureCanAccessInvoice($request, $invoice);
         $paymentSettings = $this->paymentScope($invoice->tenant_id);
         $defaultProvider = strtolower((string) ($paymentSettings['default_provider'] ?? 'cora'));
@@ -513,34 +518,38 @@ class PaymentProviderController extends Controller
 
         $supportsGateway = PaymentProviderRegistry::supportsGatewayCharge($defaultProvider);
 
-        $lockedSyncedMethod  = $this->resolveLockedMethodForSyncedInvoice($invoice);
-        $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
+        $paymentAssets = $chargeAssets->paymentAssetsFromInvoice($invoice);
+
+        if ($chargeAssets->shouldHydrateFromProvider($invoice, $paymentAssets)) {
+            $hydrateEnv = $this->resolveChargeEnvironment($request);
+            $paymentAssets = $chargeAssets->hydrateFromProvider($invoice, $factory, $paymentAssets, $hydrateEnv);
+            $invoice->refresh();
+        }
+
+        $resolvedMethod = $chargeAssets->resolveChargeMethodFromInvoice($invoice);
+
+        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice, $chargeAssets);
+        $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice, $chargeAssets);
 
         // Trava geral: qualquer invoice com cobrança já gerada fica no método original.
         $lockedMethod = $lockedSyncedMethod
-            ?? ($invoice->cora_charge_id ? $existingStoredMethod : null);
-        $lockReason   = $lockedSyncedMethod !== null
+            ?? ($invoice->cora_charge_id ? ($resolvedMethod ?? $existingStoredMethod) : null);
+        $lockReason = $lockedSyncedMethod !== null
             ? 'synced_charge_method_lock'
             : ($lockedMethod !== null ? 'method_already_charged' : null);
 
-        $pixQrImageUrl = data_get($invoice->cora_payload, 'pix.qr_code_image_url')
-            ?? data_get($invoice->cora_payload, 'pix.qr_code_url')
-            ?? data_get($invoice->cora_payload, 'payment_options.pix.qr_code_url')
-            ?? data_get($invoice->cora_payload, 'qr_code_image_url');
-
-        $currentMethod = match (true) {
-            $invoice->payment_method === 'hybrid' => 'hybrid',
-            in_array($invoice->payment_method, ['bank_slip', 'boleto'], true) => 'boleto',
-            $invoice->payment_method === 'pix' => 'pix',
-            $lockedMethod === 'hybrid' => 'hybrid',
-            in_array($lockedMethod, ['bank_slip', 'boleto'], true) => 'boleto',
-            $lockedMethod === 'pix' => 'pix',
+        $lockedUiMethod = match ($lockedMethod) {
+            'bank_slip' => 'boleto',
+            'hybrid' => 'hybrid',
+            'pix' => 'pix',
             default => null,
         };
 
+        $currentMethod = $chargeAssets->resolveUiMethodFromInvoice($invoice) ?? $lockedUiMethod;
+
         $allowedMethods = match (true) {
             $lockedMethod === 'hybrid' => ['hybrid'],
-            in_array($lockedMethod, ['bank_slip', 'boleto'], true) => ['boleto'],
+            $lockedMethod === 'bank_slip' => ['boleto'],
             $lockedMethod === 'pix' => ['pix'],
             default => $enabledMethods,
         };
@@ -575,30 +584,25 @@ class PaymentProviderController extends Controller
                 'can_generate_charge'  => $supportsGateway
                     && ! in_array($invoice->status, ['paid', 'cancelled'], true),
                 'can_change_method'    => $lockedMethod === null,
-                'can_open_boleto_url'  => (bool) $invoice->cora_payment_url,
-                'can_copy_boleto_line' => (bool) $invoice->boleto_digitable,
-                'can_copy_pix_code'    => (bool) $invoice->cora_pix_copy_paste,
+                'can_open_boleto_url'  => $chargeAssets->hasBoletoAssets($paymentAssets),
+                'can_copy_boleto_line' => ! empty($paymentAssets['boleto_digitable']),
+                'can_copy_pix_code'    => $chargeAssets->hasPixAssets($paymentAssets),
             ],
             'method_lock' => [
                 'locked' => $lockedMethod !== null,
-                'method' => $lockedMethod === 'bank_slip' ? 'boleto' : $lockedMethod,
+                'method' => $lockedUiMethod,
                 'reason' => $lockReason,
             ],
-            'payment_assets' => [
-                'charge_id'       => $invoice->cora_charge_id,
-                'charge_status'   => $invoice->cora_status,
-                'boleto_number'   => $invoice->boleto_number,
-                'boleto_digitable'=> $invoice->boleto_digitable,
-                'boleto_url'      => $invoice->cora_payment_url,
-                'pix_copy_paste'  => $invoice->cora_pix_copy_paste,
-                'pix_qr_image_url'=> $pixQrImageUrl,
-                'last_synced_at'  => $invoice->cora_last_synced_at?->toISOString(),
-            ],
+            'payment_assets' => $paymentAssets,
         ], 'Opções de pagamento carregadas com sucesso.');
     }
 
-    public function generateCharge(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
-    {
+    public function generateCharge(
+        Request $request,
+        Invoice $invoice,
+        PaymentGatewayFactory $factory,
+        InvoiceCoraChargeAssetsService $chargeAssets,
+    ): JsonResponse {
         $this->ensureCanAccessInvoice($request, $invoice);
 
         $data = $request->validate([
@@ -697,8 +701,8 @@ class PaymentProviderController extends Controller
             'pix' => 'pix',
             default => null,
         };
-        $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
-        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice);
+        $existingStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice, $chargeAssets);
+        $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice, $chargeAssets);
 
         if ($lockedSyncedMethod !== null && $requestedStoredMethod !== null && $requestedStoredMethod !== $lockedSyncedMethod) {
             Log::info('PaymentProviderController generateCharge blocked by synced method lock', [
@@ -747,7 +751,7 @@ class PaymentProviderController extends Controller
             );
         }
 
-        $reusableCharge = $this->resolveReusableCharge($invoice, $requestedStoredMethod);
+        $reusableCharge = $this->resolveReusableCharge($invoice, $requestedStoredMethod, $chargeAssets);
 
         Log::info('PaymentProviderController generateCharge called', [
             'invoice_id' => $invoice->id,
@@ -974,32 +978,17 @@ class PaymentProviderController extends Controller
         return true;
     }
 
-    private function resolveStoredMethodForExistingCharge(Invoice $invoice): ?string
+    private function resolveStoredMethodForExistingCharge(Invoice $invoice, InvoiceCoraChargeAssetsService $chargeAssets): ?string
     {
-        $paymentMethod = strtolower((string) $invoice->payment_method);
-
-        if (in_array($paymentMethod, ['boleto', 'bank_slip'], true)) {
-            return 'bank_slip';
-        }
-
-        if ($paymentMethod === 'pix') {
-            return 'pix';
-        }
-
-        if ($invoice->boleto_digitable || $invoice->boleto_number || $invoice->cora_payment_url) {
-            return 'bank_slip';
-        }
-
-        if ($invoice->cora_pix_copy_paste) {
-            return 'pix';
-        }
-
-        return null;
+        return $chargeAssets->resolveChargeMethodFromInvoice($invoice);
     }
 
-    private function resolveReusableCharge(Invoice $invoice, ?string $requestedStoredMethod): ?array
-    {
-        $currentStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice);
+    private function resolveReusableCharge(
+        Invoice $invoice,
+        ?string $requestedStoredMethod,
+        InvoiceCoraChargeAssetsService $chargeAssets,
+    ): ?array {
+        $currentStoredMethod = $this->resolveStoredMethodForExistingCharge($invoice, $chargeAssets);
         $currentSnapshot = $this->buildChargeSnapshotFromInvoice($invoice, $currentStoredMethod);
 
         if ($currentSnapshot
@@ -1073,7 +1062,7 @@ class PaymentProviderController extends Controller
         return is_array($methodCharges) ? $methodCharges : [];
     }
 
-    private function resolveLockedMethodForSyncedInvoice(Invoice $invoice): ?string
+    private function resolveLockedMethodForSyncedInvoice(Invoice $invoice, InvoiceCoraChargeAssetsService $chargeAssets): ?string
     {
         if (! $invoice->cora_charge_id) {
             return null;
@@ -1085,15 +1074,11 @@ class PaymentProviderController extends Controller
         $originalMethod = strtolower(trim((string) data_get($payload, 'integration.original_method')));
 
         if ($origin === 'cora_sync' && $methodLocked) {
-            if ($originalMethod === 'hybrid') {
-                return 'bank_slip';
-            }
-
-            if (in_array($originalMethod, ['pix', 'bank_slip'], true)) {
+            if (in_array($originalMethod, ['pix', 'bank_slip', 'hybrid'], true)) {
                 return $originalMethod;
             }
 
-            return $this->resolveStoredMethodForExistingCharge($invoice);
+            return $this->resolveStoredMethodForExistingCharge($invoice, $chargeAssets);
         }
 
         // Regra de compatibilidade para registros sincronizados legados.
@@ -1101,7 +1086,7 @@ class PaymentProviderController extends Controller
         $looksLikeImported = str_contains(strtolower((string) $invoice->description), 'importada');
 
         if (! $hasLocalInvoiceMetadata && $looksLikeImported) {
-            return $this->resolveStoredMethodForExistingCharge($invoice);
+            return $this->resolveStoredMethodForExistingCharge($invoice, $chargeAssets);
         }
 
         return null;
@@ -1112,6 +1097,27 @@ class PaymentProviderController extends Controller
         $providerStatus = strtoupper(trim((string) $status));
 
         return in_array($providerStatus, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true);
+    }
+
+    private function resolveChargeEnvironment(Request $request): string
+    {
+        $data = $request->validate([
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
+        ]);
+
+        $requestedEnv = $data['environment'] ?? 'stage';
+        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
+
+        $user = $request->user();
+        if (! app()->environment('production')) {
+            return 'stage';
+        }
+
+        if ($user && $user->isSuperAdmin()) {
+            return $requestedEnv ?: 'prod';
+        }
+
+        return 'prod';
     }
 
     public function chargeStatus(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
@@ -1126,21 +1132,7 @@ class PaymentProviderController extends Controller
             ], 'Status da cobrança carregado com sucesso.');
         }
 
-        $data = $request->validate([
-            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
-        ]);
-
-        $requestedEnv = $data['environment'] ?? 'stage';
-        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
-
-        $user = $request->user();
-        if (! app()->environment('production')) {
-            $environment = 'stage';
-        } elseif ($user && $user->isSuperAdmin()) {
-            $environment = $requestedEnv ?: 'prod';
-        } else {
-            $environment = 'prod';
-        }
+        $environment = $this->resolveChargeEnvironment($request);
 
         $invoice->loadMissing('tenant');
 

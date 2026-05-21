@@ -1,0 +1,438 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Invoice;
+use App\Services\PaymentGatewayFactory;
+
+/**
+ * Normaliza método e assets de cobrança Cora (boleto, PIX, híbrido).
+ */
+class InvoiceCoraChargeAssetsService
+{
+    /**
+     * @return array{
+     *     charge_id: ?string,
+     *     charge_status: ?string,
+     *     boleto_number: ?string,
+     *     boleto_digitable: ?string,
+     *     boleto_url: ?string,
+     *     pix_copy_paste: ?string,
+     *     pix_qr_image_url: ?string,
+     *     last_synced_at: ?string
+     * }
+     */
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     * @return array<string, mixed>
+     */
+    public function paymentAssetsFromExternal(array $externalInvoice): array
+    {
+        return [
+            'boleto_number' => $this->extractBoletoNumber($externalInvoice),
+            'boleto_digitable' => $this->extractBoletoDigitable($externalInvoice),
+            'boleto_url' => $this->extractPaymentUrl($externalInvoice),
+            'pix_copy_paste' => $this->extractPixCopyPaste($externalInvoice),
+            'pix_qr_image_url' => $this->extractPixQrImageUrl($externalInvoice),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $assets
+     */
+    public function shouldHydrateFromProvider(Invoice $invoice, array $assets): bool
+    {
+        if (! $invoice->cora_charge_id || ! $invoice->tenant_id) {
+            return false;
+        }
+
+        $hasBoleto = $this->hasBoletoAssets($assets);
+        $hasPix = $this->hasPixAssets($assets);
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+
+        if ($hasBoleto && $hasPix) {
+            return false;
+        }
+
+        if ($hasBoleto && $this->indicatesHybridCharge($payload)) {
+            return ! $hasPix;
+        }
+
+        return ! $hasBoleto || ! $hasPix;
+    }
+
+    /**
+     * Busca detalhes na Cora e persiste assets ausentes (ex.: EMV PIX em boleto híbrido).
+     *
+     * @param  array<string, mixed>  $assets
+     * @return array<string, mixed>
+     */
+    public function hydrateFromProvider(Invoice $invoice, PaymentGatewayFactory $factory, array $assets, string $environment = 'prod'): array
+    {
+        if (! $invoice->cora_charge_id) {
+            return $assets;
+        }
+
+        $invoice->loadMissing('tenant');
+        if (! $invoice->tenant) {
+            return $assets;
+        }
+
+        try {
+            $external = $factory->resolve('cora')->getInvoiceById(
+                $invoice->tenant,
+                (string) $invoice->cora_charge_id,
+                $environment
+            );
+        } catch (\Throwable) {
+            return $assets;
+        }
+
+        if ($external === []) {
+            return $assets;
+        }
+
+        $fromExternal = $this->paymentAssetsFromExternal($external);
+        $mergedAssets = array_merge($assets, array_filter([
+            'boleto_number' => $fromExternal['boleto_number'] ?? null,
+            'boleto_digitable' => $fromExternal['boleto_digitable'] ?? null,
+            'boleto_url' => $fromExternal['boleto_url'] ?? null,
+            'pix_copy_paste' => $fromExternal['pix_copy_paste'] ?? null,
+            'pix_qr_image_url' => $fromExternal['pix_qr_image_url'] ?? null,
+        ], static fn ($value) => $value !== null && $value !== ''));
+
+        $existingPayload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $storedMethod = $this->resolveChargeMethodFromExternal(array_replace_recursive($existingPayload, $external));
+
+        $invoice->update([
+            'cora_payload' => array_replace_recursive($existingPayload, $external),
+            'cora_payment_url' => $mergedAssets['boleto_url'] ?? $invoice->cora_payment_url,
+            'cora_pix_copy_paste' => $mergedAssets['pix_copy_paste'] ?? $invoice->cora_pix_copy_paste,
+            'boleto_number' => $mergedAssets['boleto_number'] ?? $invoice->boleto_number,
+            'boleto_digitable' => $mergedAssets['boleto_digitable'] ?? $invoice->boleto_digitable,
+            'payment_method' => match ($storedMethod) {
+                'hybrid' => 'hybrid',
+                'pix' => 'pix',
+                default => $invoice->payment_method ?: 'bank_slip',
+            },
+            'cora_last_synced_at' => now(),
+        ]);
+
+        return $this->paymentAssetsFromInvoice($invoice->fresh());
+    }
+
+    public function paymentAssetsFromInvoice(Invoice $invoice): array
+    {
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $fromPayload = $this->paymentAssetsFromExternal($payload);
+
+        return [
+            'charge_id' => $invoice->cora_charge_id,
+            'charge_status' => $invoice->cora_status,
+            'boleto_number' => $invoice->boleto_number ?: $fromPayload['boleto_number'],
+            'boleto_digitable' => $invoice->boleto_digitable ?: $fromPayload['boleto_digitable'],
+            'boleto_url' => $invoice->cora_payment_url ?: $fromPayload['boleto_url'],
+            'pix_copy_paste' => $invoice->cora_pix_copy_paste ?: $fromPayload['pix_copy_paste'],
+            'pix_qr_image_url' => $fromPayload['pix_qr_image_url'],
+            'last_synced_at' => $invoice->cora_last_synced_at?->toISOString(),
+        ];
+    }
+
+    public function hasBoletoAssets(array $assets): bool
+    {
+        return ! empty($assets['boleto_digitable'])
+            || ! empty($assets['boleto_number'])
+            || ! empty($assets['boleto_url']);
+    }
+
+    public function hasPixAssets(array $assets): bool
+    {
+        return ! empty($assets['pix_copy_paste']) || ! empty($assets['pix_qr_image_url']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    public function resolveChargeMethodFromExternal(array $externalInvoice): string
+    {
+        $hasBoleto = $this->isBoletoInvoice($externalInvoice)
+            || $this->extractBoletoDigitable($externalInvoice) !== null
+            || $this->extractBoletoNumber($externalInvoice) !== null;
+        $hasPix = $this->extractPixCopyPaste($externalInvoice) !== null
+            || $this->extractPixQrImageUrl($externalInvoice) !== null;
+        $hybridIndicator = $this->indicatesHybridCharge($externalInvoice);
+
+        if ($hasBoleto && ($hasPix || $hybridIndicator)) {
+            return 'hybrid';
+        }
+
+        if ($hasPix && ! $hasBoleto) {
+            return 'pix';
+        }
+
+        if ($hasBoleto) {
+            return 'bank_slip';
+        }
+
+        $methodCandidates = [
+            $externalInvoice['payment_form'] ?? null,
+            $externalInvoice['payment_method'] ?? null,
+            data_get($externalInvoice, 'payment.form'),
+            data_get($externalInvoice, 'payment.method'),
+            data_get($externalInvoice, 'payment_options.selected'),
+        ];
+
+        foreach ($methodCandidates as $method) {
+            $normalized = strtoupper(trim((string) $method));
+            if (in_array($normalized, ['PIX', 'INSTANT_PAYMENT'], true)) {
+                return 'pix';
+            }
+            if (in_array($normalized, ['BANK_SLIP', 'BOLETO', 'BILLET', 'BANKSLIP'], true)) {
+                return 'bank_slip';
+            }
+            if ($normalized === 'HYBRID' || str_contains($normalized, 'HYBRID')) {
+                return 'hybrid';
+            }
+        }
+
+        return 'bank_slip';
+    }
+
+    public function resolveChargeMethodFromInvoice(Invoice $invoice): ?string
+    {
+        if (! $invoice->cora_charge_id) {
+            return null;
+        }
+
+        $assets = $this->paymentAssetsFromInvoice($invoice);
+        $hasBoleto = $this->hasBoletoAssets($assets);
+        $hasPix = $this->hasPixAssets($assets);
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $hybridIndicator = $this->indicatesHybridCharge($payload)
+            || $this->isHybridBoletoUrl((string) ($assets['boleto_url'] ?? ''));
+
+        if ($hasBoleto && ($hasPix || $hybridIndicator)) {
+            return 'hybrid';
+        }
+
+        if ($hasPix) {
+            return 'pix';
+        }
+
+        if ($hasBoleto) {
+            return 'bank_slip';
+        }
+
+        $paymentMethod = strtolower((string) $invoice->payment_method);
+
+        return match (true) {
+            $paymentMethod === 'hybrid' => 'hybrid',
+            in_array($paymentMethod, ['boleto', 'bank_slip'], true) => 'bank_slip',
+            $paymentMethod === 'pix' => 'pix',
+            default => null,
+        };
+    }
+
+    /**
+     * Método para API/UI: pix | boleto | hybrid
+     */
+    public function resolveUiMethodFromInvoice(Invoice $invoice): ?string
+    {
+        $stored = $this->resolveChargeMethodFromInvoice($invoice);
+
+        return match ($stored) {
+            'bank_slip' => 'boleto',
+            'hybrid' => 'hybrid',
+            'pix' => 'pix',
+            default => null,
+        };
+    }
+
+    /**
+     * Boleto Cora com QR PIX no PDF (URL ou metadados do provedor).
+     *
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    public function indicatesHybridCharge(array $externalInvoice): bool
+    {
+        $methodCandidates = [
+            $externalInvoice['payment_form'] ?? null,
+            $externalInvoice['payment_method'] ?? null,
+            data_get($externalInvoice, 'payment.form'),
+            data_get($externalInvoice, 'payment.method'),
+            data_get($externalInvoice, 'payment_options.selected'),
+            data_get($externalInvoice, 'payment_options.type'),
+        ];
+
+        foreach ($methodCandidates as $method) {
+            $normalized = strtoupper(trim((string) $method));
+            if ($normalized === 'HYBRID' || str_contains($normalized, 'HYBRID')) {
+                return true;
+            }
+        }
+
+        $boletoUrl = $this->extractPaymentUrl($externalInvoice);
+
+        if ($this->isHybridBoletoUrl($boletoUrl)) {
+            return true;
+        }
+
+        return data_get($externalInvoice, 'payment_options.bank_slip') !== null
+            && (data_get($externalInvoice, 'payment_options.pix') !== null
+                || data_get($externalInvoice, 'pix') !== null);
+    }
+
+    public function isHybridBoletoUrl(?string $url): bool
+    {
+        if ($url === null || trim($url) === '') {
+            return false;
+        }
+
+        $normalized = strtolower(trim($url));
+
+        return str_contains($normalized, 'boleto-qrcode')
+            || str_contains($normalized, 'qrcode')
+            || str_contains($normalized, 'qr-code');
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    public function isBoletoInvoice(array $externalInvoice): bool
+    {
+        $methodCandidates = [
+            $externalInvoice['payment_method'] ?? null,
+            $externalInvoice['payment_type'] ?? null,
+            data_get($externalInvoice, 'payment_options.type'),
+            data_get($externalInvoice, 'payment_options.bank_slip'),
+        ];
+
+        foreach ($methodCandidates as $method) {
+            $normalized = strtoupper(trim((string) $method));
+            if (in_array($normalized, ['BANK_SLIP', 'BOLETO', 'BILLET', 'BANKSLIP'], true)) {
+                return true;
+            }
+        }
+
+        return $this->extractBoletoNumber($externalInvoice) !== null
+            || $this->extractBoletoDigitable($externalInvoice) !== null
+            || data_get($externalInvoice, 'payment_options.bank_slip') !== null
+            || data_get($externalInvoice, 'bank_slip') !== null
+            || data_get($externalInvoice, 'boleto') !== null
+            || data_get($externalInvoice, 'bank_slip_url') !== null
+            || data_get($externalInvoice, 'boleto_url') !== null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    private function extractPaymentUrl(array $externalInvoice): ?string
+    {
+        $candidates = [
+            $externalInvoice['payment_url'] ?? null,
+            $externalInvoice['checkout_url'] ?? null,
+            data_get($externalInvoice, 'payment_options.bank_slip.url'),
+            data_get($externalInvoice, 'payment_options.bank_slip.pdf'),
+            data_get($externalInvoice, 'links.payment'),
+            data_get($externalInvoice, 'link'),
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    private function extractPixCopyPaste(array $externalInvoice): ?string
+    {
+        $candidates = [
+            data_get($externalInvoice, 'pix.copy_paste'),
+            data_get($externalInvoice, 'pix.emv'),
+            data_get($externalInvoice, 'payment_options.pix.emv'),
+            data_get($externalInvoice, 'payment_options.pix.copy_paste'),
+            $externalInvoice['pix_copy_paste'] ?? null,
+            $externalInvoice['emv'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    private function extractPixQrImageUrl(array $externalInvoice): ?string
+    {
+        $candidates = [
+            data_get($externalInvoice, 'pix.qr_code_image_url'),
+            data_get($externalInvoice, 'pix.qr_code_url'),
+            data_get($externalInvoice, 'payment_options.pix.url'),
+            data_get($externalInvoice, 'payment_options.pix.qr_code_url'),
+            $externalInvoice['qr_code_image_url'] ?? null,
+            $externalInvoice['qr_code_url'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    private function extractBoletoNumber(array $externalInvoice): ?string
+    {
+        $candidates = [
+            data_get($externalInvoice, 'payment_options.bank_slip.barcode'),
+            data_get($externalInvoice, 'payment_options.bank_slip.number'),
+            data_get($externalInvoice, 'bank_slip.barcode'),
+            data_get($externalInvoice, 'boleto.barcode'),
+            $externalInvoice['barcode'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    private function extractBoletoDigitable(array $externalInvoice): ?string
+    {
+        $candidates = [
+            data_get($externalInvoice, 'payment_options.bank_slip.digitable'),
+            data_get($externalInvoice, 'payment_options.bank_slip.our_number'),
+            data_get($externalInvoice, 'bank_slip.digitable'),
+            data_get($externalInvoice, 'boleto.digitable'),
+            $externalInvoice['digitable'] ?? null,
+        ];
+
+        foreach ($candidates as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
+    }
+}

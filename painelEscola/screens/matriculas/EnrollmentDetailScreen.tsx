@@ -699,6 +699,23 @@ export default function EnrollmentDetailScreen({
       methodOverride ?? (chargeMethod === "hybrid" ? "hybrid" : chargeMethod === "boleto" ? "boleto" : "pix");
 
     if (chargePaymentOptions && !chargePaymentOptions.actions.can_change_method) {
+      const assets = chargePaymentOptions.payment_assets;
+      const canShowExisting =
+        (methodToGenerate === "pix" && !!(assets?.pix_copy_paste || assets?.pix_qr_image_url)) ||
+        (methodToGenerate !== "pix" &&
+          !!(assets?.boleto_digitable || assets?.boleto_url || assets?.boleto_number));
+      if (canShowExisting) {
+        const existing = toGeneratedChargeFromAssets(
+          chargeInvoice.id,
+          assets,
+          chargeProvider,
+          chargeResult?.status ?? ""
+        );
+        if (existing) {
+          setChargeResult(existing);
+          setChargeModalStep("result");
+        }
+      }
       setChargeActionError(null);
       return;
     }
@@ -913,6 +930,9 @@ export default function EnrollmentDetailScreen({
     return null;
   };
 
+  const isHybridBoletoUrl = (url?: string | null) =>
+    !!url && /boleto-qrcode|qrcode|qr-code/i.test(url);
+
   const toGeneratedChargeFromAssets = (
     invoiceId: number,
     assets?: InvoicePaymentAssets | null,
@@ -1017,11 +1037,16 @@ export default function EnrollmentDetailScreen({
   const canGenerateBoleto = canUseBoleto || canUseHybrid;
   const hasPixAssets = !!(pixCopyPaste || pixQrCodeImageUrl);
   const hasBoletoAssets = !!(boletoDigitable || boletoPaymentUrl);
+  const hasHybridBoletoPdf =
+    isHybridBoletoUrl(boletoPaymentUrl) ||
+    normalizeChargeMethod(chargePaymentOptions?.current_method) === "hybrid" ||
+    normalizeChargeMethod(chargePaymentOptions?.method_lock?.method) === "hybrid" ||
+    chargeInvoice?.payment_method === "hybrid";
   const hasDualPaymentAssets = hasPixAssets && hasBoletoAssets;
   const selectedChargeMethod = normalizeChargeMethod(chargeMethod);
   const resultDisplayMethod: "pix" | "boleto" | "hybrid" | null = (() => {
     if (chargeModalStep === "result" && (chargeResult || chargePaymentOptions?.payment_assets)) {
-      if (hasDualPaymentAssets) return "hybrid";
+      if (hasDualPaymentAssets || (hasBoletoAssets && hasHybridBoletoPdf)) return "hybrid";
       if (hasPixAssets) return "pix";
       if (hasBoletoAssets) return "boleto";
     }
@@ -1913,7 +1938,7 @@ export default function EnrollmentDetailScreen({
                   </>
                 )}
               </TouchableOpacity>
-              {!!boletoPaymentUrl && activeChargeMethod === "boleto" && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+              {!!boletoPaymentUrl && showBoletoResult && hasBoletoAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
                 <TouchableOpacity
                   onPress={() => openPreviewModal(boletoPaymentUrl)}
                   activeOpacity={0.85}
@@ -1968,11 +1993,13 @@ export default function EnrollmentDetailScreen({
                   <Text className="text-xs text-gray-600">Carregando opções de pagamento...</Text>
                 </View>
               )}
-              {resultDisplayMethod === "hybrid" && hasDualPaymentAssets && (
+              {resultDisplayMethod === "hybrid" && (hasDualPaymentAssets || hasHybridBoletoPdf) && (
                 <View className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 mb-2">
-                  <Text className="text-xs font-bold text-blue-700">Boleto + PIX disponíveis</Text>
+                  <Text className="text-xs font-bold text-blue-700">Boleto + PIX</Text>
                   <Text className="text-xs text-blue-700 mt-1">
-                    Esta cobrança possui os dois canais de pagamento. Você pode usar qualquer um sem gerar nova cobrança.
+                    {hasDualPaymentAssets
+                      ? "Esta cobrança possui os dois canais de pagamento. Você pode usar qualquer um sem gerar nova cobrança."
+                      : "O QR Code PIX está no PDF do boleto. Use o botão Ver boleto para abrir e pagar."}
                   </Text>
                 </View>
               )}
@@ -2028,13 +2055,24 @@ export default function EnrollmentDetailScreen({
 
                   return methods.map((m) => {
                     const lockedOut =
-                      isChargeMethodLocked && lockedChargeMethod !== m.key;
+                      isChargeMethodLocked &&
+                      lockedChargeMethod !== m.key &&
+                      !(
+                        lockedChargeMethod === "hybrid" &&
+                        (m.key === "boleto" || m.generateMethod === "hybrid")
+                      );
                     const disabled = baseDisabled || !m.enabled || lockedOut;
                     return (
                       <TouchableOpacity
                         key={m.key}
                         onPress={() => {
-                          requestGenerateCharge(m.generateMethod ?? m.key);
+                          const method = m.generateMethod ?? m.key;
+                          if (m.hasAssets) {
+                            setChargeMethod(method);
+                            setChargeModalStep("result");
+                            return;
+                          }
+                          requestGenerateCharge(method);
                         }}
                         disabled={disabled}
                         activeOpacity={0.85}

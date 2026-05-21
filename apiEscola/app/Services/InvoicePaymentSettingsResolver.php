@@ -161,11 +161,7 @@ class InvoicePaymentSettingsResolver
         $originalMethod = strtolower(trim((string) data_get($payload, 'integration.original_method')));
 
         if ($origin === 'cora_sync' && $methodLocked) {
-            if ($originalMethod === 'hybrid') {
-                return 'bank_slip';
-            }
-
-            if (in_array($originalMethod, ['pix', 'bank_slip'], true)) {
+            if (in_array($originalMethod, ['pix', 'bank_slip', 'hybrid'], true)) {
                 return $originalMethod;
             }
 
@@ -187,7 +183,7 @@ class InvoicePaymentSettingsResolver
         $paymentMethod = strtolower((string) $invoice->payment_method);
 
         if ($paymentMethod === 'hybrid') {
-            return 'bank_slip';
+            return 'hybrid';
         }
 
         if (in_array($paymentMethod, ['boleto', 'bank_slip'], true)) {

@@ -114,6 +114,30 @@ export default function InvoiceActionsModal({
   const canCancel = invoice.can_cancel ?? (invoice.status !== "cancelled" && invoice.status !== "paid");
   const canDelete = invoice.can_delete ?? invoice.status !== "paid";
 
+  const boletoUrl = invoice.cora?.payment_url ?? "";
+  const isHybridBoletoUrl =
+    /boleto-qrcode|qrcode|qr-code/i.test(boletoUrl);
+  const hasBoletoAssets = !!(
+    invoice.cora?.boleto_digitable ||
+    invoice.cora?.boleto_number ||
+    invoice.cora?.payment_url
+  );
+  const hasPixAssets = !!(
+    invoice.cora?.pix_copy_paste ||
+    invoice.cora?.qr_code_image_url
+  );
+  const hasChargeAssets = !!invoice.cora?.charge_id && (hasBoletoAssets || hasPixAssets);
+  const chargeActionLabel = hasChargeAssets ? "Ver boleto" : "Cobrança no provedor (PIX / Boleto)";
+  const chargeActionDescription = hasChargeAssets
+    ? isHybridBoletoUrl || invoice.payment_method === "hybrid"
+      ? "Abrir boleto com QR Code PIX."
+      : hasBoletoAssets
+        ? "Abrir PDF do boleto e linha digitável."
+        : "Consultar QR Code e código PIX."
+    : canGenerateCharge
+      ? "Gerar PIX ou boleto para esta cobrança."
+      : "Indisponível para cobrança paga ou cancelada.";
+
   const actions: ActionItem[] = [];
 
   if (isOpen) {
@@ -131,13 +155,9 @@ export default function InvoiceActionsModal({
 
   actions.push({
     key: "generate_charge",
-    label: "Cobrança no provedor (PIX / Boleto)",
-    description: canGenerateCharge
-      ? invoice.cora?.charge_id
-        ? "Consultar PIX, boleto e dados da cobrança."
-        : "Gerar PIX ou boleto para esta cobrança."
-      : "Indisponível para cobrança paga ou cancelada.",
-    icon: "qr-code-outline",
+    label: chargeActionLabel,
+    description: chargeActionDescription,
+    icon: hasChargeAssets ? "document-text-outline" : "qr-code-outline",
     tone: canGenerateCharge ? "blue" : "gray",
     group: "primary",
     disabled: !canGenerateCharge,
