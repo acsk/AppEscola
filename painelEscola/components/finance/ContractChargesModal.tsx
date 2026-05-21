@@ -335,6 +335,15 @@ function CardBadges({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DueDateBadge({ date }: { date: string | null | undefined }) {
+  return (
+    <View className="flex-row items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5">
+      <Ionicons name="calendar-outline" size={11} color="#6B7280" />
+      <Text className="text-[10px] font-semibold text-gray-600">{fmtDate(date)}</Text>
+    </View>
+  );
+}
+
 function AccordionChevron({ expanded }: { expanded: boolean }) {
   return (
     <Ionicons
@@ -400,11 +409,14 @@ function LocalInvoiceCard({
           <Ionicons name="document-text-outline" size={14} color="#6B7280" />
         </View>
         <View className="flex-1">
-          <Text className="flex-1 text-xs font-bold text-gray-900" numberOfLines={1}>
-            {row.description}
-          </Text>
+          <View className="flex-row items-center gap-1.5">
+            <Text className="flex-1 text-xs font-bold text-gray-900" numberOfLines={1}>
+              {row.description}
+            </Text>
+            <DueDateBadge date={row.due_date} />
+          </View>
           <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
-            {fmtDate(row.due_date)} · {fmtMoney(row.amount)}
+            {fmtMoney(row.amount)}
           </Text>
         </View>
         <CardBadges>
@@ -491,9 +503,12 @@ function GenerateChargeCard({
           className="flex-1 flex-row items-center gap-2"
         >
           <View className="flex-1">
-            <Text className="text-xs font-bold text-gray-900" numberOfLines={1}>
-              {row.description ?? "Cobrança"}
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              <Text className="flex-1 text-xs font-bold text-gray-900" numberOfLines={1}>
+                {row.description ?? "Cobrança"}
+              </Text>
+              <DueDateBadge date={row.due_date} />
+            </View>
             <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
               {fmtMoney(row.amount)}
             </Text>
@@ -566,11 +581,14 @@ function ExternalChargeCard({
           className="flex-1 flex-row items-center gap-2"
         >
           <View className="flex-1">
-            <Text className="text-xs font-bold text-gray-900" numberOfLines={1}>
-              {row.description}
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              <Text className="flex-1 text-xs font-bold text-gray-900" numberOfLines={1}>
+                {row.description}
+              </Text>
+              <DueDateBadge date={row.due_date} />
+            </View>
             <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
-              {fmtDate(row.due_date)} · {fmtMoney(row.amount)}
+              {fmtMoney(row.amount)}
             </Text>
           </View>
         </TouchableOpacity>
