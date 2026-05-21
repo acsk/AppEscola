@@ -29,7 +29,10 @@ export type ContractExternalChargeRow = {
   due_date: string | null;
   description: string;
   linked_invoice_id: number | null;
-  link_status: "new" | "linked" | "updatable";
+  link_status: "new" | "linked" | "updatable" | "other";
+  for_this_enrollment?: boolean;
+  matches_payer?: boolean;
+  syncable?: boolean;
   selected_by_default?: boolean;
   action: string;
 };
@@ -46,7 +49,9 @@ export type ContractChargesPreview = {
     to_generate_count: number;
     to_sync_count: number;
     external_total: number;
+    external_boleto_total: number;
     external_for_enrollment: number;
+    external_matches_payer: number;
     provider_fetch_error: string | null;
   };
   warnings: string[];
@@ -69,6 +74,8 @@ export type ContractChargesPreview = {
   }>;
   to_generate: ContractChargePreviewRow[];
   external_charges: ContractExternalChargeRow[];
+  /** Todos os boletos retornados pela Cora (catálogo da escola). */
+  provider_boleto_list: ContractExternalChargeRow[];
 };
 
 export type ContractChargesApplyResult = {

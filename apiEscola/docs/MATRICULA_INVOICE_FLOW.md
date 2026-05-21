@@ -248,7 +248,8 @@ Aceita ID numérico ou `enrollment_number`. Atualiza apenas invoices `pending` e
 Na modal **Cobranças do contrato**, ao consultar a Cora:
 
 - Boletos **novos** no provedor (`link_status: new`) vêm **marcados** para sincronizar/importar.
-- Parcelas **locais** na mesma **data de vencimento** de um boleto na Cora **não** vêm marcadas para gerar (regra: só gerar local quando não houver boleto no provedor naquela data). O usuário pode marcar manualmente se quiser criar no sistema mesmo assim.
+- A modal lista **todos os boletos** retornados pela Cora (`provider_boleto_list`), com coluna de vínculo: **Matrícula**, **Mesmo CPF** ou **Outro**.
+- Parcelas **locais** na mesma data de um boleto com vínculo **Matrícula** ou **Mesmo CPF** **não** vêm marcadas para gerar local. O usuário pode marcar manualmente se quiser criar no sistema mesmo assim.
 
 ---
 

@@ -244,53 +244,6 @@ function SectionPanel({
   );
 }
 
-function ChargeGroup({
-  title,
-  subtitle,
-  rows,
-  selectedKeys,
-  expandedKeys,
-  canGenerate,
-  onToggle,
-  onToggleExpanded,
-}: {
-  title: string;
-  subtitle: string;
-  rows: ContractChargePreviewRow[];
-  selectedKeys: Set<string>;
-  expandedKeys: Set<string>;
-  canGenerate: boolean;
-  onToggle: (key: string) => void;
-  onToggleExpanded: (key: string) => void;
-}) {
-  if (rows.length === 0) return null;
-
-  return (
-    <View className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-      <View className="flex-row items-center justify-between gap-3 bg-gray-50 px-2.5 py-2 border-b border-gray-100">
-        <View className="flex-1">
-          <Text className="text-xs font-bold uppercase text-gray-700">{title}</Text>
-          <Text className="text-[10px] text-gray-500 mt-0.5">{subtitle}</Text>
-        </View>
-        <Pill label={`${rows.length} item${rows.length === 1 ? "" : "s"}`} tone="gray" />
-      </View>
-      <View className="gap-1.5 p-2">
-        {rows.map((row) => (
-          <GenerateChargeCard
-            key={row.key}
-            row={row}
-            selected={selectedKeys.has(row.key)}
-            expanded={expandedKeys.has(row.key)}
-            canGenerate={canGenerate}
-            onToggle={onToggle}
-            onToggleExpanded={onToggleExpanded}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
 function Pill({
   label,
   tone = "gray",
@@ -462,100 +415,6 @@ function LocalInvoiceCard({
   );
 }
 
-function GenerateChargeCard({
-  row,
-  selected,
-  expanded,
-  canGenerate,
-  onToggle,
-  onToggleExpanded,
-}: {
-  row: ContractChargePreviewRow;
-  selected: boolean;
-  expanded: boolean;
-  canGenerate: boolean;
-  onToggle: (key: string) => void;
-  onToggleExpanded: (key: string) => void;
-}) {
-  const disabled = row.disabled || row.already_exists || !canGenerate;
-
-  return (
-    <View
-      className={`w-full rounded-lg border px-2.5 py-2 ${
-        selected && !row.already_exists
-          ? "border-violet-200 bg-violet-50"
-          : row.already_exists
-            ? "border-gray-100 bg-gray-50 opacity-70"
-            : "border-gray-100 bg-white"
-      }`}
-    >
-      <View className="flex-row items-center gap-2">
-        <TouchableOpacity
-          onPress={() => onToggle(row.key)}
-          disabled={disabled}
-          activeOpacity={0.75}
-        >
-          <RowCheckbox checked={selected} disabled={disabled} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => onToggleExpanded(row.key)}
-          activeOpacity={0.75}
-          className="flex-1 flex-row items-center gap-2"
-        >
-          <View className="flex-1">
-            <View className="flex-row items-center gap-1.5">
-              <Text className="flex-1 text-xs font-bold text-gray-900" numberOfLines={1}>
-                {row.description ?? "Cobrança"}
-              </Text>
-              <DueDateBadge date={row.due_date} />
-            </View>
-            <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
-              {fmtMoney(row.amount)}
-            </Text>
-            {row.provider_has_boleto && !row.already_exists ? (
-              <Text className="text-[10px] text-emerald-700 mt-0.5" numberOfLines={2}>
-                Boleto na Cora — desmarcado por padrão
-              </Text>
-            ) : null}
-          </View>
-        </TouchableOpacity>
-        {row.already_exists ? <Pill label="Já existe" tone="gray" /> : null}
-        {row.provider_has_boleto && !row.already_exists ? (
-          <Pill label="Na Cora" tone="emerald" />
-        ) : null}
-        <TouchableOpacity onPress={() => onToggleExpanded(row.key)} className="p-1">
-          <AccordionChevron expanded={expanded} />
-        </TouchableOpacity>
-      </View>
-
-      {expanded ? (
-        <View className="mt-2 pt-2 border-t border-gray-100">
-          <View className="flex-row flex-wrap gap-1.5">
-            <DetailBlock icon="calendar-outline" label="Vencimento" value={fmtDate(row.due_date)} />
-            <DetailBlock icon="cash-outline" label="Valor" value={fmtMoney(row.amount)} />
-            <DetailBlock
-              icon="document-text-outline"
-              label="Tipo"
-              value={row.type === "monthly" ? "Mensalidade" : row.type === "enrollment_fee" ? "Taxa de matrícula" : "Cobrança"}
-            />
-            <DetailBlock
-              icon="checkmark-done-outline"
-              label="Situação"
-              value={row.already_exists ? "Já existe no sistema" : disabled ? "Indisponível" : "Pode ser gerada"}
-            />
-          </View>
-          {row.skip_default_reason ? (
-            <View className="flex-row items-start gap-1.5 mt-1.5 rounded-md bg-emerald-50 border border-emerald-100 px-2 py-1.5">
-              <Ionicons name="cloud-outline" size={13} color="#059669" />
-              <Text className="flex-1 text-[10px] leading-4 text-emerald-900">{row.skip_default_reason}</Text>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 function CompactTableHeader({
   columns,
 }: {
@@ -594,7 +453,7 @@ function CoraChargesCompactList({
       <EmptyState
         icon="cloud-offline-outline"
         title="Nenhum boleto na Cora"
-        description="Não há cobrança deste contrato no provedor para sincronizar."
+        description="A API da Cora não retornou boletos para esta escola."
       />
     );
   }
@@ -603,16 +462,20 @@ function CoraChargesCompactList({
     <View className="rounded-lg border border-emerald-200 bg-white overflow-hidden">
       <CompactTableHeader
         columns={[
-          { label: "Vencimento", width: 76 },
-          { label: "Valor", width: 88 },
+          { label: "Venc.", width: 68 },
+          { label: "Valor", width: 82 },
+          { label: "Vínculo", width: 72 },
           { label: "Status", flex: 1 },
-          { label: "Ação", width: 80, align: "right" },
+          { label: "Sync", width: 64, align: "right" },
         ]}
       />
       {rows.map((row, index) => {
-        const disabled = row.link_status === "linked";
+        const syncDisabled = row.syncable === false || row.link_status === "linked";
         const selected = selectedKeys.has(row.key);
-        const actionLabel = LINK_STATUS_LABELS[row.link_status] ?? row.link_status;
+        const actionLabel =
+          row.link_status === "other"
+            ? "—"
+            : LINK_STATUS_LABELS[row.link_status] ?? row.link_status;
         const actionTone = LINK_STATUS_TONES[row.link_status] ?? "violet";
         const statusLabel = getStatusDisplay(row.status).label;
 
@@ -621,26 +484,29 @@ function CoraChargesCompactList({
             key={row.key}
             className={`flex-row items-center px-1 py-1.5 ${
               index < rows.length - 1 ? "border-b border-gray-50" : ""
-            } ${selected ? "bg-violet-50/80" : disabled ? "opacity-60" : ""}`}
+            } ${selected ? "bg-violet-50/80" : syncDisabled ? "opacity-75" : ""}`}
           >
             <TouchableOpacity
               onPress={() => onToggle(row.key)}
-              disabled={disabled}
+              disabled={syncDisabled}
               activeOpacity={0.75}
               style={{ width: 28 }}
             >
-              <RowCheckbox checked={selected} disabled={disabled} />
+              <RowCheckbox checked={selected} disabled={syncDisabled} />
             </TouchableOpacity>
-            <Text className="text-[11px] text-gray-700" style={{ width: 76 }}>
+            <Text className="text-[11px] text-gray-700" style={{ width: 68 }}>
               {fmtDate(row.due_date)}
             </Text>
-            <Text className="text-[11px] font-semibold text-gray-900" style={{ width: 88 }}>
+            <Text className="text-[11px] font-semibold text-gray-900" style={{ width: 82 }}>
               {fmtMoney(row.amount)}
             </Text>
+            <View style={{ width: 72 }}>
+              <Pill label={providerLinkLabel(row)} tone={providerLinkTone(row)} />
+            </View>
             <Text className="flex-1 text-[10px] text-gray-600 pr-1" numberOfLines={1}>
               {statusLabel}
             </Text>
-            <View style={{ width: 80 }} className="items-end">
+            <View style={{ width: 64 }} className="items-end">
               <Pill label={actionLabel} tone={actionTone} />
             </View>
           </View>
@@ -683,13 +549,7 @@ function ExecutionPreviewSummary({
   });
 
   if (lines.length === 0) {
-    return (
-      <View className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-2.5">
-        <Text className="text-xs text-gray-500">
-          Marque as cobranças abaixo para ver o que será executado.
-        </Text>
-      </View>
-    );
+    return null;
   }
 
   return (
@@ -713,14 +573,140 @@ function ExecutionPreviewSummary({
 const LINK_STATUS_LABELS: Record<string, string> = {
   new: "Importar",
   linked: "Já vinculada",
-  updatable: "Atualizar no sistema",
+  updatable: "Atualizar",
+  other: "—",
 };
 
 const LINK_STATUS_TONES: Record<string, PillTone> = {
   new: "violet",
   linked: "emerald",
   updatable: "blue",
+  other: "gray",
 };
+
+function providerLinkLabel(row: ContractExternalChargeRow): string {
+  if (row.for_this_enrollment) return "Matrícula";
+  if (row.matches_payer) return "Mesmo CPF";
+  return "Outro";
+}
+
+function providerLinkTone(row: ContractExternalChargeRow): PillTone {
+  if (row.for_this_enrollment) return "violet";
+  if (row.matches_payer) return "blue";
+  return "gray";
+}
+
+function PreviewAlerts({
+  warnings,
+  providerError,
+}: {
+  warnings: string[];
+  providerError: string | null;
+}) {
+  const items = [...warnings];
+  if (providerError && !items.includes(providerError)) {
+    items.push(providerError);
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <View className="gap-1.5">
+      {items.map((text, i) => (
+        <View
+          key={`${i}-${text.slice(0, 24)}`}
+          className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2"
+        >
+          <Ionicons name="warning-outline" size={15} color="#B45309" />
+          <Text className="flex-1 text-xs text-amber-800">{text}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function CompactGenerateList({
+  rows,
+  selectedKeys,
+  canGenerate,
+  onToggle,
+}: {
+  rows: ContractChargePreviewRow[];
+  selectedKeys: Set<string>;
+  canGenerate: boolean;
+  onToggle: (key: string) => void;
+}) {
+  const selectable = rows.filter((r) => !r.disabled && !r.already_exists);
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        icon="checkmark-done-outline"
+        title="Nada a gerar"
+        description="Não há parcelas novas para criar com os filtros atuais."
+      />
+    );
+  }
+
+  return (
+    <View className="rounded-lg border border-violet-200 bg-white overflow-hidden">
+      <CompactTableHeader
+        columns={[
+          { label: "Venc.", width: 68 },
+          { label: "Valor", width: 82 },
+          { label: "Tipo", flex: 1 },
+          { label: "", width: 56, align: "right" },
+        ]}
+      />
+      {rows.map((row, index) => {
+        const disabled = row.disabled || row.already_exists || !canGenerate;
+        const selected = selectedKeys.has(row.key);
+        const typeLabel =
+          row.type === "monthly"
+            ? "Mensalidade"
+            : row.type === "enrollment_fee"
+              ? "Taxa"
+              : "Outro";
+
+        return (
+          <View
+            key={row.key}
+            className={`flex-row items-center px-1 py-1.5 ${
+              index < rows.length - 1 ? "border-b border-gray-50" : ""
+            } ${selected ? "bg-violet-50/80" : disabled ? "opacity-60" : ""}`}
+          >
+            <TouchableOpacity
+              onPress={() => onToggle(row.key)}
+              disabled={disabled}
+              activeOpacity={0.75}
+              style={{ width: 28 }}
+            >
+              <RowCheckbox checked={selected} disabled={disabled} />
+            </TouchableOpacity>
+            <Text className="text-[11px] text-gray-700" style={{ width: 68 }}>
+              {fmtDate(row.due_date)}
+            </Text>
+            <Text className="text-[11px] font-semibold text-gray-900" style={{ width: 82 }}>
+              {fmtMoney(row.amount)}
+            </Text>
+            <Text className="flex-1 text-[10px] text-gray-600" numberOfLines={1}>
+              {row.description ?? typeLabel}
+            </Text>
+            <View style={{ width: 56 }} className="items-end">
+              {row.already_exists ? (
+                <Pill label="Existe" tone="gray" />
+              ) : row.provider_has_boleto ? (
+                <Pill label="Cora" tone="emerald" />
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
+      {selectable.length === 0 && rows.length > 0 ? (
+        <Text className="text-[10px] text-gray-500 px-2 py-2">Todas as parcelas já existem ou estão bloqueadas.</Text>
+      ) : null}
+    </View>
+  );
+}
 
 export default function ContractChargesModal({
   visible,
@@ -752,8 +738,14 @@ export default function ContractChargesModal({
       data.to_generate
         .filter((row) => row.selected_by_default && !row.disabled && !row.already_exists)
         .forEach((row) => defaults.add(row.key));
-      data.external_charges
-        .filter((row) => row.selected_by_default && row.link_status !== "linked")
+      (data.provider_boleto_list ?? data.external_charges)
+        .filter(
+          (row) =>
+            row.selected_by_default &&
+            row.syncable !== false &&
+            row.link_status !== "linked" &&
+            row.link_status !== "other"
+        )
         .forEach((row) => defaults.add(row.key));
       setSelectedKeys(defaults);
       setExpandedKeys(new Set());
@@ -775,38 +767,15 @@ export default function ContractChargesModal({
     [preview]
   );
 
-  const selectableSync = useMemo(
-    () => preview?.external_charges.filter((r) => r.link_status !== "linked") ?? [],
+  const providerBoletoRows = useMemo(
+    () => preview?.provider_boleto_list ?? preview?.external_charges ?? [],
     [preview]
   );
 
-  const generateGroups = useMemo(() => {
-    const rows = preview?.to_generate ?? [];
-    const monthly = rows.filter((row) => row.type === "monthly");
-    const enrollmentFee = rows.filter((row) => row.type === "enrollment_fee");
-    const other = rows.filter((row) => row.type !== "monthly" && row.type !== "enrollment_fee");
-
-    return [
-      {
-        key: "monthly",
-        title: "Mensalidades",
-        subtitle: "Parcelas recorrentes do plano contratado.",
-        rows: monthly,
-      },
-      {
-        key: "enrollment_fee",
-        title: "Taxa de matrícula",
-        subtitle: "Cobrança inicial do contrato, quando aplicável.",
-        rows: enrollmentFee,
-      },
-      {
-        key: "other",
-        title: "Outras cobranças",
-        subtitle: "Itens retornados pela análise do contrato.",
-        rows: other,
-      },
-    ].filter((group) => group.rows.length > 0);
-  }, [preview]);
+  const selectableSync = useMemo(
+    () => providerBoletoRows.filter((r) => r.syncable !== false && r.link_status !== "linked"),
+    [providerBoletoRows]
+  );
 
   const toggleKey = (key: string) => {
     setSelectedKeys((prev) => {
@@ -916,22 +885,14 @@ export default function ContractChargesModal({
       }
     >
       <View className="gap-3">
-        <View className="rounded-xl bg-slate-50 border border-slate-200 overflow-hidden">
-          <View className="flex-row items-center gap-2.5 px-3 py-2.5">
-            <View className="w-8 h-8 rounded-lg bg-white border border-slate-100 items-center justify-center">
-              <Ionicons name="receipt-outline" size={17} color="#475569" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm font-bold text-slate-900">Revise antes de executar</Text>
-              <Text className="text-[11px] text-slate-600 mt-0.5">
-                Gere parcelas no sistema, sincronize boletos da Cora ou execute as duas ações juntas.
-              </Text>
-            </View>
-            <Pill
-              label={environment === "prod" ? "Produção" : "Homologação"}
-              tone={environment === "prod" ? "amber" : "gray"}
-            />
-          </View>
+        <View className="flex-row items-center justify-between gap-2">
+          <Text className="text-xs text-gray-500 flex-1">
+            Marque o que deseja executar. Com boleto na Cora na mesma data, a geração local não vem pré-marcada.
+          </Text>
+          <Pill
+            label={environment === "prod" ? "Produção" : "Homologação"}
+            tone={environment === "prod" ? "amber" : "gray"}
+          />
         </View>
 
         {preview?.charges_batch_generated ? (
@@ -990,41 +951,16 @@ export default function ContractChargesModal({
 
         {preview && !loading ? (
           <View className="gap-3">
-            <View className="flex-row flex-wrap gap-1.5">
-              {[
-                { label: "No sistema", value: preview.summary.local_count, icon: "albums-outline" },
-                { label: "Com Cora", value: preview.summary.local_with_gateway, icon: "cloud-done-outline" },
-                { label: "A gerar", value: preview.summary.to_generate_count, icon: "add-circle-outline" },
-                { label: "A sincronizar", value: preview.summary.to_sync_count, icon: "sync-outline" },
-              ].map((card) => (
-                <View
-                  key={card.label}
-                  className="flex-row items-center gap-2 bg-white border border-gray-100 rounded-lg px-2.5 py-2 min-w-[132px] flex-1"
-                >
-                  <View className="w-7 h-7 rounded-lg bg-gray-50 items-center justify-center">
-                    <Ionicons name={card.icon as keyof typeof Ionicons.glyphMap} size={15} color="#6B7280" />
-                  </View>
-                  <View>
-                    <Text className="text-[9px] uppercase text-gray-500 font-semibold">{card.label}</Text>
-                    <Text className="text-lg font-bold text-gray-900">{card.value}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-
             <ExecutionPreviewSummary preview={preview} selectedKeys={selectedKeys} />
 
-            {/* Cora — lista enxuta antes de executar */}
+            <PreviewAlerts
+              warnings={preview.warnings}
+              providerError={preview.summary.provider_fetch_error}
+            />
+
             <SectionPanel accent="emerald">
               <SectionHeader
-                title={`Cora — boletos encontrados (${preview.external_charges.length})`}
-                subtitle={
-                  preview.summary.provider_fetch_error
-                    ? "Consulta ao provedor indisponível; veja o alerta abaixo."
-                    : preview.summary.external_total > 0
-                      ? `${preview.summary.external_total} no cadastro da escola · ${preview.summary.to_sync_count} para sincronizar nesta matrícula`
-                      : "Lista retornada pela API da Cora para este aluno/contrato."
-                }
+                title={`Cora (${preview.summary.external_boleto_total ?? providerBoletoRows.length} boleto${(preview.summary.external_boleto_total ?? 0) === 1 ? "" : "s"})`}
                 action={
                   selectableSync.length > 0 ? (
                     <TouchableOpacity
@@ -1039,86 +975,28 @@ export default function ContractChargesModal({
                       <Text className="text-xs font-semibold text-emerald-800">
                         {selectedSyncSelectableCount === selectableSync.length
                           ? "Desmarcar"
-                          : "Marcar sync."}
+                          : "Marcar sync"}
                       </Text>
                     </TouchableOpacity>
                   ) : null
                 }
               />
-              <CoraChargesCompactList
-                rows={preview.external_charges}
-                selectedKeys={selectedKeys}
-                onToggle={toggleKey}
-              />
-              {preview.external_charges.length > 0 ? (
-                <Text className="text-[10px] text-gray-500 mt-2 leading-4">
-                  Importar = criar cobrança local · Atualizar = alinhar status com a Cora · Já vinculada = não altera.
+              {providerBoletoRows.length === 0 && (preview.summary.external_total ?? 0) > 0 ? (
+                <Text className="text-xs text-amber-800">
+                  {preview.summary.external_total} cobrança(s) na API, nenhuma como boleto.
                 </Text>
-              ) : null}
-            </SectionPanel>
-
-            {preview.warnings.map((w, i) => (
-              <View
-                key={i}
-                className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2"
-              >
-                <Ionicons name="warning-outline" size={16} color="#B45309" />
-                <Text className="flex-1 text-xs text-amber-800">{w}</Text>
-              </View>
-            ))}
-
-            {preview.summary.provider_fetch_error ? (
-              <View className="flex-row items-start gap-2 rounded-lg bg-orange-50 border border-orange-200 px-3 py-2">
-                <Ionicons name="alert-circle-outline" size={16} color="#C2410C" />
-                <Text className="flex-1 text-xs text-orange-800">
-                  {preview.summary.provider_fetch_error}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Local — recolhido por padrão */}
-            <SectionPanel>
-              <SectionHeader
-                title={`Já no sistema (${preview.local_invoices.length})`}
-                subtitle="Cobranças locais desta matrícula (opcional)."
-                action={
-                  preview.local_invoices.length > 0 ? (
-                    <TouchableOpacity
-                      className="px-2 py-1 rounded-lg bg-gray-100"
-                      onPress={() => setShowLocalInvoices((v) => !v)}
-                    >
-                      <Text className="text-xs font-semibold text-gray-700">
-                        {showLocalInvoices ? "Ocultar" : "Ver lista"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null
-                }
-              />
-              {preview.local_invoices.length === 0 ? (
-                <EmptyState
-                  icon="folder-open-outline"
-                  title="Nenhuma cobrança local"
-                  description="Ainda não há cobrança criada para esta matrícula."
-                />
-              ) : showLocalInvoices ? (
-                <LocalInvoicesGrid
-                  rows={preview.local_invoices}
-                  expandedKeys={expandedKeys}
-                  onToggleExpanded={toggleExpanded}
-                />
               ) : (
-                <Text className="text-xs text-gray-500">
-                  {preview.summary.local_with_gateway} com vínculo na Cora ·{" "}
-                  {preview.summary.local_count - preview.summary.local_with_gateway} apenas no sistema.
-                </Text>
+                <CoraChargesCompactList
+                  rows={providerBoletoRows}
+                  selectedKeys={selectedKeys}
+                  onToggle={toggleKey}
+                />
               )}
             </SectionPanel>
 
-            {/* A gerar */}
             <SectionPanel accent="violet">
               <SectionHeader
-                title={`Gerar no contrato (${selectableGenerate.length})`}
-                subtitle="Selecione as parcelas locais que serão criadas agora."
+                title={`Gerar local (${selectableGenerate.length})`}
                 action={
                   canGenerate && selectableGenerate.length > 0 ? (
                     <TouchableOpacity
@@ -1132,38 +1010,45 @@ export default function ContractChargesModal({
                     >
                       <Text className="text-xs font-semibold text-violet-700">
                         {selectedGenerateKeys.length === selectableGenerate.length
-                          ? "Desmarcar todas"
-                          : "Marcar todas"}
+                          ? "Desmarcar"
+                          : "Marcar"}
                       </Text>
                     </TouchableOpacity>
                   ) : null
                 }
               />
-              {preview.to_generate.length === 0 ? (
-                <EmptyState
-                  icon="checkmark-done-outline"
-                  title="Nada a gerar"
-                  description="Os tipos selecionados não têm novas parcelas para criação."
-                />
-              ) : (
-                <View className="gap-2">
-                  {generateGroups.map((group) => (
-                    <ChargeGroup
-                      key={group.key}
-                      title={group.title}
-                      subtitle={group.subtitle}
-                      rows={group.rows}
-                      selectedKeys={selectedKeys}
-                      expandedKeys={expandedKeys}
-                      canGenerate={canGenerate}
-                      onToggle={toggleKey}
-                      onToggleExpanded={toggleExpanded}
-                    />
-                  ))}
-                </View>
-              )}
+              <CompactGenerateList
+                rows={preview.to_generate}
+                selectedKeys={selectedKeys}
+                canGenerate={canGenerate}
+                onToggle={toggleKey}
+              />
             </SectionPanel>
 
+            {preview.local_invoices.length > 0 ? (
+              <SectionPanel>
+                <SectionHeader
+                  title={`No sistema (${preview.local_invoices.length})`}
+                  action={
+                    <TouchableOpacity
+                      className="px-2 py-1 rounded-lg bg-gray-100"
+                      onPress={() => setShowLocalInvoices((v) => !v)}
+                    >
+                      <Text className="text-xs font-semibold text-gray-700">
+                        {showLocalInvoices ? "Ocultar" : "Ver"}
+                      </Text>
+                    </TouchableOpacity>
+                  }
+                />
+                {showLocalInvoices ? (
+                  <LocalInvoicesGrid
+                    rows={preview.local_invoices}
+                    expandedKeys={expandedKeys}
+                    onToggleExpanded={toggleExpanded}
+                  />
+                ) : null}
+              </SectionPanel>
+            ) : null}
           </View>
         ) : null}
       </View>

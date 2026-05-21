@@ -188,7 +188,15 @@ class CoraEnrollmentInvoiceSyncService
     /**
      * Lista boletos da Cora vinculáveis à matrícula (somente leitura, sem persistir).
      *
-     * @return array{items: array<int, array<string, mixed>>, external_total: int, external_for_enrollment: int, fetch_error: null|string}
+     * @return array{
+     *     items: array<int, array<string, mixed>>,
+     *     provider_boleto_list: array<int, array<string, mixed>>,
+     *     external_total: int,
+     *     external_boleto_total: int,
+     *     external_for_enrollment: int,
+     *     external_matches_payer: int,
+     *     fetch_error: null|string
+     * }
      */
     public function previewExternalBoletoCharges(Enrollment $enrollment, string $environment = 'prod'): array
     {
@@ -211,13 +219,12 @@ class CoraEnrollmentInvoiceSyncService
         ]);
 
         $items = [];
+        $catalog = [];
+        $boletoTotal = 0;
+        $matchesPayerCount = 0;
 
         foreach ($externalInvoices as $externalInvoice) {
             if (! $this->isBoletoInvoice($externalInvoice)) {
-                continue;
-            }
-
-            if (! $this->belongsToEnrollment($enrollment, $externalInvoice)) {
                 continue;
             }
 
@@ -226,7 +233,17 @@ class CoraEnrollmentInvoiceSyncService
                 continue;
             }
 
-            $localInvoice = $this->findLocalInvoiceForExternal($enrollment, $externalInvoice, $chargeId);
+            $boletoTotal++;
+            $forEnrollment = $this->belongsToEnrollment($enrollment, $externalInvoice);
+            $matchesPayer = $this->matchesEnrollmentPayer($enrollment, $externalInvoice);
+
+            if ($matchesPayer) {
+                $matchesPayerCount++;
+            }
+
+            $localInvoice = $forEnrollment
+                ? $this->findLocalInvoiceForExternal($enrollment, $externalInvoice, $chargeId)
+                : null;
 
             if ($localInvoice && (int) $localInvoice->enrollment_id !== (int) $enrollment->id) {
                 continue;
@@ -235,14 +252,14 @@ class CoraEnrollmentInvoiceSyncService
             $amount = $this->extractAmount($externalInvoice);
             $dueDate = $this->parseDate((string) ($externalInvoice['due_date'] ?? ''));
 
-            $linkStatus = 'new';
-            if ($localInvoice) {
+            $linkStatus = $forEnrollment ? 'new' : 'other';
+            if ($forEnrollment && $localInvoice) {
                 $linkStatus = strtolower((string) $localInvoice->cora_charge_id) === strtolower($chargeId)
                     ? 'linked'
                     : 'updatable';
             }
 
-            $items[] = [
+            $row = [
                 'key' => EnrollmentContractChargesService::syncKey($chargeId),
                 'charge_id' => $chargeId,
                 'status' => (string) ($externalInvoice['status'] ?? ''),
@@ -255,15 +272,27 @@ class CoraEnrollmentInvoiceSyncService
                 ),
                 'linked_invoice_id' => $localInvoice?->id,
                 'link_status' => $linkStatus,
-                'selected_by_default' => $linkStatus === 'new',
-                'action' => 'sync_from_provider',
+                'for_this_enrollment' => $forEnrollment,
+                'matches_payer' => $matchesPayer,
+                'syncable' => $forEnrollment && $linkStatus !== 'linked' && $linkStatus !== 'other',
+                'selected_by_default' => $forEnrollment && $linkStatus === 'new',
+                'action' => $forEnrollment ? 'sync_from_provider' : 'view_only',
             ];
+
+            $catalog[] = $row;
+
+            if ($forEnrollment) {
+                $items[] = $row;
+            }
         }
 
         return [
             'items' => $items,
+            'provider_boleto_list' => $catalog,
             'external_total' => count($externalInvoices),
+            'external_boleto_total' => $boletoTotal,
             'external_for_enrollment' => count($items),
+            'external_matches_payer' => $matchesPayerCount,
             'fetch_error' => null,
         ];
     }
@@ -331,6 +360,33 @@ class CoraEnrollmentInvoiceSyncService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * CPF do pagador na Cora coincide com aluno ou responsável (sem exigir metadata do sistema).
+     */
+    private function matchesEnrollmentPayer(Enrollment $enrollment, array $externalInvoice): bool
+    {
+        $customerDocument = $this->extractCustomerDocument($externalInvoice);
+
+        if ($customerDocument === '') {
+            return false;
+        }
+
+        $studentDocument = $this->digitsOnly((string) ($enrollment->student?->document ?? ''));
+
+        if ($studentDocument !== '' && $customerDocument === $studentDocument) {
+            return true;
+        }
+
+        foreach ($enrollment->student?->guardians ?? [] as $guardian) {
+            $guardianDocument = $this->digitsOnly((string) ($guardian->document ?? ''));
+            if ($guardianDocument !== '' && $customerDocument === $guardianDocument) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function belongsToEnrollment(Enrollment $enrollment, array $externalInvoice): bool

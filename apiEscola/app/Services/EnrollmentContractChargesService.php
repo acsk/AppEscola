@@ -84,8 +84,11 @@ class EnrollmentContractChargesService
 
         $externalPreview = [
             'items' => [],
+            'provider_boleto_list' => [],
             'external_total' => 0,
+            'external_boleto_total' => 0,
             'external_for_enrollment' => 0,
+            'external_matches_payer' => 0,
             'fetch_error' => null,
         ];
 
@@ -100,7 +103,8 @@ class EnrollmentContractChargesService
         }
 
         $syncCandidates = $externalPreview['items'];
-        $toGenerate = $this->deferLocalGenerationWhenProviderHasBoleto($toGenerate, $syncCandidates);
+        $providerBoletoList = $externalPreview['provider_boleto_list'] ?? $syncCandidates;
+        $toGenerate = $this->deferLocalGenerationWhenProviderHasBoleto($toGenerate, $providerBoletoList);
         $toGenerateSelectable = array_values(array_filter(
             $toGenerate,
             static fn (array $row) => empty($row['already_exists']) && empty($row['disabled'])
@@ -134,7 +138,9 @@ class EnrollmentContractChargesService
                     static fn (array $row) => ($row['link_status'] ?? '') === 'new'
                 )),
                 'external_total' => $externalPreview['external_total'],
+                'external_boleto_total' => $externalPreview['external_boleto_total'] ?? 0,
                 'external_for_enrollment' => $externalPreview['external_for_enrollment'] ?? count($syncCandidates),
+                'external_matches_payer' => $externalPreview['external_matches_payer'] ?? 0,
                 'provider_fetch_error' => $externalPreview['fetch_error'],
             ],
             'warnings' => $warnings,
@@ -142,6 +148,7 @@ class EnrollmentContractChargesService
             'local_invoices' => $localInvoices,
             'to_generate' => $toGenerate,
             'external_charges' => $syncCandidates,
+            'provider_boleto_list' => $providerBoletoList,
         ];
     }
 
@@ -246,14 +253,21 @@ class EnrollmentContractChargesService
      * @param  array<int, array<string, mixed>>  $externalCharges
      * @return array<int, array<string, mixed>>
      */
-    private function deferLocalGenerationWhenProviderHasBoleto(array $toGenerate, array $externalCharges): array
+    private function deferLocalGenerationWhenProviderHasBoleto(array $toGenerate, array $providerBoletoList): array
     {
-        if ($externalCharges === []) {
+        if ($providerBoletoList === []) {
             return $toGenerate;
         }
 
         $providerDueDates = [];
-        foreach ($externalCharges as $external) {
+        foreach ($providerBoletoList as $external) {
+            $relevant = ! empty($external['for_this_enrollment'])
+                || ! empty($external['matches_payer']);
+
+            if (! $relevant) {
+                continue;
+            }
+
             $dueDate = $external['due_date'] ?? null;
             if (is_string($dueDate) && $dueDate !== '') {
                 $providerDueDates[$dueDate] = true;
@@ -276,7 +290,7 @@ class EnrollmentContractChargesService
                 $row['selected_by_default'] = false;
                 $row['provider_has_boleto'] = true;
                 $row['skip_default_reason'] =
-                    'Boleto na Cora nesta data — prefira sincronizar; marque se quiser gerar local mesmo assim.';
+                    'Boleto na Cora nesta data (mesmo pagador ou matrícula) — prefira sincronizar; marque se quiser gerar local.';
             }
 
             return $row;
