@@ -248,7 +248,7 @@ Aceita ID numérico ou `enrollment_number`. Atualiza apenas invoices `pending` e
 Na modal **Cobranças do contrato**, ao consultar a Cora:
 
 - Boletos **novos** no provedor (`link_status: new`) vêm **marcados** para sincronizar/importar.
-- A modal lista **todos os boletos** retornados pela Cora (`provider_boleto_list`), com coluna de vínculo: **Matrícula**, **Mesmo CPF** ou **Outro**.
+- `provider_boleto_list` lista boletos **desta matrícula** (inclui `cora_charge_id` já vinculado local) ou **mesmo CPF** do pagador; outros CPFs da escola não aparecem. Status Cora `LATE` exibido como **Atrasada**.
 
 ### Debug em produção
 

@@ -61,6 +61,7 @@ function getStatusDisplay(v: string | null | undefined): { label: string; tone: 
     canceled: { label: "Cancelada", tone: "red" },
     cancelled: { label: "Cancelada", tone: "red" },
     open: { label: "Aberta", tone: "blue" },
+    late: { label: "Atrasada", tone: "red" },
     active: { label: "Ativa", tone: "blue" },
     closed: { label: "Fechada", tone: "slate" },
     draft: { label: "Rascunho", tone: "gray" },
@@ -84,6 +85,7 @@ function providerStatusToLocalKey(provider: string | null | undefined): string |
     completed: "paid",
     received: "paid",
     open: "pending",
+    late: "overdue",
     pending: "pending",
     draft: "pending",
     created: "pending",
@@ -811,9 +813,6 @@ export default function ContractChargesModal({
       setPreview(data);
 
       const defaults = new Set<string>();
-      data.to_generate
-        .filter((row) => row.selected_by_default && !row.disabled && !row.already_exists)
-        .forEach((row) => defaults.add(row.key));
       (data.provider_boleto_list ?? data.external_charges)
         .filter(
           (row) =>

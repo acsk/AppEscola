@@ -241,11 +241,18 @@ class CoraEnrollmentInvoiceSyncService
                 $matchesPayerCount++;
             }
 
-            $localInvoice = $forEnrollment
-                ? $this->findLocalInvoiceForExternal($enrollment, $externalInvoice, $chargeId)
-                : null;
+            $localInvoice = $this->findLocalInvoiceForExternal($enrollment, $externalInvoice, $chargeId);
 
             if ($localInvoice && (int) $localInvoice->enrollment_id !== (int) $enrollment->id) {
+                continue;
+            }
+
+            if ($localInvoice) {
+                $forEnrollment = true;
+            }
+
+            // Lista só boletos desta matrícula ou do mesmo CPF do pagador (ex.: R$ 50 de outro CPF fica de fora).
+            if (! $forEnrollment && ! $matchesPayer) {
                 continue;
             }
 
