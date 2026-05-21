@@ -21,6 +21,7 @@ import { displayToISO, isoToDisplay } from "../../utils/masks";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useBillingSettings } from "../../hooks/useBillingSettings";
+import { unwrapApi } from "../../types/api";
 import type {
   BundleSummary,
   CoursePlanSummary,
@@ -181,19 +182,21 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
     (async () => {
       try {
         const { data } = await api.get(`/students/${studentId}`);
-        const g = (data.guardians ?? []).map((r: any) => ({
-          id: r.guardian.id,
-          name: r.guardian.name,
-          document: r.guardian.document ?? null,
+        const student = unwrapApi<Record<string, unknown>>(data);
+        const guardianRows = Array.isArray(student.guardians) ? student.guardians : [];
+        const g = guardianRows.map((r: any) => ({
+          id: r.guardian?.id ?? r.id,
+          name: r.guardian?.name ?? r.name,
+          document: r.guardian?.document ?? r.document ?? null,
         }));
         setGuardians(g);
         setGuardianId(g.length > 0 ? String(g[0].id) : "");
         setStudentDetail({
-          id: data.id,
-          name: data.name,
-          enrollment_number: data.enrollment_number,
-          document: data.document ?? null,
-          birth_date: data.birth_date ?? null,
+          id: Number(student.id),
+          name: String(student.name ?? ""),
+          enrollment_number: (student.enrollment_number as string) ?? null,
+          document: (student.document as string) ?? null,
+          birth_date: (student.birth_date as string) ?? null,
         });
       } catch {}
     })();
@@ -207,7 +210,10 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         per_page: 50,
       },
     });
-    const list: StudentPickerItem[] = data.data ?? [];
+    const unwrapped = unwrapApi<{ data?: StudentPickerItem[] } | StudentPickerItem[]>(data);
+    const list: StudentPickerItem[] = Array.isArray(unwrapped)
+      ? unwrapped
+      : (unwrapped?.data ?? []);
     return list.map((s) => ({
       value: String(s.id),
       label: s.name,

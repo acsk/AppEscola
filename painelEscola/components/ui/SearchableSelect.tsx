@@ -58,14 +58,16 @@ export default function SearchableSelect({
   const [query, setQuery] = useState("");
   const [asyncOptions, setAsyncOptions] = useState<SearchableOption[]>([]);
   const [searching, setSearching] = useState(false);
+  /** Mantém label/sublabel visíveis após seleção em modo assíncrono */
+  const [pickedOption, setPickedOption] = useState<SearchableOption | null>(null);
 
   const asyncMode = !!onSearch;
 
   const selected =
-    selectedOption?.value === value
-      ? selectedOption
-      : options.find((o) => o.value === value) ??
-        asyncOptions.find((o) => o.value === value);
+    (selectedOption?.value === value ? selectedOption : null) ??
+    (pickedOption?.value === value ? pickedOption : null) ??
+    options.find((o) => o.value === value) ??
+    asyncOptions.find((o) => o.value === value);
 
   const filtered = asyncMode
     ? asyncOptions
@@ -101,6 +103,7 @@ export default function SearchableSelect({
 
   const handleSelect = useCallback(
     (opt: SearchableOption) => {
+      setPickedOption(opt);
       onChange(opt.value);
       setOpen(false);
       setQuery("");
@@ -112,7 +115,18 @@ export default function SearchableSelect({
   const handleClear = () => {
     onChange("");
     setQuery("");
+    setPickedOption(null);
   };
+
+  useEffect(() => {
+    if (!value) {
+      setPickedOption(null);
+      return;
+    }
+    if (selectedOption?.value === value) {
+      setPickedOption(selectedOption);
+    }
+  }, [value, selectedOption]);
 
   const borderColor = error ? "#EF4444" : "#E5E7EB";
 
