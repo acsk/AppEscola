@@ -22,6 +22,11 @@ class StudentResource extends JsonResource
             'photo_url' => $this->photo_url,
             'is_minor' => $this->is_minor,
             'status' => $this->status,
+            'pivot' => $this->when($this->pivot !== null, fn () => [
+                'is_financial_responsible' => (bool) $this->pivot?->is_financial_responsible,
+                'is_pedagogical_responsible' => (bool) $this->pivot?->is_pedagogical_responsible,
+                'can_access_portal' => (bool) $this->pivot?->can_access_portal,
+            ]),
             'desired_courses' => $this->whenLoaded('desiredCourses', fn () => $this->desiredCourses->map(fn ($course) => [
                 'id' => $course->id,
                 'name' => $course->name,

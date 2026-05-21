@@ -243,6 +243,13 @@ php artisan enrollments:sync-invoice-amounts MAT-2-00003 --fix-base-from-plan --
 
 Aceita ID numérico ou `enrollment_number`. Atualiza apenas invoices `pending` e `overdue` dos tipos `monthly` e `enrollment_fee`. Cobranças já pagas ou canceladas não são alteradas.
 
+### Cobranças do contrato (preview / Cora)
+
+Na modal **Cobranças do contrato**, ao consultar a Cora:
+
+- Boletos **novos** no provedor (`link_status: new`) vêm **marcados** para sincronizar/importar.
+- Parcelas **locais** na mesma **data de vencimento** de um boleto na Cora **não** vêm marcadas para gerar (regra: só gerar local quando não houver boleto no provedor naquela data). O usuário pode marcar manualmente se quiser criar no sistema mesmo assim.
+
 ---
 
 ## Campo `type` nas Invoices

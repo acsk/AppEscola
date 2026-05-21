@@ -305,6 +305,8 @@ Authorization: Bearer {token}
 
 **Query params:** `search` (nome), `page`.
 
+**Listagem (leve):** cada item traz apenas `id`, `name`, `document`, `email`, `phone`, `relationship` e `students_count` (sem array de alunos).
+
 ---
 
 ### Criar
@@ -341,6 +343,10 @@ GET    /api/guardians/{id}
 PUT    /api/guardians/{id}
 DELETE /api/guardians/{id}
 ```
+
+**Detalhe** (`GET /api/guardians/{id}`): envelope `body` com dados completos e `students[]` enxuto (`id`, `name`, `enrollment_number`, `status`, `pivot`).
+
+**Atualizar** (`PUT`): retorna o mesmo formato da listagem (sem `students`); recarregar o detalhe após salvar se a tela exibir alunos vinculados.
 
 ---
 

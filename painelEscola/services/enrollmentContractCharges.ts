@@ -15,6 +15,9 @@ export type ContractChargePreviewRow = {
   already_exists?: boolean;
   disabled?: boolean;
   selected_by_default?: boolean;
+  /** Há boleto na Cora na mesma data — geração local não vem marcada por padrão. */
+  provider_has_boleto?: boolean;
+  skip_default_reason?: string;
   action: string;
 };
 

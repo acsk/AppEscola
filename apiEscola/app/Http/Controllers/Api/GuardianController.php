@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use OpenApi\Attributes as OA;
 use App\Http\Requests\StoreGuardianRequest;
 use App\Http\Requests\UpdateGuardianRequest;
+use App\Http\Resources\GuardianListResource;
 use App\Http\Resources\GuardianResource;
 use App\Models\Guardian;
 use App\Traits\ScopedByTenant;
@@ -36,9 +37,10 @@ class GuardianController extends Controller
         $this->applyTenantScope($query, $request);
 
         $query
-            ->when($request->query('search'), fn ($q, $v) => $q->where('name', 'like', "%{$v}%"));
+            ->when($request->query('search'), fn ($q, $v) => $q->where('name', 'like', "%{$v}%"))
+            ->withCount('students');
 
-        return GuardianResource::collection($query->orderBy('name')->paginate(20));
+        return GuardianListResource::collection($query->orderBy('name')->paginate(20));
     }
 
     #[OA\Post(
@@ -86,7 +88,9 @@ class GuardianController extends Controller
             ]));
         }
 
-        return $this->created(new GuardianResource($guardian));
+        $guardian->loadCount('students');
+
+        return $this->created(new GuardianListResource($guardian));
     }
 
     #[OA\Get(
@@ -103,6 +107,8 @@ class GuardianController extends Controller
     public function show(Request $request, Guardian $guardian): JsonResponse
     {
         $this->authorizeTenant($request, $guardian->tenant_id);
+
+        $guardian->load(['students' => fn ($q) => $q->orderBy('name')]);
 
         return $this->success(new GuardianResource($guardian));
     }
@@ -124,8 +130,9 @@ class GuardianController extends Controller
         $this->authorizeTenant($request, $guardian->tenant_id);
 
         $guardian->update($request->validated());
+        $guardian->loadCount('students');
 
-        return $this->success(new GuardianResource($guardian));
+        return $this->success(new GuardianListResource($guardian));
     }
 
     #[OA\Delete(

@@ -100,10 +100,20 @@ class EnrollmentContractChargesService
         }
 
         $syncCandidates = $externalPreview['items'];
+        $toGenerate = $this->deferLocalGenerationWhenProviderHasBoleto($toGenerate, $syncCandidates);
         $toGenerateSelectable = array_values(array_filter(
             $toGenerate,
             static fn (array $row) => empty($row['already_exists']) && empty($row['disabled'])
         ));
+
+        $deferredForProvider = array_values(array_filter(
+            $toGenerate,
+            static fn (array $row) => ! empty($row['provider_has_boleto'])
+        ));
+        if ($deferredForProvider !== []) {
+            $warnings[] = 'Parcelas com boleto na Cora na mesma data não vêm marcadas para gerar local. '
+                . 'Prefira importar/sincronizar pelo provedor ou marque manualmente se ainda quiser criar no sistema.';
+        }
 
         return [
             'enrollment_id' => $enrollment->id,
@@ -226,6 +236,51 @@ class EnrollmentContractChargesService
                 'source' => $invoice->cora_charge_id ? 'local_with_provider' : 'local_only',
             ];
         })->values()->all();
+    }
+
+    /**
+     * Não pré-seleciona geração local quando já existe boleto na Cora na mesma data de vencimento.
+     * O usuário ainda pode marcar manualmente (geração local opcional).
+     *
+     * @param  array<int, array<string, mixed>>  $toGenerate
+     * @param  array<int, array<string, mixed>>  $externalCharges
+     * @return array<int, array<string, mixed>>
+     */
+    private function deferLocalGenerationWhenProviderHasBoleto(array $toGenerate, array $externalCharges): array
+    {
+        if ($externalCharges === []) {
+            return $toGenerate;
+        }
+
+        $providerDueDates = [];
+        foreach ($externalCharges as $external) {
+            $dueDate = $external['due_date'] ?? null;
+            if (is_string($dueDate) && $dueDate !== '') {
+                $providerDueDates[$dueDate] = true;
+            }
+        }
+
+        if ($providerDueDates === []) {
+            return $toGenerate;
+        }
+
+        return array_map(function (array $row) use ($providerDueDates) {
+            $dueDate = $row['due_date'] ?? null;
+
+            if (
+                ! ($row['already_exists'] ?? false)
+                && ! ($row['disabled'] ?? false)
+                && is_string($dueDate)
+                && isset($providerDueDates[$dueDate])
+            ) {
+                $row['selected_by_default'] = false;
+                $row['provider_has_boleto'] = true;
+                $row['skip_default_reason'] =
+                    'Boleto na Cora nesta data — prefira sincronizar; marque se quiser gerar local mesmo assim.';
+            }
+
+            return $row;
+        }, $toGenerate);
     }
 
     /**

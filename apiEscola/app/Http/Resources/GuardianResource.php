@@ -18,6 +18,7 @@ class GuardianResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'relationship' => $this->relationship,
+            'students' => GuardianStudentResource::collection($this->whenLoaded('students')),
             'pivot' => $this->when($this->pivot !== null, fn () => [
                 'is_financial_responsible' => (bool) $this->pivot?->is_financial_responsible,
                 'is_pedagogical_responsible' => (bool) $this->pivot?->is_pedagogical_responsible,
