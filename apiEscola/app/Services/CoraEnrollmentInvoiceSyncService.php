@@ -305,6 +305,336 @@ class CoraEnrollmentInvoiceSyncService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function buildListInvoicesDebugSnapshot(Enrollment $enrollment, string $environment): array
+    {
+        $enrollment->loadMissing(['tenant']);
+        $tenant = $enrollment->tenant;
+
+        if (! $tenant) {
+            throw new RuntimeException('Tenant da matricula nao encontrado.');
+        }
+
+        $externalInvoices = $this->factory->resolve('cora')->listInvoices($tenant, $environment, [
+            'limit' => 200,
+        ]);
+
+        $paymentMethods = [];
+        $statuses = [];
+        $withCustomerDocument = 0;
+        $boletoCount = 0;
+
+        foreach ($externalInvoices as $invoice) {
+            $method = strtoupper(trim((string) (
+                $invoice['payment_method']
+                ?? $invoice['payment_type']
+                ?? data_get($invoice, 'payment_options.type')
+                ?? 'unknown'
+            )));
+            $paymentMethods[$method] = ($paymentMethods[$method] ?? 0) + 1;
+
+            $status = strtoupper(trim((string) ($invoice['status'] ?? 'unknown')));
+            $statuses[$status] = ($statuses[$status] ?? 0) + 1;
+
+            if ($this->extractCustomerDocument($invoice) !== '') {
+                $withCustomerDocument++;
+            }
+
+            if ($this->isBoletoInvoice($invoice)) {
+                $boletoCount++;
+            }
+        }
+
+        $first = $externalInvoices[0] ?? null;
+
+        return [
+            'listed_count' => count($externalInvoices),
+            'boleto_count' => $boletoCount,
+            'with_customer_document_in_list' => $withCustomerDocument,
+            'without_customer_document_in_list' => count($externalInvoices) - $withCustomerDocument,
+            'payment_method_counts' => $paymentMethods,
+            'status_counts' => $statuses,
+            'first_invoice_top_level_keys' => $first !== null ? array_keys($first) : [],
+            'first_invoice_customer_keys' => is_array($first['customer'] ?? null)
+                ? array_keys($first['customer'])
+                : [],
+            'first_invoice_sample' => $first !== null ? $this->sanitizeInvoiceForDebug($first) : null,
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function diagnoseAllBoletoInvoices(Enrollment $enrollment, string $environment, int $maxRows = 30): array
+    {
+        $enrollment->loadMissing(['tenant', 'student', 'student.guardians']);
+        $tenant = $enrollment->tenant;
+
+        if (! $tenant) {
+            throw new RuntimeException('Tenant da matricula nao encontrado.');
+        }
+
+        $externalInvoices = $this->factory->resolve('cora')->listInvoices($tenant, $environment, [
+            'limit' => 200,
+        ]);
+
+        $rows = [];
+
+        foreach ($externalInvoices as $externalInvoice) {
+            if (! $this->isBoletoInvoice($externalInvoice)) {
+                continue;
+            }
+
+            $chargeId = $this->extractExternalChargeId($externalInvoice);
+            if ($chargeId === '') {
+                continue;
+            }
+
+            $rows[] = $this->diagnoseInvoiceForEnrollment($enrollment, $externalInvoice);
+
+            if (count($rows) >= $maxRows) {
+                break;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Compara listagem vs GET por ID (CPF/metadata costumam vir só no detalhe).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function buildHydrateComparisonSamples(Enrollment $enrollment, string $environment, int $limit = 5): array
+    {
+        $enrollment->loadMissing(['tenant']);
+        $tenant = $enrollment->tenant;
+
+        if (! $tenant) {
+            throw new RuntimeException('Tenant da matricula nao encontrado.');
+        }
+
+        $externalInvoices = $this->factory->resolve('cora')->listInvoices($tenant, $environment, [
+            'limit' => 200,
+        ]);
+
+        $samples = [];
+
+        foreach ($externalInvoices as $listInvoice) {
+            if (! $this->isBoletoInvoice($listInvoice)) {
+                continue;
+            }
+
+            $chargeId = $this->extractExternalChargeId($listInvoice);
+            if ($chargeId === '') {
+                continue;
+            }
+
+            if ($this->extractCustomerDocument($listInvoice) !== '') {
+                continue;
+            }
+
+            $listDiag = $this->diagnoseInvoiceForEnrollment($enrollment, $listInvoice);
+            $detailInvoice = [];
+
+            try {
+                $detailInvoice = $this->factory->resolve('cora')->getInvoiceById($tenant, $chargeId, $environment);
+            } catch (\Throwable $e) {
+                $samples[] = [
+                    'charge_id' => $chargeId,
+                    'list' => $listDiag,
+                    'detail_fetch_error' => $e->getMessage(),
+                ];
+
+                if (count($samples) >= $limit) {
+                    break;
+                }
+
+                continue;
+            }
+
+            $detailDiag = $this->diagnoseInvoiceForEnrollment(
+                $enrollment,
+                array_replace_recursive($listInvoice, $detailInvoice)
+            );
+
+            $samples[] = [
+                'charge_id' => $chargeId,
+                'list' => [
+                    'customer_document_masked' => $listDiag['customer_document_masked'],
+                    'for_this_enrollment' => $listDiag['for_this_enrollment'],
+                    'matches_payer' => $listDiag['matches_payer'],
+                    'link_reason' => $listDiag['link_reason'],
+                ],
+                'detail' => [
+                    'customer_document_masked' => $detailDiag['customer_document_masked'],
+                    'for_this_enrollment' => $detailDiag['for_this_enrollment'],
+                    'matches_payer' => $detailDiag['matches_payer'],
+                    'link_reason' => $detailDiag['link_reason'],
+                    'metadata' => $detailDiag['metadata'],
+                    'top_level_keys' => $detailDiag['top_level_keys'],
+                ],
+            ];
+
+            if (count($samples) >= $limit) {
+                break;
+            }
+        }
+
+        return $samples;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function maskedPayerDocumentsForEnrollment(Enrollment $enrollment): array
+    {
+        $enrollment->loadMissing(['student.guardians']);
+
+        $guardians = [];
+        foreach ($enrollment->student?->guardians ?? [] as $guardian) {
+            $guardians[] = [
+                'id' => $guardian->id,
+                'document_masked' => $this->maskDocument($this->digitsOnly((string) ($guardian->document ?? ''))),
+            ];
+        }
+
+        return [
+            'student_document_masked' => $this->maskDocument(
+                $this->digitsOnly((string) ($enrollment->student?->document ?? ''))
+            ),
+            'guardians' => $guardians,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function diagnoseInvoiceForEnrollment(Enrollment $enrollment, array $externalInvoice): array
+    {
+        $metadata = $this->extractProviderLinkMetadata($externalInvoice);
+        $customerDocument = $this->extractCustomerDocument($externalInvoice);
+        $studentDocument = $this->digitsOnly((string) ($enrollment->student?->document ?? ''));
+        $forEnrollment = $this->belongsToEnrollment($enrollment, $externalInvoice);
+        $matchesPayer = $this->matchesEnrollmentPayer($enrollment, $externalInvoice);
+        $amount = $this->extractAmount($externalInvoice);
+        $dueDate = $this->parseDate((string) ($externalInvoice['due_date'] ?? ''));
+
+        $metadataTenantId = $this->toNullableInt($metadata['tenant_id'] ?? null);
+        $metadataEnrollmentId = $this->toNullableInt($metadata['enrollment_id'] ?? null);
+        $metadataStudentId = $this->toNullableInt($metadata['student_id'] ?? null);
+        $metadataInvoiceId = $this->toNullableInt($metadata['invoice_id'] ?? null);
+
+        $guardianMatches = [];
+        foreach ($enrollment->student?->guardians ?? [] as $guardian) {
+            $guardianDoc = $this->digitsOnly((string) ($guardian->document ?? ''));
+            $guardianMatches[] = [
+                'guardian_id' => $guardian->id,
+                'document_masked' => $this->maskDocument($guardianDoc),
+                'matches_customer' => $guardianDoc !== '' && $customerDocument !== '' && $guardianDoc === $customerDocument,
+            ];
+        }
+
+        $matchChecks = [
+            'metadata_tenant_ok' => $metadataTenantId === null || $metadataTenantId === (int) $enrollment->tenant_id,
+            'metadata_enrollment_id_match' => $metadataEnrollmentId === (int) $enrollment->id,
+            'metadata_student_id_match' => $metadataStudentId === (int) $enrollment->student_id,
+            'metadata_invoice_belongs_enrollment' => $metadataInvoiceId !== null
+                && Invoice::withTrashed()
+                    ->where('tenant_id', $enrollment->tenant_id)
+                    ->where('id', $metadataInvoiceId)
+                    ->where('enrollment_id', $enrollment->id)
+                    ->exists(),
+            'student_cpf_match' => $studentDocument !== ''
+                && $customerDocument !== ''
+                && $studentDocument === $customerDocument,
+            'customer_document_in_payload' => $customerDocument !== '',
+            'has_strong_metadata_for_guardian' => $this->hasStrongEnrollmentMetadataLink($enrollment, $metadata),
+        ];
+
+        $linkReason = 'other';
+        if ($forEnrollment) {
+            $linkReason = 'for_this_enrollment';
+        } elseif ($matchesPayer) {
+            $linkReason = 'matches_payer';
+        } elseif ($customerDocument === '') {
+            $linkReason = 'no_customer_document_in_list';
+        } elseif (! $matchChecks['metadata_tenant_ok']) {
+            $linkReason = 'metadata_other_tenant';
+        } elseif ($metadataEnrollmentId !== null && ! $matchChecks['metadata_enrollment_id_match']) {
+            $linkReason = 'metadata_other_enrollment';
+        } elseif (
+            ! $matchChecks['student_cpf_match']
+            && ! collect($guardianMatches)->contains(fn (array $g) => ! empty($g['matches_customer']))
+        ) {
+            $linkReason = 'cpf_not_matching_payer';
+        }
+
+        return [
+            'charge_id' => $this->extractExternalChargeId($externalInvoice),
+            'due_date' => $dueDate?->toDateString(),
+            'amount' => $amount !== null ? number_format($amount, 2, '.', '') : null,
+            'status' => (string) ($externalInvoice['status'] ?? ''),
+            'description' => $this->extractInvoiceDescription($externalInvoice),
+            'for_this_enrollment' => $forEnrollment,
+            'matches_payer' => $matchesPayer,
+            'link_reason' => $linkReason,
+            'customer_document_masked' => $this->maskDocument($customerDocument),
+            'metadata' => $metadata,
+            'match_checks' => $matchChecks,
+            'guardian_matches' => $guardianMatches,
+            'top_level_keys' => array_keys($externalInvoice),
+            'customer_keys' => is_array($externalInvoice['customer'] ?? null)
+                ? array_keys($externalInvoice['customer'])
+                : [],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $invoice
+     * @return array<string, mixed>
+     */
+    private function sanitizeInvoiceForDebug(array $invoice): array
+    {
+        $sanitized = [
+            'id' => $invoice['id'] ?? $invoice['invoice_id'] ?? null,
+            'status' => $invoice['status'] ?? null,
+            'due_date' => $invoice['due_date'] ?? null,
+            'amount' => $this->extractAmount($invoice),
+            'description' => $this->extractInvoiceDescription($invoice),
+            'payment_method' => $invoice['payment_method'] ?? $invoice['payment_type'] ?? null,
+            'customer_document_masked' => $this->maskDocument($this->extractCustomerDocument($invoice)),
+            'metadata' => $this->extractProviderLinkMetadata($invoice),
+        ];
+
+        if (is_array($invoice['customer'] ?? null)) {
+            $customer = $invoice['customer'];
+            $sanitized['customer'] = [
+                'name' => $customer['name'] ?? $customer['trade_name'] ?? null,
+                'document_masked' => $this->maskDocument($this->extractCustomerDocument($invoice)),
+                'keys' => array_keys($customer),
+            ];
+        }
+
+        return $sanitized;
+    }
+
+    private function maskDocument(string $digits): string
+    {
+        $digits = $this->digitsOnly($digits);
+        if ($digits === '') {
+            return '';
+        }
+
+        if (strlen($digits) <= 4) {
+            return '***';
+        }
+
+        return '***' . substr($digits, -4);
+    }
+
+    /**
      * Agrupa linhas com mesma data/valor/status para evitar lista repetitiva na UI.
      *
      * @param  array<int, array<string, mixed>>  $rows

@@ -427,13 +427,23 @@ class EnrollmentController extends Controller
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
             'invoice_types' => ['nullable', 'array'],
             'invoice_types.*' => ['string', 'in:enrollment_fee,monthly'],
+            'debug' => ['nullable', 'boolean'],
         ]);
 
         $environment = $this->resolveContractChargesEnvironment($request, $data['environment'] ?? null);
         $invoiceTypes = $data['invoice_types'] ?? ['monthly'];
+        $includeDebug = filter_var($data['debug'] ?? $request->query('debug'), FILTER_VALIDATE_BOOLEAN);
+
+        if ($includeDebug && ! $this->canUseContractChargesDebug($request)) {
+            return $this->error(
+                'Debug de cobranças não autorizado. Use super_admin ou defina CORA_CONTRACT_CHARGES_DEBUG=true no servidor.',
+                ['enrollment_id' => $enrollment->id],
+                403
+            );
+        }
 
         try {
-            $preview = $this->contractCharges->preview($enrollment, $environment, $invoiceTypes);
+            $preview = $this->contractCharges->preview($enrollment, $environment, $invoiceTypes, $includeDebug);
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), ['enrollment_id' => $enrollment->id], 422);
         }
@@ -515,6 +525,17 @@ class EnrollmentController extends Controller
         };
 
         return $this->success($result, $message);
+    }
+
+    private function canUseContractChargesDebug(Request $request): bool
+    {
+        if ((bool) config('services.cora.contract_charges_debug', false)) {
+            return true;
+        }
+
+        $user = $request->user();
+
+        return $user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin();
     }
 
     private function resolveContractChargesEnvironment(Request $request, ?string $requested): string

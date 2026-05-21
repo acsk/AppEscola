@@ -18,6 +18,7 @@ class EnrollmentContractChargesService
         private readonly TenantBillingSettingsService $billingSettings,
         private readonly CoraEnrollmentInvoiceSyncService $coraSync,
         private readonly InvoiceLifecycleService $invoiceLifecycle,
+        private readonly ContractChargesPreviewDebugService $previewDebug,
     ) {
     }
 
@@ -35,7 +36,7 @@ class EnrollmentContractChargesService
      * @param  array<int, string>  $invoiceTypes
      * @return array<string, mixed>
      */
-    public function preview(Enrollment $enrollment, string $environment, array $invoiceTypes = ['monthly']): array
+    public function preview(Enrollment $enrollment, string $environment, array $invoiceTypes = ['monthly'], bool $includeDebug = false): array
     {
         $enrollment->loadMissing([
             'student.guardians',
@@ -136,7 +137,7 @@ class EnrollmentContractChargesService
                 . 'Prefira importar/sincronizar pelo provedor ou marque manualmente se ainda quiser criar no sistema.';
         }
 
-        return [
+        $payload = [
             'enrollment_id' => $enrollment->id,
             'title' => 'Cobranças do contrato',
             'environment' => $environment,
@@ -169,6 +170,18 @@ class EnrollmentContractChargesService
             'provider_boleto_list' => $providerBoletoList,
             'provider_boleto_school_groups' => $providerSchoolGroups,
         ];
+
+        if ($includeDebug) {
+            $payload['debug'] = $this->previewDebug->build(
+                $enrollment,
+                $environment,
+                $invoiceTypes,
+                $toGenerate,
+                $externalPreview
+            );
+        }
+
+        return $payload;
     }
 
     /**

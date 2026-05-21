@@ -88,6 +88,8 @@ export type ContractChargesPreview = {
   provider_boleto_list: ContractExternalChargeRow[];
   /** Resumo agrupado dos demais boletos da escola (outros alunos). */
   provider_boleto_school_groups?: ProviderBoletoSchoolGroup[];
+  /** Presente quando preview é chamado com debug=1 (super_admin ou CORA_CONTRACT_CHARGES_DEBUG). */
+  debug?: Record<string, unknown>;
 };
 
 export type ContractChargesApplyResult = {
@@ -118,7 +120,11 @@ function unwrapBody<T>(data: ApiEnvelope<T> | T): T {
 
 export async function fetchContractChargesPreview(
   enrollmentId: number,
-  params?: { environment?: "stage" | "prod"; invoice_types?: string[] }
+  params?: {
+    environment?: "stage" | "prod";
+    invoice_types?: string[];
+    debug?: boolean;
+  }
 ): Promise<ContractChargesPreview> {
   const { data } = await api.get<ApiEnvelope<ContractChargesPreview>>(
     `/enrollments/${enrollmentId}/contract-charges/preview`,

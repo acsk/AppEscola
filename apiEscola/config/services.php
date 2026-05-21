@@ -45,6 +45,8 @@ return [
         'token_url_stage' => env('CORA_TOKEN_URL_STAGE', 'https://matls-clients.api.stage.cora.com.br/token'),
         'token_url_prod' => env('CORA_TOKEN_URL_PROD', 'https://matls-clients.api.cora.com.br/token'),
         'verify_ssl' => (bool) env('CORA_VERIFY_SSL', true),
+        /** GET contract-charges/preview?debug=1 — super_admin sempre; demais usuários se true */
+        'contract_charges_debug' => filter_var(env('CORA_CONTRACT_CHARGES_DEBUG', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
 ];

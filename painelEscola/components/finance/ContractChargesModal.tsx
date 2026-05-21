@@ -4,6 +4,8 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Modal from "../ui/Modal";
@@ -16,6 +18,7 @@ import {
   type ProviderBoletoSchoolGroup,
 } from "../../services/enrollmentContractCharges";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
+import { useAuth } from "../../contexts/AuthContext";
 
 type LocalInvoiceRow = ContractChargesPreview["local_invoices"][number];
 
@@ -655,6 +658,73 @@ function providerLinkTone(row: ContractExternalChargeRow): PillTone {
   return "gray";
 }
 
+function ContractChargesDebugPanel({ debug }: { debug: Record<string, unknown> }) {
+  const cora = (debug.cora ?? {}) as Record<string, unknown>;
+  const local = (debug.local ?? {}) as Record<string, unknown>;
+  const api = (cora.api ?? {}) as Record<string, unknown>;
+  const amounts = (local.amounts ?? {}) as Record<string, string | null>;
+  const coraSummary = (cora.summary ?? {}) as Record<string, number | null>;
+  const json = JSON.stringify(debug, null, 2);
+
+  const copyJson = async () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(json);
+      return;
+    }
+  };
+
+  const bullets = [
+    `Matrícula #${local.enrollment_id} (${local.enrollment_number ?? "—"}) · ambiente ${local.environment}`,
+    `Valores: base ${amounts.base_monthly_amount} − desconto ${amounts.discount_amount} = líquido ${amounts.net_monthly_amount}`,
+    `Cora listagem: ${api.listed_count ?? "?"} cobranças, ${api.boleto_count ?? "?"} boletos, CPF na listagem: ${api.with_customer_document_in_list ?? "?"}/${api.listed_count ?? "?"}`,
+    `Vínculo: ${coraSummary.external_for_enrollment ?? 0} matrícula · ${coraSummary.external_matches_payer ?? 0} mesmo CPF · grupos escola: ${coraSummary.provider_boleto_school_groups_count ?? "?"}`,
+    (cora.fetch_error as string) ? `Erro: ${cora.fetch_error}` : null,
+  ].filter(Boolean) as string[];
+
+  const hydrateSamples = (cora.hydrate_samples ?? []) as Array<Record<string, unknown>>;
+
+  return (
+    <View className="rounded-lg border border-amber-300 bg-amber-50/90 overflow-hidden">
+      <View className="px-3 py-2 border-b border-amber-200">
+        <Text className="text-xs font-bold text-amber-950">Debug cobranças (prod)</Text>
+        <Text className="text-[10px] text-amber-800 mt-0.5">
+          {String(debug.hint ?? "")}
+        </Text>
+      </View>
+      <View className="px-3 py-2 gap-1">
+        {bullets.map((line, i) => (
+          <Text key={i} className="text-[10px] leading-4 text-amber-950">
+            • {line}
+          </Text>
+        ))}
+        {hydrateSamples.length > 0 ? (
+          <Text className="text-[10px] text-amber-900 mt-1">
+            Amostra hidratação (list vs detalhe): {hydrateSamples.length} boleto(s) sem CPF na
+            listagem — veja JSON completo.
+          </Text>
+        ) : null}
+      </View>
+      <View className="flex-row gap-2 px-3 pb-2">
+        {Platform.OS === "web" ? (
+          <TouchableOpacity
+            onPress={() => copyJson().catch(() => undefined)}
+            className="px-2 py-1 rounded-md bg-amber-100 border border-amber-200"
+          >
+            <Text className="text-[10px] font-semibold text-amber-900">Copiar JSON</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <ScrollView
+        className="max-h-48 bg-gray-900 mx-2 mb-2 rounded-md"
+        horizontal={false}
+        nestedScrollEnabled
+      >
+        <Text className="text-[9px] leading-3.5 text-emerald-100 font-mono p-2">{json}</Text>
+      </ScrollView>
+    </View>
+  );
+}
+
 function PreviewAlerts({
   warnings,
   providerError,
@@ -774,14 +844,20 @@ export default function ContractChargesModal({
   onClose,
   onSuccess,
 }: Props) {
+  const { user } = useAuth();
+  const canRequestDebug =
+    user?.role === "super_admin" || user?.role === "admin" || user?.role === "financial";
+
   const [preview, setPreview] = useState<ContractChargesPreview | null>(null);
   const [loading, setLoading] = useState(false);
+  const [debugLoading, setDebugLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [invoiceTypes, setInvoiceTypes] = useState<string[]>(["monthly"]);
   const [showLocalInvoices, setShowLocalInvoices] = useState(false);
+  const [debugPayload, setDebugPayload] = useState<Record<string, unknown> | null>(null);
 
   const loadPreview = useCallback(async () => {
     setLoading(true);
@@ -815,9 +891,34 @@ export default function ContractChargesModal({
     setLoading(false);
   }, [enrollmentId, environment, invoiceTypes]);
 
+  const loadDebugPreview = useCallback(async () => {
+    if (!canRequestDebug) return;
+    setDebugLoading(true);
+    setError(null);
+    try {
+      const data = await fetchContractChargesPreview(enrollmentId, {
+        environment,
+        invoice_types: invoiceTypes,
+        debug: true,
+      });
+      setPreview(data);
+      setDebugPayload((data.debug as Record<string, unknown>) ?? null);
+      if (!data.debug) {
+        setError(
+          "Debug não retornado. No servidor: CORA_CONTRACT_CHARGES_DEBUG=true ou login super_admin."
+        );
+      }
+    } catch (e: any) {
+      setDebugPayload(null);
+      setError(e?.response?.data?.message ?? e?.message ?? "Falha ao carregar debug.");
+    }
+    setDebugLoading(false);
+  }, [canRequestDebug, enrollmentId, environment, invoiceTypes]);
+
   useEffect(() => {
     if (!visible) return;
     setShowLocalInvoices(false);
+    setDebugPayload(null);
     loadPreview();
   }, [visible, loadPreview]);
 
@@ -949,15 +1050,35 @@ export default function ContractChargesModal({
       }
     >
       <View className="gap-3">
-        <View className="flex-row items-center justify-between gap-2">
-          <Text className="text-xs text-gray-500 flex-1">
+        <View className="flex-row items-center justify-between gap-2 flex-wrap">
+          <Text className="text-xs text-gray-500 flex-1 min-w-[200px]">
             Marque o que deseja executar. Com boleto na Cora na mesma data, a geração local não vem pré-marcada.
           </Text>
-          <Pill
-            label={environment === "prod" ? "Produção" : "Homologação"}
-            tone={environment === "prod" ? "amber" : "gray"}
-          />
+          <View className="flex-row items-center gap-2">
+            {canRequestDebug ? (
+              <TouchableOpacity
+                onPress={loadDebugPreview}
+                disabled={loading || debugLoading || applying}
+                className={`flex-row items-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 ${
+                  loading || debugLoading || applying ? "opacity-60" : ""
+                }`}
+              >
+                {debugLoading ? (
+                  <ActivityIndicator size="small" color="#B45309" />
+                ) : (
+                  <Ionicons name="bug-outline" size={14} color="#B45309" />
+                )}
+                <Text className="text-[11px] font-semibold text-amber-900">Debug</Text>
+              </TouchableOpacity>
+            ) : null}
+            <Pill
+              label={environment === "prod" ? "Produção" : "Homologação"}
+              tone={environment === "prod" ? "amber" : "gray"}
+            />
+          </View>
         </View>
+
+        {debugPayload ? <ContractChargesDebugPanel debug={debugPayload} /> : null}
 
         {preview?.charges_batch_generated ? (
           <View className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">

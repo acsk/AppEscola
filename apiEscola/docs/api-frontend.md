@@ -662,6 +662,8 @@ POST /api/enrollments/{id}/contract-charges/apply
 
 O painel usa esses endpoints para mostrar o que já existe no sistema, o que será gerado no contrato e os boletos encontrados na Cora, com checkboxes por item. Na mesma execução é possível **gerar parcelas locais** (`generate_keys`) e **sincronizar boletos** (`sync_charge_ids`).
 
+**Debug (prod):** `GET .../preview?debug=1&environment=prod` — retorna `body.debug` (super_admin ou `CORA_CONTRACT_CHARGES_DEBUG=true`). Ver `docs/MATRICULA_INVOICE_FLOW.md`.
+
 ### Exibir / Atualizar / Excluir
 ```http
 GET    /api/enrollments/{id}

@@ -250,6 +250,26 @@ Na modal **Cobranças do contrato**, ao consultar a Cora:
 - Boletos **novos** no provedor (`link_status: new`) vêm **marcados** para sincronizar/importar.
 - `provider_boleto_list`: boletos **desta matrícula** ou **mesmo CPF** (sincronizáveis); linhas iguais podem vir agrupadas (`group_count`).
 - `provider_boleto_school_groups`: resumo dos demais boletos da escola (vencimento + valor + quantidade), para não repetir dezenas de linhas de outros alunos.
+
+### Debug em produção
+
+`GET /api/enrollments/{id}/contract-charges/preview?debug=1&environment=prod`
+
+Autorizado se:
+
+- usuário **super_admin**, ou
+- `.env` com `CORA_CONTRACT_CHARGES_DEBUG=true` (qualquer usuário autenticado do tenant).
+
+A resposta inclui `body.debug` com:
+
+- `local`: valores da matrícula, parcelas planejadas, CPFs mascarados do pagador
+- `cora.api`: contagem da listagem Cora e se o CPF veio no payload da listagem
+- `cora.boleto_diagnosis`: até 30 boletos com `link_reason` (`no_customer_document_in_list`, `cpf_not_matching_payer`, etc.)
+- `cora.hydrate_samples`: compara listagem vs GET por ID (quando CPF não vem na listagem)
+
+No painel: botão **Debug** no modal “Cobranças do contrato” (admin/financeiro/super_admin).
+
+Log adicional: `storage/logs/cora_sync_debug.log` (mesmo canal das sincronizações Cora).
 - Parcelas **locais** na mesma data de um boleto com vínculo **Matrícula** ou **Mesmo CPF** **não** vêm marcadas para gerar local. O usuário pode marcar manualmente se quiser criar no sistema mesmo assim.
 
 ---
