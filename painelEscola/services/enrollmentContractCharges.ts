@@ -123,12 +123,22 @@ export async function fetchContractChargesPreview(
   params?: {
     environment?: "stage" | "prod";
     invoice_types?: string[];
-    debug?: boolean;
+    /** Use 1 na query (evita rejeição da validação com boolean do axios). */
+    debug?: boolean | 0 | 1;
   }
 ): Promise<ContractChargesPreview> {
+  const queryParams = params ? { ...params } : undefined;
+  if (queryParams) {
+    if (queryParams.debug) {
+      queryParams.debug = 1;
+    } else {
+      delete queryParams.debug;
+    }
+  }
+
   const { data } = await api.get<ApiEnvelope<ContractChargesPreview>>(
     `/enrollments/${enrollmentId}/contract-charges/preview`,
-    { params }
+    { params: queryParams }
   );
 
   return unwrapBody(data);

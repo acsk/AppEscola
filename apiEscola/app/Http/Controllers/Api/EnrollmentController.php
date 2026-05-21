@@ -427,12 +427,13 @@ class EnrollmentController extends Controller
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
             'invoice_types' => ['nullable', 'array'],
             'invoice_types.*' => ['string', 'in:enrollment_fee,monthly'],
-            'debug' => ['nullable', 'boolean'],
+            // Query string costuma vir como "1"/"true" — não usar rule boolean (rejeita alguns clientes).
+            'debug' => ['nullable'],
         ]);
 
         $environment = $this->resolveContractChargesEnvironment($request, $data['environment'] ?? null);
         $invoiceTypes = $data['invoice_types'] ?? ['monthly'];
-        $includeDebug = filter_var($data['debug'] ?? $request->query('debug'), FILTER_VALIDATE_BOOLEAN);
+        $includeDebug = $this->parseTruthyParam($request, 'debug', $data['debug'] ?? null);
 
         if ($includeDebug && ! $this->canUseContractChargesDebug($request)) {
             return $this->error(
@@ -525,6 +526,27 @@ class EnrollmentController extends Controller
         };
 
         return $this->success($result, $message);
+    }
+
+    private function parseTruthyParam(Request $request, string $key, mixed $validated = null): bool
+    {
+        $value = $validated ?? $request->query($key);
+
+        if ($value === null || $value === '') {
+            return false;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (int) $value !== 0;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
     }
 
     private function canUseContractChargesDebug(Request $request): bool
