@@ -428,8 +428,12 @@ export default function EnrollmentDetailScreen({
         status: editForm.status,
       };
       if (editForm.end_date) payload.end_date = editForm.end_date;
-      if (editForm.monthly_amount) payload.monthly_amount = parseFloat(editForm.monthly_amount);
-      if (editForm.discount_amount) payload.discount_amount = parseFloat(editForm.discount_amount);
+      if (editForm.monthly_amount !== "") {
+        payload.monthly_amount = parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+      }
+      payload.discount_amount = parseFloat(
+        (editForm.discount_amount || "0").replace(",", ".")
+      ) || 0;
       if (editForm.payment_due_day) payload.payment_due_day = Number(editForm.payment_due_day);
 
       await api.put(`/enrollments/${enrollmentId}`, payload);
@@ -1392,17 +1396,33 @@ export default function EnrollmentDetailScreen({
           </View>
 
           <View style={{ flexDirection: isMobile ? "column" : "row", gap: 10 }}>
-            {renderFinanceBlock("Mensalidade", money(enrollment.monthly_amount))}
-            {renderFinanceBlock(
-              "Taxa de matrícula",
-              enrollment.course_plan?.enrollment_fee_amount
-                ? money(String(enrollment.course_plan.enrollment_fee_amount))
-                : "—"
-            )}
+            {renderFinanceBlock("Mensalidade (base)", money(enrollment.monthly_amount))}
             {renderFinanceBlock(
               "Desconto",
               enrollment.discount_amount && parseFloat(enrollment.discount_amount) > 0
                 ? money(enrollment.discount_amount)
+                : "—"
+            )}
+            {renderFinanceBlock(
+              "Mensalidade líquida",
+              enrollment.net_monthly_amount
+                ? money(enrollment.net_monthly_amount)
+                : enrollment.monthly_amount
+                  ? money(
+                      String(
+                        Math.max(
+                          0,
+                          parseFloat(enrollment.monthly_amount) -
+                            (parseFloat(enrollment.discount_amount ?? "0") || 0)
+                        )
+                      )
+                    )
+                  : "—"
+            )}
+            {renderFinanceBlock(
+              "Taxa de matrícula",
+              enrollment.course_plan?.enrollment_fee_amount
+                ? money(String(enrollment.course_plan.enrollment_fee_amount))
                 : "—"
             )}
             {renderFinanceBlock(

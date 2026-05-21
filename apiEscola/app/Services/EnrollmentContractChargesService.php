@@ -250,11 +250,8 @@ class EnrollmentContractChargesService
             ? Carbon::parse($enrollment->end_date)
             : $startDate->copy()->addMonths($plan->monthsInCycle())->subDay();
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
-        $netAmount = max(
-            (float) ($enrollment->monthly_amount ?? $plan->monthlyEquivalent()) - (float) ($enrollment->discount_amount ?? 0),
-            0
-        );
-        $feeAmount = $this->resolveEnrollmentFeeAmount($plan);
+        $netAmount = $enrollment->netMonthlyAmount();
+        $feeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
         $courseName = $enrollment->coursePlan?->course?->name ?? 'Curso';
         $enrollmentFeeCoversFirstMonth = ! empty($billing['charges_enrollment_fee'])
             && ! empty($billing['enrollment_fee_covers_first_month']);
@@ -336,11 +333,8 @@ class EnrollmentContractChargesService
         $guardianId = $this->resolveGuardianId($enrollment);
         $startDate = Carbon::parse($enrollment->start_date ?? now());
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
-        $netAmount = max(
-            (float) ($enrollment->monthly_amount ?? $plan->monthlyEquivalent()) - (float) ($enrollment->discount_amount ?? 0),
-            0
-        );
-        $feeAmount = $this->resolveEnrollmentFeeAmount($plan);
+        $netAmount = $enrollment->netMonthlyAmount();
+        $feeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
         $courseName = $enrollment->coursePlan?->course?->name ?? 'Curso';
 
         $monthliesBlocked = ! empty($billing['charges_enrollment_fee'])
@@ -440,7 +434,7 @@ class EnrollmentContractChargesService
         ];
     }
 
-    private function resolveEnrollmentFeeAmount(CoursePlan $plan): ?float
+    private function resolveEnrollmentFeeAmount(CoursePlan $plan, Enrollment $enrollment): ?float
     {
         $planFee = $plan->enrollment_fee_amount;
 
@@ -449,8 +443,13 @@ class EnrollmentContractChargesService
         }
 
         $amount = (float) $planFee;
+        if ($amount <= 0) {
+            return null;
+        }
 
-        return $amount > 0 ? $amount : null;
+        $net = max($amount - (float) ($enrollment->discount_amount ?? 0), 0);
+
+        return $net > 0 ? $net : null;
     }
 
     private function resolveGuardianId(Enrollment $enrollment): ?int

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,10 @@ interface Props {
   disabled?: boolean;
   /** Título da modal */
   modalTitle?: string;
+  /** Busca assíncrona no servidor; quando informado, a lista vem da API em vez de filtrar `options` localmente */
+  onSearch?: (query: string) => Promise<SearchableOption[]>;
+  /** Opção selecionada quando não está na lista atual (ex.: busca server-side) */
+  selectedOption?: SearchableOption;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -43,25 +47,60 @@ export default function SearchableSelect({
   error,
   disabled = false,
   modalTitle = "Selecionar",
+  onSearch,
+  selectedOption,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [asyncOptions, setAsyncOptions] = useState<SearchableOption[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  const selected = options.find((o) => o.value === value);
+  const asyncMode = !!onSearch;
 
-  const filtered = query.trim()
-    ? options.filter(
-        (o) =>
-          o.label.toLowerCase().includes(query.toLowerCase()) ||
-          (o.sublabel ?? "").toLowerCase().includes(query.toLowerCase())
-      )
-    : options;
+  const selected =
+    selectedOption?.value === value
+      ? selectedOption
+      : options.find((o) => o.value === value) ??
+        asyncOptions.find((o) => o.value === value);
+
+  const filtered = asyncMode
+    ? asyncOptions
+    : query.trim()
+      ? options.filter(
+          (o) =>
+            o.label.toLowerCase().includes(query.toLowerCase()) ||
+            (o.sublabel ?? "").toLowerCase().includes(query.toLowerCase())
+        )
+      : options;
+
+  useEffect(() => {
+    if (!open || !onSearch) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await onSearch(query);
+        if (!cancelled) setAsyncOptions(results);
+      } catch {
+        if (!cancelled) setAsyncOptions([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, query, onSearch]);
 
   const handleSelect = useCallback(
     (opt: SearchableOption) => {
       onChange(opt.value);
       setOpen(false);
       setQuery("");
+      setAsyncOptions([]);
     },
     [onChange]
   );
@@ -167,7 +206,7 @@ export default function SearchableSelect({
         visible={open}
         transparent
         animationType="fade"
-        onRequestClose={() => { setOpen(false); setQuery(""); }}
+        onRequestClose={() => { setOpen(false); setQuery(""); setAsyncOptions([]); }}
       >
         <View
           style={{
@@ -202,7 +241,7 @@ export default function SearchableSelect({
                 {modalTitle}
               </Text>
               <TouchableOpacity
-                onPress={() => { setOpen(false); setQuery(""); }}
+                onPress={() => { setOpen(false); setQuery(""); setAsyncOptions([]); }}
                 style={{
                   padding: 4,
                   backgroundColor: "#F3F4F6",
@@ -258,7 +297,9 @@ export default function SearchableSelect({
               }}
             >
               <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
-                {filtered.length} opção{filtered.length !== 1 ? "ões" : ""} encontrada{filtered.length !== 1 ? "s" : ""}
+                {searching
+                  ? "Buscando..."
+                  : `${filtered.length} opção${filtered.length !== 1 ? "ões" : ""} encontrada${filtered.length !== 1 ? "s" : ""}`}
               </Text>
             </View>
 
@@ -268,7 +309,22 @@ export default function SearchableSelect({
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              {filtered.length === 0 ? (
+              {searching && filtered.length === 0 ? (
+                <View
+                  style={{
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 40,
+                  }}
+                >
+                  <ActivityIndicator size="small" color="#7C3AED" />
+                  <Text
+                    style={{ fontSize: 13, color: "#9CA3AF", marginTop: 8 }}
+                  >
+                    Buscando...
+                  </Text>
+                </View>
+              ) : filtered.length === 0 ? (
                 <View
                   style={{
                     alignItems: "center",
@@ -350,7 +406,7 @@ export default function SearchableSelect({
               }}
             >
               <TouchableOpacity
-                onPress={() => { setOpen(false); setQuery(""); }}
+                onPress={() => { setOpen(false); setQuery(""); setAsyncOptions([]); }}
                 style={{
                   paddingHorizontal: 20,
                   paddingVertical: 8,

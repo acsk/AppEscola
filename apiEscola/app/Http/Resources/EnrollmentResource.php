@@ -27,6 +27,7 @@ class EnrollmentResource extends JsonResource
             'status' => $this->status,
             'monthly_amount' => $this->monthly_amount,
             'discount_amount' => $this->discount_amount,
+            'net_monthly_amount' => number_format($this->netMonthlyAmount(), 2, '.', ''),
             'payment_due_day' => $this->payment_due_day,
             'charges_generated_at' => $this->charges_generated_at?->toISOString(),
             'charges_batch_generated' => $this->charges_generated_at !== null,

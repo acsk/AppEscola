@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -104,7 +104,6 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
   const [mode, setMode] = useState<"plan" | "bundle">("plan");
 
   // ── Lookup data ─────────────────────────────────────────────────────────────
-  const [students, setStudents] = useState<StudentPickerItem[]>([]);
   const [courses, setCourses] = useState<CourseSummary[]>([]);
   const [plans, setPlans] = useState<CoursePlanSummary[]>([]);
   const [classes, setClasses] = useState<SchoolClassWithSchedules[]>([]);
@@ -161,13 +160,10 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
   useEffect(() => {
     (async () => {
       try {
-        const [sRes, cRes, clRes, gRes] = await Promise.all([
-          api.get("/students", { params: { per_page: 500 } }),
+        const [cRes, clRes] = await Promise.all([
           api.get("/courses", { params: { status: "active", per_page: 200 } }),
           api.get("/school-classes", { params: { status: "active", per_page: 200 } }),
-          api.get("/students", { params: { per_page: 500 } }), // guardians loaded per student below
         ]);
-        setStudents(sRes.data.data ?? []);
         setCourses(cRes.data.data ?? []);
         setClasses(clRes.data.data ?? []);
       } catch {}
@@ -202,6 +198,22 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
       } catch {}
     })();
   }, [studentId]);
+
+  const searchStudents = useCallback(async (query: string) => {
+    const { data } = await api.get("/students", {
+      params: {
+        status: "active",
+        search: query.trim() || undefined,
+        per_page: 50,
+      },
+    });
+    const list: StudentPickerItem[] = data.data ?? [];
+    return list.map((s) => ({
+      value: String(s.id),
+      label: s.name,
+      sublabel: s.enrollment_number ?? undefined,
+    }));
+  }, []);
 
   // Pré-preencher vencimento com o default do tenant (regra do backend)
   useEffect(() => {
@@ -704,11 +716,17 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           required
           placeholder="Selecione o aluno..."
           modalTitle="Selecionar Aluno"
-          options={students.map((s) => ({
-            value: String(s.id),
-            label: s.name,
-            sublabel: s.enrollment_number ?? undefined,
-          }))}
+          options={[]}
+          onSearch={searchStudents}
+          selectedOption={
+            studentDetail
+              ? {
+                  value: String(studentDetail.id),
+                  label: studentDetail.name,
+                  sublabel: studentDetail.enrollment_number ?? undefined,
+                }
+              : undefined
+          }
           value={studentId}
           onChange={(v) => { setStudentId(v); setGuardianId(""); }}
           error={errors.student_id}

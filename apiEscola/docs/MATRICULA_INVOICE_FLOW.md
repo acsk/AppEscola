@@ -224,6 +224,22 @@ O `monthly_equivalent` é sempre o **preço dividido pelos meses do ciclo**:
 - Plano anual de R$ 1.200 → `monthly_equivalent = 100,00`
 - Pacote semestral de R$ 600 → `monthly_equivalent = 100,00`
 
+Na matrícula, o valor líquido das mensalidades usa `monthly_amount` (base) − `discount_amount`, exposto na API como `net_monthly_amount`.
+
+### Recalcular cobranças pendentes (produção)
+
+Se o desconto foi ajustado depois que as invoices foram geradas:
+
+```bash
+# Ver o que mudaria, sem gravar
+php artisan enrollments:sync-invoice-amounts MAT-2-00003 --dry-run
+
+# Aplicar
+php artisan enrollments:sync-invoice-amounts MAT-2-00003
+```
+
+Aceita ID numérico ou `enrollment_number`. Atualiza apenas invoices `pending` e `overdue` dos tipos `monthly` e `enrollment_fee`.
+
 ---
 
 ## Campo `type` nas Invoices

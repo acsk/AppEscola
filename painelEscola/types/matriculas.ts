@@ -40,6 +40,8 @@ export type EnrollmentSummary = {
   status: string;
   monthly_amount: string | null;
   discount_amount: string | null;
+  /** Valor da mensalidade após desconto (base − desconto). */
+  net_monthly_amount?: string | null;
   payment_due_day: number | null;
   student?: StudentRef;
   school_class?: SchoolClassRef;

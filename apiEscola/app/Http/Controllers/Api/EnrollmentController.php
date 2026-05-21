@@ -16,6 +16,7 @@ use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Tenant;
 use App\Services\EnrollmentContractChargesService;
+use App\Services\EnrollmentInvoiceAmountSyncService;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceSettlementService;
 use App\Services\TenantBillingSettingsService;
@@ -39,6 +40,7 @@ class EnrollmentController extends Controller
     public function __construct(
         private readonly InvoiceLifecycleService $invoiceLifecycle,
         private readonly EnrollmentContractChargesService $contractCharges,
+        private readonly EnrollmentInvoiceAmountSyncService $invoiceAmountSync,
     ) {
     }
 
@@ -202,8 +204,8 @@ class EnrollmentController extends Controller
             : $startDate->copy()->addMonths($plan->monthsInCycle())->subDay();
         $billing = $this->billingScope($enrollment->tenant_id);
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
-        $netAmount = max((float) ($enrollment->monthly_amount ?? $plan->monthlyEquivalent()) - (float) ($enrollment->discount_amount ?? 0), 0);
-        $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan);
+        $netAmount = $enrollment->netMonthlyAmount();
+        $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
 
         // Sem taxa no plano ou escola não cobra → remove enrollment_fee do lote
         if (empty($billing['charges_enrollment_fee']) || $enrollmentFeeAmount === null) {
@@ -351,7 +353,7 @@ class EnrollmentController extends Controller
         ], $created > 0 ? 'Cobranças locais geradas em lote com sucesso.' : 'Cobranças locais já existiam e o lote foi marcado como processado.', 200);
     }
 
-    private function resolveEnrollmentFeeAmount(CoursePlan $plan): ?float
+    private function resolveEnrollmentFeeAmount(CoursePlan $plan, ?Enrollment $enrollment = null): ?float
     {
         $planFee = $plan->enrollment_fee_amount;
 
@@ -360,8 +362,16 @@ class EnrollmentController extends Controller
         }
 
         $amount = (float) $planFee;
+        if ($amount <= 0) {
+            return null;
+        }
 
-        return $amount > 0 ? $amount : null;
+        $discount = $enrollment !== null
+            ? (float) ($enrollment->discount_amount ?? 0)
+            : 0.0;
+        $net = max($amount - $discount, 0);
+
+        return $net > 0 ? $net : null;
     }
 
     private function firstMonthlyDueDate(Carbon $startDate, int $dueDay): Carbon
@@ -609,7 +619,14 @@ class EnrollmentController extends Controller
     {
         $this->authorizeTenant($request, $enrollment->tenant_id);
 
-        $enrollment->update($request->validated());
+        $validated = $request->validated();
+        $enrollment->update($validated);
+
+        if (array_key_exists('monthly_amount', $validated) || array_key_exists('discount_amount', $validated)) {
+            $enrollment->refresh();
+            $this->invoiceAmountSync->syncPendingInvoices($enrollment);
+        }
+
         $enrollment->load(['student', 'schoolClass.course', 'coursePlan.course']);
 
         return response()->json(new EnrollmentResource($enrollment));
@@ -717,9 +734,7 @@ class EnrollmentController extends Controller
             $effectiveTenantId = $tenantId ?? $plan->tenant_id;
             $billing = $this->billingScope($effectiveTenantId);
 
-            $dueDay    = $request->payment_due_day ?? (int) ($billing['default_payment_due_day'] ?? 10);
-            $netAmount = $plan->monthlyEquivalent() - ($request->discount_amount ?? 0);
-            $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan);
+            $dueDay = $request->payment_due_day ?? (int) ($billing['default_payment_due_day'] ?? 10);
 
             $enrollment = Enrollment::create([
                 'tenant_id'         => $effectiveTenantId,
@@ -735,6 +750,9 @@ class EnrollmentController extends Controller
                 'payment_due_day'   => $dueDay,
             ]);
 
+            $netAmount = $enrollment->netMonthlyAmount();
+            $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
+
             $paymentData = $request->input('enrollment_payment', []);
 
             // Taxa de matrícula — só cria se a escola cobra e o plano tem valor cadastrado
@@ -746,7 +764,7 @@ class EnrollmentController extends Controller
                     guardianId: $guardianId,
                     type: 'enrollment_fee',
                     description: 'Taxa de Matrícula — ' . $plan->course->name,
-                    amount: max($enrollmentFeeAmount, 0),
+                    amount: $enrollmentFeeAmount,
                     dueDate: $startDate->toDateString(),
                     paymentData: $paymentData,
                 );

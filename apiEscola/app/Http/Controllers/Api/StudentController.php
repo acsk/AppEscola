@@ -44,10 +44,18 @@ class StudentController extends Controller
 
         $query
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
-            ->when($request->query('search'), fn ($q, $v) => $q->where('name', 'like', "%{$v}%"))
+            ->when($request->query('search'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('name', 'like', "%{$v}%")
+                        ->orWhere('enrollment_number', 'like', "%{$v}%")
+                        ->orWhere('document', 'like', "%{$v}%");
+                });
+            })
             ->when($request->query('is_minor'), fn ($q, $v) => $q->where('is_minor', filter_var($v, FILTER_VALIDATE_BOOLEAN)));
 
-        return StudentResource::collection($query->orderBy('name')->paginate(20));
+        $perPage = min(max((int) $request->query('per_page', 20), 1), 50);
+
+        return StudentResource::collection($query->orderBy('name')->paginate($perPage));
     }
 
     #[OA\Post(

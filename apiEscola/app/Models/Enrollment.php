@@ -69,4 +69,34 @@ class Enrollment extends Model
     {
         return $this->hasMany(Invoice::class);
     }
+
+    /**
+     * Valor base da mensalidade antes do desconto (override da matrícula ou plano/pacote).
+     */
+    public function baseMonthlyAmount(): float
+    {
+        if ($this->monthly_amount !== null) {
+            return (float) $this->monthly_amount;
+        }
+
+        $plan = $this->coursePlan;
+        if ($plan) {
+            return (float) $plan->monthlyEquivalent();
+        }
+
+        $bundle = $this->bundle;
+        if ($bundle) {
+            return (float) $bundle->monthlyEquivalent();
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Valor líquido da mensalidade usado nas cobranças: base − desconto (mín. 0).
+     */
+    public function netMonthlyAmount(): float
+    {
+        return max($this->baseMonthlyAmount() - (float) ($this->discount_amount ?? 0), 0);
+    }
 }

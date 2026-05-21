@@ -147,10 +147,12 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         status: editForm.status,
       };
       if (editForm.end_date) payload.end_date = editForm.end_date;
-      if (editForm.monthly_amount)
-        payload.monthly_amount = parseFloat(editForm.monthly_amount);
-      if (editForm.discount_amount)
-        payload.discount_amount = parseFloat(editForm.discount_amount);
+      if (editForm.monthly_amount !== "") {
+        payload.monthly_amount = parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+      }
+      payload.discount_amount = parseFloat(
+        (editForm.discount_amount || "0").replace(",", ".")
+      ) || 0;
       if (editForm.payment_due_day)
         payload.payment_due_day = Number(editForm.payment_due_day);
 
