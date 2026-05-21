@@ -137,7 +137,7 @@ class EnrollmentContractChargesService
                 'to_generate_count' => count($toGenerateSelectable),
                 'to_sync_count' => count(array_filter(
                     $syncCandidates,
-                    static fn (array $row) => ($row['link_status'] ?? '') === 'new'
+                    static fn (array $row) => ! empty($row['syncable'])
                 )),
                 'external_total' => $externalPreview['external_total'],
                 'external_boleto_total' => $externalPreview['external_boleto_total'] ?? 0,

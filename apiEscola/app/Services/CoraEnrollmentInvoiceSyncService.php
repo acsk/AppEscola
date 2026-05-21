@@ -122,13 +122,17 @@ class CoraEnrollmentInvoiceSyncService
                 continue;
             }
 
-            if (! $this->belongsToEnrollment($enrollment, $externalInvoice)) {
+            $chargeId = $this->extractExternalChargeId($externalInvoice);
+            if ($chargeId === '') {
                 $ignored++;
                 continue;
             }
 
-            $chargeId = $this->extractExternalChargeId($externalInvoice);
-            if ($chargeId === '') {
+            if (
+                ! $belongs
+                && ! $this->matchesEnrollmentPayer($enrollment, $externalInvoice)
+                && ! $this->findLocalInvoiceForExternal($enrollment, $externalInvoice, $chargeId)
+            ) {
                 $ignored++;
                 continue;
             }
@@ -259,12 +263,9 @@ class CoraEnrollmentInvoiceSyncService
             $amount = $this->extractAmount($externalInvoice);
             $dueDate = $this->parseDate((string) ($externalInvoice['due_date'] ?? ''));
 
-            $linkStatus = $forEnrollment ? 'new' : 'other';
-            if ($forEnrollment && $localInvoice) {
-                $linkStatus = strtolower((string) $localInvoice->cora_charge_id) === strtolower($chargeId)
-                    ? 'linked'
-                    : 'updatable';
-            }
+            $linkStatus = $this->resolveProviderLinkStatus($localInvoice, $chargeId);
+
+            $syncable = $linkStatus === 'new' || $linkStatus === 'updatable';
 
             $row = [
                 'key' => EnrollmentContractChargesService::syncKey($chargeId),
@@ -277,14 +278,14 @@ class CoraEnrollmentInvoiceSyncService
                 'link_status' => $linkStatus,
                 'for_this_enrollment' => $forEnrollment,
                 'matches_payer' => $matchesPayer,
-                'syncable' => $forEnrollment && $linkStatus !== 'linked' && $linkStatus !== 'other',
+                'syncable' => $syncable,
                 'selected_by_default' => $forEnrollment && $linkStatus === 'new',
-                'action' => $forEnrollment ? 'sync_from_provider' : 'view_only',
+                'action' => $syncable ? 'sync_from_provider' : 'view_only',
             ];
 
             $catalog[] = $row;
 
-            if ($forEnrollment) {
+            if ($syncable || $forEnrollment) {
                 $items[] = $row;
             }
         }
@@ -782,10 +783,6 @@ class CoraEnrollmentInvoiceSyncService
             return true;
         }
 
-        if (! $this->hasStrongEnrollmentMetadataLink($enrollment, $metadata)) {
-            return false;
-        }
-
         foreach ($enrollment->student?->guardians ?? [] as $guardian) {
             $guardianDocument = $this->digitsOnly((string) ($guardian->document ?? ''));
             if ($guardianDocument !== '' && $customerDocument === $guardianDocument) {
@@ -794,6 +791,17 @@ class CoraEnrollmentInvoiceSyncService
         }
 
         return false;
+    }
+
+    private function resolveProviderLinkStatus(?Invoice $localInvoice, string $chargeId): string
+    {
+        if (! $localInvoice) {
+            return 'new';
+        }
+
+        return strtolower((string) $localInvoice->cora_charge_id) === strtolower($chargeId)
+            ? 'linked'
+            : 'updatable';
     }
 
     /**

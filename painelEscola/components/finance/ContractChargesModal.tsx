@@ -475,12 +475,14 @@ function CoraChargesCompactList({
         ]}
       />
       {rows.map((row, index) => {
-        const syncDisabled = row.syncable === false || row.link_status === "linked";
+        const syncDisabled = row.syncable !== true;
         const selected = selectedKeys.has(row.key);
         const actionLabel =
-          row.link_status === "other"
-            ? "—"
-            : LINK_STATUS_LABELS[row.link_status] ?? row.link_status;
+          row.syncable === true
+            ? LINK_STATUS_LABELS[row.link_status] ?? "Sincronizar"
+            : row.link_status === "linked"
+              ? LINK_STATUS_LABELS.linked
+              : "—";
         const actionTone = LINK_STATUS_TONES[row.link_status] ?? "violet";
         const statusLabel = getStatusDisplay(row.status).label;
 
@@ -544,8 +546,8 @@ function ExecutionPreviewSummary({
     });
   });
 
-  preview.external_charges.forEach((row) => {
-    if (!selectedKeys.has(row.key) || row.link_status === "linked") return;
+  (preview.provider_boleto_list ?? preview.external_charges).forEach((row) => {
+    if (!selectedKeys.has(row.key) || row.syncable !== true) return;
     const acao = LINK_STATUS_LABELS[row.link_status] ?? "Sincronizar";
     lines.push({
       icon: "cloud-download-outline",
@@ -814,13 +816,7 @@ export default function ContractChargesModal({
 
       const defaults = new Set<string>();
       (data.provider_boleto_list ?? data.external_charges)
-        .filter(
-          (row) =>
-            row.selected_by_default &&
-            row.syncable !== false &&
-            row.link_status !== "linked" &&
-            row.link_status !== "other"
-        )
+        .filter((row) => row.syncable === true && row.selected_by_default === true)
         .forEach((row) => defaults.add(row.key));
       setSelectedKeys(defaults);
       setExpandedKeys(new Set());
@@ -873,7 +869,7 @@ export default function ContractChargesModal({
   );
 
   const selectableSync = useMemo(
-    () => providerBoletoRows.filter((r) => r.syncable !== false && r.link_status !== "linked"),
+    () => providerBoletoRows.filter((r) => r.syncable === true),
     [providerBoletoRows]
   );
 

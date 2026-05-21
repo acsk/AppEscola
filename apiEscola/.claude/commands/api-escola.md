@@ -46,6 +46,7 @@ Implementar e manter endpoints, migrations, validações e regras de negócio **
 - Controllers enxutos; regra de negócio em **Services**; validação em **Form Requests** quando fizer sentido.
 - Não duplicar endpoints nem lógica.
 - Nomes em português quando o módulo já seguir esse padrão.
+- sempre ATUALIZE API_VERSION no api_meta.php a cada mudança de feature
 
 ## Envelope JSON (padrão do projeto)
 
