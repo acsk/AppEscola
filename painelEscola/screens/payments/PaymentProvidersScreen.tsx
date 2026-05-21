@@ -133,13 +133,15 @@ const validateDraftFields = (
   return nextErrors;
 };
 
-const isEnvironmentConfigured = (draft: EnvironmentDraft): boolean => {
-  const hasClientId = !!String(draft.values.client_id ?? "").trim();
-  const hasCertificate = !!draft.uploadedFiles.certificate || !!draft.files.certificate;
-  const hasPrivateKey = !!draft.uploadedFiles.private_key || !!draft.files.private_key;
+const isCoraEnvironmentSaved = (settings: CoraEnvironmentSettings | null | undefined): boolean =>
+  !!(
+    settings?.client_id &&
+    settings.cert_uploaded &&
+    settings.key_uploaded
+  );
 
-  return hasClientId && hasCertificate && hasPrivateKey;
-};
+const hasPendingCredentialFiles = (draft: EnvironmentDraft): boolean =>
+  !!draft.files.certificate || !!draft.files.private_key;
 
 const mergeEnvironmentSettings = (
   draft: EnvironmentDraft,
@@ -190,6 +192,11 @@ export default function PaymentProvidersScreen() {
   });
   const draftsRef = useRef(drafts);
 
+  const [credentialsSaved, setCredentialsSaved] = useState<Record<EnvironmentKey, boolean>>({
+    stage: false,
+    prod: false,
+  });
+
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
 
@@ -209,6 +216,8 @@ export default function PaymentProvidersScreen() {
   );
 
   const activeDraft = drafts[selectedEnvironment];
+  const canTestConnection =
+    credentialsSaved[selectedEnvironment] && !hasPendingCredentialFiles(activeDraft);
 
   useEffect(() => {
     draftsRef.current = drafts;
@@ -284,6 +293,18 @@ export default function PaymentProvidersScreen() {
         stage: mergeEnvironmentSettings(createDraft("stage", fields), currentSettings?.cora?.stage),
         prod: mergeEnvironmentSettings(createDraft("prod", fields), currentSettings?.cora?.prod),
       });
+
+      if (provider === "cora") {
+        setCredentialsSaved({
+          stage: isCoraEnvironmentSaved(currentSettings?.cora?.stage),
+          prod: isCoraEnvironmentSaved(currentSettings?.cora?.prod),
+        });
+      } else {
+        setCredentialsSaved({
+          stage: !!schema?.environments?.stage,
+          prod: !!schema?.environments?.prod,
+        });
+      }
     } catch (e: any) {
       showToast("error", e?.response?.data?.message || "Falha ao carregar schema do provedor.");
     } finally {
@@ -311,7 +332,12 @@ export default function PaymentProvidersScreen() {
       ...current,
       values: { ...current.values, [fieldName]: value },
       errors: { ...current.errors, [fieldName]: "" },
+      connectionStatus: fieldName === "client_id" || fieldName === "api_key" ? null : current.connectionStatus,
     }));
+
+    if (fieldName === "client_id" || fieldName === "api_key") {
+      setCredentialsSaved((current) => ({ ...current, [selectedEnvironment]: false }));
+    }
   };
 
   const onChangeFile = (fieldName: string, file: File | null) => {
@@ -320,11 +346,8 @@ export default function PaymentProvidersScreen() {
       const nextDraft: EnvironmentDraft = {
         ...environmentDraft,
         files: { ...environmentDraft.files, [fieldName]: file },
-        uploadedFiles: {
-          ...environmentDraft.uploadedFiles,
-          [fieldName]: file ? true : environmentDraft.uploadedFiles[fieldName],
-        },
         errors: { ...environmentDraft.errors, [fieldName]: "" },
+        connectionStatus: null,
       };
       const next = { ...current, [selectedEnvironment]: nextDraft };
       draftsRef.current = next;
@@ -443,16 +466,7 @@ export default function PaymentProvidersScreen() {
   };
 
   const onTestConnection = async () => {
-    if (!tenantId || !provider) return;
-
-    const draft = draftsRef.current[selectedEnvironment];
-    if (!isEnvironmentConfigured(draft)) {
-      showToast(
-        "error",
-        "Salve as credenciais deste ambiente antes de testar a conexao (Client ID, certificado e chave privada)."
-      );
-      return;
-    }
+    if (!tenantId || !provider || !canTestConnection) return;
 
     setTesting(true);
     updateActiveDraft((current) => ({ ...current, connectionStatus: null }));
@@ -799,17 +813,31 @@ export default function PaymentProvidersScreen() {
 
                   <TouchableOpacity
                     onPress={onTestConnection}
-                    disabled={saving || testing}
+                    disabled={saving || testing || !canTestConnection}
                     className="px-5 py-2.5 rounded-xl border border-violet-200"
-                    style={{ opacity: saving || testing ? 0.75 : 1 }}
+                    style={{ opacity: saving || testing || !canTestConnection ? 0.45 : 1 }}
                   >
                     {testing ? (
                       <ActivityIndicator size="small" color="#7C3AED" />
                     ) : (
-                      <Text className="text-sm font-semibold text-violet-700">Testar conexao</Text>
+                      <Text
+                        className={`text-sm font-semibold ${
+                          canTestConnection ? "text-violet-700" : "text-gray-400"
+                        }`}
+                      >
+                        Testar conexao
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
+
+                {!canTestConnection && (
+                  <Text className="text-xs text-gray-500 mt-2">
+                    {hasPendingCredentialFiles(activeDraft)
+                      ? "Salve os novos arquivos antes de testar a conexao."
+                      : "Salve as credenciais deste ambiente para habilitar o teste de conexao."}
+                  </Text>
+                )}
 
                 {!!activeDraft.connectionStatus && (
                   <View
