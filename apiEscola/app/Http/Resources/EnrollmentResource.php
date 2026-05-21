@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\EnrollmentFinancialLockService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use App\Http\Resources\InvoiceResource;
@@ -10,6 +11,9 @@ class EnrollmentResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $lockService = app(EnrollmentFinancialLockService::class);
+        $lockedFields = $lockService->lockedFieldsFor($this->resource);
+
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
@@ -29,6 +33,8 @@ class EnrollmentResource extends JsonResource
             'discount_amount' => $this->discount_amount,
             'net_monthly_amount' => number_format($this->netMonthlyAmount(), 2, '.', ''),
             'payment_due_day' => $this->payment_due_day,
+            'financial_fields_locked' => $lockedFields !== [],
+            'locked_fields' => $lockedFields,
             'charges_generated_at' => $this->charges_generated_at?->toISOString(),
             'charges_batch_generated' => $this->charges_generated_at !== null,
             'created_at' => $this->created_at?->toISOString(),

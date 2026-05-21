@@ -16,6 +16,7 @@ use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Tenant;
 use App\Services\EnrollmentContractChargesService;
+use App\Services\EnrollmentFinancialLockService;
 use App\Services\EnrollmentInvoiceAmountSyncService;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceSettlementService;
@@ -41,6 +42,7 @@ class EnrollmentController extends Controller
         private readonly InvoiceLifecycleService $invoiceLifecycle,
         private readonly EnrollmentContractChargesService $contractCharges,
         private readonly EnrollmentInvoiceAmountSyncService $invoiceAmountSync,
+        private readonly EnrollmentFinancialLockService $financialLock,
     ) {
     }
 
@@ -620,6 +622,7 @@ class EnrollmentController extends Controller
         $this->authorizeTenant($request, $enrollment->tenant_id);
 
         $validated = $request->validated();
+        $this->financialLock->assertChangesAllowed($enrollment, $validated);
         $enrollment->update($validated);
 
         if (array_key_exists('monthly_amount', $validated) || array_key_exists('discount_amount', $validated)) {

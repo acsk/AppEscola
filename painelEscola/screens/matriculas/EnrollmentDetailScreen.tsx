@@ -423,18 +423,21 @@ export default function EnrollmentDetailScreen({
     setSaving(true);
     setEditErrors({});
     try {
-      const payload: Record<string, any> = {
-        start_date: editForm.start_date,
-        status: editForm.status,
-      };
-      if (editForm.end_date) payload.end_date = editForm.end_date;
-      if (editForm.monthly_amount !== "") {
-        payload.monthly_amount = parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+      const locked = !!enrollment?.financial_fields_locked;
+      const payload: Record<string, any> = { status: editForm.status };
+      if (!locked) {
+        payload.start_date = editForm.start_date;
+        if (editForm.end_date) payload.end_date = editForm.end_date;
+        if (editForm.monthly_amount !== "") {
+          payload.monthly_amount =
+            parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+        }
+        payload.discount_amount =
+          parseFloat((editForm.discount_amount || "0").replace(",", ".")) || 0;
       }
-      payload.discount_amount = parseFloat(
-        (editForm.discount_amount || "0").replace(",", ".")
-      ) || 0;
-      if (editForm.payment_due_day) payload.payment_due_day = Number(editForm.payment_due_day);
+      if (editForm.payment_due_day) {
+        payload.payment_due_day = Number(editForm.payment_due_day);
+      }
 
       await api.put(`/enrollments/${enrollmentId}`, payload);
       setEditVisible(false);
@@ -1603,24 +1606,32 @@ export default function EnrollmentDetailScreen({
           </>
         }
       >
+        {enrollment?.financial_fields_locked && (
+          <View className="flex-row items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-4">
+            <Ionicons name="lock-closed-outline" size={14} color="#D97706" />
+            <Text className="text-xs text-amber-800 flex-1">
+              Datas, mensalidade e desconto estão bloqueados porque já existem cobranças baixadas nesta matrícula.
+            </Text>
+          </View>
+        )}
         <View className="flex-row gap-4">
           <View className="flex-1">
             <DatePickerInput
               label="Data de Início"
               required
               value={editForm.start_date}
-              onChangeText={() => {}}
+              onChangeText={(v) => setEditForm({ ...editForm, start_date: v })}
               error={editErrors.start_date}
-              disabled
+              disabled={!!enrollment?.financial_fields_locked}
             />
           </View>
           <View className="flex-1">
             <DatePickerInput
               label="Data de Término"
               value={editForm.end_date}
-              onChangeText={() => {}}
+              onChangeText={(v) => setEditForm({ ...editForm, end_date: v })}
               error={editErrors.end_date}
-              disabled
+              disabled={!!enrollment?.financial_fields_locked}
             />
           </View>
         </View>
@@ -1654,6 +1665,7 @@ export default function EnrollmentDetailScreen({
               error={editErrors.monthly_amount}
               placeholder="0.00"
               keyboardType="decimal-pad"
+              editable={!enrollment?.financial_fields_locked}
             />
           </View>
           <View className="flex-1">
@@ -1664,6 +1676,7 @@ export default function EnrollmentDetailScreen({
               error={editErrors.discount_amount}
               placeholder="0.00"
               keyboardType="decimal-pad"
+              editable={!enrollment?.financial_fields_locked}
             />
           </View>
         </View>

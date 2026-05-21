@@ -62,6 +62,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   const [editForm, setEditForm] = useState<EnrollmentEditFormValues>(EMPTY_EDIT);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
   const [editVisible, setEditVisible] = useState(false);
+  const [financialFieldsLocked, setFinancialFieldsLocked] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Lookups for edit modal
@@ -122,39 +123,49 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     setLoadingView(false);
   };
 
-  const openEdit = async (row: EnrollmentSummary) => {    await fetchLookups();
+  const openEdit = async (row: EnrollmentSummary) => {
     setEditId(row.id);
-    setEditForm({
-      student_id: String(row.student?.id ?? ""),
-      school_class_id: String(row.school_class?.id ?? ""),
-      start_date: isoToDisplay(row.start_date ?? ""),
-      end_date: isoToDisplay(row.end_date ?? ""),
-      status: row.status,
-      monthly_amount: row.monthly_amount ?? "",
-      discount_amount: row.discount_amount ?? "",
-      payment_due_day: String(row.payment_due_day ?? ""),
-    });
     setEditErrors({});
     setEditVisible(true);
+    setFinancialFieldsLocked(false);
+    try {
+      const { data } = await api.get(`/enrollments/${row.id}`);
+      const detail: EnrollmentSummary = data.data ?? data;
+      setFinancialFieldsLocked(!!detail.financial_fields_locked);
+      setEditForm({
+        student_id: String(detail.student?.id ?? row.student?.id ?? ""),
+        school_class_id: String(detail.school_class?.id ?? row.school_class?.id ?? ""),
+        start_date: isoToDisplay(detail.start_date ?? ""),
+        end_date: isoToDisplay(detail.end_date ?? ""),
+        status: detail.status,
+        monthly_amount: detail.monthly_amount ?? "",
+        discount_amount: detail.discount_amount ?? "",
+        payment_due_day: String(detail.payment_due_day ?? ""),
+      });
+    } catch {
+      setEditVisible(false);
+      setEditId(null);
+    }
   };
 
   const saveEdit = async () => {
     setSaving(true);
     setEditErrors({});
     try {
-      const payload: Record<string, any> = {
-        start_date: editForm.start_date,
-        status: editForm.status,
-      };
-      if (editForm.end_date) payload.end_date = editForm.end_date;
-      if (editForm.monthly_amount !== "") {
-        payload.monthly_amount = parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+      const payload: Record<string, any> = { status: editForm.status };
+      if (!financialFieldsLocked) {
+        payload.start_date = editForm.start_date;
+        if (editForm.end_date) payload.end_date = editForm.end_date;
+        if (editForm.monthly_amount !== "") {
+          payload.monthly_amount =
+            parseFloat(editForm.monthly_amount.replace(",", ".")) || 0;
+        }
+        payload.discount_amount =
+          parseFloat((editForm.discount_amount || "0").replace(",", ".")) || 0;
       }
-      payload.discount_amount = parseFloat(
-        (editForm.discount_amount || "0").replace(",", ".")
-      ) || 0;
-      if (editForm.payment_due_day)
+      if (editForm.payment_due_day) {
         payload.payment_due_day = Number(editForm.payment_due_day);
+      }
 
       await api.put(`/enrollments/${editId}`, payload);
       setEditVisible(false);
@@ -553,24 +564,32 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           </>
         }
       >
+        {financialFieldsLocked && (
+          <View className="flex-row items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-4">
+            <Ionicons name="lock-closed-outline" size={14} color="#D97706" />
+            <Text className="text-xs text-amber-800 flex-1">
+              Datas, mensalidade e desconto estão bloqueados porque já existem cobranças baixadas nesta matrícula.
+            </Text>
+          </View>
+        )}
         <View className="flex-row gap-4">
           <View className="flex-1">
             <DatePickerInput
               label="Data de Início"
               required
               value={editForm.start_date}
-              onChangeText={() => {}}
+              onChangeText={(v) => setEditForm({ ...editForm, start_date: v })}
               error={editErrors.start_date}
-              disabled
+              disabled={financialFieldsLocked}
             />
           </View>
           <View className="flex-1">
             <DatePickerInput
               label="Data de Término"
               value={editForm.end_date}
-              onChangeText={() => {}}
+              onChangeText={(v) => setEditForm({ ...editForm, end_date: v })}
               error={editErrors.end_date}
-              disabled
+              disabled={financialFieldsLocked}
             />
           </View>
         </View>
@@ -608,6 +627,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
               error={editErrors.monthly_amount}
               placeholder="0.00"
               keyboardType="decimal-pad"
+              editable={!financialFieldsLocked}
             />
           </View>
           <View className="flex-1">
@@ -620,6 +640,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
               error={editErrors.discount_amount}
               placeholder="0.00"
               keyboardType="decimal-pad"
+              editable={!financialFieldsLocked}
             />
           </View>
         </View>
