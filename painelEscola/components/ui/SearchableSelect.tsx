@@ -35,6 +35,10 @@ interface Props {
   selectedOption?: SearchableOption;
 }
 
+const MODAL_WIDTH = 380;
+const MODAL_HEIGHT = 420;
+const LIST_HEIGHT = 240;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function SearchableSelect({
@@ -218,11 +222,12 @@ export default function SearchableSelect({
         >
           <View
             style={{
-              width: 520,
-              maxHeight: "80%",
+              width: MODAL_WIDTH,
+              height: MODAL_HEIGHT,
               backgroundColor: "white",
               borderRadius: 16,
               overflow: "hidden",
+              flexDirection: "column",
             }}
           >
             {/* Header */}
@@ -303,10 +308,11 @@ export default function SearchableSelect({
               </Text>
             </View>
 
-            {/* Lista */}
+            {/* Lista (altura fixa para rolagem) */}
             <ScrollView
-              style={{ flex: 1 }}
-              showsVerticalScrollIndicator={false}
+              style={{ height: LIST_HEIGHT }}
+              contentContainerStyle={{ flexGrow: 1 }}
+              showsVerticalScrollIndicator
               keyboardShouldPersistTaps="handled"
             >
               {searching && filtered.length === 0 ? (
@@ -362,7 +368,7 @@ export default function SearchableSelect({
                       <View style={{ flex: 1 }}>
                         <Text
                           style={{
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: isSelected ? "600" : "400",
                             color: isSelected ? "#5B21B6" : "#374151",
                           }}
@@ -372,7 +378,7 @@ export default function SearchableSelect({
                         {opt.sublabel && (
                           <Text
                             style={{
-                              fontSize: 12,
+                              fontSize: 13,
                               color: isSelected ? "#7C3AED" : "#9CA3AF",
                               marginTop: 2,
                             }}
