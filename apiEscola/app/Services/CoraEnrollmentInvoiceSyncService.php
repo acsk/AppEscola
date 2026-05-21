@@ -191,6 +191,7 @@ class CoraEnrollmentInvoiceSyncService
      * @return array{
      *     items: array<int, array<string, mixed>>,
      *     provider_boleto_list: array<int, array<string, mixed>>,
+     *     provider_boleto_school_groups: array<int, array<string, mixed>>,
      *     external_total: int,
      *     external_boleto_total: int,
      *     external_for_enrollment: int,
@@ -265,11 +266,7 @@ class CoraEnrollmentInvoiceSyncService
                 'status' => (string) ($externalInvoice['status'] ?? ''),
                 'amount' => $amount !== null ? number_format($amount, 2, '.', '') : null,
                 'due_date' => $dueDate?->toDateString(),
-                'description' => (string) (
-                    $externalInvoice['description']
-                    ?? data_get($externalInvoice, 'services.0.description')
-                    ?? 'Boleto Cora'
-                ),
+                'description' => $this->extractInvoiceDescription($externalInvoice),
                 'linked_invoice_id' => $localInvoice?->id,
                 'link_status' => $linkStatus,
                 'for_this_enrollment' => $forEnrollment,
@@ -286,15 +283,145 @@ class CoraEnrollmentInvoiceSyncService
             }
         }
 
+        $relevantCatalog = array_values(array_filter(
+            $catalog,
+            static fn (array $row) => ! empty($row['for_this_enrollment']) || ! empty($row['matches_payer'])
+        ));
+        $otherCatalog = array_values(array_filter(
+            $catalog,
+            static fn (array $row) => empty($row['for_this_enrollment']) && empty($row['matches_payer'])
+        ));
+
         return [
             'items' => $items,
-            'provider_boleto_list' => $catalog,
+            'provider_boleto_list' => $this->collapseProviderBoletoRows($relevantCatalog),
+            'provider_boleto_school_groups' => $this->summarizeSchoolBoletoGroups($otherCatalog),
             'external_total' => count($externalInvoices),
             'external_boleto_total' => $boletoTotal,
             'external_for_enrollment' => count($items),
             'external_matches_payer' => $matchesPayerCount,
             'fetch_error' => null,
         ];
+    }
+
+    /**
+     * Agrupa linhas com mesma data/valor/status para evitar lista repetitiva na UI.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function collapseProviderBoletoRows(array $rows): array
+    {
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $groupKey = implode('|', [
+                (string) ($row['due_date'] ?? ''),
+                (string) ($row['amount'] ?? ''),
+                (string) ($row['link_status'] ?? 'other'),
+                ! empty($row['for_this_enrollment']) ? '1' : '0',
+                ! empty($row['matches_payer']) ? '1' : '0',
+                strtoupper((string) ($row['status'] ?? '')),
+            ]);
+
+            if (! isset($groups[$groupKey])) {
+                $groups[$groupKey] = array_merge($row, [
+                    'group_count' => 1,
+                    'charge_ids' => [(string) ($row['charge_id'] ?? '')],
+                ]);
+
+                continue;
+            }
+
+            $groups[$groupKey]['group_count'] = ((int) ($groups[$groupKey]['group_count'] ?? 1)) + 1;
+            $groups[$groupKey]['charge_ids'][] = (string) ($row['charge_id'] ?? '');
+        }
+
+        $collapsed = [];
+
+        foreach ($groups as $group) {
+            $count = (int) ($group['group_count'] ?? 1);
+            if ($count > 1) {
+                $description = trim((string) ($group['description'] ?? 'Boleto Cora'));
+                $suffix = ' (+' . ($count - 1) . ' similares)';
+                if (! str_contains($description, $suffix)) {
+                    $group['description'] = $description . $suffix;
+                }
+            }
+
+            $collapsed[] = $group;
+        }
+
+        usort($collapsed, static function (array $a, array $b): int {
+            return strcmp((string) ($a['due_date'] ?? ''), (string) ($b['due_date'] ?? ''));
+        });
+
+        return $collapsed;
+    }
+
+    /**
+     * Resumo de boletos da escola sem vínculo com a matrícula (outros alunos).
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function summarizeSchoolBoletoGroups(array $rows): array
+    {
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $groupKey = implode('|', [
+                (string) ($row['due_date'] ?? ''),
+                (string) ($row['amount'] ?? ''),
+                strtoupper((string) ($row['status'] ?? '')),
+            ]);
+
+            if (! isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'due_date' => $row['due_date'] ?? null,
+                    'amount' => $row['amount'] ?? null,
+                    'status' => (string) ($row['status'] ?? ''),
+                    'count' => 1,
+                ];
+
+                continue;
+            }
+
+            $groups[$groupKey]['count'] = ((int) ($groups[$groupKey]['count'] ?? 1)) + 1;
+        }
+
+        $summary = array_values($groups);
+
+        usort($summary, static function (array $a, array $b): int {
+            $countCompare = ((int) ($b['count'] ?? 0)) <=> ((int) ($a['count'] ?? 0));
+            if ($countCompare !== 0) {
+                return $countCompare;
+            }
+
+            return strcmp((string) ($a['due_date'] ?? ''), (string) ($b['due_date'] ?? ''));
+        });
+
+        return $summary;
+    }
+
+    private function extractInvoiceDescription(array $externalInvoice): string
+    {
+        $candidates = [
+            $externalInvoice['description'] ?? null,
+            data_get($externalInvoice, 'services.0.description'),
+            data_get($externalInvoice, 'customer.name'),
+            data_get($externalInvoice, 'customer.trade_name'),
+            data_get($externalInvoice, 'payer.name'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $text = trim((string) $candidate);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return 'Boleto Cora';
     }
 
     /**

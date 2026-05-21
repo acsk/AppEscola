@@ -35,6 +35,15 @@ export type ContractExternalChargeRow = {
   syncable?: boolean;
   selected_by_default?: boolean;
   action: string;
+  group_count?: number;
+  charge_ids?: string[];
+};
+
+export type ProviderBoletoSchoolGroup = {
+  due_date: string | null;
+  amount: string | null;
+  status: string;
+  count: number;
 };
 
 export type ContractChargesPreview = {
@@ -52,6 +61,7 @@ export type ContractChargesPreview = {
     external_boleto_total: number;
     external_for_enrollment: number;
     external_matches_payer: number;
+    external_boleto_school_groups?: number;
     provider_fetch_error: string | null;
   };
   warnings: string[];
@@ -74,8 +84,10 @@ export type ContractChargesPreview = {
   }>;
   to_generate: ContractChargePreviewRow[];
   external_charges: ContractExternalChargeRow[];
-  /** Todos os boletos retornados pela Cora (catálogo da escola). */
+  /** Boletos vinculados à matrícula ou ao mesmo CPF (sincronizáveis). */
   provider_boleto_list: ContractExternalChargeRow[];
+  /** Resumo agrupado dos demais boletos da escola (outros alunos). */
+  provider_boleto_school_groups?: ProviderBoletoSchoolGroup[];
 };
 
 export type ContractChargesApplyResult = {
