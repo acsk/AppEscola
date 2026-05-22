@@ -35,6 +35,8 @@ export type ContractExternalChargeRow = {
   syncable?: boolean;
   selected_by_default?: boolean;
   action: string;
+  /** Cobrança já ligada a fatura local (generate-charge). */
+  source?: string;
 };
 
 export type ContractChargesPreview = {

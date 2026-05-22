@@ -292,6 +292,15 @@ class CoraEnrollmentInvoiceSyncService
             }
         }
 
+        $localLinkedCount = $this->appendLocalLinkedCoraCharges(
+            $enrollment,
+            $tenant,
+            $environment,
+            $catalog,
+            $items,
+            $boletoTotal
+        );
+
         return [
             'items' => $items,
             'provider_boleto_list' => $catalog,
@@ -299,8 +308,117 @@ class CoraEnrollmentInvoiceSyncService
             'external_boleto_total' => $boletoTotal,
             'external_for_enrollment' => count($items),
             'external_matches_payer' => $matchesPayerCount,
+            'local_linked_in_preview' => $localLinkedCount,
             'fetch_error' => null,
         ];
+    }
+
+    /**
+     * Cobranças já geradas pelo sistema (cora_charge_id local) que não aparecem na listagem
+     * da Cora ou foram filtradas por CPF — ex.: hybrid recém-criado em /generate-charge.
+     *
+     * @param  array<int, array<string, mixed>>  $catalog
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    private function appendLocalLinkedCoraCharges(
+        Enrollment $enrollment,
+        Tenant $tenant,
+        string $environment,
+        array &$catalog,
+        array &$items,
+        int &$boletoTotal,
+    ): int {
+        $seenChargeIds = [];
+
+        foreach ($catalog as $row) {
+            $chargeId = trim((string) ($row['charge_id'] ?? ''));
+            if ($chargeId !== '') {
+                $seenChargeIds[strtolower($chargeId)] = true;
+            }
+        }
+
+        $appended = 0;
+
+        foreach ($enrollment->invoices as $localInvoice) {
+            $chargeId = trim((string) ($localInvoice->cora_charge_id ?? ''));
+            if ($chargeId === '') {
+                continue;
+            }
+
+            if (isset($seenChargeIds[strtolower($chargeId)])) {
+                continue;
+            }
+
+            $seenChargeIds[strtolower($chargeId)] = true;
+            $boletoTotal++;
+            $appended++;
+
+            $externalInvoice = $this->fetchExternalInvoiceForLocalLink(
+                $tenant,
+                $environment,
+                $chargeId,
+                $localInvoice
+            );
+
+            $amount = $this->extractAmount($externalInvoice) ?? (float) $localInvoice->amount;
+            $dueDate = $this->parseDate((string) ($externalInvoice['due_date'] ?? ''))
+                ?? ($localInvoice->due_date instanceof Carbon ? $localInvoice->due_date : null);
+
+            $row = [
+                'key' => EnrollmentContractChargesService::syncKey($chargeId),
+                'charge_id' => $chargeId,
+                'status' => (string) ($externalInvoice['status'] ?? $localInvoice->cora_status ?? 'OPEN'),
+                'amount' => number_format($amount, 2, '.', ''),
+                'due_date' => $dueDate?->toDateString(),
+                'description' => $this->extractInvoiceDescription($externalInvoice) ?: (string) $localInvoice->description,
+                'linked_invoice_id' => $localInvoice->id,
+                'link_status' => 'linked',
+                'for_this_enrollment' => true,
+                'matches_payer' => $this->matchesEnrollmentPayer($enrollment, $externalInvoice),
+                'syncable' => false,
+                'selected_by_default' => false,
+                'action' => 'view_only',
+                'source' => 'local_gateway_charge',
+            ];
+
+            $catalog[] = $row;
+            $items[] = $row;
+        }
+
+        return $appended;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fetchExternalInvoiceForLocalLink(
+        Tenant $tenant,
+        string $environment,
+        string $chargeId,
+        Invoice $localInvoice,
+    ): array {
+        try {
+            $detailed = $this->factory->resolve('cora')->getInvoiceById($tenant, $chargeId, $environment);
+            if ($detailed !== []) {
+                return $detailed;
+            }
+        } catch (\Throwable $e) {
+            $this->writeSyncDebug('preview-local-link-fetch-failed', [
+                'tenant_id' => $tenant->id,
+                'charge_id' => $chargeId,
+                'invoice_id' => $localInvoice->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $payload = is_array($localInvoice->cora_payload) ? $localInvoice->cora_payload : [];
+
+        return array_merge($payload, [
+            'id' => $chargeId,
+            'status' => $localInvoice->cora_status,
+            'due_date' => $localInvoice->due_date?->toDateString(),
+            'total_amount' => (int) round((float) $localInvoice->amount * 100),
+        ]);
     }
 
     /**
@@ -1128,9 +1246,15 @@ class CoraEnrollmentInvoiceSyncService
 
         foreach ($methodCandidates as $method) {
             $normalized = strtoupper(trim((string) $method));
-            if (in_array($normalized, ['BANK_SLIP', 'BOLETO', 'BILLET', 'BANKSLIP'], true)) {
+            if (in_array($normalized, ['BANK_SLIP', 'BOLETO', 'BILLET', 'BANKSLIP', 'HYBRID'], true)) {
                 return true;
             }
+        }
+
+        // Listagem v2 costuma retornar payment_method UNKNOWN mesmo para boleto/híbrido.
+        $listMethod = strtoupper(trim((string) ($externalInvoice['payment_method'] ?? '')));
+        if ($listMethod === 'UNKNOWN' && trim((string) ($externalInvoice['customer_document'] ?? '')) !== '') {
+            return true;
         }
 
         return $this->extractBoletoNumber($externalInvoice) !== null

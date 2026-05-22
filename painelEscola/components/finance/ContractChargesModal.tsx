@@ -592,6 +592,9 @@ const LINK_STATUS_TONES: Record<string, PillTone> = {
 };
 
 function providerLinkLabel(row: ContractExternalChargeRow): string {
+  if (row.link_status === "linked" && row.linked_invoice_id) {
+    return `Fatura #${row.linked_invoice_id}`;
+  }
   if (row.for_this_enrollment) return "Matrícula";
   if (row.matches_payer) return "Mesmo CPF";
   return "Outro";
@@ -1097,7 +1100,24 @@ export default function ContractChargesModal({
                   ) : null
                 }
               />
-              {providerBoletoRows.length === 0 && (preview.summary.external_total ?? 0) > 0 ? (
+              {providerBoletoRows.length === 0 &&
+              (preview.summary.external_boleto_total ?? 0) > 0 ? (
+                <View className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 gap-1">
+                  <Text className="text-xs font-semibold text-amber-900">
+                    {preview.summary.external_boleto_total} boleto(s) na Cora, nenhum vinculável a esta
+                    matrícula
+                  </Text>
+                  <Text className="text-[11px] leading-4 text-amber-800">
+                    A sincronização só importa boletos com o mesmo CPF do aluno/responsável ou criados pelo
+                    AppCurso (metadata). Boletos emitidos manualmente na Cora com outro CPF não aparecem aqui.
+                    Use &quot;Gerar local&quot; e depois &quot;Gerar cobrança&quot; em cada fatura, ou corrija o
+                    CPF do responsável financeiro.
+                    {canRequestDebug
+                      ? ' Use Debug para ver a lista completa e o motivo (cpf_not_matching_payer).'
+                      : ''}
+                  </Text>
+                </View>
+              ) : providerBoletoRows.length === 0 && (preview.summary.external_total ?? 0) > 0 ? (
                 <Text className="text-xs text-amber-800">
                   {preview.summary.external_total} cobrança(s) na API, nenhuma como boleto.
                 </Text>

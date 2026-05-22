@@ -124,6 +124,20 @@ class EnrollmentContractChargesService
                 . 'Prefira importar/sincronizar pelo provedor ou marque manualmente se ainda quiser criar no sistema.';
         }
 
+        $externalBoletoTotal = (int) ($externalPreview['external_boleto_total'] ?? 0);
+        $externalMatchesPayer = (int) ($externalPreview['external_matches_payer'] ?? 0);
+        if ($externalBoletoTotal > 0 && $externalMatchesPayer === 0 && $syncCandidates === []) {
+            $warnings[] = "A Cora retornou {$externalBoletoTotal} boleto(s) da conta, mas nenhum com o CPF do aluno/responsável "
+                . 'desta matrícula (ou com metadata de vínculo). Confira o CPF do responsável financeiro no cadastro '
+                . 'ou gere novas cobranças pelo sistema (elas passam a incluir metadata e o CPF correto).';
+        }
+
+        $localLinkedInPreview = (int) ($externalPreview['local_linked_in_preview'] ?? 0);
+        if ($localLinkedInPreview > 0) {
+            $warnings[] = "{$localLinkedInPreview} cobrança(s) já gerada(s) pelo sistema aparecem como "
+                . '"Vinculada" na lista Cora (não é necessário sincronizar de novo).';
+        }
+
         $payload = [
             'enrollment_id' => $enrollment->id,
             'title' => 'Cobranças do contrato',
