@@ -275,6 +275,7 @@ class MergeDuplicateBundleEnrollmentsTest extends TestCase
 
         $actual = $service->run(dryRun: false);
 
+        $this->assertSame($keeper->id, $dryRun['details'][0]['keeper_id']);
         $this->assertSame(1, $dryRun['invoices_moved']);
         $this->assertSame(1, $dryRun['invoices_dropped']);
         $this->assertSame($dryRun['invoices_moved'], $actual['invoices_moved']);

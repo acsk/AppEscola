@@ -67,7 +67,7 @@ class MergeDuplicateBundleEnrollmentsService
     private function mergeGroup(Collection $group, bool $dryRun): ?array
     {
         /** @var Enrollment $keeper */
-        $keeper = $group->sortByDesc(fn (Enrollment $e) => $this->keeperScore($e))->first();
+        $keeper = $this->selectKeeper($group);
         $duplicates = $group->filter(fn (Enrollment $e) => $e->id !== $keeper->id)->values();
 
         if ($duplicates->isEmpty()) {
@@ -200,20 +200,25 @@ class MergeDuplicateBundleEnrollmentsService
         return 'moved';
     }
 
-    private function keeperScore(Enrollment $enrollment): int
+    /**
+     * Matrícula que permanece: a que já gerou cobranças em lote; senão a de menor id (primeira criada).
+     *
+     * @param  Collection<int, Enrollment>  $group
+     */
+    private function selectKeeper(Collection $group): Enrollment
     {
-        $invoices = $enrollment->relationLoaded('invoices')
-            ? $this->activeKeeperInvoices($enrollment)
-            : $enrollment->invoices()->get();
+        $withBatchCharges = $group->filter(fn (Enrollment $e) => $e->charges_generated_at !== null);
 
-        $paidCount = $invoices->where('status', 'paid')->count();
-        $coraCount = $invoices->filter(fn (Invoice $i) => ! empty($i->cora_charge_id))->count();
+        if ($withBatchCharges->isNotEmpty()) {
+            return $withBatchCharges
+                ->sortBy(fn (Enrollment $e) => [
+                    -$this->activeKeeperInvoices($e)->count(),
+                    $e->id,
+                ])
+                ->first();
+        }
 
-        return ($invoices->count() * 1000)
-            + ($enrollment->charges_generated_at ? 500 : 0)
-            + ($coraCount * 100)
-            + ($paidCount * 50)
-            - (int) $enrollment->id;
+        return $group->sortBy('id')->first();
     }
 
     /**
