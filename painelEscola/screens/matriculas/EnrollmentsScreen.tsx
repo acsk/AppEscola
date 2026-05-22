@@ -62,6 +62,14 @@ const STATUS_LABELS: Record<string, string> = {
   concluded: "Concluído",
 };
 
+const STUDENT_NAME_LIMIT = 32;
+
+const limitText = (value: string | undefined | null, max = STUDENT_NAME_LIMIT) => {
+  if (!value) return "—";
+  const clean = value.trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+};
+
 export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<EnrollmentSummary[]>([]);
@@ -250,6 +258,13 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   const fmt = (v: string | null) =>
     v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";
 
+  const formatCurrency = (v: string | null | undefined) =>
+    v
+      ? `R$ ${parseFloat(v).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        })}`
+      : "—";
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -338,54 +353,54 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
       >
       <View
-        className="bg-white rounded-2xl overflow-hidden"
+        className="bg-white rounded-2xl overflow-hidden border border-gray-200"
         style={{
           width: "100%",
-          minWidth: tableMinWidth,
+          minWidth: isMobile ? tableMinWidth : 980,
           shadowColor: "#000",
           shadowOpacity: 0.05,
           shadowRadius: 10,
           elevation: 2,
         }}
       >
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
+        <View className="flex-row bg-gray-100 border-b border-gray-200 px-3 py-2">
           <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
+            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+            style={{ flex: 1.55 }}
           >
             Aluno
           </Text>
           <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
+            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+            style={{ flex: 1.65 }}
           >
             Curso / Pacote
           </Text>
           <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
+            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+            style={{ flex: 0.85 }}
           >
             Nº Matrícula
           </Text>
           <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
+            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+            style={{ flex: 0.7 }}
           >
             Início
           </Text>
           <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
+            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+            style={{ flex: 0.8 }}
           >
             Mensalidade
           </Text>
           <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
+            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+            style={{ flex: 0.65 }}
           >
             Status
           </Text>
-          <View style={{ width: 48 }} />
+          <View style={{ width: 42 }} />
         </View>
 
         {loading ? (
@@ -403,43 +418,40 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           rows.map((item, i) => (
             <View
               key={item.id}
-              className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${
-                i % 2 === 1 ? "bg-gray-50/40" : ""
+              className={`flex-row items-center px-3 py-2 border-b border-gray-100 ${
+                i % 2 === 1 ? "bg-slate-50/70" : "bg-white"
               }`}
             >
               <Text
-                className="text-sm font-medium text-gray-800"
-                style={{ flex: 2 }}
+                className="text-xs font-semibold text-gray-800"
+                style={{ flex: 1.55, paddingRight: 10 }}
+                numberOfLines={1}
               >
-                {item.student?.name ?? "—"}
+                {limitText(item.student?.name)}
               </Text>
-              <EnrollmentProductCell item={item} />
-              <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
+              <EnrollmentProductCell item={item} compact flex={1.65} />
+              <Text className="text-xs font-medium text-gray-600" style={{ flex: 0.85 }}>
                 {item.enrollment_number ?? "—"}
               </Text>
-              <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
+              <Text className="text-xs text-gray-600" style={{ flex: 0.7 }}>
                 {fmt(item.start_date)}
               </Text>
-              <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
-                {item.monthly_amount
-                  ? `R$ ${parseFloat(item.monthly_amount).toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                    })}`
-                  : "—"}
+              <Text className="text-xs font-semibold text-gray-700" style={{ flex: 0.8 }}>
+                {formatCurrency(item.monthly_amount)}
               </Text>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 0.65 }}>
                 <Badge
                   slug={item.status}
                   label={STATUS_LABELS[item.status] ?? item.status}
                 />
               </View>
-              <View style={{ width: 48 }} className="flex-row justify-end">
+              <View style={{ width: 42 }} className="flex-row justify-end">
                 <TouchableOpacity
                   onPress={() => setMenuEnrollment(item)}
-                  className="p-2 bg-gray-100 rounded-lg"
+                  className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="ellipsis-horizontal" size={18} color="#4B5563" />
+                  <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
                 </TouchableOpacity>
               </View>
             </View>
