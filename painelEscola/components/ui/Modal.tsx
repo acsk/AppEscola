@@ -61,15 +61,16 @@ export default function Modal({
         }}
       >
         <View
-          className="bg-white rounded-2xl"
+          className="bg-white rounded-2xl overflow-hidden"
           style={{
             width: "100%",
             maxWidth: Math.min(width - horizontalPadding * 2, widths[size]),
             maxHeight,
+            flexDirection: "column",
           }}
         >
           {/* Header */}
-          <View className="px-6 py-4 border-b border-gray-100">
+          <View className="px-6 py-3 border-b border-gray-100" style={{ flexShrink: 0 }}>
             <View className="flex-row items-center justify-between">
               <Text className="text-base font-bold text-gray-800">{title}</Text>
               <TouchableOpacity
@@ -85,8 +86,11 @@ export default function Modal({
 
           {/* Body */}
           <ScrollView
-            className={`${isMobile ? "px-4 py-4" : "px-6 py-4"} ${scrollViewClassName}`}
+            className={`${isMobile ? "px-4" : "px-6"} ${scrollViewClassName}`}
+            style={{ flexGrow: 1, flexShrink: 1 }}
+            contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 }}
             showsVerticalScrollIndicator={showScrollIndicator}
+            keyboardShouldPersistTaps="handled"
           >
             {children}
           </ScrollView>
@@ -94,8 +98,15 @@ export default function Modal({
           {/* Footer */}
           {footer && (
             <View
-              className="justify-end px-6 py-4 border-t border-gray-100"
-              style={{ flexDirection: isMobile ? "column" : "row", gap: 12, ...footerStyle }}
+              className="px-6 py-3 border-t border-gray-100 bg-white"
+              style={{
+                flexShrink: 0,
+                width: "100%",
+                flexDirection: isMobile ? "column" : "row",
+                alignItems: "stretch",
+                gap: 10,
+                ...footerStyle,
+              }}
             >
               {footer}
             </View>

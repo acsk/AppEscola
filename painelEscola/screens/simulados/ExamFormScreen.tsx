@@ -132,12 +132,10 @@ function validateExam(form: ExamForm): Record<string, string> {
   return errs;
 }
 
-function validateQuestion(form: ExamQuestionForm): Record<string, string> {
+function validateQuestionEnunciado(form: ExamQuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.question_text.trim() && !form.image_url.trim()) {
-    const message = "Informe o texto do enunciado, a imagem, ou ambos.";
-    errs.question_text = message;
-    errs.image_url = message;
+    errs.enunciado = "Informe o texto do enunciado, envie uma imagem, ou ambos.";
   }
   if (form.points) {
     const pts = Number(form.points);
@@ -147,13 +145,24 @@ function validateQuestion(form: ExamQuestionForm): Record<string, string> {
     const ord = Number(form.order);
     if (!Number.isInteger(ord) || ord < 1) errs.order = "Ordem deve ser um número inteiro maior que 0.";
   }
-  if (form.type === "multiple_choice") {
-    const filled = form.options.filter((o) => o.option_text.trim());
-    if (filled.length < 2) errs.options = "Informe pelo menos 2 opções.";
-    const hasCorrect = form.options.some((o) => o.is_correct && o.option_text.trim());
-    if (!hasCorrect) errs.options = "Marque pelo menos uma opção como correta.";
+  if (form.video_url.trim() && !/^https?:\/\//i.test(form.video_url.trim())) {
+    errs.video_url = "Informe uma URL de vídeo válida (http:// ou https://).";
   }
   return errs;
+}
+
+function validateQuestionAlternatives(form: ExamQuestionForm): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (form.type !== "multiple_choice") return errs;
+  const filled = form.options.filter((o) => o.option_text.trim());
+  if (filled.length < 2) errs.options = "Informe pelo menos 2 opções.";
+  const hasCorrect = form.options.some((o) => o.is_correct && o.option_text.trim());
+  if (!hasCorrect) errs.options = "Marque pelo menos uma opção como correta.";
+  return errs;
+}
+
+function validateQuestion(form: ExamQuestionForm): Record<string, string> {
+  return { ...validateQuestionEnunciado(form), ...validateQuestionAlternatives(form) };
 }
 
 function resolveExamId(data: unknown): number | null {
@@ -167,7 +176,7 @@ function resolveExamId(data: unknown): number | null {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps) {
-  const { contentPadding } = useResponsiveLayout();
+  const { contentPadding, isMobile } = useResponsiveLayout();
   const [savedExamId, setSavedExamId] = useState<number | null>(null);
   const [postCreatePrompt, setPostCreatePrompt] = useState(false);
   const effectiveExamId = examId ?? savedExamId;
@@ -204,6 +213,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionModal, setQuestionModal] = useState(false);
+  const [questionModalStep, setQuestionModalStep] = useState<1 | 2>(1);
   const [editQuestionId, setEditQuestionId] = useState<number | null>(null);
   const [qForm, setQForm] = useState<ExamQuestionForm>(EMPTY_QUESTION);
   const [qErrors, setQErrors] = useState<Record<string, string>>({});
@@ -415,10 +425,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
   // ── Question Modal ────────────────────────────────────────────────────────────
 
+  const closeQuestionModal = () => {
+    setQuestionModal(false);
+    setQuestionModalStep(1);
+    setQErrors({});
+  };
+
   const openNewQuestion = () => {
     setEditQuestionId(null);
     setQForm({ ...EMPTY_QUESTION, options: EMPTY_QUESTION.options.map((o) => ({ ...o })) });
     setQErrors({});
+    setQuestionModalStep(1);
     setQuestionModal(true);
   };
 
@@ -444,8 +461,19 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           : EMPTY_QUESTION.options.map((o) => ({ ...o })),
     });
     setQErrors({});
+    setQuestionModalStep(1);
     setQuestionModal(true);
   };
+
+  const goToQuestionStep2 = () => {
+    const errs = validateQuestionEnunciado(qForm);
+    setQErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setQuestionModalStep(2);
+  };
+
+  const questionStep2Label =
+    qForm.type === "multiple_choice" ? "Alternativas" : "Gabarito";
 
   const setQField = (k: keyof ExamQuestionForm, v: any) =>
     setQForm((prev) => ({ ...prev, [k]: v }));
@@ -463,9 +491,12 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       const response = data.body ?? data.data ?? data;
       if (response?.image_url) {
         setQField("image_url", response.image_url);
-      }
-      if (response?.image_url) {
-        setQErrors((prev) => ({ ...prev, image_url: "" }));
+        setQErrors((prev) => {
+          const next = { ...prev };
+          delete next.enunciado;
+          delete next.image_url;
+          return next;
+        });
       }
     } catch (err: any) {
       const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
@@ -535,9 +566,14 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
   const saveQuestion = async () => {
     if (!effectiveExamId) return;
-    const errs = validateQuestion(qForm);
+    const enunciadoErrs = validateQuestionEnunciado(qForm);
+    const altErrs = validateQuestionAlternatives(qForm);
+    const errs = { ...enunciadoErrs, ...altErrs };
     setQErrors(errs);
-    if (Object.keys(errs).length > 0) return;
+    if (Object.keys(errs).length > 0) {
+      setQuestionModalStep(Object.keys(enunciadoErrs).length > 0 ? 1 : 2);
+      return;
+    }
 
     setSavingQuestion(true);
     try {
@@ -577,7 +613,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           message: data?.message || "Questão adicionada com sucesso.",
         });
       }
-      setQuestionModal(false);
+      closeQuestionModal();
       fetchQuestions();
     } catch (err: any) {
       const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
@@ -1119,21 +1155,29 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
         >
           {/* Header da seção */}
-          <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
-            <View>
+          <View
+            className={`px-6 py-4 border-b border-gray-100 gap-3 ${
+              isMobile ? "flex-col" : "flex-row items-center justify-between"
+            }`}
+          >
+            <View style={{ flex: 1 }}>
               <Text className="text-base font-bold text-gray-800">Questões</Text>
               <Text className="text-xs text-gray-400">
                 {questions.length} questão{questions.length !== 1 ? "ões" : ""} · {totalPoints.toFixed(1)} pontos no total
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={openNewQuestion}
-              className="flex-row items-center bg-violet-600 px-4 py-2 rounded-xl"
-              activeOpacity={0.85}
-            >
-              <Ionicons name="add" size={16} color="white" />
-              <Text className="text-white text-sm font-semibold ml-1">Nova Questão</Text>
-            </TouchableOpacity>
+            {questions.length > 0 && (
+              <TouchableOpacity
+                onPress={openNewQuestion}
+                className={`flex-row items-center justify-center bg-violet-600 px-4 py-2.5 rounded-xl ${
+                  isMobile ? "w-full" : ""
+                }`}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={16} color="white" />
+                <Text className="text-white text-sm font-semibold ml-1">Nova Questão</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Lista de questões */}
@@ -1142,11 +1186,16 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <ActivityIndicator color="#7C3AED" />
             </View>
           ) : questions.length === 0 ? (
-            <View className="py-12 items-center gap-2">
+            <View className="py-12 items-center gap-3 px-6">
               <Ionicons name="help-circle-outline" size={32} color="#D1D5DB" />
-              <Text className="text-sm text-gray-400">Nenhuma questão adicionada ainda</Text>
-              <TouchableOpacity onPress={openNewQuestion} activeOpacity={0.7}>
-                <Text className="text-sm text-violet-600 font-semibold">Adicionar primeira questão</Text>
+              <Text className="text-sm text-gray-400 text-center">Nenhuma questão adicionada ainda</Text>
+              <TouchableOpacity
+                onPress={openNewQuestion}
+                className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={16} color="white" />
+                <Text className="text-sm font-semibold text-white ml-1">Nova Questão</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1217,27 +1266,28 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             ))
           )}
 
-          <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
+          <View
+            className={`px-6 py-4 border-t border-gray-100 gap-3 ${
+              isMobile ? "flex-col" : "flex-row flex-wrap justify-between"
+            }`}
+          >
             <TouchableOpacity
               onPress={() => setActiveStep(1)}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+              className={`px-4 py-2.5 rounded-xl border border-gray-200 bg-white items-center ${
+                isMobile ? "w-full" : ""
+              }`}
               activeOpacity={0.85}
             >
               <Text className="text-sm font-semibold text-gray-700">Voltar para dados</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveStep(3)}
-              className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50"
+              className={`px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50 items-center ${
+                isMobile ? "w-full" : ""
+              }`}
               activeOpacity={0.85}
             >
               <Text className="text-sm font-semibold text-violet-700">Materiais de apoio</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={openNewQuestion}
-              className="px-4 py-2.5 rounded-xl bg-violet-600"
-              activeOpacity={0.85}
-            >
-              <Text className="text-sm font-semibold text-white">Nova Questão</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1490,265 +1540,356 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       <Modal
         visible={questionModal}
         title={editQuestionId ? "Editar Questão" : "Nova Questão"}
-        onClose={() => setQuestionModal(false)}
-        size="lg"
+        onClose={closeQuestionModal}
+        size="md"
+        showScrollIndicator
         footer={
-          <View className="flex-row gap-3 px-6 py-4 border-t border-gray-100">
+          <>
             <TouchableOpacity
-              onPress={() => setQuestionModal(false)}
-              className="flex-1 border border-gray-200 py-2.5 rounded-xl items-center"
+              onPress={questionModalStep === 1 ? closeQuestionModal : () => {
+                setQuestionModalStep(1);
+                setQErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.options;
+                  return next;
+                });
+              }}
+              className="flex-1 border border-gray-200 py-2.5 rounded-xl items-center justify-center"
+              style={{ minWidth: 0 }}
               activeOpacity={0.7}
             >
-              <Text className="text-sm font-semibold text-gray-600">Cancelar</Text>
+              <Text className="text-sm font-semibold text-gray-600">
+                {questionModalStep === 1 ? "Cancelar" : "Voltar"}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={saveQuestion}
-              disabled={savingQuestion}
-              className="flex-1 bg-violet-600 py-2.5 rounded-xl items-center"
-              activeOpacity={0.85}
-            >
-              {savingQuestion ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
+            {questionModalStep === 1 ? (
+              <TouchableOpacity
+                onPress={goToQuestionStep2}
+                className="flex-1 bg-violet-600 py-2.5 rounded-xl items-center justify-center"
+                style={{ minWidth: 0 }}
+                activeOpacity={0.85}
+              >
                 <Text className="text-sm font-semibold text-white">
-                  {editQuestionId ? "Salvar" : "Adicionar"}
+                  Próximo: {questionStep2Label}
                 </Text>
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={saveQuestion}
+                disabled={savingQuestion}
+                className="flex-1 bg-violet-600 py-2.5 rounded-xl items-center justify-center"
+                style={{ minWidth: 0 }}
+                activeOpacity={0.85}
+              >
+                {savingQuestion ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-sm font-semibold text-white">
+                    {editQuestionId ? "Salvar alterações" : "Salvar questão"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
+        }
+        headerContent={
+          <View className="flex-row items-center gap-2 mt-3">
+            {[
+              { step: 1, label: "Enunciado" },
+              { step: 2, label: questionStep2Label },
+            ].map((item, index) => {
+              const active = questionModalStep === item.step;
+              const complete = questionModalStep > item.step;
+
+              return (
+                <React.Fragment key={item.step}>
+                  {index > 0 ? <Ionicons name="chevron-forward" size={14} color="#9CA3AF" /> : null}
+                  <View
+                    className="flex-1 rounded-xl px-3 py-2.5"
+                    style={{
+                      backgroundColor: active ? "#7C3AED" : complete ? "#F5F3FF" : "#F9FAFB",
+                      borderWidth: 1,
+                      borderColor: active ? "#7C3AED" : complete ? "#C4B5FD" : "#E5E7EB",
+                    }}
+                  >
+                    <View className="flex-row items-center gap-2">
+                      <View
+                        className="w-5 h-5 rounded-full items-center justify-center"
+                        style={{
+                          backgroundColor: active ? "#FFFFFF" : complete ? "#DDD6FE" : "#EEF2F7",
+                        }}
+                      >
+                        <Text
+                          className="text-[10px] font-bold"
+                          style={{ color: active ? "#7C3AED" : complete ? "#6D28D9" : "#9CA3AF" }}
+                        >
+                          {item.step}
+                        </Text>
+                      </View>
+                      <Text
+                        className="text-[11px] font-bold uppercase"
+                        numberOfLines={1}
+                        style={{ color: active ? "#FFFFFF" : complete ? "#6D28D9" : "#6B7280" }}
+                      >
+                        {item.label}
+                      </Text>
+                    </View>
+                  </View>
+                </React.Fragment>
+              );
+            })}
           </View>
         }
       >
-        {/* Tipo */}
-        <View className="flex-row gap-3 mb-4">
-          {(["multiple_choice", "essay"] as const).map((t) => (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setQField("type", t)}
-              className={`flex-1 flex-row items-center justify-center gap-2 py-3 rounded-xl border ${
-                qForm.type === t
-                  ? "border-violet-500 bg-violet-50"
-                  : "border-gray-200 bg-white"
-              }`}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={t === "multiple_choice" ? "radio-button-on-outline" : "create-outline"}
-                size={16}
-                color={qForm.type === t ? "#7C3AED" : "#9CA3AF"}
-              />
-              <Text
-                className={`text-sm font-semibold ${
-                  qForm.type === t ? "text-violet-700" : "text-gray-500"
-                }`}
-              >
-                {t === "multiple_choice" ? "Objetiva" : "Discursiva"}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Enunciado */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-            Enunciado textual (opcional)
-          </Text>
-          <textarea
-            value={qForm.question_text}
-            onChange={(e: any) => setQField("question_text", e.target.value)}
-            placeholder="Digite o texto do enunciado ou deixe vazio se usar apenas imagem..."
-            style={{
-              ...inputStyle,
-              borderColor: qErrors.question_text ? "#FCA5A5" : "#E5E7EB",
-            }}
-            rows={3}
-          />
-          {qErrors.question_text && (
-            <Text className="text-xs text-red-500 mt-1">{qErrors.question_text}</Text>
-          )}
-          <Text className="text-xs text-gray-400 mt-1">
-            A questão pode ter somente texto, somente imagem ou os dois.
-          </Text>
-        </View>
-
-        {/* Matéria e pontuação */}
-        <View className="flex-row gap-4 mb-2">
-          <View style={{ flex: 2 }}>
-            <SearchableSelect
-              label="Matéria"
-              value={qForm.subject_id}
-              options={subjectOptions}
-              onChange={(v) => setQField("subject_id", v)}
-              placeholder="Selecione uma matéria"
-              modalTitle="Selecionar matéria"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <FormInput
-              label="Pontuação"
-              value={qForm.points}
-              onChangeText={(v) => setQField("points", v)}
-              valueFormat="decimal"
-              decimalPlaces={2}
-              placeholder="1.0"
-              error={qErrors.points}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <FormInput
-              label="Ordem"
-              value={qForm.order}
-              onChangeText={(v) => setQField("order", v)}
-              valueFormat="integer"
-              maxDigits={4}
-              placeholder="Auto"
-              error={qErrors.order}
-            />
-          </View>
-        </View>
-
-        {/* URLs opcionais */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-            Imagem do enunciado (opcional)
-          </Text>
-          <View className="flex-row items-center gap-3 flex-wrap">
-            <TouchableOpacity
-              onPress={() => questionImageInputRef.current?.click()}
-              disabled={uploadingQuestionImage}
-              className="px-4 py-2.5 rounded-xl bg-violet-600"
-              activeOpacity={0.85}
-            >
-              {uploadingQuestionImage ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Text className="text-sm font-semibold text-white">
-                  Enviar imagem
-                </Text>
-              )}
-            </TouchableOpacity>
-            {qForm.image_url ? (
-              <View className="flex-1 min-w-[220px] px-3 py-2 rounded-xl border border-violet-200 bg-violet-50">
-                <Text className="text-xs font-semibold text-violet-700" numberOfLines={1}>
-                  {qForm.image_url}
-                </Text>
+        {questionModalStep === 1 ? (
+          <View className="gap-4">
+            {qErrors.enunciado && (
+              <View className="rounded-xl bg-red-50 border border-red-200 px-3 py-2">
+                <Text className="text-xs text-red-600">{qErrors.enunciado}</Text>
               </View>
-            ) : (
-              <Text className="text-xs text-gray-400">
-                Se preferir, envie apenas imagem sem texto.
-              </Text>
             )}
-          </View>
-          <Text className="text-xs text-gray-400 mt-2">
-            A imagem será comprimida automaticamente antes do envio para tentar ficar abaixo de 100 KB.
-          </Text>
-          <input
-            ref={questionImageInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={(e: any) => {
-              const file = e.target.files?.[0];
-              if (file) uploadQuestionImage(file);
-              e.target.value = "";
-            }}
-          />
-          {qErrors.image_url && (
-            <Text className="text-xs text-red-500 mt-1">{qErrors.image_url}</Text>
-          )}
-        </View>
 
-        <FormInput
-          label="URL da Imagem (opcional)"
-          value={qForm.image_url}
-          onChangeText={(v) => setQField("image_url", v)}
-          placeholder="https://..."
-          keyboardType="url"
-          error={qErrors.image_url}
-        />
-        <FormInput
-          label="URL do Vídeo (opcional)"
-          value={qForm.video_url}
-          onChangeText={(v) => setQField("video_url", v)}
-          placeholder="https://..."
-          keyboardType="url"
-        />
-
-        {/* Gabarito / explicação */}
-        <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">Explicação / Gabarito (opcional)</Text>
-          <textarea
-            value={qForm.explanation}
-            onChange={(e: any) => setQField("explanation", e.target.value)}
-            placeholder="Explicação da resposta correta..."
-            style={inputStyle}
-            rows={2}
-          />
-        </View>
-
-        {/* Opções – somente objetiva */}
-        {qForm.type === "multiple_choice" && (
-          <View>
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-sm font-semibold text-gray-700">Opções</Text>
-              <TouchableOpacity onPress={addOption} activeOpacity={0.7} className="flex-row items-center gap-1">
-                <Ionicons name="add-circle-outline" size={16} color="#7C3AED" />
-                <Text className="text-xs text-violet-600 font-semibold">Adicionar opção</Text>
-              </TouchableOpacity>
+            <View className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <Text className="text-xs font-semibold text-gray-500 mb-2">Formato</Text>
+              <View className="flex-row bg-white rounded-xl p-1 border border-gray-200">
+                {(["multiple_choice", "essay"] as const).map((t) => {
+                  const selected = qForm.type === t;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => setQField("type", t)}
+                      className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-lg"
+                      style={{
+                        backgroundColor: selected ? "#7C3AED" : "transparent",
+                        borderWidth: 1,
+                        borderColor: selected ? "#7C3AED" : "transparent",
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={t === "multiple_choice" ? "list-outline" : "create-outline"}
+                        size={15}
+                        color={selected ? "#FFFFFF" : "#6B7280"}
+                      />
+                      <Text
+                        className={`text-sm font-semibold ${selected ? "text-white" : "text-gray-600"}`}
+                      >
+                        {t === "multiple_choice" ? "Objetiva" : "Discursiva"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
-            {qErrors.options && (
-              <Text className="text-xs text-red-500 mb-2">{qErrors.options}</Text>
-            )}
+            <View>
+              <Text className="text-sm font-semibold text-gray-700 mb-1.5">Enunciado</Text>
+              <textarea
+                value={qForm.question_text}
+                onChange={(e: any) => {
+                  setQField("question_text", e.target.value);
+                  if (qErrors.enunciado) {
+                    setQErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.enunciado;
+                      return next;
+                    });
+                  }
+                }}
+                placeholder="Digite o texto da questão..."
+                style={{
+                  ...inputStyle,
+                  minHeight: 88,
+                  borderColor: qErrors.enunciado ? "#FCA5A5" : "#E5E7EB",
+                }}
+                rows={3}
+              />
+              {!qErrors.enunciado && (
+                <Text className="text-xs text-gray-400 mt-1">
+                  Texto e/ou imagem — pelo menos um é necessário.
+                </Text>
+              )}
+            </View>
 
-            {qForm.options.map((opt, idx) => (
-              <View key={idx} className="flex-row items-center gap-2 mb-2">
-                {/* Botão de correta */}
-                <TouchableOpacity onPress={() => markCorrect(idx)} activeOpacity={0.7}>
-                  <Ionicons
-                    name={opt.is_correct ? "radio-button-on" : "radio-button-off"}
-                    size={20}
-                    color={opt.is_correct ? "#7C3AED" : "#D1D5DB"}
-                  />
+            <View className={`gap-3 ${isMobile ? "" : "flex-row items-start"}`}>
+              <View className={isMobile ? "" : "flex-1"} style={{ minWidth: 0 }}>
+                <FormSelect
+                  label="Matéria"
+                  value={qForm.subject_id}
+                  options={subjectOptions.filter((o) => o.value !== "")}
+                  onChange={(v) => setQField("subject_id", v)}
+                  placeholder="Nenhuma"
+                />
+              </View>
+              <View style={{ width: isMobile ? undefined : 96 }}>
+                <FormInput
+                  label="Pontos"
+                  value={qForm.points}
+                  onChangeText={(v) => setQField("points", v)}
+                  valueFormat="decimal"
+                  decimalPlaces={2}
+                  placeholder="1"
+                  error={qErrors.points}
+                  style={{ height: 42, textAlign: "center" }}
+                />
+              </View>
+              <View style={{ width: isMobile ? undefined : 88 }}>
+                <FormInput
+                  label="Ordem"
+                  value={qForm.order}
+                  onChangeText={(v) => setQField("order", v)}
+                  valueFormat="integer"
+                  maxDigits={4}
+                  placeholder="1"
+                  error={qErrors.order}
+                  style={{ height: 42, textAlign: "center" }}
+                />
+              </View>
+            </View>
+
+            <View
+              className="rounded-xl border p-3"
+              style={{
+                borderColor: qErrors.enunciado ? "#FCA5A5" : "#E5E7EB",
+                backgroundColor: "#FAFAFA",
+              }}
+            >
+              <Text className="text-sm font-semibold text-gray-700 mb-2">Mídia (opcional)</Text>
+              <View className="flex-row items-center gap-3 flex-wrap">
+                <TouchableOpacity
+                  onPress={() => questionImageInputRef.current?.click()}
+                  disabled={uploadingQuestionImage}
+                  className="flex-row items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white"
+                  activeOpacity={0.85}
+                >
+                  {uploadingQuestionImage ? (
+                    <ActivityIndicator color="#7C3AED" size="small" />
+                  ) : (
+                    <Ionicons name="image-outline" size={16} color="#7C3AED" />
+                  )}
+                  <Text className="text-sm font-medium text-gray-700">
+                    {qForm.image_url ? "Trocar imagem" : "Enviar imagem"}
+                  </Text>
                 </TouchableOpacity>
-
-                {/* Input da opção */}
-                <View style={{ flex: 1 }}>
-                  <TextInput
-                    value={opt.option_text}
-                    onChangeText={(v) => setOptionField(idx, "option_text", v)}
-                    placeholder={`Opção ${idx + 1}`}
-                    placeholderTextColor="#9CA3AF"
-                    className={`border rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-gray-50 ${
-                      opt.is_correct ? "border-violet-300" : "border-gray-200"
-                    }`}
-                  />
+                {qForm.image_url ? (
+                  <View className="flex-row items-center gap-2">
+                    <Image
+                      source={{ uri: qForm.image_url }}
+                      style={{ width: 80, height: 56, borderRadius: 8, backgroundColor: "#E5E7EB" }}
+                      resizeMode="cover"
+                    />
+                    <TouchableOpacity onPress={() => setQField("image_url", "")} activeOpacity={0.7}>
+                      <Text className="text-xs font-semibold text-red-600">Remover</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </View>
+              <input
+                ref={questionImageInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e: any) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadQuestionImage(file);
+                  e.target.value = "";
+                }}
+              />
+              <View className="mt-3">
+                <FormInput
+                  label="URL do vídeo"
+                  value={qForm.video_url}
+                  onChangeText={(v) => setQField("video_url", v)}
+                  placeholder="https://..."
+                  keyboardType="url"
+                  error={qErrors.video_url}
+                />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View className="gap-4">
+            {qForm.type === "multiple_choice" ? (
+              <View>
+                <Text className="text-sm font-semibold text-gray-800 mb-1">
+                  Alternativas de resposta
+                </Text>
+                <Text className="text-xs text-gray-400 mb-3">
+                  Marque a opção correta e preencha pelo menos duas alternativas.
+                </Text>
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-xs font-medium text-gray-600">Opções</Text>
+                  <TouchableOpacity
+                    onPress={addOption}
+                    activeOpacity={0.7}
+                    className="flex-row items-center gap-1 px-2 py-1 rounded-md bg-gray-100"
+                  >
+                    <Ionicons name="add" size={14} color="#374151" />
+                    <Text className="text-xs text-gray-700 font-semibold">Opção</Text>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Toggle triggers_text_input */}
-                <TouchableOpacity
-                  onPress={() => markTriggerText(idx)}
-                  activeOpacity={0.7}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons
-                    name={opt.triggers_text_input ? "chatbox" : "chatbox-outline"}
-                    size={17}
-                    color={opt.triggers_text_input ? "#F59E0B" : "#D1D5DB"}
-                  />
-                </TouchableOpacity>
-
-                {/* Remover opção */}
-                {qForm.options.length > 2 && (
-                  <TouchableOpacity onPress={() => removeOption(idx)} activeOpacity={0.7}>
-                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                  </TouchableOpacity>
+                {qErrors.options && (
+                  <Text className="text-xs text-red-500 mb-2">{qErrors.options}</Text>
                 )}
-              </View>
-            ))}
 
-            <Text className="text-xs text-gray-400 mt-1">
-              Círculo: marca correta · Ícone de chat: ativa campo de texto para o aluno (ex: "Outro")
-            </Text>
+                {qForm.options.map((opt, idx) => (
+                  <View key={idx} className="flex-row items-center gap-2 mb-2">
+                    <TouchableOpacity onPress={() => markCorrect(idx)} activeOpacity={0.7}>
+                      <Ionicons
+                        name={opt.is_correct ? "radio-button-on" : "radio-button-off"}
+                        size={20}
+                        color={opt.is_correct ? "#7C3AED" : "#D1D5DB"}
+                      />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <TextInput
+                        value={opt.option_text}
+                        onChangeText={(v) => setOptionField(idx, "option_text", v)}
+                        placeholder={`Opção ${idx + 1}`}
+                        placeholderTextColor="#9CA3AF"
+                        className={`border rounded-lg px-3 py-2 text-sm text-gray-800 bg-gray-50 ${
+                          opt.is_correct ? "border-violet-300" : "border-gray-200"
+                        }`}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => markTriggerText(idx)}
+                      activeOpacity={0.7}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons
+                        name={opt.triggers_text_input ? "chatbox" : "chatbox-outline"}
+                        size={17}
+                        color={opt.triggers_text_input ? "#F59E0B" : "#D1D5DB"}
+                      />
+                    </TouchableOpacity>
+                    {qForm.options.length > 2 && (
+                      <TouchableOpacity onPress={() => removeOption(idx)} activeOpacity={0.7}>
+                        <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+
+                <Text className="text-[11px] text-gray-400 mt-1 mb-2">
+                  ○ correta · 💬 &quot;Outro&quot;
+                </Text>
+              </View>
+            ) : null}
+
+            <View className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+                Gabarito / explicação (opcional)
+              </Text>
+              <textarea
+                value={qForm.explanation}
+                onChange={(e: any) => setQField("explanation", e.target.value)}
+                placeholder="Texto exibido após a correção..."
+                style={{ ...inputStyle, minHeight: 72, backgroundColor: "#fff" }}
+                rows={3}
+              />
+            </View>
           </View>
         )}
       </Modal>
