@@ -568,11 +568,41 @@ class CompareTenantsCoraDebugCommand extends Command
      */
     private function isBoletoLike(array $invoice): bool
     {
-        $method = strtolower($this->extractPaymentMethod($invoice));
+        $paymentForms = $invoice['payment_forms'] ?? [];
 
-        return str_contains($method, 'bank_slip')
-            || str_contains($method, 'boleto')
-            || str_contains($method, 'hybrid')
-            || isset($invoice['payment_options']['bank_slip']);
+        if (is_array($paymentForms)) {
+            foreach ($paymentForms as $form) {
+                $normalizedForm = strtoupper(trim((string) $form));
+                if (in_array($normalizedForm, ['BANK_SLIP', 'BOLETO'], true)) {
+                    return true;
+                }
+            }
+        }
+
+        $methodCandidates = [
+            $invoice['payment_form'] ?? null,
+            $invoice['payment_method'] ?? null,
+            data_get($invoice, 'payment.form'),
+            data_get($invoice, 'payment.method'),
+            data_get($invoice, 'payment_options.selected'),
+        ];
+
+        foreach ($methodCandidates as $method) {
+            $normalized = strtoupper(trim((string) $method));
+            if (in_array($normalized, ['BANK_SLIP', 'BOLETO', 'BILLET', 'BANKSLIP', 'HYBRID'], true)) {
+                return true;
+            }
+        }
+
+        $listMethod = strtoupper(trim((string) ($invoice['payment_method'] ?? '')));
+        if ($listMethod === 'UNKNOWN' && $this->extractCustomerDocument($invoice) !== '') {
+            return true;
+        }
+
+        return data_get($invoice, 'payment_options.bank_slip') !== null
+            || data_get($invoice, 'bank_slip') !== null
+            || data_get($invoice, 'boleto') !== null
+            || data_get($invoice, 'bank_slip_url') !== null
+            || data_get($invoice, 'boleto_url') !== null;
     }
 }
