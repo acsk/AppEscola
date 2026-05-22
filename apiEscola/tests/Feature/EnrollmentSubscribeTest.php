@@ -99,7 +99,6 @@ class EnrollmentSubscribeTest extends TestCase
 
         $course = Course::factory()->create([
             'tenant_id' => $tenant->id,
-            'enrollment_fee_amount' => 150,
         ]);
 
         $plan = CoursePlan::query()->create([
