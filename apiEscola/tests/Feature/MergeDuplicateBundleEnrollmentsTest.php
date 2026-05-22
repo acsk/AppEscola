@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Course;
 use App\Models\CourseBundle;
+use App\Models\Enrollment;
 use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Student;
@@ -83,7 +84,7 @@ class MergeDuplicateBundleEnrollmentsTest extends TestCase
 
         $this->assertSame(1, $result['merged_groups']);
         $this->assertSame(1, $result['removed_enrollments']);
-        $this->assertDatabaseCount('enrollments', 1);
+        $this->assertSame(1, Enrollment::query()->count());
         $this->assertSoftDeleted('enrollments', ['id' => $second->id]);
 
         $keeper = $first->fresh();
@@ -267,7 +268,7 @@ class MergeDuplicateBundleEnrollmentsTest extends TestCase
 
         $dryRun = $service->run(dryRun: true);
 
-        $this->assertDatabaseCount('enrollments', 3);
+        $this->assertSame(3, Enrollment::query()->count());
         $this->assertSame(
             $duplicateOne->id,
             (int) Invoice::query()->whereKey($duplicateOneInvoiceId)->value('enrollment_id')
