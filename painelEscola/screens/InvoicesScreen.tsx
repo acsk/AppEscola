@@ -90,6 +90,21 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelado",
 };
 
+const STUDENT_NAME_LIMIT = 32;
+const DESCRIPTION_LIMIT = 44;
+
+const limitText = (value: string | undefined | null, max: number) => {
+  if (!value) return "—";
+  const clean = value.trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+};
+
+const SUMMARY_TONES: Record<string, { bg: string; border: string; text: string }> = {
+  amber: { bg: "#FFFBEB", border: "#FDE68A", text: "#92400E" },
+  red: { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B" },
+  emerald: { bg: "#ECFDF5", border: "#A7F3D0", text: "#065F46" },
+};
+
 type ListView = "open" | "paid" | "all";
 
 const monthStartISO = () => {
@@ -699,12 +714,29 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
           summaryCards.map((card) => (
             <View
               key={card.label}
-              className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex-1"
-              style={{ minWidth: isMobile ? "100%" : 200, maxWidth: isMobile ? "100%" : 280 }}
+              className="bg-white rounded-xl border px-4 py-3 flex-1"
+              style={{
+                minWidth: isMobile ? "100%" : 200,
+                maxWidth: isMobile ? "100%" : 280,
+                borderColor: SUMMARY_TONES[card.tone]?.border ?? "#E5E7EB",
+              }}
             >
-              <Text className="text-xs font-semibold text-gray-500 uppercase">{card.label}</Text>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                  {card.label}
+                </Text>
+                <View
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: SUMMARY_TONES[card.tone]?.text ?? "#6B7280" }}
+                />
+              </View>
               <Text className="text-2xl font-bold text-gray-900 mt-1">{card.value}</Text>
-              <Text className="text-sm text-gray-600 mt-0.5">{fmtMoney(card.amount)}</Text>
+              <Text
+                className="text-sm font-semibold mt-0.5"
+                style={{ color: SUMMARY_TONES[card.tone]?.text ?? "#4B5563" }}
+              >
+                {fmtMoney(card.amount)}
+              </Text>
             </View>
           ))
         )}
@@ -814,24 +846,24 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             rows.map((item) => (
               <View
                 key={item.id}
-                className="bg-white rounded-2xl border border-gray-100 px-4 py-3"
+                className="bg-white rounded-xl border border-gray-200 px-3 py-3"
                 style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
               >
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1">
                     <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
-                      {item.student?.name ?? "—"}
+                      {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
                     </Text>
                     <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
-                      {item.description}
+                      {limitText(item.description, DESCRIPTION_LIMIT)}
                     </Text>
                   </View>
                   <TouchableOpacity
                     onPress={() => setActionsInvoice(item)}
-                    className="w-9 h-9 items-center justify-center bg-gray-100 rounded-lg"
+                    className="w-8 h-8 items-center justify-center bg-gray-100 rounded-lg border border-gray-200"
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="ellipsis-horizontal" size={18} color="#4B5563" />
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
                   </TouchableOpacity>
                 </View>
 
@@ -888,53 +920,80 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
           style={{ width: "100%" }}
           contentContainerStyle={{ width: "100%" }}
         >
-          <View className="bg-white rounded-2xl overflow-hidden" style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-            <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-              <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>Aluno</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>Descrição</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Valor</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>
+          <View
+            className="bg-white rounded-2xl overflow-hidden border border-gray-200"
+            style={{
+              width: "100%",
+              minWidth: tableMinWidth ?? (listView === "paid" ? 1160 : 1040),
+              shadowColor: "#000",
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 2,
+            }}
+          >
+            <View className="flex-row bg-gray-100 border-b border-gray-200 px-3 py-2">
+              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 1.6 }}>Aluno</Text>
+              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 1.8 }}>Descrição</Text>
+              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.75 }}>Valor</Text>
+              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.85 }}>
                 {listView === "paid" ? "Pago em" : "Vencimento"}
               </Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Forma</Text>
+              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.9 }}>Forma</Text>
               {listView === "paid" ? (
-                <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>
+                <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 1 }}>
                   Identificador
                 </Text>
               ) : null}
-              <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Status</Text>
-              <View style={{ width: 56 }} />
+              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.65 }}>Status</Text>
+              <View style={{ width: 42 }} />
             </View>
 
             {renderInvoiceListState() ??
               rows.map((item, i) => (
-                <View key={item.id} className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${i % 2 === 1 ? "bg-gray-50/40" : ""}`}>
-                  <Text className="text-sm font-medium text-gray-800" style={{ flex: 2 }}>{item.student?.name ?? "—"}</Text>
-                  <Text className="text-sm text-gray-600" style={{ flex: 2 }} numberOfLines={1}>{item.description}</Text>
-                  <Text className="text-sm font-semibold text-gray-800" style={{ flex: 1 }}>
+                <View
+                  key={item.id}
+                  className={`flex-row items-center px-3 py-2 border-b border-gray-100 ${
+                    i % 2 === 1 ? "bg-slate-50/70" : "bg-white"
+                  }`}
+                >
+                  <Text
+                    className="text-xs font-semibold text-gray-800"
+                    style={{ flex: 1.6, paddingRight: 10 }}
+                    numberOfLines={1}
+                  >
+                    {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
+                  </Text>
+                  <Text
+                    className="text-xs text-gray-600"
+                    style={{ flex: 1.8, paddingRight: 10 }}
+                    numberOfLines={1}
+                  >
+                    {limitText(item.description, DESCRIPTION_LIMIT)}
+                  </Text>
+                  <Text className="text-xs font-bold text-gray-800" style={{ flex: 0.75 }}>
                     {fmtMoney(item.amount)}
                   </Text>
-                  <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
+                  <Text className="text-xs text-gray-600" style={{ flex: 0.85 }}>
                     {listView === "paid" ? fmtDateTime(item.paid_at) : fmt(item.due_date)}
                   </Text>
-                  <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
+                  <Text className="text-xs text-gray-600" style={{ flex: 0.9 }} numberOfLines={1}>
                     {paymentMethodLabel(item.payment_method)}
                   </Text>
                   {listView === "paid" ? (
-                    <Text className="text-sm text-gray-600" style={{ flex: 1 }} numberOfLines={1}>
+                    <Text className="text-xs text-gray-600" style={{ flex: 1, paddingRight: 10 }} numberOfLines={1}>
                       {item.payment_reference ?? "—"}
                     </Text>
                   ) : null}
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 0.65 }}>
                     <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
                   </View>
-                  <View style={{ width: 56 }} className="flex-row justify-end">
+                  <View style={{ width: 42 }} className="flex-row justify-end">
                     <TouchableOpacity
                       onPress={() => setActionsInvoice(item)}
-                      className="p-2 bg-gray-100 rounded-lg"
+                      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="ellipsis-horizontal" size={18} color="#4B5563" />
+                      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
                     </TouchableOpacity>
                   </View>
                 </View>
