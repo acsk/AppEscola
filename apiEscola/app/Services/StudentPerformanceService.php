@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Enrollment;
 use App\Models\Student;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -26,15 +27,8 @@ class StudentPerformanceService
         if ($student->exists) {
             $student->loadMissing([
                 'desiredCourses:id,name',
-                'enrollments' => function ($query) {
-                    $query->where('status', 'active')
-                        ->with([
-                            'schoolClass:id,name',
-                            'coursePlan:id,name,course_id',
-                            'coursePlan.course:id,name',
-                        ]);
-                },
             ]);
+            $this->loadActiveEnrollments($student);
         }
 
         $rows = $this->fetchCompletedAttempts((int) $student->id, $subjectId);
@@ -54,6 +48,117 @@ class StudentPerformanceService
         ];
     }
 
+    public function loadActiveEnrollments(Student $student): void
+    {
+        if (! $student->exists) {
+            return;
+        }
+
+        $student->loadMissing([
+            'enrollments' => function ($query) {
+                $query->where('status', 'active')
+                    ->with([
+                        'schoolClass:id,name,course_id',
+                        'schoolClass.course:id,name',
+                        'schoolClasses:id,name,course_id',
+                        'schoolClasses.course:id,name',
+                        'coursePlan:id,name,course_id',
+                        'coursePlan.course:id,name',
+                        'bundle:id,name,billing_cycle',
+                    ]);
+            },
+        ]);
+    }
+
+    /**
+     * Matrículas ativas formatadas para mobile / painel.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function activeEnrollmentsPayload(Student $student): array
+    {
+        $this->loadActiveEnrollments($student);
+
+        return $student->enrollments
+            ->map(fn (Enrollment $enrollment) => $this->mapActiveEnrollment($enrollment))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapActiveEnrollment(Enrollment $enrollment): array
+    {
+        $isBundle = $enrollment->bundle_id !== null;
+
+        $schoolClasses = $isBundle && $enrollment->relationLoaded('schoolClasses')
+            ? $enrollment->schoolClasses
+            : collect();
+
+        if ($isBundle && $schoolClasses->isEmpty() && $enrollment->schoolClass) {
+            $schoolClasses = collect([$enrollment->schoolClass]);
+        }
+
+        $courses = [];
+        if ($isBundle) {
+            $courses = $schoolClasses
+                ->map(function ($schoolClass) {
+                    $course = $schoolClass->course;
+
+                    return $course
+                        ? ['id' => (int) $course->id, 'name' => (string) $course->name]
+                        : null;
+                })
+                ->filter()
+                ->unique('id')
+                ->values()
+                ->all();
+        } else {
+            $course = $enrollment->coursePlan?->course ?? $enrollment->schoolClass?->course;
+            if ($course) {
+                $courses = [['id' => (int) $course->id, 'name' => (string) $course->name]];
+            }
+        }
+
+        $primaryCourse = $courses[0] ?? null;
+
+        return [
+            'id' => (int) $enrollment->id,
+            'enrollment_number' => $enrollment->enrollment_number,
+            'status' => $enrollment->status,
+            'enrollment_type' => $isBundle ? 'bundle' : 'plan',
+            'school_class' => $enrollment->schoolClass
+                ? [
+                    'id' => (int) $enrollment->schoolClass->id,
+                    'name' => (string) $enrollment->schoolClass->name,
+                ]
+                : null,
+            'school_classes' => $schoolClasses
+                ->map(fn ($schoolClass) => [
+                    'id' => (int) $schoolClass->id,
+                    'name' => (string) $schoolClass->name,
+                    'course' => $schoolClass->course
+                        ? ['id' => (int) $schoolClass->course->id, 'name' => (string) $schoolClass->course->name]
+                        : null,
+                ])
+                ->values()
+                ->all(),
+            'courses' => $courses,
+            'course' => $primaryCourse,
+            'course_plan' => $enrollment->coursePlan
+                ? ['id' => (int) $enrollment->coursePlan->id, 'name' => (string) $enrollment->coursePlan->name]
+                : null,
+            'bundle' => $isBundle && $enrollment->bundle
+                ? [
+                    'id' => (int) $enrollment->bundle->id,
+                    'name' => (string) $enrollment->bundle->name,
+                    'cycle_label' => $enrollment->bundle->cycleLabel(),
+                ]
+                : null,
+        ];
+    }
+
     /**
      * Dados do aluno para o cabeçalho da tela de aproveitamento (painel / mobile).
      *
@@ -61,30 +166,11 @@ class StudentPerformanceService
      */
     private function studentSummary(Student $student): array
     {
-        $enrollments = $student->relationLoaded('enrollments')
-            ? $student->enrollments
-            : collect();
-
         $desiredCourses = $student->relationLoaded('desiredCourses')
             ? $student->desiredCourses
             : collect();
 
-        $activeEnrollments = $enrollments
-            ->map(fn ($enrollment) => [
-                'id' => $enrollment->id,
-                'status' => $enrollment->status,
-                'school_class' => $enrollment->schoolClass
-                    ? ['id' => $enrollment->schoolClass->id, 'name' => $enrollment->schoolClass->name]
-                    : null,
-                'course' => $enrollment->coursePlan?->course
-                    ? ['id' => $enrollment->coursePlan->course->id, 'name' => $enrollment->coursePlan->course->name]
-                    : null,
-                'course_plan' => $enrollment->coursePlan
-                    ? ['id' => $enrollment->coursePlan->id, 'name' => $enrollment->coursePlan->name]
-                    : null,
-            ])
-            ->values()
-            ->all();
+        $activeEnrollments = $this->activeEnrollmentsPayload($student);
 
         return [
             'id' => (int) $student->id,

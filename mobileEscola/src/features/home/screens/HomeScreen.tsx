@@ -26,6 +26,8 @@ import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 import { useUnreadNotificationsCount } from '../../notifications/hooks';
 import { WeeklyCalendarWidget } from '../../calendar/components/WeeklyCalendarWidget';
+import { StudentEnrollmentContextCard } from '../../../components/student/StudentEnrollmentContextCard';
+import type { StudentActiveEnrollment } from '../../../types/student-enrollment';
 
 function getInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
@@ -53,6 +55,7 @@ interface AlunoDashboardMetrics {
   current_streak_days: number;
   period: DashboardPeriod;
   summary: AlunoDashboardSummary;
+  active_enrollments?: StudentActiveEnrollment[];
 }
 
 interface DashboardEnvelope {
@@ -409,6 +412,12 @@ export function HomeScreen() {
       </View>
 
       {user?.role === 'aluno' && <WeeklyCalendarWidget />}
+
+      {user?.role === 'aluno' && dashboard?.active_enrollments?.length ? (
+        <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+          <StudentEnrollmentContextCard enrollments={dashboard.active_enrollments} compact />
+        </View>
+      ) : null}
 
       {/* ── Resumo de desempenho ───────────────────────────────────────── */}
       {user?.role === 'aluno' && (

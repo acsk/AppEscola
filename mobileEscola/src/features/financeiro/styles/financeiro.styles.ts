@@ -37,6 +37,10 @@ export function createFinanceiroStyles(colors: ThemeColors) {
     backgroundColor: '#F7F2FF',
     opacity: 0.98,
   },
+  enrollmentCardWrap: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
   headerTituloRow: {
     flexDirection: 'row',
     alignItems: 'center',

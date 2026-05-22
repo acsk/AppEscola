@@ -19,6 +19,7 @@ import {
 } from '../../../services/performance.service';
 import { subjectIconName } from '../../../services/simulados.service';
 import { MenuButton } from '../../../components/navigation/MenuButton';
+import { StudentEnrollmentContextCard } from '../../../components/student/StudentEnrollmentContextCard';
 import { platformShadow } from '../../../lib/shadow';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
@@ -216,6 +217,10 @@ export function PerformanceScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
+        {data?.student?.active_enrollments?.length ? (
+          <StudentEnrollmentContextCard enrollments={data.student.active_enrollments} />
+        ) : null}
+
         <View style={styles.periodRow}>
           {MONTH_OPTIONS.map((option) => (
             <TouchableOpacity

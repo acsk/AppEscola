@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { CobrancasResponse } from '../../../services/financeiro.service';
@@ -6,6 +6,9 @@ import { useThemeColors } from '../../../context/TenantThemeContext';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { formatarMoeda, formatarReferenciaMes } from '../utils/formatters';
 import { useFinanceiroStyles } from '../FinanceiroStylesContext';
+import { StudentEnrollmentContextCard } from '../../../components/student/StudentEnrollmentContextCard';
+import { fetchStudentPerformance } from '../../../services/performance.service';
+import type { StudentActiveEnrollment } from '../../../types/student-enrollment';
 
 interface HeaderFinanceiroProps {
   topInset: number;
@@ -17,6 +20,27 @@ export function HeaderFinanceiro({ topInset, resumo, referencia }: HeaderFinance
   const colors = useThemeColors();
   const styles = useFinanceiroStyles();
   const periodoAtual = referencia ? formatarReferenciaMes(referencia) : null;
+  const [activeEnrollments, setActiveEnrollments] = useState<StudentActiveEnrollment[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    fetchStudentPerformance(6)
+      .then((result) => {
+        if (active) {
+          setActiveEnrollments(result.student?.active_enrollments ?? []);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setActiveEnrollments([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <View style={[styles.headerWrap, { paddingTop: topInset }]}>
@@ -73,6 +97,11 @@ export function HeaderFinanceiro({ topInset, resumo, referencia }: HeaderFinance
             </Text>
             <Text style={styles.resumoItemQtd}>{resumo.quantidade_pagas} cobranças</Text>
           </View>
+        </View>
+      ) : null}
+      {activeEnrollments.length > 0 ? (
+        <View style={styles.enrollmentCardWrap}>
+          <StudentEnrollmentContextCard enrollments={activeEnrollments} compact />
         </View>
       ) : null}
     </View>

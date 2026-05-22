@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { StudentActiveEnrollment } from '../types/student-enrollment';
 
 export interface PerformanceSubject {
   id: number | null;
@@ -57,13 +58,7 @@ export interface PerformanceStudent {
   status: string;
   is_minor: boolean;
   desired_courses: Array<{ id: number; name: string }>;
-  active_enrollments: Array<{
-    id: number;
-    status: string;
-    school_class: { id: number; name: string } | null;
-    course: { id: number; name: string } | null;
-    course_plan: { id: number; name: string } | null;
-  }>;
+  active_enrollments: StudentActiveEnrollment[];
 }
 
 export interface StudentPerformance {

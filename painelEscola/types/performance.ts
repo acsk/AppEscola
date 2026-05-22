@@ -46,10 +46,19 @@ export type PerformanceOverview = {
 
 export type PerformanceStudentEnrollment = {
   id: number;
+  enrollment_number?: string | null;
   status: string;
+  enrollment_type?: 'plan' | 'bundle';
   school_class: { id: number; name: string } | null;
+  school_classes?: Array<{
+    id: number;
+    name: string;
+    course: { id: number; name: string } | null;
+  }>;
+  courses?: Array<{ id: number; name: string }>;
   course: { id: number; name: string } | null;
   course_plan: { id: number; name: string } | null;
+  bundle?: { id: number; name: string; cycle_label: string } | null;
 };
 
 export type PerformanceStudent = {

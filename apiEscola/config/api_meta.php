@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => env('API_VERSION', '1.0.34'),
+    'version' => env('API_VERSION', '1.0.35'),
     'contract_version' => env('API_CONTRACT_VERSION', '2026-05-21'),
     'has_breaking_changes' => (bool) env('API_HAS_BREAKING_CHANGES', false),
     'force_relogin' => (bool) env('API_FORCE_RELOGIN', false),

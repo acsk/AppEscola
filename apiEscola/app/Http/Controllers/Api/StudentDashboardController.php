@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ExamAttempt;
 use App\Models\Student;
+use App\Services\StudentPerformanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class StudentDashboardController extends Controller
 {
+    public function __construct(
+        private readonly StudentPerformanceService $performanceService,
+    ) {
+    }
     /**
      * Retorna as métricas de desempenho do aluno autenticado.
      *
@@ -85,6 +90,7 @@ class StudentDashboardController extends Controller
                 'wrong'           => $summaryAnswers['wrong'],
                 'accuracy_change' => $accuracyChange,
             ],
+            'active_enrollments'  => $this->performanceService->activeEnrollmentsPayload($student),
         ]);
     }
 
