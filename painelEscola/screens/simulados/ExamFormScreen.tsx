@@ -156,11 +156,22 @@ function validateQuestion(form: ExamQuestionForm): Record<string, string> {
   return errs;
 }
 
+function resolveExamId(data: unknown): number | null {
+  const root = data as Record<string, unknown> | null | undefined;
+  if (!root) return null;
+  const body = (root.body ?? root.data ?? root) as Record<string, unknown>;
+  const id = body.id;
+  return typeof id === "number" ? id : null;
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps) {
   const { contentPadding } = useResponsiveLayout();
-  const isEdit = examId !== null;
+  const [savedExamId, setSavedExamId] = useState<number | null>(null);
+  const [postCreatePrompt, setPostCreatePrompt] = useState(false);
+  const effectiveExamId = examId ?? savedExamId;
+  const canManageContent = effectiveExamId != null;
   const scrollRef = useRef<ScrollView>(null);
   const questionImageInputRef = useRef<HTMLInputElement | null>(null);
   const supportMaterialFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -180,7 +191,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   ];
 
   // Exam form state
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(examId !== null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ExamForm>(EMPTY_EXAM);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -273,7 +284,8 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   }, []);
 
   useEffect(() => {
-    if (!isEdit) return;
+    if (!examId) return;
+    if (savedExamId === examId) return;
     (async () => {
       setLoading(true);
       try {
@@ -300,30 +312,30 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       } catch {}
       setLoading(false);
     })();
-  }, [examId]);
+  }, [examId, savedExamId]);
 
   const fetchQuestions = useCallback(async () => {
-    if (!isEdit || !examId) return;
+    if (!effectiveExamId) return;
     setLoadingQuestions(true);
     try {
-      const { data } = await api.get(`/exams/${examId}`);
+      const { data } = await api.get(`/exams/${effectiveExamId}`);
       setQuestions((data.body ?? data).questions ?? []);
     } catch {}
     setLoadingQuestions(false);
-  }, [examId, isEdit]);
+  }, [effectiveExamId]);
 
   const fetchSupportMaterials = useCallback(async () => {
-    if (!isEdit || !examId) return;
+    if (!effectiveExamId) return;
     setLoadingSupportMaterials(true);
     try {
-      const { data } = await api.get(`/exams/${examId}/support-materials`);
+      const { data } = await api.get(`/exams/${effectiveExamId}/support-materials`);
       const rows = data?.body ?? data?.data ?? data;
       setSupportMaterials(Array.isArray(rows) ? rows : Array.isArray(rows?.data) ? rows.data : []);
     } catch {
       setSupportMaterials([]);
     }
     setLoadingSupportMaterials(false);
-  }, [examId, isEdit]);
+  }, [effectiveExamId]);
 
   // ── Exam Save ────────────────────────────────────────────────────────────────
 
@@ -363,8 +375,8 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             : null,
       };
 
-      if (isEdit) {
-        const { data } = await api.put(`/exams/${examId}`, payload);
+      if (canManageContent && effectiveExamId) {
+        const { data } = await api.put(`/exams/${effectiveExamId}`, payload);
         const response = data?.body ?? data?.data ?? data;
         setToast({
           visible: true,
@@ -373,11 +385,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         });
       } else {
         const { data } = await api.post("/exams", payload);
-        const response = data?.body ?? data?.data ?? data;
+        const newId = resolveExamId(data);
+        if (!newId) {
+          throw new Error("Resposta da API sem identificador do simulado.");
+        }
+        setSavedExamId(newId);
+        navigate("simulados-form", { examId: newId });
+        setPostCreatePrompt(true);
         setToast({
           visible: true,
           type: "success",
-          message: data?.message || response?.message || "Operação realizada com sucesso.",
+          message: data?.message || "Formulário criado com sucesso.",
         });
       }
       setErrors({});
@@ -433,13 +451,13 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     setQForm((prev) => ({ ...prev, [k]: v }));
 
   const uploadQuestionImage = async (file: File) => {
-    if (!examId) return;
+    if (!effectiveExamId) return;
     setUploadingQuestionImage(true);
     try {
       const compressed = await prepareImageForUpload(file, 100);
       const formData = new FormData();
       formData.append("image", compressed);
-      const { data } = await api.post(`/exams/${examId}/questions/upload-image`, formData, {
+      const { data } = await api.post(`/exams/${effectiveExamId}/questions/upload-image`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       const response = data.body ?? data.data ?? data;
@@ -516,7 +534,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   };
 
   const saveQuestion = async () => {
-    if (!examId) return;
+    if (!effectiveExamId) return;
     const errs = validateQuestion(qForm);
     setQErrors(errs);
     if (Object.keys(errs).length > 0) return;
@@ -545,14 +563,14 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       }
 
       if (editQuestionId) {
-        const { data } = await api.put(`/exams/${examId}/questions/${editQuestionId}`, payload);
+        const { data } = await api.put(`/exams/${effectiveExamId}/questions/${editQuestionId}`, payload);
         setToast({
           visible: true,
           type: "success",
           message: data?.message || "Questão atualizada com sucesso.",
         });
       } else {
-        const { data } = await api.post(`/exams/${examId}/questions`, payload);
+        const { data } = await api.post(`/exams/${effectiveExamId}/questions`, payload);
         setToast({
           visible: true,
           type: "success",
@@ -575,10 +593,10 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   };
 
   const deleteQuestion = async () => {
-    if (!deleteQuestionId || !examId) return;
+    if (!deleteQuestionId || !effectiveExamId) return;
     setDeletingQuestion(true);
     try {
-      await api.delete(`/exams/${examId}/questions/${deleteQuestionId}`);
+      await api.delete(`/exams/${effectiveExamId}/questions/${deleteQuestionId}`);
       setDeleteQuestionId(null);
       fetchQuestions();
     } catch {}
@@ -611,7 +629,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   };
 
   const saveSupportMaterial = async () => {
-    if (!examId) return;
+    if (!effectiveExamId) return;
 
     const errs: Record<string, string> = {};
     if (!supportMaterialForm.title.trim()) errs.title = "Título é obrigatório.";
@@ -640,7 +658,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         }
         formData.append("file", supportMaterialFile as File);
         const { data } = await api.post(
-          `/exams/${examId}/support-materials/upload`,
+          `/exams/${effectiveExamId}/support-materials/upload`,
           formData
         );
         setToast({
@@ -663,7 +681,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
         if (editSupportMaterialId) {
           const { data } = await api.put(
-            `/exams/${examId}/support-materials/${editSupportMaterialId}`,
+            `/exams/${effectiveExamId}/support-materials/${editSupportMaterialId}`,
             payload
           );
           setToast({
@@ -672,7 +690,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             message: data?.message || "Material de apoio atualizado com sucesso.",
           });
         } else {
-          const { data } = await api.post(`/exams/${examId}/support-materials`, payload);
+          const { data } = await api.post(`/exams/${effectiveExamId}/support-materials`, payload);
           setToast({
             visible: true,
             type: "success",
@@ -700,11 +718,11 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   };
 
   const deleteSupportMaterial = async () => {
-    if (!examId || !deleteSupportMaterialId) return;
+    if (!effectiveExamId || !deleteSupportMaterialId) return;
     setDeletingSupportMaterial(true);
     try {
       const { data } = await api.delete(
-        `/exams/${examId}/support-materials/${deleteSupportMaterialId}`
+        `/exams/${effectiveExamId}/support-materials/${deleteSupportMaterialId}`
       );
       setToast({
         visible: true,
@@ -724,8 +742,16 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     }
   };
 
+  const prevExamIdRef = useRef<number | null>(examId);
   useEffect(() => {
-    setActiveStep(1);
+    if (
+      examId != null &&
+      prevExamIdRef.current != null &&
+      examId !== prevExamIdRef.current
+    ) {
+      setActiveStep(1);
+    }
+    prevExamIdRef.current = examId;
   }, [examId]);
 
   useEffect(() => {
@@ -735,8 +761,24 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   }, [questions, ensureQuestionImageRatio]);
 
   useEffect(() => {
-    fetchSupportMaterials();
-  }, [fetchSupportMaterials]);
+    if (canManageContent) fetchSupportMaterials();
+  }, [canManageContent, fetchSupportMaterials]);
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const handlePostCreateContinue = () => {
+    setPostCreatePrompt(false);
+    setActiveStep(2);
+    fetchQuestions();
+    scrollToTop();
+  };
+
+  const handlePostCreateLater = () => {
+    setPostCreatePrompt(false);
+    navigate("simulados");
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -770,7 +812,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const stepItems = isEdit
+  const stepItems = canManageContent
     ? [
         { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
         { id: 2 as const, title: "Questões", description: "Cadastro, edição e organização das questões" },
@@ -800,14 +842,16 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           </TouchableOpacity>
           <View>
             <Text className="text-2xl font-bold text-gray-800">
-              {isEdit ? "Editar Simulado" : "Novo Simulado"}
+              {canManageContent ? "Editar Simulado" : "Novo Simulado"}
             </Text>
             <Text className="text-sm text-gray-500">
-              {isEdit ? "Atualize as informações e questões do simulado" : "Preencha os dados para criar o simulado"}
+              {canManageContent
+                ? "Atualize as informações, questões e materiais do simulado"
+                : "Informe o título e, se quiser, os demais dados do formulário"}
             </Text>
           </View>
         </View>
-        {isEdit && (
+        {canManageContent && (
           <Badge
             label={examStatuses.find((s) => s.slug === form.status)?.label ?? form.status}
             slug={form.status}
@@ -815,7 +859,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         )}
       </View>
 
-      {isEdit && (
+      {canManageContent && (
         <View className="flex-row gap-3 mb-6">
           {stepItems.map((step) => {
             const active = activeStep === step.id;
@@ -851,7 +895,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       )}
 
       {/* Formulário principal */}
-      {(activeStep === 1 || !isEdit) && (
+      {(activeStep === 1 || !canManageContent) && (
         <View
           className="bg-white rounded-2xl p-6 mb-6"
           style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
@@ -1045,15 +1089,19 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <ActivityIndicator size="small" color="white" />
             ) : (
               <Text className="text-sm font-semibold text-white">
-                {isEdit ? "Salvar Alterações" : "Criar Simulado"}
+                {canManageContent ? "Salvar Alterações" : "Criar Formulário"}
               </Text>
             )}
           </TouchableOpacity>
         </View>
-        {isEdit && (
+        {canManageContent && activeStep === 1 && (
           <View className="flex-row justify-end mt-4">
             <TouchableOpacity
-              onPress={() => setActiveStep(2)}
+              onPress={() => {
+                setActiveStep(2);
+                fetchQuestions();
+                scrollToTop();
+              }}
               className="px-4 py-2.5 rounded-xl bg-violet-600"
               activeOpacity={0.85}
             >
@@ -1065,7 +1113,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       )}
 
       {/* Seção de Questões – só exibe quando o simulado já existe */}
-      {isEdit && activeStep === 2 && (
+      {canManageContent && activeStep === 2 && (
         <View
           className="bg-white rounded-2xl overflow-hidden"
           style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
@@ -1195,7 +1243,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         </View>
       )}
 
-      {isEdit && activeStep === 3 && (
+      {canManageContent && activeStep === 3 && (
         <View
           className="bg-white rounded-2xl overflow-hidden mb-6"
           style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
@@ -1315,7 +1363,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         </View>
       )}
 
-      {isEdit && activeStep === 4 && (
+      {canManageContent && activeStep === 4 && (
         <View
           className="bg-white rounded-2xl overflow-hidden"
           style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
@@ -1844,6 +1892,18 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           </View>
         )}
       </Modal>
+
+      <ConfirmModal
+        visible={postCreatePrompt}
+        title="Formulário criado"
+        message="Deseja cadastrar questões e materiais de apoio (links/anexos) agora?"
+        confirmLabel="Sim, cadastrar agora"
+        cancelLabel="Depois"
+        iconName="help-circle-outline"
+        tone="primary"
+        onConfirm={handlePostCreateContinue}
+        onCancel={handlePostCreateLater}
+      />
 
       {/* Confirm delete question */}
       <ConfirmModal
