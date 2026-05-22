@@ -53,6 +53,18 @@ class EnrollmentSubscribeTest extends TestCase
             ->assertJsonValidationErrors(['guardian_id']);
     }
 
+    public function test_subscribe_without_enrollment_payment_payload(): void
+    {
+        [$user, $payload] = $this->seedSubscribeContext();
+
+        Sanctum::actingAs($user);
+
+        unset($payload['enrollment_payment']);
+
+        $this->postJson('/api/enrollments/subscribe', $payload)
+            ->assertCreated();
+    }
+
     public function test_subscribe_rejects_plan_from_another_course(): void
     {
         [$user, $payload, $context] = $this->seedSubscribeContext(returnContext: true);

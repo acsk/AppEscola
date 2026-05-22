@@ -406,6 +406,18 @@ class EnrollmentController extends Controller
     }
 
     /**
+     * Garante array mesmo quando o cliente envia enrollment_payment ausente ou null.
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizeEnrollmentPaymentData(Request $request): array
+    {
+        $paymentData = $request->input('enrollment_payment', []);
+
+        return is_array($paymentData) ? $paymentData : [];
+    }
+
+    /**
      * @param  array<string, mixed>  $paymentData
      */
     private function createEnrollmentInvoice(
@@ -828,7 +840,7 @@ class EnrollmentController extends Controller
             $netAmount = $enrollment->netMonthlyAmount();
             $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
 
-            $paymentData = $request->input('enrollment_payment', []);
+            $paymentData = $this->normalizeEnrollmentPaymentData($request);
 
             // Taxa de matrícula — só cria se a escola cobra e o plano tem valor cadastrado
             if (! empty($billing['charges_enrollment_fee']) && $enrollmentFeeAmount !== null) {
@@ -1188,7 +1200,9 @@ class EnrollmentController extends Controller
         // Equivalente mensal do pacote dividido pelo número de cursos
         $courseCount    = $bundle->courses->count();
         $monthlyAmount  = round($bundle->monthlyEquivalent() / max($courseCount, 1), 2);
-        $paymentData    = $data['enrollment_payment'] ?? [];
+        $paymentData = is_array($data['enrollment_payment'] ?? null)
+            ? $data['enrollment_payment']
+            : [];
         $isPaid         = ! empty($paymentData['payment_method']);
 
         // Taxa de matrícula = monthly_equivalent do pacote inteiro (menos desconto)

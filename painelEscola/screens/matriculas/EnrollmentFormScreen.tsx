@@ -448,7 +448,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         };
         if (startDate) payload.start_date = displayToISO(startDate) ?? startDate;
         if (endDate) payload.end_date = displayToISO(endDate) ?? endDate;
-        if (enrollmentPayment) payload.enrollment_payment = enrollmentPayment;
+        payload.enrollment_payment = enrollmentPayment ?? {};
 
         const { data } = await api.post("/enrollments/subscribe", payload);
         setResult({
@@ -469,7 +469,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         };
         if (startDate) payload.start_date = displayToISO(startDate) ?? startDate;
         if (endDate) payload.end_date = displayToISO(endDate) ?? endDate;
-        if (enrollmentPayment) payload.enrollment_payment = enrollmentPayment;
+        payload.enrollment_payment = enrollmentPayment ?? {};
 
         const { data } = await api.post("/enrollments/subscribe-bundle", payload);
         setResult({
