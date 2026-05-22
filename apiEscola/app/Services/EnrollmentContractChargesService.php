@@ -19,6 +19,7 @@ class EnrollmentContractChargesService
         private readonly CoraEnrollmentInvoiceSyncService $coraSync,
         private readonly InvoiceLifecycleService $invoiceLifecycle,
         private readonly ContractChargesPreviewDebugService $previewDebug,
+        private readonly EnrollmentInvoiceDescriptionService $invoiceDescriptions,
     ) {
     }
 
@@ -354,7 +355,11 @@ class EnrollmentContractChargesService
                 'type' => 'enrollment_fee',
                 'due_date' => $dueDate,
                 'amount' => number_format($feeAmount, 2, '.', ''),
-                'description' => 'Taxa de Matrícula — ' . $courseName,
+                'description' => $this->invoiceDescriptions->forEnrollmentCharge(
+                    $enrollment,
+                    'enrollment_fee',
+                    $dueDate
+                ),
                 'already_exists' => $exists,
                 'disabled' => $batchBlocked || $exists,
                 'selected_by_default' => ! $exists && ! $batchBlocked,
@@ -382,7 +387,11 @@ class EnrollmentContractChargesService
                     'type' => 'monthly',
                     'due_date' => $dueDate,
                     'amount' => number_format($netAmount, 2, '.', ''),
-                    'description' => 'Mensalidade ' . $cursor->format('m/Y') . ' — ' . $courseName,
+                    'description' => $this->invoiceDescriptions->forEnrollmentCharge(
+                        $enrollment,
+                        'monthly',
+                        $dueDate
+                    ),
                     'already_exists' => $exists,
                     'disabled' => $batchBlocked || $exists,
                     'selected_by_default' => ! $exists && ! $batchBlocked,
@@ -475,10 +484,18 @@ class EnrollmentContractChargesService
                     if ($feeAmount === null) {
                         throw new RuntimeException('Este plano não possui taxa de matrícula cadastrada.');
                     }
-                    $defaults['description'] = 'Taxa de Matrícula — ' . $courseName;
+                    $defaults['description'] = $this->invoiceDescriptions->forEnrollmentCharge(
+                        $enrollment,
+                        'enrollment_fee',
+                        $dueDate
+                    );
                     $defaults['amount'] = $feeAmount;
                 } else {
-                    $defaults['description'] = 'Mensalidade ' . Carbon::parse($dueDate)->format('m/Y') . ' — ' . $courseName;
+                    $defaults['description'] = $this->invoiceDescriptions->forEnrollmentCharge(
+                        $enrollment,
+                        'monthly',
+                        $dueDate
+                    );
                     $defaults['amount'] = $netAmount;
                 }
 

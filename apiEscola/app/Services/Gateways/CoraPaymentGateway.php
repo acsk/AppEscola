@@ -5,6 +5,7 @@ namespace App\Services\Gateways;
 use App\Contracts\PaymentGatewayContract;
 use App\Models\Invoice;
 use App\Models\TenantCoraCredential;
+use App\Services\EnrollmentInvoiceDescriptionService;
 use App\Models\Tenant;
 use App\Services\CoraTokenService;
 use Illuminate\Http\Client\ConnectionException;
@@ -571,7 +572,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
     ): array {
         $identity = $payerDocument !== '' ? $payerDocument : '';
         $docType = strlen($identity) > 11 ? 'CNPJ' : 'CPF';
-        $description = trim((string) $invoice->description) !== '' ? (string) $invoice->description : 'Cobrança escolar';
+        $description = app(EnrollmentInvoiceDescriptionService::class)->forInvoice($invoice);
         $providerDueDate = $this->resolveProviderDueDate($invoice);
 
         // Define payment_forms baseado no método solicitado

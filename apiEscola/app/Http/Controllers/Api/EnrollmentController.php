@@ -12,12 +12,15 @@ use App\Http\Resources\EnrollmentResource;
 use App\Models\CoursePlan;
 use App\Models\CourseBundle;
 use App\Models\Enrollment;
+use App\Models\Guardian;
 use App\Models\Invoice;
 use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\EnrollmentContractChargesService;
 use App\Services\EnrollmentFinancialLockService;
 use App\Services\EnrollmentInvoiceAmountSyncService;
+use App\Services\EnrollmentInvoiceDescriptionService;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceSettlementService;
 use App\Services\TenantBillingSettingsService;
@@ -30,6 +33,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -43,6 +47,7 @@ class EnrollmentController extends Controller
         private readonly EnrollmentContractChargesService $contractCharges,
         private readonly EnrollmentInvoiceAmountSyncService $invoiceAmountSync,
         private readonly EnrollmentFinancialLockService $financialLock,
+        private readonly EnrollmentInvoiceDescriptionService $invoiceDescriptions,
     ) {
     }
 
@@ -274,7 +279,11 @@ class EnrollmentController extends Controller
                     [
                         'student_id' => $enrollment->student_id,
                         'guardian_id' => $guardianId,
-                        'description' => 'Taxa de Matrícula — ' . $enrollment->coursePlan?->course?->name,
+                        'description' => $this->invoiceDescriptions->forEnrollmentCharge(
+                            $enrollment,
+                            'enrollment_fee',
+                            $startDate->toDateString()
+                        ),
                         'amount' => max($enrollmentFeeAmount, 0),
                         'status' => 'pending',
                     ]
@@ -317,7 +326,11 @@ class EnrollmentController extends Controller
                         [
                             'student_id' => $enrollment->student_id,
                             'guardian_id' => $guardianId,
-                            'description' => 'Mensalidade ' . $cursor->format('m/Y') . ' — ' . $enrollment->coursePlan?->course?->name,
+                            'description' => $this->invoiceDescriptions->forEnrollmentCharge(
+                                $enrollment,
+                                'monthly',
+                                $cursor->toDateString()
+                            ),
                             'amount' => $netAmount,
                             'status' => 'pending',
                         ]
@@ -376,8 +389,14 @@ class EnrollmentController extends Controller
         return $net > 0 ? $net : null;
     }
 
+    private function normalizePaymentDueDay(int $dueDay): int
+    {
+        return max(1, min(28, $dueDay));
+    }
+
     private function firstMonthlyDueDate(Carbon $startDate, int $dueDay): Carbon
     {
+        $dueDay = $this->normalizePaymentDueDay($dueDay);
         $cursor = $startDate->copy()->day($dueDay);
         if ($cursor->lt($startDate)) {
             $cursor->addMonth();
@@ -760,6 +779,9 @@ class EnrollmentController extends Controller
         $schoolClass = SchoolClass::findOrFail($request->school_class_id);
         $this->authorizeTenant($request, $plan->tenant_id);
 
+        $effectiveTenantId = (int) ($tenantId ?? $plan->tenant_id);
+        $this->assertSubscribeEntities($request, $plan, $schoolClass, $effectiveTenantId);
+
         // Prioridade de datas:
         // start_date: request > hoje (data da matrícula — não o início da turma)
         // end_date:   request > turma > ciclo do plano
@@ -770,17 +792,24 @@ class EnrollmentController extends Controller
                 ? Carbon::parse($schoolClass->end_date)
                 : $startDate->copy()->addMonths($plan->monthsInCycle())->subDay());
 
-        $effectiveTenantId = $tenantId ?? $plan->tenant_id;
+        if ($endDate->lt($startDate)) {
+            $endDate = $startDate->copy()->addMonths($plan->monthsInCycle())->subDay();
+        }
 
-        // Resolve pagador e valida CPF obrigatório
-        $payer      = $this->resolveInvoicePayer($request->student_id, $effectiveTenantId);
-        $guardianId = $payer['guardian_id'];
+        try {
+            $guardianId = $this->resolveFinancialGuardianForSubscribe($request, $effectiveTenantId);
+        } catch (ValidationException $e) {
+            return $this->validationError($e->errors(), 'Não foi possível concluir a matrícula.');
+        }
 
-        $enrollment = DB::transaction(function () use ($request, $plan, $tenantId, $guardianId, $startDate, $endDate) {
-            $effectiveTenantId = $tenantId ?? $plan->tenant_id;
+        try {
+            $enrollment = DB::transaction(function () use ($request, $plan, $tenantId, $guardianId, $startDate, $endDate) {
+            $effectiveTenantId = (int) ($tenantId ?? $plan->tenant_id);
             $billing = $this->billingScope($effectiveTenantId);
 
-            $dueDay = $request->payment_due_day ?? (int) ($billing['default_payment_due_day'] ?? 10);
+            $dueDay = $this->normalizePaymentDueDay(
+                (int) ($request->payment_due_day ?? $billing['default_payment_due_day'] ?? 10)
+            );
 
             $enrollment = Enrollment::create([
                 'tenant_id'         => $effectiveTenantId,
@@ -809,7 +838,11 @@ class EnrollmentController extends Controller
                     studentId: $request->student_id,
                     guardianId: $guardianId,
                     type: 'enrollment_fee',
-                    description: 'Taxa de Matrícula — ' . $plan->course->name,
+                    description: $this->invoiceDescriptions->forEnrollmentCharge(
+                        $enrollment,
+                        'enrollment_fee',
+                        $startDate->toDateString()
+                    ),
                     amount: $enrollmentFeeAmount,
                     dueDate: $startDate->toDateString(),
                     paymentData: $paymentData,
@@ -828,7 +861,11 @@ class EnrollmentController extends Controller
                         studentId: $request->student_id,
                         guardianId: $guardianId,
                         type: 'monthly',
-                        description: 'Mensalidade ' . $firstDue->format('m/Y') . ' — ' . $plan->course->name,
+                        description: $this->invoiceDescriptions->forEnrollmentCharge(
+                            $enrollment,
+                            'monthly',
+                            $firstDue->toDateString()
+                        ),
                         amount: $netMonthly,
                         dueDate: $firstDue->toDateString(),
                         paymentData: $paymentData,
@@ -837,7 +874,19 @@ class EnrollmentController extends Controller
             }
 
             return $enrollment;
-        });
+            });
+        } catch (QueryException $e) {
+            Log::error('Enrollment subscribe database error', [
+                'tenant_id' => $effectiveTenantId,
+                'student_id' => $request->student_id,
+                'school_class_id' => $request->school_class_id,
+                'course_plan_id' => $request->course_plan_id,
+                'guardian_id' => $request->guardian_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($this->friendlySubscribeDatabaseMessage($e), null, 422);
+        }
 
         $enrollment->load(['student', 'schoolClass.course', 'coursePlan.course', 'invoices']);
 
@@ -845,6 +894,116 @@ class EnrollmentController extends Controller
             (new EnrollmentResource($enrollment))->resolve($request),
             ['financial_guardian_id' => $guardianId]
         ), 201);
+    }
+
+    private function assertSubscribeEntities(
+        SubscribeEnrollmentRequest $request,
+        CoursePlan $plan,
+        SchoolClass $schoolClass,
+        int $effectiveTenantId,
+    ): void {
+        $student = Student::query()->find($request->student_id);
+
+        if (! $student || (int) $student->tenant_id !== $effectiveTenantId) {
+            throw ValidationException::withMessages([
+                'student_id' => ['Aluno não pertence a esta escola.'],
+            ]);
+        }
+
+        if ((int) $schoolClass->tenant_id !== $effectiveTenantId) {
+            throw ValidationException::withMessages([
+                'school_class_id' => ['Turma não pertence a esta escola.'],
+            ]);
+        }
+
+        if ((int) $plan->tenant_id !== $effectiveTenantId) {
+            throw ValidationException::withMessages([
+                'course_plan_id' => ['Plano não pertence a esta escola.'],
+            ]);
+        }
+
+        if ((int) $plan->course_id !== (int) $schoolClass->course_id) {
+            throw ValidationException::withMessages([
+                'course_plan_id' => ['O plano selecionado não corresponde ao curso da turma.'],
+            ]);
+        }
+    }
+
+    private function resolveFinancialGuardianForSubscribe(
+        SubscribeEnrollmentRequest $request,
+        int $tenantId,
+    ): ?int {
+        if ($request->filled('guardian_id')) {
+            return $this->resolveRequestedGuardianId(
+                (int) $request->student_id,
+                (int) $request->guardian_id,
+                $tenantId
+            );
+        }
+
+        return $this->resolveInvoicePayer((int) $request->student_id, $tenantId)['guardian_id'];
+    }
+
+    private function resolveRequestedGuardianId(int $studentId, int $guardianId, int $tenantId): int
+    {
+        $enrollmentSettings = $this->enrollmentScope($tenantId);
+        $requireCpf = ! array_key_exists('require_cpf_to_enroll', $enrollmentSettings)
+            ? true
+            : (bool) $enrollmentSettings['require_cpf_to_enroll'];
+
+        $guardian = Guardian::query()
+            ->where('id', $guardianId)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        if (! $guardian) {
+            throw ValidationException::withMessages([
+                'guardian_id' => ['Responsável não encontrado nesta escola.'],
+            ]);
+        }
+
+        $isLinked = Student::query()
+            ->where('id', $studentId)
+            ->where('tenant_id', $tenantId)
+            ->whereHas('guardians', fn ($query) => $query->where('guardians.id', $guardianId))
+            ->exists();
+
+        if (! $isLinked) {
+            throw ValidationException::withMessages([
+                'guardian_id' => ['Responsável não vinculado a este aluno.'],
+            ]);
+        }
+
+        if ($requireCpf && empty($guardian->document)) {
+            throw ValidationException::withMessages([
+                'guardian_id' => ['O responsável financeiro deve ter CPF cadastrado para realizar a matrícula.'],
+            ]);
+        }
+
+        return $guardian->id;
+    }
+
+    private function friendlySubscribeDatabaseMessage(QueryException $exception): string
+    {
+        $message = strtolower($exception->getMessage());
+
+        if (str_contains($message, 'domain_invoice_types')) {
+            return 'Tipo de cobrança não cadastrado no servidor. Execute as migrações/seeders de domínio (domain_invoice_types).';
+        }
+
+        if (str_contains($message, 'domain_invoice_statuses')) {
+            return 'Status de cobrança não cadastrado no servidor. Execute as migrações/seeders de domínio (domain_invoice_statuses).';
+        }
+
+        if (str_contains($message, 'domain_enrollment_statuses')) {
+            return 'Status de matrícula não cadastrado no servidor. Execute as migrações/seeders de domínio (domain_enrollment_statuses).';
+        }
+
+        if (str_contains($message, 'foreign key constraint')) {
+            return 'Não foi possível gravar a matrícula: referência de cadastro ausente ou inválida no banco de dados.';
+        }
+
+        return 'Não foi possível gravar a matrícula. Verifique os dados e tente novamente.';
     }
 
     /**
@@ -859,11 +1018,19 @@ class EnrollmentController extends Controller
      */
     private function generateEnrollmentNumber(int $tenantId): string
     {
-        $next = DB::table('enrollments')
+        $prefix = sprintf('MAT-%d-', $tenantId);
+
+        $latest = DB::table('enrollments')
             ->where('tenant_id', $tenantId)
-            ->whereRaw("enrollment_number LIKE 'MAT-{$tenantId}-%'")
+            ->where('enrollment_number', 'like', $prefix . '%')
             ->lockForUpdate()
-            ->count() + 1;
+            ->orderByDesc('id')
+            ->value('enrollment_number');
+
+        $next = 1;
+        if (is_string($latest) && preg_match('/-(\d+)$/', $latest, $matches)) {
+            $next = ((int) $matches[1]) + 1;
+        }
 
         return sprintf('MAT-%d-%05d', $tenantId, $next);
     }
@@ -1075,7 +1242,11 @@ class EnrollmentController extends Controller
                     'student_id'     => $data['student_id'],
                     'guardian_id'    => $guardianId,
                     'type'           => 'enrollment_fee',
-                    'description'    => 'Taxa de Matrícula — ' . $bundle->name,
+                    'description'    => $this->invoiceDescriptions->forEnrollmentCharge(
+                        $firstEnrollment,
+                        'enrollment_fee',
+                        $startDate->toDateString()
+                    ),
                     'amount'         => $feeAmount,
                     'due_date'       => $startDate->toDateString(),
                     'status'         => $isPaid ? 'paid' : 'pending',
@@ -1111,7 +1282,11 @@ class EnrollmentController extends Controller
                         'student_id'     => $data['student_id'],
                         'guardian_id'    => $guardianId,
                         'type'           => 'monthly',
-                        'description'    => 'Mensalidade ' . $cursor->format('m/Y') . ' — ' . $bundle->name,
+                        'description'    => $this->invoiceDescriptions->forEnrollmentCharge(
+                            $firstEnrollment,
+                            'monthly',
+                            $cursor->toDateString()
+                        ),
                         'amount'         => $netMonthly,
                         'due_date'       => $cursor->toDateString(),
                         'status'         => 'pending',
