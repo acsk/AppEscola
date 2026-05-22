@@ -431,7 +431,9 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     setQErrors({});
   };
 
-  const openNewQuestion = () => {
+  const openNewQuestion = (event?: any) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
     setEditQuestionId(null);
     setQForm({ ...EMPTY_QUESTION, options: EMPTY_QUESTION.options.map((o) => ({ ...o })) });
     setQErrors({});
@@ -1288,6 +1290,16 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               activeOpacity={0.85}
             >
               <Text className="text-sm font-semibold text-violet-700">Materiais de apoio</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={openNewQuestion}
+              className={`px-4 py-2.5 rounded-xl bg-violet-600 flex-row items-center justify-center ${
+                isMobile ? "w-full" : ""
+              }`}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={16} color="white" />
+              <Text className="text-sm font-semibold text-white ml-1">Nova Questão</Text>
             </TouchableOpacity>
           </View>
         </View>
