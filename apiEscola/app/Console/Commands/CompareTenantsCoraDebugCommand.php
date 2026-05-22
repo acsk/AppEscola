@@ -288,7 +288,7 @@ class CompareTenantsCoraDebugCommand extends Command
                 $q->where('is_minor', true);
             })
             ->whereDoesntHave('student.guardians', function ($q) {
-                $q->wherePivot('is_financial_responsible', true);
+                $q->where('student_guardians.is_financial_responsible', true);
             })
             ->count();
 
