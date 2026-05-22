@@ -7,6 +7,7 @@ use App\Models\Student;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class CalendarEventVisibilityService
 {
@@ -21,7 +22,7 @@ class CalendarEventVisibilityService
     {
         $today = now()->toDateString();
 
-        return \Illuminate\Support\Facades\DB::table('enrollments')
+        $fromEnrollment = DB::table('enrollments')
             ->where('student_id', $student->id)
             ->where('status', 'active')
             ->where('start_date', '<=', $today)
@@ -30,7 +31,22 @@ class CalendarEventVisibilityService
             })
             ->whereNull('deleted_at')
             ->whereNotNull('school_class_id')
-            ->pluck('school_class_id')
+            ->pluck('school_class_id');
+
+        $fromPivot = DB::table('enrollment_school_classes')
+            ->join('enrollments', 'enrollment_school_classes.enrollment_id', '=', 'enrollments.id')
+            ->where('enrollments.student_id', $student->id)
+            ->where('enrollments.status', 'active')
+            ->where('enrollments.start_date', '<=', $today)
+            ->where(function ($q) use ($today) {
+                $q->whereNull('enrollments.end_date')
+                    ->orWhere('enrollments.end_date', '>=', $today);
+            })
+            ->whereNull('enrollments.deleted_at')
+            ->pluck('enrollment_school_classes.school_class_id');
+
+        return $fromEnrollment
+            ->merge($fromPivot)
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();

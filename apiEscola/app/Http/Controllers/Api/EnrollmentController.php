@@ -70,13 +70,18 @@ class EnrollmentController extends Controller
     )]
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Enrollment::query()->with(['student', 'schoolClass.course']);
+        $query = Enrollment::query()->with(['student', 'schoolClass.course', 'schoolClasses.course']);
         $this->applyTenantScope($query, $request);
 
         $query
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
             ->when($request->query('student_id'), fn ($q, $v) => $q->where('student_id', $v))
-            ->when($request->query('school_class_id'), fn ($q, $v) => $q->where('school_class_id', $v))
+            ->when($request->query('school_class_id'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('school_class_id', $v)
+                        ->orWhereHas('schoolClasses', fn ($sc) => $sc->where('school_classes.id', $v));
+                });
+            })
             ->when($request->query('start_date'), fn ($q, $v) => $q->whereDate('start_date', '>=', $v))
             ->when($request->query('end_date'), fn ($q, $v) => $q->whereDate('start_date', '<=', $v));
 
@@ -127,6 +132,7 @@ class EnrollmentController extends Controller
         $enrollment->load([
             'student',
             'schoolClass.course',
+            'schoolClasses.course',
             'coursePlan.course',
             'bundle',
             'invoices' => fn ($q) => $q->orderBy('due_date'),
@@ -174,7 +180,7 @@ class EnrollmentController extends Controller
             'invoice_types.*' => ['string', 'in:enrollment_fee,monthly'],
         ]);
 
-        $enrollment->loadMissing(['student', 'schoolClass.course', 'coursePlan.course', 'invoices']);
+        $enrollment->loadMissing(['student', 'schoolClass.course', 'coursePlan.course', 'bundle', 'invoices']);
 
         $invoiceTypes = empty($data['invoice_types'])
             ? ['monthly']
@@ -196,9 +202,10 @@ class EnrollmentController extends Controller
         $existing = 0;
 
         $plan = $enrollment->coursePlan;
-        if (! $plan) {
+        $bundle = $enrollment->bundle;
+        if (! $plan && ! $bundle) {
             return $this->error(
-                'A matrícula não possui plano associado para gerar cobranças locais.',
+                'A matrícula não possui plano ou pacote associado para gerar cobranças locais.',
                 ['enrollment_id' => $enrollment->id],
                 422
             );
@@ -206,13 +213,16 @@ class EnrollmentController extends Controller
 
         $guardianId = $this->resolveInvoicePayer($enrollment->student_id, $enrollment->tenant_id)['guardian_id'];
         $startDate = Carbon::parse($enrollment->start_date ?? now());
+        $cycleMonths = $plan?->monthsInCycle() ?? $bundle->monthsInCycle();
         $endDate = $enrollment->end_date
             ? Carbon::parse($enrollment->end_date)
-            : $startDate->copy()->addMonths($plan->monthsInCycle())->subDay();
+            : $startDate->copy()->addMonths($cycleMonths)->subDay();
         $billing = $this->billingScope($enrollment->tenant_id);
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
         $netAmount = $enrollment->netMonthlyAmount();
-        $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
+        $enrollmentFeeAmount = $plan
+            ? $this->resolveEnrollmentFeeAmount($plan, $enrollment)
+            : $this->resolveBundleEnrollmentFeeAmount($bundle, $enrollment);
 
         // Sem taxa no plano ou escola não cobra → remove enrollment_fee do lote
         if (empty($billing['charges_enrollment_fee']) || $enrollmentFeeAmount === null) {
@@ -377,6 +387,21 @@ class EnrollmentController extends Controller
         }
 
         $amount = (float) $planFee;
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $discount = $enrollment !== null
+            ? (float) ($enrollment->discount_amount ?? 0)
+            : 0.0;
+        $net = max($amount - $discount, 0);
+
+        return $net > 0 ? $net : null;
+    }
+
+    private function resolveBundleEnrollmentFeeAmount(CourseBundle $bundle, ?Enrollment $enrollment = null): ?float
+    {
+        $amount = (float) $bundle->monthlyEquivalent();
         if ($amount <= 0) {
             return null;
         }
@@ -1145,7 +1170,7 @@ class EnrollmentController extends Controller
             )
         ),
         responses: [
-            new OA\Response(response: 201, description: 'Matrículas criadas (uma por curso) + invoice da taxa de matrícula do pacote'),
+            new OA\Response(response: 201, description: 'Matrícula única do pacote + turmas vinculadas + invoice da taxa de matrícula'),
             new OA\Response(response: 422, description: 'Dados inválidos'),
         ]
     )]
@@ -1155,14 +1180,7 @@ class EnrollmentController extends Controller
             'student_id'                         => ['required', 'integer', 'exists:students,id'],
             'bundle_id'                          => ['required', 'integer', 'exists:course_bundles,id'],
             'school_class_ids'                   => ['required', 'array', 'min:1'],
-            'school_class_ids.*'                 => [
-                'required',
-                'integer',
-                'exists:school_classes,id',
-                Rule::unique('enrollments', 'school_class_id')
-                    ->where('student_id', $request->input('student_id'))
-                    ->whereNotIn('status', ['cancelled']),
-            ],
+            'school_class_ids.*'                 => ['required', 'integer', 'exists:school_classes,id'],
             'start_date'                         => ['nullable', 'date'],
             'end_date'                           => ['nullable', 'date', 'after:start_date'],
             'discount_amount'                    => ['nullable', 'numeric', 'min:0'],
@@ -1197,9 +1215,56 @@ class EnrollmentController extends Controller
         $payer      = $this->resolveInvoicePayer($data['student_id'], $effectiveTenantId);
         $guardianId = $payer['guardian_id'];
 
-        // Equivalente mensal do pacote dividido pelo número de cursos
-        $courseCount    = $bundle->courses->count();
-        $monthlyAmount  = round($bundle->monthlyEquivalent() / max($courseCount, 1), 2);
+        $schoolClassIds = array_values(array_unique(array_map('intval', $data['school_class_ids'])));
+        $bundleCourseIds = $bundle->courses->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        if (count($schoolClassIds) !== count($bundleCourseIds)) {
+            return response()->json([
+                'message' => 'Informe uma turma para cada curso do pacote.',
+                'errors' => [
+                    'school_class_ids' => ['Informe uma turma para cada curso do pacote.'],
+                ],
+            ], 422);
+        }
+
+        $schoolClasses = SchoolClass::query()
+            ->whereIn('id', $schoolClassIds)
+            ->where('tenant_id', $effectiveTenantId)
+            ->get();
+
+        if ($schoolClasses->count() !== count($schoolClassIds)) {
+            return response()->json([
+                'message' => 'Uma ou mais turmas não pertencem a esta escola.',
+                'errors' => [
+                    'school_class_ids' => ['Uma ou mais turmas não pertencem a esta escola.'],
+                ],
+            ], 422);
+        }
+
+        $selectedCourseIds = $schoolClasses->pluck('course_id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+        $expectedCourseIds = collect($bundleCourseIds)->sort()->values()->all();
+
+        if ($selectedCourseIds !== $expectedCourseIds) {
+            return response()->json([
+                'message' => 'As turmas selecionadas devem corresponder aos cursos do pacote.',
+                'errors' => [
+                    'school_class_ids' => ['As turmas selecionadas devem corresponder aos cursos do pacote.'],
+                ],
+            ], 422);
+        }
+
+        foreach ($schoolClassIds as $schoolClassId) {
+            if (Enrollment::studentHasActiveEnrollmentInClass((int) $data['student_id'], $schoolClassId)) {
+                return response()->json([
+                    'message' => 'O aluno já possui matrícula ativa em uma das turmas selecionadas.',
+                    'errors' => [
+                        'school_class_ids' => ['O aluno já possui matrícula ativa em uma das turmas selecionadas.'],
+                    ],
+                ], 422);
+            }
+        }
+
+        $monthlyAmount = round($bundle->monthlyEquivalent(), 2);
         $paymentData = is_array($data['enrollment_payment'] ?? null)
             ? $data['enrollment_payment']
             : [];
@@ -1211,7 +1276,7 @@ class EnrollmentController extends Controller
         // Prioridade de datas:
         // start_date: request > hoje (data da matrícula — não o início da turma)
         // end_date:   request > primeira turma > ciclo do pacote
-        $firstSchoolClass = SchoolClass::find($data['school_class_ids'][0]);
+        $firstSchoolClass = $schoolClasses->firstWhere('id', $schoolClassIds[0]) ?? $schoolClasses->first();
         $startDate = Carbon::parse($data['start_date'] ?? now());
         $endDate   = isset($data['end_date'])
             ? Carbon::parse($data['end_date'])
@@ -1219,45 +1284,42 @@ class EnrollmentController extends Controller
                 ? Carbon::parse($firstSchoolClass->end_date)
                 : $startDate->copy()->addMonths($bundle->monthsInCycle())->subDay());
 
-        $result = DB::transaction(function () use ($data, $bundle, $tenantId, $monthlyAmount, $guardianId, $feeAmount, $isPaid, $paymentData, $startDate, $endDate) {
+        $result = DB::transaction(function () use ($data, $bundle, $tenantId, $monthlyAmount, $guardianId, $feeAmount, $isPaid, $paymentData, $startDate, $endDate, $schoolClassIds) {
             $effectiveTenantId = $tenantId ?? $bundle->tenant_id;
             $billing           = $this->billingScope($effectiveTenantId);
-            $created           = [];
-            $firstEnrollment   = null;
             $dueDay            = $data['payment_due_day'] ?? (int) ($billing['default_payment_due_day'] ?? 10);
             $netMonthly        = max($bundle->monthlyEquivalent() - ($data['discount_amount'] ?? 0), 0);
+            $primaryClassId    = $schoolClassIds[0];
 
-            foreach ($data['school_class_ids'] as $schoolClassId) {
-                $enrollment = Enrollment::create([
-                    'tenant_id'         => $effectiveTenantId,
-                    'student_id'        => $data['student_id'],
-                    'school_class_id'   => $schoolClassId,
-                    'bundle_id'         => $bundle->id,
-                    'enrollment_number' => $this->generateEnrollmentNumber($effectiveTenantId),
-                    'start_date'        => $startDate->toDateString(),
-                    'end_date'          => $endDate->toDateString(),
-                    'status'            => 'active',
-                    'monthly_amount'    => $monthlyAmount,
-                    'discount_amount'   => $data['discount_amount'] ?? 0,
-                    'payment_due_day'   => $dueDay,
-                ]);
+            $enrollment = Enrollment::create([
+                'tenant_id'         => $effectiveTenantId,
+                'student_id'        => $data['student_id'],
+                'school_class_id'   => $primaryClassId,
+                'bundle_id'         => $bundle->id,
+                'enrollment_number' => $this->generateEnrollmentNumber($effectiveTenantId),
+                'start_date'        => $startDate->toDateString(),
+                'end_date'          => $endDate->toDateString(),
+                'status'            => 'active',
+                'monthly_amount'    => $monthlyAmount,
+                'discount_amount'   => $data['discount_amount'] ?? 0,
+                'payment_due_day'   => $dueDay,
+            ]);
 
-                $firstEnrollment ??= $enrollment;
-                $enrollment->load(['student', 'schoolClass.course', 'bundle.courses']);
-                $created[] = new EnrollmentResource($enrollment);
-            }
+            $enrollment->syncSchoolClasses($schoolClassIds);
+            $enrollment->load(['student', 'schoolClass.course', 'schoolClasses.course', 'bundle.courses']);
+            $created = [new EnrollmentResource($enrollment)];
 
             // Taxa de matrícula única para o pacote (só cria se a escola cobra)
             $invoice = null;
             if (! empty($billing['charges_enrollment_fee'])) {
                 $invoice = Invoice::create([
                     'tenant_id'      => $effectiveTenantId,
-                    'enrollment_id'  => $firstEnrollment->id,
+                    'enrollment_id'  => $enrollment->id,
                     'student_id'     => $data['student_id'],
                     'guardian_id'    => $guardianId,
                     'type'           => 'enrollment_fee',
                     'description'    => $this->invoiceDescriptions->forEnrollmentCharge(
-                        $firstEnrollment,
+                        $enrollment,
                         'enrollment_fee',
                         $startDate->toDateString()
                     ),
@@ -1292,12 +1354,12 @@ class EnrollmentController extends Controller
                 while ($cursor->lte($endDate)) {
                     Invoice::create([
                         'tenant_id'      => $effectiveTenantId,
-                        'enrollment_id'  => $firstEnrollment->id,
+                        'enrollment_id'  => $enrollment->id,
                         'student_id'     => $data['student_id'],
                         'guardian_id'    => $guardianId,
                         'type'           => 'monthly',
                         'description'    => $this->invoiceDescriptions->forEnrollmentCharge(
-                            $firstEnrollment,
+                            $enrollment,
                             'monthly',
                             $cursor->toDateString()
                         ),
@@ -1310,7 +1372,7 @@ class EnrollmentController extends Controller
             }
 
             // Coleta mensalidades para retornar na resposta
-            $monthlyInvoices = Invoice::where('enrollment_id', $firstEnrollment->id)
+            $monthlyInvoices = Invoice::where('enrollment_id', $enrollment->id)
                 ->where('type', 'monthly')
                 ->orderBy('due_date')
                 ->get();
@@ -1324,6 +1386,7 @@ class EnrollmentController extends Controller
         });
 
         return response()->json([
+            'enrollment' => $result['enrollments'][0] ?? null,
             'enrollments' => $result['enrollments'],
             'bundle'      => [
                 'id'                 => $bundle->id,

@@ -172,8 +172,11 @@ class StudentNotificationService
             ->where('status', 'active')
             ->whereNotNull('user_id')
             ->whereHas('enrollments', fn ($q) => $q
-                ->where('school_class_id', $schoolClassId)
-                ->where('status', 'active'))
+                ->where('status', 'active')
+                ->where(function ($inner) use ($schoolClassId) {
+                    $inner->where('school_class_id', $schoolClassId)
+                        ->orWhereHas('schoolClasses', fn ($sc) => $sc->where('school_classes.id', $schoolClassId));
+                }))
             ->pluck('id');
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CourseBundle;
 use App\Models\CoursePlan;
 use App\Models\Enrollment;
 use App\Models\Invoice;
@@ -43,6 +44,7 @@ class EnrollmentContractChargesService
             'student.guardians',
             'schoolClass.course',
             'coursePlan.course',
+            'bundle',
             'invoices' => fn ($q) => $q->orderBy('due_date'),
         ]);
 
@@ -325,18 +327,21 @@ class EnrollmentContractChargesService
         array $blocked,
     ): array {
         $plan = $enrollment->coursePlan;
-        if (! $plan) {
+        $bundle = $enrollment->bundle;
+        if (! $plan && ! $bundle) {
             return [];
         }
 
         $startDate = Carbon::parse($enrollment->start_date ?? now());
+        $cycleMonths = $plan?->monthsInCycle() ?? $bundle->monthsInCycle();
         $endDate = $enrollment->end_date
             ? Carbon::parse($enrollment->end_date)
-            : $startDate->copy()->addMonths($plan->monthsInCycle())->subDay();
+            : $startDate->copy()->addMonths($cycleMonths)->subDay();
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
         $netAmount = $enrollment->netMonthlyAmount();
-        $feeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
-        $courseName = $enrollment->coursePlan?->course?->name ?? 'Curso';
+        $feeAmount = $plan
+            ? $this->resolveEnrollmentFeeAmount($plan, $enrollment)
+            : $this->resolveBundleEnrollmentFeeAmount($bundle, $enrollment);
         $enrollmentFeeCoversFirstMonth = ! empty($billing['charges_enrollment_fee'])
             && ! empty($billing['enrollment_fee_covers_first_month']);
 
@@ -411,11 +416,12 @@ class EnrollmentContractChargesService
      */
     private function generateByKeys(Enrollment $enrollment, array $generateKeys): array
     {
-        $enrollment->loadMissing(['coursePlan.course', 'student.guardians', 'invoices']);
+        $enrollment->loadMissing(['coursePlan.course', 'bundle', 'student.guardians', 'invoices']);
         $plan = $enrollment->coursePlan;
+        $bundle = $enrollment->bundle;
 
-        if (! $plan) {
-            throw new RuntimeException('A matrícula não possui plano associado.');
+        if (! $plan && ! $bundle) {
+            throw new RuntimeException('A matrícula não possui plano ou pacote associado.');
         }
 
         $billing = $this->billingSettings->scope(
@@ -426,8 +432,9 @@ class EnrollmentContractChargesService
         $startDate = Carbon::parse($enrollment->start_date ?? now());
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
         $netAmount = $enrollment->netMonthlyAmount();
-        $feeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
-        $courseName = $enrollment->coursePlan?->course?->name ?? 'Curso';
+        $feeAmount = $plan
+            ? $this->resolveEnrollmentFeeAmount($plan, $enrollment)
+            : $this->resolveBundleEnrollmentFeeAmount($bundle, $enrollment);
 
         $monthliesBlocked = ! empty($billing['charges_enrollment_fee'])
             && empty($billing['allow_monthlies_before_fee_paid'])
@@ -543,6 +550,18 @@ class EnrollmentContractChargesService
         }
 
         $amount = (float) $planFee;
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $net = max($amount - (float) ($enrollment->discount_amount ?? 0), 0);
+
+        return $net > 0 ? $net : null;
+    }
+
+    private function resolveBundleEnrollmentFeeAmount(CourseBundle $bundle, Enrollment $enrollment): ?float
+    {
+        $amount = (float) $bundle->monthlyEquivalent();
         if ($amount <= 0) {
             return null;
         }

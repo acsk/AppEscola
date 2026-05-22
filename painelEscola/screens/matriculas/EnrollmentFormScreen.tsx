@@ -472,10 +472,9 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         payload.enrollment_payment = enrollmentPayment ?? {};
 
         const { data } = await api.post("/enrollments/subscribe-bundle", payload);
+        const bundleEnrollment = data.enrollment ?? data.enrollments?.[0];
         setResult({
-          enrollmentNumbers: (data.enrollments ?? []).map(
-            (e: any) => e.enrollment_number
-          ).filter(Boolean),
+          enrollmentNumbers: [bundleEnrollment?.enrollment_number].filter(Boolean),
           invoice: data.enrollment_fee,
           bundleName: data.bundle?.name,
         });
@@ -527,7 +526,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           </Text>
           <Text className="text-sm text-gray-500 text-center">
             {mode === "bundle"
-              ? `Pacote ${result.bundleName ?? ""} — ${result.enrollmentNumbers.length} matrícula(s) criada(s)`
+              ? `Pacote ${result.bundleName ?? ""} — matrícula ${result.enrollmentNumbers[0] ?? ""} criada`
               : "Matrícula criada com sucesso"}
           </Text>
         </View>

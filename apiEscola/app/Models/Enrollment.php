@@ -6,8 +6,10 @@ use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Enrollment extends Model
 {
@@ -53,6 +55,40 @@ class Enrollment extends Model
     public function schoolClass(): BelongsTo
     {
         return $this->belongsTo(SchoolClass::class);
+    }
+
+    public function schoolClasses(): BelongsToMany
+    {
+        return $this->belongsToMany(SchoolClass::class, 'enrollment_school_classes')
+            ->withTimestamps();
+    }
+
+    public function syncSchoolClasses(array $schoolClassIds): void
+    {
+        $ids = array_values(array_unique(array_map('intval', $schoolClassIds)));
+
+        $this->schoolClasses()->sync($ids);
+    }
+
+    public static function studentHasActiveEnrollmentInClass(int $studentId, int $schoolClassId): bool
+    {
+        $active = static::query()
+            ->where('student_id', $studentId)
+            ->where('school_class_id', $schoolClassId)
+            ->whereNotIn('status', ['cancelled'])
+            ->exists();
+
+        if ($active) {
+            return true;
+        }
+
+        return DB::table('enrollment_school_classes')
+            ->join('enrollments', 'enrollment_school_classes.enrollment_id', '=', 'enrollments.id')
+            ->where('enrollment_school_classes.school_class_id', $schoolClassId)
+            ->where('enrollments.student_id', $studentId)
+            ->whereNotIn('enrollments.status', ['cancelled'])
+            ->whereNull('enrollments.deleted_at')
+            ->exists();
     }
 
     public function coursePlan(): BelongsTo

@@ -21,6 +21,13 @@ class EnrollmentResource extends JsonResource
             'student' => new StudentResource($this->whenLoaded('student')),
             'school_class_id' => $this->school_class_id,
             'school_class' => new SchoolClassResource($this->whenLoaded('schoolClass')),
+            'school_class_ids' => $this->when(
+                $this->bundle_id !== null,
+                fn () => $this->relationLoaded('schoolClasses')
+                    ? $this->schoolClasses->pluck('id')->values()->all()
+                    : [$this->school_class_id]
+            ),
+            'school_classes' => SchoolClassResource::collection($this->whenLoaded('schoolClasses')),
             'course_plan_id' => $this->course_plan_id,
             'course_plan' => new CoursePlanResource($this->whenLoaded('coursePlan')),
             'bundle_id'   => $this->bundle_id,
