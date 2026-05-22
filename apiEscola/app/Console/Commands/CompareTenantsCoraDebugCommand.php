@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Storage;
 class CompareTenantsCoraDebugCommand extends Command
 {
     protected $signature = 'tenants:debug-cora-compare
-                            {tenants=2,3 : IDs separados por vírgula}
+                            {tenants=2,4 : IDs separados por vírgula (Conectivo vs Kroqui)}
                             {--environment=prod : Ambiente Cora (prod ou stage)}
                             {--json : Saída apenas JSON}
                             {--save= : Grava JSON em storage/logs}';
