@@ -19,6 +19,12 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import EnrollmentActionsModal, {
   type EnrollmentActionKey,
 } from "../../components/matriculas/EnrollmentActionsModal";
+import EnrollmentProductCell from "../../components/matriculas/EnrollmentProductCell";
+import {
+  enrollmentProductKind,
+  enrollmentProductSubtitle,
+  enrollmentProductTitle,
+} from "../../utils/enrollmentDisplay";
 import {
   currencyToFloat,
   displayToISO,
@@ -353,7 +359,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
             style={{ flex: 2 }}
           >
-            Turma
+            Curso / Pacote
           </Text>
           <Text
             className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
@@ -407,9 +413,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
               >
                 {item.student?.name ?? "—"}
               </Text>
-              <Text className="text-sm text-gray-600" style={{ flex: 2 }}>
-                {item.school_class?.name ?? "—"}
-              </Text>
+              <EnrollmentProductCell item={item} />
               <Text className="text-sm text-gray-600" style={{ flex: 1 }}>
                 {item.enrollment_number ?? "—"}
               </Text>
@@ -511,14 +515,23 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
               )}
             </View>
 
-            {/* Turma e Curso */}
+            {/* Curso / Pacote */}
             <View className="bg-gray-50 rounded-xl px-4 py-3 gap-1">
-              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Turma / Curso</Text>
-              <Text className="text-sm font-semibold text-gray-800">{viewData.school_class?.name ?? "—"}</Text>
-              {viewData.school_class?.course && (
-                <Text className="text-xs text-gray-500">{viewData.school_class.course.name}</Text>
+              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                {enrollmentProductKind(viewData) === "bundle" ? "Pacote" : "Curso / Plano"}
+              </Text>
+              <Text className="text-sm font-semibold text-gray-800">
+                {enrollmentProductTitle(viewData)}
+              </Text>
+              {enrollmentProductSubtitle(viewData) ? (
+                <Text className="text-xs text-gray-500">{enrollmentProductSubtitle(viewData)}</Text>
+              ) : null}
+              {viewData.bundle?.cycle_label && (
+                <Text className="text-xs text-gray-500">
+                  Cobrança {viewData.bundle.cycle_label.toLowerCase()}
+                </Text>
               )}
-              {viewData.course_plan && (
+              {viewData.course_plan && enrollmentProductKind(viewData) !== "bundle" && (
                 <Text className="text-xs text-gray-500">
                   Plano: {viewData.course_plan.name} • {viewData.course_plan.cycle_label}
                 </Text>

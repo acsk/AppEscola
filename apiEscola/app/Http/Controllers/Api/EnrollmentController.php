@@ -70,7 +70,13 @@ class EnrollmentController extends Controller
     )]
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Enrollment::query()->with(['student', 'schoolClass.course', 'schoolClasses.course']);
+        $query = Enrollment::query()->with([
+            'student',
+            'schoolClass.course',
+            'schoolClasses.course',
+            'coursePlan.course',
+            'bundle',
+        ]);
         $this->applyTenantScope($query, $request);
 
         $query

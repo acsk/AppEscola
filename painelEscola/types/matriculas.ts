@@ -48,8 +48,12 @@ export type EnrollmentSummary = {
   payment_due_day: number | null;
   student?: StudentRef;
   school_class?: SchoolClassRef;
+  school_class_ids?: number[];
+  school_classes?: Array<SchoolClassRef & { course?: CourseRef | null }>;
   guardian?: GuardianRef;
-  course_plan?: CoursePlanSummary;
+  course_plan?: CoursePlanSummary | null;
+  bundle_id?: number | null;
+  bundle?: BundleSummary | null;
   created_at?: string;
 };
 

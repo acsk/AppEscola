@@ -35,6 +35,11 @@ import {
   validateEnrollmentEditForm,
 } from "../../utils/enrollmentForm";
 import {
+  enrollmentProductKind,
+  enrollmentProductSubtitle,
+  enrollmentProductTitle,
+} from "../../utils/enrollmentDisplay";
+import {
   useEnrollmentStatuses,
   useInvoiceStatuses,
   usePaymentMethods,
@@ -1356,8 +1361,11 @@ export default function EnrollmentDetailScreen({
             >
               Matrícula {enrollment.enrollment_number ?? `#${enrollment.id}`}
             </Text>
-            <Text className="text-sm text-gray-500" numberOfLines={1}>
-              {enrollment.student?.name ?? "—"} · {enrollment.school_class?.name ?? "—"}
+            <Text className="text-sm text-gray-500" numberOfLines={2}>
+              {enrollment.student?.name ?? "—"}
+              {enrollmentProductTitle(enrollment) !== "—"
+                ? ` · ${enrollmentProductTitle(enrollment)}`
+                : ""}
             </Text>
           </View>
         </View>
@@ -1429,16 +1437,12 @@ export default function EnrollmentDetailScreen({
               1.25
             )}
             {renderInfoBlock(
-              "Turma / Curso",
-              enrollment.school_class?.name ?? "—",
-              [
-                enrollment.school_class?.course?.name,
-                enrollment.course_plan
-                  ? `Plano: ${enrollment.course_plan.name} · ${enrollment.course_plan.cycle_label}`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · "),
+              enrollmentProductKind(enrollment) === "bundle" ? "Pacote" : "Curso / Plano",
+              enrollmentProductTitle(enrollment),
+              enrollmentProductSubtitle(enrollment) ??
+                (enrollment.course_plan
+                  ? `Plano ${enrollment.course_plan.name} · ${enrollment.course_plan.cycle_label}`
+                  : null),
               1.25
             )}
             {renderInfoBlock("Início", fmt(enrollment.start_date), null, 0.7)}
