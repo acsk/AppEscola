@@ -19,6 +19,12 @@ use RuntimeException;
 
 class CoraPaymentGateway implements PaymentGatewayContract
 {
+    /** Valor mínimo exigido pela Cora para services[].amount (centavos). */
+    private const MIN_SERVICE_AMOUNT_CENTS = 500;
+
+    /** Limite da descrição do serviço na API Cora v2. */
+    private const MAX_SERVICE_DESCRIPTION_LENGTH = 100;
+
     public function __construct(private readonly CoraTokenService $tokenService)
     {
     }
@@ -65,6 +71,8 @@ class CoraPaymentGateway implements PaymentGatewayContract
             throw new RuntimeException('Não é possível emitir boleto/hybrid sem data de vencimento na fatura.');
         }
 
+        $this->assertChargeableInvoice($invoice, $payerDocument);
+
         $endpoint = '/v2/invoices';
         if ($normalizedMethod === 'boleto') {
             $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment, 'boleto');
@@ -81,6 +89,8 @@ class CoraPaymentGateway implements PaymentGatewayContract
             'environment' => $environment,
             'normalized_method' => $normalizedMethod,
             'endpoint' => $baseUrl . $endpoint,
+            'amount' => (string) $invoice->amount,
+            'amount_cents' => $this->resolveServiceAmountInCents($invoice),
         ]);
 
         $httpOptions = $this->resolveHttpClientOptions($invoice->tenant, $environment);
@@ -572,8 +582,11 @@ class CoraPaymentGateway implements PaymentGatewayContract
     ): array {
         $identity = $payerDocument !== '' ? $payerDocument : '';
         $docType = strlen($identity) > 11 ? 'CNPJ' : 'CPF';
-        $description = app(EnrollmentInvoiceDescriptionService::class)->forInvoice($invoice);
+        $description = $this->truncateServiceDescription(
+            app(EnrollmentInvoiceDescriptionService::class)->forInvoice($invoice)
+        );
         $providerDueDate = $this->resolveProviderDueDate($invoice);
+        $amountInCents = $this->resolveServiceAmountInCents($invoice);
 
         // Define payment_forms baseado no método solicitado
         $paymentForms = match ($method) {
@@ -597,7 +610,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
                 [
                     'name' => 'Mensalidade',
                     'description' => $description,
-                    'amount' => (int) round(((float) $invoice->amount) * 100),
+                    'amount' => $amountInCents,
                 ],
             ],
             'payment_terms' => [
@@ -612,6 +625,52 @@ class CoraPaymentGateway implements PaymentGatewayContract
                 'environment' => $environment,
             ],
         ];
+    }
+
+    private function resolveServiceAmountInCents(Invoice $invoice): int
+    {
+        $amount = (string) $invoice->amount;
+
+        if (function_exists('bcmul')) {
+            return (int) bcmul($amount, '100', 0);
+        }
+
+        return (int) round((float) $amount * 100);
+    }
+
+    private function assertChargeableInvoice(Invoice $invoice, string $payerDocument): void
+    {
+        $amountInCents = $this->resolveServiceAmountInCents($invoice);
+
+        if ($amountInCents < self::MIN_SERVICE_AMOUNT_CENTS) {
+            $formattedAmount = number_format($amountInCents / 100, 2, ',', '.');
+
+            throw new RuntimeException(
+                "O valor da fatura deve ser de no mínimo R$ 5,00 para gerar cobrança na Cora. Valor atual: R$ {$formattedAmount}."
+            );
+        }
+
+        $documentLength = strlen($payerDocument);
+        if (! in_array($documentLength, [11, 14], true)) {
+            throw new RuntimeException(
+                'CPF (11 dígitos) ou CNPJ (14 dígitos) do responsável financeiro é obrigatório para gerar cobrança na Cora.'
+            );
+        }
+    }
+
+    private function truncateServiceDescription(string $description): string
+    {
+        $normalized = trim($description);
+
+        if ($normalized === '') {
+            return 'Cobrança escolar';
+        }
+
+        if (mb_strlen($normalized) <= self::MAX_SERVICE_DESCRIPTION_LENGTH) {
+            return $normalized;
+        }
+
+        return mb_substr($normalized, 0, self::MAX_SERVICE_DESCRIPTION_LENGTH);
     }
 
     private function resolvePayerGuardian(Invoice $invoice): ?\App\Models\Guardian

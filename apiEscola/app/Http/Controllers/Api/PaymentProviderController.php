@@ -844,9 +844,10 @@ class PaymentProviderController extends Controller
 
             if ($status >= 400 && $status < 500) {
                 $httpStatus = 422;
-                $userMessage = $providerMessage !== ''
-                    ? $providerMessage
-                    : ($providerError !== '' ? $providerError : 'Falha de validação retornada pelo provedor.');
+                $userMessage = $this->resolveProviderUserMessage(
+                    $e instanceof RequestException ? $e->response : null,
+                    'Falha de validação retornada pelo provedor.'
+                );
             }
 
             Log::warning('PaymentProviderController generateCharge communication error', [
@@ -1266,6 +1267,51 @@ class PaymentProviderController extends Controller
         }
 
         return null;
+    }
+
+    private function resolveProviderUserMessage(?\Illuminate\Http\Client\Response $response, string $fallback): string
+    {
+        if ($response === null) {
+            return $fallback;
+        }
+
+        $providerMessage = (string) ($response->json('message') ?? '');
+        $providerError = (string) ($response->json('error') ?? '');
+        $errors = $response->json('errors');
+        $details = [];
+
+        if (is_array($errors)) {
+            foreach ($errors as $error) {
+                if (! is_array($error)) {
+                    continue;
+                }
+
+                $code = (string) ($error['code'] ?? '');
+                $message = (string) ($error['message'] ?? '');
+
+                if ($code === 'services[0].amount') {
+                    $details[] = 'Valor da fatura inválido para a Cora: o mínimo é R$ 5,00 (500 centavos).';
+
+                    continue;
+                }
+
+                if ($code !== '' || $message !== '') {
+                    $details[] = trim($code . ($code !== '' && $message !== '' ? ': ' : '') . $message);
+                }
+            }
+        }
+
+        if ($details !== []) {
+            return $providerMessage !== ''
+                ? $providerMessage . ' — ' . implode('; ', $details)
+                : implode('; ', $details);
+        }
+
+        if ($providerMessage !== '') {
+            return $providerMessage;
+        }
+
+        return $providerError !== '' ? $providerError : $fallback;
     }
 
     private function mapProviderStatusToInvoiceStatus(string $providerStatus, string $currentStatus): string
