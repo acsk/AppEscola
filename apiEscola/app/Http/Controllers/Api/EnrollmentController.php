@@ -63,6 +63,7 @@ class EnrollmentController extends Controller
             new OA\Parameter(name: 'status', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'student_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'school_class_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'course_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'start_date', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'end_date', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'search', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
@@ -91,6 +92,19 @@ class EnrollmentController extends Controller
                 $q->where(function ($inner) use ($v) {
                     $inner->where('school_class_id', $v)
                         ->orWhereHas('schoolClasses', fn ($sc) => $sc->where('school_classes.id', $v));
+                });
+            })
+            ->when($request->query('course_id'), function ($q, $v) {
+                $courseId = (int) $v;
+                if ($courseId <= 0) {
+                    return;
+                }
+
+                $q->where(function ($inner) use ($courseId) {
+                    $inner->whereHas('schoolClass', fn ($sc) => $sc->where('course_id', $courseId))
+                        ->orWhereHas('schoolClasses', fn ($sc) => $sc->where('course_id', $courseId))
+                        ->orWhereHas('coursePlan', fn ($cp) => $cp->where('course_id', $courseId))
+                        ->orWhereHas('bundle.courses', fn ($course) => $course->where('courses.id', $courseId));
                 });
             })
             ->when($request->query('start_date'), fn ($q, $v) => $q->whereDate('start_date', '>=', $v))

@@ -43,7 +43,7 @@ import type {
   EnrollmentSummary,
   EnrollmentsScreenProps,
 } from "../../types/matriculas";
-import type { SchoolClassRef, StudentRef } from "../../types/entities";
+import type { CourseOption, SchoolClassRef, StudentRef } from "../../types/entities";
 
 const EMPTY_EDIT: EnrollmentEditFormValues = {
   student_id: "",
@@ -77,6 +77,8 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [courseFilter, setCourseFilter] = useState("");
+  const [classFilter, setClassFilter] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({
     current_page: 1,
@@ -96,6 +98,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   // Lookups for edit modal
   const [students, setStudents] = useState<StudentRef[]>([]);
   const [classes, setClasses] = useState<SchoolClassRef[]>([]);
+  const [courses, setCourses] = useState<CourseOption[]>([]);
 
   // Delete
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -121,27 +124,68 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
       const params: Record<string, any> = { page };
       if (statusFilter) params.status = statusFilter;
       if (search.trim()) params.search = search.trim();
+      if (courseFilter) params.course_id = Number(courseFilter);
+      if (classFilter) params.school_class_id = Number(classFilter);
       const { data } = await api.get("/enrollments", { params });
       setRows(data.data);
       setMeta(data.meta);
     } catch {}
     setLoading(false);
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, search, courseFilter, classFilter]);
 
   useEffect(() => {
     fetchRows();
   }, [fetchRows]);
 
-  const fetchLookups = async () => {
+  const fetchLookups = useCallback(async () => {
     try {
-      const [sRes, cRes] = await Promise.all([
+      const [sRes, coursesRes, classesRes] = await Promise.all([
         api.get("/students", { params: { per_page: 200 } }),
-        api.get("/school-classes", { params: { per_page: 200, status: "active" } }),
+        api.get("/courses", { params: { per_page: 500, status: "active" } }),
+        api.get("/school-classes", { params: { per_page: 500, status: "active" } }),
       ]);
       setStudents(sRes.data.data ?? []);
-      setClasses(cRes.data.data ?? []);
+      setCourses(
+        (coursesRes.data.data ?? [])
+          .filter((item: { id?: number; name?: string }) => item?.id && item?.name)
+          .map((item: { id: number; name: string }) => ({ id: Number(item.id), name: item.name }))
+      );
+      setClasses(classesRes.data.data ?? []);
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchLookups();
+  }, [fetchLookups]);
+
+  const classOptions = classes.filter((schoolClass) => {
+    if (!courseFilter) return true;
+    const courseId = schoolClass.course?.id;
+    return courseId != null && String(courseId) === courseFilter;
+  });
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setCourseFilter("");
+    setClassFilter("");
+    setPage(1);
   };
+
+  const hasActiveFilters =
+    !!search.trim() || !!statusFilter || !!courseFilter || !!classFilter;
+
+  const filterSelectStyle = {
+    border: "1px solid #E5E7EB",
+    borderRadius: 12,
+    padding: "0 14px",
+    fontSize: 14,
+    color: "#374151",
+    backgroundColor: "white",
+    height: 44,
+    minWidth: isMobile ? "100%" : 160,
+    flexGrow: isMobile ? 1 : 0,
+  } as const;
 
   const openView = async (id: number) => {
     setLoadingView(true);
@@ -397,15 +441,30 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
       </View>
 
       {/* Filters */}
-      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
-        <View style={{ flex: 1, maxWidth: isMobile ? undefined : 320 }}>
+      <View className="bg-white border border-gray-200 rounded-2xl p-3 mb-4">
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Filtros
+          </Text>
+          {hasActiveFilters ? (
+            <TouchableOpacity
+              onPress={clearFilters}
+              className="px-2 py-1 rounded-lg bg-gray-100"
+              activeOpacity={0.8}
+            >
+              <Text className="text-xs font-semibold text-gray-600">Limpar</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
           <View
-            className="flex-row items-center bg-white rounded-xl border border-gray-200 px-3"
-            style={{ height: 44 }}
+            className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3"
+            style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
             <Ionicons name="search-outline" size={16} color="#9CA3AF" />
             <input
-              placeholder="Buscar aluno..."
+              placeholder="Aluno ou matrícula..."
               value={search}
               onChange={(e: any) => {
                 setSearch(e.target.value);
@@ -421,31 +480,63 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                 backgroundColor: "transparent",
               }}
             />
+            {!!search.trim() ? (
+              <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
+                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              </TouchableOpacity>
+            ) : null}
           </View>
+
+          <select
+            value={courseFilter}
+            onChange={(e: any) => {
+              setCourseFilter(e.target.value);
+              setClassFilter("");
+              setPage(1);
+            }}
+            style={{ ...filterSelectStyle, minWidth: isMobile ? "100%" : 200 }}
+          >
+            <option value="">Todos os cursos</option>
+            {courses.map((course) => (
+              <option key={course.id} value={String(course.id)}>
+                {course.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={classFilter}
+            onChange={(e: any) => {
+              setClassFilter(e.target.value);
+              setPage(1);
+            }}
+            style={{ ...filterSelectStyle, minWidth: isMobile ? "100%" : 200 }}
+          >
+            <option value="">Todas as turmas</option>
+            {classOptions.map((schoolClass) => (
+              <option key={schoolClass.id} value={String(schoolClass.id)}>
+                {schoolClass.course?.name
+                  ? `${schoolClass.name} · ${schoolClass.course.name}`
+                  : schoolClass.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e: any) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            style={{ ...filterSelectStyle, minWidth: isMobile ? "100%" : 160 }}
+          >
+            {statusFilterOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </View>
-        <select
-          value={statusFilter}
-          onChange={(e: any) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
-            padding: "0 14px",
-            fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
-            height: 44,
-            minWidth: isMobile ? "100%" : 180,
-          }}
-        >
-          {statusFilterOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
       </View>
 
       {/* List */}
