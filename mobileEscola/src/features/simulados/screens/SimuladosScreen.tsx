@@ -241,6 +241,14 @@ export function SimuladosScreen() {
       <View style={styles.headerTituloRow}>
         <MenuButton />
         <Text style={styles.headerTitulo}>Simulados</Text>
+        <TouchableOpacity
+          style={styles.headerLinkBtn}
+          onPress={() => navigation.navigate('ProvasAnteriores')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="archive-outline" size={16} color={colors.surface} />
+          <Text style={styles.headerLinkTexto}>Provas anteriores</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -368,6 +376,16 @@ function createSimuladosStyles(colors: ThemeColors) {
     paddingBottom: 14,
   },
   headerTitulo: { flex: 1, fontSize: 22, fontWeight: '800', color: '#111827' },
+  headerLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  headerLinkTexto: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
   lista: { padding: 16, paddingTop: 12 },
   listaComVazio: { flexGrow: 1 },
   listHeader: { marginBottom: 12, gap: 10 },

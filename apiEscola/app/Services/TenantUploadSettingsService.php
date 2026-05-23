@@ -78,6 +78,19 @@ class TenantUploadSettingsService
         ];
     }
 
+    public function buildPastExamDirectory(int $tenantId): array
+    {
+        $tenant = Tenant::findOrFail($tenantId);
+        $config = $this->getForTenant($tenant);
+
+        return [
+            'disk' => $config['disk'],
+            'directory' => $this->normalizePath(
+                $config['base_path'] . '/past-exams/' . $tenantId
+            ),
+        ];
+    }
+
     public function url(string $disk, string $path): string
     {
         $normalizedPath = ltrim($path, '/');

@@ -31,6 +31,7 @@ import InvoicesScreen from "./screens/InvoicesScreen";
 import PaymentProvidersScreen from "./screens/payments/PaymentProvidersScreen";
 import PaymentProvidersCrudScreen from "./screens/payments/PaymentProvidersCrudScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
+import { PastExamsScreen } from "./screens/provas-anteriores";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
@@ -99,6 +100,7 @@ const SCREEN_SLUGS = [
   "pacotes",
   "simulados",
   "simulados-tentativas",
+  "provas-anteriores",
   "tenants",
   "users",
   "matriculas-detail",
@@ -757,6 +759,7 @@ function AppContent() {
       case "bancos_crud": return <PaymentProvidersCrudScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
+      case "provas-anteriores": return <PastExamsScreen navigate={navigate} />;
       case "configuracoes-cobranca": return <BillingSettingsScreen />;
       case "configuracoes-tema-mobile": return <MobileThemeSettingsScreen />;
       case "notificacoes":

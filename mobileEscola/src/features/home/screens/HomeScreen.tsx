@@ -19,6 +19,7 @@ import { api } from '../../../services/api';
 import { compressImageToMaxSize } from '../../../services/image-compression.service';
 import { SimuladoListItem, AttemptStatus, subjectIconName } from '../../../services/simulados.service';
 import { useSimuladosList } from '../../simulados/hooks';
+import { useProvasAnterioresList } from '../../provas-anteriores/hooks';
 import { uploadStudentPhoto } from '../../../services/student-photo.service';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { platformShadow } from '../../../lib/shadow';
@@ -134,7 +135,9 @@ export function HomeScreen() {
   const simCardWidth = (width - 32 - 12 * (simColumns - 1)) / simColumns;
 
   const { data: simuladosLista = [] } = useSimuladosList();
+  const { data: provasAnterioresLista = [] } = useProvasAnterioresList();
   const simuladosRecentes = user?.role === 'aluno' ? simuladosLista : [];
+  const provasAnterioresRecentes = user?.role === 'aluno' ? provasAnterioresLista.slice(0, 5) : [];
   const {
     data: unreadNotifications = 0,
     refetch: refetchUnreadNotifications,
@@ -489,6 +492,42 @@ export function HomeScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.primary} />
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* ── Provas anteriores ─────────────────────────────────────────── */}
+      {user?.role === 'aluno' && provasAnterioresRecentes.length > 0 && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Provas anteriores</Text>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('Simulados', { screen: 'ProvasAnteriores' })
+              }
+            >
+              <Text style={styles.sectionLink}>Ver todas</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+            {provasAnterioresRecentes.map((p) => (
+              <TouchableOpacity
+                key={p.id}
+                style={[styles.simCard, { width: 220, backgroundColor: colors.soft, borderColor: colors.border }]}
+                activeOpacity={0.85}
+                onPress={() =>
+                  navigation.navigate('Simulados', {
+                    screen: 'ProvaAnteriorDetalhe',
+                    params: { pastExamId: p.id },
+                  })
+                }
+              >
+                <Text style={styles.simTitulo} numberOfLines={2}>{p.title}</Text>
+                <Text style={styles.simMateria}>
+                  {[p.exam_year, p.exam_type_label].filter(Boolean).join(' · ') || 'Prova'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
       )}
 
       {/* ── Meus simulados ────────────────────────────────────────────── */}

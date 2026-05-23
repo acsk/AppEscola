@@ -4,10 +4,14 @@ import { SimuladosScreen }       from '../../features/simulados/screens/Simulado
 import { SimuladoDetalheScreen } from '../../features/simulados/screens/SimuladoDetalheScreen';
 import { SimuladoExamScreen }    from '../../features/simulados/screens/SimuladoExamScreen';
 import { SimuladoResultScreen }  from '../../features/simulados/screens/SimuladoResultScreen';
+import { ProvasAnterioresScreen } from '../../features/provas-anteriores/screens/ProvasAnterioresScreen';
+import { ProvaAnteriorDetalheScreen } from '../../features/provas-anteriores/screens/ProvaAnteriorDetalheScreen';
 import { useThemeColors } from '../../context/TenantThemeContext';
 
 export type SimuladosStackParamList = {
   SimuladosList: undefined;
+  ProvasAnteriores: undefined;
+  ProvaAnteriorDetalhe: { pastExamId: number };
   SimuladoDetalhe: { examId: number };
   SimuladoExam: { examId: number; attemptId: number };
   SimuladoResult: { attemptId: number };
@@ -31,6 +35,23 @@ export function SimuladosNavigator() {
         name="SimuladosList"
         component={SimuladosScreen}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ProvasAnteriores"
+        component={ProvasAnterioresScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ProvaAnteriorDetalhe"
+        component={ProvaAnteriorDetalheScreen}
+        options={{
+          title: 'Prova anterior',
+          headerBackTitle: 'Voltar',
+          headerStyle: { backgroundColor: '#FBFAFF' },
+          headerTintColor: colors.ink,
+          headerTitleStyle: { fontWeight: '800', color: '#111827' },
+          headerShadowVisible: false,
+        }}
       />
       <Stack.Screen
         name="SimuladoDetalhe"

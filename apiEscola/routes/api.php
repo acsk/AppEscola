@@ -42,6 +42,8 @@ use App\Http\Controllers\Api\TenantNotificationSettingsController;
 use App\Http\Controllers\Api\StudentNotificationController;
 use App\Http\Controllers\Api\CalendarEventController;
 use App\Http\Controllers\Api\StudentCalendarController;
+use App\Http\Controllers\Api\PastExamController;
+use App\Http\Controllers\Api\StudentPastExamController;
 use Illuminate\Support\Facades\Route;
 
 // Health check (público)
@@ -261,6 +263,13 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('aluno/attempts',                 [StudentExamController::class, 'attempts']);
     Route::get('aluno/attempts/{attempt}',       [StudentExamController::class, 'reviewAttempt']);
     Route::get('aluno/attempts/{attempt}/review',[StudentExamController::class, 'reviewAttempt']);
+
+    Route::get('aluno/past-exams', [StudentPastExamController::class, 'index']);
+    Route::get('aluno/past-exams/{pastExam}', [StudentPastExamController::class, 'show']);
+
+    // Provas anteriores (painel)
+    Route::post('past-exams/upload', [PastExamController::class, 'uploadFile']);
+    Route::apiResource('past-exams', PastExamController::class);
 
     // Simulados
     Route::apiResource('exams', ExamController::class);
