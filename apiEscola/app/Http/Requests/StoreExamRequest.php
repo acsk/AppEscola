@@ -9,10 +9,27 @@ class StoreExamRequest extends FormRequest
 {
     public function authorize(): bool { return true; }
 
+    protected function prepareForValidation(): void
+    {
+        $ids = $this->input('course_ids');
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+        if ($this->filled('course_id')) {
+            $ids[] = $this->input('course_id');
+        }
+
+        $this->merge([
+            'course_ids' => array_values(array_unique(array_map('intval', array_filter($ids)))),
+        ]);
+    }
+
     public function rules(): array
     {
         return [
-            'course_id'        => ['nullable', 'exists:courses,id'],
+            'course_ids'       => ['nullable', 'array'],
+            'course_ids.*'     => ['integer', 'exists:courses,id'],
+            'course_id'        => ['nullable', 'integer', 'exists:courses,id'],
             'subject_id'       => ['nullable', 'exists:subjects,id'],
             'title'            => ['required', 'string', 'max:255'],
             'description'      => ['nullable', 'string'],

@@ -76,7 +76,12 @@ class CalendarEventVisibilityService
                 if ($courseIds->isNotEmpty()) {
                     $q->orWhere(function (Builder $inner) use ($courseIds) {
                         $inner->where('audience_type', 'course')
-                            ->whereIn('course_id', $courseIds);
+                            ->where(function (Builder $scope) use ($courseIds) {
+                                $scope->whereIn('course_id', $courseIds);
+                                foreach ($courseIds as $courseId) {
+                                    $scope->orWhereJsonContains('audience_params->course_ids', $courseId);
+                                }
+                            });
                     });
                 }
 

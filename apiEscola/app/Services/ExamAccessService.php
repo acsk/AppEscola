@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Student;
 use App\Models\User;
@@ -125,14 +126,28 @@ class ExamAccessService
         }
     }
 
-    public function assertActiveEnrollmentForExam(Student $student, ?int $courseId): void
+    public function assertActiveEnrollmentForExam(Student $student, Exam $exam): void
     {
-        if ($courseId === null) {
-            return;
-        }
-
-        if (! $this->enrollmentService->hasActiveEnrollmentInCourse($student, $courseId)) {
+        if (! $this->hasActiveEnrollmentForExam($student, $exam)) {
             throw new AccessDeniedHttpException('Você não possui matrícula ativa neste curso.');
         }
+    }
+
+    public function hasActiveEnrollmentForExam(Student $student, Exam $exam): bool
+    {
+        $exam->loadMissing('courses');
+        $courseIds = $exam->linkedCourseIds();
+
+        if ($courseIds->isEmpty()) {
+            return true;
+        }
+
+        foreach ($courseIds as $courseId) {
+            if ($this->enrollmentService->hasActiveEnrollmentInCourse($student, $courseId)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

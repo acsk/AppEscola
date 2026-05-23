@@ -13,10 +13,18 @@ class ExamResource extends JsonResource
             'id'               => $this->id,
             'tenant_id'        => $this->tenant_id,
             'course_id'        => $this->course_id,
-            'course'           => $this->whenLoaded('course', fn () => [
+            'course_ids'       => $this->when(
+                $this->relationLoaded('courses') || $this->course_id,
+                fn () => $this->linkedCourseIds()->all()
+            ),
+            'course'           => $this->whenLoaded('course', fn () => $this->course ? [
                 'id'   => $this->course->id,
                 'name' => $this->course->name,
-            ]),
+            ] : null),
+            'courses'          => $this->whenLoaded('courses', fn () => $this->courses->map(fn ($course) => [
+                'id'   => $course->id,
+                'name' => $course->name,
+            ])->values()),
             'subject_id'       => $this->subject_id,
             'subject'          => $this->whenLoaded('subject', fn () => [
                 'id'    => $this->subject->id,

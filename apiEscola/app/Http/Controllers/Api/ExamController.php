@@ -10,6 +10,7 @@ use App\Models\Exam;
 use App\Models\ExamStatus;
 use App\Models\ExamType;
 use App\Services\ExamAttemptIntegrityService;
+use App\Services\ExamCourseService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,15 +20,25 @@ class ExamController extends Controller
 {
     use ScopedByTenant;
 
+    public function __construct(
+        private readonly ExamCourseService $examCourseService,
+    ) {
+    }
+
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Exam::with(['course', 'subject', 'examStatus', 'examType']);
+        $query = Exam::with(['course', 'courses', 'subject', 'examStatus', 'examType']);
         $this->applyTenantScope($query, $request);
 
         $query
             ->when($request->query('status'),     fn ($q, $v) => $q->whereHas('examStatus',  fn ($sq) => $sq->where('slug', $v)))
             ->when($request->query('exam_type'),  fn ($q, $v) => $q->whereHas('examType',    fn ($sq) => $sq->where('slug', $v)))
-            ->when($request->query('course_id'),  fn ($q, $v) => $q->where('course_id', $v))
+            ->when($request->query('course_id'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('course_id', $v)
+                        ->orWhereHas('courses', fn ($c) => $c->where('courses.id', $v));
+                });
+            })
             ->when($request->query('subject_id'), fn ($q, $v) => $q->where('subject_id', $v))
             ->when($request->query('search'),     fn ($q, $v) => $q->where('title', 'like', "%{$v}%"));
 
@@ -39,13 +50,16 @@ class ExamController extends Controller
         $tenantId = $this->getTenantId($request);
 
         $data = $request->validated();
+        $courseIds = $data['course_ids'] ?? [];
+        unset($data['course_ids'], $data['course_id']);
 
         $data['exam_status_id'] = ExamStatus::where('slug', $data['status'] ?? 'draft')->value('id');
         $data['exam_type_id']   = ExamType::where('slug',   $data['exam_type'] ?? 'custom')->value('id');
         unset($data['status'], $data['exam_type']);
 
         $exam = Exam::create(array_merge($data, ['tenant_id' => $tenantId]));
-        $exam->load(['course', 'subject', 'examStatus', 'examType']);
+        $this->examCourseService->sync($exam, $courseIds, $tenantId);
+        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType']);
 
         return $this->created(new ExamResource($exam));
     }
@@ -54,7 +68,7 @@ class ExamController extends Controller
     {
         $this->authorizeTenant($request, $exam->tenant_id);
 
-        $exam->load(['course', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject']);
+        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject']);
 
         return $this->success(new ExamResource($exam));
     }
@@ -64,6 +78,8 @@ class ExamController extends Controller
         $this->authorizeTenant($request, $exam->tenant_id);
 
         $data = $request->validated();
+        $courseIds = array_key_exists('course_ids', $data) ? ($data['course_ids'] ?? []) : null;
+        unset($data['course_ids'], $data['course_id']);
 
         if (isset($data['status'])) {
             $data['exam_status_id'] = ExamStatus::where('slug', $data['status'])->value('id');
@@ -75,7 +91,12 @@ class ExamController extends Controller
         }
 
         $exam->update($data);
-        $exam->load(['course', 'subject', 'examStatus', 'examType']);
+
+        if ($courseIds !== null) {
+            $this->examCourseService->sync($exam, $courseIds, (int) $exam->tenant_id);
+        }
+
+        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType']);
 
         return $this->success(new ExamResource($exam));
     }

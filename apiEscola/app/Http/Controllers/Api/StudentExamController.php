@@ -8,6 +8,7 @@ use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Student;
+use App\Services\ExamAccessService;
 use App\Services\ExamAttemptIntegrityService;
 use App\Services\StudentEnrollmentService;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,7 @@ class StudentExamController extends Controller
     public function __construct(
         private readonly StudentEnrollmentService $enrollmentService,
         private readonly ExamAttemptIntegrityService $integrity,
+        private readonly ExamAccessService $examAccess,
     ) {
     }
 
@@ -77,11 +79,11 @@ class StudentExamController extends Controller
             $period = 'open';
         }
 
-        $examsQuery = Exam::with(['course', 'subject', 'examStatus', 'examType'])
+        $examsQuery = Exam::with(['course', 'courses', 'subject', 'examStatus', 'examType'])
             ->withCount('questions')
             ->withSum('questions as total_points_sum', 'points')
             ->where('tenant_id', $user->tenant_id)
-            ->whereIn('course_id', $courseIds)
+            ->forStudentCourses($courseIds)
             ->whereHas('examStatus', fn ($q) => $q->where('slug', 'published'));
 
         if ($period === 'open') {
@@ -201,11 +203,11 @@ class StudentExamController extends Controller
             return $this->forbidden();
         }
 
-        if ($exam->course_id && ! $this->enrollmentService->hasActiveEnrollmentInCourse($student, $exam->course_id)) {
+        if (! $this->examAccess->hasActiveEnrollmentForExam($student, $exam)) {
             return $this->forbidden('Você não possui matrícula ativa neste curso.');
         }
 
-        $exam->load(['course', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject']);
+        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject']);
 
         $attempt = ExamAttempt::with(['attemptStatus', 'exam:id,release_results_after_end,ends_at'])
             ->where('exam_id', $exam->id)

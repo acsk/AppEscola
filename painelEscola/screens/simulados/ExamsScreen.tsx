@@ -351,7 +351,11 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
               </View>
               <View style={{ flex: 2 }}>
                 <Text className="text-sm text-gray-700">
-                  {exam.course?.name ?? <Text className="text-gray-400">—</Text>}
+                  {exam.courses?.length
+                    ? exam.courses.map((c) => c.name).join(", ")
+                    : exam.course?.name ?? (
+                        <Text className="text-gray-400">—</Text>
+                      )}
                 </Text>
                 {exam.subject ? (
                   <View className="flex-row items-center gap-1.5 mt-0.5">
@@ -492,10 +496,14 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                     <Ionicons name="star-outline" size={14} color="#6B7280" />
                     <Text className="text-sm text-gray-500">{previewExam.total_points} pontos</Text>
                   </View>
-                  {previewExam.course && (
+                  {(previewExam.courses?.length || previewExam.course) && (
                     <View className="flex-row items-center gap-1.5">
                       <Ionicons name="book-outline" size={14} color="#6B7280" />
-                      <Text className="text-sm text-gray-500">{previewExam.course.name}</Text>
+                      <Text className="text-sm text-gray-500">
+                        {previewExam.courses?.length
+                          ? previewExam.courses.map((c) => c.name).join(", ")
+                          : previewExam.course?.name}
+                      </Text>
                     </View>
                   )}
                   {previewExam.subject && (

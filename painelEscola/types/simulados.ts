@@ -4,7 +4,7 @@ export type ExamForm = {
   title: string;
   exam_type: string;
   status: string;
-  course_id: string;
+  course_ids: number[];
   subject_id: string;
   description: string;
   duration_minutes: string;
@@ -90,6 +90,8 @@ export type ExamListItem = {
   total_questions: number;
   total_points: number;
   course: { id: number; name: string } | null;
+  courses?: { id: number; name: string }[];
+  course_ids?: number[];
   subject: { id: number; name: string; icon: string | null; color: string | null } | null;
 };
 

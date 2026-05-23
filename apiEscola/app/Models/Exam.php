@@ -5,8 +5,11 @@ namespace App\Models;
 use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Exam extends Model
@@ -53,6 +56,37 @@ class Exam extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function courses(): BelongsToMany
+    {
+        return $this->belongsToMany(Course::class, 'exam_course')->withTimestamps();
+    }
+
+    /** IDs dos cursos vinculados (pivot + legado em course_id). */
+    public function linkedCourseIds(): Collection
+    {
+        $ids = $this->relationLoaded('courses')
+            ? $this->courses->pluck('id')
+            : $this->courses()->pluck('courses.id');
+
+        if ($ids->isNotEmpty()) {
+            return $ids->map(fn ($id) => (int) $id)->values();
+        }
+
+        return $this->course_id ? collect([(int) $this->course_id]) : collect();
+    }
+
+    /** Simulados visíveis para alunos matriculados em pelo menos um dos cursos informados. */
+    public function scopeForStudentCourses(Builder $query, Collection $courseIds): Builder
+    {
+        return $query->where(function (Builder $q) use ($courseIds) {
+            $q->whereHas('courses', fn (Builder $c) => $c->whereIn('courses.id', $courseIds))
+                ->orWhere(function (Builder $inner) use ($courseIds) {
+                    $inner->whereDoesntHave('courses')
+                        ->whereIn('course_id', $courseIds);
+                });
+        });
     }
 
     public function subject(): BelongsTo

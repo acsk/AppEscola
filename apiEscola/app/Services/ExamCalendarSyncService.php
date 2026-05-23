@@ -10,7 +10,7 @@ class ExamCalendarSyncService
 {
     public function sync(Exam $exam): void
     {
-        $exam->loadMissing(['examStatus', 'examType', 'course']);
+        $exam->loadMissing(['examStatus', 'examType', 'course', 'courses']);
 
         if (! $exam->isPublished() || (! $exam->starts_at && ! $exam->ends_at)) {
             $this->remove($exam);
@@ -37,6 +37,9 @@ class ExamCalendarSyncService
             ? $exam->title
             : $titlePrefix.$exam->title;
 
+        $linkedCourseIds = $exam->linkedCourseIds();
+        $primaryCourseId = $linkedCourseIds->first();
+
         CalendarEvent::updateOrCreate(
             [
                 'source_type' => 'exam',
@@ -50,11 +53,13 @@ class ExamCalendarSyncService
                 'starts_at'       => $startsAt,
                 'ends_at'         => $endsAt,
                 'all_day'         => false,
-                'course_id'       => $exam->course_id,
+                'course_id'       => $primaryCourseId,
                 'school_class_id' => null,
                 'location'        => null,
-                'audience_type'   => 'course',
-                'audience_params' => ['course_id' => $exam->course_id],
+                'audience_type'   => $linkedCourseIds->isEmpty() ? 'tenant' : 'course',
+                'audience_params' => $linkedCourseIds->isEmpty()
+                    ? null
+                    : ['course_id' => $primaryCourseId, 'course_ids' => $linkedCourseIds->values()->all()],
                 'is_published'    => true,
                 'updated_by'      => $exam->updated_by,
                 'created_by'      => $exam->created_by,

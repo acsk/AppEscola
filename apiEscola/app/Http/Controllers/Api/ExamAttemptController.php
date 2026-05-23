@@ -101,7 +101,7 @@ class ExamAttemptController extends Controller
         $this->examAccess->assertTenantMatch($request, $exam->tenant_id);
 
         if ($user->role === 'aluno') {
-            $this->examAccess->assertActiveEnrollmentForExam($student, $exam->course_id);
+            $this->examAccess->assertActiveEnrollmentForExam($student, $exam);
         }
 
         if (!$exam->isPublished()) {

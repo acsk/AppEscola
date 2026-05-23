@@ -46,7 +46,7 @@ const EMPTY_EXAM: ExamForm = {
   title: "",
   exam_type: "custom",
   status: "draft",
-  course_id: "",
+  course_ids: [],
   subject_id: "",
   description: "",
   duration_minutes: "",
@@ -208,7 +208,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Select options loaded from API
-  const [courseOptions, setCourseOptions] = useState<SelectOption[]>([]);
+  const [courseOptions, setCourseOptions] = useState<{ id: number; name: string }[]>([]);
   const [subjectOptions, setSubjectOptions] = useState<SearchableOption[]>([]);
 
   // Questions state
@@ -283,10 +283,12 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           api.get("/courses", { params: { per_page: 200 } }),
           api.get("/subjects", { params: { status: "active", per_page: 200 } }),
         ]);
-        setCourseOptions([
-          { value: "", label: "Nenhum" },
-          ...(cRes.data.data ?? cRes.data).map((c: any) => ({ value: String(c.id), label: c.name })),
-        ]);
+        setCourseOptions(
+          (cRes.data.data ?? cRes.data).map((c: { id: number; name: string }) => ({
+            id: c.id,
+            name: c.name,
+          }))
+        );
         setSubjectOptions([
           { value: "", label: "Nenhuma" },
           ...(sRes.data.data ?? sRes.data).map((s: any) => ({ value: String(s.id), label: s.name })),
@@ -307,7 +309,13 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           title: exam.title ?? "",
           exam_type: exam.exam_type ?? "custom",
           status: exam.status ?? "draft",
-          course_id: exam.course?.id ? String(exam.course.id) : "",
+          course_ids: Array.isArray(exam.courses)
+            ? exam.courses.map((c: { id: number }) => c.id)
+            : Array.isArray(exam.course_ids)
+              ? exam.course_ids
+              : exam.course?.id
+                ? [exam.course.id]
+                : [],
           subject_id: exam.subject?.id ? String(exam.subject.id) : "",
           description: exam.description ?? "",
           duration_minutes: exam.duration_minutes != null ? String(exam.duration_minutes) : "",
@@ -354,6 +362,15 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const setField = (k: keyof ExamForm, v: string) =>
     setForm((prev) => ({ ...prev, [k]: v }));
 
+  const toggleCourse = (courseId: number) => {
+    setForm((prev) => ({
+      ...prev,
+      course_ids: prev.course_ids.includes(courseId)
+        ? prev.course_ids.filter((id) => id !== courseId)
+        : [...prev.course_ids, courseId],
+    }));
+  };
+
   const saveExam = async () => {
     const errs = validateExam(form);
     setErrors(errs);
@@ -369,7 +386,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         exam_type: form.exam_type,
         status: form.status,
         description: form.description.trim() || null,
-        course_id: form.course_id ? Number(form.course_id) : null,
+        course_ids: form.course_ids,
         subject_id: form.subject_id ? Number(form.subject_id) : null,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
         passing_score: form.passing_score ? Number(form.passing_score) : null,
@@ -971,16 +988,52 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           </View>
         </View>
 
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-gray-700 mb-1">Cursos</Text>
+          <Text className="text-xs text-gray-400 mb-3">
+            Selecione um ou mais cursos. Alunos matriculados em qualquer um deles verão o simulado.
+          </Text>
+          {courseOptions.length === 0 ? (
+            <Text className="text-sm text-gray-400">Nenhum curso disponível</Text>
+          ) : (
+            <View className="gap-2">
+              {courseOptions.map((course) => {
+                const selected = form.course_ids.includes(course.id);
+                return (
+                  <TouchableOpacity
+                    key={course.id}
+                    onPress={() => toggleCourse(course.id)}
+                    activeOpacity={0.7}
+                    className={`flex-row items-center gap-3 px-4 py-3 rounded-xl border ${
+                      selected ? "bg-violet-50 border-violet-200" : "bg-gray-50 border-gray-100"
+                    }`}
+                  >
+                    <Ionicons
+                      name={selected ? "checkbox" : "square-outline"}
+                      size={20}
+                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                    />
+                    <Text
+                      className={`text-sm font-medium ${
+                        selected ? "text-violet-700" : "text-gray-700"
+                      }`}
+                    >
+                      {course.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+          {form.course_ids.length > 0 && (
+            <Text className="text-xs text-green-600 mt-2">
+              {form.course_ids.length} curso{form.course_ids.length !== 1 ? "s" : ""} selecionado
+              {form.course_ids.length !== 1 ? "s" : ""}
+            </Text>
+          )}
+        </View>
+
         <View className="flex-row gap-4 flex-wrap">
-          <View style={{ flex: 1.2, minWidth: 220 }}>
-            <FormSelect
-              label="Curso"
-              value={form.course_id}
-              options={courseOptions}
-              onChange={(v) => setField("course_id", v)}
-              placeholder="Selecione um curso"
-            />
-          </View>
           <View style={{ flex: 1.2, minWidth: 240 }}>
             <SearchableSelect
               label="Matéria"

@@ -10,10 +10,31 @@ class UpdateExamRequest extends FormRequest
 {
     public function authorize(): bool { return true; }
 
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('course_ids') && ! $this->has('course_id')) {
+            return;
+        }
+
+        $ids = $this->input('course_ids');
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+        if ($this->filled('course_id')) {
+            $ids[] = $this->input('course_id');
+        }
+
+        $this->merge([
+            'course_ids' => array_values(array_unique(array_map('intval', array_filter($ids)))),
+        ]);
+    }
+
     public function rules(): array
     {
         return [
-            'course_id'        => ['sometimes', 'nullable', 'exists:courses,id'],
+            'course_ids'       => ['sometimes', 'nullable', 'array'],
+            'course_ids.*'     => ['integer', 'exists:courses,id'],
+            'course_id'        => ['sometimes', 'nullable', 'integer', 'exists:courses,id'],
             'subject_id'       => ['sometimes', 'nullable', 'exists:subjects,id'],
             'title'            => ['sometimes', 'string', 'max:255'],
             'description'      => ['sometimes', 'nullable', 'string'],
