@@ -15,6 +15,7 @@ export type CarnePreviewInvoice = {
   has_boleto: boolean;
   carne_ready?: boolean;
   needs_boleto_issue?: boolean;
+  needs_pdf_sync?: boolean;
   cora_charge_id: string | null;
 };
 
@@ -47,11 +48,14 @@ export type CarnePreview = {
 
 export async function fetchCarnePreview(
   enrollmentId: number,
-  invoiceIds?: number[]
+  options?: { invoiceIds?: number[]; environment?: string }
 ): Promise<CarnePreview> {
   const params: Record<string, unknown> = {};
-  if (invoiceIds?.length) {
-    params.invoice_ids = invoiceIds;
+  if (options?.invoiceIds?.length) {
+    params.invoice_ids = options.invoiceIds;
+  }
+  if (options?.environment) {
+    params.environment = options.environment;
   }
   const { data } = await api.get(`/enrollments/${enrollmentId}/carne/preview`, { params });
   const body = (data as ApiEnvelope<CarnePreview>).body ?? data;

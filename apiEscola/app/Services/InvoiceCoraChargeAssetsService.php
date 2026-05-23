@@ -38,6 +38,10 @@ class InvoiceCoraChargeAssetsService
         $hasPix = $this->hasPixAssets($assets);
         $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
 
+        if ($hasBoleto && $this->resolveBoletoPdfUrl($invoice) === null) {
+            return true;
+        }
+
         if ($hasBoleto && $hasPix) {
             return false;
         }
@@ -188,16 +192,15 @@ class InvoiceCoraChargeAssetsService
     {
         $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
 
-        $candidates = [
-            data_get($payload, 'payment_options.bank_slip.pdf'),
-            data_get($payload, 'payment_options.bank_slip.url'),
-            $invoice->cora_payment_url,
-            data_get($payload, 'bank_slip.pdf'),
-            data_get($payload, 'bank_slip.url'),
-            data_get($payload, 'boleto_url'),
-        ];
+        return $this->resolveBoletoPdfUrlFromPayload($payload, $invoice);
+    }
 
-        foreach ($candidates as $candidate) {
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function resolveBoletoPdfUrlFromPayload(array $payload, ?Invoice $invoice = null): ?string
+    {
+        foreach ($this->collectBoletoPdfCandidates($payload, $invoice) as $candidate) {
             $url = $this->coerceScalarString($candidate);
             if ($url === null) {
                 continue;
@@ -208,14 +211,111 @@ class InvoiceCoraChargeAssetsService
             }
         }
 
-        foreach ($candidates as $candidate) {
+        foreach ($this->collectBoletoPdfCandidates($payload, $invoice) as $candidate) {
             $url = $this->coerceScalarString($candidate);
-            if ($url !== null) {
+            if ($url !== null && $this->looksLikeHttpUrl($url)) {
                 return $url;
             }
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<int, mixed>
+     */
+    public function collectBoletoPdfCandidates(array $payload, ?Invoice $invoice = null): array
+    {
+        $bankSlip = data_get($payload, 'payment_options.bank_slip');
+
+        $candidates = [
+            data_get($payload, 'payment_options.bank_slip.url'),
+            data_get($payload, 'payment_options.bank_slip.pdf'),
+            data_get($payload, 'payment_options.bank_slip.link'),
+            is_array($bankSlip) ? $bankSlip : null,
+            data_get($payload, 'bank_slip.url'),
+            data_get($payload, 'bank_slip.pdf'),
+            data_get($payload, 'boleto_url'),
+            data_get($payload, 'payment_url'),
+            data_get($payload, 'checkout_url'),
+            data_get($payload, 'method_charges.bank_slip.payment_url'),
+            data_get($payload, 'links.payment'),
+            data_get($payload, 'links.checkout'),
+            data_get($payload, 'links.bank_slip'),
+        ];
+
+        $links = $payload['links'] ?? null;
+        if (is_array($links)) {
+            $candidates[] = $this->extractHrefFromLinks($links, ['payment', 'checkout', 'bank_slip', 'BANK_SLIP']);
+        }
+
+        if ($invoice !== null) {
+            $candidates[] = $invoice->cora_payment_url;
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $links
+     * @param  array<int, string>  $rels
+     */
+    public function extractHrefFromLinks(array $links, array $rels): ?string
+    {
+        foreach ($rels as $rel) {
+            $key = strtolower($rel);
+            if (array_key_exists($key, $links)) {
+                $href = $this->coerceScalarString($links[$key]);
+                if ($href !== null) {
+                    return $href;
+                }
+            }
+        }
+
+        if (! array_is_list($links)) {
+            return null;
+        }
+
+        foreach ($links as $link) {
+            if (! is_array($link)) {
+                $href = $this->coerceScalarString($link);
+                if ($href !== null) {
+                    return $href;
+                }
+
+                continue;
+            }
+
+            $rel = strtoupper((string) ($link['rel'] ?? $link['type'] ?? $link['name'] ?? ''));
+            $href = $this->coerceScalarString($link['href'] ?? $link['url'] ?? null);
+
+            if ($href === null) {
+                continue;
+            }
+
+            foreach ($rels as $wanted) {
+                $wantedUpper = strtoupper($wanted);
+                if ($rel === $wantedUpper || str_contains($rel, $wantedUpper)) {
+                    return $href;
+                }
+            }
+        }
+
+        foreach ($links as $link) {
+            $href = $this->coerceScalarString(is_array($link) ? ($link['href'] ?? $link['url'] ?? null) : $link);
+            if ($href !== null) {
+                return $href;
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikeHttpUrl(string $url): bool
+    {
+        return str_starts_with(strtolower($url), 'http://')
+            || str_starts_with(strtolower($url), 'https://');
     }
 
     private function looksLikePdfUrl(string $url): bool
@@ -412,13 +512,15 @@ class InvoiceCoraChargeAssetsService
      */
     private function extractPaymentUrl(array $externalInvoice): ?string
     {
+        $links = $externalInvoice['links'] ?? null;
         $candidates = [
-            $externalInvoice['payment_url'] ?? null,
-            $externalInvoice['checkout_url'] ?? null,
             data_get($externalInvoice, 'payment_options.bank_slip.url'),
             data_get($externalInvoice, 'payment_options.bank_slip.pdf'),
+            $externalInvoice['payment_url'] ?? null,
+            $externalInvoice['checkout_url'] ?? null,
             data_get($externalInvoice, 'links.payment'),
             data_get($externalInvoice, 'link'),
+            is_array($links) ? $this->extractHrefFromLinks($links, ['payment', 'checkout', 'bank_slip']) : null,
         ];
 
         foreach ($candidates as $value) {

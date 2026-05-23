@@ -27,8 +27,14 @@ type Props = {
   onError?: (message: string) => void;
 };
 
-type Step = "select" | "confirm";
-type AccordionKey = "excluded" | "eligible" | "confirmExcluded" | "confirmSelected";
+type Step = "intro" | "select" | "options" | "confirm";
+
+const STEPS: { id: Step; label: string }[] = [
+  { id: "intro", label: "Resumo" },
+  { id: "select", label: "Parcelas" },
+  { id: "options", label: "Opções" },
+  { id: "confirm", label: "Gerar" },
+];
 
 const money = (v: string | number | null | undefined) => {
   if (v === null || v === undefined || v === "") return "—";
@@ -37,98 +43,41 @@ const money = (v: string | number | null | undefined) => {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pendente",
-  overdue: "Vencida",
-  paid: "Paga",
-  cancelled: "Cancelada",
-};
-
-function dueAmountLine(inv: { due_date: string | null; amount: string }) {
-  return `Venc. ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)}`;
+function isInvoiceCarneReady(inv: CarnePreviewInvoice): boolean {
+  return inv.carne_ready === true;
 }
 
-function AccordionSection({
-  title,
-  badge,
-  expanded,
-  onToggle,
-  tone,
-  headerAction,
-  maxBodyHeight,
-  children,
-}: {
-  title: string;
-  badge?: string;
-  expanded: boolean;
-  onToggle: () => void;
-  tone: "amber" | "violet" | "emerald";
-  headerAction?: React.ReactNode;
-  maxBodyHeight?: number;
-  children: React.ReactNode;
-}) {
-  const tones = {
-    amber: {
-      wrap: "border-amber-200 bg-amber-50/30",
-      head: "bg-amber-50",
-      title: "text-amber-950",
-      badge: "bg-amber-100 text-amber-900",
-    },
-    violet: {
-      wrap: "border-violet-200 bg-violet-50/20",
-      head: "bg-violet-50",
-      title: "text-violet-950",
-      badge: "bg-violet-100 text-violet-900",
-    },
-    emerald: {
-      wrap: "border-emerald-200 bg-emerald-50/20",
-      head: "bg-emerald-50",
-      title: "text-emerald-950",
-      badge: "bg-emerald-100 text-emerald-900",
-    },
-  }[tone];
+function StepIndicator({ current }: { current: Step }) {
+  const index = STEPS.findIndex((s) => s.id === current);
 
   return (
-    <View className={`rounded-xl border mb-3 overflow-hidden ${tones.wrap}`}>
-      <View className={`flex-row items-center gap-2 px-3 py-2.5 ${tones.head}`}>
-        <TouchableOpacity
-          onPress={onToggle}
-          activeOpacity={0.8}
-          className="flex-row items-center gap-2 flex-1 min-w-0"
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-        >
-          <Ionicons
-            name={expanded ? "chevron-up" : "chevron-down"}
-            size={18}
-            color={tone === "amber" ? "#B45309" : tone === "violet" ? "#6D28D9" : "#047857"}
-          />
-          <Text className={`flex-1 text-sm font-bold ${tones.title}`} numberOfLines={1}>
-            {title}
-          </Text>
-          {badge ? (
-            <View className={`rounded-full px-2 py-0.5 ${tones.badge}`}>
-              <Text className="text-[10px] font-bold">{badge}</Text>
-            </View>
-          ) : null}
-        </TouchableOpacity>
-        {headerAction}
-      </View>
-      {expanded ? (
-        <View className="px-2 pb-2 pt-1">
-          {maxBodyHeight ? (
-            <ScrollView
-              style={{ maxHeight: maxBodyHeight }}
-              showsVerticalScrollIndicator
-              nestedScrollEnabled
+    <View className="flex-row items-center justify-center gap-1 mb-4 px-1">
+      {STEPS.map((step, i) => {
+        const done = i < index;
+        const active = i === index;
+        return (
+          <View key={step.id} className="flex-row items-center flex-1 max-w-[72px]">
+            <View
+              className={`h-7 w-7 rounded-full items-center justify-center ${
+                active ? "bg-violet-600" : done ? "bg-violet-200" : "bg-gray-200"
+              }`}
             >
-              {children}
-            </ScrollView>
-          ) : (
-            children
-          )}
-        </View>
-      ) : null}
+              {done ? (
+                <Ionicons name="checkmark" size={14} color="#5B21B6" />
+              ) : (
+                <Text
+                  className={`text-xs font-bold ${active ? "text-white" : "text-gray-500"}`}
+                >
+                  {i + 1}
+                </Text>
+              )}
+            </View>
+            {i < STEPS.length - 1 ? (
+              <View className={`flex-1 h-0.5 mx-0.5 ${done ? "bg-violet-300" : "bg-gray-200"}`} />
+            ) : null}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -143,48 +92,33 @@ export default function EnrollmentCarneModal({
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [step, setStep] = useState<Step>("select");
+  const [step, setStep] = useState<Step>("intro");
   const [preview, setPreview] = useState<CarnePreview | null>(null);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
   const [issueMissing, setIssueMissing] = useState(false);
   const [requireAll, setRequireAll] = useState(true);
-  const [openSections, setOpenSections] = useState<Record<AccordionKey, boolean>>({
-    excluded: true,
-    eligible: true,
-    confirmExcluded: false,
-    confirmSelected: true,
-  });
-
-  const toggleSection = (key: AccordionKey) => {
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  const [showExcluded, setShowExcluded] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchCarnePreview(enrollmentId);
+      const data = await fetchCarnePreview(enrollmentId, { environment });
       setPreview(data);
       const initial: Record<number, boolean> = {};
       data.invoices.forEach((inv) => {
-        const ready = inv.carne_ready ?? inv.has_boleto;
-        initial[inv.invoice_id] = ready;
+        initial[inv.invoice_id] = isInvoiceCarneReady(inv);
       });
       setSelected(initial);
       setIssueMissing(false);
       setRequireAll(true);
-      setStep("select");
-      setOpenSections({
-        excluded: (data.excluded_invoices?.length ?? 0) > 0,
-        eligible: (data.invoices?.length ?? 0) > 0,
-        confirmExcluded: false,
-        confirmSelected: true,
-      });
+      setStep("intro");
+      setShowExcluded(false);
     } catch (e: any) {
       onError?.(e?.response?.data?.message || "Não foi possível carregar o carnê.");
       setPreview(null);
     }
     setLoading(false);
-  }, [enrollmentId, onError]);
+  }, [enrollmentId, environment, onError]);
 
   useEffect(() => {
     if (visible) {
@@ -192,7 +126,7 @@ export default function EnrollmentCarneModal({
     } else {
       setPreview(null);
       setSelected({});
-      setStep("select");
+      setStep("intro");
     }
   }, [visible, load]);
 
@@ -204,9 +138,9 @@ export default function EnrollmentCarneModal({
   const selectedInvoices =
     preview?.invoices.filter((inv) => selected[inv.invoice_id]) ?? [];
 
-  const selectedNeedingIssue = selectedInvoices.filter(
-    (inv) => !(inv.carne_ready ?? inv.has_boleto)
-  ).length;
+  const readyCount = preview?.ready_for_bundle_count ?? 0;
+  const needsPdfCount =
+    preview?.invoices.filter((inv) => inv.needs_pdf_sync).length ?? 0;
 
   const toggle = (id: number) => {
     setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -286,91 +220,91 @@ export default function EnrollmentCarneModal({
     setGenerating(false);
   };
 
-  const onContinue = () => {
+  const validateSelection = (): boolean => {
     if (selectedIds.length === 0) {
       onError?.("Selecione ao menos uma cobrança.");
-      return;
+      return false;
     }
-    if (!issueMissing && selectedNeedingIssue > 0) {
+
+    const notReady = selectedInvoices.filter((inv) => !isInvoiceCarneReady(inv));
+    if (!issueMissing && notReady.length > 0) {
       onError?.(
-        `${selectedNeedingIssue} parcela(s) selecionada(s) ainda não têm boleto emitido. ` +
-          "Marque \"Emitir faltantes no provedor\" ou selecione só parcelas com boleto pronto."
+        `${notReady.length} parcela(s) sem PDF de boleto disponível. ` +
+          'Marque "Emitir faltantes" ou sincronize em Financeiro.'
       );
-      return;
+      return false;
     }
-    setStep("confirm");
-    setOpenSections((prev) => ({
-      ...prev,
-      confirmExcluded: excluded.length > 0,
-      confirmSelected: true,
-    }));
+
+    return true;
   };
 
-  const renderOptionToggle = (
-    label: string,
-    hint: string,
-    value: boolean,
-    onToggle: () => void
-  ) => (
-    <TouchableOpacity
-      onPress={onToggle}
-      activeOpacity={0.85}
-      className="flex-row items-start gap-2.5 px-3 py-2.5 rounded-lg border border-gray-200 bg-white mb-2"
-    >
-      <Ionicons
-        name={value ? "checkbox" : "square-outline"}
-        size={18}
-        color={value ? "#7C3AED" : "#9CA3AF"}
-        style={{ marginTop: 1 }}
-      />
-      <View style={{ flex: 1 }}>
-        <Text className="text-sm font-semibold text-gray-800">{label}</Text>
-        <Text className="text-xs text-gray-500 leading-relaxed">{hint}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const goNext = () => {
+    if (step === "intro") {
+      setStep("select");
+      return;
+    }
+    if (step === "select") {
+      if (!validateSelection()) return;
+      setStep("options");
+      return;
+    }
+    if (step === "options") {
+      setStep("confirm");
+    }
+  };
 
-  const renderEligibleRow = (inv: CarnePreviewInvoice, selectable = true) => {
+  const goBack = () => {
+    if (step === "confirm") setStep("options");
+    else if (step === "options") setStep("select");
+    else if (step === "select") setStep("intro");
+  };
+
+  const renderInvoiceRow = (
+    inv: CarnePreviewInvoice,
+    selectable: boolean
+  ) => {
     const checked = !!selected[inv.invoice_id];
-    const ready = inv.carne_ready ?? inv.has_boleto;
-    const metaSuffix = ready
-      ? " · Pronta para carnê"
-      : issueMissing
-        ? " · Será emitida no provedor"
-        : " · Emitir boleto antes";
-    const metaColor = ready ? "#047857" : issueMissing ? "#B45309" : "#DC2626";
+    const ready = isInvoiceCarneReady(inv);
+    const needsSync = inv.needs_pdf_sync;
+    const statusText = ready
+      ? "Pronta"
+      : needsSync
+        ? "Sincronizar PDF"
+        : issueMissing
+          ? "Emitir no provedor"
+          : "Sem boleto";
+    const statusColor = ready ? "#047857" : needsSync ? "#B45309" : "#DC2626";
 
-    const content = (
-      <>
+    const row = (
+      <View className="flex-row items-center gap-2 min-w-0 flex-1">
         {selectable ? (
           <Ionicons
             name={checked ? "checkbox" : "square-outline"}
             size={18}
             color={checked ? "#7C3AED" : "#9CA3AF"}
-            style={{ marginTop: 1 }}
           />
         ) : (
-          <Ionicons name="checkmark-circle" size={18} color="#7C3AED" style={{ marginTop: 1 }} />
+          <Ionicons name="checkmark-circle" size={18} color="#7C3AED" />
         )}
-        <View style={{ flex: 1, minWidth: 0 }}>
+        <View className="flex-1 min-w-0">
           <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
             {inv.description}
           </Text>
           <Text className="text-xs text-gray-500" numberOfLines={1}>
-            {dueAmountLine(inv)}
-            <Text style={{ color: metaColor, fontWeight: "600" }}>{metaSuffix}</Text>
+            {`Venc. ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)} · `}
+            <Text style={{ color: statusColor, fontWeight: "600" }}>{statusText}</Text>
           </Text>
         </View>
-      </>
+      </View>
     );
 
     if (!selectable) {
       return (
         <View
           key={inv.invoice_id}
-          className="flex-row items-start gap-2 px-2 py-2 rounded-lg bg-white border border-violet-100 mb-1"
+          className="px-3 py-2 border-b border-gray-100"
         >
-          {content}
+          {row}
         </View>
       );
     }
@@ -380,216 +314,252 @@ export default function EnrollmentCarneModal({
         key={inv.invoice_id}
         onPress={() => toggle(inv.invoice_id)}
         activeOpacity={0.85}
-        className={`flex-row items-start gap-2 px-2 py-2 rounded-lg border mb-1 ${
-          checked ? "border-violet-300 bg-white" : "border-gray-100 bg-white/80"
-        }`}
+        className={`px-3 py-2 border-b border-gray-100 ${checked ? "bg-violet-50/50" : ""}`}
       >
-        {content}
+        {row}
       </TouchableOpacity>
     );
   };
 
   const renderExcludedRow = (inv: CarneExcludedInvoice) => (
-    <View
-      key={inv.invoice_id}
-      className="flex-row items-start gap-2 px-2 py-2 rounded-lg border border-gray-100 bg-white mb-1"
-    >
-      <Ionicons name="close-circle" size={16} color="#D1D5DB" style={{ marginTop: 2 }} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text className="text-sm font-medium text-gray-800" numberOfLines={1}>
-          {inv.description}
-        </Text>
-        <Text className="text-xs text-gray-500" numberOfLines={1}>
-          {`${dueAmountLine(inv)} · ${STATUS_LABELS[inv.status] ?? inv.status} · ${inv.reason_label}`}
-        </Text>
-      </View>
+    <View key={inv.invoice_id} className="px-3 py-2 border-b border-amber-100">
+      <Text className="text-sm text-gray-800" numberOfLines={1}>
+        {inv.description}
+      </Text>
+      <Text className="text-xs text-gray-500" numberOfLines={1}>
+        {`${inv.reason_label} · ${money(inv.amount)}`}
+      </Text>
     </View>
   );
 
   const studentLabel = preview?.student_name ?? "Aluno";
+  const archiveLabel =
+    preview?.archive_format === "zip" ? "ZIP (um PDF por parcela)" : "PDF único";
 
-  const renderSelectStep = () => (
-    <>
-      <View className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5 mb-3 flex-row gap-2">
-        <Ionicons name="information-circle-outline" size={17} color="#2563EB" />
-        <Text className="text-xs text-blue-800 flex-1 leading-relaxed">
-          {issueMissing
-            ? "Modo emissão: cria ou atualiza cobranças no provedor e monta o arquivo. Pode falhar parcela a parcela."
-            : `Modo carnê (padrão): monta ${preview?.archive_format === "zip" ? "ZIP" : "PDF"} só com boletos já emitidos — sem nova cobrança no provedor.`}
+  const renderIntro = () => (
+    <View>
+      <View className="rounded-xl bg-violet-50 border border-violet-100 p-4 mb-3">
+        <Text className="text-base font-bold text-violet-950">{studentLabel}</Text>
+        <Text className="text-xs text-violet-700 mt-1">
+          {preview?.enrollment_number ? `Matrícula ${preview.enrollment_number}` : ""}
         </Text>
       </View>
+      <View className="flex-row flex-wrap gap-2 mb-3">
+        <View className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2 flex-1 min-w-[45%]">
+          <Text className="text-lg font-bold text-emerald-800">{preview?.eligible_count ?? 0}</Text>
+          <Text className="text-[10px] text-emerald-700">Aptas ao carnê</Text>
+        </View>
+        <View className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 flex-1 min-w-[45%]">
+          <Text className="text-lg font-bold text-gray-800">{excluded.length}</Text>
+          <Text className="text-[10px] text-gray-600">Excluídas</Text>
+        </View>
+      </View>
+      <Text className="text-sm text-gray-700 mb-2">
+        Formato: <Text className="font-semibold">{archiveLabel}</Text>
+      </Text>
+      <Text className="text-xs text-gray-500 leading-relaxed">
+        {preview?.archive_format_hint}
+      </Text>
+      {needsPdfCount > 0 ? (
+        <View className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex-row gap-2">
+          <Ionicons name="warning-outline" size={18} color="#B45309" />
+          <Text className="text-xs text-amber-900 flex-1 leading-relaxed">
+            {`${needsPdfCount} parcela(s) têm boleto na Cora, mas o PDF ainda não está acessível. `}
+            O passo seguinte mostra quais precisam de sincronização.
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
 
-      {renderOptionToggle(
-        "Exigir todas as parcelas selecionadas",
-        "Se alguma falhar, o carnê inteiro não é baixado (recomendado).",
-        requireAll,
-        () => setRequireAll((v) => !v)
-      )}
-      {renderOptionToggle(
-        "Emitir faltantes no provedor",
-        "Parcelas sem boleto serão emitidas na Cora ao gerar (comportamento antigo).",
-        issueMissing,
-        () => setIssueMissing((v) => !v)
-      )}
-
-      {preview && preview.invoices.length > 0 ? (
-        <Text className="text-xs text-gray-600 mb-2 px-1">
-          {`${preview.ready_for_bundle_count ?? 0} com boleto pronto · ${preview.invoices.length - (preview.ready_for_bundle_count ?? 0)} aguardando emissão`}
+  const renderSelect = () => (
+    <View className="flex-1">
+      <View className="flex-row items-center justify-between mb-2 px-1">
+        <Text className="text-xs text-gray-600">
+          {`${readyCount} pronta(s) · ${selectedIds.length} selecionada(s)`}
         </Text>
-      ) : null}
-
-      {excluded.length > 0 ? (
-        <AccordionSection
-          title="Não entram no carnê"
-          badge={String(excluded.length)}
-          expanded={openSections.excluded}
-          onToggle={() => toggleSection("excluded")}
-          tone="amber"
-          maxBodyHeight={200}
-        >
-          {excluded.map(renderExcludedRow)}
-        </AccordionSection>
-      ) : null}
-
+        {preview && preview.invoices.length > 0 ? (
+          <TouchableOpacity onPress={() => toggleAll(selectedIds.length !== preview.invoices.length)}>
+            <Text className="text-xs font-bold text-violet-700">
+              {selectedIds.length === preview.invoices.length ? "Desmarcar todas" : "Marcar todas"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
       {!preview || preview.invoices.length === 0 ? (
-        <View className="py-8 items-center gap-2">
-          <Ionicons name="document-outline" size={32} color="#D1D5DB" />
-          <Text className="text-sm text-gray-500 text-center px-4">
-            {excluded.length > 0
-              ? "Não há cobranças aptas. Abra a seção acima para ver o motivo de cada uma."
-              : "Não há cobranças nesta matrícula para o carnê."}
+        <View className="py-8 items-center">
+          <Text className="text-sm text-gray-500 text-center">
+            Não há cobranças aptas para o carnê.
           </Text>
         </View>
       ) : (
-        <AccordionSection
-          title={`Aptas — ${studentLabel}`}
-          badge={`${selectedIds.length}/${preview.invoices.length}`}
-          expanded={openSections.eligible}
-          onToggle={() => toggleSection("eligible")}
-          tone="violet"
-          maxBodyHeight={280}
-          headerAction={
-            <TouchableOpacity
-              onPress={() => toggleAll(selectedIds.length !== preview.invoices.length)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text className="text-[10px] font-bold text-violet-700">
-                {selectedIds.length === preview.invoices.length ? "Desmarcar" : "Marcar"}
-              </Text>
-            </TouchableOpacity>
-          }
-        >
-          {preview.invoices.map((inv) => renderEligibleRow(inv, true))}
-        </AccordionSection>
+        <View className="rounded-xl border border-gray-200 overflow-hidden max-h-[280px]">
+          <ScrollView nestedScrollEnabled>
+            {preview.invoices.map((inv) => renderInvoiceRow(inv, true))}
+          </ScrollView>
+        </View>
       )}
-    </>
+      {excluded.length > 0 ? (
+        <TouchableOpacity
+          onPress={() => setShowExcluded((v) => !v)}
+          className="mt-3 flex-row items-center gap-1"
+        >
+          <Ionicons
+            name={showExcluded ? "chevron-up" : "chevron-down"}
+            size={16}
+            color="#9CA3AF"
+          />
+          <Text className="text-xs text-gray-500">
+            {`${excluded.length} cobrança(s) não entram no carnê`}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+      {showExcluded && excluded.length > 0 ? (
+        <View className="mt-1 rounded-xl border border-amber-100 bg-amber-50/30 overflow-hidden max-h-[120px]">
+          <ScrollView nestedScrollEnabled>
+            {excluded.map(renderExcludedRow)}
+          </ScrollView>
+        </View>
+      ) : null}
+    </View>
   );
 
-  const renderConfirmStep = () => (
-    <>
-      <View className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 mb-3">
-        <Text className="text-sm font-semibold text-amber-900">Confirme a geração</Text>
-        <Text className="text-xs text-amber-800 mt-0.5" numberOfLines={2}>
-          {`${selectedIds.length} parcela(s) · ${
-            preview?.archive_format === "zip" ? "ZIP para impressão" : "PDF único"
-          }${issueMissing ? " · com emissão no provedor" : " · só boletos existentes"}`}
+  const renderOptions = () => (
+    <View>
+      <Text className="text-sm text-gray-600 mb-3 px-1">
+        Como o sistema deve tratar parcelas sem PDF ou com falha?
+      </Text>
+      <TouchableOpacity
+        onPress={() => setRequireAll((v) => !v)}
+        activeOpacity={0.85}
+        className="flex-row items-start gap-2.5 px-3 py-3 rounded-xl border border-gray-200 bg-white mb-2"
+      >
+        <Ionicons
+          name={requireAll ? "checkbox" : "square-outline"}
+          size={20}
+          color={requireAll ? "#7C3AED" : "#9CA3AF"}
+        />
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-gray-800">Exigir todas as parcelas</Text>
+          <Text className="text-xs text-gray-500 mt-0.5">
+            Se uma falhar, o carnê inteiro não é baixado (recomendado).
+          </Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => setIssueMissing((v) => !v)}
+        activeOpacity={0.85}
+        className="flex-row items-start gap-2.5 px-3 py-3 rounded-xl border border-gray-200 bg-white"
+      >
+        <Ionicons
+          name={issueMissing ? "checkbox" : "square-outline"}
+          size={20}
+          color={issueMissing ? "#7C3AED" : "#9CA3AF"}
+        />
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-gray-800">Emitir faltantes no provedor</Text>
+          <Text className="text-xs text-gray-500 mt-0.5">
+            Cria ou atualiza cobranças na Cora ao gerar (use se o PDF não existir).
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderConfirm = () => (
+    <View>
+      <View className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-3 mb-3">
+        <Text className="text-sm font-semibold text-emerald-900">Pronto para gerar</Text>
+        <Text className="text-xs text-emerald-800 mt-1">
+          {`${selectedIds.length} parcela(s) · ${archiveLabel}`}
+          {issueMissing ? " · com emissão na Cora" : " · só boletos existentes"}
         </Text>
       </View>
+      <View className="rounded-xl border border-gray-200 overflow-hidden max-h-[220px]">
+        <ScrollView nestedScrollEnabled>
+          {selectedInvoices.map((inv) => renderInvoiceRow(inv, false))}
+        </ScrollView>
+      </View>
+    </View>
+  );
 
-      {excluded.length > 0 ? (
-        <AccordionSection
-          title="Excluídas do carnê"
-          badge={String(excluded.length)}
-          expanded={openSections.confirmExcluded}
-          onToggle={() => toggleSection("confirmExcluded")}
-          tone="amber"
-          maxBodyHeight={140}
+  const stepTitle: Record<Step, string> = {
+    intro: "Gerar carnê",
+    select: "Selecionar parcelas",
+    options: "Opções",
+    confirm: "Confirmar e baixar",
+  };
+
+  const footer = (
+    <View className="flex-row gap-2 justify-end">
+      {step !== "intro" ? (
+        <TouchableOpacity
+          onPress={goBack}
+          className="px-5 py-2.5 rounded-xl border border-gray-200"
+          disabled={generating}
         >
-          {excluded.map(renderExcludedRow)}
-        </AccordionSection>
-      ) : null}
-
-      <AccordionSection
-        title={`Serão geradas — ${studentLabel}`}
-        badge={String(selectedIds.length)}
-        expanded={openSections.confirmSelected}
-        onToggle={() => toggleSection("confirmSelected")}
-        tone="emerald"
-        maxBodyHeight={220}
-      >
-        {selectedInvoices.map((inv) => renderEligibleRow(inv, false))}
-      </AccordionSection>
-    </>
-  );
-
-  const footerSelect = (
-    <>
-      <TouchableOpacity
-        onPress={onClose}
-        className="px-5 py-2.5 rounded-xl border border-gray-200"
-        disabled={generating}
-      >
-        <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={onContinue}
-        disabled={loading || selectedIds.length === 0}
-        className={`px-5 py-2.5 rounded-xl flex-row items-center gap-2 ${
-          selectedIds.length === 0 ? "bg-gray-300" : "bg-violet-600"
-        }`}
-      >
-        <Ionicons name="arrow-forward-outline" size={16} color="#fff" />
-        <Text className="text-sm font-bold text-white">Continuar</Text>
-      </TouchableOpacity>
-    </>
-  );
-
-  const footerConfirm = (
-    <>
-      <TouchableOpacity
-        onPress={() => setStep("select")}
-        className="px-5 py-2.5 rounded-xl border border-gray-200"
-        disabled={generating}
-      >
-        <Text className="text-sm font-semibold text-gray-700">Voltar</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={runGenerate}
-        disabled={generating}
-        className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
-      >
-        {generating ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <Ionicons name="download-outline" size={16} color="#fff" />
-        )}
-        <Text className="text-sm font-bold text-white">
-          {generating
-            ? "Gerando..."
-            : preview?.archive_format === "zip"
-              ? "Confirmar ZIP"
-              : "Confirmar PDF"}
-        </Text>
-      </TouchableOpacity>
-    </>
+          <Text className="text-sm font-semibold text-gray-700">Voltar</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={onClose}
+          className="px-5 py-2.5 rounded-xl border border-gray-200"
+          disabled={generating}
+        >
+          <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+        </TouchableOpacity>
+      )}
+      {step === "confirm" ? (
+        <TouchableOpacity
+          onPress={runGenerate}
+          disabled={generating}
+          className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+        >
+          {generating ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Ionicons name="download-outline" size={16} color="#fff" />
+          )}
+          <Text className="text-sm font-bold text-white">
+            {generating ? "Gerando..." : "Baixar carnê"}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={goNext}
+          disabled={loading || (step === "select" && selectedIds.length === 0)}
+          className={`px-5 py-2.5 rounded-xl flex-row items-center gap-2 ${
+            step === "select" && selectedIds.length === 0 ? "bg-gray-300" : "bg-violet-600"
+          }`}
+        >
+          <Text className="text-sm font-bold text-white">Continuar</Text>
+          <Ionicons name="arrow-forward-outline" size={16} color="#fff" />
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
   return (
     <Modal
       visible={visible}
-      title={step === "confirm" ? "Confirmar carnê" : "Gerar carnê (boletos)"}
+      title={stepTitle[step]}
       onClose={onClose}
       size="md"
-      footer={step === "confirm" ? footerConfirm : footerSelect}
+      footer={footer}
     >
       {loading ? (
         <View className="py-12 items-center">
           <ActivityIndicator color="#7C3AED" size="large" />
+          <Text className="text-xs text-gray-500 mt-3">Consultando boletos na Cora…</Text>
         </View>
-      ) : step === "confirm" ? (
-        renderConfirmStep()
       ) : (
-        renderSelectStep()
+        <>
+          <StepIndicator current={step} />
+          {step === "intro" && renderIntro()}
+          {step === "select" && renderSelect()}
+          {step === "options" && renderOptions()}
+          {step === "confirm" && renderConfirm()}
+        </>
       )}
     </Modal>
   );

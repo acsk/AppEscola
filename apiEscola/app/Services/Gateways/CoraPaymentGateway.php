@@ -8,7 +8,9 @@ use App\Models\TenantCoraCredential;
 use App\Services\EnrollmentInvoiceDescriptionService;
 use App\Models\Tenant;
 use App\Services\CoraTokenService;
+use App\Services\InvoiceCoraChargeAssetsService;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -1003,6 +1005,65 @@ class CoraPaymentGateway implements PaymentGatewayContract
         $options['ssl_key'] = Storage::disk('local')->path($keyPath);
 
         return $options;
+    }
+
+    /**
+     * Baixa o PDF do boleto consultando a cobrança na Cora (fonte confiável para carnê).
+     */
+    public function downloadBankSlipPdf(Tenant $tenant, string $chargeId, string $environment = 'prod'): string
+    {
+        $body = $this->getInvoiceById($tenant, $chargeId, $environment);
+        $assets = app(InvoiceCoraChargeAssetsService::class);
+        $url = $assets->resolveBoletoPdfUrlFromPayload($body);
+
+        if ($url === null) {
+            throw new RuntimeException('PDF do boleto não disponível na Cora para esta cobrança.');
+        }
+
+        return $this->fetchRemotePdf($tenant, $url, $environment);
+    }
+
+    public function applyAuthenticatedPdfRequest(
+        PendingRequest $request,
+        Tenant $tenant,
+        string $environment,
+    ): PendingRequest {
+        $httpOptions = $this->resolveHttpClientOptions($tenant, $environment);
+        $token = $this->resolveBearerToken($tenant, $environment);
+
+        $request = $request->withOptions($httpOptions);
+
+        if ($token !== '') {
+            $request = $request->withToken($token);
+        }
+
+        return $request;
+    }
+
+    public function fetchRemotePdf(Tenant $tenant, string $url, string $environment): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            throw new RuntimeException('URL do PDF do boleto vazia.');
+        }
+
+        $request = Http::timeout(45)
+            ->withHeaders(['Accept' => 'application/pdf,*/*']);
+
+        $request = $this->applyAuthenticatedPdfRequest($request, $tenant, $environment);
+
+        $response = $request->get($url);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Falha ao baixar PDF do boleto (HTTP ' . $response->status() . ').');
+        }
+
+        $body = $response->body();
+        if ($body === '' || ! str_starts_with($body, '%PDF') || strlen($body) < 200) {
+            throw new RuntimeException('O link do boleto não retornou PDF válido.');
+        }
+
+        return $body;
     }
 
     /**

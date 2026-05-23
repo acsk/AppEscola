@@ -491,11 +491,18 @@ class EnrollmentController extends Controller
         $data = $request->validate([
             'invoice_ids' => ['nullable', 'array'],
             'invoice_ids.*' => ['integer'],
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
         ]);
+
+        $environment = $this->carneService->resolveEnvironment(
+            $data['environment'] ?? null,
+            $request->user()
+        );
 
         $preview = $this->carneService->preview(
             $enrollment,
-            $data['invoice_ids'] ?? null
+            $data['invoice_ids'] ?? null,
+            $environment
         );
 
         return $this->success($preview, 'Pré-visualização do carnê.');

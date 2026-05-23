@@ -6,6 +6,7 @@ use App\Exceptions\CarneGenerationException;
 use App\Models\Enrollment;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\Gateways\CoraPaymentGateway;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -17,6 +18,7 @@ class EnrollmentCarneService
         private readonly InvoiceGatewayChargeService $chargeService,
         private readonly InvoiceCoraChargeAssetsService $chargeAssets,
         private readonly PdfMergeService $pdfMerge,
+        private readonly PaymentGatewayFactory $factory,
     ) {
     }
 
@@ -24,7 +26,7 @@ class EnrollmentCarneService
      * @param  array<int>|null  $invoiceIds
      * @return array<string, mixed>
      */
-    public function preview(Enrollment $enrollment, ?array $invoiceIds = null): array
+    public function preview(Enrollment $enrollment, ?array $invoiceIds = null, string $environment = 'prod'): array
     {
         $enrollment->loadMissing('student');
         $all = $this->enrollmentInvoices($enrollment);
@@ -59,12 +61,7 @@ class EnrollmentCarneService
             'archive_format_hint' => $archiveFormat === 'pdf'
                 ? 'Um único PDF com todos os boletos em sequência.'
                 : 'Arquivo ZIP com um PDF por parcela (ideal para imprimir todos).',
-            'ready_for_bundle_count' => $eligible
-                ->filter(fn (Invoice $invoice) => $this->chargeAssets->hasBoletoAssets(
-                    $this->chargeAssets->paymentAssetsFromInvoice($invoice)
-                ))
-                ->count(),
-            'invoices' => $eligible->map(fn (Invoice $invoice) => $this->invoiceRow($invoice))->values()->all(),
+            ...$this->buildPreviewInvoiceLists($eligible, $environment),
             'excluded_invoices' => $excluded->values()->all(),
         ];
     }
@@ -101,9 +98,8 @@ class EnrollmentCarneService
                     ? $this->chargeService->ensureBoletoCharge($invoice, $environment, $provider)
                     : $this->chargeService->prepareBoletoForCarneBundle($invoice, $environment);
 
-                $pdfUrl = $this->resolvePdfUrlWithRetry($fresh, $environment);
-
-                $binary = $this->downloadPdf($pdfUrl, $fresh, $environment);
+                $binary = $this->fetchBoletoPdfBinary($fresh, $environment);
+                $pdfUrl = $this->chargeAssets->resolveBoletoPdfUrl($fresh->fresh()) ?? '';
                 $sequence++;
                 $pdfFiles[] = [
                     'name' => $this->boletoFilename($fresh, $sequence),
@@ -289,9 +285,27 @@ class EnrollmentCarneService
     /**
      * @return array<string, mixed>
      */
+    /**
+     * @param  Collection<int, Invoice>  $eligible
+     * @return array{ready_for_bundle_count: int, invoices: array<int, array<string, mixed>>}
+     */
+    private function buildPreviewInvoiceLists(Collection $eligible, string $environment): array
+    {
+        $warmed = $eligible
+            ->map(fn (Invoice $invoice) => $this->warmInvoiceForCarne($invoice, $environment))
+            ->values();
+
+        return [
+            'ready_for_bundle_count' => $warmed->filter(fn (Invoice $invoice) => $this->isCarneReady($invoice))->count(),
+            'invoices' => $warmed->map(fn (Invoice $invoice) => $this->invoiceRow($invoice))->all(),
+        ];
+    }
+
     private function invoiceRow(Invoice $invoice): array
     {
         $assets = $this->chargeAssets->paymentAssetsFromInvoice($invoice);
+        $hasBoleto = $this->chargeAssets->hasBoletoAssets($assets);
+        $carneReady = $this->isCarneReady($invoice);
 
         return [
             'invoice_id' => $invoice->id,
@@ -299,41 +313,72 @@ class EnrollmentCarneService
             'due_date' => $invoice->due_date?->toDateString(),
             'amount' => (string) $invoice->amount,
             'status' => $invoice->status,
-            'has_boleto' => $this->chargeAssets->hasBoletoAssets($assets),
-            'carne_ready' => $this->chargeAssets->hasBoletoAssets($assets),
-            'needs_boleto_issue' => ! $this->chargeAssets->hasBoletoAssets($assets),
+            'has_boleto' => $hasBoleto,
+            'carne_ready' => $carneReady,
+            'needs_boleto_issue' => ! $hasBoleto,
+            'needs_pdf_sync' => $hasBoleto && ! $carneReady,
             'cora_charge_id' => $invoice->cora_charge_id,
         ];
     }
 
-    private function resolvePdfUrlWithRetry(Invoice $invoice, string $environment): string
+    private function isCarneReady(Invoice $invoice): bool
     {
-        $attempts = [0, 2];
-        $lastError = 'PDF do boleto indisponível no provedor.';
+        return $this->chargeAssets->resolveBoletoPdfUrl($invoice) !== null;
+    }
 
-        foreach ($attempts as $waitSeconds) {
-            if ($waitSeconds > 0) {
-                sleep($waitSeconds);
-                $invoice = $invoice->fresh();
-                $factory = app(PaymentGatewayFactory::class);
+    private function warmInvoiceForCarne(Invoice $invoice, string $environment): Invoice
+    {
+        $invoice->loadMissing('tenant');
+        $assets = $this->chargeAssets->paymentAssetsFromInvoice($invoice);
+
+        if ($invoice->cora_charge_id
+            && $invoice->tenant
+            && ($this->chargeAssets->shouldHydrateFromProvider($invoice, $assets) || ! $this->isCarneReady($invoice))) {
+            $this->chargeAssets->hydrateFromProvider($invoice, $this->factory, $assets, $environment);
+        }
+
+        return $invoice->fresh();
+    }
+
+    private function fetchBoletoPdfBinary(Invoice $invoice, string $environment): string
+    {
+        $invoice = $this->warmInvoiceForCarne($invoice, $environment);
+        $invoice->loadMissing('tenant');
+
+        $url = $this->chargeAssets->resolveBoletoPdfUrl($invoice);
+        if ($url !== null) {
+            try {
+                return $this->downloadPdf($url, $invoice, $environment);
+            } catch (\Throwable $e) {
+                Log::warning('EnrollmentCarneService PDF download via URL failed', [
+                    'invoice_id' => $invoice->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($invoice->cora_charge_id && $invoice->tenant) {
+            $gateway = $this->factory->resolve('cora');
+            if ($gateway instanceof CoraPaymentGateway) {
+                $binary = $gateway->downloadBankSlipPdf(
+                    $invoice->tenant,
+                    (string) $invoice->cora_charge_id,
+                    $environment
+                );
                 $this->chargeAssets->hydrateFromProvider(
                     $invoice,
-                    $factory,
+                    $this->factory,
                     $this->chargeAssets->paymentAssetsFromInvoice($invoice),
                     $environment
                 );
-                $invoice = $invoice->fresh();
-            }
 
-            $pdfUrl = $this->chargeAssets->resolveBoletoPdfUrl($invoice);
-            if ($pdfUrl !== null) {
-                return $pdfUrl;
+                return $binary;
             }
-
-            $lastError = 'PDF do boleto ainda não disponível no provedor.';
         }
 
-        throw new RuntimeException($lastError . ' Aguarde alguns segundos e tente de novo.');
+        throw new RuntimeException(
+            'PDF do boleto indisponível no provedor. Sincronize a cobrança em Financeiro ou marque "Emitir faltantes".'
+        );
     }
 
     /**
@@ -352,6 +397,14 @@ class EnrollmentCarneService
             fn (array $row) => str_contains(strtolower($row['message'] ?? ''), 'ainda não tem boleto')
         )) {
             return 'O carnê padrão só monta boletos já emitidos. Marque "Emitir faltantes no provedor" ou gere cada parcela em Financeiro antes.';
+        }
+
+        if (collect($errors)->contains(
+            fn (array $row) => str_contains(strtolower($row['message'] ?? ''), 'formato inválido')
+                || str_contains(strtolower($row['message'] ?? ''), 'pdf do boleto')
+                || str_contains(strtolower($row['message'] ?? ''), 'sincronize')
+        )) {
+            return 'Abra cada cobrança em Financeiro e use "Sincronizar com Cora" (ou marque "Emitir faltantes") antes de gerar o carnê.';
         }
 
         return null;
@@ -373,9 +426,16 @@ class EnrollmentCarneService
             );
         }
 
-        $response = Http::timeout(45)
-            ->withHeaders(['Accept' => 'application/pdf,*/*'])
-            ->get($url);
+        $request = Http::timeout(45)->withHeaders(['Accept' => 'application/pdf,*/*']);
+
+        if ($invoice?->tenant && $this->urlRequiresCoraAuth($url)) {
+            $gateway = $this->factory->resolve('cora');
+            if ($gateway instanceof CoraPaymentGateway) {
+                $request = $gateway->applyAuthenticatedPdfRequest($request, $invoice->tenant, $environment);
+            }
+        }
+
+        $response = $request->get($url);
 
         if (! $response->successful()) {
             throw new RuntimeException('Falha ao baixar PDF do boleto (HTTP ' . $response->status() . ').');
@@ -420,5 +480,13 @@ class EnrollmentCarneService
         }
 
         return $e->getMessage();
+    }
+
+    private function urlRequiresCoraAuth(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        return str_contains($host, 'cora.com.br')
+            || str_contains($host, 'corainvestimentos.com.br');
     }
 }

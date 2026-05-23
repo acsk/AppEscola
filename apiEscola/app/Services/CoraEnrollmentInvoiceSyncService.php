@@ -1017,7 +1017,7 @@ class CoraEnrollmentInvoiceSyncService
         $pixQrUrl = $assets['pix_qr_image_url'] ?? null;
         $boletoNumber = $assets['boleto_number'] ?? null;
         $boletoDigitable = $assets['boleto_digitable'] ?? null;
-        $paymentUrl = $assets['boleto_url'] ?? null;
+        $paymentUrl = $this->chargeAssets->coerceScalarString($assets['boleto_url'] ?? null);
 
         $paymentMethod = match ($storedMethod) {
             'hybrid' => 'hybrid',
