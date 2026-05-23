@@ -94,7 +94,11 @@ class InvoiceCoraChargeAssetsService
         ], fn ($value) => $this->coerceScalarString($value) !== null));
 
         $existingPayload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
-        $storedMethod = $this->resolveChargeMethodFromExternal(array_replace_recursive($existingPayload, $external));
+        try {
+            $storedMethod = $this->resolveChargeMethodFromExternal(array_replace_recursive($existingPayload, $external));
+        } catch (\Throwable) {
+            $storedMethod = $this->resolveChargeMethodFromInvoice($invoice) ?? 'bank_slip';
+        }
 
         $invoice->update([
             'cora_payload' => array_replace_recursive($existingPayload, $external),
@@ -143,6 +147,23 @@ class InvoiceCoraChargeAssetsService
         return $this->coerceScalarString($assets['boleto_digitable'] ?? null) !== null
             || $this->coerceScalarString($assets['boleto_number'] ?? null) !== null
             || $this->coerceScalarString($assets['boleto_url'] ?? null) !== null;
+    }
+
+    /**
+     * Normaliza tokens de método de pagamento (string escalar; ignora arrays/objetos Cora).
+     */
+    private function normalizePaymentMethodToken(mixed $value): ?string
+    {
+        if (is_array($value)) {
+            return null;
+        }
+
+        $scalar = $this->coerceScalarString($value);
+        if ($scalar === null) {
+            return null;
+        }
+
+        return strtoupper(trim($scalar));
     }
 
     /**
@@ -367,7 +388,10 @@ class InvoiceCoraChargeAssetsService
         ];
 
         foreach ($methodCandidates as $method) {
-            $normalized = strtoupper(trim((string) $method));
+            $normalized = $this->normalizePaymentMethodToken($method);
+            if ($normalized === null) {
+                continue;
+            }
             if (in_array($normalized, ['PIX', 'INSTANT_PAYMENT'], true)) {
                 return 'pix';
             }
@@ -449,7 +473,10 @@ class InvoiceCoraChargeAssetsService
         ];
 
         foreach ($methodCandidates as $method) {
-            $normalized = strtoupper(trim((string) $method));
+            $normalized = $this->normalizePaymentMethodToken($method);
+            if ($normalized === null) {
+                continue;
+            }
             if ($normalized === 'HYBRID' || str_contains($normalized, 'HYBRID')) {
                 return true;
             }
@@ -488,14 +515,23 @@ class InvoiceCoraChargeAssetsService
             $externalInvoice['payment_method'] ?? null,
             $externalInvoice['payment_type'] ?? null,
             data_get($externalInvoice, 'payment_options.type'),
-            data_get($externalInvoice, 'payment_options.bank_slip'),
+            data_get($externalInvoice, 'payment_options.selected'),
+            data_get($externalInvoice, 'payment_form'),
         ];
 
         foreach ($methodCandidates as $method) {
-            $normalized = strtoupper(trim((string) $method));
+            $normalized = $this->normalizePaymentMethodToken($method);
+            if ($normalized === null) {
+                continue;
+            }
             if (in_array($normalized, ['BANK_SLIP', 'BOLETO', 'BILLET', 'BANKSLIP'], true)) {
                 return true;
             }
+        }
+
+        if (is_array(data_get($externalInvoice, 'payment_options.bank_slip'))
+            && data_get($externalInvoice, 'payment_options.bank_slip') !== []) {
+            return true;
         }
 
         return $this->extractBoletoNumber($externalInvoice) !== null

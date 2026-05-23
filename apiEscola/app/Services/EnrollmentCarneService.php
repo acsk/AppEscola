@@ -334,7 +334,14 @@ class EnrollmentCarneService
         if ($invoice->cora_charge_id
             && $invoice->tenant
             && ($this->chargeAssets->shouldHydrateFromProvider($invoice, $assets) || ! $this->isCarneReady($invoice))) {
-            $this->chargeAssets->hydrateFromProvider($invoice, $this->factory, $assets, $environment);
+            try {
+                $this->chargeAssets->hydrateFromProvider($invoice, $this->factory, $assets, $environment);
+            } catch (\Throwable $e) {
+                Log::warning('EnrollmentCarneService hydrate skipped', [
+                    'invoice_id' => $invoice->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return $invoice->fresh();
