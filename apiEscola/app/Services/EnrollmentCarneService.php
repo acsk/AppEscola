@@ -127,7 +127,7 @@ class EnrollmentCarneService
                     'invoice_id' => $invoice->id,
                     'description' => $invoice->description,
                     'due_date' => $invoice->due_date?->toDateString(),
-                    'message' => $e->getMessage(),
+                    'message' => $this->humanizeCarneError($e),
                 ];
             }
         }
@@ -366,6 +366,13 @@ class EnrollmentCarneService
 
     private function downloadPdf(string $url, ?Invoice $invoice, string $environment): string
     {
+        $url = $this->chargeAssets->coerceScalarString($url) ?? '';
+        if ($url === '') {
+            throw new RuntimeException(
+                'URL do PDF do boleto inválida. Sincronize a cobrança em Financeiro e tente novamente.'
+            );
+        }
+
         $response = Http::timeout(45)
             ->withHeaders(['Accept' => 'application/pdf,*/*'])
             ->get($url);
@@ -404,5 +411,14 @@ class EnrollmentCarneService
         return $body !== ''
             && str_starts_with($body, '%PDF')
             && strlen($body) >= 200;
+    }
+
+    private function humanizeCarneError(\Throwable $e): string
+    {
+        if (str_contains($e->getMessage(), 'Array to string conversion')) {
+            return 'Dados do boleto no provedor estão em formato inválido. Sincronize a cobrança em Financeiro e tente novamente.';
+        }
+
+        return $e->getMessage();
     }
 }

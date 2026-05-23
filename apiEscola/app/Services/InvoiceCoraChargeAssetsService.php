@@ -11,18 +11,6 @@ use App\Services\PaymentGatewayFactory;
 class InvoiceCoraChargeAssetsService
 {
     /**
-     * @return array{
-     *     charge_id: ?string,
-     *     charge_status: ?string,
-     *     boleto_number: ?string,
-     *     boleto_digitable: ?string,
-     *     boleto_url: ?string,
-     *     pix_copy_paste: ?string,
-     *     pix_qr_image_url: ?string,
-     *     last_synced_at: ?string
-     * }
-     */
-    /**
      * @param  array<string, mixed>  $externalInvoice
      * @return array<string, mixed>
      */
@@ -99,17 +87,21 @@ class InvoiceCoraChargeAssetsService
             'boleto_url' => $fromExternal['boleto_url'] ?? null,
             'pix_copy_paste' => $fromExternal['pix_copy_paste'] ?? null,
             'pix_qr_image_url' => $fromExternal['pix_qr_image_url'] ?? null,
-        ], static fn ($value) => $value !== null && $value !== ''));
+        ], fn ($value) => $this->coerceScalarString($value) !== null));
 
         $existingPayload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
         $storedMethod = $this->resolveChargeMethodFromExternal(array_replace_recursive($existingPayload, $external));
 
         $invoice->update([
             'cora_payload' => array_replace_recursive($existingPayload, $external),
-            'cora_payment_url' => $mergedAssets['boleto_url'] ?? $invoice->cora_payment_url,
-            'cora_pix_copy_paste' => $mergedAssets['pix_copy_paste'] ?? $invoice->cora_pix_copy_paste,
-            'boleto_number' => $mergedAssets['boleto_number'] ?? $invoice->boleto_number,
-            'boleto_digitable' => $mergedAssets['boleto_digitable'] ?? $invoice->boleto_digitable,
+            'cora_payment_url' => $this->coerceScalarString($mergedAssets['boleto_url'] ?? null)
+                ?? $this->coerceScalarString($invoice->cora_payment_url),
+            'cora_pix_copy_paste' => $this->coerceScalarString($mergedAssets['pix_copy_paste'] ?? null)
+                ?? $this->coerceScalarString($invoice->cora_pix_copy_paste),
+            'boleto_number' => $this->coerceScalarString($mergedAssets['boleto_number'] ?? null)
+                ?? $this->coerceScalarString($invoice->boleto_number),
+            'boleto_digitable' => $this->coerceScalarString($mergedAssets['boleto_digitable'] ?? null)
+                ?? $this->coerceScalarString($invoice->boleto_digitable),
             'payment_method' => match ($storedMethod) {
                 'hybrid' => 'hybrid',
                 'pix' => 'pix',
@@ -129,10 +121,14 @@ class InvoiceCoraChargeAssetsService
         return [
             'charge_id' => $invoice->cora_charge_id,
             'charge_status' => $invoice->cora_status,
-            'boleto_number' => $invoice->boleto_number ?: $fromPayload['boleto_number'],
-            'boleto_digitable' => $invoice->boleto_digitable ?: $fromPayload['boleto_digitable'],
-            'boleto_url' => $invoice->cora_payment_url ?: $fromPayload['boleto_url'],
-            'pix_copy_paste' => $invoice->cora_pix_copy_paste ?: $fromPayload['pix_copy_paste'],
+            'boleto_number' => $this->coerceScalarString($invoice->boleto_number)
+                ?: $fromPayload['boleto_number'],
+            'boleto_digitable' => $this->coerceScalarString($invoice->boleto_digitable)
+                ?: $fromPayload['boleto_digitable'],
+            'boleto_url' => $this->coerceScalarString($invoice->cora_payment_url)
+                ?: $fromPayload['boleto_url'],
+            'pix_copy_paste' => $this->coerceScalarString($invoice->cora_pix_copy_paste)
+                ?: $fromPayload['pix_copy_paste'],
             'pix_qr_image_url' => $fromPayload['pix_qr_image_url'],
             'last_synced_at' => $invoice->cora_last_synced_at?->toISOString(),
         ];
@@ -140,9 +136,49 @@ class InvoiceCoraChargeAssetsService
 
     public function hasBoletoAssets(array $assets): bool
     {
-        return ! empty($assets['boleto_digitable'])
-            || ! empty($assets['boleto_number'])
-            || ! empty($assets['boleto_url']);
+        return $this->coerceScalarString($assets['boleto_digitable'] ?? null) !== null
+            || $this->coerceScalarString($assets['boleto_number'] ?? null) !== null
+            || $this->coerceScalarString($assets['boleto_url'] ?? null) !== null;
+    }
+
+    /**
+     * Normaliza valores da Cora (string, número ou array com url/href) para string escalar.
+     */
+    public function coerceScalarString(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            $trimmed = trim($value);
+
+            return $trimmed !== '' ? $trimmed : null;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        foreach (['url', 'href', 'pdf', 'link', 'download', 'file', '0'] as $key) {
+            if (! array_key_exists($key, $value)) {
+                continue;
+            }
+
+            $nested = $this->coerceScalarString($value[$key]);
+            if ($nested !== null) {
+                return $nested;
+            }
+        }
+
+        foreach ($value as $nestedValue) {
+            $nested = $this->coerceScalarString($nestedValue);
+            if ($nested !== null) {
+                return $nested;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -161,20 +197,21 @@ class InvoiceCoraChargeAssetsService
             data_get($payload, 'boleto_url'),
         ];
 
-        foreach ($candidates as $url) {
-            if (! is_string($url) || trim($url) === '') {
+        foreach ($candidates as $candidate) {
+            $url = $this->coerceScalarString($candidate);
+            if ($url === null) {
                 continue;
             }
 
-            $trimmed = trim($url);
-            if ($this->looksLikePdfUrl($trimmed)) {
-                return $trimmed;
+            if ($this->looksLikePdfUrl($url)) {
+                return $url;
             }
         }
 
-        foreach ($candidates as $url) {
-            if (is_string($url) && trim($url) !== '') {
-                return trim($url);
+        foreach ($candidates as $candidate) {
+            $url = $this->coerceScalarString($candidate);
+            if ($url !== null) {
+                return $url;
             }
         }
 
@@ -193,7 +230,8 @@ class InvoiceCoraChargeAssetsService
 
     public function hasPixAssets(array $assets): bool
     {
-        return ! empty($assets['pix_copy_paste']) || ! empty($assets['pix_qr_image_url']);
+        return $this->coerceScalarString($assets['pix_copy_paste'] ?? null) !== null
+            || $this->coerceScalarString($assets['pix_qr_image_url'] ?? null) !== null;
     }
 
     /**
@@ -255,7 +293,7 @@ class InvoiceCoraChargeAssetsService
         $hasPix = $this->hasPixAssets($assets);
         $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
         $hybridIndicator = $this->indicatesHybridCharge($payload)
-            || $this->isHybridBoletoUrl((string) ($assets['boleto_url'] ?? ''));
+            || $this->isHybridBoletoUrl($this->coerceScalarString($assets['boleto_url'] ?? null));
 
         if ($hasBoleto && ($hasPix || $hybridIndicator)) {
             return 'hybrid';
@@ -384,8 +422,9 @@ class InvoiceCoraChargeAssetsService
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
+            $normalized = $this->coerceScalarString($value);
+            if ($normalized !== null) {
+                return $normalized;
             }
         }
 
@@ -407,8 +446,9 @@ class InvoiceCoraChargeAssetsService
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
+            $normalized = $this->coerceScalarString($value);
+            if ($normalized !== null) {
+                return $normalized;
             }
         }
 
@@ -430,8 +470,9 @@ class InvoiceCoraChargeAssetsService
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
+            $normalized = $this->coerceScalarString($value);
+            if ($normalized !== null) {
+                return $normalized;
             }
         }
 
@@ -452,8 +493,9 @@ class InvoiceCoraChargeAssetsService
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
+            $normalized = $this->coerceScalarString($value);
+            if ($normalized !== null) {
+                return $normalized;
             }
         }
 
@@ -474,8 +516,9 @@ class InvoiceCoraChargeAssetsService
         ];
 
         foreach ($candidates as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
+            $normalized = $this->coerceScalarString($value);
+            if ($normalized !== null) {
+                return $normalized;
             }
         }
 
