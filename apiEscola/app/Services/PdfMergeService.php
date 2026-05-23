@@ -80,6 +80,10 @@ class PdfMergeService
 
                 $pageCount = $pdf->setSourceFile($stream);
 
+                if ($pageCount < 1) {
+                    throw new RuntimeException('PDF sem páginas na posição ' . ($index + 1) . '.');
+                }
+
                 for ($page = 1; $page <= $pageCount; $page++) {
                     $template = $pdf->importPage($page);
                     $size = $pdf->getTemplateSize($template);
@@ -98,7 +102,13 @@ class PdfMergeService
             }
         }
 
-        return $pdf->Output('S');
+        $output = $pdf->Output('S');
+
+        if ($output === '' || strlen($output) < 200) {
+            throw new RuntimeException('O PDF do carnê ficou vazio após a mesclagem.');
+        }
+
+        return $output;
     }
 
     /**

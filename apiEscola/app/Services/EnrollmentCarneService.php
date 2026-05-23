@@ -99,7 +99,7 @@ class EnrollmentCarneService
                     );
                 }
 
-                $binary = $this->downloadPdf($pdfUrl, $fresh);
+                $binary = $this->downloadPdf($pdfUrl, $fresh, $environment);
                 $sequence++;
                 $pdfFiles[] = [
                     'name' => $this->boletoFilename($fresh, $sequence),
@@ -143,6 +143,15 @@ class EnrollmentCarneService
         }
 
         $bundled = $this->pdfMerge->bundle($pdfFiles);
+
+        if ($bundled['format'] === 'zip' && strlen($bundled['content']) < 100) {
+            throw new CarneGenerationException(
+                'O arquivo ZIP do carnê ficou vazio.',
+                $errors,
+                null
+            );
+        }
+
         $studentSlug = preg_replace('/[^a-z0-9]+/i', '-', (string) ($enrollment->student?->name ?? 'aluno')) ?: 'aluno';
         $extension = $bundled['format'] === 'zip' ? 'zip' : 'pdf';
         $filename = sprintf(
@@ -296,7 +305,7 @@ class EnrollmentCarneService
         return sprintf('%02d-boleto-%s-fatura-%d.pdf', $sequence, $due, $invoice->id);
     }
 
-    private function downloadPdf(string $url, ?Invoice $invoice = null): string
+    private function downloadPdf(string $url, ?Invoice $invoice, string $environment): string
     {
         $response = Http::timeout(45)
             ->withHeaders(['Accept' => 'application/pdf,*/*'])
@@ -307,28 +316,34 @@ class EnrollmentCarneService
         }
 
         $body = $response->body();
-        if ($body !== '' && str_starts_with($body, '%PDF')) {
+        if ($this->isValidPdfBinary($body)) {
             return $body;
         }
 
         if ($invoice && $invoice->cora_charge_id && $invoice->tenant) {
             $factory = app(PaymentGatewayFactory::class);
             $chargeAssets = app(InvoiceCoraChargeAssetsService::class);
-            $environment = data_get($invoice->cora_payload, 'integration.environment', 'stage');
-            $hydrated = $chargeAssets->hydrateFromProvider(
+            $chargeAssets->hydrateFromProvider(
                 $invoice,
                 $factory,
                 $chargeAssets->paymentAssetsFromInvoice($invoice),
-                is_string($environment) ? $environment : 'stage'
+                $environment
             );
             $retryUrl = $chargeAssets->resolveBoletoPdfUrl($invoice->fresh());
             if ($retryUrl && $retryUrl !== $url) {
-                return $this->downloadPdf($retryUrl, null);
+                return $this->downloadPdf($retryUrl, null, $environment);
             }
         }
 
         throw new RuntimeException(
-            'O link do boleto não retornou PDF válido. Se for ambiente de testes Cora, tente gerar como Boleto+PIX.'
+            'O link do boleto não retornou PDF válido. Aguarde alguns segundos e tente novamente, ou gere a cobrança individual antes do carnê.'
         );
+    }
+
+    private function isValidPdfBinary(string $body): bool
+    {
+        return $body !== ''
+            && str_starts_with($body, '%PDF')
+            && strlen($body) >= 200;
     }
 }

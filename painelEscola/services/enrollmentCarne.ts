@@ -55,6 +55,50 @@ export async function fetchCarnePreview(
   return body as CarnePreview;
 }
 
+function headerValue(headers: Record<string, unknown>, name: string): string {
+  const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());
+  const raw = key ? headers[key] : "";
+  return String(raw ?? "");
+}
+
+async function sniffArchiveFormat(blob: Blob): Promise<"pdf" | "zip"> {
+  const prefix = await blob.slice(0, 4).text();
+  if (prefix.startsWith("PK")) return "zip";
+  if (prefix.startsWith("%PDF")) return "pdf";
+  return "pdf";
+}
+
+async function assertCarneBlobIsArchive(blob: Blob): Promise<"pdf" | "zip"> {
+  const prefix = await blob.slice(0, 12).text();
+
+  if (prefix.trimStart().startsWith("{") || prefix.includes('"type"')) {
+    let message = "Falha ao gerar carnê.";
+    try {
+      const json = JSON.parse(await blob.text());
+      message = json?.message || json?.body?.message || message;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+
+  if (prefix.startsWith("PK")) {
+    if (blob.size < 100) {
+      throw new Error("O ZIP do carnê está vazio.");
+    }
+    return "zip";
+  }
+
+  if (prefix.startsWith("%PDF")) {
+    if (blob.size < 200) {
+      throw new Error("O PDF do carnê está vazio (nenhum boleto incluído).");
+    }
+    return "pdf";
+  }
+
+  throw new Error("Resposta inválida ao gerar carnê (arquivo não é PDF nem ZIP).");
+}
+
 export async function generateCarneArchive(
   enrollmentId: number,
   options?: { environment?: string; invoiceIds?: number[] }
@@ -73,25 +117,45 @@ export async function generateCarneArchive(
     responseType: "blob",
   });
 
-  const disposition = response.headers["content-disposition"] ?? "";
+  const blob = response.data as Blob;
+  const headers = response.headers as Record<string, unknown>;
+
+  const disposition = headerValue(headers, "content-disposition");
   const match = /filename="?([^";\n]+)"?/i.exec(disposition);
-  const formatHeader = String(response.headers["x-carne-format"] ?? "").toLowerCase();
+
+  let formatHeader = headerValue(headers, "x-carne-format").toLowerCase();
+  if (formatHeader !== "zip" && formatHeader !== "pdf") {
+    formatHeader = "";
+  }
+
   const format: "pdf" | "zip" =
     formatHeader === "zip" || formatHeader === "pdf"
       ? formatHeader
       : match?.[1]?.toLowerCase().endsWith(".zip")
         ? "zip"
-        : "pdf";
+        : await sniffArchiveFormat(blob);
+
+  await assertCarneBlobIsArchive(blob);
 
   const filename =
     match?.[1]?.trim() ||
     `carne-matricula-${enrollmentId}.${format === "zip" ? "zip" : "pdf"}`;
 
-  const generatedCount = Number(response.headers["x-carne-generated-count"] ?? 0);
-  const errorCount = Number(response.headers["x-carne-error-count"] ?? 0);
+  let generatedCount = Number(headerValue(headers, "x-carne-generated-count") || 0);
+  let errorCount = Number(headerValue(headers, "x-carne-error-count") || 0);
+
+  if (generatedCount === 0 && errorCount === 0 && blob.size > 500) {
+    generatedCount = options?.invoiceIds?.length ?? 1;
+  }
+
+  if (generatedCount === 0) {
+    throw new Error(
+      "Nenhum boleto foi incluído no carnê. Verifique as cobranças selecionadas ou tente gerar a cobrança individual antes."
+    );
+  }
 
   return {
-    blob: response.data as Blob,
+    blob,
     filename,
     format,
     generatedCount,

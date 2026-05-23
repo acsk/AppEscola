@@ -248,7 +248,7 @@ export default function EnrollmentCarneModal({
       onClose();
     } catch (e: any) {
       const payload = e?.response?.data;
-      let message = "Falha ao gerar carnê.";
+      let message = e?.message || "Falha ao gerar carnê.";
 
       if (payload instanceof Blob) {
         try {

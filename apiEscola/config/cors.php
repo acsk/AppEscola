@@ -50,6 +50,12 @@ return [
         'X-Min-Supported-App-Version',
         'X-Recommended-App-Version',
         'X-Force-Relogin',
+        'Content-Type',
+        'Content-Disposition',
+        'X-Carne-Format',
+        'X-Carne-Generated-Count',
+        'X-Carne-Error-Count',
+        'X-Carne-Errors',
     ],
 
     'max_age' => 0,
