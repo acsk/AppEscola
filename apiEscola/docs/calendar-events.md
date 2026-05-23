@@ -7,7 +7,6 @@ Agenda integrada ao app mobile e ao painel. Simulados **publicados** com `starts
 ```bash
 php artisan migrate
 php artisan calendar:sync-exams
-php artisan calendar:sync-invoices
 ```
 
 A migration `2026_05_21_000003_add_calendar_fields_to_notification_broadcasts_table` adiciona `show_on_calendar`, `starts_at` e `ends_at` em `notification_broadcasts`. Sem ela, o envio de notificação com calendário falha com *Unknown column 'show_on_calendar'*.
@@ -26,18 +25,9 @@ Backfill de simulados já existentes:
 php artisan calendar:sync-exams
 ```
 
-## Sincronização com cobranças
+## Cobranças
 
-- Observer em `Invoice` sincroniza cobranças **em aberto** com `due_date` e `student_id`.
-- Tipo `billing`, dia inteiro na data de vencimento.
-- Visível apenas para o **aluno** da cobrança (`audience_type: student`).
-- Ao marcar como **paga** ou **cancelada**, o evento sai do calendário.
-
-Backfill:
-
-```bash
-php artisan calendar:sync-invoices
-```
+Cobranças **não** entram na agenda do aluno. O financeiro continua disponível na área **Financeiro** do app e nas notificações (`billing_due`).
 
 ## Sincronização com notificações
 
@@ -75,7 +65,7 @@ Ver também: `docs/student-notifications-mobile.md`.
 - `GET /api/aluno/calendar-events/types` — metadados (label, cor) para legenda
 - `GET /api/aluno/calendar-events?from=&to=`
 
-Resposta: `{ from, to, items[] }` com `type_color`, `exam_id` / `invoice_id` (quando sincronizado), etc.
+Resposta: `{ from, to, items[] }` com `type_color`, `exam_id` (quando sincronizado), etc.
 
 ## Mobile UX
 

@@ -3,9 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Exam;
-use App\Models\Invoice;
 use App\Observers\ExamObserver;
-use App\Observers\InvoiceObserver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,7 +23,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Exam::observe(ExamObserver::class);
-        Invoice::observe(InvoiceObserver::class);
 
         Model::saving(function (Model $model): void {
             // Campos técnicos/funcionais que não devem ser forçados para caixa alta.

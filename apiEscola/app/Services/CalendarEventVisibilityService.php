@@ -64,6 +64,7 @@ class CalendarEventVisibilityService
         return CalendarEvent::query()
             ->where('tenant_id', $tenantId)
             ->where('is_published', true)
+            ->where(fn (Builder $q) => $q->whereNull('source_type')->orWhere('source_type', '!=', 'invoice'))
             ->where($this->overlapsRange($from, $to))
             ->where(function (Builder $q) use ($student, $courseIds, $schoolClassIds) {
                 $q->where('audience_type', 'tenant');
