@@ -39,6 +39,31 @@ class InvoiceGatewayChargeService
     }
 
     /**
+     * Apenas sincroniza boleto já emitido no provedor (carnê = montar PDFs, sem nova emissão).
+     */
+    public function prepareBoletoForCarneBundle(Invoice $invoice, string $environment): Invoice
+    {
+        $invoice->loadMissing(['tenant', 'student.guardians', 'guardian']);
+
+        if (in_array($invoice->status, ['paid', 'cancelled'], true)) {
+            throw new RuntimeException(
+                "A cobrança \"{$invoice->description}\" está {$invoice->status} e não pode entrar no carnê."
+            );
+        }
+
+        $assets = $this->chargeAssets->paymentAssetsFromInvoice($invoice);
+
+        if (! $this->chargeAssets->hasBoletoAssets($assets)) {
+            throw new RuntimeException(
+                "A cobrança \"{$invoice->description}\" ainda não tem boleto emitido. "
+                . 'Gere como Boleto ou Boleto+PIX em Financeiro, ou marque "Emitir faltantes" no carnê.'
+            );
+        }
+
+        return $this->hydrateIfNeeded($invoice, $assets, $environment);
+    }
+
+    /**
      * Garante cobrança em boleto (ou híbrido) no provedor e retorna a fatura atualizada.
      */
     public function ensureBoletoCharge(Invoice $invoice, string $environment, ?string $provider = null): Invoice
@@ -92,7 +117,7 @@ class InvoiceGatewayChargeService
             return $this->createAndPersist($invoice, $environment, $provider, 'boleto');
         } catch (ConnectionException|RequestException $e) {
             if ($e instanceof RequestException
-                && $environment === 'stage'
+                && $coraMethod === 'boleto'
                 && $this->shouldRetryAsHybrid($e)) {
                 Log::info('InvoiceGatewayChargeService retrying as hybrid after boleto blocked in stage', [
                     'invoice_id' => $invoice->id,

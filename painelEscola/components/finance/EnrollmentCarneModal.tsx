@@ -146,6 +146,8 @@ export default function EnrollmentCarneModal({
   const [step, setStep] = useState<Step>("select");
   const [preview, setPreview] = useState<CarnePreview | null>(null);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
+  const [issueMissing, setIssueMissing] = useState(false);
+  const [requireAll, setRequireAll] = useState(true);
   const [openSections, setOpenSections] = useState<Record<AccordionKey, boolean>>({
     excluded: true,
     eligible: true,
@@ -164,9 +166,12 @@ export default function EnrollmentCarneModal({
       setPreview(data);
       const initial: Record<number, boolean> = {};
       data.invoices.forEach((inv) => {
-        initial[inv.invoice_id] = true;
+        const ready = inv.carne_ready ?? inv.has_boleto;
+        initial[inv.invoice_id] = ready;
       });
       setSelected(initial);
+      setIssueMissing(false);
+      setRequireAll(true);
       setStep("select");
       setOpenSections({
         excluded: (data.excluded_invoices?.length ?? 0) > 0,
@@ -198,6 +203,10 @@ export default function EnrollmentCarneModal({
 
   const selectedInvoices =
     preview?.invoices.filter((inv) => selected[inv.invoice_id]) ?? [];
+
+  const selectedNeedingIssue = selectedInvoices.filter(
+    (inv) => !(inv.carne_ready ?? inv.has_boleto)
+  ).length;
 
   const toggle = (id: number) => {
     setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -232,17 +241,28 @@ export default function EnrollmentCarneModal({
   const runGenerate = async () => {
     setGenerating(true);
     try {
-      const { blob, filename, format, generatedCount, errorCount } = await generateCarneArchive(
-        enrollmentId,
-        { environment, invoiceIds: selectedIds }
-      );
+      const { blob, filename, format, generatedCount, errorCount, errors } =
+        await generateCarneArchive(enrollmentId, {
+          environment,
+          invoiceIds: selectedIds,
+          issueMissing,
+          requireAll,
+        });
       downloadBlob(blob, filename);
       let message =
         format === "zip"
-          ? `Carnê ZIP com ${generatedCount} boleto(s) (um PDF por parcela).`
-          : `Carnê PDF único com ${generatedCount} boleto(s).`;
+          ? `Carnê montado: ${generatedCount} boleto(s) no ZIP.`
+          : `Carnê montado: ${generatedCount} boleto(s) em PDF único.`;
+      if (!issueMissing) {
+        message += " (somente boletos já emitidos.)";
+      }
       if (errorCount > 0) {
-        message += ` ${errorCount} cobrança(s) não puderam ser incluídas.`;
+        message += ` ${errorCount} parcela(s) ficaram de fora.`;
+        errors.slice(0, 3).forEach((row) => {
+          if (row.message) {
+            message += `\n• ${row.description ? `${row.description}: ` : ""}${row.message}`;
+          }
+        });
       }
       onSuccess?.(message);
       onClose();
@@ -271,6 +291,13 @@ export default function EnrollmentCarneModal({
       onError?.("Selecione ao menos uma cobrança.");
       return;
     }
+    if (!issueMissing && selectedNeedingIssue > 0) {
+      onError?.(
+        `${selectedNeedingIssue} parcela(s) selecionada(s) ainda não têm boleto emitido. ` +
+          "Marque \"Emitir faltantes no provedor\" ou selecione só parcelas com boleto pronto."
+      );
+      return;
+    }
     setStep("confirm");
     setOpenSections((prev) => ({
       ...prev,
@@ -279,10 +306,39 @@ export default function EnrollmentCarneModal({
     }));
   };
 
+  const renderOptionToggle = (
+    label: string,
+    hint: string,
+    value: boolean,
+    onToggle: () => void
+  ) => (
+    <TouchableOpacity
+      onPress={onToggle}
+      activeOpacity={0.85}
+      className="flex-row items-start gap-2.5 px-3 py-2.5 rounded-lg border border-gray-200 bg-white mb-2"
+    >
+      <Ionicons
+        name={value ? "checkbox" : "square-outline"}
+        size={18}
+        color={value ? "#7C3AED" : "#9CA3AF"}
+        style={{ marginTop: 1 }}
+      />
+      <View style={{ flex: 1 }}>
+        <Text className="text-sm font-semibold text-gray-800">{label}</Text>
+        <Text className="text-xs text-gray-500 leading-relaxed">{hint}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   const renderEligibleRow = (inv: CarnePreviewInvoice, selectable = true) => {
     const checked = !!selected[inv.invoice_id];
-    const metaSuffix = inv.has_boleto ? " · Boleto pronto" : " · Emitir no carnê";
-    const metaColor = inv.has_boleto ? "#047857" : "#B45309";
+    const ready = inv.carne_ready ?? inv.has_boleto;
+    const metaSuffix = ready
+      ? " · Pronta para carnê"
+      : issueMissing
+        ? " · Será emitida no provedor"
+        : " · Emitir boleto antes";
+    const metaColor = ready ? "#047857" : issueMissing ? "#B45309" : "#DC2626";
 
     const content = (
       <>
@@ -357,10 +413,30 @@ export default function EnrollmentCarneModal({
       <View className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5 mb-3 flex-row gap-2">
         <Ionicons name="information-circle-outline" size={17} color="#2563EB" />
         <Text className="text-xs text-blue-800 flex-1 leading-relaxed">
-          {preview?.archive_format_hint ??
-            "Emite boleto no provedor para cada parcela e prepara o arquivo para impressão."}
+          {issueMissing
+            ? "Modo emissão: cria ou atualiza cobranças no provedor e monta o arquivo. Pode falhar parcela a parcela."
+            : `Modo carnê (padrão): monta ${preview?.archive_format === "zip" ? "ZIP" : "PDF"} só com boletos já emitidos — sem nova cobrança no provedor.`}
         </Text>
       </View>
+
+      {renderOptionToggle(
+        "Exigir todas as parcelas selecionadas",
+        "Se alguma falhar, o carnê inteiro não é baixado (recomendado).",
+        requireAll,
+        () => setRequireAll((v) => !v)
+      )}
+      {renderOptionToggle(
+        "Emitir faltantes no provedor",
+        "Parcelas sem boleto serão emitidas na Cora ao gerar (comportamento antigo).",
+        issueMissing,
+        () => setIssueMissing((v) => !v)
+      )}
+
+      {preview && preview.invoices.length > 0 ? (
+        <Text className="text-xs text-gray-600 mb-2 px-1">
+          {`${preview.ready_for_bundle_count ?? 0} com boleto pronto · ${preview.invoices.length - (preview.ready_for_bundle_count ?? 0)} aguardando emissão`}
+        </Text>
+      ) : null}
 
       {excluded.length > 0 ? (
         <AccordionSection
@@ -414,9 +490,9 @@ export default function EnrollmentCarneModal({
       <View className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 mb-3">
         <Text className="text-sm font-semibold text-amber-900">Confirme a geração</Text>
         <Text className="text-xs text-amber-800 mt-0.5" numberOfLines={2}>
-          {`${selectedIds.length} boleto(s) · ${
-            preview?.archive_format === "zip" ? "arquivo ZIP" : "PDF único"
-          }`}
+          {`${selectedIds.length} parcela(s) · ${
+            preview?.archive_format === "zip" ? "ZIP para impressão" : "PDF único"
+          }${issueMissing ? " · com emissão no provedor" : " · só boletos existentes"}`}
         </Text>
       </View>
 

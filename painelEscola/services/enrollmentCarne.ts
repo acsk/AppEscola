@@ -13,6 +13,8 @@ export type CarnePreviewInvoice = {
   amount: string;
   status: string;
   has_boleto: boolean;
+  carne_ready?: boolean;
+  needs_boleto_issue?: boolean;
   cora_charge_id: string | null;
 };
 
@@ -35,6 +37,7 @@ export type CarnePreview = {
   student_name: string | null;
   total_invoices?: number;
   eligible_count: number;
+  ready_for_bundle_count?: number;
   excluded_count?: number;
   archive_format?: "pdf" | "zip";
   archive_format_hint?: string;
@@ -99,19 +102,33 @@ async function assertCarneBlobIsArchive(blob: Blob): Promise<"pdf" | "zip"> {
   throw new Error("Resposta inválida ao gerar carnê (arquivo não é PDF nem ZIP).");
 }
 
+export type CarneGenerateErrorRow = {
+  invoice_id?: number;
+  description?: string;
+  message?: string;
+};
+
 export async function generateCarneArchive(
   enrollmentId: number,
-  options?: { environment?: string; invoiceIds?: number[] }
+  options?: {
+    environment?: string;
+    invoiceIds?: number[];
+    issueMissing?: boolean;
+    requireAll?: boolean;
+  }
 ): Promise<{
   blob: Blob;
   filename: string;
   format: "pdf" | "zip";
   generatedCount: number;
   errorCount: number;
+  errors: CarneGenerateErrorRow[];
 }> {
   const payload: Record<string, unknown> = {};
   if (options?.environment) payload.environment = options.environment;
   if (options?.invoiceIds?.length) payload.invoice_ids = options.invoiceIds;
+  if (options?.issueMissing) payload.issue_missing = true;
+  if (options?.requireAll === false) payload.require_all = false;
 
   const response = await api.post(`/enrollments/${enrollmentId}/carne/generate`, payload, {
     responseType: "blob",
@@ -144,8 +161,14 @@ export async function generateCarneArchive(
   let generatedCount = Number(headerValue(headers, "x-carne-generated-count") || 0);
   let errorCount = Number(headerValue(headers, "x-carne-error-count") || 0);
 
-  if (generatedCount === 0 && errorCount === 0 && blob.size > 500) {
-    generatedCount = options?.invoiceIds?.length ?? 1;
+  let errors: CarneGenerateErrorRow[] = [];
+  const errorsHeader = headerValue(headers, "x-carne-errors");
+  if (errorsHeader) {
+    try {
+      errors = JSON.parse(atob(errorsHeader)) as CarneGenerateErrorRow[];
+    } catch {
+      errors = [];
+    }
   }
 
   if (generatedCount === 0) {
@@ -160,6 +183,7 @@ export async function generateCarneArchive(
     format,
     generatedCount,
     errorCount,
+    errors,
   };
 }
 

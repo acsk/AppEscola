@@ -59,6 +59,11 @@ class EnrollmentCarneService
             'archive_format_hint' => $archiveFormat === 'pdf'
                 ? 'Um único PDF com todos os boletos em sequência.'
                 : 'Arquivo ZIP com um PDF por parcela (ideal para imprimir todos).',
+            'ready_for_bundle_count' => $eligible
+                ->filter(fn (Invoice $invoice) => $this->chargeAssets->hasBoletoAssets(
+                    $this->chargeAssets->paymentAssetsFromInvoice($invoice)
+                ))
+                ->count(),
             'invoices' => $eligible->map(fn (Invoice $invoice) => $this->invoiceRow($invoice))->values()->all(),
             'excluded_invoices' => $excluded->values()->all(),
         ];
@@ -75,6 +80,8 @@ class EnrollmentCarneService
         string $environment,
         ?array $invoiceIds = null,
         ?string $provider = null,
+        bool $issueMissing = false,
+        bool $requireAll = true,
     ): array {
         $enrollment->loadMissing('student');
         $invoices = $this->eligibleInvoices($enrollment, $invoiceIds);
@@ -90,14 +97,11 @@ class EnrollmentCarneService
 
         foreach ($invoices as $invoice) {
             try {
-                $fresh = $this->chargeService->ensureBoletoCharge($invoice, $environment, $provider);
-                $pdfUrl = $this->chargeAssets->resolveBoletoPdfUrl($fresh);
+                $fresh = $issueMissing
+                    ? $this->chargeService->ensureBoletoCharge($invoice, $environment, $provider)
+                    : $this->chargeService->prepareBoletoForCarneBundle($invoice, $environment);
 
-                if ($pdfUrl === null) {
-                    throw new RuntimeException(
-                        'Cobrança emitida, mas o PDF do boleto ainda não está disponível no provedor. Aguarde alguns segundos e tente de novo.'
-                    );
-                }
+                $pdfUrl = $this->resolvePdfUrlWithRetry($fresh, $environment);
 
                 $binary = $this->downloadPdf($pdfUrl, $fresh, $environment);
                 $sequence++;
@@ -111,6 +115,7 @@ class EnrollmentCarneService
                     'due_date' => $fresh->due_date?->toDateString(),
                     'amount' => (string) $fresh->amount,
                     'pdf_url' => $pdfUrl,
+                    'source' => $issueMissing ? 'issued_or_existing' : 'existing_boleto_only',
                 ];
             } catch (\Throwable $e) {
                 Log::warning('EnrollmentCarneService invoice failed', [
@@ -128,17 +133,22 @@ class EnrollmentCarneService
         }
 
         if ($pdfFiles === []) {
-            $hint = collect($errors)->contains(
-                fn (array $row) => str_contains(strtolower($row['message'] ?? ''), 'cip')
-                    || str_contains(strtolower($row['message'] ?? ''), 'rec-0030')
-            )
-                ? 'No ambiente stage da Cora, boleto puro pode ser rejeitado. O sistema tenta boleto+PIX automaticamente; se persistir, use produção ou gere a cobrança individual antes.'
-                : null;
+            $hint = $this->buildFailureHint($errors, $issueMissing);
 
             throw new CarneGenerationException(
-                'Não foi possível gerar nenhum boleto para o carnê.',
+                'Não foi possível montar o carnê.',
                 $errors,
                 $hint
+            );
+        }
+
+        if ($requireAll && $errors !== []) {
+            throw new CarneGenerationException(
+                'O carnê exige todas as parcelas selecionadas. Corrija as pendências abaixo ou desmarque "Exigir todas as parcelas".',
+                $errors,
+                $issueMissing
+                    ? null
+                    : 'Parcelas sem boleto: gere em Financeiro ou ative "Emitir faltantes no provedor".'
             );
         }
 
@@ -175,10 +185,6 @@ class EnrollmentCarneService
         return $this->chargeService->resolveEnvironment($requested, $user);
     }
 
-    /**
-     * @param  array<int>|null  $invoiceIds
-     * @return Collection<int, Invoice>
-     */
     /**
      * @return Collection<int, Invoice>
      */
@@ -294,8 +300,61 @@ class EnrollmentCarneService
             'amount' => (string) $invoice->amount,
             'status' => $invoice->status,
             'has_boleto' => $this->chargeAssets->hasBoletoAssets($assets),
+            'carne_ready' => $this->chargeAssets->hasBoletoAssets($assets),
+            'needs_boleto_issue' => ! $this->chargeAssets->hasBoletoAssets($assets),
             'cora_charge_id' => $invoice->cora_charge_id,
         ];
+    }
+
+    private function resolvePdfUrlWithRetry(Invoice $invoice, string $environment): string
+    {
+        $attempts = [0, 2];
+        $lastError = 'PDF do boleto indisponível no provedor.';
+
+        foreach ($attempts as $waitSeconds) {
+            if ($waitSeconds > 0) {
+                sleep($waitSeconds);
+                $invoice = $invoice->fresh();
+                $factory = app(PaymentGatewayFactory::class);
+                $this->chargeAssets->hydrateFromProvider(
+                    $invoice,
+                    $factory,
+                    $this->chargeAssets->paymentAssetsFromInvoice($invoice),
+                    $environment
+                );
+                $invoice = $invoice->fresh();
+            }
+
+            $pdfUrl = $this->chargeAssets->resolveBoletoPdfUrl($invoice);
+            if ($pdfUrl !== null) {
+                return $pdfUrl;
+            }
+
+            $lastError = 'PDF do boleto ainda não disponível no provedor.';
+        }
+
+        throw new RuntimeException($lastError . ' Aguarde alguns segundos e tente de novo.');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $errors
+     */
+    private function buildFailureHint(array $errors, bool $issueMissing): ?string
+    {
+        if (collect($errors)->contains(
+            fn (array $row) => str_contains(strtolower($row['message'] ?? ''), 'cip')
+                || str_contains(strtolower($row['message'] ?? ''), 'rec-0030')
+        )) {
+            return 'No ambiente stage da Cora, boleto puro pode ser rejeitado. Use produção ou marque "Emitir faltantes" com Boleto+PIX.';
+        }
+
+        if (! $issueMissing && collect($errors)->contains(
+            fn (array $row) => str_contains(strtolower($row['message'] ?? ''), 'ainda não tem boleto')
+        )) {
+            return 'O carnê padrão só monta boletos já emitidos. Marque "Emitir faltantes no provedor" ou gere cada parcela em Financeiro antes.';
+        }
+
+        return null;
     }
 
     private function boletoFilename(Invoice $invoice, int $sequence): string

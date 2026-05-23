@@ -510,6 +510,8 @@ class EnrollmentController extends Controller
             'invoice_ids' => ['nullable', 'array'],
             'invoice_ids.*' => ['integer'],
             'provider' => ['nullable', 'string', 'max:50'],
+            'issue_missing' => ['sometimes', 'boolean'],
+            'require_all' => ['sometimes', 'boolean'],
         ]);
 
         $environment = $this->carneService->resolveEnvironment(
@@ -522,7 +524,9 @@ class EnrollmentController extends Controller
                 $enrollment,
                 $environment,
                 $data['invoice_ids'] ?? null,
-                $data['provider'] ?? null
+                $data['provider'] ?? null,
+                (bool) ($data['issue_missing'] ?? false),
+                (bool) ($data['require_all'] ?? true),
             );
         } catch (CarneGenerationException $e) {
             return $this->error($e->getMessage(), [

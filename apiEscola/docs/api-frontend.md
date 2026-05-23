@@ -675,7 +675,13 @@ POST /api/enrollments/{id}/carne/generate
 
 **Preview:** lista cobranças elegíveis (`pending` / `overdue` com vencimento) e `excluded_invoices` (pagas, canceladas, PIX já emitido, sem vencimento, etc.) com `reason_code` / `reason_label`.
 
-**Gerar:** body opcional `{ "invoice_ids": [1,2,3], "environment": "prod" }`. Download com cabeçalhos `X-Carne-Format` (`zip` ou `pdf`), `X-Carne-Generated-Count`, `X-Carne-Error-Count`.
+**Gerar:** body opcional `{ "invoice_ids": [1,2,3], "environment": "prod", "issue_missing": false, "require_all": true }`.
+
+- `issue_missing` (default `false`): **carnê de verdade** — só baixa PDFs de boletos já emitidos; não cria cobrança nova na Cora.
+- `issue_missing: true`: emite no provedor as parcelas sem boleto (comportamento anterior).
+- `require_all` (default `true`): se alguma parcela selecionada falhar, retorna 422 e não entrega ZIP/PDF parcial.
+
+Download com cabeçalhos `X-Carne-Format`, `X-Carne-Generated-Count`, `X-Carne-Error-Count`, `X-Carne-Errors` (base64 JSON).
 
 **Hospedagem compartilhada (sem `composer install` no deploy):** padrão **`application/zip`** — um PDF por parcela dentro do ZIP (extensão `ZipArchive` do PHP). PDF único concatenado só se `vendor/setasign/fpdi` existir (enviar `vendor` após `composer install` local).
 
