@@ -565,7 +565,9 @@ export default function EnrollmentDetailScreen({
     if (!cancelInvoiceId) return;
     setCancellingInvoice(true);
     try {
-      await api.post(`/invoices/${cancelInvoiceId}/cancel`);
+      await api.post(`/invoices/${cancelInvoiceId}/cancel`, {
+        environment: defaultChargeEnvironment,
+      });
       setCancelInvoiceId(null);
       fetch();
       showToast("success", "Cobrança cancelada com sucesso.", "Sucesso");

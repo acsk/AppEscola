@@ -365,7 +365,10 @@ class CoraPaymentGateway implements PaymentGatewayContract
         $baseUrl = $this->resolveApiBaseUrl($environment);
 
         if ($token === '' || $baseUrl === '') {
-            throw new RuntimeException('Integração Cora não configurada para cancelar cobrança.');
+            throw new RuntimeException(
+                "Integração Cora não configurada para cancelar cobrança (ambiente {$environment}). "
+                . 'Configure as credenciais do tenant neste ambiente ou envie environment=prod na requisição.'
+            );
         }
 
         $httpOptions = $this->resolveHttpClientOptions($tenant, $environment);

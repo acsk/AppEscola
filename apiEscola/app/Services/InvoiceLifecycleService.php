@@ -110,9 +110,17 @@ class InvoiceLifecycleService
         }
     }
 
-    public function resolveCoraEnvironment(Request $request): string
+    public function resolveCoraEnvironment(Request $request, ?Invoice $invoice = null): string
     {
-        $requestedEnv = (string) $request->input('environment', 'stage');
+        $fromInvoice = $this->environmentFromInvoicePayload($invoice);
+        if ($fromInvoice !== null) {
+            return $fromInvoice;
+        }
+
+        $requestedEnv = (string) $request->input('environment', '');
+        if ($requestedEnv === '') {
+            $requestedEnv = app()->environment('production') ? 'prod' : 'stage';
+        }
         $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
 
         if (! app()->environment('production')) {
@@ -121,10 +129,30 @@ class InvoiceLifecycleService
 
         $user = $request->user();
         if ($user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
-            return $requestedEnv ?: 'prod';
+            return in_array($requestedEnv, ['prod', 'stage'], true) ? $requestedEnv : 'prod';
         }
 
         return 'prod';
+    }
+
+    private function environmentFromInvoicePayload(?Invoice $invoice): ?string
+    {
+        if ($invoice === null) {
+            return null;
+        }
+
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $stored = strtolower(trim((string) data_get($payload, 'integration.environment', '')));
+
+        if (in_array($stored, ['prod', 'production'], true)) {
+            return 'prod';
+        }
+
+        if ($stored === 'stage') {
+            return 'stage';
+        }
+
+        return null;
     }
 
     /**
@@ -136,7 +164,7 @@ class InvoiceLifecycleService
     {
         $this->assertCanCancel($invoice);
 
-        $environment = $this->resolveCoraEnvironment($request);
+        $environment = $this->resolveCoraEnvironment($request, $invoice);
         $cancelledOnGateway = false;
 
         if ($this->shouldCancelOnGateway($invoice)) {
@@ -293,7 +321,7 @@ class InvoiceLifecycleService
             throw new RuntimeException('Tenant da cobrança não encontrado.');
         }
 
-        $environment = $this->resolveCoraEnvironment($request);
+        $environment = $this->resolveCoraEnvironment($request, $invoice);
         $chargeId = (string) $invoice->cora_charge_id;
 
         $this->cancelChargeOnGateway($tenant, $chargeId, $environment);

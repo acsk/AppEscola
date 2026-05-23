@@ -41,6 +41,10 @@ import InvoiceActionsModal, { type InvoiceActionKey } from "../components/financ
 import { fetchInvoiceSummary, type InvoiceSummary } from "../services/invoices";
 import { paymentMethodLabel } from "../utils/paymentMethods";
 import {
+  defaultPaymentEnvironment,
+  resolveInvoiceGatewayEnvironment,
+} from "../utils/paymentEnvironment";
+import {
   currencyToFloat,
   displayToISO,
   floatToCurrency,
@@ -195,7 +199,9 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
   const [chargeModalVisible, setChargeModalVisible] = useState(false);
   const [chargeInvoice, setChargeInvoice] = useState<Invoice | null>(null);
   const [chargeProvider, setChargeProvider] = useState("");
-  const [chargeEnvironment, setChargeEnvironment] = useState<"stage" | "prod">("stage");
+  const [chargeEnvironment, setChargeEnvironment] = useState<"stage" | "prod">(
+    defaultPaymentEnvironment
+  );
   const [chargeMethod, setChargeMethod] = useState("pix");
   const [generatingCharge, setGeneratingCharge] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
@@ -417,7 +423,10 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     setCancelling(true);
     setActionError(null);
     try {
-      await api.post(`/invoices/${cancelId}/cancel`);
+      const invoice = rows.find((row) => row.id === cancelId);
+      await api.post(`/invoices/${cancelId}/cancel`, {
+        environment: resolveInvoiceGatewayEnvironment(invoice),
+      });
       setCancelId(null);
       fetch();
     } catch (e: any) {
