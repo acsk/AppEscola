@@ -65,6 +65,8 @@ class EnrollmentController extends Controller
             new OA\Parameter(name: 'school_class_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'start_date', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'end_date', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'search', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'per_page', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Lista paginada de matrículas'),
@@ -92,9 +94,26 @@ class EnrollmentController extends Controller
                 });
             })
             ->when($request->query('start_date'), fn ($q, $v) => $q->whereDate('start_date', '>=', $v))
-            ->when($request->query('end_date'), fn ($q, $v) => $q->whereDate('start_date', '<=', $v));
+            ->when($request->query('end_date'), fn ($q, $v) => $q->whereDate('start_date', '<=', $v))
+            ->when($request->query('search'), function ($q, $v) {
+                $term = '%' . trim((string) $v) . '%';
+                if ($term === '%%') {
+                    return;
+                }
 
-        return EnrollmentResource::collection($query->latest()->paginate(20));
+                $q->where(function ($inner) use ($term) {
+                    $inner->where('enrollment_number', 'like', $term)
+                        ->orWhereHas('student', fn ($student) => $student->where('name', 'like', $term))
+                        ->orWhereHas('schoolClass', fn ($schoolClass) => $schoolClass->where('name', 'like', $term))
+                        ->orWhereHas('schoolClasses', fn ($schoolClass) => $schoolClass->where('name', 'like', $term))
+                        ->orWhereHas('coursePlan.course', fn ($course) => $course->where('name', 'like', $term))
+                        ->orWhereHas('bundle', fn ($bundle) => $bundle->where('name', 'like', $term));
+                });
+            });
+
+        $perPage = min(max((int) $request->query('per_page', 20), 1), 50);
+
+        return EnrollmentResource::collection($query->latest()->paginate($perPage));
     }
 
     #[OA\Post(
