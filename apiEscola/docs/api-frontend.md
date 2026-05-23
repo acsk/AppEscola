@@ -664,6 +664,21 @@ O painel usa esses endpoints para mostrar o que já existe no sistema, o que ser
 
 **Debug (prod):** `GET .../preview?debug=1&environment=prod` — retorna `body.debug` (super_admin ou `CORA_CONTRACT_CHARGES_DEBUG=true`). SSH: `php artisan enrollments:debug-contract-charges {id}`. Ver `docs/MATRICULA_INVOICE_FLOW.md`.
 
+### Carnê (boletos em lote para impressão)
+
+Emite boleto no provedor para cada parcela em aberto e devolve um **único PDF** concatenado.
+
+```http
+GET  /api/enrollments/{id}/carne/preview
+POST /api/enrollments/{id}/carne/generate
+```
+
+**Preview:** lista cobranças elegíveis (`pending` / `overdue` com vencimento) e `excluded_invoices` (pagas, canceladas, PIX já emitido, sem vencimento, etc.) com `reason_code` / `reason_label`.
+
+**Gerar:** body opcional `{ "invoice_ids": [1,2,3], "environment": "prod" }`. Download com cabeçalhos `X-Carne-Format` (`zip` ou `pdf`), `X-Carne-Generated-Count`, `X-Carne-Error-Count`.
+
+**Hospedagem compartilhada (sem `composer install` no deploy):** padrão **`application/zip`** — um PDF por parcela dentro do ZIP (extensão `ZipArchive` do PHP). PDF único concatenado só se `vendor/setasign/fpdi` existir (enviar `vendor` após `composer install` local).
+
 ### Exibir / Atualizar / Excluir
 ```http
 GET    /api/enrollments/{id}

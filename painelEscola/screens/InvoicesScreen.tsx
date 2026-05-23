@@ -661,7 +661,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
       >
         <View>
           <Text className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-gray-800`}>
-            Gestão de Pagamentos
+            \-Pagamentos
           </Text>
           <Text className="text-sm text-gray-500">
             Cobranças em aberto, baixas manuais e resumo financeiro

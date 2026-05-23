@@ -28,6 +28,8 @@ import {
 } from "../../utils/masks";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
+import { mapExamQuestionToPreview } from "../../components/simulados/examPreviewUtils";
 import type {
   ExamForm,
   ExamFormScreenProps,
@@ -855,7 +857,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
         { id: 2 as const, title: "Questões", description: "Cadastro, edição e organização das questões" },
         { id: 3 as const, title: "Materiais", description: "Links e arquivos de apoio" },
-        { id: 4 as const, title: "Pré-visualização", description: "Como o aluno verá o simulado" },
+        { id: 4 as const, title: "Testar", description: "Responder e validar o simulado" },
       ]
     : [
         { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
@@ -1412,7 +1414,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-violet-700">Ir para preview</Text>
+              <Text className="text-sm font-semibold text-violet-700">Ir para teste</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={openNewSupportMaterial}
@@ -1432,9 +1434,9 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         >
           <View className="px-6 py-4 border-b border-gray-100 flex-row items-center justify-between">
             <View>
-              <Text className="text-base font-bold text-gray-800">Pré-visualização do aluno</Text>
+              <Text className="text-base font-bold text-gray-800">Testar simulado</Text>
               <Text className="text-xs text-gray-400">
-                Simulação de como o simulado aparece durante a realização
+                Responda como o aluno e confira gabarito e comportamento
               </Text>
             </View>
             <View className="flex-row items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
@@ -1445,89 +1447,31 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             </View>
           </View>
 
-          <View className="px-6 py-5 bg-violet-50 border-b border-violet-100">
-            <Text className="text-lg font-bold text-violet-900">{form.title || "Título do simulado"}</Text>
-            <Text className="text-sm text-violet-700 mt-1">
-              {examTypeOptions.find((o) => o.value === form.exam_type)?.label ?? form.exam_type}
-              {form.subject_id ? ` · ${subjectOptions.find((o) => o.value === form.subject_id)?.label ?? "Matéria"}` : ""}
-            </Text>
-            <Text className="text-xs text-violet-600 mt-2">
-              Duração: {form.duration_minutes || "--"} min · Nota mínima: {form.passing_score || "--"}%
-            </Text>
-          </View>
-
-          {questions.length === 0 ? (
-            <View className="py-12 items-center gap-2">
-              <Ionicons name="eye-off-outline" size={32} color="#D1D5DB" />
-              <Text className="text-sm text-gray-400">Adicione questões para visualizar o simulado.</Text>
-            </View>
-          ) : (
-            questions.map((q, index) => (
-              <View key={q.id} className={`px-6 py-5 ${index < questions.length - 1 ? "border-b border-gray-50" : ""}`}>
-                <View className="flex-row items-start gap-3 mb-3">
-                  <View className="w-8 h-8 rounded-full bg-violet-100 items-center justify-center">
-                    <Text className="text-xs font-bold text-violet-700">{index + 1}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text className="text-sm font-semibold text-gray-800">
-                      {q.question_text || "Questão sem texto"}
-                    </Text>
-                    <Text className="text-xs text-gray-400 mt-1">
-                      {q.type === "essay" ? "Discursiva" : q.options.some((o) => o.triggers_text_input) ? 'Objetiva c/ "Outro"' : "Objetiva"}
-                      {q.points ? ` · ${q.points} pontos` : ""}
-                    </Text>
-                  </View>
+          <View className="px-6 py-5">
+            <ExamPreviewPlayer
+              key={questions.map((q) => q.id).join("-") || "empty"}
+              questions={questions.map(mapExamQuestionToPreview)}
+              gradeObjective
+              emptyMessage="Adicione questões na etapa anterior para testar o simulado."
+              header={
+                <View className="mb-5 p-5 rounded-2xl border border-violet-100 bg-violet-50">
+                  <Text className="text-lg font-bold text-violet-900">
+                    {form.title || "Título do simulado"}
+                  </Text>
+                  <Text className="text-sm text-violet-700 mt-1">
+                    {examTypeOptions.find((o) => o.value === form.exam_type)?.label ?? form.exam_type}
+                    {form.subject_id
+                      ? ` · ${subjectOptions.find((o) => o.value === form.subject_id)?.label ?? "Matéria"}`
+                      : ""}
+                  </Text>
+                  <Text className="text-xs text-violet-600 mt-2">
+                    Duração: {form.duration_minutes || "--"} min · Nota mínima:{" "}
+                    {form.passing_score || "--"}%
+                  </Text>
                 </View>
-
-                {q.image_url && (
-                  <View className="mb-4 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
-                    <Image
-                      source={{ uri: q.image_url }}
-                      style={{
-                        width: "100%",
-                        aspectRatio: questionImageRatios[q.image_url] || 1.4,
-                        backgroundColor: "#F3F4F6",
-                      }}
-                      resizeMode="contain"
-                    />
-                    <View className="px-3 py-2 border-t border-gray-200">
-                      <Text className="text-xs text-gray-500" numberOfLines={1}>
-                        {q.image_url}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {q.type === "essay" ? (
-                  <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 min-h-[96px]">
-                    <Text className="text-xs text-gray-400">Resposta do aluno</Text>
-                    <Text className="text-sm text-gray-500 mt-2">Espaço para resposta discursiva...</Text>
-                  </View>
-                ) : (
-                  <View className="gap-2">
-                    {q.options.map((opt) => (
-                      <View
-                        key={opt.id ?? `${q.id}-${opt.order}`}
-                        className={`flex-row items-center gap-3 rounded-xl border px-4 py-3 ${
-                          opt.triggers_text_input ? "border-amber-200 bg-amber-50" : "border-gray-200 bg-white"
-                        }`}
-                      >
-                        <View className="w-5 h-5 rounded-full border-2 border-gray-300 items-center justify-center">
-                          <View className="w-2.5 h-2.5 rounded-full bg-gray-300" />
-                        </View>
-                        <Text className="text-sm flex-1 text-gray-700">{opt.option_text || `Opção ${opt.order}`}</Text>
-                        {opt.triggers_text_input && (
-                          <View className="px-2 py-1 rounded-full bg-amber-100 border border-amber-200">
-                            <Text className="text-[11px] font-semibold text-amber-700">Exige texto</Text>
-                          </View>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            ))
-          )}
+              }
+            />
+          </View>
 
           <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
             <TouchableOpacity
@@ -1846,46 +1790,72 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                 )}
 
                 {qForm.options.map((opt, idx) => (
-                  <View key={idx} className="flex-row items-center gap-2 mb-2">
-                    <TouchableOpacity onPress={() => markCorrect(idx)} activeOpacity={0.7}>
-                      <Ionicons
-                        name={opt.is_correct ? "radio-button-on" : "radio-button-off"}
-                        size={20}
-                        color={opt.is_correct ? "#7C3AED" : "#D1D5DB"}
-                      />
-                    </TouchableOpacity>
-                    <View style={{ flex: 1 }}>
-                      <TextInput
-                        value={opt.option_text}
-                        onChangeText={(v) => setOptionField(idx, "option_text", v)}
-                        placeholder={`Opção ${idx + 1}`}
-                        placeholderTextColor="#9CA3AF"
-                        className={`border rounded-lg px-3 py-2 text-sm text-gray-800 bg-gray-50 ${
-                          opt.is_correct ? "border-violet-300" : "border-gray-200"
-                        }`}
-                      />
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => markTriggerText(idx)}
-                      activeOpacity={0.7}
-                      style={{ padding: 4 }}
-                    >
-                      <Ionicons
-                        name={opt.triggers_text_input ? "chatbox" : "chatbox-outline"}
-                        size={17}
-                        color={opt.triggers_text_input ? "#F59E0B" : "#D1D5DB"}
-                      />
-                    </TouchableOpacity>
-                    {qForm.options.length > 2 && (
-                      <TouchableOpacity onPress={() => removeOption(idx)} activeOpacity={0.7}>
-                        <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                      </TouchableOpacity>
+                  <View
+                    key={idx}
+                    className={`mb-2.5 rounded-xl border px-3 py-2.5 ${
+                      opt.is_correct
+                        ? "border-emerald-300 bg-emerald-50"
+                        : "border-gray-200 bg-white"
+                    }`}
+                  >
+                    {opt.is_correct && (
+                      <View className="flex-row items-center gap-1.5 mb-2">
+                        <Ionicons name="checkmark-circle" size={14} color="#059669" />
+                        <Text className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">
+                          Resposta correta
+                        </Text>
+                      </View>
                     )}
+                    <View className="flex-row items-center gap-2">
+                      <TouchableOpacity
+                        onPress={() => markCorrect(idx)}
+                        activeOpacity={0.7}
+                        accessibilityLabel={
+                          opt.is_correct ? "Alternativa correta" : "Marcar como correta"
+                        }
+                      >
+                        <Ionicons
+                          name={opt.is_correct ? "radio-button-on" : "radio-button-off"}
+                          size={22}
+                          color={opt.is_correct ? "#059669" : "#D1D5DB"}
+                        />
+                      </TouchableOpacity>
+                      <View style={{ flex: 1 }}>
+                        <TextInput
+                          value={opt.option_text}
+                          onChangeText={(v) => setOptionField(idx, "option_text", v)}
+                          placeholder={`Opção ${idx + 1}`}
+                          placeholderTextColor="#9CA3AF"
+                          className={`border rounded-lg px-3 py-2 text-sm text-gray-800 ${
+                            opt.is_correct
+                              ? "border-emerald-200 bg-white"
+                              : "border-gray-200 bg-gray-50"
+                          }`}
+                        />
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => markTriggerText(idx)}
+                        activeOpacity={0.7}
+                        style={{ padding: 4 }}
+                        accessibilityLabel='Alternativa "Outro"'
+                      >
+                        <Ionicons
+                          name={opt.triggers_text_input ? "chatbox" : "chatbox-outline"}
+                          size={17}
+                          color={opt.triggers_text_input ? "#F59E0B" : "#D1D5DB"}
+                        />
+                      </TouchableOpacity>
+                      {qForm.options.length > 2 && (
+                        <TouchableOpacity onPress={() => removeOption(idx)} activeOpacity={0.7}>
+                          <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 ))}
 
                 <Text className="text-[11px] text-gray-400 mt-1 mb-2">
-                  ○ correta · 💬 &quot;Outro&quot;
+                  Toque no círculo para marcar a correta · ícone de chat = &quot;Outro&quot;
                 </Text>
               </View>
             ) : null}

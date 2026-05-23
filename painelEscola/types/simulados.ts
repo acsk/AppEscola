@@ -104,6 +104,26 @@ export type ExamPreviewQuestion = {
   options: { id: number; option_text: string; order: number; triggers_text_input: boolean }[];
 };
 
+export type ExamPreviewPlayerOption = {
+  id: number;
+  option_text: string;
+  order: number;
+  triggers_text_input: boolean;
+  is_correct?: boolean;
+};
+
+export type ExamPreviewPlayerQuestion = {
+  id: number;
+  type: "multiple_choice" | "essay";
+  question_text: string;
+  image_url?: string | null;
+  video_url?: string | null;
+  points: number;
+  order: number;
+  explanation?: string | null;
+  options: ExamPreviewPlayerOption[];
+};
+
 export type ExamAttempt = {
   id: number;
   status: "in_progress" | "pending_review" | "awaiting_release" | "completed";

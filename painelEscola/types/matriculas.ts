@@ -51,6 +51,7 @@ export type EnrollmentSummary = {
   school_class_ids?: number[];
   school_classes?: Array<SchoolClassRef & { course?: CourseRef | null }>;
   guardian?: GuardianRef;
+  course_plan_id?: number | null;
   course_plan?: CoursePlanSummary | null;
   bundle_id?: number | null;
   bundle?: BundleSummary | null;

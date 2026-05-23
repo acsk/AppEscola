@@ -47,6 +47,8 @@ Implementar e manter endpoints, migrations, validações e regras de negócio **
 - Não duplicar endpoints nem lógica.
 - Nomes em português quando o módulo já seguir esse padrão.
 - sempre ATUALIZE API_VERSION no api_meta.php a cada mudança de feature
+- Lembrar que o deploy é em servidor compartilhado não executa composer install
+- os comandos php são assim /opt/alt/php83/usr/bin/php
 
 ## Envelope JSON (padrão do projeto)
 

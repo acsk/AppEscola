@@ -831,9 +831,43 @@ class PaymentProviderController extends Controller
             default => 'pix',
         };
 
+        $result = null;
+        $providerChargeError = null;
+
         try {
             $result = $factory->resolve($resolvedProvider)->createCharge($invoice, $environment, $coraMethod);
         } catch (ConnectionException|RequestException $e) {
+            $providerChargeError = $e;
+
+            if ($e instanceof RequestException
+                && $coraMethod === 'boleto'
+                && $environment === 'stage'
+                && $this->isCoraBoletoCipBlock($e)) {
+                try {
+                    $result = $factory->resolve($resolvedProvider)->createCharge($invoice, $environment, 'hybrid');
+                    $coraMethod = 'hybrid';
+                    $storedMethod = 'hybrid';
+                    $requestedMethod = 'hybrid';
+                    $providerChargeError = null;
+                } catch (\Throwable) {
+                    // mantém erro original do boleto
+                }
+            }
+        } catch (\RuntimeException $e) {
+            Log::warning('PaymentProviderController generateCharge runtime error', [
+                'invoice_id' => $invoice->id,
+                'tenant_id' => $invoice->tenant_id,
+                'provider' => $data['provider'],
+                'environment' => $environment,
+                'method' => $coraMethod,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->error($e->getMessage(), null, 422);
+        }
+
+        if ($providerChargeError !== null) {
+            $e = $providerChargeError;
             $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
             $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';
             $providerMessage = $e instanceof RequestException ? (string) ($e->response?->json('message') ?? '') : '';
@@ -848,6 +882,11 @@ class PaymentProviderController extends Controller
                     $e instanceof RequestException ? $e->response : null,
                     'Falha de validação retornada pelo provedor.'
                 );
+                if ($environment === 'stage'
+                    && $e instanceof RequestException
+                    && $this->isCoraBoletoCipBlock($e)) {
+                    $userMessage .= ' No ambiente de testes (stage) da Cora, boleto puro costuma falhar; use Boleto+PIX ou produção.';
+                }
             }
 
             Log::warning('PaymentProviderController generateCharge communication error', [
@@ -872,17 +911,6 @@ class PaymentProviderController extends Controller
                 'provider_error' => $providerError !== '' ? $providerError : null,
                 'error' => $e->getMessage(),
             ], $httpStatus);
-        } catch (\RuntimeException $e) {
-            Log::warning('PaymentProviderController generateCharge runtime error', [
-                'invoice_id' => $invoice->id,
-                'tenant_id' => $invoice->tenant_id,
-                'provider' => $data['provider'],
-                'environment' => $environment,
-                'method' => $coraMethod,
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->error($e->getMessage(), null, 422);
         }
 
         $existingSnapshot = $this->buildChargeSnapshotFromInvoice($invoice, $existingStoredMethod);
@@ -1267,6 +1295,16 @@ class PaymentProviderController extends Controller
         }
 
         return null;
+    }
+
+    private function isCoraBoletoCipBlock(RequestException $e): bool
+    {
+        $message = strtolower((string) ($e->response?->json('message') ?? ''));
+        $code = strtoupper((string) ($e->response?->json('code') ?? ''));
+
+        return $code === 'REC-0030'
+            || str_contains($message, 'bank slip not registered in cip')
+            || str_contains($message, 'not registered in cip');
     }
 
     private function resolveProviderUserMessage(?\Illuminate\Http\Client\Response $response, string $fallback): string

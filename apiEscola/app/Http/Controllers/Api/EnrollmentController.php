@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\CarneGenerationException;
 use App\Jobs\SyncEnrollmentCoraChargesJob;
 use App\Http\Controllers\Controller;
 use OpenApi\Attributes as OA;
@@ -17,6 +18,7 @@ use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Services\EnrollmentCarneService;
 use App\Services\EnrollmentContractChargesService;
 use App\Services\EnrollmentFinancialLockService;
 use App\Services\EnrollmentInvoiceAmountSyncService;
@@ -48,6 +50,7 @@ class EnrollmentController extends Controller
         private readonly EnrollmentInvoiceAmountSyncService $invoiceAmountSync,
         private readonly EnrollmentFinancialLockService $financialLock,
         private readonly EnrollmentInvoiceDescriptionService $invoiceDescriptions,
+        private readonly EnrollmentCarneService $carneService,
     ) {
     }
 
@@ -479,6 +482,74 @@ class EnrollmentController extends Controller
             'payment_reference' => $paymentData['payment_reference'] ?? null,
             'notes'             => $paymentData['notes'] ?? null,
         ]);
+    }
+
+    public function carnePreview(Request $request, Enrollment $enrollment): JsonResponse
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+
+        $data = $request->validate([
+            'invoice_ids' => ['nullable', 'array'],
+            'invoice_ids.*' => ['integer'],
+        ]);
+
+        $preview = $this->carneService->preview(
+            $enrollment,
+            $data['invoice_ids'] ?? null
+        );
+
+        return $this->success($preview, 'Pré-visualização do carnê.');
+    }
+
+    public function carneGenerate(Request $request, Enrollment $enrollment)
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+
+        $data = $request->validate([
+            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
+            'invoice_ids' => ['nullable', 'array'],
+            'invoice_ids.*' => ['integer'],
+            'provider' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $environment = $this->carneService->resolveEnvironment(
+            $data['environment'] ?? null,
+            $request->user()
+        );
+
+        try {
+            $result = $this->carneService->generate(
+                $enrollment,
+                $environment,
+                $data['invoice_ids'] ?? null,
+                $data['provider'] ?? null
+            );
+        } catch (CarneGenerationException $e) {
+            return $this->error($e->getMessage(), [
+                'enrollment_id' => $enrollment->id,
+                'errors' => $e->errors,
+                'hint' => $e->hint,
+            ], 422);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), ['enrollment_id' => $enrollment->id], 422);
+        }
+
+        $format = $result['format'] ?? 'pdf';
+        $contentType = $format === 'zip' ? 'application/zip' : 'application/pdf';
+
+        $headers = [
+            'Content-Type' => $contentType,
+            'Content-Disposition' => 'attachment; filename="' . $result['filename'] . '"',
+            'X-Carne-Format' => $format,
+            'X-Carne-Generated-Count' => (string) count($result['generated']),
+            'X-Carne-Error-Count' => (string) count($result['errors']),
+        ];
+
+        if ($result['errors'] !== []) {
+            $headers['X-Carne-Errors'] = base64_encode(json_encode($result['errors'], JSON_UNESCAPED_UNICODE));
+        }
+
+        return response($result['content'], 200, $headers);
     }
 
     public function contractChargesPreview(Request $request, Enrollment $enrollment): JsonResponse

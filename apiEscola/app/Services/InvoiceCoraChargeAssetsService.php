@@ -145,6 +145,52 @@ class InvoiceCoraChargeAssetsService
             || ! empty($assets['boleto_url']);
     }
 
+    /**
+     * URL preferencial do PDF do boleto (para carnê / download em lote).
+     */
+    public function resolveBoletoPdfUrl(Invoice $invoice): ?string
+    {
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+
+        $candidates = [
+            data_get($payload, 'payment_options.bank_slip.pdf'),
+            data_get($payload, 'payment_options.bank_slip.url'),
+            $invoice->cora_payment_url,
+            data_get($payload, 'bank_slip.pdf'),
+            data_get($payload, 'bank_slip.url'),
+            data_get($payload, 'boleto_url'),
+        ];
+
+        foreach ($candidates as $url) {
+            if (! is_string($url) || trim($url) === '') {
+                continue;
+            }
+
+            $trimmed = trim($url);
+            if ($this->looksLikePdfUrl($trimmed)) {
+                return $trimmed;
+            }
+        }
+
+        foreach ($candidates as $url) {
+            if (is_string($url) && trim($url) !== '') {
+                return trim($url);
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikePdfUrl(string $url): bool
+    {
+        $path = strtolower((string) parse_url($url, PHP_URL_PATH));
+
+        return str_ends_with($path, '.pdf')
+            || str_contains(strtolower($url), '.pdf')
+            || str_contains(strtolower($url), 'boleto-qrcode')
+            || str_contains(strtolower($url), '/bank_slip');
+    }
+
     public function hasPixAssets(array $assets): bool
     {
         return ! empty($assets['pix_copy_paste']) || ! empty($assets['pix_qr_image_url']);

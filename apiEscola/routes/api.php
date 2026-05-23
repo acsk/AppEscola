@@ -191,6 +191,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('enrollments/{enrollment}/contract-charges/apply', [EnrollmentController::class, 'contractChargesApply']);
     Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
     Route::post('enrollments/{enrollment}/generate-charges',  [EnrollmentController::class, 'generateCharges']);
+    Route::get('enrollments/{enrollment}/carne/preview', [EnrollmentController::class, 'carnePreview']);
+    Route::post('enrollments/{enrollment}/carne/generate', [EnrollmentController::class, 'carneGenerate']);
     Route::apiResource('enrollments', EnrollmentController::class);
 
     // Provedores de gateway (catálogo técnico para tela de configuração)

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -22,7 +21,13 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import Modal from "../../components/ui/Modal";
 import { useExamStatuses, useExamTypes } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
-import type { ExamListItem, ExamPreviewQuestion, ExamsScreenProps } from "../../types/simulados";
+import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
+import { mapApiPreviewQuestion } from "../../components/simulados/examPreviewUtils";
+import type {
+  ExamListItem,
+  ExamPreviewPlayerQuestion,
+  ExamsScreenProps,
+} from "../../types/simulados";
 
 // ── Subject icon helpers ──────────────────────────────────────────────────────
 
@@ -82,22 +87,21 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
 
   // Preview
   const [previewExam, setPreviewExam] = useState<ExamListItem | null>(null);
-  const [previewQuestions, setPreviewQuestions] = useState<ExamPreviewQuestion[]>([]);
+  const [previewQuestions, setPreviewQuestions] = useState<ExamPreviewPlayerQuestion[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewSelected, setPreviewSelected] = useState<Record<number, number | null>>({});
-  const [previewTexts, setPreviewTexts] = useState<Record<number, string>>({});
-  const [previewBrokenImages, setPreviewBrokenImages] = useState<Record<number, boolean>>({});
 
   const openPreview = async (exam: ExamListItem) => {
     setPreviewExam(exam);
-    setPreviewSelected({});
-    setPreviewTexts({});
-    setPreviewBrokenImages({});
+    setPreviewQuestions([]);
     setPreviewLoading(true);
     try {
       const { data } = await api.get(`/exams/${exam.id}/questions`);
-      setPreviewQuestions(data.body ?? data);
-    } catch {}
+      const raw = data.body ?? data;
+      const items = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+      setPreviewQuestions(items.map((q: Parameters<typeof mapApiPreviewQuestion>[0]) => mapApiPreviewQuestion(q)));
+    } catch {
+      setPreviewQuestions([]);
+    }
     setPreviewLoading(false);
   };
 
@@ -431,268 +435,83 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         onCancel={() => setDeleteId(null)}
       />
 
-      {/* ── Modal de Pré-visualização ───────────────────────────────────────── */}
+      {/* ── Modal de teste do simulado ───────────────────────────────────────── */}
       <Modal
         visible={previewExam !== null}
-        title="Pré-visualização do Simulado"
+        title="Testar simulado"
         onClose={() => setPreviewExam(null)}
         size="lg"
+        showScrollIndicator
       >
         {previewExam && (
-          <View>
-            {/* Banner de aviso */}
-            <View
-              className="flex-row items-center gap-2 mb-5 px-4 py-3 rounded-xl"
-              style={{ backgroundColor: "#EFF6FF" }}
-            >
-              <Ionicons name="eye-outline" size={16} color="#3B82F6" />
-              <Text className="text-sm text-blue-700 font-medium flex-1">
-                Pré-visualização — as interações não serão salvas.
-              </Text>
-            </View>
-
-            {/* Cabeçalho do simulado */}
-            <View
-              className="mb-6 p-5 rounded-2xl border border-gray-100"
-              style={{ backgroundColor: "#FAFAFA" }}
-            >
-              <View className="flex-row items-start justify-between gap-4 mb-3">
-                <Text className="text-xl font-bold text-gray-800 flex-1">
-                  {previewExam.title}
-                </Text>
-                <Badge label={previewExam.exam_type_label ?? previewExam.exam_type} slug={previewExam.exam_type} />
-              </View>
-              <View className="flex-row gap-4 flex-wrap">
-                {previewExam.duration_minutes != null && (
-                  <View className="flex-row items-center gap-1.5">
-                    <Ionicons name="time-outline" size={14} color="#6B7280" />
-                    <Text className="text-sm text-gray-500">{previewExam.duration_minutes} min</Text>
-                  </View>
-                )}
-                {previewExam.passing_score != null && (
-                  <View className="flex-row items-center gap-1.5">
-                    <Ionicons name="ribbon-outline" size={14} color="#6B7280" />
-                    <Text className="text-sm text-gray-500">Mínimo: {previewExam.passing_score}%</Text>
-                  </View>
-                )}
-                <View className="flex-row items-center gap-1.5">
-                  <Ionicons name="help-circle-outline" size={14} color="#6B7280" />
-                  <Text className="text-sm text-gray-500">
-                    {previewExam.total_questions} questão{previewExam.total_questions !== 1 ? "ões" : ""}
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-1.5">
-                  <Ionicons name="star-outline" size={14} color="#6B7280" />
-                  <Text className="text-sm text-gray-500">{previewExam.total_points} pontos</Text>
-                </View>
-                {previewExam.course && (
-                  <View className="flex-row items-center gap-1.5">
-                    <Ionicons name="book-outline" size={14} color="#6B7280" />
-                    <Text className="text-sm text-gray-500">{previewExam.course.name}</Text>
-                  </View>
-                )}
-                {previewExam.subject && (
-                  <View className="flex-row items-center gap-1.5">
-                    <SubjectIcon icon={previewExam.subject.icon} color={previewExam.subject.color} size={14} />
-                    <Text className="text-sm text-gray-500">{previewExam.subject.name}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Questões */}
-            {previewLoading ? (
-              <View className="py-12 items-center">
-                <ActivityIndicator color="#7C3AED" />
-              </View>
-            ) : previewQuestions.length === 0 ? (
-              <View className="py-10 items-center gap-2">
-                <Ionicons name="help-circle-outline" size={32} color="#D1D5DB" />
-                <Text className="text-sm text-gray-400">Nenhuma questão cadastrada</Text>
-              </View>
-            ) : (
-              previewQuestions.map((q) => {
-                const selected = previewSelected[q.id];
-                return (
-                  <View
-                    key={q.id}
-                    className="mb-5 rounded-2xl border border-gray-100 overflow-hidden"
-                  >
-                    {/* Cabeçalho da questão */}
-                    <View
-                      className="flex-row items-center justify-between px-5 py-3"
-                      style={{ backgroundColor: "#F5F3FF" }}
-                    >
-                      <View className="flex-row items-center gap-2">
-                        <View
-                          className="items-center justify-center rounded-lg"
-                          style={{ width: 28, height: 28, backgroundColor: "#7C3AED" }}
-                        >
-                          <Text className="text-xs font-bold text-white">{q.order}</Text>
-                        </View>
-                        <Text className="text-xs font-semibold text-violet-700">
-                          {q.type === "essay"
-                            ? "Discursiva"
-                            : q.options.some((o) => o.triggers_text_input)
-                            ? 'Objetiva c/ "Outro"'
-                            : "Objetiva"}
-                        </Text>
-                      </View>
-                      <Text className="text-xs text-violet-600 font-semibold">
-                        {q.points} pt{q.points !== 1 ? "s" : ""}
-                      </Text>
-                    </View>
-
-                    <View className="px-5 py-4">
-                      {/* Enunciado */}
-                      <Text className="text-sm font-medium text-gray-800 mb-4 leading-relaxed">
-                        {q.question_text}
-                      </Text>
-
-                      {/* Imagem opcional */}
-                      {q.image_url && (
-                        <View
-                          className="mb-4 rounded-xl overflow-hidden border border-gray-200 bg-gray-50"
-                          style={{ minHeight: 180 }}
-                        >
-                          {!previewBrokenImages[q.id] ? (
-                            <Image
-                              source={{ uri: q.image_url }}
-                              style={{ width: "100%", height: 220, backgroundColor: "#F3F4F6" }}
-                              resizeMode="contain"
-                              onError={() =>
-                                setPreviewBrokenImages((prev) => ({ ...prev, [q.id]: true }))
-                              }
-                            />
-                          ) : (
-                            <View className="h-[220px] items-center justify-center bg-gray-100 px-4">
-                              <Ionicons name="image-outline" size={28} color="#9CA3AF" />
-                              <Text className="text-xs text-gray-400 mt-2 text-center">
-                                Não foi possível carregar a imagem.
-                              </Text>
-                            </View>
-                          )}
-                          <Text className="text-xs text-gray-400 px-3 py-2 border-t border-gray-200" numberOfLines={1}>
-                            {q.image_url}
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* Opções – objetiva */}
-                      {q.type === "multiple_choice" &&
-                        q.options.map((opt) => {
-                          const isSelected = selected === opt.id;
-                          return (
-                            <TouchableOpacity
-                              key={opt.id}
-                              onPress={() => {
-                                const newId = isSelected ? null : opt.id;
-                                setPreviewSelected((prev) => ({ ...prev, [q.id]: newId }));
-                                if (isSelected || !opt.triggers_text_input) {
-                                  setPreviewTexts((prev) => ({ ...prev, [q.id]: "" }));
-                                }
-                              }}
-                              activeOpacity={0.75}
-                              className={`flex-row items-center gap-3 mb-2.5 px-4 py-3 rounded-xl border ${
-                                isSelected
-                                  ? "border-violet-400 bg-violet-50"
-                                  : "border-gray-200 bg-white"
-                              }`}
-                            >
-                              <View
-                                className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
-                                  isSelected ? "border-violet-500" : "border-gray-300"
-                                }`}
-                              >
-                                {isSelected && (
-                                  <View
-                                    className="rounded-full bg-violet-500"
-                                    style={{ width: 10, height: 10 }}
-                                  />
-                                )}
-                              </View>
-                              <Text
-                                className={`text-sm flex-1 ${
-                                  isSelected ? "text-violet-800 font-medium" : "text-gray-700"
-                                }`}
-                              >
-                                {opt.option_text}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-
-                      {/* Textarea – discursiva */}
-                      {q.type === "essay" && (
-                        <textarea
-                          value={previewTexts[q.id] ?? ""}
-                          onChange={(e: any) =>
-                            setPreviewTexts((prev) => ({ ...prev, [q.id]: e.target.value }))
-                          }
-                          placeholder="Escreva sua resposta aqui..."
-                          rows={4}
-                          style={{
-                            width: "100%",
-                            border: "1px solid #E5E7EB",
-                            borderRadius: 12,
-                            padding: "10px 14px",
-                            fontSize: 14,
-                            color: "#1F2937",
-                            backgroundColor: "#F9FAFB",
-                            resize: "vertical" as const,
-                            fontFamily: "inherit",
-                            outline: "none",
-                          }}
-                        />
-                      )}
-                      {/* Textarea – opção com triggers_text_input */}
-                      {q.type === "multiple_choice" &&
-                        selected != null &&
-                        q.options.find((o) => o.id === selected)?.triggers_text_input && (
-                          <View className="mt-3">
-                            <Text className="text-xs font-semibold text-gray-500 mb-2">
-                              Especifique:
-                            </Text>
-                            <textarea
-                              value={previewTexts[q.id] ?? ""}
-                              onChange={(e: any) =>
-                                setPreviewTexts((prev) => ({ ...prev, [q.id]: e.target.value }))
-                              }
-                              placeholder="Especifique..."
-                              rows={3}
-                              style={{
-                                width: "100%",
-                                border: "1px solid #E5E7EB",
-                                borderRadius: 12,
-                                padding: "10px 14px",
-                                fontSize: 14,
-                                color: "#1F2937",
-                                backgroundColor: "#F9FAFB",
-                                resize: "vertical" as const,
-                                fontFamily: "inherit",
-                                outline: "none",
-                              }}
-                            />
-                          </View>
-                        )}
-                    </View>
-                  </View>
-                );
-              })
-            )}
-
-            {/* Rodapé visual – botão de finalizar */}
-            {!previewLoading && previewQuestions.length > 0 && (
+          <ExamPreviewPlayer
+            key={previewExam.id}
+            questions={previewQuestions}
+            loading={previewLoading}
+            gradeObjective
+            emptyMessage="Nenhuma questão cadastrada"
+            header={
               <View
-                className="mt-2 mb-4 rounded-2xl border border-dashed border-gray-300 items-center py-6 gap-2"
+                className="mb-2 p-5 rounded-2xl border border-gray-100"
+                style={{ backgroundColor: "#FAFAFA" }}
               >
-                <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" />
-                <Text className="text-sm text-gray-400">
-                  Na versão do aluno, aqui apareceria o botão "Finalizar Simulado"
-                </Text>
+                <View className="flex-row items-start justify-between gap-4 mb-3">
+                  <Text className="text-xl font-bold text-gray-800 flex-1">
+                    {previewExam.title}
+                  </Text>
+                  <Badge
+                    label={previewExam.exam_type_label ?? previewExam.exam_type}
+                    slug={previewExam.exam_type}
+                  />
+                </View>
+                <View className="flex-row gap-4 flex-wrap">
+                  {previewExam.duration_minutes != null && (
+                    <View className="flex-row items-center gap-1.5">
+                      <Ionicons name="time-outline" size={14} color="#6B7280" />
+                      <Text className="text-sm text-gray-500">
+                        {previewExam.duration_minutes} min
+                      </Text>
+                    </View>
+                  )}
+                  {previewExam.passing_score != null && (
+                    <View className="flex-row items-center gap-1.5">
+                      <Ionicons name="ribbon-outline" size={14} color="#6B7280" />
+                      <Text className="text-sm text-gray-500">
+                        Mínimo: {previewExam.passing_score}%
+                      </Text>
+                    </View>
+                  )}
+                  <View className="flex-row items-center gap-1.5">
+                    <Ionicons name="help-circle-outline" size={14} color="#6B7280" />
+                    <Text className="text-sm text-gray-500">
+                      {previewExam.total_questions} questão
+                      {previewExam.total_questions !== 1 ? "ões" : ""}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center gap-1.5">
+                    <Ionicons name="star-outline" size={14} color="#6B7280" />
+                    <Text className="text-sm text-gray-500">{previewExam.total_points} pontos</Text>
+                  </View>
+                  {previewExam.course && (
+                    <View className="flex-row items-center gap-1.5">
+                      <Ionicons name="book-outline" size={14} color="#6B7280" />
+                      <Text className="text-sm text-gray-500">{previewExam.course.name}</Text>
+                    </View>
+                  )}
+                  {previewExam.subject && (
+                    <View className="flex-row items-center gap-1.5">
+                      <SubjectIcon
+                        icon={previewExam.subject.icon}
+                        color={previewExam.subject.color}
+                        size={14}
+                      />
+                      <Text className="text-sm text-gray-500">{previewExam.subject.name}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
-            )}
-          </View>
+            }
+          />
         )}
       </Modal>
     </ScrollView>
