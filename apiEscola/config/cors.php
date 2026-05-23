@@ -53,6 +53,7 @@ return [
         'Content-Type',
         'Content-Disposition',
         'X-Carne-Format',
+        'X-Carne-Filename',
         'X-Carne-Generated-Count',
         'X-Carne-Error-Count',
         'X-Carne-Errors',

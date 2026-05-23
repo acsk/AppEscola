@@ -112,6 +112,53 @@ export type CarneGenerateErrorRow = {
   message?: string;
 };
 
+/** Espelha o padrão do backend para exibir nome do arquivo antes do download. */
+export function predictCarneFilename(
+  preview: Pick<CarnePreview, "enrollment_id" | "enrollment_number" | "student_name" | "archive_format">,
+  parcelCount: number
+): string {
+  const ref = (preview.enrollment_number ?? `matricula-${preview.enrollment_id}`)
+    .replace(/[^a-zA-Z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "matricula";
+  const slug = (preview.student_name ?? "aluno")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "aluno";
+  const date = new Date().toISOString().slice(0, 10);
+  const ext = preview.archive_format === "pdf" ? "pdf" : "zip";
+  const count = Math.max(1, parcelCount);
+
+  return `carne-${ref}-${slug}-${count}-parcelas-${date}.${ext}`;
+}
+
+export function buildCarneSuccessMessage(options: {
+  studentName?: string | null;
+  enrollmentNumber?: string | null;
+  filename: string;
+  format: "pdf" | "zip";
+  generatedCount: number;
+  errorCount?: number;
+}): string {
+  const who = options.studentName?.trim() || "Aluno";
+  const matricula = options.enrollmentNumber?.trim();
+  const ref = matricula ? ` (${matricula})` : "";
+  const formatHint =
+    options.format === "zip"
+      ? "Abra o ZIP e imprima cada PDF."
+      : "Imprima o PDF único em sequência.";
+
+  let message = `Carnê de ${who}${ref}: ${options.generatedCount} boleto(s) em "${options.filename}". ${formatHint}`;
+
+  if ((options.errorCount ?? 0) > 0) {
+    message += ` (${options.errorCount} parcela(s) não incluída(s).)`;
+  }
+
+  return message;
+}
+
 export async function generateCarneArchive(
   enrollmentId: number,
   options?: {
@@ -158,7 +205,9 @@ export async function generateCarneArchive(
 
   await assertCarneBlobIsArchive(blob);
 
+  const filenameHeader = headerValue(headers, "x-carne-filename");
   const filename =
+    filenameHeader ||
     match?.[1]?.trim() ||
     `carne-matricula-${enrollmentId}.${format === "zip" ? "zip" : "pdf"}`;
 

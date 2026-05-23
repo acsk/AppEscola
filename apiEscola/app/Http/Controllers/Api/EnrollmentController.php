@@ -552,6 +552,7 @@ class EnrollmentController extends Controller
             'Content-Type' => $contentType,
             'Content-Disposition' => 'attachment; filename="' . $result['filename'] . '"',
             'X-Carne-Format' => $format,
+            'X-Carne-Filename' => $result['filename'],
             'X-Carne-Generated-Count' => (string) count($result['generated']),
             'X-Carne-Error-Count' => (string) count($result['errors']),
         ];

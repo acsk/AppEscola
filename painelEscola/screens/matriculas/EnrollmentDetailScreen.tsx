@@ -2765,7 +2765,7 @@ export default function EnrollmentDetailScreen({
         environment={defaultChargeEnvironment}
         onClose={() => setCarneModalVisible(false)}
         onSuccess={(message) => {
-          showToast("success", message, "Carnê");
+          showToast("success", message, "Carnê baixado");
           fetch();
         }}
         onError={(message) => showToast("error", message, "Carnê")}

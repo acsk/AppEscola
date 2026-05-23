@@ -9,9 +9,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import Modal from "../ui/Modal";
 import {
+  buildCarneSuccessMessage,
   downloadBlob,
   fetchCarnePreview,
   generateCarneArchive,
+  predictCarneFilename,
   type CarneExcludedInvoice,
   type CarnePreview,
   type CarnePreviewInvoice,
@@ -183,20 +185,23 @@ export default function EnrollmentCarneModal({
           requireAll,
         });
       downloadBlob(blob, filename);
-      let message =
-        format === "zip"
-          ? `Carnê montado: ${generatedCount} boleto(s) no ZIP.`
-          : `Carnê montado: ${generatedCount} boleto(s) em PDF único.`;
-      if (!issueMissing) {
-        message += " (somente boletos já emitidos.)";
-      }
-      if (errorCount > 0) {
-        message += ` ${errorCount} parcela(s) ficaram de fora.`;
-        errors.slice(0, 3).forEach((row) => {
-          if (row.message) {
-            message += `\n• ${row.description ? `${row.description}: ` : ""}${row.message}`;
-          }
-        });
+      let message = buildCarneSuccessMessage({
+        studentName: preview?.student_name,
+        enrollmentNumber: preview?.enrollment_number,
+        filename,
+        format,
+        generatedCount,
+        errorCount,
+      });
+      if (errorCount > 0 && errors.length > 0) {
+        const detail = errors
+          .slice(0, 2)
+          .map((row) => row.description || row.message)
+          .filter(Boolean)
+          .join("; ");
+        if (detail) {
+          message += ` Detalhe: ${detail}.`;
+        }
       }
       onSuccess?.(message);
       onClose();
@@ -466,6 +471,11 @@ export default function EnrollmentCarneModal({
     </View>
   );
 
+  const expectedFilename =
+    preview && selectedIds.length > 0
+      ? predictCarneFilename(preview, selectedIds.length)
+      : null;
+
   const renderConfirm = () => (
     <View>
       <View className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-3 mb-3">
@@ -474,6 +484,14 @@ export default function EnrollmentCarneModal({
           {`${selectedIds.length} parcela(s) · ${archiveLabel}`}
           {issueMissing ? " · com emissão na Cora" : " · só boletos existentes"}
         </Text>
+        {expectedFilename ? (
+          <View className="mt-2 flex-row items-start gap-1.5">
+            <Ionicons name="document-outline" size={14} color="#047857" style={{ marginTop: 1 }} />
+            <Text className="text-[11px] text-emerald-900 flex-1" selectable>
+              {`Será salvo como: ${expectedFilename}`}
+            </Text>
+          </View>
+        ) : null}
       </View>
       <View className="rounded-xl border border-gray-200 overflow-hidden max-h-[220px]">
         <ScrollView nestedScrollEnabled>
@@ -521,7 +539,7 @@ export default function EnrollmentCarneModal({
             <Ionicons name="download-outline" size={16} color="#fff" />
           )}
           <Text className="text-sm font-bold text-white">
-            {generating ? "Gerando..." : "Baixar carnê"}
+            {generating ? "Gerando..." : "Baixar arquivo"}
           </Text>
         </TouchableOpacity>
       ) : (

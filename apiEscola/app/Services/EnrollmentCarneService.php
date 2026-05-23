@@ -158,13 +158,10 @@ class EnrollmentCarneService
             );
         }
 
-        $studentSlug = preg_replace('/[^a-z0-9]+/i', '-', (string) ($enrollment->student?->name ?? 'aluno')) ?: 'aluno';
-        $extension = $bundled['format'] === 'zip' ? 'zip' : 'pdf';
-        $filename = sprintf(
-            'carne-matricula-%s-%s.%s',
-            $enrollment->enrollment_number ?? $enrollment->id,
-            trim($studentSlug, '-'),
-            $extension
+        $filename = $this->buildCarneFilename(
+            $enrollment,
+            $bundled['format'],
+            count($generated)
         );
 
         return [
@@ -415,6 +412,37 @@ class EnrollmentCarneService
         }
 
         return null;
+    }
+
+    private function buildCarneFilename(Enrollment $enrollment, string $format, int $boletoCount): string
+    {
+        $ref = preg_replace('/[^a-zA-Z0-9\-]+/', '-', (string) ($enrollment->enrollment_number ?? ('matricula-' . $enrollment->id)));
+        $ref = trim($ref, '-') ?: 'matricula';
+        $studentSlug = $this->slugifyForFilename((string) ($enrollment->student?->name ?? 'aluno'));
+        $extension = $format === 'zip' ? 'zip' : 'pdf';
+
+        return sprintf(
+            'carne-%s-%s-%d-parcelas-%s.%s',
+            $ref,
+            $studentSlug,
+            max(1, $boletoCount),
+            now()->format('Y-m-d'),
+            $extension
+        );
+    }
+
+    private function slugifyForFilename(string $value): string
+    {
+        $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+        $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($ascii !== false ? $ascii : $value)) ?? '';
+
+        $slug = trim($slug, '-');
+
+        if ($slug === '') {
+            return 'aluno';
+        }
+
+        return strlen($slug) > 40 ? substr($slug, 0, 40) : $slug;
     }
 
     private function boletoFilename(Invoice $invoice, int $sequence): string
