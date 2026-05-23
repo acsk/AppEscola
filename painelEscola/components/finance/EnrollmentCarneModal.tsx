@@ -28,6 +28,7 @@ type Props = {
 };
 
 type Step = "select" | "confirm";
+type AccordionKey = "excluded" | "eligible" | "confirmExcluded" | "confirmSelected";
 
 const money = (v: string | number | null | undefined) => {
   if (v === null || v === undefined || v === "") return "—";
@@ -43,6 +44,95 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelada",
 };
 
+function dueAmountLine(inv: { due_date: string | null; amount: string }) {
+  return `Venc. ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)}`;
+}
+
+function AccordionSection({
+  title,
+  badge,
+  expanded,
+  onToggle,
+  tone,
+  headerAction,
+  maxBodyHeight,
+  children,
+}: {
+  title: string;
+  badge?: string;
+  expanded: boolean;
+  onToggle: () => void;
+  tone: "amber" | "violet" | "emerald";
+  headerAction?: React.ReactNode;
+  maxBodyHeight?: number;
+  children: React.ReactNode;
+}) {
+  const tones = {
+    amber: {
+      wrap: "border-amber-200 bg-amber-50/30",
+      head: "bg-amber-50",
+      title: "text-amber-950",
+      badge: "bg-amber-100 text-amber-900",
+    },
+    violet: {
+      wrap: "border-violet-200 bg-violet-50/20",
+      head: "bg-violet-50",
+      title: "text-violet-950",
+      badge: "bg-violet-100 text-violet-900",
+    },
+    emerald: {
+      wrap: "border-emerald-200 bg-emerald-50/20",
+      head: "bg-emerald-50",
+      title: "text-emerald-950",
+      badge: "bg-emerald-100 text-emerald-900",
+    },
+  }[tone];
+
+  return (
+    <View className={`rounded-xl border mb-3 overflow-hidden ${tones.wrap}`}>
+      <View className={`flex-row items-center gap-2 px-3 py-2.5 ${tones.head}`}>
+        <TouchableOpacity
+          onPress={onToggle}
+          activeOpacity={0.8}
+          className="flex-row items-center gap-2 flex-1 min-w-0"
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+        >
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={tone === "amber" ? "#B45309" : tone === "violet" ? "#6D28D9" : "#047857"}
+          />
+          <Text className={`flex-1 text-sm font-bold ${tones.title}`} numberOfLines={1}>
+            {title}
+          </Text>
+          {badge ? (
+            <View className={`rounded-full px-2 py-0.5 ${tones.badge}`}>
+              <Text className="text-[10px] font-bold">{badge}</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+        {headerAction}
+      </View>
+      {expanded ? (
+        <View className="px-2 pb-2 pt-1">
+          {maxBodyHeight ? (
+            <ScrollView
+              style={{ maxHeight: maxBodyHeight }}
+              showsVerticalScrollIndicator
+              nestedScrollEnabled
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            children
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export default function EnrollmentCarneModal({
   visible,
   enrollmentId,
@@ -56,6 +146,16 @@ export default function EnrollmentCarneModal({
   const [step, setStep] = useState<Step>("select");
   const [preview, setPreview] = useState<CarnePreview | null>(null);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
+  const [openSections, setOpenSections] = useState<Record<AccordionKey, boolean>>({
+    excluded: true,
+    eligible: true,
+    confirmExcluded: false,
+    confirmSelected: true,
+  });
+
+  const toggleSection = (key: AccordionKey) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +168,12 @@ export default function EnrollmentCarneModal({
       });
       setSelected(initial);
       setStep("select");
+      setOpenSections({
+        excluded: (data.excluded_invoices?.length ?? 0) > 0,
+        eligible: (data.invoices?.length ?? 0) > 0,
+        confirmExcluded: false,
+        confirmSelected: true,
+      });
     } catch (e: any) {
       onError?.(e?.response?.data?.message || "Não foi possível carregar o carnê.");
       setPreview(null);
@@ -166,39 +272,63 @@ export default function EnrollmentCarneModal({
       return;
     }
     setStep("confirm");
+    setOpenSections((prev) => ({
+      ...prev,
+      confirmExcluded: excluded.length > 0,
+      confirmSelected: true,
+    }));
   };
 
-  const renderEligibleRow = (inv: CarnePreviewInvoice) => {
+  const renderEligibleRow = (inv: CarnePreviewInvoice, selectable = true) => {
     const checked = !!selected[inv.invoice_id];
+    const metaSuffix = inv.has_boleto ? " · Boleto pronto" : " · Emitir no carnê";
+    const metaColor = inv.has_boleto ? "#047857" : "#B45309";
+
+    const content = (
+      <>
+        {selectable ? (
+          <Ionicons
+            name={checked ? "checkbox" : "square-outline"}
+            size={18}
+            color={checked ? "#7C3AED" : "#9CA3AF"}
+            style={{ marginTop: 1 }}
+          />
+        ) : (
+          <Ionicons name="checkmark-circle" size={18} color="#7C3AED" style={{ marginTop: 1 }} />
+        )}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
+            {inv.description}
+          </Text>
+          <Text className="text-xs text-gray-500" numberOfLines={1}>
+            {dueAmountLine(inv)}
+            <Text style={{ color: metaColor, fontWeight: "600" }}>{metaSuffix}</Text>
+          </Text>
+        </View>
+      </>
+    );
+
+    if (!selectable) {
+      return (
+        <View
+          key={inv.invoice_id}
+          className="flex-row items-start gap-2 px-2 py-2 rounded-lg bg-white border border-violet-100 mb-1"
+        >
+          {content}
+        </View>
+      );
+    }
+
     return (
       <TouchableOpacity
         key={inv.invoice_id}
         onPress={() => toggle(inv.invoice_id)}
         activeOpacity={0.85}
-        className={`flex-row items-start gap-3 px-3 py-3 rounded-xl border mb-2 ${
-          checked ? "border-violet-300 bg-violet-50/50" : "border-gray-200 bg-white"
+        className={`flex-row items-start gap-2 px-2 py-2 rounded-lg border mb-1 ${
+          checked ? "border-violet-300 bg-white" : "border-gray-100 bg-white/80"
         }`}
       >
-        <Ionicons
-          name={checked ? "checkbox" : "square-outline"}
-          size={20}
-          color={checked ? "#7C3AED" : "#9CA3AF"}
-        />
-        <View style={{ flex: 1 }}>
-          <Text className="text-sm font-semibold text-gray-800">{inv.description}</Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
-            {`Venc.: ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)}`}
-          </Text>
-          {inv.has_boleto ? (
-            <Text className="text-[10px] text-emerald-700 font-semibold mt-1">
-              Já possui boleto no provedor
-            </Text>
-          ) : (
-            <Text className="text-[10px] text-amber-700 mt-1">
-              Será emitido no provedor ao gerar o carnê
-            </Text>
-          )}
-        </View>
+        {content}
       </TouchableOpacity>
     );
   };
@@ -206,134 +336,113 @@ export default function EnrollmentCarneModal({
   const renderExcludedRow = (inv: CarneExcludedInvoice) => (
     <View
       key={inv.invoice_id}
-      className="flex-row items-start gap-3 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 mb-2"
+      className="flex-row items-start gap-2 px-2 py-2 rounded-lg border border-gray-100 bg-white mb-1"
     >
-      <Ionicons name="close-circle-outline" size={18} color="#9CA3AF" style={{ marginTop: 2 }} />
-      <View style={{ flex: 1 }}>
-        <Text className="text-sm font-medium text-gray-700">{inv.description}</Text>
-        <Text className="text-xs text-gray-500 mt-0.5">
-          {`Venc.: ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)} · ${
-            STATUS_LABELS[inv.status] ?? inv.status
-          }`}
+      <Ionicons name="close-circle" size={16} color="#D1D5DB" style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text className="text-sm font-medium text-gray-800" numberOfLines={1}>
+          {inv.description}
         </Text>
-        <Text className="text-[10px] text-gray-600 mt-1 leading-relaxed">{inv.reason_label}</Text>
+        <Text className="text-xs text-gray-500" numberOfLines={1}>
+          {`${dueAmountLine(inv)} · ${STATUS_LABELS[inv.status] ?? inv.status} · ${inv.reason_label}`}
+        </Text>
       </View>
     </View>
   );
 
-  const renderExcludedBlock = (compact = false) => {
-    if (excluded.length === 0) return null;
-
-    return (
-      <View className={compact ? "mb-4" : "mb-5"}>
-        <View className="flex-row items-center gap-2 mb-2">
-          <Ionicons name="alert-circle-outline" size={16} color="#B45309" />
-          <Text className="text-xs font-bold text-amber-800 uppercase tracking-wide">
-            {excluded.length} cobrança(s) não entram no carnê
-          </Text>
-        </View>
-        <ScrollView
-          style={{ maxHeight: compact ? 160 : 200 }}
-          showsVerticalScrollIndicator
-          nestedScrollEnabled
-        >
-          {excluded.map(renderExcludedRow)}
-        </ScrollView>
-      </View>
-    );
-  };
-
-  const renderConfirmStep = () => (
-    <>
-      <View className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 mb-4">
-        <Text className="text-sm font-semibold text-amber-900 mb-1">Confirme a geração</Text>
-        <Text className="text-xs text-amber-800 leading-relaxed">
-          Serão emitidos boletos no provedor e montado o arquivo para impressão. Cobranças abaixo
-          não serão incluídas.
-        </Text>
-      </View>
-
-      <View className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 mb-4">
-        <Text className="text-xs font-semibold text-emerald-800 uppercase tracking-wide mb-1">
-          Incluídas no carnê
-        </Text>
-        <Text className="text-lg font-bold text-emerald-900">
-          {selectedIds.length} cobrança(s) selecionada(s)
-        </Text>
-        <Text className="text-xs text-emerald-700 mt-1">
-          {preview?.archive_format === "zip"
-            ? "Download em ZIP (um PDF por parcela)"
-            : "Download em PDF único"}
-        </Text>
-      </View>
-
-      {renderExcludedBlock(true)}
-
-      <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-        Parcelas que serão geradas
-      </Text>
-      <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator nestedScrollEnabled>
-        {selectedInvoices.map((inv) => (
-          <View
-            key={inv.invoice_id}
-            className="flex-row items-center gap-2 px-3 py-2 rounded-lg bg-violet-50/60 border border-violet-100 mb-1.5"
-          >
-            <Ionicons name="checkmark-circle" size={16} color="#7C3AED" />
-            <View style={{ flex: 1 }}>
-              <Text className="text-sm text-gray-800" numberOfLines={1}>
-                {inv.description}
-              </Text>
-              <Text className="text-xs text-gray-500">
-                {`Venc.: ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)}`}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-    </>
-  );
+  const studentLabel = preview?.student_name ?? "Aluno";
 
   const renderSelectStep = () => (
     <>
-      <View className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 mb-4 flex-row gap-2">
-        <Ionicons name="information-circle-outline" size={18} color="#2563EB" />
+      <View className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5 mb-3 flex-row gap-2">
+        <Ionicons name="information-circle-outline" size={17} color="#2563EB" />
         <Text className="text-xs text-blue-800 flex-1 leading-relaxed">
           {preview?.archive_format_hint ??
-            "Emite boleto no provedor para cada parcela e prepara o arquivo para impressão ou entrega aos pais."}
+            "Emite boleto no provedor para cada parcela e prepara o arquivo para impressão."}
         </Text>
       </View>
 
-      {excluded.length > 0 && renderExcludedBlock()}
+      {excluded.length > 0 ? (
+        <AccordionSection
+          title="Não entram no carnê"
+          badge={String(excluded.length)}
+          expanded={openSections.excluded}
+          onToggle={() => toggleSection("excluded")}
+          tone="amber"
+          maxBodyHeight={200}
+        >
+          {excluded.map(renderExcludedRow)}
+        </AccordionSection>
+      ) : null}
 
       {!preview || preview.invoices.length === 0 ? (
-        <View className="py-10 items-center gap-2">
-          <Ionicons name="document-outline" size={36} color="#D1D5DB" />
+        <View className="py-8 items-center gap-2">
+          <Ionicons name="document-outline" size={32} color="#D1D5DB" />
           <Text className="text-sm text-gray-500 text-center px-4">
             {excluded.length > 0
-              ? "Não há cobranças em aberto aptas para o carnê. As cobranças listadas acima não podem ser incluídas."
+              ? "Não há cobranças aptas. Abra a seção acima para ver o motivo de cada uma."
               : "Não há cobranças nesta matrícula para o carnê."}
           </Text>
         </View>
       ) : (
-        <>
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-sm text-gray-600 flex-1 mr-2">
-              {`${preview.student_name ?? "Aluno"} · ${selectedIds.length} de ${preview.invoices.length} selecionada(s)`}
-            </Text>
-            <TouchableOpacity onPress={() => toggleAll(selectedIds.length !== preview.invoices.length)}>
-              <Text className="text-xs font-semibold text-violet-700">
-                {selectedIds.length === preview.invoices.length ? "Desmarcar todas" : "Marcar todas"}
+        <AccordionSection
+          title={`Aptas — ${studentLabel}`}
+          badge={`${selectedIds.length}/${preview.invoices.length}`}
+          expanded={openSections.eligible}
+          onToggle={() => toggleSection("eligible")}
+          tone="violet"
+          maxBodyHeight={280}
+          headerAction={
+            <TouchableOpacity
+              onPress={() => toggleAll(selectedIds.length !== preview.invoices.length)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text className="text-[10px] font-bold text-violet-700">
+                {selectedIds.length === preview.invoices.length ? "Desmarcar" : "Marcar"}
               </Text>
             </TouchableOpacity>
-          </View>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Aptas para o carnê
-          </Text>
-          <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator nestedScrollEnabled>
-            {preview.invoices.map(renderEligibleRow)}
-          </ScrollView>
-        </>
+          }
+        >
+          {preview.invoices.map((inv) => renderEligibleRow(inv, true))}
+        </AccordionSection>
       )}
+    </>
+  );
+
+  const renderConfirmStep = () => (
+    <>
+      <View className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 mb-3">
+        <Text className="text-sm font-semibold text-amber-900">Confirme a geração</Text>
+        <Text className="text-xs text-amber-800 mt-0.5" numberOfLines={2}>
+          {`${selectedIds.length} boleto(s) · ${
+            preview?.archive_format === "zip" ? "arquivo ZIP" : "PDF único"
+          }`}
+        </Text>
+      </View>
+
+      {excluded.length > 0 ? (
+        <AccordionSection
+          title="Excluídas do carnê"
+          badge={String(excluded.length)}
+          expanded={openSections.confirmExcluded}
+          onToggle={() => toggleSection("confirmExcluded")}
+          tone="amber"
+          maxBodyHeight={140}
+        >
+          {excluded.map(renderExcludedRow)}
+        </AccordionSection>
+      ) : null}
+
+      <AccordionSection
+        title={`Serão geradas — ${studentLabel}`}
+        badge={String(selectedIds.length)}
+        expanded={openSections.confirmSelected}
+        onToggle={() => toggleSection("confirmSelected")}
+        tone="emerald"
+        maxBodyHeight={220}
+      >
+        {selectedInvoices.map((inv) => renderEligibleRow(inv, false))}
+      </AccordionSection>
     </>
   );
 
@@ -382,8 +491,8 @@ export default function EnrollmentCarneModal({
           {generating
             ? "Gerando..."
             : preview?.archive_format === "zip"
-              ? "Confirmar e baixar ZIP"
-              : "Confirmar e baixar PDF"}
+              ? "Confirmar ZIP"
+              : "Confirmar PDF"}
         </Text>
       </TouchableOpacity>
     </>
