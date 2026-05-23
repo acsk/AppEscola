@@ -43,6 +43,7 @@ import type {
   EnrollmentSummary,
   EnrollmentsScreenProps,
 } from "../../types/matriculas";
+import type { SchoolClassRef, StudentRef } from "../../types/entities";
 
 const EMPTY_EDIT: EnrollmentEditFormValues = {
   student_id: "",
@@ -71,7 +72,7 @@ const limitText = (value: string | undefined | null, max = STUDENT_NAME_LIMIT) =
 };
 
 export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) {
-  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
+  const { isMobile, contentPadding } = useResponsiveLayout();
   const [rows, setRows] = useState<EnrollmentSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -93,8 +94,8 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   const [saving, setSaving] = useState(false);
 
   // Lookups for edit modal
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [students, setStudents] = useState<StudentRef[]>([]);
+  const [classes, setClasses] = useState<SchoolClassRef[]>([]);
 
   // Delete
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -265,6 +266,107 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         })}`
       : "—";
 
+  const renderProductBadge = (item: EnrollmentSummary) => {
+    const isBundle = enrollmentProductKind(item) === "bundle";
+    return (
+      <View
+        className={`self-start rounded-md px-1.5 py-0.5 ${
+          isBundle ? "bg-violet-100" : "bg-sky-100"
+        }`}
+      >
+        <Text
+          className={`text-[10px] font-bold uppercase ${
+            isBundle ? "text-violet-700" : "text-sky-700"
+          }`}
+        >
+          {isBundle ? "Pacote" : "Plano"}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderEnrollmentCard = (item: EnrollmentSummary) => {
+    const subtitle = enrollmentProductSubtitle(item);
+
+    return (
+      <TouchableOpacity
+        key={item.id}
+        onPress={() => navigate("matriculas-detail", { enrollmentId: item.id })}
+        activeOpacity={0.86}
+        className="bg-white rounded-2xl border border-gray-200 p-4"
+        style={{
+          shadowColor: "#000",
+          shadowOpacity: 0.04,
+          shadowRadius: 8,
+          elevation: 1,
+        }}
+      >
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1" style={{ minWidth: 0 }}>
+            <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+              {item.student?.name ?? "—"}
+            </Text>
+            <Text className="text-xs font-semibold text-gray-500 mt-1" numberOfLines={1}>
+              {item.enrollment_number ?? "—"}
+            </Text>
+          </View>
+          <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
+        </View>
+
+        <View className="mt-3 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
+          {renderProductBadge(item)}
+          <Text className="text-sm font-bold text-gray-900 mt-1" numberOfLines={1}>
+            {enrollmentProductTitle(item)}
+          </Text>
+          {!!subtitle && (
+            <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
+              {subtitle}
+            </Text>
+          )}
+        </View>
+
+        <View className="flex-row gap-2 mt-3">
+          <View className="flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
+            <Text className="text-[11px] font-semibold uppercase text-gray-400">Início</Text>
+            <Text className="text-sm font-semibold text-gray-800 mt-0.5">
+              {fmt(item.start_date)}
+            </Text>
+          </View>
+          <View className="flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
+            <Text className="text-[11px] font-semibold uppercase text-gray-400">Mensalidade</Text>
+            <Text className="text-sm font-semibold text-gray-800 mt-0.5" numberOfLines={1}>
+              {formatCurrency(item.monthly_amount)}
+            </Text>
+          </View>
+        </View>
+
+        <View className="flex-row justify-end gap-2 mt-3">
+          <TouchableOpacity
+            onPress={(event: any) => {
+              event?.stopPropagation?.();
+              navigate("matriculas-detail", { enrollmentId: item.id });
+            }}
+            className="h-9 px-3 rounded-lg bg-violet-50 border border-violet-100 flex-row items-center justify-center"
+            activeOpacity={0.85}
+          >
+            <Ionicons name="eye-outline" size={15} color="#7C3AED" />
+            <Text className="text-xs font-bold text-violet-700 ml-1.5">Detalhes</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={(event: any) => {
+              event?.stopPropagation?.();
+              setMenuEnrollment(item);
+            }}
+            className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 items-center justify-center"
+            activeOpacity={0.85}
+          >
+            <Ionicons name="ellipsis-horizontal" size={17} color="#4B5563" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -284,6 +386,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         <TouchableOpacity
           onPress={() => navigate("matriculas-form")}
           className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          style={{ justifyContent: "center", width: isMobile ? "100%" : undefined }}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="white" />
@@ -345,132 +448,163 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         </select>
       </View>
 
-      {/* Table */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={isMobile}
-        style={{ width: "100%" }}
-        contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
-      >
-      <View
-        className="bg-white rounded-2xl overflow-hidden border border-gray-200"
-        style={{
-          width: "100%",
-          minWidth: isMobile ? tableMinWidth : 980,
-          shadowColor: "#000",
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 2,
-        }}
-      >
-        <View className="flex-row bg-gray-100 border-b border-gray-200 px-3 py-2">
-          <Text
-            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-            style={{ flex: 1.55 }}
-          >
-            Aluno
-          </Text>
-          <Text
-            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-            style={{ flex: 1.65 }}
-          >
-            Curso / Pacote
-          </Text>
-          <Text
-            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-            style={{ flex: 0.85 }}
-          >
-            Nº Matrícula
-          </Text>
-          <Text
-            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-            style={{ flex: 0.7 }}
-          >
-            Início
-          </Text>
-          <Text
-            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-            style={{ flex: 0.8 }}
-          >
-            Mensalidade
-          </Text>
-          <Text
-            className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-            style={{ flex: 0.65 }}
-          >
-            Status
-          </Text>
-          <View style={{ width: 42 }} />
-        </View>
-
-        {loading ? (
-          <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color="#7C3AED" />
-          </View>
-        ) : rows.length === 0 ? (
-          <View className="items-center justify-center py-16">
-            <Ionicons name="clipboard-outline" size={40} color="#E5E7EB" />
-            <Text className="text-gray-400 mt-3 text-sm">
-              Nenhuma matrícula encontrada
-            </Text>
-          </View>
-        ) : (
-          rows.map((item, i) => (
-            <View
-              key={item.id}
-              className={`flex-row items-center px-3 py-2 border-b border-gray-100 ${
-                i % 2 === 1 ? "bg-slate-50/70" : "bg-white"
-              }`}
-            >
-              <Text
-                className="text-xs font-semibold text-gray-800"
-                style={{ flex: 1.55, paddingRight: 10 }}
-                numberOfLines={1}
-              >
-                {limitText(item.student?.name)}
-              </Text>
-              <EnrollmentProductCell item={item} compact flex={1.65} />
-              <Text className="text-xs font-medium text-gray-600" style={{ flex: 0.85 }}>
-                {item.enrollment_number ?? "—"}
-              </Text>
-              <Text className="text-xs text-gray-600" style={{ flex: 0.7 }}>
-                {fmt(item.start_date)}
-              </Text>
-              <Text className="text-xs font-semibold text-gray-700" style={{ flex: 0.8 }}>
-                {formatCurrency(item.monthly_amount)}
-              </Text>
-              <View style={{ flex: 0.65 }}>
-                <Badge
-                  slug={item.status}
-                  label={STATUS_LABELS[item.status] ?? item.status}
-                />
-              </View>
-              <View style={{ width: 42 }} className="flex-row justify-end">
-                <TouchableOpacity
-                  onPress={() => setMenuEnrollment(item)}
-                  className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
-                </TouchableOpacity>
-              </View>
+      {/* List */}
+      {isMobile ? (
+        <View className="gap-3">
+          {loading ? (
+            <View className="items-center justify-center py-16 bg-white rounded-2xl border border-gray-200">
+              <ActivityIndicator size="large" color="#7C3AED" />
             </View>
-          ))
-        )}
+          ) : rows.length === 0 ? (
+            <View className="items-center justify-center py-14 bg-white rounded-2xl border border-gray-200">
+              <Ionicons name="clipboard-outline" size={40} color="#E5E7EB" />
+              <Text className="text-gray-400 mt-3 text-sm">
+                Nenhuma matrícula encontrada
+              </Text>
+            </View>
+          ) : (
+            rows.map(renderEnrollmentCard)
+          )}
 
-        {meta.total > 0 && (
-          <View className="px-4 border-t border-gray-100">
-            <Pagination
-              currentPage={meta.current_page}
-              lastPage={meta.last_page}
-              total={meta.total}
-              perPage={meta.per_page}
-              onPageChange={setPage}
-            />
+          {meta.total > 0 && (
+            <View className="bg-white rounded-2xl border border-gray-200 px-4">
+              <Pagination
+                currentPage={meta.current_page}
+                lastPage={meta.last_page}
+                total={meta.total}
+                perPage={meta.per_page}
+                onPageChange={setPage}
+              />
+            </View>
+          )}
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ width: "100%" }}
+          contentContainerStyle={{ width: "100%" }}
+        >
+        <View
+          className="bg-white rounded-2xl overflow-hidden border border-gray-200"
+          style={{
+            width: "100%",
+            minWidth: 980,
+            shadowColor: "#000",
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            elevation: 2,
+          }}
+        >
+          <View className="flex-row bg-gray-100 border-b border-gray-200 px-3 py-2">
+            <Text
+              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+              style={{ flex: 1.55 }}
+            >
+              Aluno
+            </Text>
+            <Text
+              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+              style={{ flex: 1.65 }}
+            >
+              Curso / Pacote
+            </Text>
+            <Text
+              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+              style={{ flex: 0.85 }}
+            >
+              Nº Matrícula
+            </Text>
+            <Text
+              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+              style={{ flex: 0.7 }}
+            >
+              Início
+            </Text>
+            <Text
+              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+              style={{ flex: 0.8 }}
+            >
+              Mensalidade
+            </Text>
+            <Text
+              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
+              style={{ flex: 0.65 }}
+            >
+              Status
+            </Text>
+            <View style={{ width: 42 }} />
           </View>
-        )}
-      </View>
-      </ScrollView>
+
+          {loading ? (
+            <View className="items-center justify-center py-20">
+              <ActivityIndicator size="large" color="#7C3AED" />
+            </View>
+          ) : rows.length === 0 ? (
+            <View className="items-center justify-center py-16">
+              <Ionicons name="clipboard-outline" size={40} color="#E5E7EB" />
+              <Text className="text-gray-400 mt-3 text-sm">
+                Nenhuma matrícula encontrada
+              </Text>
+            </View>
+          ) : (
+            rows.map((item, i) => (
+              <View
+                key={item.id}
+                className={`flex-row items-center px-3 py-2 border-b border-gray-100 ${
+                  i % 2 === 1 ? "bg-slate-50/70" : "bg-white"
+                }`}
+              >
+                <Text
+                  className="text-xs font-semibold text-gray-800"
+                  style={{ flex: 1.55, paddingRight: 10 }}
+                  numberOfLines={1}
+                >
+                  {limitText(item.student?.name)}
+                </Text>
+                <EnrollmentProductCell item={item} compact flex={1.65} />
+                <Text className="text-xs font-medium text-gray-600" style={{ flex: 0.85 }}>
+                  {item.enrollment_number ?? "—"}
+                </Text>
+                <Text className="text-xs text-gray-600" style={{ flex: 0.7 }}>
+                  {fmt(item.start_date)}
+                </Text>
+                <Text className="text-xs font-semibold text-gray-700" style={{ flex: 0.8 }}>
+                  {formatCurrency(item.monthly_amount)}
+                </Text>
+                <View style={{ flex: 0.65 }}>
+                  <Badge
+                    slug={item.status}
+                    label={STATUS_LABELS[item.status] ?? item.status}
+                  />
+                </View>
+                <View style={{ width: 42 }} className="flex-row justify-end">
+                  <TouchableOpacity
+                    onPress={() => setMenuEnrollment(item)}
+                    className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+
+          {meta.total > 0 && (
+            <View className="px-4 border-t border-gray-100">
+              <Pagination
+                currentPage={meta.current_page}
+                lastPage={meta.last_page}
+                total={meta.total}
+                perPage={meta.per_page}
+                onPageChange={setPage}
+              />
+            </View>
+          )}
+        </View>
+        </ScrollView>
+      )}
 
       {/* View Modal */}
       <Modal
