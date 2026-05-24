@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAlunoDrawer } from '../../context/AlunoDrawerContext';
 import { useAuth } from '../../context/AuthContext';
@@ -33,17 +33,22 @@ type NavigationStateSnapshot = Partial<ReturnType<Nav['getState']>> | undefined;
 
 const DRAWER_WIDTH = 312;
 
+type MenuId = 'home' | 'calendario' | 'desempenho' | 'simulados' | 'provas-anteriores' | 'financeiro';
+
 type MenuItem =
-  | { label: string; icon: IconName; tab: TabName; nestedScreen?: 'ProvasAnteriores' | 'SimuladosList' }
-  | { label: string; icon: IconName; stack: keyof Pick<AlunoStackParamList, 'Calendario'> };
+  | { id: MenuId; label: string; icon: IconName; tab: TabName; nestedScreen?: 'ProvasAnteriores' | 'SimuladosList' }
+  | { id: MenuId; label: string; icon: IconName; stack: keyof Pick<AlunoStackParamList, 'Calendario'> };
+
+const PROVAS_ANTERIORES_SCREENS = new Set(['ProvasAnteriores', 'ProvaAnteriorDetalhe']);
+const SIMULADOS_SCREENS = new Set(['SimuladosList', 'SimuladoDetalhe', 'SimuladoExam']);
 
 const MENU_ITEMS: MenuItem[] = [
-  { label: 'Início', tab: 'Home', icon: 'home-outline' },
-  { label: 'Calendário', stack: 'Calendario', icon: 'calendar-outline' },
-  { label: 'Desempenho', tab: 'Desempenho', icon: 'stats-chart-outline' },
-  { label: 'Simulados', tab: 'Simulados', icon: 'clipboard-outline' },
-  { label: 'Provas anteriores', tab: 'Simulados', nestedScreen: 'ProvasAnteriores', icon: 'archive-outline' },
-  { label: 'Financeiro', tab: 'Financeiro', icon: 'wallet-outline' },
+  { id: 'home', label: 'Início', tab: 'Home', icon: 'home-outline' },
+  { id: 'calendario', label: 'Calendário', stack: 'Calendario', icon: 'calendar-outline' },
+  { id: 'desempenho', label: 'Desempenho', tab: 'Desempenho', icon: 'stats-chart-outline' },
+  { id: 'simulados', label: 'Simulados', tab: 'Simulados', icon: 'clipboard-outline' },
+  { id: 'provas-anteriores', label: 'Provas anteriores', tab: 'Simulados', nestedScreen: 'ProvasAnteriores', icon: 'archive-outline' },
+  { id: 'financeiro', label: 'Financeiro', tab: 'Financeiro', icon: 'wallet-outline' },
 ];
 
 function getInitials(name: string): string {
@@ -56,6 +61,59 @@ function getInitials(name: string): string {
 
 function isAlunoTabName(name: string | undefined): name is TabName {
   return name === 'Home' || name === 'Desempenho' || name === 'Simulados' || name === 'Financeiro';
+}
+
+function getActiveSimuladosScreen(state: NavigationStateSnapshot): string | null {
+  const routes = state?.routes;
+  if (!routes?.length) return null;
+
+  const stackRoute = routes[state?.index ?? 0] ?? routes[0];
+  if (stackRoute?.name !== 'AlunoTabs') return null;
+
+  const tabState = stackRoute.state as {
+    index?: number;
+    routes?: Array<{ name?: string; state?: { index?: number; routes?: Array<{ name?: string }> } }>;
+  } | undefined;
+  const tabRoutes = tabState?.routes;
+  if (!tabRoutes?.length) return null;
+
+  const tabRoute = tabRoutes[tabState?.index ?? 0] ?? tabRoutes[0];
+  if (tabRoute?.name !== 'Simulados') return null;
+
+  const simState = tabRoute.state;
+  const simRoutes = simState?.routes;
+  if (!simRoutes?.length) return 'SimuladosList';
+
+  const simRoute = simRoutes[simState?.index ?? 0] ?? simRoutes[0];
+  return simRoute?.name ?? 'SimuladosList';
+}
+
+function getActiveMenuId(state: NavigationStateSnapshot): MenuId | null {
+  const routes = state?.routes;
+  if (!routes?.length) return 'home';
+
+  const stackRoute = routes[state?.index ?? 0] ?? routes[0];
+  if (stackRoute?.name === 'Calendario') return 'calendario';
+  if (stackRoute?.name !== 'AlunoTabs') return null;
+
+  const activeTab = getActiveTabName(state);
+  if (!activeTab) return 'home';
+
+  if (activeTab === 'Simulados') {
+    const simScreen = getActiveSimuladosScreen(state);
+    if (simScreen && PROVAS_ANTERIORES_SCREENS.has(simScreen)) return 'provas-anteriores';
+    if (!simScreen || SIMULADOS_SCREENS.has(simScreen)) return 'simulados';
+    return 'simulados';
+  }
+
+  const tabMenuMap: Record<TabName, MenuId> = {
+    Home: 'home',
+    Desempenho: 'desempenho',
+    Simulados: 'simulados',
+    Financeiro: 'financeiro',
+  };
+
+  return tabMenuMap[activeTab] ?? null;
 }
 
 function getActiveTabName(state: NavigationStateSnapshot): TabName | null {
@@ -83,7 +141,7 @@ export function AlunoDrawer() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const drawerWidth = Math.min(DRAWER_WIDTH, width * 0.86);
-  const activeTab = getActiveTabName(navigation.getState());
+  const activeMenuId = useNavigationState((state) => getActiveMenuId(state as NavigationStateSnapshot));
   const [shouldRender, setShouldRender] = useState(visible);
   const [confirmLogoutVisible, setConfirmLogoutVisible] = useState(false);
   const userEmail = user?.email ?? '';
@@ -247,13 +305,11 @@ export function AlunoDrawer() {
               <Text style={styles.secaoLabel}>Navegação</Text>
               <View style={styles.menuPrincipal}>
                 {MENU_ITEMS.map((item) => {
-                  const active =
-                    ('tab' in item && activeTab === item.tab) ||
-                    ('stack' in item && item.stack === 'Calendario' && false);
+                  const active = item.id === activeMenuId;
 
                   return (
                     <TouchableOpacity
-                      key={'tab' in item ? item.tab : item.stack}
+                      key={item.id}
                       style={[styles.navItem, active && styles.navItemAtivo]}
                       onPress={() => handleMenuPress(item)}
                       activeOpacity={0.75}
