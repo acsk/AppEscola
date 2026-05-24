@@ -66,7 +66,7 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ProvasAnterioresHeader />
+        <ProvasAnterioresHeader variant="detail" />
         <View style={styles.centro}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.carregandoTexto}>Carregando prova…</Text>
@@ -78,7 +78,7 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   if (isError || !prova) {
     return (
       <View style={styles.container}>
-        <ProvasAnterioresHeader />
+        <ProvasAnterioresHeader variant="detail" />
         <View style={styles.centro}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
           <Text style={styles.erroTexto}>
@@ -110,7 +110,7 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <ProvasAnterioresHeader />
+      <ProvasAnterioresHeader variant="detail" />
 
       <ScrollView
         style={styles.scroll}

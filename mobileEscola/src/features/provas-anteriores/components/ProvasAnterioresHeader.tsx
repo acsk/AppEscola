@@ -11,19 +11,45 @@ import type { ThemeColors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList>;
 
-export function ProvasAnterioresHeader() {
+type ProvasAnterioresHeaderProps = {
+  /** Lista = menu + "Provas anteriores"; detalhe = voltar + "Prova". */
+  variant?: 'list' | 'detail';
+};
+
+export function ProvasAnterioresHeader({ variant = 'list' }: ProvasAnterioresHeaderProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
+  const isDetail = variant === 'detail';
+
+  function handleVoltar() {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('ProvasAnteriores');
+  }
 
   return (
     <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
       <View style={styles.headerGlowPrimary} />
       <View style={styles.headerGlowSecondary} />
       <View style={styles.headerTituloRow}>
-        <MenuButton />
-        <Text style={styles.headerTitulo}>Provas anteriores</Text>
+        {isDetail ? (
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={handleVoltar}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.ink} />
+          </TouchableOpacity>
+        ) : (
+          <MenuButton />
+        )}
+        <Text style={styles.headerTitulo}>{isDetail ? 'Prova' : 'Provas anteriores'}</Text>
         <TouchableOpacity
           style={styles.headerLinkBtn}
           onPress={() => navigation.navigate('SimuladosList')}
@@ -79,6 +105,16 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: 14,
     },
     headerTitulo: { flex: 1, fontSize: 22, fontWeight: '800', color: '#111827' },
+    headerIconBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.72)',
+      borderWidth: 1,
+      borderColor: '#E8EDF5',
+    },
     headerLinkBtn: {
       flexDirection: 'row',
       alignItems: 'center',
