@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use DateTimeImmutable;
 use Illuminate\Support\Carbon;
 
 /**
@@ -34,13 +35,14 @@ final class PastExamDate
             return null;
         }
 
-        $parsed = Carbon::createFromFormat('Y-m-d', $value);
+        // DateTimeImmutable não lança com Carbon strict mode em entradas inválidas.
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
-        if (! $parsed instanceof Carbon) {
+        if ($parsed === false) {
             return null;
         }
 
-        $errors = Carbon::getLastErrors();
+        $errors = DateTimeImmutable::getLastErrors();
 
         if (is_array($errors) && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0)) {
             return null;
@@ -50,6 +52,6 @@ final class PastExamDate
             return null;
         }
 
-        return $parsed;
+        return Carbon::instance($parsed);
     }
 }

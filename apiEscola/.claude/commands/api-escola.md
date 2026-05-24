@@ -128,6 +128,56 @@ Antes de alterar endpoint, campo, paginação ou validação:
 
 ## Comandos úteis
 
+### Local (Docker — preferencial para desenvolvimento e testes)
+
+Subir o ambiente (na pasta `apiEscola`):
+
+```bash
+docker compose up -d
+```
+
+Rodar testes dentro do container PHP (`app`):
+
+```bash
+cd apiEscola
+docker compose exec app php artisan test
+```
+
+Filtrar suíte ou teste:
+
+```bash
+docker compose exec app php artisan test --filter='PastExamDateTest|StorePastExamRequestScheduleTest'
+```
+
+Outros comandos artisan no container:
+
+```bash
+docker compose exec app php artisan route:list
+docker compose exec app php artisan migrate
+docker compose exec app php artisan config:clear
+docker compose exec app php artisan optimize:clear
+```
+
+Se o container não estiver em execução, use `run` em vez de `exec`:
+
+```bash
+docker compose run --rm app php artisan test --filter=NomeDoTeste
+```
+
+**Agentes:** após alterar código PHP da API, rodar os testes relevantes via Docker antes de concluir a tarefa (não assumir que `php` está instalado no host).
+
+### Produção / Hostinger (sem Docker)
+
+```bash
+cd apiEscola
+/opt/alt/php83/usr/bin/php artisan test
+/opt/alt/php83/usr/bin/php artisan migrate
+```
+
+O deploy em servidor compartilhado **não** executa `composer install` automaticamente.
+
+### Host local com PHP instalado
+
 ```bash
 cd apiEscola
 composer install
