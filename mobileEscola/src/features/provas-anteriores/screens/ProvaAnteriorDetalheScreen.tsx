@@ -84,10 +84,14 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
             <Text style={styles.metaTexto}>{prova.exam_type_label}</Text>
           </View>
         ) : null}
-        {prova.course?.name ? (
+        {(prova.courses?.length || prova.course) ? (
           <View style={styles.metaChip}>
             <Ionicons name="book-outline" size={14} color={colors.muted} />
-            <Text style={styles.metaTexto}>{prova.course.name}</Text>
+            <Text style={styles.metaTexto}>
+              {prova.courses?.length
+                ? prova.courses.map((c) => c.name).join(', ')
+                : prova.course?.name}
+            </Text>
           </View>
         ) : null}
       </View>

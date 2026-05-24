@@ -17,6 +17,8 @@ export interface PastExamListItem {
   file_size: number | null;
   subject: SimuladoSubject | null;
   course: { id: number; name: string } | null;
+  courses?: { id: number; name: string }[];
+  course_ids?: number[];
 }
 
 interface ApiEnvelope<T> {

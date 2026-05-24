@@ -2,14 +2,22 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\MergesPastExamCourseIds;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UploadPastExamFileRequest extends FormRequest
 {
+    use MergesPastExamCourseIds;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->mergePastExamCourseIds();
     }
 
     public function rules(): array
@@ -21,7 +29,9 @@ class UploadPastExamFileRequest extends FormRequest
             'description'  => ['nullable', 'string', 'max:2000'],
             'exam_year'    => ['nullable', 'integer', 'min:1990', 'max:2100'],
             'exam_type'    => ['nullable', 'string', Rule::in($examTypes)],
-            'course_id'    => ['nullable', 'integer', 'exists:courses,id'],
+            'course_ids'   => ['nullable', 'array'],
+            'course_ids.*' => $this->pastExamCourseIdItemRules(),
+            'course_id'    => $this->pastExamLegacyCourseIdRules(),
             'subject_id'   => ['nullable', 'integer', 'exists:subjects,id'],
             'is_published' => ['nullable', 'boolean'],
             'sort_order'   => ['nullable', 'integer', 'min:0', 'max:99999'],

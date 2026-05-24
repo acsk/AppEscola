@@ -26,7 +26,7 @@ class StudentPastExamController extends Controller
         $courseIds = $this->enrollmentService->activeCourseIdsForStudent($student);
 
         $query = PastExam::query()
-            ->with(['course:id,name', 'subject:id,name,icon,color'])
+            ->with(['course:id,name', 'courses:id,name', 'subject:id,name,icon,color'])
             ->where('tenant_id', $user->tenant_id)
             ->where('type', 'file')
             ->where('file_type', 'pdf')
@@ -69,11 +69,14 @@ class StudentPastExamController extends Controller
 
         $courseIds = $this->enrollmentService->activeCourseIdsForStudent($student);
 
-        if ($pastExam->course_id !== null && ! $courseIds->contains((int) $pastExam->course_id)) {
+        $pastExam->loadMissing('courses');
+        $linkedCourseIds = $pastExam->linkedCourseIds();
+
+        if ($linkedCourseIds->isNotEmpty() && $linkedCourseIds->intersect($courseIds)->isEmpty()) {
             return $this->forbidden('Você não possui acesso a esta prova.');
         }
 
-        $pastExam->load(['course:id,name', 'subject:id,name,icon,color']);
+        $pastExam->load(['course:id,name', 'courses:id,name', 'subject:id,name,icon,color']);
 
         return $this->success(new PastExamResource($pastExam));
     }

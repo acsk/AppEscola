@@ -126,6 +126,16 @@ export function ProvasAnterioresScreen() {
         {item.exam_type_label ? (
           <Text style={styles.subtitulo}>{item.exam_type_label}</Text>
         ) : null}
+        {(item.courses?.length || item.course) ? (
+          <Text style={styles.cursosTexto} numberOfLines={1}>
+            {(item.courses?.length
+              ? item.courses.map((c) => c.name)
+              : item.course
+                ? [item.course.name]
+                : []
+            ).join(', ')}
+          </Text>
+        ) : null}
         <View style={styles.rodape}>
           <Ionicons
             name={item.type === 'file' ? 'document-outline' : 'link-outline'}
@@ -302,6 +312,7 @@ function createStyles(colors: ThemeColors) {
     anoTexto: { fontSize: 11, fontWeight: '700', color: colors.muted },
     cardTitulo: { fontSize: 16, fontWeight: '800', color: colors.ink },
     subtitulo: { fontSize: 12, color: colors.muted, marginTop: 4 },
+    cursosTexto: { fontSize: 11, color: colors.muted, marginTop: 4 },
     rodape: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
     rodapeTexto: { fontSize: 12, color: colors.muted },
     centro: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },

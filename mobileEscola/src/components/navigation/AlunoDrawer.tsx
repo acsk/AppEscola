@@ -9,7 +9,6 @@ import {
   Image,
   Animated,
   Easing,
-  Alert,
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
@@ -23,6 +22,7 @@ import type { AlunoStackParamList, AlunoTabParamList } from '../../navigation/st
 import { platformShadow } from '../../lib/shadow';
 import { useThemeColors } from '../../context/TenantThemeContext';
 import type { ThemeColors } from '../../theme';
+import ConfirmModal from '../ConfirmModal';
 
 const drawerShadow = platformShadow({ color: '#000000', opacity: 0.15, radius: 24, elevation: 12 });
 
@@ -84,6 +84,7 @@ export function AlunoDrawer() {
   const drawerWidth = Math.min(DRAWER_WIDTH, width * 0.86);
   const activeTab = getActiveTabName(navigation.getState());
   const [shouldRender, setShouldRender] = useState(visible);
+  const [confirmLogoutVisible, setConfirmLogoutVisible] = useState(false);
   const userEmail = user?.email ?? '';
   const shouldShowEmail = Boolean(userEmail && !userEmail.endsWith('@interno'));
 
@@ -177,14 +178,17 @@ export function AlunoDrawer() {
   }
 
   function handleSair() {
+    setConfirmLogoutVisible(true);
+  }
+
+  function handleConfirmarSair() {
+    setConfirmLogoutVisible(false);
     close();
-    Alert.alert('Sair', 'Deseja sair do aplicativo?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => void signOut() },
-    ]);
+    void signOut();
   }
 
   return (
+    <>
     <Modal visible={shouldRender} transparent animationType="none" onRequestClose={close}>
       <View style={styles.root}>
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
@@ -291,6 +295,20 @@ export function AlunoDrawer() {
         </Animated.View>
       </View>
     </Modal>
+
+    <ConfirmModal
+      visible={confirmLogoutVisible}
+      title="Sair"
+      message="Deseja sair do aplicativo?"
+      confirmLabel="Sair"
+      cancelLabel="Cancelar"
+      confirmDestructive
+      icon="log-out-outline"
+      iconColor={colors.debit}
+      onConfirm={handleConfirmarSair}
+      onCancel={() => setConfirmLogoutVisible(false)}
+    />
+    </>
   );
 }
 

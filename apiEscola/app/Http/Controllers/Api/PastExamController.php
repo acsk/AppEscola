@@ -27,12 +27,22 @@ class PastExamController extends Controller
     {
         $this->denyUnlessStaff($request);
 
-        $query = PastExam::with(['course:id,name', 'subject:id,name,icon,color']);
+        $query = PastExam::with(['course', 'courses', 'subject:id,name,icon,color']);
         $this->applyTenantScope($query, $request);
 
         $query
-            ->when($request->query('search'), fn ($q, $v) => $q->where('title', 'like', "%{$v}%"))
-            ->when($request->query('course_id'), fn ($q, $v) => $q->where('course_id', $v))
+            ->when($request->query('search'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('title', 'like', "%{$v}%")
+                        ->orWhere('description', 'like', "%{$v}%");
+                });
+            })
+            ->when($request->query('course_id'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('course_id', $v)
+                        ->orWhereHas('courses', fn ($c) => $c->where('courses.id', $v));
+                });
+            })
             ->when($request->query('subject_id'), fn ($q, $v) => $q->where('subject_id', $v))
             ->when($request->has('is_published'), fn ($q) => $q->where('is_published', $request->boolean('is_published')))
             ->when($request->query('exam_year'), fn ($q, $v) => $q->where('exam_year', $v))
@@ -48,13 +58,18 @@ class PastExamController extends Controller
         $this->denyUnlessStaff($request);
         $tenantId = $this->requireTenantId($request);
 
-        $data = $this->pastExamService->validateRelations($request->validated(), $tenantId);
+        $data = $request->validated();
+        $courseIds = $data['course_ids'] ?? [];
+        unset($data['course_ids'], $data['course_id']);
+
+        $data = $this->pastExamService->validateRelations($data, $tenantId);
         $data['tenant_id'] = $tenantId;
         $data['created_by'] = $request->user()->id;
         $data['is_published'] = (bool) ($data['is_published'] ?? false);
 
         $pastExam = PastExam::create($data);
-        $pastExam->load(['course:id,name', 'subject:id,name,icon,color']);
+        $this->pastExamService->syncCourses($pastExam, $courseIds, $tenantId);
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
 
         return $this->created(new PastExamResource($pastExam), 'Prova anterior cadastrada com sucesso.');
     }
@@ -64,7 +79,7 @@ class PastExamController extends Controller
         $this->denyUnlessStaff($request);
         $this->pastExamService->assertBelongsToTenant($pastExam, $this->requireTenantId($request));
 
-        $pastExam->load(['course:id,name', 'subject:id,name,icon,color']);
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
 
         return $this->success(new PastExamResource($pastExam));
     }
@@ -76,13 +91,20 @@ class PastExamController extends Controller
         $this->pastExamService->assertBelongsToTenant($pastExam, $tenantId);
 
         $data = $request->validated();
+        $courseIds = array_key_exists('course_ids', $data) ? ($data['course_ids'] ?? []) : null;
+        unset($data['course_ids'], $data['course_id']);
+
         if ($data !== []) {
             $data = $this->pastExamService->validateRelations($data, $tenantId);
             $data['updated_by'] = $request->user()->id;
             $pastExam->update($data);
         }
 
-        $pastExam->load(['course:id,name', 'subject:id,name,icon,color']);
+        if ($courseIds !== null) {
+            $this->pastExamService->syncCourses($pastExam, $courseIds, $tenantId);
+        }
+
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
 
         return $this->success(new PastExamResource($pastExam), 'Prova anterior atualizada com sucesso.');
     }
@@ -104,7 +126,11 @@ class PastExamController extends Controller
         $this->denyUnlessStaff($request);
         $tenantId = $this->requireTenantId($request);
 
-        $data = $this->pastExamService->validateRelations($request->validated(), $tenantId);
+        $data = $request->validated();
+        $courseIds = $data['course_ids'] ?? [];
+        unset($data['course_ids'], $data['course_id'], $data['file']);
+
+        $data = $this->pastExamService->validateRelations($data, $tenantId);
         $file = $request->file('file');
 
         $directoryConfig = $uploadSettings->buildPastExamDirectory($tenantId);
@@ -117,7 +143,6 @@ class PastExamController extends Controller
             'description'  => $data['description'] ?? null,
             'exam_year'    => $data['exam_year'] ?? null,
             'exam_type'    => $data['exam_type'] ?? null,
-            'course_id'    => $data['course_id'] ?? null,
             'subject_id'   => $data['subject_id'] ?? null,
             'type'         => 'file',
             'content'      => $contentUrl,
@@ -128,7 +153,8 @@ class PastExamController extends Controller
             'created_by'   => $request->user()->id,
         ]);
 
-        $pastExam->load(['course:id,name', 'subject:id,name,icon,color']);
+        $this->pastExamService->syncCourses($pastExam, $courseIds, $tenantId);
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
 
         return $this->created(new PastExamResource($pastExam), 'Arquivo enviado com sucesso.');
     }
