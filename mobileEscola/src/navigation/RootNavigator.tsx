@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
+import { navigationRef } from './navigationRef';
 import { useAuth } from '../context/AuthContext';
 import { AuthNavigator } from './AuthNavigator';
 import { AlunoStack } from './stacks/AlunoStack';
@@ -94,7 +95,7 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       {renderStack()}
     </NavigationContainer>
   );

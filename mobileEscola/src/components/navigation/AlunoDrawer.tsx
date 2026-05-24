@@ -14,11 +14,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useNavigationState } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NavigationState } from '@react-navigation/native';
 import { useAlunoDrawer } from '../../context/AlunoDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import type { AlunoStackParamList, AlunoTabParamList } from '../../navigation/stacks/AlunoStack';
+import { navigationRef } from '../../navigation/navigationRef';
+import { useRootNavigationState } from '../../navigation/useRootNavigationState';
 import { platformShadow } from '../../lib/shadow';
 import { useThemeColors } from '../../context/TenantThemeContext';
 import type { ThemeColors } from '../../theme';
@@ -26,10 +27,9 @@ import ConfirmModal from '../ConfirmModal';
 
 const drawerShadow = platformShadow({ color: '#000000', opacity: 0.15, radius: 24, elevation: 12 });
 
-type Nav = NativeStackNavigationProp<AlunoStackParamList>;
 type TabName = keyof AlunoTabParamList;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
-type NavigationStateSnapshot = Partial<ReturnType<Nav['getState']>> | undefined;
+type NavigationStateSnapshot = Partial<NavigationState> | undefined;
 
 const DRAWER_WIDTH = 312;
 
@@ -137,11 +137,11 @@ export function AlunoDrawer() {
   const styles = useMemo(() => createAlunoDrawerStyles(colors), [colors]);
   const { visible, close } = useAlunoDrawer();
   const { user, signOut, refreshUserProfile } = useAuth();
-  const navigation = useNavigation<Nav>();
+  const rootNavState = useRootNavigationState();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const drawerWidth = Math.min(DRAWER_WIDTH, width * 0.86);
-  const activeMenuId = useNavigationState((state) => getActiveMenuId(state as NavigationStateSnapshot));
+  const activeMenuId = getActiveMenuId(rootNavState as NavigationStateSnapshot);
   const [shouldRender, setShouldRender] = useState(visible);
   const [confirmLogoutVisible, setConfirmLogoutVisible] = useState(false);
   const userEmail = user?.email ?? '';
@@ -214,26 +214,29 @@ export function AlunoDrawer() {
 
   function handleAlterarSenha() {
     close();
-    navigation.navigate('AlterarSenha');
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('AlterarSenha');
+    }
   }
 
   function handleMenuPress(item: MenuItem) {
     close();
+    if (!navigationRef.isReady()) return;
 
     if ('stack' in item) {
-      navigation.navigate(item.stack);
+      navigationRef.navigate(item.stack);
       return;
     }
 
     if ('tab' in item && item.tab === 'Simulados') {
-      navigation.navigate('AlunoTabs', {
+      navigationRef.navigate('AlunoTabs', {
         screen: item.tab,
         params: { screen: item.nestedScreen ?? 'SimuladosList' },
       });
       return;
     }
 
-    navigation.navigate('AlunoTabs', { screen: item.tab });
+    navigationRef.navigate('AlunoTabs', { screen: item.tab });
   }
 
   function handleSair() {
