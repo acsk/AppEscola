@@ -44,14 +44,7 @@ export function SimuladosNavigator() {
       <Stack.Screen
         name="ProvaAnteriorDetalhe"
         component={ProvaAnteriorDetalheScreen}
-        options={{
-          title: 'Prova anterior',
-          headerBackTitle: 'Voltar',
-          headerStyle: { backgroundColor: '#FBFAFF' },
-          headerTintColor: colors.ink,
-          headerTitleStyle: { fontWeight: '800', color: '#111827' },
-          headerShadowVisible: false,
-        }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="SimuladoDetalhe"
