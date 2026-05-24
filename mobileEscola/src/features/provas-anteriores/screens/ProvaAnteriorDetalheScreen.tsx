@@ -11,13 +11,13 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import { subjectIconName } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { platformShadow } from '../../../lib/shadow';
 import { useProvaAnteriorDetail } from '../hooks';
+import { ProvasAnterioresHeader } from '../components/ProvasAnterioresHeader';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 
@@ -40,7 +40,6 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   const { pastExamId } = route.params;
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const { data: prova, isLoading, isError, error, refetch } = useProvaAnteriorDetail(pastExamId);
 
   const abrirConteudo = async () => {
@@ -66,26 +65,32 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
 
   if (isLoading) {
     return (
-      <View style={styles.centro}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.carregandoTexto}>Carregando prova…</Text>
+      <View style={styles.container}>
+        <ProvasAnterioresHeader />
+        <View style={styles.centro}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.carregandoTexto}>Carregando prova…</Text>
+        </View>
       </View>
     );
   }
 
   if (isError || !prova) {
     return (
-      <View style={styles.centro}>
-        <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
-        <Text style={styles.erroTexto}>
-          {getApiErrorMessage(error, 'Prova não encontrada.')}
-        </Text>
-        <TouchableOpacity style={styles.botaoTentar} onPress={() => refetch()} activeOpacity={0.85}>
-          <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.botaoVoltarLink}>
-          <Text style={styles.botaoVoltarLinkTexto}>Voltar</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <ProvasAnterioresHeader />
+        <View style={styles.centro}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
+          <Text style={styles.erroTexto}>
+            {getApiErrorMessage(error, 'Prova não encontrada.')}
+          </Text>
+          <TouchableOpacity style={styles.botaoTentar} onPress={() => refetch()} activeOpacity={0.85}>
+            <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.botaoVoltarLink}>
+            <Text style={styles.botaoVoltarLinkTexto}>Voltar para a lista</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -105,40 +110,7 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-        <View style={styles.headerGlowPrimary} />
-        <View style={styles.headerGlowSecondary} />
-        <View style={styles.headerRow}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backIcon}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-          >
-            <Ionicons name="arrow-back" size={22} color={colors.ink} />
-          </TouchableOpacity>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.headerSubtitle}>Provas anteriores</Text>
-            <Text style={styles.headerTitle} numberOfLines={2}>
-              {prova.title}
-            </Text>
-          </View>
-          {prova.subject ? (
-            <View style={[styles.headerTypeIcon, { backgroundColor: tint(subjectColor, '18', colors.soft) }]}>
-              <Ionicons
-                name={subjectIconName(prova.subject.icon) as any}
-                size={22}
-                color={subjectColor}
-              />
-            </View>
-          ) : (
-            <View style={[styles.headerTypeIcon, { backgroundColor: colors.soft }]}>
-              <Ionicons name="document-text-outline" size={22} color={colors.primary} />
-            </View>
-          )}
-        </View>
-      </View>
+      <ProvasAnterioresHeader />
 
       <ScrollView
         style={styles.scroll}
@@ -248,69 +220,11 @@ function createStyles(colors: ThemeColors) {
     scroll: { flex: 1 },
     content: { padding: 16, paddingBottom: 32 },
 
-    headerWrap: {
-      backgroundColor: '#FBFAFF',
-      paddingHorizontal: 20,
-      paddingBottom: 16,
-      borderBottomLeftRadius: 28,
-      borderBottomRightRadius: 28,
-      overflow: 'hidden',
-      ...platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 }),
-    },
-    headerGlowPrimary: {
-      position: 'absolute',
-      width: 320,
-      height: 320,
-      borderRadius: 160,
-      right: -104,
-      top: -150,
-      backgroundColor: '#F0E9FF',
-      opacity: 0.92,
-    },
-    headerGlowSecondary: {
-      position: 'absolute',
-      width: 190,
-      height: 190,
-      borderRadius: 95,
-      left: -76,
-      top: 58,
-      backgroundColor: '#F7F2FF',
-      opacity: 0.98,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      paddingTop: 12,
-      paddingBottom: 4,
-    },
-    backIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'rgba(255,255,255,0.72)',
-      borderWidth: 1,
-      borderColor: '#E8EDF5',
-    },
-    headerTextWrap: { flex: 1 },
-    headerSubtitle: { fontSize: 12, fontWeight: '700', color: colors.muted, marginBottom: 2 },
-    headerTitle: { fontSize: 18, fontWeight: '800', color: colors.ink, lineHeight: 24 },
-    headerTypeIcon: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-
     centro: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       padding: 32,
-      backgroundColor: '#F6F7FB',
     },
     carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
     erroTexto: {

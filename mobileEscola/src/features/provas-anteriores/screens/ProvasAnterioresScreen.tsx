@@ -10,7 +10,6 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
@@ -22,7 +21,7 @@ import {
 import { subjectIconName } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { useProvasAnterioresList } from '../hooks';
-import { MenuButton } from '../../../components/navigation/MenuButton';
+import { ProvasAnterioresHeader } from '../components/ProvasAnterioresHeader';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 
@@ -37,7 +36,6 @@ export function ProvasAnterioresScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation<Nav>();
-  const insets = useSafeAreaInsets();
   const [busca, setBusca] = useState('');
   const [anoFiltro, setAnoFiltro] = useState<number | null>(null);
   const [disciplinaFiltro, setDisciplinaFiltro] = useState<number | null>(null);
@@ -76,25 +74,6 @@ export function ProvasAnterioresScreen() {
     useCallback(() => {
       refetch();
     }, [refetch]),
-  );
-
-  const header = (
-    <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-      <View style={styles.headerGlowPrimary} />
-      <View style={styles.headerGlowSecondary} />
-      <View style={styles.headerTituloRow}>
-        <MenuButton />
-        <Text style={styles.headerTitulo}>Provas anteriores</Text>
-        <TouchableOpacity
-          style={styles.headerLinkBtn}
-          onPress={() => navigation.navigate('SimuladosList')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="clipboard-outline" size={16} color={colors.surface} />
-          <Text style={styles.headerLinkTexto}>Simulados</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
   );
 
   const renderItem = ({ item }: { item: PastExamListItem }) => {
@@ -185,7 +164,7 @@ export function ProvasAnterioresScreen() {
 
   return (
     <View style={styles.container}>
-      {header}
+      <ProvasAnterioresHeader />
       <FlatList
         data={itens}
         keyExtractor={(item) => String(item.id)}
@@ -276,56 +255,6 @@ export function ProvasAnterioresScreen() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F6F7FB' },
-    headerWrap: {
-      backgroundColor: '#FBFAFF',
-      paddingHorizontal: 20,
-      paddingBottom: 16,
-      borderBottomLeftRadius: 28,
-      borderBottomRightRadius: 28,
-      overflow: 'hidden',
-      shadowColor: '#7C3AED',
-      shadowOpacity: 0.08,
-      shadowRadius: 18,
-      elevation: 3,
-    },
-    headerGlowPrimary: {
-      position: 'absolute',
-      width: 320,
-      height: 320,
-      borderRadius: 160,
-      right: -104,
-      top: -150,
-      backgroundColor: '#F0E9FF',
-      opacity: 0.92,
-    },
-    headerGlowSecondary: {
-      position: 'absolute',
-      width: 190,
-      height: 190,
-      borderRadius: 95,
-      left: -76,
-      top: 58,
-      backgroundColor: '#F7F2FF',
-      opacity: 0.98,
-    },
-    headerTituloRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingTop: 18,
-      paddingBottom: 14,
-    },
-    headerTitulo: { flex: 1, fontSize: 22, fontWeight: '800', color: '#111827' },
-    headerLinkBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: colors.primary,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 999,
-    },
-    headerLinkTexto: { fontSize: 11, fontWeight: '700', color: colors.surface },
     lista: { padding: 16, paddingTop: 12, paddingBottom: 32 },
     listaComVazio: { flexGrow: 1 },
     filtros: { gap: 10, marginBottom: 12 },
