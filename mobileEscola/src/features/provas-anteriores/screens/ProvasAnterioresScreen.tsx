@@ -138,7 +138,7 @@ export function ProvasAnterioresScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        {header}
+        <ProvasAnterioresHeader />
         <View style={styles.centrado}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.carregandoTexto}>Carregando provas anteriores…</Text>
@@ -150,7 +150,7 @@ export function ProvasAnterioresScreen() {
   if (erro) {
     return (
       <View style={styles.container}>
-        {header}
+        <ProvasAnterioresHeader />
         <View style={styles.centrado}>
           <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
           <Text style={styles.erroTexto}>{erro}</Text>
