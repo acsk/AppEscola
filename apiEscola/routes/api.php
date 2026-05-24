@@ -269,6 +269,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Provas anteriores (painel)
     Route::post('past-exams/upload', [PastExamController::class, 'uploadFile']);
+    Route::post('past-exams/{pastExam}/replace-file', [PastExamController::class, 'replaceFile']);
     Route::apiResource('past-exams', PastExamController::class);
 
     // Simulados

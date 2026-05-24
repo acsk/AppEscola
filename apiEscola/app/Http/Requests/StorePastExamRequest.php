@@ -3,12 +3,14 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\MergesPastExamCourseIds;
+use App\Http\Requests\Concerns\NormalizesPastExamSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StorePastExamRequest extends FormRequest
 {
     use MergesPastExamCourseIds;
+    use NormalizesPastExamSchedule;
 
     public function authorize(): bool
     {
@@ -18,6 +20,12 @@ class StorePastExamRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->mergePastExamCourseIds();
+        $this->normalizePastExamSchedule();
+    }
+
+    public function messages(): array
+    {
+        return $this->pastExamScheduleMessages();
     }
 
     public function rules(): array
@@ -28,7 +36,7 @@ class StorePastExamRequest extends FormRequest
             'title'        => ['required', 'string', 'max:255'],
             'description'  => ['nullable', 'string', 'max:2000'],
             'exam_year'    => ['nullable', 'integer', 'min:1990', 'max:2100'],
-            'exam_date'    => ['nullable', 'date'],
+            'exam_date'    => ['nullable', 'date_format:Y-m-d'],
             'exam_type'    => ['nullable', 'string', Rule::in($examTypes)],
             'course_ids'   => ['nullable', 'array'],
             'course_ids.*' => $this->pastExamCourseIdItemRules(),

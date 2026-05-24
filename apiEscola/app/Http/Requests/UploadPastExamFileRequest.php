@@ -3,12 +3,14 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\MergesPastExamCourseIds;
+use App\Http\Requests\Concerns\NormalizesPastExamSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UploadPastExamFileRequest extends FormRequest
 {
     use MergesPastExamCourseIds;
+    use NormalizesPastExamSchedule;
 
     public function authorize(): bool
     {
@@ -18,6 +20,7 @@ class UploadPastExamFileRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->mergePastExamCourseIds();
+        $this->normalizePastExamSchedule();
     }
 
     public function rules(): array
@@ -28,7 +31,7 @@ class UploadPastExamFileRequest extends FormRequest
             'title'        => ['required', 'string', 'max:255'],
             'description'  => ['nullable', 'string', 'max:2000'],
             'exam_year'    => ['nullable', 'integer', 'min:1990', 'max:2100'],
-            'exam_date'    => ['nullable', 'date'],
+            'exam_date'    => ['nullable', 'date_format:Y-m-d'],
             'exam_type'    => ['nullable', 'string', Rule::in($examTypes)],
             'course_ids'   => ['nullable', 'array'],
             'course_ids.*' => $this->pastExamCourseIdItemRules(),
@@ -42,12 +45,12 @@ class UploadPastExamFileRequest extends FormRequest
 
     public function messages(): array
     {
-        return [
+        return array_merge($this->pastExamScheduleMessages(), [
             'title.required' => 'O título da prova é obrigatório.',
             'file.required'  => 'Selecione o arquivo PDF da prova.',
             'file.mimes'     => 'Envie apenas arquivos PDF.',
             'file.max'       => 'O PDF deve ter no máximo 150 kB.',
             'exam_type.in'   => 'Tipo de prova inválido.',
-        ];
+        ]);
     }
 }

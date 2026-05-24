@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ReplacePastExamFileRequest;
 use App\Http\Requests\StorePastExamRequest;
 use App\Http\Requests\UpdatePastExamRequest;
 use App\Http\Requests\UploadPastExamFileRequest;
@@ -158,6 +159,32 @@ class PastExamController extends Controller
         $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
 
         return $this->created(new PastExamResource($pastExam), 'Arquivo enviado com sucesso.');
+    }
+
+    public function replaceFile(
+        ReplacePastExamFileRequest $request,
+        PastExam $pastExam,
+        TenantUploadSettingsService $uploadSettings,
+    ): JsonResponse {
+        $this->denyUnlessStaff($request);
+        $tenantId = $this->requireTenantId($request);
+        $this->pastExamService->assertBelongsToTenant($pastExam, $tenantId);
+
+        $file = $request->file('file');
+        $directoryConfig = $uploadSettings->buildPastExamDirectory($tenantId);
+        $path = $file->store($directoryConfig['directory'], $directoryConfig['disk']);
+        $contentUrl = $uploadSettings->url($directoryConfig['disk'], $path);
+
+        $pastExam->update([
+            'content'    => $contentUrl,
+            'file_type'  => 'pdf',
+            'file_size'  => $file->getSize(),
+            'updated_by' => $request->user()->id,
+        ]);
+
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
+
+        return $this->success(new PastExamResource($pastExam), 'Arquivo da prova atualizado com sucesso.');
     }
 
     private function denyUnlessStaff(Request $request): void

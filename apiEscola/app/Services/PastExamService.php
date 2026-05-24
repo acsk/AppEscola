@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Course;
 use App\Models\PastExam;
 use App\Models\Subject;
+use App\Support\PastExamDate;
 use App\Support\StrictIntegerId;
 use Illuminate\Validation\ValidationException;
 
@@ -114,9 +115,12 @@ class PastExamService
     public function applyExamScheduleFields(array $data): array
     {
         if (! empty($data['exam_date'])) {
-            $parsed = \Illuminate\Support\Carbon::parse($data['exam_date']);
-            $data['exam_date'] = $parsed->toDateString();
-            $data['exam_year'] = (int) $parsed->format('Y');
+            $normalized = PastExamDate::scheduleFieldsFromString((string) $data['exam_date']);
+
+            if ($normalized !== null) {
+                $data['exam_date'] = $normalized['exam_date'];
+                $data['exam_year'] = $normalized['exam_year'];
+            }
         }
 
         return $data;
