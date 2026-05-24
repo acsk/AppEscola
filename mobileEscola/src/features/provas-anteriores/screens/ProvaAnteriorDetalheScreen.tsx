@@ -117,6 +117,17 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity
+          style={styles.voltarListaBtn}
+          onPress={() => navigation.navigate('ProvasAnteriores')}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar para provas anteriores"
+        >
+          <Ionicons name="arrow-back" size={18} color={colors.primary} />
+          <Text style={styles.voltarListaTexto}>Voltar para provas anteriores</Text>
+        </TouchableOpacity>
+
         <View
           style={[
             styles.card,
@@ -219,6 +230,20 @@ function createStyles(colors: ThemeColors) {
     container: { flex: 1, backgroundColor: '#F6F7FB' },
     scroll: { flex: 1 },
     content: { padding: 16, paddingBottom: 32 },
+    voltarListaBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 6,
+      marginBottom: 12,
+      paddingVertical: 8,
+      paddingHorizontal: 4,
+    },
+    voltarListaTexto: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.primary,
+    },
 
     centro: {
       flex: 1,

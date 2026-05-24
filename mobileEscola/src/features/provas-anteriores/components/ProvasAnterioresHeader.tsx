@@ -23,11 +23,7 @@ export function ProvasAnterioresHeader({ variant = 'list' }: ProvasAnterioresHea
   const navigation = useNavigation<Nav>();
   const isDetail = variant === 'detail';
 
-  function handleVoltar() {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
+  function voltarParaLista() {
     navigation.navigate('ProvasAnteriores');
   }
 
@@ -39,7 +35,7 @@ export function ProvasAnterioresHeader({ variant = 'list' }: ProvasAnterioresHea
         {isDetail ? (
           <TouchableOpacity
             style={styles.headerIconBtn}
-            onPress={handleVoltar}
+            onPress={voltarParaLista}
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel="Voltar"
@@ -49,7 +45,19 @@ export function ProvasAnterioresHeader({ variant = 'list' }: ProvasAnterioresHea
         ) : (
           <MenuButton />
         )}
-        <Text style={styles.headerTitulo}>{isDetail ? 'Prova' : 'Provas anteriores'}</Text>
+        {isDetail ? (
+          <TouchableOpacity
+            style={styles.headerTituloBtn}
+            onPress={voltarParaLista}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar para provas anteriores"
+          >
+            <Text style={styles.headerTitulo}>Prova</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={[styles.headerTitulo, styles.headerTituloFlex]}>Provas anteriores</Text>
+        )}
         <TouchableOpacity
           style={styles.headerLinkBtn}
           onPress={() => navigation.navigate('SimuladosList')}
@@ -104,7 +112,9 @@ function createStyles(colors: ThemeColors) {
       paddingTop: 18,
       paddingBottom: 14,
     },
-    headerTitulo: { flex: 1, fontSize: 22, fontWeight: '800', color: '#111827' },
+    headerTitulo: { fontSize: 22, fontWeight: '800', color: '#111827' },
+    headerTituloBtn: { flex: 1, justifyContent: 'center' },
+    headerTituloFlex: { flex: 1 },
     headerIconBtn: {
       width: 40,
       height: 40,
