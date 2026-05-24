@@ -6,12 +6,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Switch,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
-import FormInput from "../../components/ui/FormInput";
-import FormSelect from "../../components/ui/FormSelect";
 import Modal from "../../components/ui/Modal";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
@@ -55,6 +54,8 @@ const MAX_PDF_UPLOAD_BYTES = MAX_PDF_UPLOAD_KB * 1024;
 const PDF_SIZE_ERROR = `O PDF deve ter no máximo ${MAX_PDF_UPLOAD_KB} kB.`;
 
 export default function PastExamsScreen({ navigate }: WithNavigate) {
+  const { width } = useWindowDimensions();
+  const compactStack = width < 640;
   const [rows, setRows] = useState<PastExamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -115,6 +116,25 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setErrors({});
     setModalOpen(true);
   };
+
+  const fieldStyle = {
+    border: "1px solid #E5E7EB",
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontSize: 13,
+    color: "#1F2937",
+    backgroundColor: "#F9FAFB",
+    outline: "none",
+    width: "100%",
+    minHeight: 38,
+  } as const;
+
+  const renderFieldLabel = (label: string, required = false) => (
+    <Text className="text-xs font-semibold text-gray-600 mb-1">
+      {label}
+      {required ? <Text className="text-red-500"> *</Text> : null}
+    </Text>
+  );
 
   const save = async () => {
     const localErrors: Record<string, string> = {};
@@ -235,106 +255,163 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         visible={modalOpen}
         title="Nova prova anterior"
         onClose={() => setModalOpen(false)}
+        size="sm"
+        scrollViewClassName="py-0"
         footer={
           <TouchableOpacity
             onPress={save}
             disabled={saving}
-            className="bg-violet-600 px-6 py-3 rounded-xl"
+            className="bg-violet-600 px-5 py-2.5 rounded-xl items-center"
           >
             {saving ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text className="text-white font-semibold">Salvar</Text>
+              <Text className="text-white text-sm font-semibold">Salvar</Text>
             )}
           </TouchableOpacity>
         }
       >
-        <FormInput
-          label="Título"
-          required
-          value={form.title}
-          onChangeText={(v) => setForm((p) => ({ ...p, title: v }))}
-          error={errors.title}
-        />
-        <FormInput
-          label="Descrição"
-          value={form.description}
-          onChangeText={(v) => setForm((p) => ({ ...p, description: v }))}
-        />
-        <View className="flex-row gap-3">
+        <View className="gap-3">
+          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
+            <View className="flex-[2]">
+              {renderFieldLabel("Título", true)}
+              <input
+                value={form.title}
+                onChange={(e: any) => setForm((p) => ({ ...p, title: e.target.value }))}
+                style={{
+                  ...fieldStyle,
+                  borderColor: errors.title ? "#FCA5A5" : "#E5E7EB",
+                }}
+              />
+              {errors.title ? (
+                <Text className="text-xs text-red-500 mt-1">{errors.title}</Text>
+              ) : null}
+            </View>
+            <View className="flex-1">
+              {renderFieldLabel("Ano")}
+              <input
+                value={form.exam_year}
+                inputMode="numeric"
+                onChange={(e: any) =>
+                  setForm((p) => ({
+                    ...p,
+                    exam_year: e.target.value.replace(/\D/g, "").slice(0, 4),
+                  }))
+                }
+                style={fieldStyle}
+              />
+            </View>
+          </View>
+
+          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
+            <View className="flex-1">
+              {renderFieldLabel("Tipo")}
+              <select
+                value={form.exam_type}
+                onChange={(e: any) => setForm((p) => ({ ...p, exam_type: e.target.value }))}
+                style={fieldStyle}
+              >
+                {EXAM_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </View>
+            <View className="flex-1">
+              {renderFieldLabel("Publicar")}
+              <select
+                value={form.is_published}
+                onChange={(e: any) => setForm((p) => ({ ...p, is_published: e.target.value }))}
+                style={fieldStyle}
+              >
+                <option value="true">Sim</option>
+                <option value="false">Não</option>
+              </select>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
+            <View className="flex-1">
+              {renderFieldLabel("Curso")}
+              <select
+                value={form.course_id}
+                onChange={(e: any) => setForm((p) => ({ ...p, course_id: e.target.value }))}
+                style={fieldStyle}
+              >
+                {courseOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </View>
+            <View className="flex-1">
+              {renderFieldLabel("Disciplina")}
+              <select
+                value={form.subject_id}
+                onChange={(e: any) => setForm((p) => ({ ...p, subject_id: e.target.value }))}
+                style={fieldStyle}
+              >
+                {subjectOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </View>
+          </View>
+
           <View className="flex-1">
-            <FormInput
-              label="Ano"
-              value={form.exam_year}
-              onChangeText={(v) => setForm((p) => ({ ...p, exam_year: v }))}
-              valueFormat="integer"
+            {renderFieldLabel("Descrição")}
+            <input
+              value={form.description}
+              onChange={(e: any) => setForm((p) => ({ ...p, description: e.target.value }))}
+              style={fieldStyle}
             />
           </View>
-          <View className="flex-1">
-            <FormSelect
-              label="Tipo"
-              value={form.exam_type}
-              options={EXAM_TYPE_OPTIONS}
-              onChange={(v) => setForm((p) => ({ ...p, exam_type: v }))}
-            />
+
+          <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1">
+                {renderFieldLabel("Arquivo PDF", true)}
+                <Text className="text-xs text-gray-400">Máximo {MAX_PDF_UPLOAD_KB} kB</Text>
+              </View>
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file && !file.name.toLowerCase().endsWith(".pdf")) {
+                    setPdfFile(null);
+                    e.currentTarget.value = "";
+                    setErrors((prev) => ({ ...prev, file: "Envie apenas arquivos PDF." }));
+                  } else if (file && file.size > MAX_PDF_UPLOAD_BYTES) {
+                    setPdfFile(null);
+                    e.currentTarget.value = "";
+                    setErrors((prev) => ({ ...prev, file: PDF_SIZE_ERROR }));
+                  } else {
+                    setPdfFile(file);
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.file;
+                      return next;
+                    });
+                  }
+                }}
+                style={{ fontSize: 12, maxWidth: compactStack ? "100%" : 230 }}
+              />
+            </View>
+            {pdfFile ? (
+              <Text className="text-xs text-gray-500 mt-2" numberOfLines={1}>
+                {pdfFile.name} · {(pdfFile.size / 1024).toFixed(1)} kB
+              </Text>
+            ) : null}
+            {errors.file ? (
+              <Text className="text-xs text-red-600 mt-1">{errors.file}</Text>
+            ) : null}
           </View>
         </View>
-        <FormSelect
-          label="Curso (opcional)"
-          value={form.course_id}
-          options={courseOptions}
-          onChange={(v) => setForm((p) => ({ ...p, course_id: v }))}
-        />
-        <FormSelect
-          label="Disciplina"
-          value={form.subject_id}
-          options={subjectOptions}
-          onChange={(v) => setForm((p) => ({ ...p, subject_id: v }))}
-        />
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-gray-700 mb-2">Arquivo PDF *</Text>
-          <input
-            type="file"
-            accept="application/pdf,.pdf"
-            onChange={(e) => {
-              const file = e.target.files?.[0] ?? null;
-              if (file && !file.name.toLowerCase().endsWith(".pdf")) {
-                setPdfFile(null);
-                e.currentTarget.value = "";
-                setErrors((prev) => ({ ...prev, file: "Envie apenas arquivos PDF." }));
-              } else if (file && file.size > MAX_PDF_UPLOAD_BYTES) {
-                setPdfFile(null);
-                e.currentTarget.value = "";
-                setErrors((prev) => ({ ...prev, file: PDF_SIZE_ERROR }));
-              } else {
-                setPdfFile(file);
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.file;
-                  return next;
-                });
-              }
-            }}
-          />
-          {pdfFile ? (
-            <Text className="text-xs text-gray-500 mt-2">
-              {pdfFile.name} · {(pdfFile.size / 1024).toFixed(1)} kB
-            </Text>
-          ) : null}
-          <Text className="text-xs text-gray-400 mt-1">Tamanho máximo: {MAX_PDF_UPLOAD_KB} kB.</Text>
-          {errors.file ? (
-            <Text className="text-xs text-red-600 mt-1">{errors.file}</Text>
-          ) : null}
-        </View>
-        <FormSelect
-          label="Publicar no app"
-          value={form.is_published}
-          options={[
-            { value: "true", label: "Sim" },
-            { value: "false", label: "Não" },
-          ]}
-          onChange={(v) => setForm((p) => ({ ...p, is_published: v }))}
-        />
       </Modal>
 
       <ConfirmModal
