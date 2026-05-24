@@ -28,6 +28,7 @@ class UploadPastExamFileRequest extends FormRequest
             'title'        => ['required', 'string', 'max:255'],
             'description'  => ['nullable', 'string', 'max:2000'],
             'exam_year'    => ['nullable', 'integer', 'min:1990', 'max:2100'],
+            'exam_date'    => ['nullable', 'date'],
             'exam_type'    => ['nullable', 'string', Rule::in($examTypes)],
             'course_ids'   => ['nullable', 'array'],
             'course_ids.*' => $this->pastExamCourseIdItemRules(),

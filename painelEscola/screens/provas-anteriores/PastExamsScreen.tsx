@@ -12,6 +12,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
+import { displayToISO, isoToDisplay } from "../../utils/masks";
+import DatePickerInput from "../../components/ui/DatePickerInput";
 import Modal from "../../components/ui/Modal";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
@@ -23,6 +25,7 @@ type PastExamRow = {
   title: string;
   description: string | null;
   exam_year: number | null;
+  exam_date: string | null;
   exam_type: string | null;
   exam_type_label: string | null;
   type: "file";
@@ -58,6 +61,7 @@ const EMPTY_FORM = {
   title: "",
   description: "",
   exam_year: "",
+  exam_date: "",
   exam_type: "",
   course_ids: [] as number[],
   subject_id: "",
@@ -67,6 +71,15 @@ const EMPTY_FORM = {
 const MAX_PDF_UPLOAD_KB = 150;
 const MAX_PDF_UPLOAD_BYTES = MAX_PDF_UPLOAD_KB * 1024;
 const PDF_SIZE_ERROR = `O PDF deve ter no máximo ${MAX_PDF_UPLOAD_KB} kB.`;
+
+function formatPastExamDate(row: { exam_date?: string | null; exam_year?: number | null }): string | null {
+  if (row.exam_date) {
+    const display = isoToDisplay(row.exam_date);
+    if (display) return display;
+  }
+  if (row.exam_year) return String(row.exam_year);
+  return null;
+}
 
 export default function PastExamsScreen({ navigate }: WithNavigate) {
   const { width } = useWindowDimensions();
@@ -229,6 +242,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
       title: row.title,
       description: row.description ?? "",
       exam_year: row.exam_year ? String(row.exam_year) : "",
+      exam_date: row.exam_date ? isoToDisplay(row.exam_date) : "",
       exam_type: row.exam_type ?? "",
       course_ids: courseIds,
       subject_id: row.subject ? String(row.subject.id) : "",
@@ -283,10 +297,16 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setSaving(true);
     try {
       if (editingId) {
+        const examDateIso = displayToISO(form.exam_date);
         const payload = {
           title: form.title.trim(),
           description: form.description.trim() || null,
-          exam_year: form.exam_year ? Number(form.exam_year) : null,
+          exam_date: examDateIso || null,
+          exam_year: examDateIso
+            ? Number(examDateIso.slice(0, 4))
+            : form.exam_year
+              ? Number(form.exam_year)
+              : null,
           exam_type: form.exam_type || null,
           subject_id: form.subject_id ? Number(form.subject_id) : null,
           course_ids: form.course_ids,
@@ -302,7 +322,13 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         const formData = new FormData();
         formData.append("title", form.title.trim());
         if (form.description.trim()) formData.append("description", form.description.trim());
-        if (form.exam_year) formData.append("exam_year", form.exam_year);
+        const examDateIso = displayToISO(form.exam_date);
+        if (examDateIso) {
+          formData.append("exam_date", examDateIso);
+          formData.append("exam_year", examDateIso.slice(0, 4));
+        } else if (form.exam_year) {
+          formData.append("exam_year", form.exam_year);
+        }
         if (form.exam_type) formData.append("exam_type", form.exam_type);
         form.course_ids.forEach((id) => formData.append("course_ids[]", String(id)));
         if (form.subject_id) formData.append("subject_id", form.subject_id);
@@ -511,7 +537,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 <Text className="text-base font-semibold text-gray-800">{row.title}</Text>
                 <Text className="text-xs text-gray-400 mt-1">
                   {[
-                    row.exam_year,
+                    formatPastExamDate(row),
                     row.exam_type_label,
                     row.subject?.name,
                     row.courses?.length
@@ -587,17 +613,10 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
               ) : null}
             </View>
             <View className="flex-1">
-              {renderFieldLabel("Ano")}
-              <input
-                value={form.exam_year}
-                inputMode="numeric"
-                onChange={(e: any) =>
-                  setForm((p) => ({
-                    ...p,
-                    exam_year: e.target.value.replace(/\D/g, "").slice(0, 4),
-                  }))
-                }
-                style={fieldStyle}
+              <DatePickerInput
+                label="Data da prova"
+                value={form.exam_date}
+                onChangeText={(exam_date) => setForm((p) => ({ ...p, exam_date }))}
               />
             </View>
           </View>

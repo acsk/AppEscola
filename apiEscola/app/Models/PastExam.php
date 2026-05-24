@@ -21,6 +21,7 @@ class PastExam extends Model
         'title',
         'description',
         'exam_year',
+        'exam_date',
         'exam_type',
         'type',
         'content',
@@ -34,6 +35,7 @@ class PastExam extends Model
 
     protected $casts = [
         'exam_year'    => 'integer',
+        'exam_date'    => 'date',
         'file_size'    => 'integer',
         'is_published' => 'boolean',
         'sort_order'   => 'integer',

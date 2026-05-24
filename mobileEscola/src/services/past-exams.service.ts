@@ -9,6 +9,7 @@ export interface PastExamListItem {
   title: string;
   description: string | null;
   exam_year: number | null;
+  exam_date: string | null;
   exam_type: string | null;
   exam_type_label: string | null;
   type: PastExamType;
@@ -66,6 +67,34 @@ export async function detalharProvaAnterior(id: number): Promise<PastExamListIte
   return unwrapBody<PastExamListItem>(data);
 }
 
+export function formatDataProva(
+  examDate: string | null | undefined,
+  examYear?: number | null,
+): string | null {
+  if (examDate) {
+    const isoMatch = String(examDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+    }
+  }
+
+  if (examYear != null) return String(examYear);
+
+  return null;
+}
+
+export function anoDaProva(
+  examDate: string | null | undefined,
+  examYear: number | null | undefined,
+): number | null {
+  if (examDate) {
+    const match = String(examDate).match(/^(\d{4})/);
+    if (match) return Number(match[1]);
+  }
+
+  return examYear ?? null;
+}
+
 export function extrairDisciplinasDasProvas(
   items: PastExamListItem[],
 ): SimuladoSubject[] {
@@ -81,8 +110,9 @@ export function extrairDisciplinasDasProvas(
 export function extrairAnosDasProvas(items: PastExamListItem[]): number[] {
   const anos = new Set<number>();
   for (const item of items) {
-    if (item.exam_year != null) {
-      anos.add(item.exam_year);
+    const ano = anoDaProva(item.exam_date, item.exam_year);
+    if (ano != null) {
+      anos.add(ano);
     }
   }
   return Array.from(anos).sort((a, b) => b - a);

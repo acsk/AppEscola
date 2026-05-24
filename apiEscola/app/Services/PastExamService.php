@@ -104,6 +104,21 @@ class PastExamService
             }
         }
 
+        return $this->applyExamScheduleFields($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public function applyExamScheduleFields(array $data): array
+    {
+        if (! empty($data['exam_date'])) {
+            $parsed = \Illuminate\Support\Carbon::parse($data['exam_date']);
+            $data['exam_date'] = $parsed->toDateString();
+            $data['exam_year'] = (int) $parsed->format('Y');
+        }
+
         return $data;
     }
 }

@@ -36,11 +36,18 @@ class StudentPastExamController extends Controller
         $query
             ->when($request->query('search'), fn ($q, $v) => $q->where('title', 'like', "%{$v}%"))
             ->when($request->query('subject_id'), fn ($q, $v) => $q->where('subject_id', (int) $v))
-            ->when($request->query('exam_year'), fn ($q, $v) => $q->where('exam_year', (int) $v))
+            ->when($request->query('exam_year'), function ($q, $v) {
+                $year = (int) $v;
+                $q->where(function ($inner) use ($year) {
+                    $inner->where('exam_year', $year)
+                        ->orWhereYear('exam_date', $year);
+                });
+            })
             ->when($request->query('exam_type'), fn ($q, $v) => $q->where('exam_type', $v));
 
         $items = $query
             ->orderByDesc('sort_order')
+            ->orderByDesc('exam_date')
             ->orderByDesc('exam_year')
             ->orderBy('title')
             ->get();

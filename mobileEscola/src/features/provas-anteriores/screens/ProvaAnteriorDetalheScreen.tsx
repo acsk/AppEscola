@@ -15,6 +15,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import { subjectIconName } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
+import { formatDataProva } from '../../../services/past-exams.service';
 import { platformShadow } from '../../../lib/shadow';
 import { useProvaAnteriorDetail } from '../hooks';
 import { ProvasAnterioresHeader } from '../components/ProvasAnterioresHeader';
@@ -87,7 +88,10 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
           <TouchableOpacity style={styles.botaoTentar} onPress={() => refetch()} activeOpacity={0.85}>
             <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.botaoVoltarLink}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ProvasAnteriores')}
+            style={styles.botaoVoltarLink}
+          >
             <Text style={styles.botaoVoltarLinkTexto}>Voltar para a lista</Text>
           </TouchableOpacity>
         </View>
@@ -96,6 +100,7 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   }
 
   const subjectColor = prova.subject?.color ?? colors.primary;
+  const dataProva = formatDataProva(prova.exam_date, prova.exam_year);
   const cursoLabel =
     prova.courses?.length
       ? prova.courses.map((c) => c.name).join(', ')
@@ -117,102 +122,73 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity
-          style={styles.voltarListaBtn}
-          onPress={() => navigation.navigate('ProvasAnteriores')}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar para provas anteriores"
-        >
-          <Ionicons name="arrow-back" size={18} color={colors.primary} />
-          <Text style={styles.voltarListaTexto}>Voltar para provas anteriores</Text>
-        </TouchableOpacity>
+        <View style={[styles.card, platformShadow({ color: '#7C3AED', opacity: 0.06, radius: 10, elevation: 2 })]}>
+          <View style={[styles.cardAccent, { backgroundColor: colors.primary }]} />
 
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: tint(subjectColor, '0D', colors.soft),
-              borderColor: tint(subjectColor, '35', colors.soft),
-              borderTopColor: subjectColor,
-              ...platformShadow({ color: subjectColor, opacity: 0.1, radius: 16, elevation: 2 }),
-            },
-          ]}
-        >
-          <View style={[styles.cardGlow, { backgroundColor: tint(subjectColor, '18', colors.soft) }]} />
-
-          <View style={styles.headerBlock}>
-            <View style={styles.titleGroup}>
-              {prova.subject ? (
-                <View style={[styles.subjectBadge, { backgroundColor: tint(subjectColor, '18', colors.soft) }]}>
-                  <Ionicons
-                    name={subjectIconName(prova.subject.icon) as any}
-                    size={15}
-                    color={subjectColor}
-                  />
-                  <Text style={[styles.subjectBadgeText, { color: subjectColor }]}>
-                    {prova.subject.name}
-                  </Text>
-                </View>
-              ) : null}
-              <Text style={styles.titulo}>{prova.title}</Text>
+          {prova.subject ? (
+            <View style={[styles.subjectChip, { backgroundColor: tint(subjectColor, '18', colors.soft) }]}>
+              <Ionicons
+                name={subjectIconName(prova.subject.icon) as any}
+                size={12}
+                color={subjectColor}
+              />
+              <Text style={[styles.subjectNome, { color: subjectColor }]}>{prova.subject.name}</Text>
             </View>
-            <View style={[styles.tipoBadge, { backgroundColor: tint(subjectColor, '14', colors.soft) }]}>
-              <Ionicons name="archive-outline" size={15} color={subjectColor} />
-              <Text style={[styles.tipoBadgeText, { color: subjectColor }]}>Prova anterior</Text>
-            </View>
-          </View>
-
-          {prova.description ? (
-            <Text style={styles.descricao}>{prova.description}</Text>
           ) : null}
 
-          <View style={styles.metaBox}>
-            {prova.exam_year ? (
-              <View style={styles.metaRow}>
-                <Ionicons name="calendar-outline" size={16} color={colors.muted} />
-                <Text style={styles.metaLabel}>Ano</Text>
-                <Text style={styles.metaValue}>{prova.exam_year}</Text>
-              </View>
-            ) : null}
-            {prova.exam_type_label ? (
-              <View style={styles.metaRow}>
-                <Ionicons name="layers-outline" size={16} color={colors.muted} />
-                <Text style={styles.metaLabel}>Tipo</Text>
-                <Text style={styles.metaValue}>{prova.exam_type_label}</Text>
-              </View>
-            ) : null}
-            {cursoLabel ? (
-              <View style={styles.metaRow}>
-                <Ionicons name="school-outline" size={16} color={colors.muted} />
-                <Text style={styles.metaLabel}>Curso</Text>
-                <Text style={styles.metaValue}>{cursoLabel}</Text>
-              </View>
-            ) : null}
-            {tamanhoArquivo ? (
-              <View style={styles.metaRow}>
-                <Ionicons name="document-outline" size={16} color={colors.muted} />
-                <Text style={styles.metaLabel}>Arquivo</Text>
-                <Text style={styles.metaValue}>{tamanhoArquivo}</Text>
-              </View>
-            ) : null}
-          </View>
+          <Text style={styles.titulo}>{prova.title}</Text>
 
-          <View style={[styles.avisoBox, { backgroundColor: tint(subjectColor, '12', colors.soft) }]}>
-            <Ionicons name="information-circle-outline" size={18} color={subjectColor} />
-            <Text style={[styles.avisoTexto, { color: subjectColor }]}>
-              Material de consulta publicado pela escola. Abra o arquivo para estudar offline ou no navegador.
+          {(dataProva || prova.exam_type_label) ? (
+            <View style={styles.chipsRow}>
+              {dataProva ? (
+                <View style={styles.metaChip}>
+                  <Ionicons name="calendar-outline" size={13} color={colors.muted} />
+                  <Text style={styles.metaChipTexto}>{dataProva}</Text>
+                </View>
+              ) : null}
+              {prova.exam_type_label ? (
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipTexto}>{prova.exam_type_label}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {cursoLabel ? (
+            <Text style={styles.linhaMeta} numberOfLines={2}>
+              <Text style={styles.linhaMetaLabel}>Curso </Text>
+              {cursoLabel}
+            </Text>
+          ) : null}
+
+          {tamanhoArquivo ? (
+            <View style={styles.arquivoRow}>
+              <Ionicons name="document-outline" size={14} color={colors.muted} />
+              <Text style={styles.linhaMeta}>{tamanhoArquivo}</Text>
+            </View>
+          ) : null}
+
+          {prova.description ? (
+            <Text style={styles.descricao} numberOfLines={4}>
+              {prova.description}
+            </Text>
+          ) : null}
+
+          <View style={styles.avisoBox}>
+            <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
+            <Text style={styles.avisoTexto}>
+              Material de consulta da escola. Abra o arquivo para estudar.
             </Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.botaoAcao, { backgroundColor: subjectColor }]}
+            style={styles.botaoAcao}
             onPress={abrirConteudo}
             activeOpacity={0.85}
           >
             <Ionicons
               name={prova.type === 'file' ? 'document-text-outline' : 'open-outline'}
-              size={20}
+              size={18}
               color={colors.surface}
             />
             <Text style={styles.botaoAcaoTexto}>{botaoLabel}</Text>
@@ -227,150 +203,128 @@ ProvaAnteriorDetalheScreen.displayName = 'ProvaAnteriorDetalhe';
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F6F7FB' },
+    container: { flex: 1, backgroundColor: colors.background },
     scroll: { flex: 1 },
-    content: { padding: 16, paddingBottom: 32 },
-    voltarListaBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      gap: 6,
-      marginBottom: 12,
-      paddingVertical: 8,
-      paddingHorizontal: 4,
-    },
-    voltarListaTexto: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: colors.primary,
-    },
+    content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
 
     centro: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 32,
+      padding: 24,
     },
-    carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
+    carregandoTexto: { marginTop: 10, fontSize: 14, color: colors.muted },
     erroTexto: {
       fontSize: 14,
       color: colors.text,
       textAlign: 'center',
-      marginTop: 12,
+      marginTop: 10,
       lineHeight: 20,
       paddingHorizontal: 16,
     },
     botaoTentar: {
-      marginTop: 20,
+      marginTop: 16,
       backgroundColor: colors.primary,
       borderRadius: 12,
-      paddingHorizontal: 24,
-      paddingVertical: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 11,
     },
-    botaoTentarTexto: { color: colors.surface, fontWeight: '700', fontSize: 15 },
-    botaoVoltarLink: { marginTop: 14, padding: 8 },
+    botaoTentarTexto: { color: colors.surface, fontWeight: '700', fontSize: 14 },
+    botaoVoltarLink: { marginTop: 12, padding: 6 },
     botaoVoltarLinkTexto: { color: colors.primary, fontWeight: '600', fontSize: 14 },
 
     card: {
-      borderRadius: 20,
-      padding: 20,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      paddingLeft: 18,
       borderWidth: 1,
-      borderTopWidth: 4,
+      borderColor: colors.border,
       overflow: 'hidden',
     },
-    cardGlow: {
+    cardAccent: {
       position: 'absolute',
-      width: 240,
-      height: 240,
-      borderRadius: 120,
-      right: -110,
-      top: -112,
-      opacity: 0.92,
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 4,
     },
-    headerBlock: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 12,
-      marginBottom: 12,
-      flexWrap: 'wrap',
-    },
-    titleGroup: { flex: 1, minWidth: 200 },
-    subjectBadge: {
+    subjectChip: {
       flexDirection: 'row',
       alignItems: 'center',
       alignSelf: 'flex-start',
-      gap: 5,
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      marginBottom: 10,
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 20,
+      marginBottom: 8,
     },
-    subjectBadgeText: { fontSize: 12, fontWeight: '800' },
-    tipoBadge: {
+    subjectNome: { fontSize: 11, fontWeight: '800' },
+    titulo: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.ink,
+      lineHeight: 24,
+      marginBottom: 8,
+    },
+    chipsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: 8,
+    },
+    metaChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.soft,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    metaChipTexto: { fontSize: 12, fontWeight: '600', color: colors.text },
+    linhaMeta: { fontSize: 12, color: colors.muted, lineHeight: 18, marginBottom: 4 },
+    linhaMetaLabel: { fontWeight: '700', color: colors.muted },
+    arquivoRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      borderRadius: 999,
-      paddingHorizontal: 11,
-      paddingVertical: 7,
+      marginBottom: 6,
     },
-    tipoBadgeText: { fontSize: 12, fontWeight: '800' },
-    titulo: { fontSize: 22, fontWeight: '800', color: colors.ink, lineHeight: 28 },
-    descricao: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 16 },
-
-    metaBox: {
-      backgroundColor: 'rgba(255,255,255,0.72)',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.95)',
-      borderRadius: 14,
-      padding: 12,
-      gap: 10,
-      marginBottom: 14,
-    },
-    metaRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 8,
-    },
-    metaLabel: {
-      width: 58,
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.muted,
-      textTransform: 'uppercase',
-    },
-    metaValue: {
-      flex: 1,
+    descricao: {
       fontSize: 13,
-      color: colors.text,
+      color: colors.muted,
       lineHeight: 18,
+      marginTop: 4,
+      marginBottom: 10,
     },
-
     avisoBox: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 8,
-      borderRadius: 14,
-      padding: 12,
-      marginBottom: 16,
+      backgroundColor: colors.soft,
+      borderRadius: 10,
+      padding: 10,
+      marginTop: 6,
+      marginBottom: 12,
     },
     avisoTexto: {
       flex: 1,
-      fontSize: 13,
-      fontWeight: '600',
-      lineHeight: 18,
+      fontSize: 12,
+      color: colors.text,
+      lineHeight: 17,
     },
-
     botaoAcao: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      borderRadius: 14,
-      paddingVertical: 14,
-      paddingHorizontal: 24,
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
     },
-    botaoAcaoTexto: { color: colors.surface, fontWeight: '800', fontSize: 16 },
+    botaoAcaoTexto: { color: colors.surface, fontWeight: '700', fontSize: 15 },
   });
 }

@@ -35,6 +35,7 @@ class PastExamResource extends JsonResource
             'title'        => $this->title,
             'description'  => $this->description,
             'exam_year'    => $this->exam_year,
+            'exam_date'    => $this->exam_date?->format('Y-m-d'),
             'exam_type'    => $this->exam_type,
             'exam_type_label' => $this->exam_type ? (config('past_exams.exam_types.'.$this->exam_type) ?? $this->exam_type) : null,
             'type'         => $this->type,

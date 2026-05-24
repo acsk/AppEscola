@@ -14,8 +14,10 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import {
+  anoDaProva,
   extrairAnosDasProvas,
   extrairDisciplinasDasProvas,
+  formatDataProva,
   type PastExamListItem,
 } from '../../../services/past-exams.service';
 import { subjectIconName } from '../../../services/simulados.service';
@@ -55,7 +57,7 @@ export function ProvasAnterioresScreen() {
   const itens = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     return todas.filter((item) => {
-      if (anoFiltro != null && item.exam_year !== anoFiltro) return false;
+      if (anoFiltro != null && anoDaProva(item.exam_date, item.exam_year) !== anoFiltro) return false;
       if (disciplinaFiltro != null && item.subject?.id !== disciplinaFiltro) return false;
       if (!termo) return true;
       return (
@@ -78,6 +80,7 @@ export function ProvasAnterioresScreen() {
 
   const renderItem = ({ item }: { item: PastExamListItem }) => {
     const subjectColor = item.subject?.color ?? colors.primary;
+    const dataProva = formatDataProva(item.exam_date, item.exam_year);
     return (
       <TouchableOpacity
         style={[
@@ -105,15 +108,16 @@ export function ProvasAnterioresScreen() {
               <Text style={[styles.subjectNome, { color: subjectColor }]}>{item.subject.name}</Text>
             </View>
           ) : null}
-          {item.exam_year ? (
-            <View style={styles.anoChip}>
-              <Text style={styles.anoTexto}>{item.exam_year}</Text>
-            </View>
-          ) : null}
         </View>
         <Text style={styles.cardTitulo} numberOfLines={2}>
           {item.title}
         </Text>
+        {dataProva ? (
+          <View style={styles.dataRow}>
+            <Ionicons name="calendar-outline" size={14} color={colors.muted} />
+            <Text style={styles.dataTexto}>Data da prova: {dataProva}</Text>
+          </View>
+        ) : null}
         {item.exam_type_label ? (
           <Text style={styles.subtitulo}>{item.exam_type_label}</Text>
         ) : null}
@@ -303,14 +307,9 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 20,
     },
     subjectNome: { fontSize: 11, fontWeight: '800' },
-    anoChip: {
-      backgroundColor: '#EEF2FF',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 20,
-    },
-    anoTexto: { fontSize: 11, fontWeight: '800', color: '#64748B' },
     cardTitulo: { fontSize: 16, fontWeight: '800', color: colors.ink, lineHeight: 22 },
+    dataRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+    dataTexto: { fontSize: 12, fontWeight: '600', color: colors.muted },
     subtitulo: { fontSize: 12, color: colors.muted, marginTop: 4 },
     cursosTexto: { fontSize: 11, color: colors.muted, marginTop: 4 },
     rodape: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },

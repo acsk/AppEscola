@@ -28,6 +28,7 @@ class UpdatePastExamRequest extends FormRequest
             'title'        => ['sometimes', 'string', 'max:255'],
             'description'  => ['sometimes', 'nullable', 'string', 'max:2000'],
             'exam_year'    => ['sometimes', 'nullable', 'integer', 'min:1990', 'max:2100'],
+            'exam_date'    => ['sometimes', 'nullable', 'date'],
             'exam_type'    => ['sometimes', 'nullable', 'string', Rule::in($examTypes)],
             'course_ids'   => ['sometimes', 'nullable', 'array'],
             'course_ids.*' => $this->pastExamCourseIdItemRules(),
