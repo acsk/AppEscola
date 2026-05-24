@@ -4,8 +4,8 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\MergesPastExamCourseIds;
 use App\Http\Requests\Concerns\NormalizesPastExamSchedule;
+use App\Rules\ActiveExamTypeSlug;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UploadPastExamFileRequest extends FormRequest
 {
@@ -25,14 +25,12 @@ class UploadPastExamFileRequest extends FormRequest
 
     public function rules(): array
     {
-        $examTypes = array_keys(config('past_exams.exam_types', []));
-
         return [
             'title'        => ['required', 'string', 'max:255'],
             'description'  => ['nullable', 'string', 'max:2000'],
             'exam_year'    => ['nullable', 'integer', 'min:1990', 'max:2100'],
             'exam_date'    => ['nullable', 'date_format:Y-m-d'],
-            'exam_type'    => ['nullable', 'string', Rule::in($examTypes)],
+            'exam_type'    => ['required', 'string', new ActiveExamTypeSlug()],
             'course_ids'   => ['nullable', 'array'],
             'course_ids.*' => $this->pastExamCourseIdItemRules(),
             'course_id'    => $this->pastExamLegacyCourseIdRules(),
@@ -50,7 +48,6 @@ class UploadPastExamFileRequest extends FormRequest
             'file.required'  => 'Selecione o arquivo PDF da prova.',
             'file.mimes'     => 'Envie apenas arquivos PDF.',
             'file.max'       => 'O PDF deve ter no máximo 150 kB.',
-            'exam_type.in'   => 'Tipo de prova inválido.',
         ]);
     }
 }

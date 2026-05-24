@@ -20,6 +20,8 @@ export type ExamForm = {
 export type ExamQuestion = {
   id: number;
   type: "multiple_choice" | "essay";
+  exam_type?: string | null;
+  exam_type_label?: string | null;
   question_text: string | null;
   points: number;
   order: number;
@@ -40,6 +42,7 @@ export type ExamQuestionOption = {
 
 export type ExamQuestionForm = {
   type: "multiple_choice" | "essay";
+  exam_type: string;
   question_text: string;
   subject_id: string;
   points: string;

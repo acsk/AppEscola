@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\CalendarEventController;
 use App\Http\Controllers\Api\StudentCalendarController;
 use App\Http\Controllers\Api\PastExamController;
 use App\Http\Controllers\Api\StudentPastExamController;
+use App\Http\Controllers\Api\ExamTypeController;
 use Illuminate\Support\Facades\Route;
 
 // Health check (público)
@@ -276,11 +277,15 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::apiResource('exams', ExamController::class);
     Route::get('exams/{exam}/stats',   [ExamController::class, 'stats']);
 
-    // Domínios de simulados (lookup tables — read-only)
+    // Domínios de simulados (lookup tables)
     Route::get('exam-statuses', fn () => response()->json(\App\Models\ExamStatus::orderBy('order')->get(['id', 'slug', 'label'])));
-    Route::get('exam-types', fn () => response()->json(
-        \App\Models\ExamType::query()->orderBy('label')->get(['id', 'slug', 'label'])
-    ));
+    Route::get('exam-types', [ExamTypeController::class, 'index']);
+
+    // Classificações de prova (ENEM, Vestibular, etc.) — gestão super admin
+    Route::get('admin/exam-types', [ExamTypeController::class, 'adminIndex']);
+    Route::post('admin/exam-types', [ExamTypeController::class, 'store']);
+    Route::put('admin/exam-types/{examType}', [ExamTypeController::class, 'update']);
+    Route::delete('admin/exam-types/{examType}', [ExamTypeController::class, 'destroy']);
 
     // Questões de um simulado (nested)
     Route::get('exams/{exam}/questions',               [ExamQuestionController::class, 'index']);

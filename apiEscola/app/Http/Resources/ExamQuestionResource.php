@@ -13,6 +13,9 @@ class ExamQuestionResource extends JsonResource
             'id'            => $this->id,
             'exam_id'       => $this->exam_id,
             'subject_id'    => $this->subject_id,
+            'exam_type_id'  => $this->exam_type_id,
+            'exam_type'     => $this->examType?->slug,
+            'exam_type_label' => $this->examType?->label,
             'subject'       => $this->whenLoaded('subject', fn () => [
                 'id'   => $this->subject->id,
                 'name' => $this->subject->name,

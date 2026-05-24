@@ -8,7 +8,7 @@ use App\Http\Requests\UpdateExamRequest;
 use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Models\ExamStatus;
-use App\Models\ExamType;
+use App\Services\ExamTypeService;
 use App\Services\ExamAttemptIntegrityService;
 use App\Services\ExamCourseService;
 use App\Traits\ScopedByTenant;
@@ -22,6 +22,7 @@ class ExamController extends Controller
 
     public function __construct(
         private readonly ExamCourseService $examCourseService,
+        private readonly ExamTypeService $examTypeService,
     ) {
     }
 
@@ -54,7 +55,7 @@ class ExamController extends Controller
         unset($data['course_ids'], $data['course_id']);
 
         $data['exam_status_id'] = ExamStatus::where('slug', $data['status'] ?? 'draft')->value('id');
-        $data['exam_type_id']   = ExamType::where('slug',   $data['exam_type'] ?? 'custom')->value('id');
+        $data['exam_type_id']   = $this->examTypeService->resolveActiveBySlug($data['exam_type'])->id;
         unset($data['status'], $data['exam_type']);
 
         $exam = Exam::create(array_merge($data, ['tenant_id' => $tenantId]));
@@ -68,7 +69,7 @@ class ExamController extends Controller
     {
         $this->authorizeTenant($request, $exam->tenant_id);
 
-        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject']);
+        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject', 'questions.examType']);
 
         return $this->success(new ExamResource($exam));
     }
@@ -86,7 +87,7 @@ class ExamController extends Controller
             unset($data['status']);
         }
         if (isset($data['exam_type'])) {
-            $data['exam_type_id'] = ExamType::where('slug', $data['exam_type'])->value('id');
+            $data['exam_type_id'] = $this->examTypeService->resolveActiveBySlug($data['exam_type'])->id;
             unset($data['exam_type']);
         }
 

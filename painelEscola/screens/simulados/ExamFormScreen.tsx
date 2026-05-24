@@ -44,7 +44,7 @@ import type {
 
 const EMPTY_EXAM: ExamForm = {
   title: "",
-  exam_type: "custom",
+  exam_type: "",
   status: "draft",
   course_ids: [],
   subject_id: "",
@@ -61,6 +61,7 @@ const EMPTY_EXAM: ExamForm = {
 
 const EMPTY_QUESTION: ExamQuestionForm = {
   type: "multiple_choice",
+  exam_type: "",
   question_text: "",
   subject_id: "",
   points: "1.0",
@@ -88,6 +89,7 @@ const EMPTY_SUPPORT_MATERIAL: ExamSupportMaterialForm = {
 function validateExam(form: ExamForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.title.trim()) errs.title = "Título é obrigatório.";
+  if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
   if (form.duration_minutes) {
     const dur = Number(form.duration_minutes);
     if (!Number.isInteger(dur) || dur < 1)
@@ -136,6 +138,7 @@ function validateExam(form: ExamForm): Record<string, string> {
 
 function validateQuestionEnunciado(form: ExamQuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
+  if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
   if (!form.question_text.trim() && !form.image_url.trim()) {
     errs.enunciado = "Informe o texto do enunciado, envie uma imagem, ou ambos.";
   }
@@ -454,7 +457,11 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     event?.preventDefault?.();
     event?.stopPropagation?.();
     setEditQuestionId(null);
-    setQForm({ ...EMPTY_QUESTION, options: EMPTY_QUESTION.options.map((o) => ({ ...o })) });
+    setQForm({
+      ...EMPTY_QUESTION,
+      exam_type: form.exam_type || "",
+      options: EMPTY_QUESTION.options.map((o) => ({ ...o })),
+    });
     setQErrors({});
     setQuestionModalStep(1);
     setQuestionModal(true);
@@ -464,6 +471,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     setEditQuestionId(q.id);
     setQForm({
       type: q.type,
+      exam_type: q.exam_type ?? form.exam_type ?? "",
       question_text: q.question_text ?? "",
       subject_id: q.subject?.id ? String(q.subject.id) : "",
       points: String(q.points),
@@ -600,6 +608,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     try {
       const payload: Record<string, any> = {
         type: qForm.type,
+        exam_type: qForm.exam_type,
         question_text: qForm.question_text.trim() || null,
         subject_id: qForm.subject_id ? Number(qForm.subject_id) : null,
         points: qForm.points ? Number(qForm.points) : 1.0,
@@ -972,10 +981,12 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           </View>
           <View style={{ flex: 1, minWidth: 180 }}>
             <FormSelect
-              label="Tipo"
+              label="Classificação"
+              required
               value={form.exam_type}
               options={examTypeOptions}
               onChange={(v) => setField("exam_type", v)}
+              error={errors.exam_type}
             />
           </View>
           <View style={{ flex: 1, minWidth: 180 }}>
@@ -1720,7 +1731,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               )}
             </View>
 
-            <View className={`gap-3 ${isMobile ? "" : "flex-row items-start"}`}>
+            <View className={`gap-3 ${isMobile ? "" : "flex-row items-start flex-wrap"}`}>
+              <View className={isMobile ? "" : "flex-1"} style={{ minWidth: 180 }}>
+                <FormSelect
+                  label="Classificação"
+                  required
+                  value={qForm.exam_type}
+                  options={examTypeOptions}
+                  onChange={(v) => setQField("exam_type", v)}
+                  error={qErrors.exam_type}
+                />
+              </View>
               <View className={isMobile ? "" : "flex-1"} style={{ minWidth: 0 }}>
                 <FormSelect
                   label="Matéria"

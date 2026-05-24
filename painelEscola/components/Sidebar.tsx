@@ -158,7 +158,10 @@ export default function Sidebar({
             title: "Administração",
             icon: "business-outline" as const,
             tone: "slate" as const,
-            items: [{ id: "tenants", label: "Tenants", icon: "business-outline" }],
+            items: [
+              { id: "tenants", label: "Tenants", icon: "business-outline" },
+              { id: "tipos-prova", label: "Tipos de prova", icon: "library-outline" },
+            ],
           },
         ]
       : []),

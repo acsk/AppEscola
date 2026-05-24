@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\ActiveExamTypeSlug;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -33,7 +34,7 @@ class StoreExamRequest extends FormRequest
             'subject_id'       => ['nullable', 'exists:subjects,id'],
             'title'            => ['required', 'string', 'max:255'],
             'description'      => ['nullable', 'string'],
-            'exam_type'        => ['nullable', 'string', 'exists:exam_types,slug'],
+            'exam_type'        => ['required', 'string', new ActiveExamTypeSlug()],
             'status'           => ['nullable', 'string', 'exists:exam_statuses,slug'],
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
             'passing_score'       => ['nullable', 'numeric', 'min:0', 'max:100'],

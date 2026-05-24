@@ -11,6 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class PastExamService
 {
+    public function __construct(
+        private readonly ExamTypeService $examTypeService,
+    ) {}
+
     public function assertBelongsToTenant(PastExam $pastExam, int $tenantId): void
     {
         if ((int) $pastExam->tenant_id !== $tenantId) {
@@ -105,7 +109,24 @@ class PastExamService
             }
         }
 
-        return $this->applyExamScheduleFields($data);
+        return $this->applyExamTypeFields($this->applyExamScheduleFields($data));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public function applyExamTypeFields(array $data): array
+    {
+        if (! array_key_exists('exam_type', $data)) {
+            return $data;
+        }
+
+        $type = $this->examTypeService->resolveActiveBySlug((string) $data['exam_type']);
+        $data['exam_type_id'] = $type->id;
+        $data['exam_type'] = $type->slug;
+
+        return $data;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\ActiveExamTypeSlug;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -13,6 +14,7 @@ class UpdateExamQuestionRequest extends FormRequest
     {
         return [
             'subject_id'    => ['sometimes', 'nullable', 'exists:subjects,id'],
+            'exam_type'     => ['sometimes', 'required', 'string', new ActiveExamTypeSlug()],
             'type'          => ['sometimes', 'in:multiple_choice,essay'],
             'question_text' => ['sometimes', 'nullable', 'string'],
             'image_url'     => ['sometimes', 'nullable', 'url', 'max:500'],

@@ -11,6 +11,7 @@ use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
 use App\Services\ExamAccessService;
+use App\Services\ExamTypeService;
 use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -22,13 +23,17 @@ class ExamQuestionController extends Controller
 {
     use ScopedByTenant;
 
+    public function __construct(
+        private readonly ExamTypeService $examTypeService,
+    ) {}
+
     /** Lista todas as questões de um simulado */
     public function index(Request $request, Exam $exam): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
-        $questions = $exam->questions()->with(['subject', 'options'])->get();
+        $questions = $exam->questions()->with(['subject', 'options', 'examType'])->get();
 
         return $this->success(ExamQuestionResource::collection($questions));
     }
@@ -139,11 +144,13 @@ class ExamQuestionController extends Controller
 
         $question = DB::transaction(function () use ($request, $exam, $tenantId) {
             $nextOrder = $exam->questions()->max('order') + 1;
+            $examType = $this->examTypeService->resolveActiveBySlug($request->exam_type);
 
             $question = ExamQuestion::create([
                 'tenant_id'         => $tenantId,
                 'exam_id'           => $exam->id,
                 'subject_id'        => $request->subject_id,
+                'exam_type_id'      => $examType->id,
                 'type'              => $request->type,
                 'question_text'     => $request->question_text,
                 'image_url'         => $request->image_url,
@@ -169,7 +176,7 @@ class ExamQuestionController extends Controller
             return $question;
         });
 
-        $question->load(['subject', 'options']);
+        $question->load(['subject', 'options', 'examType']);
 
         return $this->created(new ExamQuestionResource($question));
     }
@@ -179,7 +186,7 @@ class ExamQuestionController extends Controller
         $this->authorizeTenant($request, $exam->tenant_id);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
-        $question->load(['subject', 'options']);
+        $question->load(['subject', 'options', 'examType']);
 
         return $this->success(new ExamQuestionResource($question));
     }
@@ -222,7 +229,12 @@ class ExamQuestionController extends Controller
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         DB::transaction(function () use ($request, $question) {
-            $question->update($request->except('options'));
+            $data = $request->except('options');
+            if (isset($data['exam_type'])) {
+                $data['exam_type_id'] = $this->examTypeService->resolveActiveBySlug($data['exam_type'])->id;
+                unset($data['exam_type']);
+            }
+            $question->update($data);
 
             if ($request->has('options') && $request->options !== null) {
                 // Remove as antigas e recria
@@ -239,7 +251,7 @@ class ExamQuestionController extends Controller
             }
         });
 
-        $question->load(['subject', 'options']);
+        $question->load(['subject', 'options', 'examType']);
 
         return $this->success(new ExamQuestionResource($question));
     }

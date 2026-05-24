@@ -26,7 +26,7 @@ class StudentPastExamController extends Controller
         $courseIds = $this->enrollmentService->activeCourseIdsForStudent($student);
 
         $query = PastExam::query()
-            ->with(['course:id,name', 'courses:id,name', 'subject:id,name,icon,color'])
+            ->with(['course:id,name', 'courses:id,name', 'subject:id,name,icon,color', 'examType'])
             ->where('tenant_id', $user->tenant_id)
             ->where('type', 'file')
             ->where('file_type', 'pdf')
@@ -43,7 +43,12 @@ class StudentPastExamController extends Controller
                         ->orWhereYear('exam_date', $year);
                 });
             })
-            ->when($request->query('exam_type'), fn ($q, $v) => $q->where('exam_type', $v));
+            ->when($request->query('exam_type'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('exam_type', $v)
+                        ->orWhereHas('examType', fn ($t) => $t->where('slug', $v));
+                });
+            });
 
         $items = $query
             ->orderByDesc('sort_order')
@@ -83,7 +88,7 @@ class StudentPastExamController extends Controller
             return $this->forbidden('Você não possui acesso a esta prova.');
         }
 
-        $pastExam->load(['course:id,name', 'courses:id,name', 'subject:id,name,icon,color']);
+        $pastExam->load(['course:id,name', 'courses:id,name', 'subject:id,name,icon,color', 'examType']);
 
         return $this->success(new PastExamResource($pastExam));
     }

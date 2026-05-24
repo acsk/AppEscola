@@ -23,6 +23,7 @@ class PastExam extends Model
         'exam_year',
         'exam_date',
         'exam_type',
+        'exam_type_id',
         'type',
         'content',
         'file_type',
@@ -73,6 +74,11 @@ class PastExam extends Model
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    public function examType(): BelongsTo
+    {
+        return $this->belongsTo(ExamType::class);
     }
 
     public function scopePublished(Builder $query): Builder

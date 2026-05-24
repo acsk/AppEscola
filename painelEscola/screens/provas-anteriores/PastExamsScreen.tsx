@@ -22,6 +22,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import Pagination from "../../components/ui/Pagination";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import { useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import type { WithNavigate } from "../../types/navigation";
 
 type PastExamRow = {
@@ -42,19 +43,6 @@ type PastExamRow = {
   course_ids?: number[];
 };
 
-const EXAM_TYPE_FORM_OPTIONS = [
-  { value: "", label: "Nenhum" },
-  { value: "enem", label: "ENEM" },
-  { value: "vestibular", label: "Vestibular" },
-  { value: "fuvest", label: "FUVEST" },
-  { value: "concurso", label: "Concurso" },
-  { value: "custom", label: "Outro" },
-];
-
-const EXAM_TYPE_FILTER_OPTIONS = [
-  { value: "", label: "Todos os tipos" },
-  ...EXAM_TYPE_FORM_OPTIONS.filter((o) => o.value !== ""),
-];
 
 const PUBLISHED_FILTER_OPTIONS = [
   { value: "", label: "Todas publicações" },
@@ -125,6 +113,15 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const { width } = useWindowDimensions();
   const compactStack = width < 640;
+  const examTypes = useExamTypes();
+  const examTypeFormOptions = [
+    { value: "", label: "Selecione" },
+    ...domainToOptions(examTypes),
+  ];
+  const examTypeFilterOptions = [
+    { value: "", label: "Todos os tipos" },
+    ...domainToOptions(examTypes),
+  ];
   const [rows, setRows] = useState<PastExamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -505,6 +502,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
   const save = async () => {
     const localErrors: Record<string, string> = {};
     if (!form.title.trim()) localErrors.title = "Título obrigatório";
+    if (!form.exam_type) localErrors.exam_type = "Selecione a classificação da prova.";
     if (!editingId && !pdfFile) localErrors.file = "Selecione o arquivo PDF da prova.";
     if (pdfFile && pdfFile.size > MAX_PDF_UPLOAD_BYTES) localErrors.file = PDF_SIZE_ERROR;
     const examDateError = validateExamDateField(form.exam_date);
@@ -522,7 +520,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           title: form.title.trim(),
           description: form.description.trim() || null,
           exam_date: examDateIso || null,
-          exam_type: form.exam_type || null,
+          exam_type: form.exam_type,
           subject_id: form.subject_id ? Number(form.subject_id) : null,
           course_ids: form.course_ids,
           is_published: form.is_published === "true",
@@ -548,7 +546,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         if (examDateIso) {
           formData.append("exam_date", examDateIso);
         }
-        if (form.exam_type) formData.append("exam_type", form.exam_type);
+        formData.append("exam_type", form.exam_type);
         form.course_ids.forEach((id) => formData.append("course_ids[]", String(id)));
         if (form.subject_id) formData.append("subject_id", form.subject_id);
         formData.append("is_published", form.is_published === "true" ? "1" : "0");
@@ -709,7 +707,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             }}
             style={selectStyle}
           >
-            {EXAM_TYPE_FILTER_OPTIONS.map((option) => (
+            {examTypeFilterOptions.map((option) => (
               <option key={option.value || "all"} value={option.value}>
                 {option.label}
               </option>
@@ -892,10 +890,12 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
             <View style={{ flex: 1 }}>
               <FormSelect
-                label="Tipo"
+                label="Classificação"
+                required
                 value={form.exam_type}
-                options={EXAM_TYPE_FORM_OPTIONS}
+                options={examTypeFormOptions}
                 onChange={(exam_type) => setForm((p) => ({ ...p, exam_type }))}
+                error={errors.exam_type}
               />
             </View>
             <View style={{ flex: 1 }}>

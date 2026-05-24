@@ -17,6 +17,7 @@ class ExamQuestion extends Model
         'tenant_id',
         'exam_id',
         'subject_id',
+        'exam_type_id',
         'type',
         'question_text',
         'image_url',
@@ -44,6 +45,11 @@ class ExamQuestion extends Model
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    public function examType(): BelongsTo
+    {
+        return $this->belongsTo(ExamType::class);
     }
 
     public function options(): HasMany

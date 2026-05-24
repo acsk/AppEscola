@@ -126,6 +126,82 @@ Antes de alterar endpoint, campo, paginação ou validação:
 3. Plano resumido → passos pequenos → listar arquivos alterados
 4. Sugerir teste manual ou `php artisan test`
 
+## Ambiente Docker
+
+Arquivos: `docker-compose.yml` (desenvolvimento local) e `docker-compose.prod.yml` (produção em VPS com imagem baked-in).
+
+Rede interna: `appescola` (bridge). Os serviços se resolvem pelo **nome do service** (`app`, `db`, `nginx`, etc.).
+
+### Desenvolvimento (`docker-compose.yml`)
+
+| Service Compose | Container | Imagem / build | Portas (host) | Função |
+|-----------------|-----------|----------------|---------------|--------|
+| `app` | `appEscola_php` | `docker/php/Dockerfile` → PHP **8.3-FPM** | — (9000 só na rede interna) | Laravel: `artisan`, testes, Composer, FPM. `working_dir`: `/var/www`. Código montado do host (`.:/var/www`). |
+| `nginx` | `appEscola_nginx` | `nginx:1.25-alpine` | **4000** → 80 | HTTP da API. `root`: `/var/www/public`. Encaminha PHP para `app:9000`. |
+| `db` | `appEscola_mysql` | `mysql:8.0` | **4006** → 3306 | MySQL. Banco padrão: `appescola`. Usuário/senha dev: `appescola` / `appescola`. Root: `root` / `root`. |
+| `phpmyadmin` | `appEscola_phpmyadmin` | `phpmyadmin:5.2` | **4008** → 80 | UI do banco (conecta em `db:3306`). |
+
+**Volume nomeado:** `appescola_mysql_data` — dados persistentes do MySQL entre `down`/`up`.
+
+**Configuração montada:**
+
+- `docker/php/php.ini` → PHP do container `app`
+- `docker/nginx/default.conf` → virtual host do `nginx`
+- `docker/mysql/my.cnf` → MySQL
+
+**URLs locais (com stack no ar):**
+
+- API: `http://localhost:4000/api` (ex.: health, login, meta)
+- phpMyAdmin: `http://localhost:4008`
+
+**`.env` no Docker (desenvolvimento):** dentro dos containers, o host do MySQL é o service `db`, não `127.0.0.1`:
+
+```env
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=appescola
+DB_USERNAME=appescola
+DB_PASSWORD=appescola
+```
+
+Do **host** (cliente MySQL na máquina), use `127.0.0.1:4006` se precisar conectar por fora do Compose.
+
+**Ordem de dependência:** `db` → `app` → `nginx`; `phpmyadmin` → `db`.
+
+### Produção (`docker-compose.prod.yml`)
+
+| Service | Container | Observação |
+|---------|-----------|------------|
+| `app` | `appEscola_php` | Mesma imagem PHP 8.3-FPM; **não** monta o código (está na imagem). `env_file`: `.env.production`. Volume `storage_data` para arquivos públicos. |
+| `nginx` | `appEscola_nginx` | Portas **80** e **443**. Serve `storage` via volume read-only. |
+| `db` | `appEscola_mysql` | Credenciais via variáveis `${DB_DATABASE}`, `${DB_ROOT_PASSWORD}`, etc. Sem phpMyAdmin. |
+
+Produção em Hostinger compartilhado costuma **não** usar este Compose; ver seção Hostinger abaixo.
+
+### Comandos Docker frequentes
+
+```bash
+cd apiEscola
+
+# Subir / parar / status
+docker compose up -d
+docker compose down
+docker compose ps
+
+# Logs
+docker compose logs -f app
+docker compose logs -f nginx
+docker compose logs -f db
+
+# Shell no PHP (debug)
+docker compose exec app bash
+
+# Composer (se necessário no container)
+docker compose exec app composer install
+```
+
+**Serviço para `exec`:** quase sempre `app` (PHP/Artisan). Nunca rodar `migrate:fresh` / `db:wipe` sem autorização explícita do usuário.
+
 ## Comandos úteis
 
 ### Local (Docker — preferencial para desenvolvimento e testes)

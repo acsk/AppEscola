@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\ActiveExamTypeSlug;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -13,6 +14,7 @@ class StoreExamQuestionRequest extends FormRequest
     {
         return [
             'subject_id'    => ['nullable', 'exists:subjects,id'],
+            'exam_type'     => ['required', 'string', new ActiveExamTypeSlug()],
             'type'          => ['required', 'in:multiple_choice,essay'],
             'question_text' => ['nullable', 'string'],
             'image_url'     => ['nullable', 'url', 'max:500'],

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\ActiveExamTypeSlug;
 use App\Services\ExamPublishValidator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -38,7 +39,7 @@ class UpdateExamRequest extends FormRequest
             'subject_id'       => ['sometimes', 'nullable', 'exists:subjects,id'],
             'title'            => ['sometimes', 'string', 'max:255'],
             'description'      => ['sometimes', 'nullable', 'string'],
-            'exam_type'        => ['sometimes', 'string', 'exists:exam_types,slug'],
+            'exam_type'        => ['sometimes', 'required', 'string', new ActiveExamTypeSlug()],
             'status'           => ['sometimes', 'string', 'exists:exam_statuses,slug'],
             'duration_minutes' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'passing_score'       => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],

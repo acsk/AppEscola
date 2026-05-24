@@ -33,6 +33,7 @@ import PaymentProvidersCrudScreen from "./screens/payments/PaymentProvidersCrudS
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
 import { PastExamsScreen } from "./screens/provas-anteriores";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
+import ExamTypesScreen from "./screens/admin/ExamTypesScreen";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
 import { BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/configuracoes";
@@ -629,6 +630,8 @@ function AppContent() {
     ? "calendario"
     : nav.screen.startsWith("simulados")
     ? "simulados"
+    : nav.screen.startsWith("tipos-prova")
+    ? "tipos-prova"
     : nav.screen.startsWith("tenants")
     ? "tenants"
     : nav.screen.startsWith("users")
@@ -665,7 +668,7 @@ function AppContent() {
   }
 
   const renderScreen = () => {
-    if (!canManageTenants && (nav.screen === "tenants" || nav.screen === "tenants-form")) {
+    if (!canManageTenants && (nav.screen === "tenants" || nav.screen === "tenants-form" || nav.screen === "tipos-prova")) {
       return (
         <View className="flex-1 items-center justify-center px-6">
           <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
@@ -782,6 +785,7 @@ function AppContent() {
         return <CalendarScreen navigate={navigate} />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
       case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
+      case "tipos-prova": return <ExamTypesScreen />;
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;

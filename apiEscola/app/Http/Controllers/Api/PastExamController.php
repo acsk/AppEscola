@@ -28,7 +28,7 @@ class PastExamController extends Controller
     {
         $this->denyUnlessStaff($request);
 
-        $query = PastExam::with(['course', 'courses', 'subject:id,name,icon,color']);
+        $query = PastExam::with(['course', 'courses', 'subject:id,name,icon,color', 'examType']);
         $this->applyTenantScope($query, $request);
 
         $query
@@ -47,7 +47,12 @@ class PastExamController extends Controller
             ->when($request->query('subject_id'), fn ($q, $v) => $q->where('subject_id', $v))
             ->when($request->has('is_published'), fn ($q) => $q->where('is_published', $request->boolean('is_published')))
             ->when($request->query('exam_year'), fn ($q, $v) => $q->where('exam_year', $v))
-            ->when($request->query('exam_type'), fn ($q, $v) => $q->where('exam_type', $v));
+            ->when($request->query('exam_type'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('exam_type', $v)
+                        ->orWhereHas('examType', fn ($t) => $t->where('slug', $v));
+                });
+            });
 
         return PastExamResource::collection(
             $query->orderByDesc('sort_order')->orderByDesc('exam_date')->orderByDesc('exam_year')->orderBy('title')->paginate(20)
@@ -70,7 +75,7 @@ class PastExamController extends Controller
 
         $pastExam = PastExam::create($data);
         $this->pastExamService->syncCourses($pastExam, $courseIds, $tenantId);
-        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color', 'examType']);
 
         return $this->created(new PastExamResource($pastExam), 'Prova anterior cadastrada com sucesso.');
     }
@@ -80,7 +85,7 @@ class PastExamController extends Controller
         $this->denyUnlessStaff($request);
         $this->pastExamService->assertBelongsToTenant($pastExam, $this->requireTenantId($request));
 
-        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color', 'examType']);
 
         return $this->success(new PastExamResource($pastExam));
     }
@@ -105,7 +110,7 @@ class PastExamController extends Controller
             $this->pastExamService->syncCourses($pastExam, $courseIds, $tenantId);
         }
 
-        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color', 'examType']);
 
         return $this->success(new PastExamResource($pastExam), 'Prova anterior atualizada com sucesso.');
     }
@@ -145,6 +150,7 @@ class PastExamController extends Controller
             'exam_year'    => $data['exam_year'] ?? null,
             'exam_date'    => $data['exam_date'] ?? null,
             'exam_type'    => $data['exam_type'] ?? null,
+            'exam_type_id' => $data['exam_type_id'] ?? null,
             'subject_id'   => $data['subject_id'] ?? null,
             'type'         => 'file',
             'content'      => $contentUrl,
@@ -156,7 +162,7 @@ class PastExamController extends Controller
         ]);
 
         $this->pastExamService->syncCourses($pastExam, $courseIds, $tenantId);
-        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color']);
+        $pastExam->load(['course', 'courses', 'subject:id,name,icon,color', 'examType']);
 
         return $this->created(new PastExamResource($pastExam), 'Arquivo enviado com sucesso.');
     }
