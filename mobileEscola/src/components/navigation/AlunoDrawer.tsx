@@ -34,7 +34,7 @@ type NavigationStateSnapshot = Partial<ReturnType<Nav['getState']>> | undefined;
 const DRAWER_WIDTH = 312;
 
 type MenuItem =
-  | { label: string; icon: IconName; tab: TabName }
+  | { label: string; icon: IconName; tab: TabName; nestedScreen?: 'ProvasAnteriores' | 'SimuladosList' }
   | { label: string; icon: IconName; stack: keyof Pick<AlunoStackParamList, 'Calendario'> };
 
 const MENU_ITEMS: MenuItem[] = [
@@ -42,6 +42,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label: 'Calendário', stack: 'Calendario', icon: 'calendar-outline' },
   { label: 'Desempenho', tab: 'Desempenho', icon: 'stats-chart-outline' },
   { label: 'Simulados', tab: 'Simulados', icon: 'clipboard-outline' },
+  { label: 'Provas anteriores', tab: 'Simulados', nestedScreen: 'ProvasAnteriores', icon: 'archive-outline' },
   { label: 'Financeiro', tab: 'Financeiro', icon: 'wallet-outline' },
 ];
 
@@ -166,10 +167,10 @@ export function AlunoDrawer() {
       return;
     }
 
-    if (item.tab === 'Simulados') {
+    if ('tab' in item && item.tab === 'Simulados') {
       navigation.navigate('AlunoTabs', {
         screen: item.tab,
-        params: { screen: 'SimuladosList' },
+        params: { screen: item.nestedScreen ?? 'SimuladosList' },
       });
       return;
     }

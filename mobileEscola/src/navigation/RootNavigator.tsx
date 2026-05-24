@@ -32,6 +32,12 @@ const linking: LinkingOptions<any> = {
             path: 'simulados',
             screens: {
               SimuladosList: '',
+              ProvasAnteriores: 'provas-anteriores',
+              ProvaAnteriorDetalhe: {
+                path: 'provas-anteriores/:pastExamId',
+                parse: { pastExamId: (id: string) => Number(id) },
+                stringify: { pastExamId: (id: number) => String(id) },
+              },
               SimuladoDetalhe: {
                 path: ':examId',
                 parse:     { examId: (id: string) => Number(id) },

@@ -17,7 +17,6 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../../context/AuthContext';
 import { ApiError } from '../../../services/auth.service';
-import { BASE_URL } from '../../../services/api';
 import { storage } from '../../../services/storage';
 import {
   compareBuildVersions,
@@ -41,25 +40,15 @@ const APP_VERSION = String((appJson as any)?.expo?.version ?? '1.0.0');
 
 const STORAGE_API_VERSION_KEY = 'api_version_seen';
 const STORAGE_MOBILE_RELOAD_ATTEMPT_KEY = 'mobile_reload_attempt_version';
-const CHECKLIST_STEP_DELAY_MS = 500;
 
-type ChecklistStatus = 'idle' | 'pending' | 'success' | 'error';
+type ChecklistStepKey = 'internet' | 'apiUpdated' | 'appUpdated' | 'loginAuthorized';
 
-interface LoginChecklistState {
-  internet: ChecklistStatus;
-  apiUpdated: ChecklistStatus;
-  appUpdated: ChecklistStatus;
-  loginAuthorized: ChecklistStatus;
-}
-
-const INITIAL_LOGIN_CHECKLIST_STATE: LoginChecklistState = {
-  internet: 'idle',
-  apiUpdated: 'idle',
-  appUpdated: 'idle',
-  loginAuthorized: 'idle',
-};
-
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const CHECKLIST_STEPS: { key: ChecklistStepKey; label: string }[] = [
+  { key: 'internet', label: 'Conexão com a internet' },
+  { key: 'apiUpdated', label: 'API atualizada' },
+  { key: 'appUpdated', label: 'App atualizado' },
+  { key: 'loginAuthorized', label: 'Login autorizado' },
+];
 
 export function LoginScreen() {
   const { signIn } = useAuth();
@@ -83,12 +72,9 @@ export function LoginScreen() {
   const [remoteBuildVersion, setRemoteBuildVersion] = useState<string>('');
   const [remoteBuildDate, setRemoteBuildDate] = useState<string>('');
 
-  // Checklist de login
+  // Checklist de login (um passo visível por vez)
   const [loginChecklistVisible, setLoginChecklistVisible] = useState(false);
-  const [loginChecklist, setLoginChecklist] = useState<LoginChecklistState>(
-    INITIAL_LOGIN_CHECKLIST_STATE,
-  );
-  const [loginChecklistMessage, setLoginChecklistMessage] = useState<string | null>(null);
+  const [loginChecklistStep, setLoginChecklistStep] = useState<ChecklistStepKey | null>(null);
 
   // Modal de confirmação de reload
   const [reloadConfirmationVisible, setReloadConfirmationVisible] = useState(false);
@@ -97,9 +83,20 @@ export function LoginScreen() {
   const isEmail = login.includes('@');
   const isWide = width >= 768;
 
-  const updateChecklistStep = (step: keyof LoginChecklistState, status: ChecklistStatus) => {
-    setLoginChecklist((prev) => ({ ...prev, [step]: status }));
-  };
+  function showChecklistStep(step: ChecklistStepKey) {
+    setLoginChecklistStep(step);
+    setLoginChecklistVisible(true);
+  }
+
+  function hideChecklist() {
+    setLoginChecklistVisible(false);
+    setLoginChecklistStep(null);
+  }
+
+  function failLogin(message: string) {
+    hideChecklist();
+    setErro(message);
+  }
 
   async function loadMeta() {
     setMetaLoading(true);
@@ -208,79 +205,56 @@ export function LoginScreen() {
   async function handleLogin() {
     setErro(null);
 
-    setLoginChecklist(INITIAL_LOGIN_CHECKLIST_STATE);
-    setLoginChecklistMessage(null);
-    setLoginChecklistVisible(true);
-
     // Etapa 1: internet/API
-    updateChecklistStep('internet', 'pending');
-    await wait(CHECKLIST_STEP_DELAY_MS);
+    showChecklistStep('internet');
     const apiOnline = await testApiConnection();
     if (!apiOnline) {
-      updateChecklistStep('internet', 'error');
-      setLoginChecklistMessage(
-        `Sem conexão com o servidor (${BASE_URL || 'URL não configurada'}). Verifique sua internet.`,
-      );
+      failLogin('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
       return;
     }
-    updateChecklistStep('internet', 'success');
 
     // Etapa 2: API atualizada
-    updateChecklistStep('apiUpdated', 'pending');
-    await wait(CHECKLIST_STEP_DELAY_MS);
+    showChecklistStep('apiUpdated');
     let meta: MetaInfo | null = null;
     try {
       meta = await fetchMetaInfo();
       applyMetaInfo(meta);
     } catch {
-      updateChecklistStep('apiUpdated', 'error');
-      setLoginChecklistMessage('Não foi possível obter informações da API.');
+      failLogin('Não foi possível validar a API. Tente novamente em instantes.');
       return;
     }
     const promptedApi = await maybePromptReloadForApi(meta.apiVersion);
     if (promptedApi) {
-      updateChecklistStep('apiUpdated', 'pending');
-      setLoginChecklistMessage('A API foi atualizada. Recarregue para continuar.');
+      hideChecklist();
       return;
     }
-    updateChecklistStep('apiUpdated', 'success');
 
     // Etapa 3: App atualizado
-    updateChecklistStep('appUpdated', 'pending');
-    await wait(CHECKLIST_STEP_DELAY_MS);
+    showChecklistStep('appUpdated');
     const promptedApp = await maybePromptReloadForApp();
     if (promptedApp) {
-      updateChecklistStep('appUpdated', 'pending');
-      setLoginChecklistMessage('Há uma nova versão do app. Recarregue para atualizar.');
+      hideChecklist();
       return;
     }
     if (mustUpdate || (meta?.minSupportedVersion && compareVersions(APP_VERSION, meta.minSupportedVersion) < 0)) {
-      updateChecklistStep('appUpdated', 'error');
-      setLoginChecklistMessage(
+      failLogin(
         `Esta versão do app (${APP_VERSION}) não é mais suportada. Atualize para continuar.`,
       );
       return;
     }
-    updateChecklistStep('appUpdated', 'success');
 
     // Etapa 4: validar campos e autenticar
     if (!login.trim() || !senha.trim()) {
-      updateChecklistStep('loginAuthorized', 'error');
-      setLoginChecklistMessage('Preencha o login e a senha.');
-      setErro('Preencha o login e a senha.');
+      failLogin('Preencha o login e a senha.');
       return;
     }
 
-    updateChecklistStep('loginAuthorized', 'pending');
-    await wait(CHECKLIST_STEP_DELAY_MS);
+    showChecklistStep('loginAuthorized');
     try {
       setCarregando(true);
       await signIn(login.trim(), senha);
-      updateChecklistStep('loginAuthorized', 'success');
-      // Sucesso: a navegação cuida do redirecionamento; fechamos o modal por garantia.
-      setLoginChecklistVisible(false);
+      hideChecklist();
     } catch (err) {
-      updateChecklistStep('loginAuthorized', 'error');
       const axiosErr = err as AxiosError<ApiError>;
       const status = axiosErr.response?.status;
 
@@ -296,38 +270,18 @@ export function LoginScreen() {
         axiosErr.code === 'ERR_NETWORK' ||
         !axiosErr.response
       ) {
-        message =
-          `Não foi possível alcançar o servidor (${BASE_URL || 'URL não configurada'}). ` +
-          `Verifique se o backend está rodando.`;
+        message = 'Não foi possível conectar ao servidor. Tente novamente.';
       } else {
-        message = `Erro inesperado (código ${status ?? 'desconhecido'}). Tente novamente.`;
+        message = 'Não foi possível entrar. Tente novamente.';
       }
-      setErro(message);
-      setLoginChecklistMessage(message);
+      failLogin(message);
     } finally {
       setCarregando(false);
     }
   }
 
-  function renderChecklistIcon(status: ChecklistStatus) {
-    if (status === 'success') {
-      return <Ionicons name="checkmark-circle" size={20} color="#16A34A" />;
-    }
-    if (status === 'error') {
-      return <Ionicons name="close-circle" size={20} color="#DC2626" />;
-    }
-    if (status === 'pending') {
-      return <ActivityIndicator size="small" color={colors.primary} />;
-    }
-    return <Ionicons name="ellipse-outline" size={20} color="#9CA3AF" />;
-  }
-
-  const checklistRows: { key: keyof LoginChecklistState; label: string }[] = [
-    { key: 'internet', label: 'Conexão com a internet' },
-    { key: 'apiUpdated', label: 'API atualizada' },
-    { key: 'appUpdated', label: 'App atualizado' },
-    { key: 'loginAuthorized', label: 'Login autorizado' },
-  ];
+  const activeChecklistLabel =
+    CHECKLIST_STEPS.find((step) => step.key === loginChecklistStep)?.label ?? 'Validando acesso';
 
   return (
     <KeyboardAvoidingView
@@ -534,43 +488,20 @@ export function LoginScreen() {
         </View>
       </ScrollView>
 
-      {/* Modal: Checklist de login */}
+      {/* Modal: checklist mínimo (um passo por vez, sem detalhes de debug) */}
       <Modal
         visible={loginChecklistVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setLoginChecklistVisible(false)}
+        onRequestClose={hideChecklist}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
-              <Text style={styles.modalTitle}>Validando acesso</Text>
-            </View>
-
-            <View style={styles.checklist}>
-              {checklistRows.map((row) => (
-                <View key={row.key} style={styles.checklistRow}>
-                  <View style={styles.checklistIcon}>
-                    {renderChecklistIcon(loginChecklist[row.key])}
-                  </View>
-                  <Text style={styles.checklistLabel}>{row.label}</Text>
-                </View>
-              ))}
-            </View>
-
-            {loginChecklistMessage ? (
-              <Text style={styles.checklistMessage}>{loginChecklistMessage}</Text>
-            ) : null}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setLoginChecklistVisible(false)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.modalButtonSecondaryText}>Fechar</Text>
-              </TouchableOpacity>
+          <View style={[styles.modalCard, styles.checklistModalCard]}>
+            <View style={styles.checklistRow}>
+              <View style={styles.checklistIcon}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+              <Text style={styles.checklistLabel}>{activeChecklistLabel}</Text>
             </View>
           </View>
         </View>
@@ -921,13 +852,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-  checklist: {
-    marginBottom: 12,
+  checklistModalCard: {
+    paddingVertical: 20,
+    paddingHorizontal: 22,
   },
   checklistRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
   },
   checklistIcon: {
     width: 28,
@@ -937,16 +868,8 @@ const styles = StyleSheet.create({
   },
   checklistLabel: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.ink,
-  },
-  checklistMessage: {
-    marginTop: 4,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.muted,
-    backgroundColor: colors.soft,
-    borderRadius: 10,
-    padding: 10,
   },
 });

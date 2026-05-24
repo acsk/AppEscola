@@ -495,7 +495,7 @@ export function HomeScreen() {
       )}
 
       {/* ── Provas anteriores ─────────────────────────────────────────── */}
-      {user?.role === 'aluno' && provasAnterioresRecentes.length > 0 && (
+      {user?.role === 'aluno' && (
         <>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Provas anteriores</Text>
@@ -508,24 +508,30 @@ export function HomeScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
-            {provasAnterioresRecentes.map((p) => (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.simCard, { width: 220, backgroundColor: colors.soft, borderColor: colors.border }]}
-                activeOpacity={0.85}
-                onPress={() =>
-                  navigation.navigate('Simulados', {
-                    screen: 'ProvaAnteriorDetalhe',
-                    params: { pastExamId: p.id },
-                  })
-                }
-              >
-                <Text style={styles.simTitulo} numberOfLines={2}>{p.title}</Text>
-                <Text style={styles.simMateria}>
-                  {[p.exam_year, p.exam_type_label].filter(Boolean).join(' · ') || 'Prova'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {provasAnterioresRecentes.length === 0 ? (
+              <View style={styles.simCardVazio}>
+                <Text style={styles.simCardVazioTexto}>Nenhuma prova anterior disponível</Text>
+              </View>
+            ) : (
+              provasAnterioresRecentes.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.simCard, { width: 220, backgroundColor: colors.soft, borderColor: colors.border }]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    navigation.navigate('Simulados', {
+                      screen: 'ProvaAnteriorDetalhe',
+                      params: { pastExamId: p.id },
+                    })
+                  }
+                >
+                  <Text style={styles.simTitulo} numberOfLines={2}>{p.title}</Text>
+                  <Text style={styles.simMateria}>
+                    {[p.exam_year, p.exam_type_label].filter(Boolean).join(' · ') || 'Prova'}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
         </>
       )}
