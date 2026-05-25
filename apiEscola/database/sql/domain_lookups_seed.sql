@@ -44,7 +44,8 @@ INSERT IGNORE INTO domain_payment_methods (slug, name) VALUES
 ('credit_card', 'Cartão de Crédito'),
 ('debit_card', 'Cartão de Débito'),
 ('bank_slip', 'Boleto Bancário'),
-('transfer', 'Transferência Bancária');
+('transfer', 'Transferência Bancária'),
+('hybrid', 'Boleto + PIX');
 
 INSERT IGNORE INTO domain_enrollment_statuses (slug, name) VALUES
 ('pending', 'Pendente'),

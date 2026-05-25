@@ -34,6 +34,7 @@ class InvoiceLifecycleService
      *   can_cancel: bool,
      *   can_delete: bool,
      *   requires_cora_cancel_before_delete: bool,
+     *   edit_block_reason: ?string,
      *   cancel_block_reason: ?string,
      *   delete_block_reason: ?string,
      *   lifecycle_hint: ?string
@@ -43,8 +44,16 @@ class InvoiceLifecycleService
     {
         $status = strtolower((string) $invoice->status);
         $hasActiveGatewayCharge = $this->hasActiveGatewayCharge($invoice);
+        $hasGeneratedCharge = $this->hasGeneratedPaymentCharge($invoice);
 
-        $canEdit = ! in_array($status, ['paid', 'cancelled'], true);
+        $canEdit = ! in_array($status, ['paid', 'cancelled'], true) && ! $hasGeneratedCharge;
+        $editBlockReason = null;
+
+        if (in_array($status, ['paid', 'cancelled'], true)) {
+            $editBlockReason = 'Não é possível editar uma cobrança paga ou cancelada.';
+        } elseif ($hasGeneratedCharge) {
+            $editBlockReason = 'Não é possível editar uma cobrança com boleto ou PIX já gerado. Cancele a cobrança no provedor antes, se necessário.';
+        }
 
         $canCancel = false;
         $cancelBlockReason = null;
@@ -82,10 +91,34 @@ class InvoiceLifecycleService
             'can_cancel' => $canCancel,
             'can_delete' => $canDelete,
             'requires_cora_cancel_before_delete' => $requiresCoraCancelBeforeDelete,
+            'edit_block_reason' => $editBlockReason,
             'cancel_block_reason' => $cancelBlockReason,
             'delete_block_reason' => $deleteBlockReason,
             'lifecycle_hint' => $lifecycleHint,
         ];
+    }
+
+    public function hasGeneratedPaymentCharge(Invoice $invoice): bool
+    {
+        if (filled($invoice->cora_charge_id)) {
+            return true;
+        }
+
+        return filled($invoice->boleto_number)
+            || filled($invoice->boleto_digitable)
+            || filled($invoice->cora_payment_url)
+            || filled($invoice->cora_pix_copy_paste);
+    }
+
+    public function assertCanEdit(Invoice $invoice): void
+    {
+        $permissions = $this->permissions($invoice);
+
+        if (! $permissions['can_edit']) {
+            throw new RuntimeException(
+                (string) ($permissions['edit_block_reason'] ?? 'Não é possível editar esta cobrança.')
+            );
+        }
     }
 
     public function assertCanCancel(Invoice $invoice): void

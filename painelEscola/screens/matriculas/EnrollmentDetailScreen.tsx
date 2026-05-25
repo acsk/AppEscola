@@ -510,6 +510,17 @@ export default function EnrollmentDetailScreen({
   };
 
   const openEditInvoice = (inv: Invoice) => {
+    if (inv.can_edit === false) {
+      setMsgModal({
+        visible: true,
+        type: "warning",
+        title: "Edição bloqueada",
+        message:
+          inv.edit_block_reason ??
+          "Não é possível editar uma cobrança com boleto ou PIX já gerado.",
+      });
+      return;
+    }
     setInvoiceEditId(inv.id);
     setInvoiceForm({
       description: inv.description,

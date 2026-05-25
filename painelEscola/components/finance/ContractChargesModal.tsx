@@ -577,6 +577,102 @@ function ExecutionPreviewSummary({
   );
 }
 
+type ContractChargesStep = "overview" | "generate" | "cora" | "review";
+
+const WIZARD_STEPS: { id: ContractChargesStep; label: string }[] = [
+  { id: "overview", label: "Visão geral" },
+  { id: "generate", label: "Gerar local" },
+  { id: "cora", label: "Cora" },
+  { id: "review", label: "Revisão" },
+];
+
+function ContractChargesStepIndicator({ current }: { current: ContractChargesStep }) {
+  const index = WIZARD_STEPS.findIndex((s) => s.id === current);
+
+  return (
+    <View className="mb-3">
+      <View className="flex-row items-center justify-between gap-0.5 px-0.5">
+        {WIZARD_STEPS.map((step, i) => {
+          const done = i < index;
+          const active = i === index;
+          return (
+            <View key={step.id} className="flex-1 flex-row items-center">
+              <View className="flex-1 items-center min-w-0">
+                <View
+                  className={`h-7 w-7 rounded-full items-center justify-center ${
+                    active ? "bg-violet-600" : done ? "bg-violet-200" : "bg-gray-200"
+                  }`}
+                >
+                  {done ? (
+                    <Ionicons name="checkmark" size={14} color="#5B21B6" />
+                  ) : (
+                    <Text
+                      className={`text-xs font-bold ${active ? "text-white" : "text-gray-500"}`}
+                    >
+                      {i + 1}
+                    </Text>
+                  )}
+                </View>
+                <Text
+                  className={`text-[9px] font-semibold mt-1 text-center ${
+                    active ? "text-violet-800" : done ? "text-violet-600" : "text-gray-400"
+                  }`}
+                  numberOfLines={1}
+                >
+                  {step.label}
+                </Text>
+              </View>
+              {i < WIZARD_STEPS.length - 1 ? (
+                <View
+                  className={`h-0.5 flex-1 mb-4 max-w-[12px] ${done ? "bg-violet-300" : "bg-gray-200"}`}
+                />
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function OverviewSummaryCards({
+  preview,
+  providerBoletoCount,
+  syncSelectableCount,
+}: {
+  preview: ContractChargesPreview;
+  providerBoletoCount: number;
+  syncSelectableCount: number;
+}) {
+  const cards = [
+    { label: "No sistema", value: preview.summary.local_count, icon: "folder-outline" as const },
+    { label: "A gerar", value: preview.summary.to_generate_count, icon: "add-circle-outline" as const },
+    {
+      label: "Boletos Cora",
+      value: preview.summary.external_boleto_total ?? providerBoletoCount,
+      icon: "cloud-outline" as const,
+    },
+    { label: "Sync disponível", value: syncSelectableCount, icon: "sync-outline" as const },
+  ];
+
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {cards.map((card) => (
+        <View
+          key={card.label}
+          className="flex-1 min-w-[100px] rounded-lg border border-gray-100 bg-white px-2.5 py-2"
+        >
+          <View className="flex-row items-center gap-1 mb-0.5">
+            <Ionicons name={card.icon} size={12} color="#6B7280" />
+            <Text className="text-[9px] font-bold uppercase text-gray-500">{card.label}</Text>
+          </View>
+          <Text className="text-lg font-bold text-gray-900">{card.value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const LINK_STATUS_LABELS: Record<string, string> = {
   new: "Importar",
   linked: "Já vinculada",
@@ -806,6 +902,7 @@ export default function ContractChargesModal({
   const [invoiceTypes, setInvoiceTypes] = useState<string[]>(["monthly"]);
   const [showLocalInvoices, setShowLocalInvoices] = useState(false);
   const [debugPayload, setDebugPayload] = useState<Record<string, unknown> | null>(null);
+  const [step, setStep] = useState<ContractChargesStep>("overview");
 
   const loadPreview = useCallback(async () => {
     setLoading(true);
@@ -858,8 +955,25 @@ export default function ContractChargesModal({
     if (!visible) return;
     setShowLocalInvoices(false);
     setDebugPayload(null);
+    setStep("overview");
     loadPreview();
   }, [visible, loadPreview]);
+
+  const stepIndex = WIZARD_STEPS.findIndex((s) => s.id === step);
+  const isFirstStep = stepIndex <= 0;
+  const isLastStep = stepIndex >= WIZARD_STEPS.length - 1;
+
+  const goNext = () => {
+    if (isLastStep) return;
+    setError(null);
+    setStep(WIZARD_STEPS[stepIndex + 1].id);
+  };
+
+  const goBack = () => {
+    if (isFirstStep) return;
+    setError(null);
+    setStep(WIZARD_STEPS[stepIndex - 1].id);
+  };
 
   const selectableGenerate = useMemo(
     () => preview?.to_generate.filter((r) => !r.disabled && !r.already_exists) ?? [],
@@ -933,67 +1047,93 @@ export default function ContractChargesModal({
   };
 
   const canGenerate = !preview?.blocked.contract_batch_generated;
+  const currentStepMeta = WIZARD_STEPS[stepIndex] ?? WIZARD_STEPS[0];
 
-  return (
-    <Modal
-      visible={visible}
-      title="Cobranças do contrato"
-      onClose={applying ? () => undefined : onClose}
-      size="xl"
-      maxHeight="98%"
-      showScrollIndicator
-      scrollViewClassName="app-scrollbar py-3"
-      footer={
-        <>
-          <TouchableOpacity
-            onPress={onClose}
-            disabled={applying}
-            className="px-4 py-2.5 rounded-lg border border-gray-200 bg-white"
-          >
-            <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={loadPreview}
-            disabled={loading || applying}
-            className={`flex-row items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-violet-200 ${
-              loading || applying ? "opacity-60" : "bg-white"
-            }`}
-          >
-            <Ionicons name="refresh-outline" size={16} color="#6D28D9" />
-            <Text className="text-sm font-semibold text-violet-700">Atualizar análise</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={submit}
-            disabled={applying || loading}
-            className={`flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-lg ${
-              applying || loading ? "bg-violet-300" : "bg-violet-600"
-            }`}
-          >
-            {applying ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={16} color="white" />
-                <Text className="text-sm font-bold text-white">
-                  Executar ({selectedActionCount})
+  const renderStepContent = () => {
+    if (!preview) return null;
+
+    switch (step) {
+      case "overview":
+        return (
+          <View className="gap-3">
+            <Text className="text-xs text-gray-600 leading-5">
+              Analise o contrato em etapas: escolha o que gerar no sistema, o que sincronizar da Cora e
+              confirme antes de executar.
+            </Text>
+            <OverviewSummaryCards
+              preview={preview}
+              providerBoletoCount={providerBoletoRows.length}
+              syncSelectableCount={selectableSync.length}
+            />
+            <PreviewAlerts
+              warnings={preview.warnings}
+              providerError={preview.summary.provider_fetch_error}
+            />
+            {preview.summary.external_total > 0 ? (
+              <View className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2">
+                <Text className="text-xs text-violet-900">
+                  Cora: {preview.summary.external_total} cobrança
+                  {preview.summary.external_total === 1 ? "" : "s"} no tenant ·{" "}
+                  {preview.summary.external_boleto_total ?? providerBoletoRows.length} boleto
+                  {(preview.summary.external_boleto_total ?? 0) === 1 ? "" : "s"} ·{" "}
+                  {preview.summary.external_for_enrollment ?? 0} desta matrícula
                 </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </>
-      }
-    >
-      <View className="gap-3">
-        <View className="flex-row items-center justify-between gap-2 flex-wrap">
-          <Text className="text-xs text-gray-500 flex-1 min-w-[200px]">
-            Marque o que deseja executar. Com boleto na Cora na mesma data, a geração local não vem pré-marcada.
-          </Text>
-          <View className="flex-row items-center gap-2">
+              </View>
+            ) : null}
+            <View className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+              <Text className="text-xs font-bold text-gray-800 mb-2">Tipos de cobrança na análise</Text>
+              <View className="flex-row flex-wrap gap-1.5">
+                {(["monthly", "enrollment_fee"] as const).map((type) => {
+                  const active = invoiceTypes.includes(type);
+                  const label = type === "monthly" ? "Mensalidades" : "Taxa de matrícula";
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      onPress={() => {
+                        setInvoiceTypes((prev) => {
+                          const next = active ? prev.filter((t) => t !== type) : [...prev, type];
+                          return next.length > 0 ? next : ["monthly"];
+                        });
+                      }}
+                      disabled={loading || applying || preview.charges_batch_generated}
+                      className={`flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-md border ${
+                        active ? "bg-white border-violet-300" : "bg-transparent border-gray-200"
+                      }`}
+                    >
+                      <Ionicons
+                        name={active ? "checkmark-circle" : "ellipse-outline"}
+                        size={14}
+                        color={active ? "#7C3AED" : "#9CA3AF"}
+                      />
+                      <Text
+                        className={`text-[11px] font-semibold ${
+                          active ? "text-violet-800" : "text-gray-600"
+                        }`}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text className="text-[10px] text-gray-500 mt-2">
+                Alterar os tipos recarrega a análise ao avançar ou usar Atualizar.
+              </Text>
+            </View>
+            {preview.charges_batch_generated ? (
+              <View className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                <Ionicons name="lock-closed-outline" size={16} color="#B45309" />
+                <Text className="flex-1 text-xs text-amber-800">
+                  O lote do contrato já foi gerado. Novas parcelas locais estão bloqueadas; você ainda
+                  pode sincronizar boletos na etapa Cora.
+                </Text>
+              </View>
+            ) : null}
             {canRequestDebug ? (
               <TouchableOpacity
                 onPress={loadDebugPreview}
                 disabled={loading || debugLoading || applying}
-                className={`flex-row items-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 ${
+                className={`self-start flex-row items-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 ${
                   loading || debugLoading || applying ? "opacity-60" : ""
                 }`}
               >
@@ -1002,84 +1142,66 @@ export default function ContractChargesModal({
                 ) : (
                   <Ionicons name="bug-outline" size={14} color="#B45309" />
                 )}
-                <Text className="text-[11px] font-semibold text-amber-900">Debug</Text>
+                <Text className="text-[11px] font-semibold text-amber-900">Carregar debug técnico</Text>
               </TouchableOpacity>
             ) : null}
-            <Pill
-              label={environment === "prod" ? "Produção" : "Homologação"}
-              tone={environment === "prod" ? "amber" : "gray"}
-            />
+            {debugPayload ? <ContractChargesDebugPanel debug={debugPayload} /> : null}
           </View>
-        </View>
+        );
 
-        {debugPayload ? <ContractChargesDebugPanel debug={debugPayload} /> : null}
-
-        {preview?.charges_batch_generated ? (
-          <View className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-            <Ionicons name="lock-closed-outline" size={16} color="#B45309" />
-            <Text className="flex-1 text-xs text-amber-800">
-              O lote do contrato já foi gerado. Novas parcelas locais estão bloqueadas, mas
-              ainda é possível sincronizar boletos do provedor.
+      case "generate":
+        return (
+          <View className="gap-2">
+            <Text className="text-xs text-gray-600 leading-5">
+              Crie parcelas no sistema conforme o contrato. Se já existir boleto na Cora na mesma data, a
+              linha não vem marcada por padrão.
+            </Text>
+            <SectionPanel accent="violet">
+              <SectionHeader
+                title={`Parcelas (${selectableGenerate.length} disponíveis)`}
+                action={
+                  canGenerate && selectableGenerate.length > 0 ? (
+                    <TouchableOpacity
+                      className="px-2 py-1 rounded-lg bg-violet-50"
+                      onPress={() =>
+                        toggleAll(
+                          selectableGenerate.map((r) => r.key),
+                          selectedGenerateKeys.length !== selectableGenerate.length
+                        )
+                      }
+                    >
+                      <Text className="text-xs font-semibold text-violet-700">
+                        {selectedGenerateKeys.length === selectableGenerate.length
+                          ? "Desmarcar"
+                          : "Marcar todas"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null
+                }
+              />
+              <CompactGenerateList
+                rows={preview.to_generate}
+                selectedKeys={selectedKeys}
+                canGenerate={canGenerate}
+                onToggle={toggleKey}
+              />
+            </SectionPanel>
+            <Text className="text-[10px] text-gray-500 text-center">
+              {selectedGenerateKeys.length} parcela(s) marcada(s) para gerar
             </Text>
           </View>
-        ) : null}
+        );
 
-        <View className="flex-row flex-wrap gap-1.5 rounded-lg bg-gray-50 border border-gray-100 p-1">
-          {(["monthly", "enrollment_fee"] as const).map((type) => {
-            const active = invoiceTypes.includes(type);
-            const label = type === "monthly" ? "Mensalidades" : "Taxa de matrícula";
-            return (
-              <TouchableOpacity
-                key={type}
-                onPress={() => {
-                  setInvoiceTypes((prev) => {
-                    const next = active ? prev.filter((t) => t !== type) : [...prev, type];
-                    return next.length > 0 ? next : ["monthly"];
-                  });
-                }}
-                disabled={loading || applying || preview?.charges_batch_generated}
-                className={`flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-md border ${
-                  active ? "bg-white border-violet-300" : "bg-transparent border-transparent"
-                }`}
-              >
-                <Ionicons
-                  name={active ? "checkmark-circle" : "ellipse-outline"}
-                  size={14}
-                  color={active ? "#7C3AED" : "#9CA3AF"}
-                />
-                <Text className={`text-[11px] font-semibold ${active ? "text-violet-800" : "text-gray-600"}`}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {loading ? (
-          <View className="items-center py-8">
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text className="text-xs text-gray-500 mt-2">Consultando sistema e provedor...</Text>
-          </View>
-        ) : null}
-
-        {!!error && (
-          <View className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-            <Text className="text-sm text-red-700">{error}</Text>
-          </View>
-        )}
-
-        {preview && !loading ? (
-          <View className="gap-3">
-            <ExecutionPreviewSummary preview={preview} selectedKeys={selectedKeys} />
-
-            <PreviewAlerts
-              warnings={preview.warnings}
-              providerError={preview.summary.provider_fetch_error}
-            />
-
+      case "cora":
+        return (
+          <View className="gap-2">
+            <Text className="text-xs text-gray-600 leading-5">
+              Importe ou atualize boletos já emitidos na Cora para esta matrícula. Itens já vinculados
+              não podem ser selecionados.
+            </Text>
             <SectionPanel accent="emerald">
               <SectionHeader
-                title={`Cora (${preview.summary.external_boleto_total ?? providerBoletoRows.length} boleto${(preview.summary.external_boleto_total ?? 0) === 1 ? "" : "s"})`}
+                title={`Boletos Cora (${preview.summary.external_boleto_total ?? providerBoletoRows.length})`}
                 action={
                   selectableSync.length > 0 ? (
                     <TouchableOpacity
@@ -1108,13 +1230,11 @@ export default function ContractChargesModal({
                     matrícula
                   </Text>
                   <Text className="text-[11px] leading-4 text-amber-800">
-                    A sincronização só importa boletos com o mesmo CPF do aluno/responsável ou criados pelo
-                    AppCurso (metadata). Boletos emitidos manualmente na Cora com outro CPF não aparecem aqui.
-                    Use &quot;Gerar local&quot; e depois &quot;Gerar cobrança&quot; em cada fatura, ou corrija o
-                    CPF do responsável financeiro.
+                    Sincronização exige CPF do aluno/responsável ou cobrança criada pelo AppCurso. Boletos
+                    manuais com outro CPF não aparecem aqui.
                     {canRequestDebug
-                      ? ' Use Debug para ver a lista completa e o motivo (cpf_not_matching_payer).'
-                      : ''}
+                      ? " Use Debug na visão geral para ver o motivo."
+                      : ""}
                   </Text>
                 </View>
               ) : providerBoletoRows.length === 0 && (preview.summary.external_total ?? 0) > 0 ? (
@@ -1129,42 +1249,38 @@ export default function ContractChargesModal({
                 />
               )}
             </SectionPanel>
+            <Text className="text-[10px] text-gray-500 text-center">
+              {selectedSyncSelectableCount} boleto(s) marcado(s) para sincronizar
+            </Text>
+          </View>
+        );
 
-            <SectionPanel accent="violet">
-              <SectionHeader
-                title={`Gerar local (${selectableGenerate.length})`}
-                action={
-                  canGenerate && selectableGenerate.length > 0 ? (
-                    <TouchableOpacity
-                      className="px-2 py-1 rounded-lg bg-violet-50"
-                      onPress={() =>
-                        toggleAll(
-                          selectableGenerate.map((r) => r.key),
-                          selectedGenerateKeys.length !== selectableGenerate.length
-                        )
-                      }
-                    >
-                      <Text className="text-xs font-semibold text-violet-700">
-                        {selectedGenerateKeys.length === selectableGenerate.length
-                          ? "Desmarcar"
-                          : "Marcar"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null
-                }
+      case "review":
+        return (
+          <View className="gap-3">
+            <Text className="text-xs text-gray-600 leading-5">
+              Confira o que será executado. Você pode voltar às etapas anteriores para ajustar a seleção.
+            </Text>
+            <ExecutionPreviewSummary preview={preview} selectedKeys={selectedKeys} />
+            {selectedActionCount === 0 ? (
+              <EmptyState
+                icon="hand-left-outline"
+                title="Nenhuma ação selecionada"
+                description="Volte e marque parcelas para gerar e/ou boletos para sincronizar."
               />
-              <CompactGenerateList
-                rows={preview.to_generate}
-                selectedKeys={selectedKeys}
-                canGenerate={canGenerate}
-                onToggle={toggleKey}
-              />
-            </SectionPanel>
-
+            ) : (
+              <View className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 flex-row items-center gap-2">
+                <Ionicons name="checkmark-done-outline" size={18} color="#6D28D9" />
+                <Text className="text-sm font-semibold text-violet-900">
+                  {selectedActionCount} ação(ões) pronta(s) para executar
+                </Text>
+              </View>
+            )}
             {preview.local_invoices.length > 0 ? (
               <SectionPanel>
                 <SectionHeader
-                  title={`No sistema (${preview.local_invoices.length})`}
+                  title={`Já no sistema (${preview.local_invoices.length})`}
+                  subtitle="Somente consulta — não entra na execução."
                   action={
                     <TouchableOpacity
                       className="px-2 py-1 rounded-lg bg-gray-100"
@@ -1186,7 +1302,114 @@ export default function ContractChargesModal({
               </SectionPanel>
             ) : null}
           </View>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      title={`Cobranças do contrato · ${currentStepMeta.label}`}
+      onClose={applying ? () => undefined : onClose}
+      size="xl"
+      maxHeight="98%"
+      showScrollIndicator
+      scrollViewClassName="app-scrollbar py-3"
+      footer={
+        <>
+          {isFirstStep ? (
+            <TouchableOpacity
+              onPress={onClose}
+              disabled={applying}
+              className="px-4 py-2.5 rounded-lg border border-gray-200 bg-white"
+            >
+              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={goBack}
+              disabled={applying || loading}
+              className="flex-row items-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-200 bg-white"
+            >
+              <Ionicons name="arrow-back" size={16} color="#374151" />
+              <Text className="text-sm font-semibold text-gray-700">Voltar</Text>
+            </TouchableOpacity>
+          )}
+          {step === "overview" ? (
+            <TouchableOpacity
+              onPress={loadPreview}
+              disabled={loading || applying}
+              className={`flex-row items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-violet-200 ${
+                loading || applying ? "opacity-60" : "bg-white"
+              }`}
+            >
+              <Ionicons name="refresh-outline" size={16} color="#6D28D9" />
+              <Text className="text-sm font-semibold text-violet-700">Atualizar</Text>
+            </TouchableOpacity>
+          ) : null}
+          {isLastStep ? (
+            <TouchableOpacity
+              onPress={submit}
+              disabled={applying || loading || selectedActionCount === 0}
+              className={`flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-lg ${
+                applying || loading || selectedActionCount === 0 ? "bg-violet-300" : "bg-violet-600"
+              }`}
+            >
+              {applying ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={16} color="white" />
+                  <Text className="text-sm font-bold text-white">
+                    Executar ({selectedActionCount})
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={goNext}
+              disabled={loading || applying || !preview}
+              className={`flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-lg ${
+                loading || applying || !preview ? "bg-violet-300" : "bg-violet-600"
+              }`}
+            >
+              <Text className="text-sm font-bold text-white">Próximo</Text>
+              <Ionicons name="arrow-forward" size={16} color="white" />
+            </TouchableOpacity>
+          )}
+        </>
+      }
+    >
+      <View className="gap-3">
+        <View className="flex-row items-center justify-end">
+          <Pill
+            label={environment === "prod" ? "Produção" : "Homologação"}
+            tone={environment === "prod" ? "amber" : "gray"}
+          />
+        </View>
+
+        {!loading && preview ? (
+          <ContractChargesStepIndicator current={step} />
         ) : null}
+
+        {loading ? (
+          <View className="items-center py-10">
+            <ActivityIndicator size="large" color="#7C3AED" />
+            <Text className="text-xs text-gray-500 mt-2">Consultando sistema e provedor...</Text>
+          </View>
+        ) : null}
+
+        {!!error && (
+          <View className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+            <Text className="text-sm text-red-700">{error}</Text>
+          </View>
+        )}
+
+        {preview && !loading ? renderStepContent() : null}
       </View>
     </Modal>
   );

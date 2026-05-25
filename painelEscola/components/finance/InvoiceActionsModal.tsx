@@ -172,6 +172,17 @@ export default function InvoiceActionsModal({
       tone: "violet",
       group: "maintenance",
     });
+  } else if (invoice.edit_block_reason) {
+    actions.push({
+      key: "edit",
+      label: "Editar cobrança",
+      description: invoice.edit_block_reason,
+      icon: "pencil-outline",
+      tone: "gray",
+      group: "maintenance",
+      disabled: true,
+      disabledReason: invoice.edit_block_reason,
+    });
   }
 
   if (canCancel) {

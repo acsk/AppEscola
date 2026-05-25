@@ -328,6 +328,13 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
   };
 
   const openEdit = async (inv: Invoice) => {
+    if (inv.can_edit === false) {
+      setActionError(
+        inv.edit_block_reason ??
+          "Não é possível editar uma cobrança com boleto ou PIX já gerado."
+      );
+      return;
+    }
     await fetchLookups();
     setEditId(inv.id);
     setForm({

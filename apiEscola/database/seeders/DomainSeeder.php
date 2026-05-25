@@ -65,6 +65,7 @@ class DomainSeeder extends Seeder
             ['slug' => 'debit_card',  'name' => 'Cartão de Débito'],
             ['slug' => 'bank_slip',   'name' => 'Boleto Bancário'],
             ['slug' => 'transfer',    'name' => 'Transferência Bancária'],
+            ['slug' => 'hybrid',      'name' => 'Boleto + PIX'],
         ]);
 
         // Status de matrícula

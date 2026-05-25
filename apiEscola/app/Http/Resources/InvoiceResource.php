@@ -60,6 +60,7 @@ class InvoiceResource extends JsonResource
             'can_cancel' => $lifecycle['can_cancel'],
             'can_delete' => $lifecycle['can_delete'],
             'requires_cora_cancel_before_delete' => $lifecycle['requires_cora_cancel_before_delete'],
+            'edit_block_reason' => $lifecycle['edit_block_reason'],
             'cancel_block_reason' => $lifecycle['cancel_block_reason'],
             'delete_block_reason' => $lifecycle['delete_block_reason'],
             'lifecycle_hint' => $lifecycle['lifecycle_hint'],

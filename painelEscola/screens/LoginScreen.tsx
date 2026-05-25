@@ -18,22 +18,13 @@ const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
 const STORAGE_API_VERSION_KEY = "api_version_seen";
 const STORAGE_PANEL_RELOAD_ATTEMPT_KEY = "panel_reload_attempt_version";
-const CHECKLIST_STEP_DELAY_MS = 500;
 
-type ChecklistStatus = "idle" | "pending" | "success" | "error";
+type VerificationBadgeStatus = "pending" | "success" | "error";
 
-type LoginChecklistState = {
-  internet: ChecklistStatus;
-  apiUpdated: ChecklistStatus;
-  appUpdated: ChecklistStatus;
-  loginAuthorized: ChecklistStatus;
-};
-
-const INITIAL_LOGIN_CHECKLIST_STATE: LoginChecklistState = {
-  internet: "idle",
-  apiUpdated: "idle",
-  appUpdated: "idle",
-  loginAuthorized: "idle",
+type VerificationBadgeState = {
+  visible: boolean;
+  label: string;
+  status: VerificationBadgeStatus;
 };
 
 const compareVersions = (left: string, right: string) => {
@@ -116,23 +107,17 @@ export default function LoginScreen() {
   const [recommendedVersion, setRecommendedVersion] = useState<string>("");
   const [mustUpdate, setMustUpdate] = useState(false);
   const [shouldRecommendUpdate, setShouldRecommendUpdate] = useState(false);
-  const [loginChecklistVisible, setLoginChecklistVisible] = useState(false);
-  const [loginChecklist, setLoginChecklist] = useState<LoginChecklistState>(
-    INITIAL_LOGIN_CHECKLIST_STATE
-  );
-  const [loginChecklistMessage, setLoginChecklistMessage] = useState("");
+  const [verificationBadge, setVerificationBadge] = useState<VerificationBadgeState>({
+    visible: false,
+    label: "",
+    status: "pending",
+  });
   const [reloadConfirmationVisible, setReloadConfirmationVisible] = useState(false);
   const [reloadConfirmationMessage, setReloadConfirmationMessage] = useState("");
 
-  const updateChecklistStep = (
-    step: keyof LoginChecklistState,
-    status: ChecklistStatus
-  ) => {
-    setLoginChecklist((prev) => ({ ...prev, [step]: status }));
+  const showVerification = (label: string, status: VerificationBadgeStatus = "pending") => {
+    setVerificationBadge({ visible: true, label, status });
   };
-
-  const waitChecklistStep = () =>
-    new Promise((resolve) => window.setTimeout(resolve, CHECKLIST_STEP_DELAY_MS));
 
   const testInternetConnection = async () => {
     try {
@@ -349,36 +334,21 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (loading) return;
 
-    setLoginChecklistVisible(true);
-    setLoginChecklistMessage("");
-    setLoginChecklist({
-      internet: "pending",
-      apiUpdated: "idle",
-      appUpdated: "idle",
-      loginAuthorized: "idle",
-    });
-
-    await waitChecklistStep();
+    setError("");
+    showVerification("Verificando conexão com a internet...");
 
     console.log("🔍 Etapa 1: Verificando conexão com internet...");
     const isConnected = await testInternetConnection();
-    
+
     if (!isConnected) {
       console.error("🛑 Falha na conexão com a API!");
-      updateChecklistStep("internet", "error");
-      setLoginChecklistMessage("Falha ao conectar com a API. Verifique sua conexão.");
+      showVerification("Falha na conexão com a API", "error");
       setError("Não foi possível conectar com a API. Verifique se tem conexão com a internet e tente novamente.");
       return;
     }
-    
-    console.log("✅ Conexão com internet estabelecida!");
-    updateChecklistStep("internet", "success");
-    setLoginChecklistMessage("Conexão com a internet estabelecida com sucesso.");
-    await waitChecklistStep();
-    setLoginChecklistMessage("");
 
-    updateChecklistStep("apiUpdated", "pending");
-  await waitChecklistStep();
+    console.log("✅ Conexão com internet estabelecida!");
+    showVerification("Validando versão da API...");
 
     let latestApiVersion = "-";
     let latestContractVersion = "-";
@@ -406,13 +376,11 @@ export default function LoginScreen() {
 
       setMustUpdate(requireUpdate);
       setShouldRecommendUpdate(!requireUpdate && recommendUpdate);
-      updateChecklistStep("apiUpdated", "success");
 
       if (typeof localStorage !== "undefined") {
         const previousApiVersion = localStorage.getItem(STORAGE_API_VERSION_KEY);
         if (previousApiVersion && previousApiVersion !== latestApiVersion) {
-          updateChecklistStep("apiUpdated", "error");
-          setLoginChecklistMessage("Versão da API mudou. Aguardando confirmação...");
+          showVerification("Nova versão da API detectada", "error");
           setError(
             `Nova versão da API detectada: v${latestApiVersion}. Será necessário recarregar.`
           );
@@ -428,35 +396,30 @@ export default function LoginScreen() {
         localStorage.setItem(STORAGE_API_VERSION_KEY, latestApiVersion);
       }
     } catch {
-      updateChecklistStep("apiUpdated", "error");
-      setLoginChecklistMessage("Não foi possível validar atualização da API.");
+      showVerification("Não foi possível validar a API", "error");
       setError("Não foi possível validar atualização da API.");
       return;
     }
 
-    updateChecklistStep("appUpdated", "pending");
-  await waitChecklistStep();
+    showVerification("Verificando versão do painel...");
     const requiresReload = await checkPanelBuildAndReload();
     if (requiresReload) {
-      updateChecklistStep("appUpdated", "error");
-      setLoginChecklistMessage("Nova versão do app detectada. Aguardando confirmação...");
+      showVerification("Nova versão do painel detectada", "error");
       setReloadConfirmationMessage(
         "Uma nova versão do painel foi detectada. O painel será recarregado para atualizar."
       );
       setReloadConfirmationVisible(true);
       return;
     }
-    updateChecklistStep("appUpdated", "success");
 
     if (metaLoading) {
+      showVerification("Aguardando validação de versão...", "pending");
       setError("Aguarde a validação de versão antes de entrar.");
-      setLoginChecklistMessage("Validação de versão ainda em andamento.");
       return;
     }
 
     if (mustUpdate) {
-      updateChecklistStep("appUpdated", "error");
-      setLoginChecklistMessage("App desatualizado para esta versão da API.");
+      showVerification("Atualização do app obrigatória", "error");
       setError(
         `Atualização obrigatória: versão mínima suportada ${minSupportedVersion}. Versão atual ${APP_VERSION}.`
       );
@@ -464,8 +427,7 @@ export default function LoginScreen() {
     }
 
     if (!email || !password) {
-      updateChecklistStep("loginAuthorized", "error");
-      setLoginChecklistMessage("Preencha as credenciais para continuar.");
+      showVerification("Preencha e-mail e senha", "error");
       setError("Preencha o e-mail e a senha.");
       return;
     }
@@ -475,27 +437,22 @@ export default function LoginScreen() {
     lastLoginAttemptRef.current = now;
 
     setLoading(true);
-    setError("");
     setDebugInfo(null);
     setDebugCopied(false);
-    updateChecklistStep("loginAuthorized", "pending");
-    await waitChecklistStep();
+    showVerification("Autenticando...");
     try {
       const tenantIdValue = tenantId.trim();
       const parsedTenantId = tenantIdValue ? Number(tenantIdValue) : null;
       if (tenantIdValue && (!Number.isInteger(Number(tenantIdValue)) || Number(tenantIdValue) <= 0)) {
-        updateChecklistStep("loginAuthorized", "error");
-        setLoginChecklistMessage("Tenant ID inválido.");
+        showVerification("Tenant ID inválido", "error");
         setError("Tenant ID deve ser um número inteiro válido.");
         setLoading(false);
         return;
       }
       await login(email, password, parsedTenantId);
-      updateChecklistStep("loginAuthorized", "success");
-      setLoginChecklistMessage("Login autorizado com sucesso.");
+      showVerification("Login autorizado", "success");
     } catch (e: any) {
-      updateChecklistStep("loginAuthorized", "error");
-      setLoginChecklistMessage("Login não autorizado. Verifique as credenciais.");
+      showVerification("Credenciais inválidas", "error");
       const msg =
         e.response?.data?.message ||
         "Credenciais inválidas. Verifique e tente novamente.";
@@ -546,18 +503,11 @@ export default function LoginScreen() {
     setReloadConfirmationVisible(false);
   };
 
-  const renderChecklistIcon = (status: ChecklistStatus) => {
-    if (status === "success") {
-      return <Ionicons name="checkmark-circle" size={24} color="#16A34A" />;
-    }
-    if (status === "error") {
-      return <Ionicons name="close-circle" size={24} color="#DC2626" />;
-    }
-    if (status === "pending") {
-      return <ActivityIndicator size={22} color="#7C3AED" />;
-    }
-    return <Ionicons name="ellipse-outline" size={22} color="#9CA3AF" />;
-  };
+  const verificationBadgeStyles = {
+    pending: { wrap: "border-violet-200 bg-violet-50", text: "text-violet-800" },
+    success: { wrap: "border-emerald-200 bg-emerald-50", text: "text-emerald-800" },
+    error: { wrap: "border-red-200 bg-red-50", text: "text-red-700" },
+  }[verificationBadge.status];
 
   return (
     <ScrollView
@@ -648,6 +598,7 @@ export default function LoginScreen() {
               onChangeText={(v) => {
                 setEmail(v);
                 setError("");
+                setVerificationBadge((prev) => ({ ...prev, visible: false }));
               }}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -678,6 +629,7 @@ export default function LoginScreen() {
               onChangeText={(v) => {
                 setPassword(v);
                 setError("");
+                setVerificationBadge((prev) => ({ ...prev, visible: false }));
               }}
               secureTextEntry={!showPass}
               autoComplete="off"
@@ -732,6 +684,24 @@ export default function LoginScreen() {
           </Text>
         </View>
 
+        {/* Verificação inline */}
+        {verificationBadge.visible && (
+          <View
+            className={`mb-4 flex-row items-center justify-center gap-2 self-center rounded-full border px-4 py-2 ${verificationBadgeStyles.wrap}`}
+          >
+            {verificationBadge.status === "pending" ? (
+              <ActivityIndicator size="small" color="#7C3AED" />
+            ) : verificationBadge.status === "success" ? (
+              <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+            ) : (
+              <Ionicons name="close-circle" size={18} color="#DC2626" />
+            )}
+            <Text className={`text-xs font-semibold ${verificationBadgeStyles.text}`}>
+              {verificationBadge.label}
+            </Text>
+          </View>
+        )}
+
         {/* Erro */}
         {!!error && (
           <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
@@ -770,47 +740,6 @@ export default function LoginScreen() {
         )}
 
       </View>
-
-      <Modal
-        visible={loginChecklistVisible}
-        title="Checklist de validação do login"
-        onClose={() => setLoginChecklistVisible(false)}
-        size="sm"
-        footer={
-          <TouchableOpacity
-            onPress={() => setLoginChecklistVisible(false)}
-            className="px-5 py-2.5 rounded-xl bg-violet-600"
-            activeOpacity={0.8}
-          >
-            <Text className="text-sm font-bold text-white">Fechar</Text>
-          </TouchableOpacity>
-        }
-      >
-        <View className="gap-3">
-          <View className="flex-row items-center gap-3">
-            {renderChecklistIcon(loginChecklist.internet)}
-            <Text className="text-sm text-gray-700">Conexão com a internet</Text>
-          </View>
-          <View className="flex-row items-center gap-3">
-            {renderChecklistIcon(loginChecklist.apiUpdated)}
-            <Text className="text-sm text-gray-700">API atualizada</Text>
-          </View>
-          <View className="flex-row items-center gap-3">
-            {renderChecklistIcon(loginChecklist.appUpdated)}
-            <Text className="text-sm text-gray-700">App atualizado</Text>
-          </View>
-          <View className="flex-row items-center gap-3">
-            {renderChecklistIcon(loginChecklist.loginAuthorized)}
-            <Text className="text-sm text-gray-700">Login autorizado</Text>
-          </View>
-
-          {!!loginChecklistMessage && (
-            <View className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-              <Text className="text-xs text-gray-600">{loginChecklistMessage}</Text>
-            </View>
-          )}
-        </View>
-      </Modal>
 
       <Modal
         visible={!!debugInfo}

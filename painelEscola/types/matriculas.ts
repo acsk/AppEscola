@@ -96,6 +96,7 @@ export type InvoiceListItem = {
   can_cancel?: boolean;
   can_delete?: boolean;
   requires_cora_cancel_before_delete?: boolean;
+  edit_block_reason?: string | null;
   cancel_block_reason?: string | null;
   delete_block_reason?: string | null;
   lifecycle_hint?: string | null;

@@ -165,15 +165,17 @@ class InvoiceController extends Controller
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(description: 'Campos a atualizar')),
         responses: [
             new OA\Response(response: 200, description: 'Cobrança atualizada'),
-            new OA\Response(response: 422, description: 'Não editável (paga ou cancelada)'),
+            new OA\Response(response: 422, description: 'Não editável (paga, cancelada ou com boleto/PIX gerado)'),
         ]
     )]
     public function update(UpdateInvoiceRequest $request, Invoice $invoice): JsonResponse
     {
         $this->authorizeTenant($request, $invoice->tenant_id);
 
-        if (in_array($invoice->status, ['paid', 'cancelled'])) {
-            return $this->error('Não é possível editar uma cobrança paga ou cancelada.', null, 422);
+        try {
+            $this->lifecycle->assertCanEdit($invoice);
+        } catch (RuntimeException $e) {
+            return $this->error($e->getMessage(), $this->lifecycle->permissions($invoice), 422);
         }
 
         $data = $request->validated();
