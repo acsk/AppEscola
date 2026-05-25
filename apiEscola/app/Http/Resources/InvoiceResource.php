@@ -63,6 +63,7 @@ class InvoiceResource extends JsonResource
             'edit_block_reason' => $lifecycle['edit_block_reason'],
             'cancel_block_reason' => $lifecycle['cancel_block_reason'],
             'delete_block_reason' => $lifecycle['delete_block_reason'],
+            'is_local_invoice' => $lifecycle['is_local_invoice'],
             'lifecycle_hint' => $lifecycle['lifecycle_hint'],
             'has_active_gateway_charge' => $lifecycleService->hasActiveGatewayCharge($this->resource),
             'will_cancel_gateway_on_settlement' => $lifecycleService->shouldCancelOnGateway($this->resource),

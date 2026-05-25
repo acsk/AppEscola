@@ -99,6 +99,7 @@ export type InvoiceListItem = {
   edit_block_reason?: string | null;
   cancel_block_reason?: string | null;
   delete_block_reason?: string | null;
+  is_local_invoice?: boolean;
   lifecycle_hint?: string | null;
   has_active_gateway_charge?: boolean;
   will_cancel_gateway_on_settlement?: boolean;

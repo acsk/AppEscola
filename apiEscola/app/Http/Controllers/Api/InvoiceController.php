@@ -194,7 +194,7 @@ class InvoiceController extends Controller
     #[OA\Delete(
         path: '/api/invoices/{id}',
         tags: ['Invoices'],
-        summary: 'Remover cobrança',
+        summary: 'Excluir cobrança criada no sistema',
         security: [['sanctum' => []]],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [

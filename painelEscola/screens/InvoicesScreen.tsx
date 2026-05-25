@@ -1376,11 +1376,11 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
 
       <ConfirmModal
         visible={!!deleteId}
-        title="Excluir Cobrança"
+        title="Excluir cobrança local"
         message={
           rows.find((i) => i.id === deleteId)?.delete_block_reason ??
           rows.find((i) => i.id === deleteId)?.lifecycle_hint ??
-          "Remove o registro da listagem. Cobranças ativas no provedor devem ser canceladas antes."
+          "Esta ação remove a cobrança criada apenas no sistema, sem boleto ou PIX gerado no provedor."
         }
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}

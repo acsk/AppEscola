@@ -55,7 +55,7 @@ class InvoiceLifecycleServiceTest extends TestCase
         $this->assertTrue($permissions['requires_cora_cancel_before_delete']);
     }
 
-    public function test_cancelled_invoice_can_delete(): void
+    public function test_cancelled_invoice_with_provider_cannot_delete(): void
     {
         $invoice = new Invoice([
             'status' => 'cancelled',
@@ -67,7 +67,38 @@ class InvoiceLifecycleServiceTest extends TestCase
         $permissions = $service->permissions($invoice);
 
         $this->assertFalse($permissions['can_cancel']);
+        $this->assertFalse($permissions['can_delete']);
+        $this->assertFalse($permissions['is_local_invoice']);
+    }
+
+    public function test_cancelled_local_invoice_can_delete(): void
+    {
+        $invoice = new Invoice([
+            'status' => 'cancelled',
+            'cora_charge_id' => null,
+        ]);
+
+        $service = $this->makeService();
+        $permissions = $service->permissions($invoice);
+
+        $this->assertFalse($permissions['can_cancel']);
         $this->assertTrue($permissions['can_delete']);
+        $this->assertTrue($permissions['is_local_invoice']);
+    }
+
+    public function test_cora_sync_imported_invoice_cannot_delete(): void
+    {
+        $invoice = new Invoice([
+            'status' => 'pending',
+            'cora_payload' => ['integration' => ['origin' => 'cora_sync']],
+        ]);
+
+        $service = $this->makeService();
+        $permissions = $service->permissions($invoice);
+
+        $this->assertFalse($permissions['can_delete']);
+        $this->assertFalse($permissions['is_local_invoice']);
+        $this->assertStringContainsString('Cora', (string) $permissions['delete_block_reason']);
     }
 
     public function test_active_pix_requires_cancel_before_delete(): void
@@ -101,6 +132,7 @@ class InvoiceLifecycleServiceTest extends TestCase
 
         $this->assertTrue($permissions['can_cancel']);
         $this->assertTrue($permissions['can_delete']);
+        $this->assertTrue($permissions['is_local_invoice']);
         $this->assertFalse($permissions['requires_cora_cancel_before_delete']);
     }
 

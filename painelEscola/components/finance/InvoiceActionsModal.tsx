@@ -209,10 +209,15 @@ export default function InvoiceActionsModal({
   }
 
   if (canDelete || invoice.delete_block_reason) {
+    const deleteDescription = canDelete
+      ? invoice.lifecycle_hint ??
+        "Remove a cobrança criada apenas no sistema (sem boleto ou PIX no provedor)."
+      : invoice.delete_block_reason ?? undefined;
+
     actions.push({
       key: "delete",
-      label: "Excluir registro",
-      description: invoice.delete_block_reason ?? undefined,
+      label: invoice.is_local_invoice ? "Excluir cobrança local" : "Excluir registro",
+      description: deleteDescription,
       icon: "trash-outline",
       tone: canDelete ? "red" : "gray",
       group: "danger",

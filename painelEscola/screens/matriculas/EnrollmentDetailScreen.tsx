@@ -2565,12 +2565,12 @@ export default function EnrollmentDetailScreen({
       />
       <ConfirmModal
         visible={!!deleteInvoiceId}
-        title="Excluir Cobrança"
+        title="Excluir cobrança local"
         message={
           deleteInvoiceTarget?.delete_block_reason
             ? deleteInvoiceTarget.delete_block_reason
             : deleteInvoiceTarget?.lifecycle_hint ??
-              "Remove o registro da listagem. Use apenas após cancelar cobranças ativas no provedor, quando houver."
+              "Remove a cobrança criada apenas no sistema, sem boleto ou PIX gerado no provedor."
         }
         onConfirm={removeInvoice}
         onCancel={() => setDeleteInvoiceId(null)}

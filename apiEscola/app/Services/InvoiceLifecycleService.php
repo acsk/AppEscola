@@ -37,7 +37,8 @@ class InvoiceLifecycleService
      *   edit_block_reason: ?string,
      *   cancel_block_reason: ?string,
      *   delete_block_reason: ?string,
-     *   lifecycle_hint: ?string
+     *   lifecycle_hint: ?string,
+     *   is_local_invoice: bool
      * }
      */
     public function permissions(Invoice $invoice): array
@@ -67,22 +68,32 @@ class InvoiceLifecycleService
         }
 
         $requiresCoraCancelBeforeDelete = $hasActiveGatewayCharge && $status !== 'cancelled';
+        $isLocalInvoice = $this->isLocallyCreatedInvoice($invoice);
 
         $canDelete = false;
         $deleteBlockReason = null;
 
         if ($status === 'paid') {
             $deleteBlockReason = 'Não é possível excluir uma cobrança paga.';
-        } elseif ($requiresCoraCancelBeforeDelete) {
-            $deleteBlockReason = 'Cancele a cobrança no provedor antes de excluir do sistema.';
+        } elseif (! $isLocalInvoice) {
+            if ($this->wasImportedFromCoraSync($invoice)) {
+                $deleteBlockReason = 'Cobranças importadas da Cora não podem ser excluídas. Use cancelar para manter o histórico.';
+            } elseif ($hasGeneratedCharge) {
+                $deleteBlockReason = 'Só é possível excluir cobranças criadas no sistema sem boleto ou PIX gerado.';
+            } elseif ($requiresCoraCancelBeforeDelete) {
+                $deleteBlockReason = 'Cancele a cobrança no provedor antes de excluir do sistema.';
+            } else {
+                $deleteBlockReason = 'Esta cobrança não foi criada apenas no sistema e não pode ser excluída.';
+            }
         } else {
             $canDelete = true;
         }
 
         $lifecycleHint = match (true) {
-            $status === 'cancelled' => 'Cancelada no sistema. Pode ser excluída para remover da listagem.',
+            $status === 'cancelled' && $isLocalInvoice => 'Cobrança local cancelada. Pode ser excluída para remover da listagem.',
+            $status === 'cancelled' => 'Cancelada no sistema.',
             $hasActiveGatewayCharge && $canCancel => 'Cancelar invalida o boleto/PIX no provedor e mantém o histórico.',
-            ! $hasActiveGatewayCharge && $status === 'pending' => 'Excluir remove apenas o registro local (cobrança não foi enviada ao banco).',
+            $isLocalInvoice && in_array($status, ['pending', 'overdue'], true) => 'Excluir remove o registro local (cobrança ainda não foi enviada ao banco).',
             default => null,
         };
 
@@ -95,7 +106,29 @@ class InvoiceLifecycleService
             'cancel_block_reason' => $cancelBlockReason,
             'delete_block_reason' => $deleteBlockReason,
             'lifecycle_hint' => $lifecycleHint,
+            'is_local_invoice' => $isLocalInvoice,
         ];
+    }
+
+    /**
+     * Cobrança criada no sistema (lote do contrato ou cadastro manual), sem importação Cora
+     * e sem boleto/PIX já emitido.
+     */
+    public function isLocallyCreatedInvoice(Invoice $invoice): bool
+    {
+        if ($this->wasImportedFromCoraSync($invoice)) {
+            return false;
+        }
+
+        return ! $this->hasGeneratedPaymentCharge($invoice);
+    }
+
+    public function wasImportedFromCoraSync(Invoice $invoice): bool
+    {
+        $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $origin = strtolower(trim((string) data_get($payload, 'integration.origin', '')));
+
+        return $origin === 'cora_sync';
     }
 
     public function hasGeneratedPaymentCharge(Invoice $invoice): bool
