@@ -89,10 +89,32 @@ class EnrollmentSubscribeTest extends TestCase
             ->assertJsonValidationErrors(['course_plan_id']);
     }
 
+    public function test_subscribe_blocks_when_plan_has_no_enrollment_fee(): void
+    {
+        [$user, $payload] = $this->seedSubscribeContext(planEnrollmentFeeAmount: null);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/enrollments/subscribe', $payload)
+            ->assertStatus(422)
+            ->assertJsonFragment([
+                'type' => 'error',
+            ])
+            ->assertJsonPath('message', 'Não é possível concluir a matrícula: o plano precisa ter taxa de matrícula cadastrada (enrollment_fee_amount > 0).');
+
+        $this->assertDatabaseCount('enrollments', 0);
+        $this->assertDatabaseCount('invoices', 0);
+    }
+
     /**
      * @return array{0: User, 1: array<string, mixed>}|array{0: User, 1: array<string, mixed>, 2: array<string, mixed>}
      */
-    private function seedSubscribeContext(bool $linkGuardian = true, bool $returnContext = false): array
+    private function seedSubscribeContext(
+        bool $linkGuardian = true,
+        bool $returnContext = false,
+        ?float $planEnrollmentFeeAmount = 150,
+        float $discountAmount = 0,
+    ): array
     {
         $tenant = Tenant::factory()->create();
         $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'admin']);
@@ -107,7 +129,7 @@ class EnrollmentSubscribeTest extends TestCase
             'name' => 'Plano mensal',
             'billing_cycle' => 'monthly',
             'price' => 300,
-            'enrollment_fee_amount' => 150,
+            'enrollment_fee_amount' => $planEnrollmentFeeAmount,
             'status' => 'active',
         ]);
 
@@ -140,7 +162,7 @@ class EnrollmentSubscribeTest extends TestCase
             'student_id' => $student->id,
             'school_class_id' => $schoolClass->id,
             'course_plan_id' => $plan->id,
-            'discount_amount' => 0,
+            'discount_amount' => $discountAmount,
             'guardian_id' => $guardian->id,
         ];
 

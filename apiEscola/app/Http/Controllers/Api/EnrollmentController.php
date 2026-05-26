@@ -941,6 +941,27 @@ class EnrollmentController extends Controller
         $effectiveTenantId = (int) ($tenantId ?? $plan->tenant_id);
         $this->assertSubscribeEntities($request, $plan, $schoolClass, $effectiveTenantId);
 
+        // Regra: bloquear matrícula se o plano não tiver taxa de matrícula líquida > 0.
+        // Isso evita a geração automática de cobranças (mensalidades) quando não há taxa configurada.
+        $planEnrollmentFee = $plan->enrollment_fee_amount;
+        $discountAmount = (float) ($request->discount_amount ?? 0);
+        $netEnrollmentFee = null;
+        if ($planEnrollmentFee !== null) {
+            $amount = (float) $planEnrollmentFee;
+            if ($amount > 0) {
+                $net = max($amount - $discountAmount, 0);
+                $netEnrollmentFee = $net > 0 ? $net : null;
+            }
+        }
+
+        if ($netEnrollmentFee === null) {
+            return $this->error(
+                'Não é possível concluir a matrícula: o plano precisa ter taxa de matrícula cadastrada (enrollment_fee_amount > 0).',
+                ['course_plan_id' => $plan->id],
+                422
+            );
+        }
+
         // Prioridade de datas:
         // start_date: request > hoje (data da matrícula — não o início da turma)
         // end_date:   request > turma > ciclo do plano
@@ -1006,30 +1027,6 @@ class EnrollmentController extends Controller
                     dueDate: $startDate->toDateString(),
                     paymentData: $paymentData,
                 );
-            } elseif (
-                ! empty($billing['charge_first_monthly_at_enrollment'])
-                && $enrollmentFeeAmount === null
-            ) {
-                // Plano sem taxa: 1ª mensalidade no ato da matrícula (ex.: curso de 30 dias)
-                $netMonthly = max($netAmount, 0);
-                if ($netMonthly > 0) {
-                    $firstDue = $this->firstMonthlyDueDate($startDate, $dueDay);
-                    $this->createEnrollmentInvoice(
-                        tenantId: $effectiveTenantId,
-                        enrollmentId: $enrollment->id,
-                        studentId: $request->student_id,
-                        guardianId: $guardianId,
-                        type: 'monthly',
-                        description: $this->invoiceDescriptions->forEnrollmentCharge(
-                            $enrollment,
-                            'monthly',
-                            $firstDue->toDateString()
-                        ),
-                        amount: $netMonthly,
-                        dueDate: $firstDue->toDateString(),
-                        paymentData: $paymentData,
-                    );
-                }
             }
 
             return $enrollment;
@@ -1395,6 +1392,16 @@ class EnrollmentController extends Controller
         // Taxa de matrícula = monthly_equivalent do pacote inteiro (menos desconto)
         $feeAmount = max($bundle->monthlyEquivalent() - ($data['discount_amount'] ?? 0), 0);
 
+        // Regra: bloquear matrícula se não houver taxa líquida > 0.
+        // Isso impede a criação automática de cobranças (mensalidades) para pacotes sem taxa.
+        if ($feeAmount <= 0) {
+            return $this->error(
+                'Não é possível concluir a matrícula: o pacote precisa ter taxa de matrícula cadastrada (valor de taxa > 0).',
+                ['bundle_id' => $bundle->id],
+                422
+            );
+        }
+
         // Prioridade de datas:
         // start_date: request > hoje (data da matrícula — não o início da turma)
         // end_date:   request > primeira turma > ciclo do pacote
@@ -1455,55 +1462,11 @@ class EnrollmentController extends Controller
                 ]);
             }
 
-            $canGenerateMonthliesNow = true;
-            if (! empty($billing['charges_enrollment_fee']) && empty($billing['allow_monthlies_before_fee_paid'])) {
-                $canGenerateMonthliesNow = $isPaid;
-            }
-
-            // Gera mensalidades para cada mês do período (uma invoice cobre o pacote inteiro)
-            if ($canGenerateMonthliesNow) {
-                $cursor = $startDate->copy()->day($dueDay);
-                if ($cursor->lt($startDate)) {
-                    $cursor->addMonth();
-                }
-
-                $enrollmentFeeCoversFirstMonth = ! empty($billing['charges_enrollment_fee'])
-                    && ! empty($billing['enrollment_fee_covers_first_month']);
-                if ($enrollmentFeeCoversFirstMonth) {
-                    $cursor->addMonth();
-                }
-
-                while ($cursor->lte($endDate)) {
-                    Invoice::create([
-                        'tenant_id'      => $effectiveTenantId,
-                        'enrollment_id'  => $enrollment->id,
-                        'student_id'     => $data['student_id'],
-                        'guardian_id'    => $guardianId,
-                        'type'           => 'monthly',
-                        'description'    => $this->invoiceDescriptions->forEnrollmentCharge(
-                            $enrollment,
-                            'monthly',
-                            $cursor->toDateString()
-                        ),
-                        'amount'         => $netMonthly,
-                        'due_date'       => $cursor->toDateString(),
-                        'status'         => 'pending',
-                    ]);
-                    $cursor->addMonth();
-                }
-            }
-
-            // Coleta mensalidades para retornar na resposta
-            $monthlyInvoices = Invoice::where('enrollment_id', $enrollment->id)
-                ->where('type', 'monthly')
-                ->orderBy('due_date')
-                ->get();
-
             return [
                 'enrollments' => $created,
                 'invoice' => $invoice,
-                'monthly_invoices' => $monthlyInvoices,
-                'monthly_generation_skipped' => ! $canGenerateMonthliesNow,
+                'monthly_invoices' => [],
+                'monthly_generation_skipped' => true,
             ];
         });
 

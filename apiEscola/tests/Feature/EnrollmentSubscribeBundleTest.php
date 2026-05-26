@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\CourseBundle;
 use App\Models\Guardian;
+use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
@@ -58,12 +59,46 @@ class EnrollmentSubscribeBundleTest extends TestCase
             'enrollment_id' => $enrollmentId,
             'school_class_id' => $context['class_b']->id,
         ]);
+
+        // Regra nova: não gerar mensalidades automaticamente na matrícula do pacote.
+        $this->assertSame(
+            0,
+            Invoice::query()
+                ->where('enrollment_id', $enrollmentId)
+                ->where('type', 'monthly')
+                ->count()
+        );
+
+        $this->assertSame(
+            1,
+            Invoice::query()
+                ->where('enrollment_id', $enrollmentId)
+                ->where('type', 'enrollment_fee')
+                ->count()
+        );
+    }
+
+    public function test_subscribe_bundle_blocks_when_fee_is_not_positive(): void
+    {
+        [$user, $payload] = $this->seedBundleContext(discountAmount: 999);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/enrollments/subscribe-bundle', $payload)
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'message',
+                'Não é possível concluir a matrícula: o pacote precisa ter taxa de matrícula cadastrada (valor de taxa > 0).'
+            );
+
+        $this->assertDatabaseCount('enrollments', 0);
+        $this->assertDatabaseCount('invoices', 0);
     }
 
     /**
      * @return array{0: User, 1: array<string, mixed>, 2: array<string, mixed>}
      */
-    private function seedBundleContext(): array
+    private function seedBundleContext(float $discountAmount = 5, float $bundlePrice = 175): array
     {
         $tenant = Tenant::factory()->create();
         $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'admin']);
@@ -75,7 +110,7 @@ class EnrollmentSubscribeBundleTest extends TestCase
             'tenant_id' => $tenant->id,
             'name' => 'Pacote IFAL',
             'billing_cycle' => 'monthly',
-            'price' => 175,
+            'price' => $bundlePrice,
             'status' => 'active',
         ]);
         $bundle->courses()->sync([$courseA->id, $courseB->id]);
@@ -111,7 +146,7 @@ class EnrollmentSubscribeBundleTest extends TestCase
             'student_id' => $student->id,
             'bundle_id' => $bundle->id,
             'school_class_ids' => [$classA->id, $classB->id],
-            'discount_amount' => 5,
+            'discount_amount' => $discountAmount,
             'guardian_id' => $guardian->id,
             'start_date' => now()->toDateString(),
         ];
