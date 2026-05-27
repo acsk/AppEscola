@@ -10,9 +10,6 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
 import Modal from "../../components/ui/Modal";
-import FormInput from "../../components/ui/FormInput";
-import FormSelect from "../../components/ui/FormSelect";
-import DatePickerInput from "../../components/ui/DatePickerInput";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -20,6 +17,7 @@ import EnrollmentActionsModal, {
   type EnrollmentActionKey,
 } from "../../components/matriculas/EnrollmentActionsModal";
 import EnrollmentProductCell from "../../components/matriculas/EnrollmentProductCell";
+import EnrollmentEditModal from "../../components/matriculas/EnrollmentEditModal";
 import {
   enrollmentProductKind,
   enrollmentProductSubtitle,
@@ -33,7 +31,6 @@ import {
   parsePaymentDueDay,
 } from "../../utils/masks";
 import {
-  enrollmentNetMonthlyPreview,
   validateEnrollmentEditForm,
 } from "../../utils/enrollmentForm";
 import { useEnrollmentStatuses, domainToOptions } from "../../hooks/useDomains";
@@ -92,6 +89,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   const [editForm, setEditForm] = useState<EnrollmentEditFormValues>(EMPTY_EDIT);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
   const [editVisible, setEditVisible] = useState(false);
+  const [initialEditSchoolClassId, setInitialEditSchoolClassId] = useState("");
   const [financialFieldsLocked, setFinancialFieldsLocked] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -164,13 +162,6 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     return courseId != null && String(courseId) === courseFilter;
   });
 
-  const editClassOptions = classes.map((schoolClass) => ({
-    value: String(schoolClass.id),
-    label: schoolClass.course?.name
-      ? `${schoolClass.name} · ${schoolClass.course.name}`
-      : schoolClass.name,
-  }));
-
   const clearFilters = () => {
     setSearch("");
     setStatusFilter("");
@@ -224,6 +215,9 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         discount_amount: floatToCurrency(detail.discount_amount ?? 0),
         payment_due_day: detail.payment_due_day ? String(detail.payment_due_day) : "",
       });
+      setInitialEditSchoolClassId(
+        String(detail.school_class?.id ?? row.school_class?.id ?? "")
+      );
     } catch {
       setEditVisible(false);
       setEditId(null);
@@ -827,145 +821,19 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         )}
       </Modal>
 
-      {/* Edit Modal */}
-      <Modal
+      <EnrollmentEditModal
         visible={editVisible}
-        title="Editar Matrícula"
         onClose={() => setEditVisible(false)}
-        size="lg"
-        footer={
-          <>
-            <TouchableOpacity
-              onPress={() => setEditVisible(false)}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
-            >
-              <Text className="text-sm font-semibold text-gray-700">
-                Cancelar
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={saveEdit}
-              disabled={saving}
-              className="px-5 py-2.5 rounded-xl bg-violet-600"
-            >
-              {saving ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Text className="text-sm font-bold text-white">Salvar</Text>
-              )}
-            </TouchableOpacity>
-          </>
-        }
-      >
-        {financialFieldsLocked && (
-          <View className="flex-row items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-4">
-            <Ionicons name="lock-closed-outline" size={14} color="#D97706" />
-            <Text className="text-xs text-amber-800 flex-1">
-              Datas, mensalidade e desconto estão bloqueados porque já existem cobranças baixadas nesta matrícula.
-            </Text>
-          </View>
-        )}
-        <View className="flex-row gap-4">
-          <View className="flex-1">
-            <FormSelect
-              label="Turma"
-              required
-              value={editForm.school_class_id}
-              options={editClassOptions}
-              onChange={(v) => setEditForm({ ...editForm, school_class_id: v })}
-              error={editErrors.school_class_id}
-            />
-          </View>
-        </View>
-        <View className="flex-row gap-4">
-          <View className="flex-1">
-            <DatePickerInput
-              label="Data de Início"
-              required
-              value={editForm.start_date}
-              onChangeText={(v) => setEditForm({ ...editForm, start_date: v })}
-              error={editErrors.start_date}
-              disabled={financialFieldsLocked}
-            />
-          </View>
-          <View className="flex-1">
-            <DatePickerInput
-              label="Data de Término"
-              value={editForm.end_date}
-              onChangeText={(v) => setEditForm({ ...editForm, end_date: v })}
-              error={editErrors.end_date}
-              disabled={financialFieldsLocked}
-            />
-          </View>
-        </View>
-        <View className="flex-row gap-4">
-          <View className="flex-1">
-            <FormSelect
-              label="Status"
-              value={editForm.status}
-              options={statusOptions}
-              onChange={(v) => setEditForm({ ...editForm, status: v })}
-              error={editErrors.status}
-            />
-          </View>
-          <View className="flex-1">
-            <FormInput
-              label="Vencimento (dia do mês)"
-              value={editForm.payment_due_day}
-              onChangeText={(v) =>
-                setEditForm({ ...editForm, payment_due_day: v })
-              }
-              error={editErrors.payment_due_day}
-              placeholder="1 a 28"
-              valueFormat="dueDay"
-            />
-          </View>
-        </View>
-        <View className="flex-row gap-4">
-          <View className="flex-1">
-            <FormInput
-              label="Mensalidade base (R$)"
-              value={editForm.monthly_amount}
-              onChangeText={(v) =>
-                setEditForm({ ...editForm, monthly_amount: v })
-              }
-              error={editErrors.monthly_amount}
-              placeholder="0,00"
-              valueFormat="currency"
-              editable={!financialFieldsLocked}
-            />
-          </View>
-          <View className="flex-1">
-            <FormInput
-              label="Desconto (R$)"
-              value={editForm.discount_amount}
-              onChangeText={(v) =>
-                setEditForm({ ...editForm, discount_amount: v })
-              }
-              error={editErrors.discount_amount}
-              placeholder="0,00"
-              valueFormat="currency"
-              editable={!financialFieldsLocked}
-            />
-          </View>
-        </View>
-        {!financialFieldsLocked &&
-        (editForm.monthly_amount.trim() || editForm.discount_amount.trim()) ? (
-          <View className="flex-row items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 -mt-1 mb-2">
-            <Ionicons name="calculator-outline" size={14} color="#16A34A" />
-            <Text className="text-xs text-emerald-800">
-              Mensalidade líquida:{" "}
-              <Text className="font-bold">
-                {(enrollmentNetMonthlyPreview(editForm) ?? 0).toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </Text>
-              {" "}(base − desconto)
-            </Text>
-          </View>
-        ) : null}
-      </Modal>
+        onSubmit={saveEdit}
+        saving={saving}
+        financialFieldsLocked={financialFieldsLocked}
+        form={editForm}
+        setForm={setEditForm}
+        errors={editErrors}
+        statusOptions={statusOptions}
+        classes={classes}
+        initialSchoolClassId={initialEditSchoolClassId}
+      />
 
       <EnrollmentActionsModal
         visible={!!menuEnrollment}

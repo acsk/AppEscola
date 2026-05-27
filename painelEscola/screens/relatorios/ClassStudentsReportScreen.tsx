@@ -130,24 +130,22 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
   const periodLabelMap = Object.fromEntries(periodOptions.map((o) => [o.value, o.label]));
   const weekdayLabelMap = Object.fromEntries(weekdayOptions.map((o) => [o.value, o.label]));
   const COLUMN_WIDTHS = {
-    turma: 230,
-    periodo: 140,
-    dias: 220,
-    curso: 200,
-    aluno: 260,
+    turma: 280,
+    periodo: 120,
+    dias: 170,
+    curso: 170,
+    aluno: 320,
     matricula: 160,
-    status: 130,
+    status: 90,
   } as const;
   const fixedTableWidth =
-    schoolClassId
-      ? COLUMN_WIDTHS.aluno + COLUMN_WIDTHS.matricula + COLUMN_WIDTHS.status
-      : COLUMN_WIDTHS.turma +
-        COLUMN_WIDTHS.periodo +
-        COLUMN_WIDTHS.dias +
-        COLUMN_WIDTHS.curso +
-        COLUMN_WIDTHS.aluno +
-        COLUMN_WIDTHS.matricula +
-        COLUMN_WIDTHS.status;
+    COLUMN_WIDTHS.turma +
+    COLUMN_WIDTHS.periodo +
+    COLUMN_WIDTHS.dias +
+    COLUMN_WIDTHS.curso +
+    COLUMN_WIDTHS.aluno +
+    COLUMN_WIDTHS.matricula +
+    COLUMN_WIDTHS.status;
 
   const formatWeekdays = useCallback(
     (value: string | null) => {
@@ -474,29 +472,25 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ minWidth: fixedTableWidth }}>
               <View className="flex-row bg-gray-50 border-b border-gray-200 px-4 py-3">
-                {!schoolClassId ? (
-                  <>
-                    <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.turma }}>
-                      Turma
-                    </Text>
-                    <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.periodo }}>
-                      Período
-                    </Text>
-                    <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.dias }}>
-                      Dia(s) da semana
-                    </Text>
-                    <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.curso }}>
-                      Curso
-                    </Text>
-                  </>
-                ) : null}
-                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.aluno }}>
+                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.turma }} numberOfLines={1}>
+                  Turma
+                </Text>
+                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.periodo }} numberOfLines={1}>
+                  Período
+                </Text>
+                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.dias }} numberOfLines={1}>
+                  Dia(s) da semana
+                </Text>
+                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.curso }} numberOfLines={1}>
+                  Curso
+                </Text>
+                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.aluno }} numberOfLines={1}>
                   Aluno
                 </Text>
-                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.matricula }}>
+                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.matricula }} numberOfLines={1}>
                   Matrícula
                 </Text>
-                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.status }}>
+                <Text className="text-[11px] font-semibold text-gray-600" style={{ width: COLUMN_WIDTHS.status }} numberOfLines={1}>
                   Status
                 </Text>
               </View>
@@ -505,31 +499,27 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
                   key={`${row.student_id}-${row.school_class_id}-${idx}`}
                   className={`flex-row px-4 py-3 border-b border-gray-100 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}
                 >
-                  {!schoolClassId ? (
-                    <>
-                      <Text className="text-xs font-semibold text-gray-800" style={{ width: COLUMN_WIDTHS.turma }}>
-                        {row.school_class_name}
-                      </Text>
-                      <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.periodo }}>
-                        {row.school_class_period
-                          ? (periodLabelMap[row.school_class_period] ?? row.school_class_period)
-                          : "-"}
-                      </Text>
-                      <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.dias }}>
-                        {formatWeekdays(row.class_weekdays)}
-                      </Text>
-                      <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.curso }}>
-                        {row.course_name || "-"}
-                      </Text>
-                    </>
-                  ) : null}
-                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.aluno }}>
+                  <Text className="text-xs font-semibold text-gray-800" style={{ width: COLUMN_WIDTHS.turma }} numberOfLines={1}>
+                    {row.school_class_name}
+                  </Text>
+                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.periodo }} numberOfLines={1}>
+                    {row.school_class_period
+                      ? (periodLabelMap[row.school_class_period] ?? row.school_class_period)
+                      : "-"}
+                  </Text>
+                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.dias }} numberOfLines={1}>
+                    {formatWeekdays(row.class_weekdays)}
+                  </Text>
+                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.curso }} numberOfLines={1}>
+                    {row.course_name || "-"}
+                  </Text>
+                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.aluno }} numberOfLines={1}>
                     {row.student_name}
                   </Text>
-                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.matricula }}>
+                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.matricula }} numberOfLines={1}>
                     {row.enrollment_number || "-"}
                   </Text>
-                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.status }}>
+                  <Text className="text-xs text-gray-700" style={{ width: COLUMN_WIDTHS.status }} numberOfLines={1}>
                     {statusLabel(row.enrollment_status)}
                   </Text>
                 </View>
