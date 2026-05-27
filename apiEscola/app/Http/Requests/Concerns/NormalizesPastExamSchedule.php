@@ -43,12 +43,15 @@ trait NormalizesPastExamSchedule
     /** @return array<string, string> */
     protected function pastExamScheduleMessages(): array
     {
-        return [
-            'exam_date.date'         => 'Informe uma data válida da prova (dia/mês/ano).',
-            'exam_date.date_format'  => 'Informe uma data válida da prova (dia/mês/ano).',
-            'exam_year.integer'  => 'Informe uma data válida da prova.',
-            'exam_year.min'      => 'A data da prova deve ser de 1990 em diante.',
-            'exam_year.max'      => 'A data da prova não pode ser posterior a 2100.',
-        ];
+        return array_merge(
+            method_exists($this, 'pastExamProvaYearMessages') ? $this->pastExamProvaYearMessages() : [],
+            [
+                'exam_date.date'         => 'Informe uma data válida da prova (dia/mês/ano).',
+                'exam_date.date_format'  => 'Informe uma data válida da prova (dia/mês/ano).',
+                'exam_year.integer'  => 'Informe uma data válida da prova.',
+                'exam_year.min'      => 'A data da prova deve ser de 1990 em diante.',
+                'exam_year.max'      => 'A data da prova não pode ser posterior a 2100.',
+            ],
+        );
     }
 }

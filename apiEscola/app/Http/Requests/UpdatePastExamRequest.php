@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\MergesPastExamCourseIds;
 use App\Http\Requests\Concerns\NormalizesPastExamSchedule;
+use App\Http\Requests\Concerns\ValidatesPastExamProvaYear;
 use App\Rules\ActiveExamTypeSlug;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -11,6 +12,7 @@ class UpdatePastExamRequest extends FormRequest
 {
     use MergesPastExamCourseIds;
     use NormalizesPastExamSchedule;
+    use ValidatesPastExamProvaYear;
 
     public function authorize(): bool
     {

@@ -77,11 +77,16 @@ const EMPTY_FORM = {
   is_published: "true",
 };
 
-function validateExamDateField(display: string): string | null {
+function validateExamDateField(
+  display: string,
+  materialKind: PastExamMaterialKind,
+): string | null {
   const trimmed = display.trim();
-  if (!trimmed) return null;
+  if (!trimmed) {
+    return materialKind === "prova" ? "Informe o ano da prova." : null;
+  }
   const iso = displayToISO(trimmed);
-  if (!iso) return "Informe a data completa (dd/mm/aaaa).";
+  if (!iso) return "Informe a data completa (dd/mm/aaaa) ou o ano da prova.";
   const year = Number(iso.slice(0, 4));
   if (year < 1990 || year > 2100) return "A data da prova deve ser de 1990 em diante.";
   return null;
@@ -549,7 +554,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           : "Selecione a classificação da prova.";
     }
     if (!editingId && !pdfFile) localErrors.file = "Selecione o arquivo PDF da prova.";
-    const examDateError = validateExamDateField(form.exam_date);
+    const examDateError = validateExamDateField(form.exam_date, form.material_kind);
     if (examDateError) localErrors.exam_date = examDateError;
     if (Object.keys(localErrors).length) {
       setErrors(localErrors);
@@ -959,7 +964,8 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           <View style={{ flexDirection: compactStack ? "column" : "row", gap: 12 }}>
             <View style={{ flex: 1, minWidth: compactStack ? undefined : 220 }}>
               <DatePickerInput
-                label="Data da prova"
+                label={form.material_kind === "prova" ? "Ano / data da prova" : "Data (opcional)"}
+                required={form.material_kind === "prova"}
                 value={form.exam_date}
                 onChangeText={(exam_date) => {
                   setForm((p) => ({ ...p, exam_date }));
