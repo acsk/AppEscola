@@ -20,7 +20,7 @@ class SimuladoSeeder extends Seeder
         $admin    = User::where('tenant_id', $tenant->id)->first();
 
         $published  = ExamStatus::where('slug', 'published')->value('id');
-        $vestibular = ExamType::where('slug', 'vestibular')->value('id');
+        $vestibular = ExamType::where('slug', 'vestibular-tradicional')->value('id');
 
         $math = Subject::where('tenant_id', $tenant->id)->where('name', 'Matemática')->first();
         $port = Subject::where('tenant_id', $tenant->id)->where('name', 'Português')->first();

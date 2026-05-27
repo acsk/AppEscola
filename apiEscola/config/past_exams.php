@@ -11,10 +11,10 @@ return [
     ],
 
     'exam_types' => [
-        'enem'       => 'ENEM',
+        'enem'     => 'ENEM',
+        'custom'   => 'Personalizado',
         'vestibular' => 'Vestibular',
-        'fuvest'     => 'FUVEST',
-        'concurso'   => 'Concurso',
-        'custom'     => 'Outro',
+        'fuvest'   => 'FUVEST',
+        'concurso' => 'Concurso',
     ],
 ];

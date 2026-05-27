@@ -104,5 +104,7 @@ class DomainSeeder extends Seeder
             ['slug' => 'late_fee',       'name' => 'Multa/Juros'],
             ['slug' => 'other',          'name' => 'Outro'],
         ]);
+
+        $this->call(ExamTypeSeeder::class);
     }
 }
