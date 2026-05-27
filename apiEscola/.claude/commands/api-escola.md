@@ -250,6 +250,23 @@ cd apiEscola
 /opt/alt/php83/usr/bin/php artisan migrate
 ```
 
+**Diagnóstico — alunos sem login no app (migração / matrícula sem usuário):**
+
+```bash
+# Resumo do tenant (matrícula ativa, taxa paga, etc. — pagamento NÃO cria usuário hoje)
+/opt/alt/php83/usr/bin/php artisan students:debug-app-access --tenant=2
+
+# Um aluno + detalhe de matrículas/cobranças
+/opt/alt/php83/usr/bin/php artisan students:debug-app-access --tenant=2 --student=123
+
+# Exportar JSON
+/opt/alt/php83/usr/bin/php artisan students:debug-app-access --tenant=2 --json --save=1
+
+# Corrigir em lote (após conferir o debug)
+/opt/alt/php83/usr/bin/php artisan students:provision-users --tenant=2 --dry-run
+/opt/alt/php83/usr/bin/php artisan students:provision-users --tenant=2 --show-passwords
+```
+
 O deploy em servidor compartilhado **não** executa `composer install` automaticamente.
 
 ### Host local com PHP instalado
