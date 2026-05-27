@@ -134,6 +134,13 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [enrollmentNumber, setEnrollmentNumber] = useState<string | null>(null);
+  const [hasAppAccess, setHasAppAccess] = useState(false);
+  const [provisioningAccess, setProvisioningAccess] = useState(false);
+  const [provisionModalVisible, setProvisionModalVisible] = useState(false);
+  const [provisionCredentials, setProvisionCredentials] = useState<{
+    login: string;
+    password: string;
+  } | null>(null);
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -242,6 +249,8 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
         const { data } = await api.get(`/students/${studentId}`);
         const student = data.body ?? data.data ?? data;
         setEnrollmentNumber(student.enrollment_number ?? null);
+        setHasAppAccess(!!student.user_id);
+        setProvisionCredentials(null);
         setForm({
           name: student.name ?? "",
           birth_date: isoToDisplay(student.birth_date ?? ""),
@@ -265,6 +274,39 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
       setLoading(false);
     })();
   }, [studentId, fetchGuardianOptions, isEdit, mapApiGuardiansToForm]);
+
+  const handleProvisionAppAccess = useCallback(async () => {
+    if (!studentId) return;
+    setProvisioningAccess(true);
+    try {
+      const { data } = await api.post(`/students/${studentId}/provision-app-access`);
+      const body = data?.body ?? data?.data ?? data;
+      const login =
+        body?.login ?? body?.student?.enrollment_number ?? enrollmentNumber ?? "";
+      const password = body?.initial_password ?? "";
+      setHasAppAccess(true);
+      if (login) setEnrollmentNumber(login);
+      if (login && password) {
+        setProvisionCredentials({ login, password });
+      }
+      setToast({
+        visible: true,
+        type: "success",
+        message: data?.message ?? "Acesso ao app criado com sucesso.",
+      });
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: unknown } };
+      const parsed = parseApiErrors(apiErr.response?.data);
+      setToast({
+        visible: true,
+        type: "error",
+        message: parsed.message ?? "Não foi possível gerar o acesso ao app.",
+      });
+    } finally {
+      setProvisioningAccess(false);
+      setProvisionModalVisible(false);
+    }
+  }, [studentId, enrollmentNumber]);
 
   const handlePhotoSelect = useCallback(
     async (e: any) => {
@@ -718,12 +760,49 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                 {enrollmentNumber && (
                   <View className="flex-row items-center gap-3 bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 mb-3">
                     <Ionicons name="id-card-outline" size={18} color="#7C3AED" />
-                    <View>
+                    <View className="flex-1">
                       <Text className="text-xs text-violet-500 font-medium">Número de Matrícula (login)</Text>
                       <Text className="text-base font-bold text-violet-700 font-mono tracking-widest">
                         {enrollmentNumber}
                       </Text>
                     </View>
+                  </View>
+                )}
+
+                {isEdit && !hasAppAccess && (
+                  <TouchableOpacity
+                    onPress={() => setProvisionModalVisible(true)}
+                    disabled={provisioningAccess}
+                    className="flex-row items-center justify-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3"
+                    activeOpacity={0.85}
+                  >
+                    {provisioningAccess ? (
+                      <ActivityIndicator size="small" color="#D97706" />
+                    ) : (
+                      <Ionicons name="phone-portrait-outline" size={18} color="#D97706" />
+                    )}
+                    <Text className="text-sm font-semibold text-amber-800">
+                      Gerar acesso ao app
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {provisionCredentials && (
+                  <View className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-3">
+                    <Text className="text-xs text-emerald-700 font-medium mb-1">
+                      Credenciais geradas (informe ao aluno)
+                    </Text>
+                    <Text className="text-sm text-emerald-900">
+                      Login:{" "}
+                      <Text className="font-mono font-bold">{provisionCredentials.login}</Text>
+                    </Text>
+                    <Text className="text-sm text-emerald-900 mt-0.5">
+                      Senha inicial:{" "}
+                      <Text className="font-mono font-bold">{provisionCredentials.password}</Text>
+                    </Text>
+                    <Text className="text-xs text-emerald-600 mt-2">
+                      A senha é a data de nascimento (DDMMAAAA) ou código padrão do sistema.
+                    </Text>
                   </View>
                 )}
                 <Text className="text-xs text-gray-400 leading-relaxed">
@@ -1182,6 +1261,18 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
         onConfirm={confirmDeleteGuardian}
         onCancel={() => setDeleteGuardianIndex(null)}
         loading={false}
+      />
+
+      <ConfirmModal
+        visible={provisionModalVisible}
+        title="Gerar acesso ao app"
+        message="Será criado um usuário de login com a matrícula do aluno e senha inicial (data de nascimento ou código padrão). O aluno precisará trocar a senha no primeiro acesso."
+        confirmLabel="Gerar acesso"
+        iconName="phone-portrait-outline"
+        tone="primary"
+        onConfirm={handleProvisionAppAccess}
+        onCancel={() => setProvisionModalVisible(false)}
+        loading={provisioningAccess}
       />
 
       <ToastBanner

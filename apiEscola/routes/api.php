@@ -141,6 +141,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::apiResource('students', StudentController::class);
     Route::get('students/{student}/performance', [StudentPerformanceController::class, 'forStudent']);
     Route::post('students/{student}/upload-photo', [StudentController::class, 'uploadPhoto']);
+    Route::post('students/{student}/provision-app-access', [StudentController::class, 'provisionAppAccess']);
 
     // Responsáveis de um aluno (nested)
     Route::prefix('students/{student}/guardians')->group(function () {

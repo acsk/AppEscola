@@ -9,14 +9,13 @@ use App\Http\Requests\UpdateStudentRequest;
 use App\Http\Resources\StudentResource;
 use App\Models\Guardian;
 use App\Models\Student;
-use App\Models\User;
+use App\Services\StudentAppAccessService;
 use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class StudentController extends Controller
 {
@@ -101,47 +100,24 @@ class StudentController extends Controller
             new OA\Response(response: 422, description: 'Dados inválidos'),
         ]
     )]
-    public function store(StoreStudentRequest $request): JsonResponse
+    public function store(StoreStudentRequest $request, StudentAppAccessService $appAccess): JsonResponse
     {
         $tenantId = $this->getTenantId($request);
 
-        $student = DB::transaction(function () use ($request, $tenantId) {
+        $student = DB::transaction(function () use ($request, $tenantId, $appAccess) {
             $studentData = collect($request->validated())
                 ->except('guardians')
                 ->merge(['tenant_id' => $tenantId])
                 ->toArray();
 
             $student = Student::create($studentData);
-
-            // Gera matrícula: ano + ID do aluno com 5 dígitos (ex: 202600042)
-            $enrollmentNumber = now()->year . str_pad($student->id, 5, '0', STR_PAD_LEFT);
-
-            // Senha inicial: ddmmYYYY da data de nascimento ou fallback
-            $birthDate = $student->birth_date;
-            $initialPassword = $birthDate
-                ? $birthDate->format('dmY')
-                : 'Aluno@' . str_pad($student->id, 4, '0', STR_PAD_LEFT);
-
-            $user = User::create([
-                'tenant_id'                => $tenantId,
-                'name'                     => $student->name,
-                'email'                    => $enrollmentNumber . '@interno',
-                'password'                 => Hash::make($initialPassword),
-                'role'                     => 'aluno',
-                'status'                   => 'active',
-                'password_change_required' => true,
-            ]);
-
-            $student->update([
-                'enrollment_number' => $enrollmentNumber,
-                'user_id'           => $user->id,
-            ]);
+            $appAccess->provision($student);
 
             if ($request->has('guardians')) {
                 $this->syncGuardians($student, $request->input('guardians', []), $tenantId);
             }
 
-            return $student;
+            return $student->fresh();
         });
 
         $student->load('guardians');
@@ -267,6 +243,42 @@ class StudentController extends Controller
             'photo_url' => $photoUrl,
             'path' => $path,
         ], 'Foto enviada com sucesso.');
+    }
+
+    #[OA\Post(
+        path: '/api/students/{student}/provision-app-access',
+        tags: ['Students'],
+        summary: 'Gerar usuário de acesso ao app para aluno sem login',
+        security: [['sanctum' => []]],
+        responses: [
+            new OA\Response(response: 200, description: 'Usuário criado; retorna matrícula e senha inicial'),
+            new OA\Response(response: 422, description: 'Aluno já possui acesso ou conflito de e-mail'),
+        ]
+    )]
+    public function provisionAppAccess(
+        Request $request,
+        Student $student,
+        StudentAppAccessService $appAccess
+    ): JsonResponse {
+        $this->authorizeTenant($request, (int) $student->tenant_id);
+
+        if ($appAccess->hasAppAccess($student)) {
+            return $this->error('Este aluno já possui acesso ao app.', null, 422);
+        }
+
+        try {
+            $result = DB::transaction(fn () => $appAccess->provision($student));
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), null, 422);
+        }
+
+        $student->refresh()->load('guardians');
+
+        return $this->success([
+            'student' => new StudentResource($student),
+            'login' => $result['enrollment_number'],
+            'initial_password' => $result['initial_password'],
+        ], 'Acesso ao app criado com sucesso.');
     }
 
     private function authorizeTenant(Request $request, int $resourceTenantId): void

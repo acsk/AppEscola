@@ -109,8 +109,18 @@ const buildGroupsFromRows = (
   return Array.from(map.values());
 };
 
+const TABLE_COLUMNS = [
+  { key: "turma", label: "Turma", flex: 2.2, minWidth: 180, variant: "bodyBold" as const },
+  { key: "periodo", label: "Período", flex: 1, minWidth: 96, variant: "body" as const },
+  { key: "dias", label: "Dia(s) da semana", flex: 1.2, minWidth: 120, variant: "body" as const },
+  { key: "curso", label: "Curso", flex: 1.2, minWidth: 120, variant: "body" as const },
+  { key: "aluno", label: "Aluno", flex: 2.5, minWidth: 200, variant: "body" as const },
+  { key: "matricula", label: "Matrícula", flex: 1.1, minWidth: 130, variant: "body" as const },
+  { key: "status", label: "Status", flex: 0.9, minWidth: 88, variant: "body" as const },
+];
+
 export default function ClassStudentsReportScreen({ navigate }: Props) {
-  const { contentPadding, isMobile } = useResponsiveLayout();
+  const { contentPadding, isMobile, tableMinWidth } = useResponsiveLayout();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [courseOptions, setCourseOptions] = useState<CourseOption[]>([]);
@@ -129,35 +139,20 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
   const weekdayOptions = domainToOptions(weekdays);
   const periodLabelMap = Object.fromEntries(periodOptions.map((o) => [o.value, o.label]));
   const weekdayLabelMap = Object.fromEntries(weekdayOptions.map((o) => [o.value, o.label]));
-  const COLUMN_WIDTHS = {
-    turma: 280,
-    periodo: 120,
-    dias: 170,
-    curso: 170,
-    aluno: 320,
-    matricula: 160,
-    status: 90,
-  } as const;
-  const fixedTableWidth =
-    COLUMN_WIDTHS.turma +
-    COLUMN_WIDTHS.periodo +
-    COLUMN_WIDTHS.dias +
-    COLUMN_WIDTHS.curso +
-    COLUMN_WIDTHS.aluno +
-    COLUMN_WIDTHS.matricula +
-    COLUMN_WIDTHS.status;
+  const tableScrollMinWidth =
+    tableMinWidth ??
+    TABLE_COLUMNS.reduce((sum, col) => sum + col.minWidth, 0);
 
   const renderTableCell = (
-    width: number,
+    flex: number,
+    minWidth: number,
     value: string,
     variant: "header" | "body" | "bodyBold" = "body"
   ) => (
     <View
       style={{
-        width,
-        minWidth: width,
-        maxWidth: width,
-        flexShrink: 0,
+        flex,
+        minWidth,
         paddingHorizontal: 12,
         justifyContent: "center",
       }}
@@ -176,6 +171,29 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
       </Text>
     </View>
   );
+
+  const cellValueForRow = (row: ReportRow, key: string) => {
+    switch (key) {
+      case "turma":
+        return row.school_class_name;
+      case "periodo":
+        return row.school_class_period
+          ? (periodLabelMap[row.school_class_period] ?? row.school_class_period)
+          : "-";
+      case "dias":
+        return formatWeekdays(row.class_weekdays);
+      case "curso":
+        return row.course_name || "-";
+      case "aluno":
+        return row.student_name;
+      case "matricula":
+        return row.enrollment_number || "-";
+      case "status":
+        return statusLabel(row.enrollment_status);
+      default:
+        return "-";
+    }
+  };
 
   const formatWeekdays = useCallback(
     (value: string | null) => {
@@ -500,42 +518,37 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
           </View>
         ) : (
           <ScrollView
-            horizontal={!isMobile}
-            showsHorizontalScrollIndicator={!isMobile}
+            horizontal={isMobile}
+            showsHorizontalScrollIndicator={isMobile}
             style={{ width: "100%" }}
-            contentContainerStyle={{ minWidth: "100%" }}
+            contentContainerStyle={{
+              width: isMobile ? undefined : "100%",
+              minWidth: isMobile ? tableScrollMinWidth : "100%",
+            }}
           >
-            <View style={{ width: fixedTableWidth, minWidth: fixedTableWidth, flexShrink: 0 }}>
+            <View style={{ width: "100%", minWidth: isMobile ? tableScrollMinWidth : undefined }}>
               <View
                 className="flex-row bg-gray-50 border-b border-gray-200 py-3"
-                style={{ width: fixedTableWidth, flexShrink: 0 }}
+                style={{ width: "100%" }}
               >
-                {renderTableCell(COLUMN_WIDTHS.turma, "Turma", "header")}
-                {renderTableCell(COLUMN_WIDTHS.periodo, "Período", "header")}
-                {renderTableCell(COLUMN_WIDTHS.dias, "Dia(s) da semana", "header")}
-                {renderTableCell(COLUMN_WIDTHS.curso, "Curso", "header")}
-                {renderTableCell(COLUMN_WIDTHS.aluno, "Aluno", "header")}
-                {renderTableCell(COLUMN_WIDTHS.matricula, "Matrícula", "header")}
-                {renderTableCell(COLUMN_WIDTHS.status, "Status", "header")}
+                {TABLE_COLUMNS.map((col) =>
+                  renderTableCell(col.flex, col.minWidth, col.label, "header")
+                )}
               </View>
               {rows.map((row, idx) => (
                 <View
                   key={`${row.student_id}-${row.school_class_id}-${idx}`}
                   className={`flex-row py-3 border-b border-gray-100 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}
-                  style={{ width: fixedTableWidth, flexShrink: 0 }}
+                  style={{ width: "100%" }}
                 >
-                  {renderTableCell(COLUMN_WIDTHS.turma, row.school_class_name, "bodyBold")}
-                  {renderTableCell(
-                    COLUMN_WIDTHS.periodo,
-                    row.school_class_period
-                      ? (periodLabelMap[row.school_class_period] ?? row.school_class_period)
-                      : "-"
+                  {TABLE_COLUMNS.map((col) =>
+                    renderTableCell(
+                      col.flex,
+                      col.minWidth,
+                      cellValueForRow(row, col.key),
+                      col.key === "turma" ? "bodyBold" : col.variant
+                    )
                   )}
-                  {renderTableCell(COLUMN_WIDTHS.dias, formatWeekdays(row.class_weekdays))}
-                  {renderTableCell(COLUMN_WIDTHS.curso, row.course_name || "-")}
-                  {renderTableCell(COLUMN_WIDTHS.aluno, row.student_name)}
-                  {renderTableCell(COLUMN_WIDTHS.matricula, row.enrollment_number || "-")}
-                  {renderTableCell(COLUMN_WIDTHS.status, statusLabel(row.enrollment_status))}
                 </View>
               ))}
             </View>
