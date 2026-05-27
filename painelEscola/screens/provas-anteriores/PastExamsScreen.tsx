@@ -25,6 +25,7 @@ import FormInput from "../../components/ui/FormInput";
 import PastExamScheduleFields from "../../components/provas-anteriores/PastExamScheduleFields";
 import FormSelect from "../../components/ui/FormSelect";
 import SearchableSelect from "../../components/ui/SearchableSelect";
+import PdfFileUploadField from "../../components/ui/PdfFileUploadField";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -349,11 +350,9 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     minWidth: isMobile ? "100%" : 160,
   } as const;
 
-  const handlePdfInputChange = (e: any) => {
-    const file = e.target.files?.[0] ?? null;
+  const handlePdfFileChange = (file: File | null) => {
     if (file && !file.name.toLowerCase().endsWith(".pdf")) {
       setPdfFile(null);
-      e.currentTarget.value = "";
       setErrors((prev) => ({ ...prev, file: "Envie apenas arquivos PDF." }));
       return;
     }
@@ -364,40 +363,6 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
       return next;
     });
   };
-
-  const renderPdfField = () => (
-    <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1">
-          <Text className="text-sm font-semibold text-gray-700">
-            Arquivo PDF{!editingId ? " *" : ""}
-          </Text>
-          <Text className="text-xs text-gray-400 mt-0.5">
-            Envie qualquer tamanho de PDF (limite do servidor pode se aplicar).
-            {editingId ? " · deixe em branco para manter o arquivo atual" : ""}
-          </Text>
-        </View>
-        <input
-          type="file"
-          accept="application/pdf,.pdf"
-          onChange={handlePdfInputChange}
-          style={{ fontSize: 12, maxWidth: compactStack ? "100%" : 230 }}
-        />
-      </View>
-      {pdfFile ? (
-        <Text className="text-xs text-gray-600 mt-2" numberOfLines={1}>
-          Novo: {pdfFile.name} · {(pdfFile.size / 1024).toFixed(1)} kB
-        </Text>
-      ) : editingPdfLabel ? (
-        <Text className="text-xs text-gray-500 mt-2" numberOfLines={1}>
-          Atual: {editingPdfLabel}
-        </Text>
-      ) : null}
-      {errors.file ? (
-        <Text className="text-xs text-red-600 mt-1">{errors.file}</Text>
-      ) : null}
-    </View>
-  );
 
   const courseNamesForRow = (row: PastExamRow) =>
     row.courses?.length
@@ -950,7 +915,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           </>
         }
       >
-        <View className="gap-1">
+        <View style={{ gap: 16 }}>
           {hasFormErrors ? (
             <View className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex-row items-start gap-2">
               <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
@@ -1062,8 +1027,14 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             </View>
           </View>
 
-          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 12 }}>
-            <View style={{ flex: 1, minWidth: compactStack ? undefined : 240 }}>
+          <View
+            style={{
+              flexDirection: compactStack ? "column" : "row",
+              gap: 16,
+              alignItems: "flex-start",
+            }}
+          >
+            <View style={{ flex: 1, width: compactStack ? "100%" : undefined, gap: 8 }}>
               <SearchableSelect
                 key={coursePickerKey}
                 label="Cursos"
@@ -1080,11 +1051,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 disabled={courseOptions.length === 0 || availableCourseOptions.length === 0}
                 onChange={addCourseFromPicker}
               />
-              <Text className="text-xs text-gray-400 -mt-2 mb-1">
+              <Text className="text-xs text-gray-400 leading-4">
                 Opcional. Sem curso, todos os alunos da escola veem a prova.
               </Text>
               {form.course_ids.length > 0 ? (
-                <View className="flex-row flex-wrap gap-2 mt-1">
+                <View className="flex-row flex-wrap gap-2">
                   {form.course_ids.map((id) => {
                     const course = courseOptions.find((c) => c.id === id);
                     return (
@@ -1108,7 +1079,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 </View>
               ) : null}
             </View>
-            <View style={{ flex: 1, minWidth: compactStack ? undefined : 240 }}>
+            <View style={{ flex: 1, width: compactStack ? "100%" : undefined }}>
               <SearchableSelect
                 label="Disciplina"
                 value={form.subject_id}
@@ -1126,7 +1097,18 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             onChangeText={(description) => setForm((p) => ({ ...p, description }))}
           />
 
-          {renderPdfField()}
+          <PdfFileUploadField
+            required={!editingId}
+            hint={
+              editingId
+                ? "Envie qualquer tamanho de PDF (limite do servidor pode se aplicar). Deixe em branco para manter o arquivo atual."
+                : "Envie qualquer tamanho de PDF (limite do servidor pode se aplicar)."
+            }
+            value={pdfFile}
+            onChange={handlePdfFileChange}
+            currentFileLabel={editingPdfLabel}
+            error={errors.file}
+          />
         </View>
       </Modal>
 

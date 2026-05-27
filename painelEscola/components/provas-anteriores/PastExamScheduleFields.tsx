@@ -111,7 +111,7 @@ export default function PastExamScheduleFields({
       ) : null}
 
       {value.mode === "none" ? (
-        <Text className="text-xs text-gray-400 -mt-2 mb-3">
+        <Text className="text-xs text-gray-400 mt-1 mb-1">
           Opcional para exercícios sem data definida.
         </Text>
       ) : null}
