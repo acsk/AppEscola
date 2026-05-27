@@ -52,7 +52,7 @@ function readTenantLetterheadFromStorage(): TenantLetterhead | null {
         email?: string;
         phone?: string;
         whatsapp?: string;
-        address?: string;
+        address?: string
         photo_url?: string;
       };
     };

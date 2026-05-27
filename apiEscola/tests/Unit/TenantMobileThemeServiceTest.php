@@ -41,6 +41,22 @@ class TenantMobileThemeServiceTest extends TestCase
         $this->assertSame('#15803D', $effective['menu_button_text']);
     }
 
+    public function test_conectivo_template_matches_brand_palette(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $service = app(TenantMobileThemeService::class);
+
+        $service->applyTemplate($tenant, 'conectivo', clearOverrides: true);
+        $effective = $service->effectiveColors($tenant->fresh());
+
+        $this->assertSame('conectivo', $service->persistedTemplateId($tenant->fresh()));
+        $this->assertSame('#1B2F4B', $effective['primary']);
+        $this->assertSame('#F59E0B', $effective['drawer_section_label']);
+        $this->assertSame('#22C55E', $effective['menu_button_active_text']);
+        $this->assertSame('#FFFFFF', $effective['menu_button_background']);
+        $this->assertSame('#F59E0B', $effective['debit']);
+    }
+
     public function test_color_overrides_apply_on_top_of_template(): void
     {
         $tenant = Tenant::factory()->create();
