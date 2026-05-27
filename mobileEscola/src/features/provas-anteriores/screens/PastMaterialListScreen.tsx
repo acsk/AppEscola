@@ -17,14 +17,13 @@ import {
   anoDaProva,
   extrairAnosDasProvas,
   extrairDisciplinasDasProvas,
-  formatDataProva,
   type PastExamListItem,
   type PastExamMaterialKind,
 } from '../../../services/past-exams.service';
-import { subjectIconName } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { useProvasAnterioresList } from '../hooks';
 import { ProvasAnterioresHeader } from '../components/ProvasAnterioresHeader';
+import { PastMaterialCard } from '../components/PastMaterialCard';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 
@@ -43,7 +42,8 @@ const COPY = {
     searchPlaceholder: 'Buscar prova...',
     loading: 'Carregando provas anteriores…',
     error: 'Não foi possível carregar as provas anteriores.',
-    counter: (n: number) => `${n} prova${n !== 1 ? 's' : ''}`,
+    counter: (n: number) =>
+      n === 1 ? '1 prova encontrada' : `${n} provas encontradas`,
     emptyTitle: 'Nenhuma prova anterior disponível',
     emptySub: 'Quando sua escola publicar provas, elas aparecerão aqui.',
     dateLabel: 'Data da prova',
@@ -53,7 +53,8 @@ const COPY = {
     searchPlaceholder: 'Buscar exercício...',
     loading: 'Carregando exercícios…',
     error: 'Não foi possível carregar os exercícios.',
-    counter: (n: number) => `${n} exercício${n !== 1 ? 's' : ''}`,
+    counter: (n: number) =>
+      n === 1 ? '1 exercício encontrado' : `${n} exercícios encontrados`,
     emptyTitle: 'Nenhum exercício disponível',
     emptySub: 'Quando sua escola publicar exercícios, eles aparecerão aqui.',
     dateLabel: 'Data',
@@ -103,74 +104,19 @@ export function PastMaterialListScreen({ materialKind, listScreen }: PastMateria
     }, [refetch]),
   );
 
-  const renderItem = ({ item }: { item: PastExamListItem }) => {
-    const subjectColor = item.subject?.color ?? colors.primary;
-    const dataProva = formatDataProva(item.exam_date, item.exam_year);
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          {
-            backgroundColor: tint(subjectColor, '10', colors.soft),
-            borderColor: tint(subjectColor, '35', colors.border),
-            shadowColor: subjectColor,
-          },
-        ]}
-        activeOpacity={0.85}
-        onPress={() =>
-          navigation.navigate('ProvaAnteriorDetalhe', {
-            pastExamId: item.id,
-            listScreen,
-            materialKind,
-          })
-        }
-      >
-        {item.subject ? (
-          <View style={[styles.cardAccent, { backgroundColor: subjectColor }]} />
-        ) : null}
-        <View style={styles.cardTopo}>
-          {item.subject ? (
-            <View style={[styles.subjectChip, { backgroundColor: tint(subjectColor, '18', colors.soft) }]}>
-              <Ionicons
-                name={subjectIconName(item.subject.icon) as any}
-                size={12}
-                color={subjectColor}
-              />
-              <Text style={[styles.subjectNome, { color: subjectColor }]}>{item.subject.name}</Text>
-            </View>
-          ) : null}
-        </View>
-        <Text style={styles.cardTitulo} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {dataProva ? (
-          <View style={styles.dataRow}>
-            <Ionicons name="calendar-outline" size={14} color={colors.muted} />
-            <Text style={styles.dataTexto}>
-              {copy.dateLabel}: {dataProva}
-            </Text>
-          </View>
-        ) : null}
-        {item.exam_type_label ? (
-          <Text style={styles.subtitulo}>{item.exam_type_label}</Text>
-        ) : null}
-        {(item.courses?.length || item.course) ? (
-          <Text style={styles.cursosTexto} numberOfLines={1}>
-            {(item.courses?.length
-              ? item.courses.map((c) => c.name)
-              : item.course
-                ? [item.course.name]
-                : []
-            ).join(', ')}
-          </Text>
-        ) : null}
-        <View style={styles.rodape}>
-          <Ionicons name="document-outline" size={14} color={colors.muted} />
-          <Text style={styles.rodapeTexto}>PDF</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderItem = ({ item }: { item: PastExamListItem }) => (
+    <PastMaterialCard
+      item={item}
+      dateLabel={copy.dateLabel}
+      onPress={() =>
+        navigation.navigate('ProvaAnteriorDetalhe', {
+          pastExamId: item.id,
+          listScreen,
+          materialKind,
+        })
+      }
+    />
+  );
 
   if (isLoading) {
     return (
@@ -285,14 +231,9 @@ export function PastMaterialListScreen({ materialKind, listScreen }: PastMateria
   );
 }
 
-function tint(hex: string | undefined, alpha: string, fallback: string): string {
-  if (!hex || !hex.startsWith('#')) return fallback;
-  return `${hex}${alpha}`;
-}
-
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F6F7FB' },
+    container: { flex: 1, backgroundColor: colors.background },
     lista: { padding: 16, paddingTop: 12, paddingBottom: 32 },
     listaComVazio: { flexGrow: 1 },
     filtros: { gap: 10, marginBottom: 12 },
@@ -317,43 +258,12 @@ function createStyles(colors: ThemeColors) {
     filtroChipAtivo: { backgroundColor: colors.primary, borderColor: colors.primary },
     filtroChipTexto: { fontSize: 12, fontWeight: '600', color: colors.ink },
     filtroChipTextoAtivo: { color: colors.surface },
-    contador: { fontSize: 13, color: colors.muted },
-    card: {
-      backgroundColor: colors.surface,
-      borderRadius: 18,
-      padding: 16,
-      paddingLeft: 20,
-      marginBottom: 12,
-      overflow: 'hidden',
-      borderWidth: 1,
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      elevation: 2,
-    },
-    cardAccent: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
-    cardTopo: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-    subjectChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 20,
-    },
-    subjectNome: { fontSize: 11, fontWeight: '800' },
-    cardTitulo: { fontSize: 16, fontWeight: '800', color: colors.ink, lineHeight: 22 },
-    dataRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-    dataTexto: { fontSize: 12, fontWeight: '600', color: colors.muted },
-    subtitulo: { fontSize: 12, color: colors.muted, marginTop: 4 },
-    cursosTexto: { fontSize: 11, color: colors.muted, marginTop: 4 },
-    rodape: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-    rodapeTexto: { fontSize: 12, color: colors.muted },
+    contador: { fontSize: 13, color: colors.muted, fontWeight: '600' },
     centrado: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       padding: 32,
-      backgroundColor: '#F6F7FB',
     },
     carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
     erroTexto: { fontSize: 14, color: colors.text, textAlign: 'center', marginTop: 12, lineHeight: 20 },
