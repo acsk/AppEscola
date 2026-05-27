@@ -33,11 +33,16 @@ export default function DatePickerInput({
 
   const openCalendar = () => {
     if (disabled || !hiddenRef.current) return;
+    const el = hiddenRef.current as HTMLInputElement & { showPicker?: () => void };
     try {
-      hiddenRef.current.showPicker?.();
+      if (typeof el.showPicker === "function") {
+        el.showPicker();
+        return;
+      }
     } catch {
-      hiddenRef.current.click();
+      // showPicker pode falhar fora de gesto do usuário em alguns browsers
     }
+    el.click();
   };
 
   const handleNativeChange = (e: any) => {
@@ -74,28 +79,45 @@ export default function DatePickerInput({
           editable={!disabled}
         />
 
-        <TouchableOpacity onPress={openCalendar} className="pl-2" activeOpacity={disabled ? 1 : 0.7} disabled={disabled}>
-          <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
-        </TouchableOpacity>
-
-        {/* Input nativo oculto — usado apenas na web para abrir o seletor do SO */}
-        {Platform.OS === "web" && (
-          <input
-            ref={hiddenRef}
-            type="date"
-            value={isoValue}
-            onChange={handleNativeChange}
-            style={{
-              position: "absolute",
-              opacity: 0,
-              width: 1,
-              height: 1,
-              border: "none",
-              pointerEvents: "none",
-            }}
-            tabIndex={-1}
-            aria-hidden="true"
-          />
+        {Platform.OS === "web" ? (
+          <View className="relative" style={{ width: 40, height: 40 }}>
+            <input
+              ref={hiddenRef}
+              type="date"
+              value={isoValue}
+              onChange={handleNativeChange}
+              disabled={disabled}
+              title="Abrir calendário"
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: 0,
+                width: "100%",
+                height: "100%",
+                cursor: disabled ? "not-allowed" : "pointer",
+                zIndex: 2,
+              }}
+            />
+            <View
+              className="absolute inset-0 items-center justify-center"
+              pointerEvents="none"
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={disabled ? "#D1D5DB" : "#7C3AED"}
+              />
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={openCalendar}
+            className="pl-2"
+            activeOpacity={disabled ? 1 : 0.7}
+            disabled={disabled}
+          >
+            <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
+          </TouchableOpacity>
         )}
       </View>
 

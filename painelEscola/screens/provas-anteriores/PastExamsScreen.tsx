@@ -16,6 +16,7 @@ import { displayToISO, isoToDisplay } from "../../utils/masks";
 import DatePickerInput from "../../components/ui/DatePickerInput";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
+import SearchableSelect from "../../components/ui/SearchableSelect";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -149,6 +150,18 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     type: "success",
     message: "",
   });
+  const [coursePickerKey, setCoursePickerKey] = useState(0);
+
+  const courseSearchOptions = useMemo(
+    () => courseOptions.map((c) => ({ value: String(c.id), label: c.name })),
+    [courseOptions]
+  );
+
+  const availableCourseOptions = useMemo(
+    () =>
+      courseSearchOptions.filter((o) => !form.course_ids.includes(Number(o.value))),
+    [courseSearchOptions, form.course_ids]
+  );
 
   const yearFilterOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -240,21 +253,31 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     })();
   }, [fetchRows]);
 
-  const toggleCourse = (courseId: number) => {
-    setForm((prev) => ({
-      ...prev,
-      course_ids: prev.course_ids.includes(courseId)
-        ? prev.course_ids.filter((id) => id !== courseId)
-        : [...prev.course_ids, courseId],
-    }));
-  };
-
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
     setPdfFile(null);
     setEditingPdfLabel(null);
     setErrors({});
+    setCoursePickerKey((k) => k + 1);
+  };
+
+  const addCourseFromPicker = (courseIdStr: string) => {
+    const id = Number(courseIdStr);
+    if (!Number.isFinite(id) || id <= 0) return;
+    setForm((prev) =>
+      prev.course_ids.includes(id)
+        ? prev
+        : { ...prev, course_ids: [...prev.course_ids, id] }
+    );
+    setCoursePickerKey((k) => k + 1);
+  };
+
+  const removeCourse = (courseId: number) => {
+    setForm((prev) => ({
+      ...prev,
+      course_ids: prev.course_ids.filter((id) => id !== courseId),
+    }));
   };
 
   const openCreate = () => {
@@ -846,7 +869,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         visible={modalOpen}
         title={editingId ? "Editar prova anterior" : "Nova prova anterior"}
         onClose={closeModal}
-        size="sm"
+        size="lg"
         scrollViewClassName="py-0"
         footer={
           <>
@@ -883,17 +906,16 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
               </Text>
             </View>
           ) : null}
-          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
-            <View style={{ flex: compactStack ? undefined : 2 }}>
-              <FormInput
-                label="Título"
-                required
-                value={form.title}
-                onChangeText={(title) => setForm((p) => ({ ...p, title }))}
-                error={errors.title}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
+          <FormInput
+            label="Título"
+            required
+            value={form.title}
+            onChangeText={(title) => setForm((p) => ({ ...p, title }))}
+            error={errors.title}
+          />
+
+          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 12 }}>
+            <View style={{ flex: 1, minWidth: compactStack ? undefined : 220 }}>
               <DatePickerInput
                 label="Data da prova"
                 value={form.exam_date}
@@ -908,6 +930,17 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                   }
                 }}
                 error={errors.exam_date}
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: compactStack ? undefined : 200 }}>
+              <FormSelect
+                label="Publicar"
+                value={form.is_published}
+                options={[
+                  { value: "true", label: "Sim" },
+                  { value: "false", label: "Não" },
+                ]}
+                onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
               />
             </View>
           </View>
@@ -933,70 +966,65 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 error={errors.exam_type}
               />
             </View>
-            <View style={{ flex: 1 }}>
-              <FormSelect
-                label="Publicar"
-                value={form.is_published}
-                options={[
-                  { value: "true", label: "Sim" },
-                  { value: "false", label: "Não" },
-                ]}
-                onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
+          </View>
+
+          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 12 }}>
+            <View style={{ flex: 1, minWidth: compactStack ? undefined : 240 }}>
+              <SearchableSelect
+                key={coursePickerKey}
+                label="Cursos"
+                placeholder={
+                  courseOptions.length === 0
+                    ? "Nenhum curso disponível"
+                    : availableCourseOptions.length === 0
+                      ? "Todos os cursos já foram adicionados"
+                      : "Buscar e adicionar curso..."
+                }
+                modalTitle="Adicionar curso"
+                options={availableCourseOptions}
+                value=""
+                disabled={courseOptions.length === 0 || availableCourseOptions.length === 0}
+                onChange={addCourseFromPicker}
+              />
+              <Text className="text-xs text-gray-400 -mt-2 mb-1">
+                Opcional. Sem curso, todos os alunos da escola veem a prova.
+              </Text>
+              {form.course_ids.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2 mt-1">
+                  {form.course_ids.map((id) => {
+                    const course = courseOptions.find((c) => c.id === id);
+                    return (
+                      <View
+                        key={id}
+                        className="flex-row items-center gap-1.5 rounded-full bg-violet-50 border border-violet-200 px-2.5 py-1"
+                      >
+                        <Text className="text-xs font-semibold text-violet-800">
+                          {course?.name ?? `Curso #${id}`}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => removeCourse(id)}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          accessibilityLabel={`Remover ${course?.name ?? "curso"}`}
+                        >
+                          <Ionicons name="close-circle" size={16} color="#7C3AED" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+            <View style={{ flex: 1, minWidth: compactStack ? undefined : 240 }}>
+              <SearchableSelect
+                label="Disciplina"
+                value={form.subject_id}
+                options={subjectOptions.filter((o) => o.value !== "")}
+                placeholder="Nenhuma (opcional)"
+                modalTitle="Selecionar disciplina"
+                onChange={(subject_id) => setForm((p) => ({ ...p, subject_id }))}
               />
             </View>
           </View>
-
-          <View>
-            <Text className="text-sm font-semibold text-gray-700 mb-1.5">Cursos</Text>
-            <Text className="text-xs text-gray-400 mb-2">
-              Opcional. Sem seleção, todos os alunos da escola veem a prova.
-            </Text>
-            {courseOptions.length === 0 ? (
-              <Text className="text-sm text-gray-400">Nenhum curso disponível</Text>
-            ) : (
-              <View className="gap-2">
-                {courseOptions.map((course) => {
-                  const selected = form.course_ids.includes(course.id);
-                  return (
-                    <TouchableOpacity
-                      key={course.id}
-                      onPress={() => toggleCourse(course.id)}
-                      activeOpacity={0.7}
-                      className={`flex-row items-center gap-3 px-3 py-2.5 rounded-xl border ${
-                        selected ? "bg-violet-50 border-violet-200" : "bg-gray-50 border-gray-100"
-                      }`}
-                    >
-                      <Ionicons
-                        name={selected ? "checkbox" : "square-outline"}
-                        size={18}
-                        color={selected ? "#7C3AED" : "#9CA3AF"}
-                      />
-                      <Text
-                        className={`text-sm font-medium ${
-                          selected ? "text-violet-700" : "text-gray-700"
-                        }`}
-                      >
-                        {course.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-            {form.course_ids.length > 0 ? (
-              <Text className="text-xs text-green-600 mt-2">
-                {form.course_ids.length} curso{form.course_ids.length !== 1 ? "s" : ""} selecionado
-                {form.course_ids.length !== 1 ? "s" : ""}
-              </Text>
-            ) : null}
-          </View>
-
-          <FormSelect
-            label="Disciplina"
-            value={form.subject_id}
-            options={subjectOptions}
-            onChange={(subject_id) => setForm((p) => ({ ...p, subject_id }))}
-          />
 
           <FormInput
             label="Descrição"

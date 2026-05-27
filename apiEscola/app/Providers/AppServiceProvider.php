@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\EmailMarketing\EmailMarketingService;
+use App\Services\EmailMarketing\ResendMarketingEmailService;
 use App\Models\Exam;
 use App\Observers\ExamObserver;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +16,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ResendMarketingEmailService::class, fn () => new ResendMarketingEmailService());
+
+        $this->app->singleton(EmailMarketingService::class, function () {
+            return new EmailMarketingService([
+                'resend' => app(ResendMarketingEmailService::class),
+            ]);
+        });
     }
 
     /**

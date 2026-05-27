@@ -22,6 +22,16 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'marketing_email' => [
+        'provider' => env('MARKETING_EMAIL_PROVIDER', 'resend'),
+    ],
+
+    'resend_marketing' => [
+        'key' => env('RESEND_MARKETING_API_KEY', 're_LY9qrsRb_Lf4XLHAwTi1pkG7FGwCaMUJA'),
+        'base_url' => env('RESEND_MARKETING_BASE_URL', 'https://api.resend.com'),
+        'timeout' => (int) env('RESEND_MARKETING_TIMEOUT', 15),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

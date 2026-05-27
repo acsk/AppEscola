@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\StudentCalendarController;
 use App\Http\Controllers\Api\PastExamController;
 use App\Http\Controllers\Api\StudentPastExamController;
 use App\Http\Controllers\Api\ExamTypeController;
+use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
 
 // Health check (público)
@@ -170,6 +171,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Turmas
     Route::apiResource('school-classes', SchoolClassController::class);
+    Route::get('reports/class-students', [ReportController::class, 'classStudents']);
 
     // Horários por turma (nested)
     Route::prefix('school-classes/{schoolClass}/schedules')->group(function () {

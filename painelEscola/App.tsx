@@ -40,6 +40,7 @@ import { BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/conf
 import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
+import { ClassStudentsReportScreen } from "./screens/relatorios";
 
 import type { NavState } from "./types/navigation";
 
@@ -109,6 +110,7 @@ const SCREEN_SLUGS = [
   "configuracoes-tema-mobile",
   "notificacoes",
   "calendario",
+  "relatorios-turmas",
 ];
 
 function hashToNav(hash: string): NavState {
@@ -219,6 +221,11 @@ function hashToNav(hash: string): NavState {
     return { screen: "configuracoes-cobranca" };
   }
 
+  if (seg0 === "relatorios") {
+    if (seg1 === "turmas") return { screen: "relatorios-turmas" };
+    return { screen: "relatorios-turmas" };
+  }
+
   if (seg0 && SCREEN_SLUGS.includes(seg0)) return { screen: seg0 };
   return { screen: "dashboard" };
 }
@@ -273,6 +280,7 @@ function navToHash(nav: NavState): string {
   }
   if (nav.screen === "configuracoes-tema-mobile") return "#/configuracoes/tema-mobile";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
+  if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
   return `#/${nav.screen}`;
 }
 
@@ -628,6 +636,8 @@ function AppContent() {
     ? "notificacoes"
     : nav.screen.startsWith("calendario")
     ? "calendario"
+    : nav.screen.startsWith("relatorios")
+    ? "relatorios-turmas"
     : nav.screen.startsWith("simulados")
     ? "simulados"
     : nav.screen.startsWith("tipos-prova")
@@ -790,6 +800,7 @@ function AppContent() {
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
+      case "relatorios-turmas": return <ClassStudentsReportScreen navigate={navigate} />;
       default: return <DashboardScreen />;
     }
   };

@@ -22,6 +22,8 @@
     "expo": "~54.0.33",
     "expo-font": "~14.0.11",
     "expo-status-bar": "~3.0.9",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react-native": "^1.14.0",
     "nativewind": "^4.2.3",
     "pdfjs-dist": "5.4.296",

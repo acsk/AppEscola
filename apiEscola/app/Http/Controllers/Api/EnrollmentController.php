@@ -843,8 +843,15 @@ class EnrollmentController extends Controller
         $this->authorizeTenant($request, $enrollment->tenant_id);
 
         $validated = $request->validated();
+        if (array_key_exists('school_class_id', $validated)) {
+            $schoolClass = SchoolClass::findOrFail((int) $validated['school_class_id']);
+            $this->authorizeTenant($request, $schoolClass->tenant_id);
+        }
         $this->financialLock->assertChangesAllowed($enrollment, $validated);
         $enrollment->update($validated);
+        if (array_key_exists('school_class_id', $validated)) {
+            $enrollment->syncSchoolClasses([(int) $validated['school_class_id']]);
+        }
 
         if (array_key_exists('monthly_amount', $validated) || array_key_exists('discount_amount', $validated)) {
             $enrollment->refresh();

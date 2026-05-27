@@ -106,6 +106,16 @@ input:focus, select:focus, textarea:focus {
 - Select com busca: `components/ui/SearchableSelect.tsx`
 - Pagamentos: `components/payments/PaymentProviderSelectField.tsx`
 
+### Padrão de PDF (timbrado)
+
+- Conteúdo de **cabeçalho detalhado** (ex.: turma, curso, período, horários) deve ficar no **PDF**, não como bloco extra na tela.
+- Para relatórios/exportações em PDF, usar layout **timbrado** com:
+  - logo da escola (quando disponível),
+  - nome da escola,
+  - dados institucionais relevantes (ex.: endereço/contato),
+  - título e subtítulo do documento.
+- Manter esse padrão em todos os módulos que exportam PDF para consistência visual.
+
 ## Navegação
 
 - Fluxo controlado em `App.tsx` (estado de tela ativa)

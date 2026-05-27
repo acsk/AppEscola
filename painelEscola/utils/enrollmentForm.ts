@@ -31,6 +31,10 @@ export function validateEnrollmentEditForm(
   const errors: Record<string, string> = {};
   const locked = options.financialLocked === true;
 
+  if (!form.school_class_id.trim()) {
+    errors.school_class_id = "Selecione a turma.";
+  }
+
   if (!locked) {
     if (!form.start_date.trim()) {
       errors.start_date = "Informe a data de início.";

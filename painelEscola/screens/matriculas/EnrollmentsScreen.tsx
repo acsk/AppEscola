@@ -164,6 +164,13 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     return courseId != null && String(courseId) === courseFilter;
   });
 
+  const editClassOptions = classes.map((schoolClass) => ({
+    value: String(schoolClass.id),
+    label: schoolClass.course?.name
+      ? `${schoolClass.name} · ${schoolClass.course.name}`
+      : schoolClass.name,
+  }));
+
   const clearFilters = () => {
     setSearch("");
     setStatusFilter("");
@@ -256,6 +263,9 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     setEditErrors({});
     try {
       const payload: Record<string, any> = { status: editForm.status };
+      if (editForm.school_class_id.trim()) {
+        payload.school_class_id = Number(editForm.school_class_id);
+      }
       if (!financialFieldsLocked) {
         const startIso = displayToISO(editForm.start_date);
         if (startIso) payload.start_date = startIso;
@@ -855,6 +865,18 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             </Text>
           </View>
         )}
+        <View className="flex-row gap-4">
+          <View className="flex-1">
+            <FormSelect
+              label="Turma"
+              required
+              value={editForm.school_class_id}
+              options={editClassOptions}
+              onChange={(v) => setEditForm({ ...editForm, school_class_id: v })}
+              error={editErrors.school_class_id}
+            />
+          </View>
+        </View>
         <View className="flex-row gap-4">
           <View className="flex-1">
             <DatePickerInput

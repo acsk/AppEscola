@@ -119,6 +119,14 @@ export default function Sidebar({
         { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
       ],
     },
+    {
+      title: "Relatórios",
+      icon: "bar-chart-outline",
+      tone: "slate",
+      items: [
+        { id: "relatorios-turmas", label: "Turmas (alunos)", icon: "document-text-outline" },
+      ],
+    },
     ...(canSendNotifications
       ? [
           {
