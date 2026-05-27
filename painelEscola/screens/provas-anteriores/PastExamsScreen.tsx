@@ -81,9 +81,8 @@ function mapPastExamApiErrors(
   return parsed;
 }
 
-const MAX_PDF_UPLOAD_KB = 150;
-const MAX_PDF_UPLOAD_BYTES = MAX_PDF_UPLOAD_KB * 1024;
-const PDF_SIZE_ERROR = `O PDF deve ter no máximo ${MAX_PDF_UPLOAD_KB} kB.`;
+// Não aplicamos limite de tamanho no frontend.
+// Se o backend tiver limites (upload_max_filesize / etc), a API vai retornar 413/422 e a UI exibe o erro.
 
 function pdfFileNameFromContent(content: string): string {
   try {
@@ -318,12 +317,6 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
       setErrors((prev) => ({ ...prev, file: "Envie apenas arquivos PDF." }));
       return;
     }
-    if (file && file.size > MAX_PDF_UPLOAD_BYTES) {
-      setPdfFile(null);
-      e.currentTarget.value = "";
-      setErrors((prev) => ({ ...prev, file: PDF_SIZE_ERROR }));
-      return;
-    }
     setPdfFile(file);
     setErrors((prev) => {
       const next = { ...prev };
@@ -340,7 +333,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             Arquivo PDF{!editingId ? " *" : ""}
           </Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            Máximo {MAX_PDF_UPLOAD_KB} kB
+            Envie qualquer tamanho de PDF (limite do servidor pode se aplicar).
             {editingId ? " · deixe em branco para manter o arquivo atual" : ""}
           </Text>
         </View>
@@ -504,7 +497,6 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     if (!form.title.trim()) localErrors.title = "Título obrigatório";
     if (!form.exam_type) localErrors.exam_type = "Selecione a classificação da prova.";
     if (!editingId && !pdfFile) localErrors.file = "Selecione o arquivo PDF da prova.";
-    if (pdfFile && pdfFile.size > MAX_PDF_UPLOAD_BYTES) localErrors.file = PDF_SIZE_ERROR;
     const examDateError = validateExamDateField(form.exam_date);
     if (examDateError) localErrors.exam_date = examDateError;
     if (Object.keys(localErrors).length) {
