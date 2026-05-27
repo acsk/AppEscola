@@ -2,6 +2,7 @@ import { api } from './api';
 import type { SimuladoSubject } from './simulados.service';
 
 export type PastExamType = 'link' | 'file';
+export type PastExamMaterialKind = 'prova' | 'exercicio';
 export type PastExamFileType = 'pdf' | 'image' | 'document' | null;
 
 export interface PastExamListItem {
@@ -12,6 +13,8 @@ export interface PastExamListItem {
   exam_date: string | null;
   exam_type: string | null;
   exam_type_label: string | null;
+  material_kind?: PastExamMaterialKind;
+  material_kind_label?: string | null;
   type: PastExamType;
   content: string;
   file_type: PastExamFileType;
@@ -41,6 +44,7 @@ export interface PastExamsListFilters {
   subject_id?: number;
   exam_year?: number;
   exam_type?: string;
+  material_kind?: PastExamMaterialKind;
 }
 
 export async function listarProvasAnteriores(
@@ -51,6 +55,7 @@ export async function listarProvasAnteriores(
   if (filters?.subject_id != null) params.subject_id = filters.subject_id;
   if (filters?.exam_year != null) params.exam_year = filters.exam_year;
   if (filters?.exam_type) params.exam_type = filters.exam_type;
+  if (filters?.material_kind) params.material_kind = filters.material_kind;
 
   const { data } = await api.get<PastExamListItem[] | ApiEnvelope<PastExamListItem[]>>(
     '/api/aluno/past-exams',

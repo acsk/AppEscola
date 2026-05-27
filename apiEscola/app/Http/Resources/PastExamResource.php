@@ -39,6 +39,8 @@ class PastExamResource extends JsonResource
             'exam_type'    => $this->examType?->slug ?? $this->exam_type,
             'exam_type_label' => $this->examType?->label
                 ?? ($this->exam_type ? (config('past_exams.exam_types.'.$this->exam_type) ?? $this->exam_type) : null),
+            'material_kind'       => $this->material_kind ?? 'prova',
+            'material_kind_label' => config('past_exams.material_kinds.'.($this->material_kind ?? 'prova')),
             'type'         => $this->type,
             'content'      => $this->content,
             'file_type'    => $this->file_type,

@@ -33,13 +33,27 @@ type NavigationStateSnapshot = Partial<NavigationState> | undefined;
 
 const DRAWER_WIDTH = 312;
 
-type MenuId = 'home' | 'calendario' | 'desempenho' | 'simulados' | 'provas-anteriores' | 'financeiro';
+type MenuId =
+  | 'home'
+  | 'calendario'
+  | 'desempenho'
+  | 'simulados'
+  | 'provas-anteriores'
+  | 'exercicios'
+  | 'financeiro';
 
 type MenuItem =
-  | { id: MenuId; label: string; icon: IconName; tab: TabName; nestedScreen?: 'ProvasAnteriores' | 'SimuladosList' }
+  | {
+      id: MenuId;
+      label: string;
+      icon: IconName;
+      tab: TabName;
+      nestedScreen?: 'ProvasAnteriores' | 'Exercicios' | 'SimuladosList';
+    }
   | { id: MenuId; label: string; icon: IconName; stack: keyof Pick<AlunoStackParamList, 'Calendario'> };
 
 const PROVAS_ANTERIORES_SCREENS = new Set(['ProvasAnteriores', 'ProvaAnteriorDetalhe']);
+const EXERCICIOS_SCREENS = new Set(['Exercicios']);
 const SIMULADOS_SCREENS = new Set(['SimuladosList', 'SimuladoDetalhe', 'SimuladoExam']);
 
 const MENU_ITEMS: MenuItem[] = [
@@ -48,6 +62,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'desempenho', label: 'Desempenho', tab: 'Desempenho', icon: 'stats-chart-outline' },
   { id: 'simulados', label: 'Simulados', tab: 'Simulados', icon: 'clipboard-outline' },
   { id: 'provas-anteriores', label: 'Provas anteriores', tab: 'Simulados', nestedScreen: 'ProvasAnteriores', icon: 'archive-outline' },
+  { id: 'exercicios', label: 'Exercícios', tab: 'Simulados', nestedScreen: 'Exercicios', icon: 'create-outline' },
   { id: 'financeiro', label: 'Financeiro', tab: 'Financeiro', icon: 'wallet-outline' },
 ];
 
@@ -63,7 +78,10 @@ function isAlunoTabName(name: string | undefined): name is TabName {
   return name === 'Home' || name === 'Desempenho' || name === 'Simulados' || name === 'Financeiro';
 }
 
-function getActiveSimuladosScreen(state: NavigationStateSnapshot): string | null {
+function getActiveSimuladosScreen(state: NavigationStateSnapshot): {
+  name: string;
+  params?: { listScreen?: string };
+} | null {
   const routes = state?.routes;
   if (!routes?.length) return null;
 
@@ -72,7 +90,13 @@ function getActiveSimuladosScreen(state: NavigationStateSnapshot): string | null
 
   const tabState = stackRoute.state as {
     index?: number;
-    routes?: Array<{ name?: string; state?: { index?: number; routes?: Array<{ name?: string }> } }>;
+    routes?: Array<{
+      name?: string;
+      state?: {
+        index?: number;
+        routes?: Array<{ name?: string; params?: { listScreen?: string } }>;
+      };
+    }>;
   } | undefined;
   const tabRoutes = tabState?.routes;
   if (!tabRoutes?.length) return null;
@@ -82,10 +106,13 @@ function getActiveSimuladosScreen(state: NavigationStateSnapshot): string | null
 
   const simState = tabRoute.state;
   const simRoutes = simState?.routes;
-  if (!simRoutes?.length) return 'SimuladosList';
+  if (!simRoutes?.length) return { name: 'SimuladosList' };
 
   const simRoute = simRoutes[simState?.index ?? 0] ?? simRoutes[0];
-  return simRoute?.name ?? 'SimuladosList';
+  return {
+    name: simRoute?.name ?? 'SimuladosList',
+    params: simRoute?.params as { listScreen?: string } | undefined,
+  };
 }
 
 function getActiveMenuId(state: NavigationStateSnapshot): MenuId | null {
@@ -101,8 +128,17 @@ function getActiveMenuId(state: NavigationStateSnapshot): MenuId | null {
 
   if (activeTab === 'Simulados') {
     const simScreen = getActiveSimuladosScreen(state);
-    if (simScreen && PROVAS_ANTERIORES_SCREENS.has(simScreen)) return 'provas-anteriores';
-    if (!simScreen || SIMULADOS_SCREENS.has(simScreen)) return 'simulados';
+    if (!simScreen) return 'simulados';
+    if (simScreen.name === 'Exercicios') return 'exercicios';
+    if (
+      simScreen.name === 'ProvaAnteriorDetalhe' &&
+      simScreen.params?.listScreen === 'Exercicios'
+    ) {
+      return 'exercicios';
+    }
+    if (PROVAS_ANTERIORES_SCREENS.has(simScreen.name)) return 'provas-anteriores';
+    if (EXERCICIOS_SCREENS.has(simScreen.name)) return 'exercicios';
+    if (SIMULADOS_SCREENS.has(simScreen.name)) return 'simulados';
     return 'simulados';
   }
 

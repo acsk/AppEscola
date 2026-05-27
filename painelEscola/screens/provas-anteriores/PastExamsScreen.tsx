@@ -26,6 +26,8 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import type { WithNavigate } from "../../types/navigation";
 
+type PastExamMaterialKind = "prova" | "exercicio";
+
 type PastExamRow = {
   id: number;
   title: string;
@@ -34,6 +36,8 @@ type PastExamRow = {
   exam_date: string | null;
   exam_type: string | null;
   exam_type_label: string | null;
+  material_kind?: PastExamMaterialKind;
+  material_kind_label?: string | null;
   type: "file";
   content: string;
   file_size?: number | null;
@@ -51,11 +55,23 @@ const PUBLISHED_FILTER_OPTIONS = [
   { value: "0", label: "Não publicadas" },
 ];
 
+const MATERIAL_KIND_OPTIONS = [
+  { value: "", label: "Prova e exercício" },
+  { value: "prova", label: "Prova" },
+  { value: "exercicio", label: "Exercício" },
+];
+
+const MATERIAL_KIND_FORM_OPTIONS = [
+  { value: "prova", label: "Prova" },
+  { value: "exercicio", label: "Exercício" },
+];
+
 const EMPTY_FORM = {
   title: "",
   description: "",
   exam_date: "",
   exam_type: "",
+  material_kind: "prova" as PastExamMaterialKind,
   course_ids: [] as number[],
   subject_id: "",
   is_published: "true",
@@ -138,6 +154,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
   const [filterExamType, setFilterExamType] = useState("");
   const [filterExamYear, setFilterExamYear] = useState("");
   const [filterPublished, setFilterPublished] = useState("");
+  const [filterMaterialKind, setFilterMaterialKind] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({
     current_page: 1,
@@ -178,7 +195,8 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     !!filterSubjectId ||
     !!filterExamType ||
     !!filterExamYear ||
-    filterPublished !== "";
+    filterPublished !== "" ||
+    !!filterMaterialKind;
 
   const clearFilters = () => {
     setSearch("");
@@ -187,6 +205,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setFilterExamType("");
     setFilterExamYear("");
     setFilterPublished("");
+    setFilterMaterialKind("");
     setPage(1);
   };
 
@@ -200,6 +219,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
       if (filterExamType) params.exam_type = filterExamType;
       if (filterExamYear) params.exam_year = filterExamYear;
       if (filterPublished !== "") params.is_published = filterPublished === "1" ? 1 : 0;
+      if (filterMaterialKind) params.material_kind = filterMaterialKind;
 
       const { data } = await api.get("/past-exams", { params });
       const body = data?.body ?? data;
@@ -227,6 +247,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     filterExamType,
     filterExamYear,
     filterPublished,
+    filterMaterialKind,
   ]);
 
   useEffect(() => {
@@ -307,6 +328,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           ? `01/01/${row.exam_year}`
           : "",
       exam_type: row.exam_type ?? "",
+      material_kind: row.material_kind ?? "prova",
       course_ids: courseIds,
       subject_id: row.subject ? String(row.subject.id) : "",
       is_published: row.is_published ? "true" : "false",
@@ -404,7 +426,9 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             <View style={{ flex: 1 }}>
               <Text className="text-sm font-semibold text-gray-800">{row.title}</Text>
               <Text className="text-xs text-gray-400 mt-0.5">
-                {[dateLabel, row.exam_type_label, row.subject?.name].filter(Boolean).join(" · ")}
+                {[row.material_kind_label, dateLabel, row.exam_type_label, row.subject?.name]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Text>
               <Text className="text-xs text-gray-500 mt-1" numberOfLines={2}>
                 {courseNamesForRow(row)}
@@ -461,7 +485,8 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         <View style={{ flex: 3 }}>
           <Text className="text-sm font-medium text-gray-800">{row.title}</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {row.exam_type_label ?? "—"}
+            {row.material_kind_label ?? "Prova"}
+            {row.exam_type_label ? ` · ${row.exam_type_label}` : ""}
             {sizeLabel ? ` · ${sizeLabel}` : ""}
           </Text>
         </View>
@@ -545,6 +570,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           description: form.description.trim() || null,
           exam_date: examDateIso || null,
           exam_type: form.exam_type,
+          material_kind: form.material_kind,
           subject_id: form.subject_id ? Number(form.subject_id) : null,
           course_ids: form.course_ids,
           is_published: form.is_published === "true",
@@ -571,6 +597,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           formData.append("exam_date", examDateIso);
         }
         formData.append("exam_type", form.exam_type);
+        formData.append("material_kind", form.material_kind);
         form.course_ids.forEach((id) => formData.append("course_ids[]", String(id)));
         if (form.subject_id) formData.append("subject_id", form.subject_id);
         formData.append("is_published", form.is_published === "true" ? "1" : "0");
@@ -642,7 +669,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         <View>
           <Text className="text-2xl font-bold text-gray-800">Provas anteriores</Text>
           <Text className="text-sm text-gray-500">
-            Biblioteca de provas em PDF visível no app do aluno
+            Biblioteca de provas e exercícios em PDF visível no app do aluno
           </Text>
         </View>
         <TouchableOpacity
@@ -651,7 +678,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Nova prova</Text>
+          <Text className="text-white font-semibold text-sm ml-1.5">Novo material</Text>
         </TouchableOpacity>
       </View>
 
@@ -766,6 +793,21 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           >
             {PUBLISHED_FILTER_OPTIONS.map((option) => (
               <option key={option.value || "all"} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filterMaterialKind}
+            onChange={(e: any) => {
+              setFilterMaterialKind(e.target.value);
+              setPage(1);
+            }}
+            style={selectStyle}
+          >
+            {MATERIAL_KIND_OPTIONS.map((option) => (
+              <option key={option.value || "all-kinds"} value={option.value}>
                 {option.label}
               </option>
             ))}
@@ -946,6 +988,17 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           </View>
 
           <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <FormSelect
+                label="Tipo"
+                required
+                value={form.material_kind}
+                options={MATERIAL_KIND_FORM_OPTIONS}
+                onChange={(material_kind) =>
+                  setForm((p) => ({ ...p, material_kind: material_kind as PastExamMaterialKind }))
+                }
+              />
+            </View>
             <View style={{ flex: 1 }}>
               <FormSelect
                 label="Classificação"

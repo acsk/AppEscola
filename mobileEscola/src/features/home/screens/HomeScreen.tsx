@@ -136,7 +136,7 @@ export function HomeScreen() {
   const simCardWidth = (width - 32 - 12 * (simColumns - 1)) / simColumns;
 
   const { data: simuladosLista = [] } = useSimuladosList();
-  const { data: provasAnterioresLista = [] } = useProvasAnterioresList();
+  const { data: provasAnterioresLista = [] } = useProvasAnterioresList({ material_kind: 'prova' });
   const simuladosRecentes = user?.role === 'aluno' ? simuladosLista : [];
   const provasAnterioresRecentes = user?.role === 'aluno' ? provasAnterioresLista.slice(0, 5) : [];
   const {

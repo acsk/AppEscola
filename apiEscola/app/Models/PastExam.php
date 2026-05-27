@@ -24,6 +24,7 @@ class PastExam extends Model
         'exam_date',
         'exam_type',
         'exam_type_id',
+        'material_kind',
         'type',
         'content',
         'file_type',

@@ -52,7 +52,8 @@ class PastExamController extends Controller
                     $inner->where('exam_type', $v)
                         ->orWhereHas('examType', fn ($t) => $t->where('slug', $v));
                 });
-            });
+            })
+            ->when($request->query('material_kind'), fn ($q, $v) => $q->where('material_kind', $v));
 
         return PastExamResource::collection(
             $query->orderByDesc('sort_order')->orderByDesc('exam_date')->orderByDesc('exam_year')->orderBy('title')->paginate(20)
@@ -151,6 +152,7 @@ class PastExamController extends Controller
             'exam_date'    => $data['exam_date'] ?? null,
             'exam_type'    => $data['exam_type'] ?? null,
             'exam_type_id' => $data['exam_type_id'] ?? null,
+            'material_kind' => $data['material_kind'] ?? 'prova',
             'subject_id'   => $data['subject_id'] ?? null,
             'type'         => 'file',
             'content'      => $contentUrl,

@@ -36,6 +36,7 @@ class UpdatePastExamRequest extends FormRequest
             'exam_year'    => ['sometimes', 'nullable', 'integer', 'min:1990', 'max:2100'],
             'exam_date'    => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'exam_type'    => ['sometimes', 'required', 'string', new ActiveExamTypeSlug()],
+            'material_kind' => ['sometimes', 'in:prova,exercicio'],
             'course_ids'   => ['sometimes', 'nullable', 'array'],
             'course_ids.*' => $this->pastExamCourseIdItemRules(),
             'course_id'    => array_merge(['sometimes'], $this->pastExamLegacyCourseIdRules()),

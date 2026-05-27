@@ -38,7 +38,14 @@ function formatFileSize(bytes: number | null | undefined): string | null {
 }
 
 export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
-  const { pastExamId } = route.params;
+  const {
+    pastExamId,
+    listScreen = 'ProvasAnteriores',
+    materialKind = 'prova',
+  } = route.params;
+  const isExercicio = materialKind === 'exercicio';
+  const listTitle = isExercicio ? 'Exercícios' : 'Provas anteriores';
+  const detailTitle = isExercicio ? 'Exercício' : 'Prova';
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: prova, isLoading, isError, error, refetch } = useProvaAnteriorDetail(pastExamId);
@@ -67,10 +74,17 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ProvasAnterioresHeader variant="detail" />
+        <ProvasAnterioresHeader
+          variant="detail"
+          title={listTitle}
+          listScreen={listScreen}
+          detailTitle={detailTitle}
+        />
         <View style={styles.centro}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.carregandoTexto}>Carregando prova…</Text>
+          <Text style={styles.carregandoTexto}>
+            {isExercicio ? 'Carregando exercício…' : 'Carregando prova…'}
+          </Text>
         </View>
       </View>
     );
@@ -79,17 +93,25 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   if (isError || !prova) {
     return (
       <View style={styles.container}>
-        <ProvasAnterioresHeader variant="detail" />
+        <ProvasAnterioresHeader
+          variant="detail"
+          title={listTitle}
+          listScreen={listScreen}
+          detailTitle={detailTitle}
+        />
         <View style={styles.centro}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
           <Text style={styles.erroTexto}>
-            {getApiErrorMessage(error, 'Prova não encontrada.')}
+            {getApiErrorMessage(
+              error,
+              isExercicio ? 'Exercício não encontrado.' : 'Prova não encontrada.',
+            )}
           </Text>
           <TouchableOpacity style={styles.botaoTentar} onPress={() => refetch()} activeOpacity={0.85}>
             <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => navigation.navigate('ProvasAnteriores')}
+            onPress={() => navigation.navigate(listScreen)}
             style={styles.botaoVoltarLink}
           >
             <Text style={styles.botaoVoltarLinkTexto}>Voltar para a lista</Text>
@@ -109,13 +131,24 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   const botaoLabel =
     prova.type === 'file'
       ? prova.file_type === 'pdf'
-        ? 'Abrir PDF da prova'
-        : 'Abrir arquivo da prova'
-      : 'Abrir prova no navegador';
+        ? isExercicio
+          ? 'Abrir PDF do exercício'
+          : 'Abrir PDF da prova'
+        : isExercicio
+          ? 'Abrir arquivo do exercício'
+          : 'Abrir arquivo da prova'
+      : isExercicio
+        ? 'Abrir exercício no navegador'
+        : 'Abrir prova no navegador';
 
   return (
     <View style={styles.container}>
-      <ProvasAnterioresHeader variant="detail" />
+      <ProvasAnterioresHeader
+        variant="detail"
+        title={listTitle}
+        listScreen={listScreen}
+        detailTitle={detailTitle}
+      />
 
       <ScrollView
         style={styles.scroll}

@@ -5,6 +5,11 @@
  * Mantido apenas como fallback de label em registros antigos sem FK.
  */
 return [
+    'material_kinds' => [
+        'prova'      => 'Prova',
+        'exercicio'  => 'Exercício',
+    ],
+
     'exam_types' => [
         'enem'       => 'ENEM',
         'vestibular' => 'Vestibular',

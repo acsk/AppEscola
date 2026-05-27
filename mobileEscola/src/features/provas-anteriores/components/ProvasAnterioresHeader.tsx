@@ -11,12 +11,22 @@ import type { ThemeColors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList>;
 
+type ListScreenName = 'ProvasAnteriores' | 'Exercicios';
+
 type ProvasAnterioresHeaderProps = {
-  /** Lista = menu + "Provas anteriores"; detalhe = voltar + "Prova". */
+  /** Lista = menu + título; detalhe = voltar + título curto. */
   variant?: 'list' | 'detail';
+  title?: string;
+  listScreen?: ListScreenName;
+  detailTitle?: string;
 };
 
-export function ProvasAnterioresHeader({ variant = 'list' }: ProvasAnterioresHeaderProps) {
+export function ProvasAnterioresHeader({
+  variant = 'list',
+  title = 'Provas anteriores',
+  listScreen = 'ProvasAnteriores',
+  detailTitle = 'Prova',
+}: ProvasAnterioresHeaderProps) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
@@ -24,7 +34,7 @@ export function ProvasAnterioresHeader({ variant = 'list' }: ProvasAnterioresHea
   const isDetail = variant === 'detail';
 
   function voltarParaLista() {
-    navigation.navigate('ProvasAnteriores');
+    navigation.navigate(listScreen);
   }
 
   return (
@@ -51,12 +61,12 @@ export function ProvasAnterioresHeader({ variant = 'list' }: ProvasAnterioresHea
             onPress={voltarParaLista}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="Voltar para provas anteriores"
+            accessibilityLabel={`Voltar para ${title}`}
           >
-            <Text style={styles.headerTitulo}>Prova</Text>
+            <Text style={styles.headerTitulo}>{detailTitle}</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={[styles.headerTitulo, styles.headerTituloFlex]}>Provas anteriores</Text>
+          <Text style={[styles.headerTitulo, styles.headerTituloFlex]}>{title}</Text>
         )}
         <TouchableOpacity
           style={styles.headerLinkBtn}

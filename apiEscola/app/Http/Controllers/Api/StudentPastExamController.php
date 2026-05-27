@@ -48,7 +48,12 @@ class StudentPastExamController extends Controller
                     $inner->where('exam_type', $v)
                         ->orWhereHas('examType', fn ($t) => $t->where('slug', $v));
                 });
-            });
+            })
+            ->when(
+                $request->filled('material_kind'),
+                fn ($q) => $q->where('material_kind', $request->query('material_kind')),
+                fn ($q) => $q->where('material_kind', 'prova'),
+            );
 
         $items = $query
             ->orderByDesc('sort_order')
