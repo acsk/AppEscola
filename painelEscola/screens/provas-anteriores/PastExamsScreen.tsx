@@ -12,9 +12,17 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
-import { displayToISO, isoToDisplay } from "../../utils/masks";
-import DatePickerInput from "../../components/ui/DatePickerInput";
+import { isoToDisplay } from "../../utils/masks";
+import {
+  appendScheduleToFormData,
+  defaultScheduleForMaterial,
+  scheduleFromPastExamRow,
+  scheduleToApiPayload,
+  validatePastExamSchedule,
+  type PastExamScheduleMode,
+} from "../../utils/pastExamSchedule";
 import FormInput from "../../components/ui/FormInput";
+import PastExamScheduleFields from "../../components/provas-anteriores/PastExamScheduleFields";
 import FormSelect from "../../components/ui/FormSelect";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import Badge from "../../components/ui/Badge";
@@ -69,6 +77,8 @@ const MATERIAL_KIND_FORM_OPTIONS = [
 const EMPTY_FORM = {
   title: "",
   description: "",
+  exam_schedule_mode: "year" as PastExamScheduleMode,
+  exam_year: "",
   exam_date: "",
   exam_type: "",
   material_kind: "prova" as PastExamMaterialKind,
@@ -77,28 +87,12 @@ const EMPTY_FORM = {
   is_published: "true",
 };
 
-function validateExamDateField(
-  display: string,
-  materialKind: PastExamMaterialKind,
-): string | null {
-  const trimmed = display.trim();
-  if (!trimmed) {
-    return materialKind === "prova" ? "Informe o ano da prova." : null;
-  }
-  const iso = displayToISO(trimmed);
-  if (!iso) return "Informe a data completa (dd/mm/aaaa) ou o ano da prova.";
-  const year = Number(iso.slice(0, 4));
-  if (year < 1990 || year > 2100) return "A data da prova deve ser de 1990 em diante.";
-  return null;
-}
-
 function mapPastExamApiErrors(
   raw: Record<string, string | string[]>
 ): Record<string, string> {
   const parsed = parseApiErrors(raw);
-  if (parsed.exam_year && !parsed.exam_date) {
-    parsed.exam_date = parsed.exam_year;
-    delete parsed.exam_year;
+  if (parsed.exam_date && !parsed.exam_year) {
+    parsed.exam_year = parsed.exam_date;
   }
   return parsed;
 }
@@ -324,14 +318,13 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           : row.course
             ? [row.course.id]
             : [];
+    const schedule = scheduleFromPastExamRow(row);
     setForm({
       title: row.title,
       description: row.description ?? "",
-      exam_date: row.exam_date
-        ? isoToDisplay(row.exam_date)
-        : row.exam_year
-          ? `01/01/${row.exam_year}`
-          : "",
+      exam_schedule_mode: schedule.mode,
+      exam_year: schedule.exam_year,
+      exam_date: schedule.exam_date,
       exam_type: row.exam_type ?? "",
       material_kind: row.material_kind ?? "prova",
       course_ids: courseIds,
@@ -554,8 +547,15 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           : "Selecione a classificação da prova.";
     }
     if (!editingId && !pdfFile) localErrors.file = "Selecione o arquivo PDF da prova.";
-    const examDateError = validateExamDateField(form.exam_date, form.material_kind);
-    if (examDateError) localErrors.exam_date = examDateError;
+    const scheduleErrors = validatePastExamSchedule(
+      {
+        mode: form.exam_schedule_mode,
+        exam_year: form.exam_year,
+        exam_date: form.exam_date,
+      },
+      form.material_kind,
+    );
+    Object.assign(localErrors, scheduleErrors);
     if (Object.keys(localErrors).length) {
       setErrors(localErrors);
       setToast({
@@ -569,11 +569,16 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setSaving(true);
     try {
       if (editingId) {
-        const examDateIso = displayToISO(form.exam_date);
+        const schedulePayload = scheduleToApiPayload({
+          mode: form.exam_schedule_mode,
+          exam_year: form.exam_year,
+          exam_date: form.exam_date,
+        });
         const payload = {
           title: form.title.trim(),
           description: form.description.trim() || null,
-          exam_date: examDateIso || null,
+          exam_date: schedulePayload.exam_date,
+          exam_year: schedulePayload.exam_year,
           exam_type: form.exam_type,
           material_kind: form.material_kind,
           subject_id: form.subject_id ? Number(form.subject_id) : null,
@@ -597,10 +602,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         const formData = new FormData();
         formData.append("title", form.title.trim());
         if (form.description.trim()) formData.append("description", form.description.trim());
-        const examDateIso = displayToISO(form.exam_date);
-        if (examDateIso) {
-          formData.append("exam_date", examDateIso);
-        }
+        appendScheduleToFormData(formData, {
+          mode: form.exam_schedule_mode,
+          exam_year: form.exam_year,
+          exam_date: form.exam_date,
+        });
         formData.append("exam_type", form.exam_type);
         formData.append("material_kind", form.material_kind);
         form.course_ids.forEach((id) => formData.append("course_ids[]", String(id)));
@@ -962,22 +968,34 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           />
 
           <View style={{ flexDirection: compactStack ? "column" : "row", gap: 12 }}>
-            <View style={{ flex: 1, minWidth: compactStack ? undefined : 220 }}>
-              <DatePickerInput
-                label={form.material_kind === "prova" ? "Ano / data da prova" : "Data (opcional)"}
-                required={form.material_kind === "prova"}
-                value={form.exam_date}
-                onChangeText={(exam_date) => {
-                  setForm((p) => ({ ...p, exam_date }));
-                  if (errors.exam_date) {
+            <View style={{ flex: 1, minWidth: compactStack ? undefined : 280 }}>
+              <PastExamScheduleFields
+                materialKind={form.material_kind}
+                value={{
+                  mode: form.exam_schedule_mode,
+                  exam_year: form.exam_year,
+                  exam_date: form.exam_date,
+                }}
+                onChange={(schedule) => {
+                  setForm((p) => ({
+                    ...p,
+                    exam_schedule_mode: schedule.mode,
+                    exam_year: schedule.exam_year,
+                    exam_date: schedule.exam_date,
+                  }));
+                  if (errors.exam_date || errors.exam_year) {
                     setErrors((prev) => {
                       const next = { ...prev };
                       delete next.exam_date;
+                      delete next.exam_year;
                       return next;
                     });
                   }
                 }}
-                error={errors.exam_date}
+                errors={{
+                  exam_date: errors.exam_date,
+                  exam_year: errors.exam_year,
+                }}
               />
             </View>
             <View style={{ flex: 1, minWidth: compactStack ? undefined : 200 }}>
@@ -1000,9 +1018,26 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 required
                 value={form.material_kind}
                 options={MATERIAL_KIND_FORM_OPTIONS}
-                onChange={(material_kind) =>
-                  setForm((p) => ({ ...p, material_kind: material_kind as PastExamMaterialKind }))
-                }
+                onChange={(material_kind) => {
+                  const kind = material_kind as PastExamMaterialKind;
+                  setForm((p) => {
+                    const defaults = defaultScheduleForMaterial(kind);
+                    let mode = p.exam_schedule_mode;
+                    if (kind === "prova" && mode === "none") {
+                      mode = defaults.mode;
+                    }
+                    if (kind === "exercicio" && mode === "year" && !p.exam_year) {
+                      mode = "none";
+                    }
+                    return {
+                      ...p,
+                      material_kind: kind,
+                      exam_schedule_mode: mode,
+                      exam_year: mode === "year" ? p.exam_year : "",
+                      exam_date: mode === "date" ? p.exam_date : "",
+                    };
+                  });
+                }}
               />
             </View>
             <View style={{ flex: 1 }}>
