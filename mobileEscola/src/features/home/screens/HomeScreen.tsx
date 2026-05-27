@@ -20,7 +20,10 @@ import { compressImageToMaxSize } from '../../../services/image-compression.serv
 import { SimuladoListItem, AttemptStatus, subjectIconName } from '../../../services/simulados.service';
 import { useSimuladosList } from '../../simulados/hooks';
 import { useProvasAnterioresList } from '../../provas-anteriores/hooks';
-import { PastMaterialHomeCard } from '../../provas-anteriores/components/PastMaterialHomeCard';
+import {
+  formatDataProva,
+  type PastExamListItem,
+} from '../../../services/past-exams.service';
 import { uploadStudentPhoto } from '../../../services/student-photo.service';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { platformShadow } from '../../../lib/shadow';
@@ -123,6 +126,71 @@ function getSimuladoDayCounter(simulado: SimuladoListItem): string | null {
   }
 
   return null;
+}
+
+const provaHomeCardShadow = platformShadow({
+  color: '#4F46E5',
+  opacity: 0.1,
+  radius: 12,
+  elevation: 3,
+});
+
+type HomeStyles = ReturnType<typeof createHomeStyles>;
+
+function ProvaAnteriorHomeCard({
+  item,
+  styles,
+  colors,
+  onPress,
+}: {
+  item: PastExamListItem;
+  styles: HomeStyles;
+  colors: ThemeColors;
+  onPress: () => void;
+}) {
+  const dataLabel = formatDataProva(item.exam_date, item.exam_year);
+  const meta = [dataLabel, item.exam_type_label].filter(Boolean).join(' · ');
+  const isPdf = item.type !== 'link';
+
+  return (
+    <TouchableOpacity
+      style={[styles.provaHomeCard, provaHomeCardShadow]}
+      onPress={onPress}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir ${item.title}`}
+    >
+      <View style={[styles.provaHomeAccent, { backgroundColor: colors.primary }]} />
+
+      <View style={styles.provaHomePdf}>
+        <View style={styles.provaHomePdfRing} />
+        <Ionicons
+          name={isPdf ? 'document-text' : 'open-outline'}
+          size={48}
+          color={colors.primary}
+        />
+        <View style={[styles.provaHomePdfBadge, { backgroundColor: colors.primary }]}>
+          <Text style={styles.provaHomePdfBadgeText}>{isPdf ? 'PDF' : 'LINK'}</Text>
+        </View>
+      </View>
+
+      {item.subject ? (
+        <Text style={styles.provaHomeDisciplina} numberOfLines={1}>
+          {item.subject.name.toUpperCase()}
+        </Text>
+      ) : null}
+
+      <Text style={styles.provaHomeTitulo} numberOfLines={2}>
+        {item.title}
+      </Text>
+
+      {meta ? (
+        <Text style={styles.provaHomeMeta} numberOfLines={2}>
+          {meta}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
 }
 
 export function HomeScreen() {
@@ -515,9 +583,11 @@ export function HomeScreen() {
               </View>
             ) : (
               provasAnterioresRecentes.map((p) => (
-                <PastMaterialHomeCard
+                <ProvaAnteriorHomeCard
                   key={p.id}
                   item={p}
+                  styles={styles}
+                  colors={colors}
                   onPress={() =>
                     navigation.navigate('Simulados', {
                       screen: 'ProvaAnteriorDetalhe',
@@ -948,6 +1018,87 @@ function createHomeStyles(colors: ThemeColors) {
   sectionTitle:  { fontSize: 16, fontWeight: '700', color: colors.ink },
   sectionLink:   { fontSize: 13, color: colors.primary, fontWeight: '700' },
   hScroll:       { paddingHorizontal: 16, gap: 12 },
+
+  // Provas anteriores (home)
+  provaHomeCard: {
+    width: 156,
+    marginRight: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 10,
+    paddingLeft: 12,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  provaHomeAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+  },
+  provaHomePdf: {
+    width: 84,
+    height: 84,
+    borderRadius: 14,
+    backgroundColor: colors.soft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  provaHomePdfRing: {
+    position: 'absolute',
+    width: '88%',
+    height: '88%',
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.75,
+  },
+  provaHomePdfBadge: {
+    position: 'absolute',
+    bottom: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  provaHomePdfBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  provaHomeDisciplina: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 0.45,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    marginBottom: 4,
+  },
+  provaHomeTitulo: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.ink,
+    lineHeight: 18,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    marginBottom: 3,
+  },
+  provaHomeMeta: {
+    fontSize: 11,
+    color: colors.muted,
+    lineHeight: 14,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
 
   // Simulados
   simCard: {
