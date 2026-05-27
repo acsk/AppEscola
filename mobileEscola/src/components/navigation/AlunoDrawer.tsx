@@ -21,7 +21,7 @@ import type { AlunoStackParamList, AlunoTabParamList } from '../../navigation/st
 import { navigationRef } from '../../navigation/navigationRef';
 import { useRootNavigationState } from '../../navigation/useRootNavigationState';
 import { platformShadow } from '../../lib/shadow';
-import { useThemeColors } from '../../context/TenantThemeContext';
+import { useThemeColors, useTenantTheme } from '../../context/TenantThemeContext';
 import type { ThemeColors } from '../../theme';
 import ConfirmModal from '../ConfirmModal';
 
@@ -65,14 +65,6 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'exercicios', label: 'Exercícios', tab: 'Simulados', nestedScreen: 'Exercicios', icon: 'create-outline' },
   { id: 'financeiro', label: 'Financeiro', tab: 'Financeiro', icon: 'wallet-outline' },
 ];
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
 
 function isAlunoTabName(name: string | undefined): name is TabName {
   return name === 'Home' || name === 'Desempenho' || name === 'Simulados' || name === 'Financeiro';
@@ -170,9 +162,10 @@ function getActiveTabName(state: NavigationStateSnapshot): TabName | null {
 
 export function AlunoDrawer() {
   const colors = useThemeColors();
+  const { logoUrl, tenantName } = useTenantTheme();
   const styles = useMemo(() => createAlunoDrawerStyles(colors), [colors]);
   const { visible, close } = useAlunoDrawer();
-  const { user, signOut, refreshUserProfile } = useAuth();
+  const { signOut } = useAuth();
   const rootNavState = useRootNavigationState();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -180,20 +173,9 @@ export function AlunoDrawer() {
   const activeMenuId = getActiveMenuId(rootNavState as NavigationStateSnapshot);
   const [shouldRender, setShouldRender] = useState(visible);
   const [confirmLogoutVisible, setConfirmLogoutVisible] = useState(false);
-  const userEmail = user?.email ?? '';
-  const shouldShowEmail = Boolean(userEmail && !userEmail.endsWith('@interno'));
 
   const translateX = useRef(new Animated.Value(-drawerWidth)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-
-  const wasVisibleRef = useRef(false);
-  useEffect(() => {
-    const justOpened = visible && !wasVisibleRef.current;
-    wasVisibleRef.current = visible;
-    if (justOpened) {
-      void refreshUserProfile();
-    }
-  }, [visible, refreshUserProfile]);
 
   useEffect(() => {
     if (visible) {
@@ -246,8 +228,6 @@ export function AlunoDrawer() {
     });
   }, [visible, shouldRender, translateX, backdropOpacity, drawerWidth]);
 
-  const student = user?.student;
-
   function handleAlterarSenha() {
     close();
     if (navigationRef.isReady()) {
@@ -298,20 +278,41 @@ export function AlunoDrawer() {
             styles.drawer,
             {
               width: drawerWidth,
-              paddingTop: insets.top + 12,
+              paddingTop: insets.top,
               paddingBottom: Math.max(insets.bottom, 16),
               transform: [{ translateX }],
             },
           ]}
         >
-          <View style={styles.drawerHeader}>
-            <View>
-              <Text style={styles.drawerTitulo}>Menu</Text>
-              <Text style={styles.drawerSubtitulo}>Acesso rápido</Text>
+          <View style={styles.drawerTopLight}>
+            <View style={styles.drawerHeader}>
+              <View>
+                <Text style={styles.drawerTituloLight}>Menu</Text>
+                <Text style={styles.drawerSubtituloLight}>Acesso rápido</Text>
+              </View>
+              <TouchableOpacity
+                onPress={close}
+                style={styles.fecharBtnLight}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={22} color={colors.ink} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={close} style={styles.fecharBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={22} color={colors.drawer_header_icon} />
-            </TouchableOpacity>
+
+            <View style={styles.logoSection}>
+              {logoUrl ? (
+                <Image
+                  source={{ uri: logoUrl }}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                  accessibilityLabel={tenantName ? `Logo ${tenantName}` : 'Logo da escola'}
+                />
+              ) : (
+                <Text style={styles.logoFallback} numberOfLines={2}>
+                  {tenantName ?? 'App Escola'}
+                </Text>
+              )}
+            </View>
           </View>
 
           <ScrollView
@@ -319,27 +320,6 @@ export function AlunoDrawer() {
             contentContainerStyle={styles.drawerScrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.perfilCard}>
-              <View style={styles.avatar}>
-                {user?.photo_url ? (
-                  <Image source={{ uri: user.photo_url }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.avatarInitials}>{getInitials(user?.name ?? 'A')}</Text>
-                )}
-              </View>
-              <View style={styles.perfilInfo}>
-                <Text style={styles.perfilNome} numberOfLines={2}>{user?.name ?? 'Aluno'}</Text>
-                <Text style={styles.perfilRole}>Estudante</Text>
-                {student?.enrollment_number ? (
-                  <View style={styles.matriculaBadge}>
-                    <Text style={styles.matriculaLabel}>Matrícula</Text>
-                    <Text style={styles.matriculaNumero}>{student.enrollment_number}</Text>
-                  </View>
-                ) : null}
-                {shouldShowEmail ? <Text style={styles.perfilMeta}>{userEmail}</Text> : null}
-              </View>
-            </View>
-
             <View style={styles.secao}>
               <Text style={styles.secaoLabel}>Navegação</Text>
               <View style={styles.menuPrincipal}>
@@ -423,29 +403,54 @@ function createAlunoDrawerStyles(colors: ThemeColors) {
     backgroundColor: colors.primary,
     ...(drawerShadow as object),
   },
+  drawerTopLight: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   drawerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.16)',
+    paddingTop: 12,
+    paddingBottom: 10,
   },
-  drawerTitulo: { fontSize: 18, fontWeight: '800', color: colors.drawer_header_title },
-  drawerSubtitulo: { fontSize: 11, color: colors.drawer_header_subtitle, marginTop: 2, fontWeight: '600' },
-  fecharBtn: {
+  drawerTituloLight: { fontSize: 18, fontWeight: '800', color: colors.ink },
+  drawerSubtituloLight: { fontSize: 11, color: colors.muted, marginTop: 2, fontWeight: '600' },
+  fecharBtnLight: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.soft,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logoSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 16,
+    minHeight: 108,
+  },
+  logoImage: {
+    width: '100%',
+    height: 96,
+    maxWidth: 240,
+  },
+  logoFallback: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.ink,
+    textAlign: 'center',
   },
   drawerScroll: { flex: 1 },
   drawerScrollContent: {
     paddingHorizontal: 14,
-    paddingTop: 12,
+    paddingTop: 14,
     paddingBottom: 14,
     gap: 12,
   },
@@ -457,49 +462,6 @@ function createAlunoDrawerStyles(colors: ThemeColors) {
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
-  perfilCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: { width: '100%', height: '100%' },
-  avatarInitials: { color: colors.primary, fontSize: 20, fontWeight: '800' },
-  perfilInfo: { flex: 1, minWidth: 0 },
-  perfilNome: { fontSize: 15, fontWeight: '800', color: colors.drawer_header_title, marginBottom: 1 },
-  perfilRole: { fontSize: 11, fontWeight: '700', color: colors.drawer_header_subtitle, marginBottom: 3 },
-  perfilMeta: { fontSize: 11, color: colors.drawer_header_subtitle, marginTop: 1 },
-  matriculaBadge: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 3,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-    backgroundColor: colors.surface,
-  },
-  matriculaLabel: {
-    fontSize: 10,
-    color: colors.muted,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  matriculaNumero: { fontSize: 11, color: colors.primary, fontWeight: '900' },
   menuPrincipal: { gap: 7 },
   navItem: {
     flexDirection: 'row',

@@ -13,9 +13,14 @@ import { platformShadow } from '../../lib/shadow';
 type Props = {
   enrollments: StudentActiveEnrollment[] | undefined;
   compact?: boolean;
+  hideEnrollmentNumber?: boolean;
 };
 
-export function StudentEnrollmentContextCard({ enrollments, compact = false }: Props) {
+export function StudentEnrollmentContextCard({
+  enrollments,
+  compact = false,
+  hideEnrollmentNumber = false,
+}: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors, compact), [colors, compact]);
   const enrollment = primaryActiveEnrollment(enrollments);
@@ -46,7 +51,7 @@ export function StudentEnrollmentContextCard({ enrollments, compact = false }: P
             {isBundle ? 'Pacote' : 'Plano'}
           </Text>
         </View>
-        {enrollment.enrollment_number ? (
+        {enrollment.enrollment_number && !hideEnrollmentNumber ? (
           <Text style={styles.contractNumber}>{enrollment.enrollment_number}</Text>
         ) : null}
       </View>

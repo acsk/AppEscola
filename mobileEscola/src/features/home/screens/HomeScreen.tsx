@@ -32,7 +32,10 @@ import type { ThemeColors } from '../../../theme';
 import { useUnreadNotificationsCount } from '../../notifications/hooks';
 import { WeeklyCalendarWidget } from '../../calendar/components/WeeklyCalendarWidget';
 import { StudentEnrollmentContextCard } from '../../../components/student/StudentEnrollmentContextCard';
-import type { StudentActiveEnrollment } from '../../../types/student-enrollment';
+import {
+  primaryActiveEnrollment,
+  type StudentActiveEnrollment,
+} from '../../../types/student-enrollment';
 
 function getInitials(name: string): string {
   return name.split(' ').slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
@@ -395,6 +398,11 @@ export function HomeScreen() {
   const initials  = getInitials(user?.name ?? 'U');
   const roleLabel = ROLE_LABELS[user?.role ?? ''] ?? user?.role ?? '-';
   const avatarUrl = avatarOverrideUrl ?? (user as any)?.photo_url ?? (user as any)?.avatar_url ?? (user as any)?.avatar;
+  const primaryEnrollment = primaryActiveEnrollment(dashboard?.active_enrollments);
+  const matriculaDisplay =
+    user?.student?.enrollment_number ??
+    primaryEnrollment?.enrollment_number ??
+    null;
 
   const totalExams = dashboard?.total_exams ?? 0;
   const avgAccuracy = dashboard?.avg_accuracy ?? 0;
@@ -424,6 +432,8 @@ export function HomeScreen() {
               onPress={handleSelecionarFoto}
               activeOpacity={0.85}
               disabled={avatarUploading}
+              accessibilityLabel="Alterar foto de perfil"
+              accessibilityRole="button"
             >
               <View style={[styles.avatarCircle, isCompact && styles.avatarCircleCompact]}>
                 {avatarUrl ? (
@@ -436,7 +446,7 @@ export function HomeScreen() {
                 {avatarUploading ? (
                   <ActivityIndicator size="small" color={colors.ink} />
                 ) : (
-                  <Ionicons name="pencil" size={isCompact ? 11 : 12} color={colors.ink} />
+                  <Ionicons name="camera" size={isCompact ? 12 : 13} color={colors.ink} />
                 )}
               </View>
               {Platform.OS === 'web' ? (
@@ -452,14 +462,21 @@ export function HomeScreen() {
             </TouchableOpacity>
             <View style={styles.userInfo}>
               <Text style={[styles.userName, isCompact && styles.userNameCompact]} numberOfLines={2}>{user?.name ?? 'Usuário'}</Text>
-              <Text style={[styles.userRole, isCompact && styles.userRoleCompact]}>{roleLabel}</Text>
+              {user?.role !== 'aluno' ? (
+                <Text style={[styles.userRole, isCompact && styles.userRoleCompact]}>{roleLabel}</Text>
+              ) : null}
               {avatarFeedback ? <Text style={styles.avatarFeedback}>{avatarFeedback}</Text> : null}
-                {/* <View style={styles.levelBadge}>
-                  <Ionicons name="star" size={11} color={colors.primary} />
-                  <Text style={styles.levelText} numberOfLines={1}>Nível 7 – Destaque da Turma</Text>
-                </View> */}
             </View>
           </View>
+
+          {user?.role === 'aluno' && matriculaDisplay ? (
+            <View style={[styles.matriculaHighlight, isCompact && styles.matriculaHighlightCompact]}>
+              <Text style={styles.matriculaHighlightLabel}>Matrícula</Text>
+              <Text style={styles.matriculaHighlightValue} numberOfLines={1}>
+                {matriculaDisplay}
+              </Text>
+            </View>
+          ) : null}
 
           <View style={[styles.headerIcons, isCompact && styles.headerIconsCompact]}>
             {user?.role === 'aluno' ? (
@@ -487,7 +504,11 @@ export function HomeScreen() {
 
       {user?.role === 'aluno' && dashboard?.active_enrollments?.length ? (
         <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-          <StudentEnrollmentContextCard enrollments={dashboard.active_enrollments} compact />
+          <StudentEnrollmentContextCard
+            enrollments={dashboard.active_enrollments}
+            compact
+            hideEnrollmentNumber={Boolean(matriculaDisplay)}
+          />
         </View>
       ) : null}
 
@@ -906,6 +927,38 @@ function createHomeStyles(colors: ThemeColors) {
   userNameCompact: { fontSize: 22, lineHeight: 24 },
   userRole:   { fontSize: 14, color: '#525A76', marginBottom: 10 },
   userRoleCompact: { fontSize: 13, marginBottom: 6 },
+  matriculaHighlight: {
+    alignSelf: 'center',
+    flexShrink: 0,
+    alignItems: 'flex-end',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: colors.primary,
+    maxWidth: 140,
+    ...(platformShadow({ color: colors.primary, opacity: 0.12, radius: 8, elevation: 2 }) as object),
+  },
+  matriculaHighlightCompact: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    maxWidth: '100%',
+  },
+  matriculaHighlightLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  matriculaHighlightValue: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: colors.primary,
+    letterSpacing: 0.2,
+  },
   avatarFeedback: { fontSize: 12, color: colors.muted, marginBottom: 8 },
   levelBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
