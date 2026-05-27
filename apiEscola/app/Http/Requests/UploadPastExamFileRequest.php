@@ -37,7 +37,7 @@ class UploadPastExamFileRequest extends FormRequest
             'subject_id'   => ['nullable', 'integer', 'exists:subjects,id'],
             'is_published' => ['nullable', 'boolean'],
             'sort_order'   => ['nullable', 'integer', 'min:0', 'max:99999'],
-            'file'         => ['required', 'file', 'max:150', 'mimes:pdf'],
+            'file'         => ['required', 'file', 'max:52428800', 'mimes:pdf'],
         ];
     }
 
@@ -47,7 +47,7 @@ class UploadPastExamFileRequest extends FormRequest
             'title.required' => 'O título da prova é obrigatório.',
             'file.required'  => 'Selecione o arquivo PDF da prova.',
             'file.mimes'     => 'Envie apenas arquivos PDF.',
-            'file.max'       => 'O PDF deve ter no máximo 150 kB.',
+            'file.max'       => 'O PDF excede o tamanho máximo permitido (50 MB).',
         ]);
     }
 }

@@ -113,10 +113,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
   const { width } = useWindowDimensions();
   const compactStack = width < 640;
   const examTypes = useExamTypes();
-  const examTypeFormOptions = [
-    { value: "", label: "Selecione" },
-    ...domainToOptions(examTypes),
-  ];
+  const examTypeFormOptions = domainToOptions(examTypes);
   const examTypeFilterOptions = [
     { value: "", label: "Todos os tipos" },
     ...domainToOptions(examTypes),
@@ -493,14 +490,26 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
   };
 
   const save = async () => {
+    if (saving) return;
+
     const localErrors: Record<string, string> = {};
     if (!form.title.trim()) localErrors.title = "Título obrigatório";
-    if (!form.exam_type) localErrors.exam_type = "Selecione a classificação da prova.";
+    if (!form.exam_type) {
+      localErrors.exam_type =
+        examTypeFormOptions.length === 0
+          ? "Nenhum tipo de prova cadastrado. Cadastre em Administração → Tipos de prova."
+          : "Selecione a classificação da prova.";
+    }
     if (!editingId && !pdfFile) localErrors.file = "Selecione o arquivo PDF da prova.";
     const examDateError = validateExamDateField(form.exam_date);
     if (examDateError) localErrors.exam_date = examDateError;
     if (Object.keys(localErrors).length) {
       setErrors(localErrors);
+      setToast({
+        visible: true,
+        type: "error",
+        message: "Corrija os campos destacados antes de salvar.",
+      });
       return;
     }
 
@@ -589,7 +598,10 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     }
   };
 
+  const hasFormErrors = Object.keys(errors).length > 0;
+
   return (
+    <>
     <ScrollView
       className="flex-1"
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
@@ -828,28 +840,49 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           />
         </View>
       ) : null}
+    </ScrollView>
 
-      <Modal
+    <Modal
         visible={modalOpen}
         title={editingId ? "Editar prova anterior" : "Nova prova anterior"}
         onClose={closeModal}
         size="sm"
         scrollViewClassName="py-0"
         footer={
-          <TouchableOpacity
-            onPress={save}
-            disabled={saving}
-            className="bg-violet-600 px-5 py-2.5 rounded-xl items-center"
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text className="text-white text-sm font-semibold">Salvar</Text>
-            )}
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              onPress={closeModal}
+              disabled={saving}
+              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white items-center"
+              style={{ flex: 1 }}
+            >
+              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={save}
+              disabled={saving}
+              className="bg-violet-600 px-5 py-2.5 rounded-xl items-center"
+              style={{ flex: 1, zIndex: 2 }}
+              accessibilityRole="button"
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text className="text-white text-sm font-semibold">Salvar</Text>
+              )}
+            </TouchableOpacity>
+          </>
         }
       >
         <View className="gap-1">
+          {hasFormErrors ? (
+            <View className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex-row items-start gap-2">
+              <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
+              <Text className="flex-1 text-xs text-red-700">
+                {Object.values(errors).join(" ")}
+              </Text>
+            </View>
+          ) : null}
           <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
             <View style={{ flex: compactStack ? undefined : 2 }}>
               <FormInput
@@ -886,7 +919,17 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 required
                 value={form.exam_type}
                 options={examTypeFormOptions}
-                onChange={(exam_type) => setForm((p) => ({ ...p, exam_type }))}
+                placeholder="Selecione a classificação"
+                onChange={(exam_type) => {
+                  setForm((p) => ({ ...p, exam_type }));
+                  if (errors.exam_type) {
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.exam_type;
+                      return next;
+                    });
+                  }
+                }}
                 error={errors.exam_type}
               />
             </View>
@@ -979,6 +1022,6 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         message={toast.message}
         onClose={() => setToast((t) => ({ ...t, visible: false }))}
       />
-    </ScrollView>
+    </>
   );
 }

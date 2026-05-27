@@ -14,7 +14,7 @@ class ReplacePastExamFileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'max:150', 'mimes:pdf'],
+            'file' => ['required', 'file', 'max:52428800', 'mimes:pdf'],
         ];
     }
 
@@ -23,7 +23,7 @@ class ReplacePastExamFileRequest extends FormRequest
         return [
             'file.required' => 'Selecione o arquivo PDF da prova.',
             'file.mimes'    => 'Envie apenas arquivos PDF.',
-            'file.max'      => 'O PDF deve ter no máximo 150 kB.',
+            'file.max'      => 'O PDF excede o tamanho máximo permitido (50 MB).',
         ];
     }
 }
