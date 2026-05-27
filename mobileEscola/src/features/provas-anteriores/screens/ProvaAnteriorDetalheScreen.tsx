@@ -13,21 +13,16 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
-import { subjectIconName } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { formatDataProva } from '../../../services/past-exams.service';
 import { platformShadow } from '../../../lib/shadow';
 import { useProvaAnteriorDetail } from '../hooks';
 import { ProvasAnterioresHeader } from '../components/ProvasAnterioresHeader';
+import { PastMaterialPdfIcon } from '../components/PastMaterialPdfIcon';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'ProvaAnteriorDetalhe'>;
-
-function tint(hex: string | undefined, alpha: string, fallback: string): string {
-  if (!hex || !hex.startsWith('#')) return fallback;
-  return `${hex}${alpha}`;
-}
 
 function formatFileSize(bytes: number | null | undefined): string | null {
   if (bytes == null || bytes <= 0) return null;
@@ -121,8 +116,9 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
     );
   }
 
-  const subjectColor = prova.subject?.color ?? colors.primary;
   const dataProva = formatDataProva(prova.exam_date, prova.exam_year);
+  const isPdf = prova.type === 'file' && (prova.file_type === 'pdf' || !prova.file_type);
+  const pdfBadge = prova.type === 'link' ? 'LINK' : isPdf ? 'PDF' : 'ARQ';
   const cursoLabel =
     prova.courses?.length
       ? prova.courses.map((c) => c.name).join(', ')
@@ -155,64 +151,56 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.card, platformShadow({ color: '#7C3AED', opacity: 0.06, radius: 10, elevation: 2 })]}>
+        <View
+          style={[
+            styles.card,
+            platformShadow({ color: colors.primary, opacity: 0.08, radius: 12, elevation: 2 }),
+          ]}
+        >
           <View style={[styles.cardAccent, { backgroundColor: colors.primary }]} />
 
-          {prova.subject ? (
-            <View style={[styles.subjectChip, { backgroundColor: tint(subjectColor, '18', colors.soft) }]}>
-              <Ionicons
-                name={subjectIconName(prova.subject.icon) as any}
-                size={12}
-                color={subjectColor}
-              />
-              <Text style={[styles.subjectNome, { color: subjectColor }]}>{prova.subject.name}</Text>
-            </View>
-          ) : null}
+          <View style={styles.pdfHero}>
+            <PastMaterialPdfIcon
+              variant="detail"
+              fileLabel={pdfBadge}
+              isLink={prova.type === 'link'}
+            />
+            {tamanhoArquivo ? <Text style={styles.pdfTamanho}>{tamanhoArquivo}</Text> : null}
+          </View>
 
+          {prova.subject ? (
+            <Text style={styles.disciplina}>{prova.subject.name.toUpperCase()}</Text>
+          ) : null}
           <Text style={styles.titulo}>{prova.title}</Text>
 
-          {(dataProva || prova.exam_type_label) ? (
-            <View style={styles.chipsRow}>
-              {dataProva ? (
-                <View style={styles.metaChip}>
-                  <Ionicons name="calendar-outline" size={13} color={colors.muted} />
-                  <Text style={styles.metaChipTexto}>{dataProva}</Text>
-                </View>
-              ) : null}
-              {prova.exam_type_label ? (
-                <View style={styles.metaChip}>
-                  <Text style={styles.metaChipTexto}>{prova.exam_type_label}</Text>
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          {cursoLabel ? (
-            <Text style={styles.linhaMeta} numberOfLines={2}>
-              <Text style={styles.linhaMetaLabel}>Curso </Text>
-              {cursoLabel}
-            </Text>
-          ) : null}
-
-          {tamanhoArquivo ? (
-            <View style={styles.arquivoRow}>
-              <Ionicons name="document-outline" size={14} color={colors.muted} />
-              <Text style={styles.linhaMeta}>{tamanhoArquivo}</Text>
-            </View>
-          ) : null}
+          <View style={styles.metaBox}>
+            {dataProva ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="calendar-outline" size={15} color={colors.primary} />
+                <Text style={styles.metaTexto}>{dataProva}</Text>
+              </View>
+            ) : null}
+            {prova.exam_type_label ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="layers-outline" size={15} color={colors.primary} />
+                <Text style={styles.metaTexto}>{prova.exam_type_label}</Text>
+              </View>
+            ) : null}
+            {cursoLabel ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="school-outline" size={15} color={colors.primary} />
+                <Text style={styles.metaTexto} numberOfLines={2}>
+                  {cursoLabel}
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
           {prova.description ? (
-            <Text style={styles.descricao} numberOfLines={4}>
+            <Text style={styles.descricao} numberOfLines={3}>
               {prova.description}
             </Text>
           ) : null}
-
-          <View style={styles.avisoBox}>
-            <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
-            <Text style={styles.avisoTexto}>
-              Material de consulta da escola. Abra o arquivo para estudar.
-            </Text>
-          </View>
 
           <TouchableOpacity
             style={styles.botaoAcao}
@@ -220,8 +208,8 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
             activeOpacity={0.85}
           >
             <Ionicons
-              name={prova.type === 'file' ? 'document-text-outline' : 'open-outline'}
-              size={18}
+              name={prova.type === 'file' ? 'document-text' : 'open-outline'}
+              size={20}
               color={colors.surface}
             />
             <Text style={styles.botaoAcaoTexto}>{botaoLabel}</Text>
@@ -269,12 +257,14 @@ function createStyles(colors: ThemeColors) {
     card: {
       backgroundColor: colors.surface,
       borderRadius: 16,
-      paddingVertical: 14,
+      paddingTop: 16,
+      paddingBottom: 16,
       paddingHorizontal: 16,
       paddingLeft: 18,
       borderWidth: 1,
       borderColor: colors.border,
       overflow: 'hidden',
+      alignItems: 'stretch',
     },
     cardAccent: {
       position: 'absolute',
@@ -283,70 +273,55 @@ function createStyles(colors: ThemeColors) {
       bottom: 0,
       width: 4,
     },
-    subjectChip: {
-      flexDirection: 'row',
+    pdfHero: {
       alignItems: 'center',
-      alignSelf: 'flex-start',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 20,
-      marginBottom: 8,
+      marginBottom: 12,
+      gap: 6,
     },
-    subjectNome: { fontSize: 11, fontWeight: '800' },
+    pdfTamanho: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.muted,
+    },
+    disciplina: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.primary,
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
     titulo: {
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: '800',
       color: colors.ink,
-      lineHeight: 24,
-      marginBottom: 8,
+      lineHeight: 22,
+      marginBottom: 10,
+      textAlign: 'center',
     },
-    chipsRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 6,
-      marginBottom: 8,
-    },
-    metaChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
+    metaBox: {
       backgroundColor: colors.soft,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 8,
-    },
-    metaChipTexto: { fontSize: 12, fontWeight: '600', color: colors.text },
-    linhaMeta: { fontSize: 12, color: colors.muted, lineHeight: 18, marginBottom: 4 },
-    linhaMetaLabel: { fontWeight: '700', color: colors.muted },
-    arquivoRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 6,
-    },
-    descricao: {
-      fontSize: 13,
-      color: colors.muted,
-      lineHeight: 18,
-      marginTop: 4,
+      borderRadius: 12,
+      padding: 10,
+      gap: 8,
       marginBottom: 10,
     },
-    avisoBox: {
+    metaRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       gap: 8,
-      backgroundColor: colors.soft,
-      borderRadius: 10,
-      padding: 10,
-      marginTop: 6,
-      marginBottom: 12,
     },
-    avisoTexto: {
+    metaTexto: {
       flex: 1,
-      fontSize: 12,
+      fontSize: 13,
       color: colors.text,
+      lineHeight: 18,
+    },
+    descricao: {
+      fontSize: 12,
+      color: colors.muted,
       lineHeight: 17,
+      marginBottom: 12,
+      textAlign: 'center',
     },
     botaoAcao: {
       flexDirection: 'row',
@@ -355,9 +330,9 @@ function createStyles(colors: ThemeColors) {
       gap: 8,
       backgroundColor: colors.primary,
       borderRadius: 12,
-      paddingVertical: 12,
+      paddingVertical: 13,
       paddingHorizontal: 16,
     },
-    botaoAcaoTexto: { color: colors.surface, fontWeight: '700', fontSize: 15 },
+    botaoAcaoTexto: { color: colors.surface, fontWeight: '800', fontSize: 15 },
   });
 }

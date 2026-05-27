@@ -1,6 +1,19 @@
 import React, { useRef } from "react";
-import { View, Text, TouchableOpacity, Platform } from "react-native";
+import { View, Text, TouchableOpacity, Platform, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+
+const THEME = {
+  primary: "#4F46E5",
+  primaryDark: "#4338CA",
+  soft: "#EEF2FF",
+  border: "#DDE3F5",
+  ink: "#1E1B4B",
+  muted: "#64748B",
+  surface: "#FFFFFF",
+  error: "#DC2626",
+  errorBg: "#FEF2F2",
+  errorBorder: "#FECACA",
+} as const;
 
 type Props = {
   label?: string;
@@ -8,17 +21,29 @@ type Props = {
   hint?: string;
   value: File | null;
   onChange: (file: File | null) => void;
-  /** Nome do arquivo já salvo (modo edição, quando nenhum novo foi escolhido) */
   currentFileLabel?: string | null;
   error?: string;
   disabled?: boolean;
-  onInvalid?: (message: string) => void;
 };
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} kB`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function PdfIconBlock({ size = "md" }: { size?: "md" | "lg" }) {
+  const box = size === "lg" ? 72 : 56;
+  const icon = size === "lg" ? 40 : 32;
+  return (
+    <View style={[styles.pdfIconWrap, { width: box, height: box }]}>
+      <View style={styles.pdfIconRing} />
+      <Ionicons name="document-text" size={icon} color={THEME.primary} />
+      <View style={styles.pdfIconBadge}>
+        <Text style={styles.pdfIconBadgeText}>PDF</Text>
+      </View>
+    </View>
+  );
 }
 
 export default function PdfFileUploadField({
@@ -32,15 +57,21 @@ export default function PdfFileUploadField({
   disabled = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const hasFile = Boolean(value || currentFileLabel);
+  const displayName = value?.name ?? currentFileLabel ?? "";
+  const displaySize = value ? formatFileSize(value.size) : null;
 
   const openPicker = () => {
     if (disabled || Platform.OS !== "web") return;
     inputRef.current?.click();
   };
 
-  const handleInputChange = (e: any) => {
-    const file = e.target?.files?.[0] ?? null;
+  const handleInputChange = (e: { target?: { files?: FileList | null; value?: string } }) => {
+    const file = e.target.files?.[0] ?? null;
     onChange(file);
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
   };
 
   const clearSelection = () => {
@@ -48,107 +79,75 @@ export default function PdfFileUploadField({
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const borderColor = error ? "#FCA5A5" : value ? "#C4B5FD" : "#E5E7EB";
-  const bgColor = error ? "#FEF2F2" : value ? "#F5F3FF" : "#F9FAFB";
-
   return (
     <View>
       {label ? (
-        <Text style={{ fontSize: 12, fontWeight: "500", color: "#4B5563", marginBottom: 6 }}>
+        <Text style={styles.label}>
           {label}
-          {required ? <Text style={{ color: "#EF4444" }}> *</Text> : null}
+          {required ? <Text style={styles.required}> *</Text> : null}
         </Text>
       ) : null}
 
-      {hint ? (
-        <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 8, lineHeight: 18 }}>{hint}</Text>
-      ) : null}
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
       <View
-        style={{
-          borderWidth: 1,
-          borderColor,
-          borderRadius: 12,
-          borderStyle: value || currentFileLabel ? "solid" : "dashed",
-          backgroundColor: bgColor,
-          padding: 14,
-          gap: 12,
-          opacity: disabled ? 0.6 : 1,
-        }}
+        style={[
+          styles.dropzone,
+          hasFile ? styles.dropzoneFilled : styles.dropzoneEmpty,
+          error ? styles.dropzoneError : null,
+          disabled ? styles.dropzoneDisabled : null,
+        ]}
       >
-        {value ? (
-          <View className="flex-row items-center gap-3">
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                backgroundColor: "#EDE9FE",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="document-text" size={22} color="#7C3AED" />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text className="text-sm font-semibold text-gray-800" numberOfLines={1}>
-                {value.name}
+        {hasFile ? (
+          <View style={styles.fileRow}>
+            <PdfIconBlock size="md" />
+            <View style={styles.fileInfo}>
+              <Text style={styles.fileStatus}>
+                {value ? "Novo arquivo selecionado" : "Arquivo atual"}
               </Text>
-              <Text className="text-xs text-gray-500 mt-0.5">{formatFileSize(value.size)}</Text>
-            </View>
-            <TouchableOpacity
-              onPress={clearSelection}
-              disabled={disabled}
-              className="px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white"
-              activeOpacity={0.8}
-              accessibilityLabel="Remover arquivo selecionado"
-            >
-              <Text className="text-xs font-semibold text-gray-600">Remover</Text>
-            </TouchableOpacity>
-          </View>
-        ) : currentFileLabel ? (
-          <View className="flex-row items-center gap-3">
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                backgroundColor: "#E5E7EB",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="document-attach-outline" size={22} color="#6B7280" />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text className="text-xs text-gray-500">Arquivo atual</Text>
-              <Text className="text-sm font-medium text-gray-700 mt-0.5" numberOfLines={1}>
-                {currentFileLabel}
+              <Text style={styles.fileName} numberOfLines={2}>
+                {displayName}
               </Text>
+              {displaySize ? <Text style={styles.fileSize}>{displaySize}</Text> : null}
+            </View>
+            <View style={styles.fileActions}>
+              <TouchableOpacity
+                onPress={openPicker}
+                disabled={disabled}
+                style={styles.btnSecondary}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="swap-horizontal-outline" size={15} color={THEME.primary} />
+                <Text style={styles.btnSecondaryText}>Trocar</Text>
+              </TouchableOpacity>
+              {value ? (
+                <TouchableOpacity
+                  onPress={clearSelection}
+                  disabled={disabled}
+                  style={styles.btnGhost}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.btnGhostText}>Remover</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         ) : (
-          <View className="items-center py-2">
-            <Ionicons name="cloud-upload-outline" size={28} color="#9CA3AF" />
-            <Text className="text-sm text-gray-600 mt-2 text-center">
-              Nenhum PDF selecionado
-            </Text>
+          <View style={styles.emptyState}>
+            <PdfIconBlock size="lg" />
+            <Text style={styles.emptyTitle}>Nenhum PDF selecionado</Text>
+            <Text style={styles.emptySub}>Toque no botão abaixo para escolher o arquivo</Text>
+            <TouchableOpacity
+              onPress={openPicker}
+              disabled={disabled}
+              style={styles.btnPrimary}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="cloud-upload-outline" size={18} color={THEME.surface} />
+              <Text style={styles.btnPrimaryText}>Selecionar PDF</Text>
+            </TouchableOpacity>
           </View>
         )}
-
-        <TouchableOpacity
-          onPress={openPicker}
-          disabled={disabled}
-          className="flex-row items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5"
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel={value || currentFileLabel ? "Trocar arquivo PDF" : "Selecionar arquivo PDF"}
-        >
-          <Ionicons name="folder-open-outline" size={16} color="#fff" />
-          <Text className="text-sm font-semibold text-white">
-            {value || currentFileLabel ? "Trocar PDF" : "Selecionar PDF"}
-          </Text>
-        </TouchableOpacity>
 
         {Platform.OS === "web" ? (
           <input
@@ -157,13 +156,180 @@ export default function PdfFileUploadField({
             accept="application/pdf,.pdf"
             disabled={disabled}
             onChange={handleInputChange}
-            style={{ display: "none" }}
+            style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
+            tabIndex={-1}
             aria-hidden
           />
         ) : null}
       </View>
 
-      {error ? <Text className="text-xs text-red-600 mt-1.5">{error}</Text> : null}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: THEME.ink,
+    marginBottom: 6,
+  },
+  required: {
+    color: THEME.error,
+  },
+  hint: {
+    fontSize: 12,
+    color: THEME.muted,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  dropzone: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    backgroundColor: THEME.surface,
+  },
+  dropzoneEmpty: {
+    borderColor: THEME.border,
+    borderStyle: "dashed",
+    backgroundColor: THEME.soft,
+  },
+  dropzoneFilled: {
+    borderColor: THEME.border,
+    borderStyle: "solid",
+  },
+  dropzoneError: {
+    borderColor: THEME.errorBorder,
+    backgroundColor: THEME.errorBg,
+  },
+  dropzoneDisabled: {
+    opacity: 0.6,
+  },
+  fileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  fileInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  fileStatus: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: THEME.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  fileName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: THEME.ink,
+    lineHeight: 20,
+  },
+  fileSize: {
+    fontSize: 12,
+    color: THEME.muted,
+    marginTop: 2,
+  },
+  fileActions: {
+    gap: 8,
+    alignItems: "flex-end",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 8,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: THEME.ink,
+    marginTop: 4,
+  },
+  emptySub: {
+    fontSize: 12,
+    color: THEME.muted,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  btnPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: THEME.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  btnPrimaryText: {
+    color: THEME.surface,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  btnSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: THEME.soft,
+    borderWidth: 1,
+    borderColor: THEME.border,
+  },
+  btnSecondaryText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: THEME.primary,
+  },
+  btnGhost: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  btnGhostText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: THEME.muted,
+  },
+  errorText: {
+    fontSize: 12,
+    color: THEME.error,
+    marginTop: 6,
+  },
+  pdfIconWrap: {
+    borderRadius: 14,
+    backgroundColor: THEME.soft,
+    borderWidth: 1,
+    borderColor: THEME.border,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  pdfIconRing: {
+    position: "absolute",
+    width: "86%",
+    height: "86%",
+    borderRadius: 999,
+    backgroundColor: THEME.surface,
+    opacity: 0.7,
+  },
+  pdfIconBadge: {
+    position: "absolute",
+    bottom: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: THEME.primary,
+  },
+  pdfIconBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: THEME.surface,
+    letterSpacing: 0.4,
+  },
+});
