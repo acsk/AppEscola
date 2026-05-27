@@ -19,6 +19,22 @@ class StudentAppAccessService
     }
 
     /**
+     * Cria usuário somente se o aluno ainda não tiver. Retorna true quando provisionou.
+     *
+     * @throws RuntimeException
+     */
+    public function provisionIfNeeded(Student $student): bool
+    {
+        if ($this->hasAppAccess($student)) {
+            return false;
+        }
+
+        $this->provision($student);
+
+        return true;
+    }
+
+    /**
      * Cria usuário de login do app (matrícula + senha inicial) e vincula ao aluno.
      *
      * @return array{user: User, enrollment_number: string, initial_password: string}

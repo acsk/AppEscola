@@ -22,8 +22,8 @@ class StudentAppAccessDiagnosticService
             'POST /api/students (painel — cadastro aluno)' => 'Cria usuário via StudentAppAccessService::provision',
             'POST /api/students/{id}/provision-app-access' => 'Cria usuário sob demanda (painel)',
             'POST /api/public/{slug}/register (pré-cadastro app)' => 'Gera matrícula, NÃO cria usuário',
-            'POST /api/enrollments/subscribe' => 'Matricula aluno existente, NÃO cria usuário',
-            'POST /api/enrollments/subscribe-bundle' => 'Matricula pacote, NÃO cria usuário',
+            'POST /api/enrollments/subscribe' => 'Matricula aluno e provisiona usuário se ainda não existir',
+            'POST /api/enrollments/subscribe-bundle' => 'Matricula pacote e provisiona usuário se ainda não existir',
             'POST /api/enrollments (store)' => 'Cria matrícula, NÃO cria usuário',
             'POST /api/invoices/{id}/mark-as-paid (baixa)' => 'Atualiza cobrança, NÃO cria usuário',
             'Pagamento taxa matrícula no subscribe' => 'Marca invoice como paga, NÃO cria usuário',
@@ -226,7 +226,7 @@ class StudentAppAccessDiagnosticService
             : 'Nenhum aluno filtrado com taxa de matrícula paga ficou sem usuário (ou não há taxa paga nesse recorte).';
 
         $lines['enrollment_flow'] = $activeEnrollmentNoUser > 0
-            ? "Há {$activeEnrollmentNoUser} aluno(s) com matrícula ativa e sem usuário — o fluxo POST /enrollments/subscribe não provisiona login."
+            ? "Há {$activeEnrollmentNoUser} aluno(s) com matrícula ativa e sem usuário — provável matrícula antes do deploy ou cadastro sem passar por subscribe. Use students:provision-users."
             : 'Nenhum aluno com matrícula ativa ficou sem usuário neste recorte.';
 
         $lines['fix_batch'] = 'Correção em lote: php artisan students:provision-users --tenant=ID [--dry-run]';

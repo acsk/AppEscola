@@ -65,6 +65,27 @@ class EnrollmentSubscribeTest extends TestCase
             ->assertCreated();
     }
 
+    public function test_subscribe_provisions_app_user_when_student_has_no_user(): void
+    {
+        [$user, $payload, $context] = $this->seedSubscribeContext(returnContext: true);
+        $student = $context['student'];
+        $this->assertNull($student->user_id);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/enrollments/subscribe', $payload)
+            ->assertCreated();
+
+        $student->refresh();
+        $this->assertNotNull($student->user_id);
+        $this->assertNotNull($student->enrollment_number);
+        $this->assertDatabaseHas('users', [
+            'id' => $student->user_id,
+            'email' => $student->enrollment_number . '@interno',
+            'role' => 'aluno',
+        ]);
+    }
+
     public function test_subscribe_rejects_plan_from_another_course(): void
     {
         [$user, $payload, $context] = $this->seedSubscribeContext(returnContext: true);

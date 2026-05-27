@@ -25,6 +25,7 @@ use App\Services\EnrollmentInvoiceAmountSyncService;
 use App\Services\EnrollmentInvoiceDescriptionService;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceSettlementService;
+use App\Services\StudentAppAccessService;
 use App\Services\TenantBillingSettingsService;
 use App\Traits\ScopedByTenant;
 use Carbon\Carbon;
@@ -51,6 +52,7 @@ class EnrollmentController extends Controller
         private readonly EnrollmentFinancialLockService $financialLock,
         private readonly EnrollmentInvoiceDescriptionService $invoiceDescriptions,
         private readonly EnrollmentCarneService $carneService,
+        private readonly StudentAppAccessService $studentAppAccess,
     ) {
     }
 
@@ -993,6 +995,8 @@ class EnrollmentController extends Controller
                 (int) ($request->payment_due_day ?? $billing['default_payment_due_day'] ?? 10)
             );
 
+            $this->ensureStudentAppAccess((int) $request->student_id);
+
             $enrollment = Enrollment::create([
                 'tenant_id'         => $effectiveTenantId,
                 'student_id'        => $request->student_id,
@@ -1422,6 +1426,8 @@ class EnrollmentController extends Controller
             $netMonthly        = max($bundle->monthlyEquivalent() - ($data['discount_amount'] ?? 0), 0);
             $primaryClassId    = $schoolClassIds[0];
 
+            $this->ensureStudentAppAccess((int) $data['student_id']);
+
             $enrollment = Enrollment::create([
                 'tenant_id'         => $effectiveTenantId,
                 'student_id'        => $data['student_id'],
@@ -1490,6 +1496,32 @@ class EnrollmentController extends Controller
             'monthly_generation_skipped' => (bool) ($result['monthly_generation_skipped'] ?? false),
             'financial_guardian_id' => $guardianId,
         ], 201);
+    }
+
+    /**
+     * Garante login no app ao matricular (fluxo principal da escola no painel).
+     */
+    private function ensureStudentAppAccess(int $studentId): void
+    {
+        $student = Student::query()->find($studentId);
+
+        if (! $student) {
+            throw ValidationException::withMessages([
+                'student_id' => ['Aluno não encontrado.'],
+            ]);
+        }
+
+        if ($this->studentAppAccess->hasAppAccess($student)) {
+            return;
+        }
+
+        try {
+            $this->studentAppAccess->provision($student);
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages([
+                'student_id' => ['Não foi possível criar o acesso ao app: ' . $e->getMessage()],
+            ]);
+        }
     }
 
     /**
