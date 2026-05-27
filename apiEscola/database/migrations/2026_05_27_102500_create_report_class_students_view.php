@@ -16,7 +16,7 @@ return new class extends Migration
         DB::statement(<<<'SQL'
             CREATE VIEW vw_report_class_students AS
             SELECT
-                esc.tenant_id AS tenant_id,
+                e.tenant_id AS tenant_id,
                 esc.school_class_id AS school_class_id,
                 sc.name AS school_class_name,
                 c.id AS course_id,
