@@ -75,7 +75,9 @@ class ProvisionStudentAppUsersCommand extends Command
                 $ok++;
 
                 $line = "OK  #{$student->id} {$student->name} — login: {$result['enrollment_number']}";
-                if ($showPasswords) {
+                if (! empty($result['linked_existing'])) {
+                    $line .= ' — vinculado a usuário existente (senha já definida antes)';
+                } elseif ($showPasswords && ! empty($result['initial_password'])) {
                     $line .= " — senha: {$result['initial_password']}";
                 }
                 $this->line($line);

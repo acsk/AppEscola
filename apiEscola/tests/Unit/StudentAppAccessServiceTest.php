@@ -81,4 +81,28 @@ class StudentAppAccessServiceTest extends TestCase
 
         app(StudentAppAccessService::class)->provision($student);
     }
+
+    public function test_provision_links_orphan_user_with_matching_email(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $orphanUser = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'email' => '202600001@interno',
+            'role' => 'aluno',
+        ]);
+        $student = Student::factory()->create([
+            'tenant_id' => $tenant->id,
+            'user_id' => null,
+            'enrollment_number' => '202600001',
+        ]);
+
+        $result = app(StudentAppAccessService::class)->provision($student);
+
+        $student->refresh();
+
+        $this->assertTrue($result['linked_existing']);
+        $this->assertNull($result['initial_password']);
+        $this->assertSame($orphanUser->id, $student->user_id);
+        $this->assertSame($orphanUser->id, $result['user']->id);
+    }
 }

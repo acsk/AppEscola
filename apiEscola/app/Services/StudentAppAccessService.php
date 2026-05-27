@@ -56,8 +56,10 @@ class StudentAppAccessService
         $initialPassword = $this->initialPassword($student);
         $email = $enrollmentNumber . '@interno';
 
-        if (User::withTrashed()->where('email', $email)->exists()) {
-            throw new RuntimeException("Já existe um usuário com o e-mail {$email}.");
+        $existingUser = User::withTrashed()->where('email', $email)->first();
+
+        if ($existingUser) {
+            return $this->linkExistingUser($student, $existingUser, $enrollmentNumber, $tenantId);
         }
 
         $user = User::create([
@@ -79,6 +81,53 @@ class StudentAppAccessService
             'user'               => $user,
             'enrollment_number'  => $enrollmentNumber,
             'initial_password'   => $initialPassword,
+            'linked_existing'    => false,
+        ];
+    }
+
+    /**
+     * Vincula aluno a usuário @interno já existente (migração / cadastro duplicado).
+     *
+     * @return array{user: User, enrollment_number: string, initial_password: ?string, linked_existing: true}
+     */
+    private function linkExistingUser(
+        Student $student,
+        User $user,
+        string $enrollmentNumber,
+        int $tenantId
+    ): array {
+        $conflict = Student::query()
+            ->where('user_id', $user->id)
+            ->whereKeyNot($student->id)
+            ->exists();
+
+        if ($conflict) {
+            throw new RuntimeException(
+                "O e-mail {$user->email} já está vinculado a outro aluno."
+            );
+        }
+
+        if (method_exists($user, 'trashed') && $user->trashed()) {
+            $user->restore();
+        }
+
+        $user->update([
+            'tenant_id' => $tenantId,
+            'name'      => $student->name,
+            'role'      => 'aluno',
+            'status'    => 'active',
+        ]);
+
+        $student->update([
+            'enrollment_number' => $enrollmentNumber,
+            'user_id'           => $user->id,
+        ]);
+
+        return [
+            'user'              => $user->fresh(),
+            'enrollment_number' => $enrollmentNumber,
+            'initial_password'  => null,
+            'linked_existing'   => true,
         ];
     }
 
