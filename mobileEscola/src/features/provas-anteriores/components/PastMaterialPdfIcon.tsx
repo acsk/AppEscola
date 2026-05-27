@@ -6,7 +6,7 @@ import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
-type SizeVariant = 'list' | 'detail';
+type SizeVariant = 'list' | 'detail' | 'home';
 
 type PastMaterialPdfIconProps = {
   variant?: SizeVariant;
@@ -15,8 +15,9 @@ type PastMaterialPdfIconProps = {
 };
 
 const SIZES = {
-  list: { box: 76, icon: 46, labelSize: 11 },
-  detail: { box: 112, icon: 56, labelSize: 12 },
+  list: { box: 76, icon: 46, labelSize: 11, radius: 14 },
+  detail: { box: 112, icon: 56, labelSize: 12, radius: 16 },
+  home: { box: 72, icon: 44, labelSize: 10, radius: 14 },
 } as const;
 
 export function PastMaterialPdfIcon({
@@ -37,7 +38,7 @@ export function PastMaterialPdfIcon({
         {
           width: dims.box,
           height: dims.box,
-          borderRadius: variant === 'detail' ? 16 : 14,
+          borderRadius: dims.radius,
         },
       ]}
     >

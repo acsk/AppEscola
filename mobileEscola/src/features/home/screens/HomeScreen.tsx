@@ -20,7 +20,7 @@ import { compressImageToMaxSize } from '../../../services/image-compression.serv
 import { SimuladoListItem, AttemptStatus, subjectIconName } from '../../../services/simulados.service';
 import { useSimuladosList } from '../../simulados/hooks';
 import { useProvasAnterioresList } from '../../provas-anteriores/hooks';
-import { formatDataProva } from '../../../services/past-exams.service';
+import { PastMaterialHomeCard } from '../../provas-anteriores/components/PastMaterialHomeCard';
 import { uploadStudentPhoto } from '../../../services/student-photo.service';
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { platformShadow } from '../../../lib/shadow';
@@ -515,30 +515,20 @@ export function HomeScreen() {
               </View>
             ) : (
               provasAnterioresRecentes.map((p) => (
-                <TouchableOpacity
+                <PastMaterialHomeCard
                   key={p.id}
-                  style={[styles.simCard, { width: 220, backgroundColor: colors.soft, borderColor: colors.border }]}
-                  activeOpacity={0.85}
+                  item={p}
                   onPress={() =>
                     navigation.navigate('Simulados', {
                       screen: 'ProvaAnteriorDetalhe',
-                      params: { pastExamId: p.id },
+                      params: {
+                        pastExamId: p.id,
+                        listScreen: 'ProvasAnteriores',
+                        materialKind: 'prova',
+                      },
                     })
                   }
-                >
-                  <Text style={styles.simTitulo} numberOfLines={2}>{p.title}</Text>
-                  <Text style={styles.simMateria}>
-                    {[
-                      (() => {
-                        const dataLabel = formatDataProva(p.exam_date, p.exam_year);
-                        return dataLabel ? `Data: ${dataLabel}` : null;
-                      })(),
-                      p.exam_type_label,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ') || 'Prova'}
-                  </Text>
-                </TouchableOpacity>
+                />
               ))
             )}
           </ScrollView>
