@@ -88,12 +88,7 @@ class EnrollmentController extends Controller
         $query
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
             ->when($request->query('student_id'), fn ($q, $v) => $q->where('student_id', $v))
-            ->when($request->query('school_class_id'), function ($q, $v) {
-                $q->where(function ($inner) use ($v) {
-                    $inner->where('school_class_id', $v)
-                        ->orWhereHas('schoolClasses', fn ($sc) => $sc->where('school_classes.id', $v));
-                });
-            })
+            ->when($request->query('school_class_id'), fn ($q, $v) => $q->forSchoolClass((int) $v))
             ->when($request->query('course_id'), function ($q, $v) {
                 $courseId = (int) $v;
                 if ($courseId <= 0) {

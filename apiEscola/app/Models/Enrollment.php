@@ -3,13 +3,13 @@
 namespace App\Models;
 
 use App\Traits\TracksUserActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 
 class Enrollment extends Model
 {
@@ -70,24 +70,23 @@ class Enrollment extends Model
         $this->schoolClasses()->sync($ids);
     }
 
+    /**
+     * Matrícula vinculada à turma pela coluna legada ou pela pivot enrollment_school_classes.
+     */
+    public function scopeForSchoolClass(Builder $query, int $schoolClassId): Builder
+    {
+        return $query->where(function (Builder $inner) use ($schoolClassId): void {
+            $inner->where('school_class_id', $schoolClassId)
+                ->orWhereHas('schoolClasses', fn (Builder $sc) => $sc->where('school_classes.id', $schoolClassId));
+        });
+    }
+
     public static function studentHasActiveEnrollmentInClass(int $studentId, int $schoolClassId): bool
     {
-        $active = static::query()
+        return static::query()
             ->where('student_id', $studentId)
-            ->where('school_class_id', $schoolClassId)
+            ->forSchoolClass($schoolClassId)
             ->whereNotIn('status', ['cancelled'])
-            ->exists();
-
-        if ($active) {
-            return true;
-        }
-
-        return DB::table('enrollment_school_classes')
-            ->join('enrollments', 'enrollment_school_classes.enrollment_id', '=', 'enrollments.id')
-            ->where('enrollment_school_classes.school_class_id', $schoolClassId)
-            ->where('enrollments.student_id', $studentId)
-            ->whereNotIn('enrollments.status', ['cancelled'])
-            ->whereNull('enrollments.deleted_at')
             ->exists();
     }
 

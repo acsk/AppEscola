@@ -98,7 +98,8 @@ class StudentAttendanceController extends Controller
 
         $enrolledStudentIds = Enrollment::query()
             ->where('tenant_id', $schoolClass->tenant_id)
-            ->where('school_class_id', $schoolClass->id)
+            ->forSchoolClass($schoolClass->id)
+            ->whereNotIn('status', ['cancelled'])
             ->whereIn('student_id', $studentIds)
             ->pluck('student_id')
             ->unique();

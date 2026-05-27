@@ -119,6 +119,20 @@ const getWeekdaySlug = (isoDate: string) => {
   return WEEKDAY_SLUGS[day] ?? "monday";
 };
 
+/** Turma na coluna legada ou na pivot enrollment_school_classes. */
+const enrollmentBelongsToClass = (enrollment: any, targetClassId: number): boolean => {
+  const legacyId = enrollment.school_class?.id ?? enrollment.school_class_id;
+  if (Number(legacyId) === Number(targetClassId)) {
+    return true;
+  }
+  const pivotIds: number[] = Array.isArray(enrollment.school_class_ids)
+    ? enrollment.school_class_ids.map(Number)
+    : Array.isArray(enrollment.school_classes)
+      ? enrollment.school_classes.map((c: { id: number }) => Number(c.id))
+      : [];
+  return pivotIds.includes(Number(targetClassId));
+};
+
 export default function SchoolClassAttendanceScreen({ classId, navigate }: Props) {
   const { contentPadding } = useResponsiveLayout();
   const scrollRef = useRef<ScrollView>(null);
@@ -228,7 +242,9 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
     try {
       const [{ data: classRaw }, { data: enrollmentsRaw }, { data: attendanceRaw }] = await Promise.all([
         api.get(`/school-classes/${classId}`),
-        api.get("/enrollments", { params: { per_page: 500, status: "active" } }),
+        api.get("/enrollments", {
+          params: { per_page: 500, status: "active", school_class_id: classId },
+        }),
         api.get(`/school-classes/${classId}/attendances`, {
           params: { attendance_date: targetDate },
         }),
@@ -272,10 +288,10 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
 
       const enrollmentList = extractList(enrollmentsRaw);
       const nextStudents = enrollmentList
-        .filter((enrollment: any) => {
-          const schoolClassId = enrollment.school_class?.id ?? enrollment.school_class_id;
-          return Number(schoolClassId) === Number(classId) && enrollment.student?.id;
-        })
+        .filter(
+          (enrollment: any) =>
+            enrollmentBelongsToClass(enrollment, classId) && enrollment.student?.id,
+        )
         .map((enrollment: any) => ({
           id: Number(enrollment.student.id),
           name: enrollment.student.name ?? `ALUNO #${enrollment.student.id}`,
