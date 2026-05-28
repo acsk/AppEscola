@@ -13,7 +13,12 @@ import Modal from "../../components/ui/Modal";
 import OfficialAssessmentGradesTable from "../../components/avaliacoes-oficiais/OfficialAssessmentGradesTable";
 import OfficialAssessmentGradeStepper from "../../components/avaliacoes-oficiais/OfficialAssessmentGradeStepper";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
-import { parseApiErrors } from "../../utils/apiErrors";
+import {
+  getApiResponseBody,
+  getApiResponseMessage,
+  getApiResponseToastType,
+  parseApiErrors,
+} from "../../utils/apiErrors";
 import { displayToISO, isoToDisplay } from "../../utils/masks";
 import type {
   GradeDraftRow,
@@ -371,14 +376,21 @@ export default function OfficialAssessmentFormScreen({
         counts_towards_report_card: form.counts_towards_report_card,
         notes: form.notes.trim() || null,
       };
+      let responseData: unknown;
       if (assessmentBackendId) {
-        await api.put(`/official-assessments/${assessmentBackendId}`, payload);
+        const { data } = await api.put(`/official-assessments/${assessmentBackendId}`, payload);
+        responseData = data;
       } else {
         const { data } = await api.post("/official-assessments", payload);
-        const body = data?.body ?? data?.data ?? data;
-        setAssessmentBackendId(Number(body.id));
+        responseData = data;
+        const body = getApiResponseBody<{ id?: number }>(data);
+        if (body?.id) setAssessmentBackendId(Number(body.id));
       }
-      setToast({ visible: true, type: "success", message: "Avaliação salva com sucesso." });
+      setToast({
+        visible: true,
+        type: getApiResponseToastType(responseData),
+        message: getApiResponseMessage(responseData, "Avaliação salva com sucesso."),
+      });
     } catch (e: any) {
       const parsed = parseApiErrors(e?.response?.data?.body?.errors ?? e?.response?.data?.errors ?? {});
       setErrors(parsed);
@@ -417,12 +429,15 @@ export default function OfficialAssessmentFormScreen({
           notes: g.notes.trim() || null,
         })),
       };
-      await api.post(`/official-assessments/${assessmentBackendId}/grades`, payload);
+      const { data } = await api.post(`/official-assessments/${assessmentBackendId}/grades`, payload);
       closeGradesModal();
       setToast({
         visible: true,
-        type: "success",
-        message: isIndividual ? "Nota do aluno salva com sucesso." : "Notas salvas com sucesso.",
+        type: getApiResponseToastType(data),
+        message: getApiResponseMessage(
+          data,
+          isIndividual ? "Nota do aluno salva com sucesso." : "Notas salvas com sucesso."
+        ),
       });
     } catch (e: any) {
       setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Erro ao salvar notas." });
@@ -443,9 +458,13 @@ export default function OfficialAssessmentFormScreen({
     if (!assessmentBackendId) return;
     setPublishing(true);
     try {
-      await api.post(`/official-assessments/${assessmentBackendId}/publish`);
+      const { data } = await api.post(`/official-assessments/${assessmentBackendId}/publish`);
       setStatus("published");
-      setToast({ visible: true, type: "success", message: "Avaliação publicada com sucesso." });
+      setToast({
+        visible: true,
+        type: getApiResponseToastType(data),
+        message: getApiResponseMessage(data, "Avaliação publicada com sucesso."),
+      });
     } catch (e: any) {
       setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Erro ao publicar." });
     } finally {

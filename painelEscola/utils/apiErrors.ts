@@ -65,3 +65,39 @@ export function parseApiErrors(
   });
   return result;
 }
+
+/** Envelope padrão da apiEscola: `{ type, message, body }`. */
+export type ApiEnvelope<T = unknown> = {
+  type?: "success" | "error" | string;
+  message?: string;
+  body?: T;
+};
+
+/** Mensagem de sucesso/erro retornada pela API (campo `message` do envelope). */
+export function getApiResponseMessage(data: unknown, fallback: string): string {
+  if (data && typeof data === "object" && "message" in data) {
+    const message = (data as ApiEnvelope).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
+/** Tipo do toast a partir do campo `type` do envelope (`success` | `error`). */
+export function getApiResponseToastType(data: unknown): "success" | "error" {
+  if (data && typeof data === "object" && "type" in data) {
+    const type = (data as ApiEnvelope).type;
+    if (type === "error") return "error";
+  }
+  return "success";
+}
+
+/** Corpo útil da resposta (`body` ou fallbacks legados). */
+export function getApiResponseBody<T = unknown>(data: unknown): T | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const envelope = data as ApiEnvelope<T>;
+  if (envelope.body != null) return envelope.body;
+  if ("data" in envelope && (envelope as { data?: T }).data != null) {
+    return (envelope as { data?: T }).data;
+  }
+  return data as T;
+}

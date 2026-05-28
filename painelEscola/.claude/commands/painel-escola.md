@@ -62,6 +62,29 @@ Telas administrativas com UX consistente, responsivas (mobile/tablet/desktop) e 
 7. `FormData`: não forçar `Content-Type` manual (já tratado no interceptor)
 8. **Limites de upload:** alinhar validação do **frontend** com a do **backend** (ex.: PDF com `max` em kB no Laravel). Se o front liberar e o back rejeitar, o usuário vê “Salvar” sem efeito aparente.
 
+### Feedback após salvar (obrigatório)
+
+Em **toda ação de salvar** (criar, atualizar, publicar, lançar notas, etc.), o toast de retorno deve usar a **mensagem da API**, não texto fixo inventado no front.
+
+Resposta típica da apiEscola:
+
+```json
+{
+  "type": "success",
+  "message": "Avaliação oficial atualizada com sucesso.",
+  "body": { "id": 2, "title": "...", "status": "draft" }
+}
+```
+
+- Exibir `message` no `ToastBanner` (sucesso ou erro conforme `type`).
+- Usar `body` para atualizar estado local (ex.: `id` após criar, dados retornados).
+- Helpers em `utils/apiErrors.ts`:
+  - `getApiResponseMessage(data, fallback)` — texto do toast
+  - `getApiResponseToastType(data)` — `"success"` | `"error"`
+  - `getApiResponseBody(data)` — payload em `body`
+- Em `catch`, manter `e?.response?.data?.message` com fallback.
+- **Não** usar apenas `"Salvo com sucesso."` se a API já devolve mensagem específica.
+
 ## UI/UX
 
 Toda tela deve ter:
