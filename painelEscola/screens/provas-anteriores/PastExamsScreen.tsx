@@ -169,6 +169,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     message: "",
   });
   const [coursePickerKey, setCoursePickerKey] = useState(0);
+  const [editingExamTypeLabel, setEditingExamTypeLabel] = useState<string | null>(null);
 
   const courseSearchOptions = useMemo(
     () => courseOptions.map((c) => ({ value: String(c.id), label: c.name })),
@@ -280,6 +281,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setEditingId(null);
     setPdfFile(null);
     setEditingPdfLabel(null);
+    setEditingExamTypeLabel(null);
     setErrors({});
     setCoursePickerKey((k) => k + 1);
   };
@@ -307,6 +309,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setEditingId(null);
     setPdfFile(null);
     setEditingPdfLabel(null);
+    setEditingExamTypeLabel(null);
     setErrors({});
     setModalOpen(true);
   };
@@ -340,6 +343,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setEditingId(row.id);
     setPdfFile(null);
     setEditingPdfLabel(row.content ? pdfFileNameFromContent(row.content) : null);
+    setEditingExamTypeLabel(row.exam_type_label ?? null);
     setErrors({});
     setModalOpen(true);
   };
@@ -899,7 +903,10 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         visible={modalOpen}
         title={editingId ? "Editar prova anterior" : "Nova prova anterior"}
         onClose={closeModal}
-        size="lg"
+        size="md"
+        compact
+        maxHeight="88%"
+        showScrollIndicator
         scrollViewClassName="py-0"
         footer={
           <>
@@ -927,7 +934,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           </>
         }
       >
-        <View style={{ gap: 16 }}>
+        <View style={{ gap: 10 }}>
           {hasFormErrors ? (
             <View className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex-row items-start gap-2">
               <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
@@ -984,14 +991,29 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <FormSelect
+              <SearchableSelect
                 label="Classificação"
                 required
                 value={form.exam_type}
                 options={examTypeFormOptions}
-                placeholder="Selecione a classificação"
+                placeholder={
+                  examTypeFormOptions.length === 0
+                    ? "Nenhum tipo cadastrado"
+                    : "Buscar classificação..."
+                }
+                modalTitle="Selecionar classificação"
+                disabled={examTypeFormOptions.length === 0}
+                selectedOption={
+                  form.exam_type
+                    ? examTypeFormOptions.find((o) => o.value === form.exam_type) ?? {
+                        value: form.exam_type,
+                        label: editingExamTypeLabel ?? form.exam_type,
+                      }
+                    : undefined
+                }
                 onChange={(exam_type) => {
                   setForm((p) => ({ ...p, exam_type }));
+                  setEditingExamTypeLabel(null);
                   if (errors.exam_type) {
                     setErrors((prev) => {
                       const next = { ...prev };
@@ -1005,44 +1027,56 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             </View>
           </View>
 
-          <PastExamScheduleFields
-            materialKind={form.material_kind}
-            value={{
-              mode: form.exam_schedule_mode,
-              exam_year: form.exam_year,
-              exam_date: form.exam_date,
+          <View
+            style={{
+              flexDirection: compactStack ? "column" : "row",
+              gap: 10,
+              alignItems: "flex-start",
             }}
-            onChange={(schedule) => {
-              setForm((p) => ({
-                ...p,
-                exam_schedule_mode: schedule.mode,
-                exam_year: schedule.exam_year,
-                exam_date: schedule.exam_date,
-              }));
-              if (errors.exam_date || errors.exam_year) {
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.exam_date;
-                  delete next.exam_year;
-                  return next;
-                });
-              }
-            }}
-            errors={{
-              exam_date: errors.exam_date,
-              exam_year: errors.exam_year,
-            }}
-          />
-
-          <FormSelect
-            label="Publicar"
-            value={form.is_published}
-            options={[
-              { value: "true", label: "Sim" },
-              { value: "false", label: "Não" },
-            ]}
-            onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
-          />
+          >
+            <View style={{ flex: 1, width: compactStack ? "100%" : undefined }}>
+              <PastExamScheduleFields
+                materialKind={form.material_kind}
+                compact
+                value={{
+                  mode: form.exam_schedule_mode,
+                  exam_year: form.exam_year,
+                  exam_date: form.exam_date,
+                }}
+                onChange={(schedule) => {
+                  setForm((p) => ({
+                    ...p,
+                    exam_schedule_mode: schedule.mode,
+                    exam_year: schedule.exam_year,
+                    exam_date: schedule.exam_date,
+                  }));
+                  if (errors.exam_date || errors.exam_year) {
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.exam_date;
+                      delete next.exam_year;
+                      return next;
+                    });
+                  }
+                }}
+                errors={{
+                  exam_date: errors.exam_date,
+                  exam_year: errors.exam_year,
+                }}
+              />
+            </View>
+            <View style={{ width: compactStack ? "100%" : 148 }}>
+              <FormSelect
+                label="Publicar"
+                value={form.is_published}
+                options={[
+                  { value: "true", label: "Sim" },
+                  { value: "false", label: "Não" },
+                ]}
+                onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
+              />
+            </View>
+          </View>
 
           <View
             style={{
@@ -1116,10 +1150,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
 
           <PdfFileUploadField
             required={!editingId}
+            compact
             hint={
               editingId
-                ? "Envie qualquer tamanho de PDF (limite do servidor pode se aplicar). Deixe em branco para manter o arquivo atual."
-                : "Envie qualquer tamanho de PDF (limite do servidor pode se aplicar)."
+                ? "PDF opcional na edição — em branco mantém o arquivo atual."
+                : "Qualquer tamanho de PDF (limite do servidor pode se aplicar)."
             }
             value={pdfFile}
             onChange={handlePdfFileChange}

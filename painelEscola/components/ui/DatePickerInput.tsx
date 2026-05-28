@@ -18,6 +18,7 @@ type Props = {
   error?: string;
   required?: boolean;
   disabled?: boolean;
+  compact?: boolean;
 };
 
 export default function DatePickerInput({
@@ -27,6 +28,7 @@ export default function DatePickerInput({
   error,
   required,
   disabled = false,
+  compact = false,
 }: Props) {
   // Ref para o input nativo oculto (somente web)
   const hiddenRef = useRef<any>(null);
@@ -54,8 +56,10 @@ export default function DatePickerInput({
   const isoValue = displayToISO(value);
 
   return (
-    <View className="mb-4">
-      <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+    <View className={compact ? "mb-2" : "mb-4"}>
+      <Text
+        className={`font-semibold text-gray-700 ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
+      >
         {label}
         {required && <Text className="text-red-500"> *</Text>}
       </Text>

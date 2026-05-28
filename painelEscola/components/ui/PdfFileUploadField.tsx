@@ -24,6 +24,7 @@ type Props = {
   currentFileLabel?: string | null;
   error?: string;
   disabled?: boolean;
+  compact?: boolean;
 };
 
 function formatFileSize(bytes: number): string {
@@ -55,6 +56,7 @@ export default function PdfFileUploadField({
   currentFileLabel = null,
   error,
   disabled = false,
+  compact = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const hasFile = Boolean(value || currentFileLabel);
@@ -82,17 +84,18 @@ export default function PdfFileUploadField({
   return (
     <View>
       {label ? (
-        <Text style={styles.label}>
+        <Text style={[styles.label, compact && styles.labelCompact]}>
           {label}
           {required ? <Text style={styles.required}> *</Text> : null}
         </Text>
       ) : null}
 
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {hint ? <Text style={[styles.hint, compact && styles.hintCompact]}>{hint}</Text> : null}
 
       <View
         style={[
           styles.dropzone,
+          compact && styles.dropzoneCompact,
           hasFile ? styles.dropzoneFilled : styles.dropzoneEmpty,
           error ? styles.dropzoneError : null,
           disabled ? styles.dropzoneDisabled : null,
@@ -133,14 +136,18 @@ export default function PdfFileUploadField({
             </View>
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <PdfIconBlock size="lg" />
-            <Text style={styles.emptyTitle}>Nenhum PDF selecionado</Text>
-            <Text style={styles.emptySub}>Toque no botão abaixo para escolher o arquivo</Text>
+          <View style={[styles.emptyState, compact && styles.emptyStateCompact]}>
+            <PdfIconBlock size={compact ? "md" : "lg"} />
+            <Text style={[styles.emptyTitle, compact && styles.emptyTitleCompact]}>
+              Nenhum PDF selecionado
+            </Text>
+            {!compact ? (
+              <Text style={styles.emptySub}>Toque no botão abaixo para escolher o arquivo</Text>
+            ) : null}
             <TouchableOpacity
               onPress={openPicker}
               disabled={disabled}
-              style={styles.btnPrimary}
+              style={[styles.btnPrimary, compact && styles.btnPrimaryCompact]}
               activeOpacity={0.88}
             >
               <Ionicons name="cloud-upload-outline" size={18} color={THEME.surface} />
@@ -175,6 +182,10 @@ const styles = StyleSheet.create({
     color: THEME.ink,
     marginBottom: 6,
   },
+  labelCompact: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
   required: {
     color: THEME.error,
   },
@@ -184,11 +195,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     lineHeight: 18,
   },
+  hintCompact: {
+    marginBottom: 6,
+    lineHeight: 16,
+  },
   dropzone: {
     borderRadius: 14,
     borderWidth: 1,
     padding: 16,
     backgroundColor: THEME.surface,
+  },
+  dropzoneCompact: {
+    padding: 10,
+    borderRadius: 12,
   },
   dropzoneEmpty: {
     borderColor: THEME.border,
@@ -243,11 +262,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 8,
   },
+  emptyStateCompact: {
+    paddingVertical: 2,
+    gap: 4,
+  },
   emptyTitle: {
     fontSize: 14,
     fontWeight: "700",
     color: THEME.ink,
     marginTop: 4,
+  },
+  emptyTitleCompact: {
+    fontSize: 13,
+    marginTop: 0,
   },
   emptySub: {
     fontSize: 12,
@@ -265,6 +292,10 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: 12,
     marginTop: 6,
+  },
+  btnPrimaryCompact: {
+    paddingVertical: 8,
+    marginTop: 2,
   },
   btnPrimaryText: {
     color: THEME.surface,

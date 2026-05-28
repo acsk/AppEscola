@@ -21,6 +21,7 @@ type Props = {
   minYear?: number;
   maxYear?: number;
   modalTitle?: string;
+  compact?: boolean;
 };
 
 function clampYear(year: number, minYear: number, maxYear: number) {
@@ -37,6 +38,7 @@ export default function YearPickerInput({
   minYear = DEFAULT_MIN_YEAR,
   maxYear = new Date().getFullYear(),
   modalTitle = "Selecionar ano",
+  compact = false,
 }: Props) {
   const { width } = useWindowDimensions();
   const [open, setOpen] = useState(false);
@@ -81,8 +83,10 @@ export default function YearPickerInput({
   const modalWidth = Math.min(width - 32, 360);
 
   return (
-    <View className="mb-4">
-      <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+    <View className={compact ? "mb-2" : "mb-4"}>
+      <Text
+        className={`font-semibold text-gray-700 ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
+      >
         {label}
         {required ? <Text className="text-red-500"> *</Text> : null}
       </Text>

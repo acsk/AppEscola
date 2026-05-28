@@ -22,7 +22,21 @@ type Props = {
   footerStyle?: ViewStyle;
   showScrollIndicator?: boolean;
   scrollViewClassName?: string;
+  /** Menos padding no cabeçalho, corpo e rodapé */
+  compact?: boolean;
 };
+
+function resolveShellMaxHeight(
+  maxHeight: ViewStyle["maxHeight"],
+  screenHeight: number
+): number {
+  if (typeof maxHeight === "number") return maxHeight;
+  if (typeof maxHeight === "string" && maxHeight.endsWith("%")) {
+    const pct = Number.parseFloat(maxHeight) / 100;
+    if (Number.isFinite(pct)) return screenHeight * pct;
+  }
+  return screenHeight * 0.94;
+}
 
 const widths = { sm: 560, md: 760, lg: 980, xl: 1180 };
 
@@ -38,10 +52,17 @@ export default function Modal({
   footerStyle,
   showScrollIndicator = false,
   scrollViewClassName = "",
+  compact = false,
 }: Props) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isMobile = width < 640;
   const horizontalPadding = isMobile ? 12 : width < 1024 ? 24 : 40;
+  const shellMaxHeight = resolveShellMaxHeight(maxHeight, height);
+  const headerBlockHeight = compact ? 44 : 52;
+  const footerBlockHeight = footer ? (isMobile ? (compact ? 96 : 110) : compact ? 52 : 60) : 0;
+  const bodyMaxHeight = Math.max(180, shellMaxHeight - headerBlockHeight - footerBlockHeight);
+  const horizontalInset = compact ? (isMobile ? 14 : 18) : isMobile ? 16 : 24;
+  const bodyPaddingY = compact ? 10 : 16;
 
   if (!visible) return null;
 
@@ -65,14 +86,25 @@ export default function Modal({
           style={{
             width: "100%",
             maxWidth: Math.min(width - horizontalPadding * 2, widths[size]),
-            maxHeight,
+            maxHeight: shellMaxHeight,
             flexDirection: "column",
           }}
         >
           {/* Header */}
-          <View className="px-6 py-3 border-b border-gray-100" style={{ flexShrink: 0 }}>
+          <View
+            className="border-b border-gray-100"
+            style={{
+              flexShrink: 0,
+              paddingHorizontal: horizontalInset,
+              paddingVertical: compact ? 10 : 12,
+            }}
+          >
             <View className="flex-row items-center justify-between">
-              <Text className="text-base font-bold text-gray-800">{title}</Text>
+              <Text
+                className={`font-bold text-gray-800 ${compact ? "text-sm" : "text-base"}`}
+              >
+                {title}
+              </Text>
               <TouchableOpacity
                 onPress={onClose}
                 className="p-1 rounded-lg bg-gray-100"
@@ -86,11 +118,20 @@ export default function Modal({
 
           {/* Body */}
           <ScrollView
-            className={`${isMobile ? "px-4" : "px-6"} ${scrollViewClassName}`}
-            style={{ flexGrow: 1, flexShrink: 1 }}
-            contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 }}
+            className={scrollViewClassName}
+            style={{
+              maxHeight: bodyMaxHeight,
+              flexGrow: 0,
+              flexShrink: 1,
+              paddingHorizontal: horizontalInset,
+            }}
+            contentContainerStyle={{
+              paddingTop: bodyPaddingY,
+              paddingBottom: bodyPaddingY,
+            }}
             showsVerticalScrollIndicator={showScrollIndicator}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
           >
             {children}
           </ScrollView>
@@ -98,13 +139,15 @@ export default function Modal({
           {/* Footer */}
           {footer && (
             <View
-              className="px-6 py-3 border-t border-gray-100 bg-white"
+              className="border-t border-gray-100 bg-white"
               style={{
                 flexShrink: 0,
                 width: "100%",
                 flexDirection: isMobile ? "column" : "row",
                 alignItems: "stretch",
-                gap: 10,
+                gap: compact ? 8 : 10,
+                paddingHorizontal: horizontalInset,
+                paddingVertical: compact ? 10 : 12,
                 ...footerStyle,
               }}
             >

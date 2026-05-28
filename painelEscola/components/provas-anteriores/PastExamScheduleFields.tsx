@@ -14,6 +14,7 @@ type Props = {
   value: PastExamScheduleValue;
   onChange: (value: PastExamScheduleValue) => void;
   errors?: { exam_date?: string; exam_year?: string };
+  compact?: boolean;
 };
 
 const MODE_LABELS: Record<PastExamScheduleMode, string> = {
@@ -33,6 +34,7 @@ export default function PastExamScheduleFields({
   value,
   onChange,
   errors = {},
+  compact = false,
 }: Props) {
   const setMode = (mode: PastExamScheduleMode) => {
     onChange({
@@ -44,10 +46,11 @@ export default function PastExamScheduleFields({
 
   if (materialKind === "prova") {
     return (
-      <View className="mb-1">
+      <View className={compact ? "mb-0" : "mb-1"}>
         <YearPickerInput
           label="Ano da prova"
           required
+          compact={compact}
           value={value.exam_year}
           onChange={(exam_year) =>
             onChange({ mode: "year", exam_year, exam_date: "" })
@@ -60,10 +63,14 @@ export default function PastExamScheduleFields({
   }
 
   return (
-    <View className="mb-1">
-      <Text className="text-sm font-semibold text-gray-700 mb-1.5">Data do exercício</Text>
+    <View className={compact ? "mb-0" : "mb-1"}>
+      <Text
+        className={`font-semibold text-gray-700 ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
+      >
+        Data do exercício
+      </Text>
 
-      <View className="flex-row flex-wrap gap-2 mb-3">
+      <View className={`flex-row flex-wrap gap-2 ${compact ? "mb-2" : "mb-3"}`}>
         {EXERCICIO_MODE_OPTIONS.map((opt) => {
           const active = value.mode === opt.value;
           return (
@@ -92,6 +99,7 @@ export default function PastExamScheduleFields({
       {value.mode === "year" ? (
         <YearPickerInput
           label="Ano"
+          compact={compact}
           value={value.exam_year}
           onChange={(exam_year) => onChange({ ...value, mode: "year", exam_year })}
           error={errors.exam_year}
@@ -102,6 +110,7 @@ export default function PastExamScheduleFields({
       {value.mode === "date" ? (
         <DatePickerInput
           label="Data"
+          compact={compact}
           value={value.exam_date}
           onChangeText={(exam_date) => onChange({ ...value, mode: "date", exam_date })}
           error={errors.exam_date}
