@@ -223,7 +223,7 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 - Botão **Lançar notas** abre modal em lote; ícone na linha abre o mesmo formulário só para aquele aluno (`focusStudentId` no stepper).
 - Modal: `OfficialAssessmentGradeStepper` (um aluno por passo no lote, **todas as disciplinas na mesma tela**; nota máxima = **soma** das disciplinas; presença única por aluno).
 - API: `POST /official-assessments/{id}/grades` com `{ student_id, subject_id, grade, is_absent, enrollment_id? }`.
-- Migration `2026_05_28_150000_official_assessment_grades_per_subject`: unique `(official_assessment_id, student_id, subject_id)`.
+- Migration `2026_05_28_150100_restore_official_assessment_grades_per_subject`: unique `(official_assessment_id, student_id, subject_id)`.
 
 ### Provas anteriores (`screens/provas-anteriores/PastExamsScreen.tsx`)
 

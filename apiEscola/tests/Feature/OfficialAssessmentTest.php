@@ -113,45 +113,55 @@ class OfficialAssessmentTest extends TestCase
         ]);
     }
 
-    public function test_upsert_grades_without_subject_id_keeps_one_row_per_student(): void
+    public function test_upsert_grades_keeps_one_row_per_student_and_subject(): void
     {
         $ctx = $this->seedContext();
+        $math = Subject::factory()->create(['tenant_id' => $ctx['tenant']->id, 'name' => 'Matemática']);
+        $portuguese = Subject::factory()->create(['tenant_id' => $ctx['tenant']->id, 'name' => 'Português']);
         $assessment = OfficialAssessment::factory()->create([
             'tenant_id' => $ctx['tenant']->id,
             'school_class_id' => $ctx['schoolClass']->id,
         ]);
+        $assessment->subjects()->sync([
+            $math->id => [],
+            $portuguese->id => [],
+        ]);
         $this->actingAsStaff($ctx['admin']);
 
-        $payload = [
+        $this->postJson("/api/official-assessments/{$assessment->id}/grades", [
             'grades' => [
                 [
                     'student_id' => $ctx['student']->id,
-                    'grade' => 7.5,
+                    'subject_id' => $portuguese->id,
+                    'grade' => 10,
                     'is_absent' => false,
                 ],
             ],
-        ];
+        ])->assertOk();
 
-        $this->postJson("/api/official-assessments/{$assessment->id}/grades", $payload)
-            ->assertOk()
-            ->assertJsonPath('type', 'success');
+        $this->postJson("/api/official-assessments/{$assessment->id}/grades", [
+            'grades' => [
+                [
+                    'student_id' => $ctx['student']->id,
+                    'subject_id' => $math->id,
+                    'grade' => 8,
+                    'is_absent' => false,
+                ],
+            ],
+        ])->assertOk();
 
-        $this->assertDatabaseCount('official_assessment_grades', 1);
+        $this->assertDatabaseCount('official_assessment_grades', 2);
         $this->assertDatabaseHas('official_assessment_grades', [
             'official_assessment_id' => $assessment->id,
             'student_id' => $ctx['student']->id,
-            'grade' => '7.50',
+            'subject_id' => $portuguese->id,
+            'grade' => '10.00',
         ]);
-
-        $payload['grades'][0]['grade'] = 9.0;
-        $this->postJson("/api/official-assessments/{$assessment->id}/grades", $payload)
-            ->assertOk();
-
-        $this->assertDatabaseCount('official_assessment_grades', 1);
         $this->assertDatabaseHas('official_assessment_grades', [
             'official_assessment_id' => $assessment->id,
             'student_id' => $ctx['student']->id,
-            'grade' => '9.00',
+            'subject_id' => $math->id,
+            'grade' => '8.00',
         ]);
     }
 

@@ -13,8 +13,8 @@ type Props = {
   onLaunchIndividual?: (studentId: number) => void;
 };
 
+const COL_MATRICULA = { flex: 1, minWidth: 112 };
 const COL_ALUNO = { flex: 2.5, minWidth: 180 };
-const COL_MATRICULA = { flex: 1.1, minWidth: 120 };
 const COL_SUBJECT = { flex: 1, minWidth: 96 };
 const COL_ACTION = { width: 52 };
 
@@ -33,8 +33,12 @@ function renderCell(
   flex: number,
   minWidth: number,
   content: string,
-  options?: { header?: boolean; center?: boolean; color?: string }
+  options?: { header?: boolean; center?: boolean; color?: string; enrollment?: boolean }
 ) {
+  const bodyClass = options?.enrollment
+    ? "text-xs font-mono text-violet-600 font-semibold"
+    : "text-xs font-semibold text-gray-800";
+
   return (
     <View
       style={{
@@ -47,11 +51,7 @@ function renderCell(
     >
       <Text
         numberOfLines={1}
-        className={
-          options?.header
-            ? "text-[11px] font-bold text-gray-600 uppercase"
-            : "text-xs font-semibold text-gray-800"
-        }
+        className={options?.header ? "text-[11px] font-bold text-gray-600 uppercase" : bodyClass}
         style={{
           textAlign: options?.center ? "center" : "left",
           width: "100%",
@@ -184,8 +184,8 @@ export default function OfficialAssessmentGradesTable({
             style={{ width: "100%", minWidth: isMobile ? tableScrollMinWidth : undefined }}
           >
             <View className="flex-row bg-gray-100 border-b border-gray-200 py-2" style={{ width: "100%" }}>
-              {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, "Aluno", { header: true })}
               {renderCell(COL_MATRICULA.flex, COL_MATRICULA.minWidth, "Matrícula", { header: true })}
+              {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, "Aluno", { header: true })}
               {sortedSubjects.map((s) =>
                 renderCell(COL_SUBJECT.flex, COL_SUBJECT.minWidth, s.name, {
                   header: true,
@@ -215,13 +215,13 @@ export default function OfficialAssessmentGradesTable({
                 }`}
                 style={{ width: "100%" }}
               >
-                {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, student.student_name)}
                 {renderCell(
                   COL_MATRICULA.flex,
                   COL_MATRICULA.minWidth,
                   student.enrollment_number ?? "—",
-                  { color: "#4B5563" }
+                  { enrollment: true }
                 )}
+                {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, student.student_name)}
                 {sortedSubjects.map((s) => {
                   const cell = formatGradeCell(gradeMap.get(`${student.student_id}-${s.id}`));
                   const color =
