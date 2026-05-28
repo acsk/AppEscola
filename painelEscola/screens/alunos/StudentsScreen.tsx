@@ -12,14 +12,67 @@ import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import DataTableRow from "../../components/ui/DataTableRow";
+import StudentActionsModal, {
+  type StudentActionItem,
+  type StudentActionKey,
+} from "../../components/alunos/StudentActionsModal";
+import {
+  TABLE_CELL,
+  TABLE_CELL_ENROLLMENT,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_CELL_SUBLINE,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../../components/ui/dataTableStyles";
 import { useStatuses, domainToOptions } from "../../hooks/useDomains";
 import { maskPhone, maskCPF, isoToDisplay } from "../../utils/masks";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import type { CourseOption } from "../../types/entities";
 import type { StudentListItem, StudentsScreenProps } from "../../types/alunos";
 
+const TABLE_MIN_WIDTH = 1040;
+
+const COL_ENROLLMENT = { flex: 0.85, minWidth: 100 };
+const COL_NAME = { flex: 2, minWidth: 176 };
+const COL_EMAIL = { flex: 1.55, minWidth: 150 };
+const COL_PHONE = { flex: 1, minWidth: 118 };
+const COL_BIRTH = { flex: 0.85, minWidth: 96 };
+const COL_COURSES = { flex: 1.15, minWidth: 110 };
+const COL_STATUS = { flex: 0.72, minWidth: 88 };
+const COL_ACTION = { width: 42 };
+
+type ColDef = {
+  key: string;
+  label: string;
+  flex?: number;
+  minWidth?: number;
+  width?: number;
+};
+
+const COLUMNS: ColDef[] = [
+  { key: "enrollment", label: "Matrícula", ...COL_ENROLLMENT },
+  { key: "name", label: "Nome / CPF", ...COL_NAME },
+  { key: "email", label: "E-mail", ...COL_EMAIL },
+  { key: "phone", label: "Telefone", ...COL_PHONE },
+  { key: "birth", label: "Nascimento", ...COL_BIRTH },
+  { key: "courses", label: "Cursos", ...COL_COURSES },
+  { key: "status", label: "Status", ...COL_STATUS },
+];
+
+function colStyle(col: ColDef) {
+  return {
+    flex: col.width ? undefined : col.flex,
+    width: col.width,
+    minWidth: col.minWidth,
+    paddingRight: col.width ? 0 : 8,
+  };
+}
+
 export default function StudentsScreen({ navigate }: StudentsScreenProps) {
-  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
+  const { isMobile, contentPadding } = useResponsiveLayout();
   const statuses = useStatuses();
   const statusOptions = statuses.length
     ? domainToOptions(statuses)
@@ -45,6 +98,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
   const [deleting, setDeleting] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [courses, setCourses] = useState<CourseOption[]>([]);
+  const [menuStudent, setMenuStudent] = useState<StudentActionItem | null>(null);
 
   const fetchCourses = useCallback(async () => {
     try {
@@ -52,11 +106,14 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         params: { status: "active", per_page: 500 },
       });
       const list = data?.body ?? data?.data ?? data;
-      const rows = Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : [];
+      const courseRows = Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : [];
       setCourses(
-        rows
-          .filter((course: any) => course?.id && course?.name)
-          .map((course: any) => ({ id: Number(course.id), name: String(course.name) }))
+        courseRows
+          .filter((course: { id?: number; name?: string }) => course?.id && course?.name)
+          .map((course: { id: number; name: string }) => ({
+            id: Number(course.id),
+            name: String(course.name),
+          }))
       );
     } catch {
       setCourses([]);
@@ -66,17 +123,21 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
   const fetchStudents = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, any> = { page };
+      const params: Record<string, string | number> = { page };
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
       if (courseFilter) params.course_id = Number(courseFilter);
       if (minorFilter) params.is_minor = minorFilter;
       const { data } = await api.get("/students", { params });
       const list = data?.body ?? data?.data ?? data;
-      const fetchedRows = Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : [];
+      const fetchedRows: StudentListItem[] = Array.isArray(list?.data)
+        ? list.data
+        : Array.isArray(list)
+          ? list
+          : [];
       const selectedCourseId = courseFilter ? Number(courseFilter) : null;
       const filteredRows = selectedCourseId
-        ? fetchedRows.filter((student: Student) => {
+        ? fetchedRows.filter((student) => {
             const desiredIds = [
               ...(student.desired_courses ?? []).map((course) => course.id),
               student.desired_course_id ?? null,
@@ -95,7 +156,9 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
             total: 0,
           }
       );
-    } catch {}
+    } catch {
+      setRows([]);
+    }
     setLoading(false);
   }, [courseFilter, minorFilter, page, search, statusFilter]);
 
@@ -114,7 +177,9 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
       await api.delete(`/students/${deleteId}`);
       setDeleteId(null);
       fetchStudents();
-    } catch {}
+    } catch {
+      /* toast opcional */
+    }
     setDeleting(false);
   };
 
@@ -123,13 +188,15 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
     try {
       await api.put(`/students/${studentId}`, { status: "active" });
       fetchStudents();
-    } catch {}
+    } catch {
+      /* toast opcional */
+    }
     setApprovingId(null);
   };
 
   const fmtDate = (iso: string | null) => (iso ? isoToDisplay(iso) : "—");
   const fmtDocument = (value: string | null) => {
-    if (!value) return "—";
+    if (!value) return null;
     const digits = value.replace(/\D/g, "");
     return digits.length === 11 ? maskCPF(digits) : value;
   };
@@ -142,7 +209,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
     if (!items || items.length === 0) return "—";
     return items.map((item) => item.name).join(", ");
   };
-  const studentCourseLabel = (student: Student) => {
+  const studentCourseLabel = (student: StudentListItem) => {
     const primaryCourses = student.desired_courses ?? [];
     if (primaryCourses.length > 0) return courseLabel(primaryCourses);
     if (student.desired_course) return student.desired_course.name;
@@ -151,21 +218,148 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
   const statusLabel = (value: string) =>
     statusOptions.find((item) => item.value === value)?.label ?? value;
 
+  const toActionItem = (item: StudentListItem): StudentActionItem => ({
+    id: item.id,
+    name: item.name,
+    enrollment_number: item.enrollment_number,
+    email: item.email,
+    document: item.document,
+    status: item.status,
+  });
+
+  const handleStudentAction = (action: StudentActionKey) => {
+    const row = menuStudent;
+    if (!row) return;
+    if (action === "edit") {
+      navigate("alunos-form", { studentId: row.id });
+      return;
+    }
+    if (action === "boletim") {
+      navigate("alunos-boletim", { studentId: row.id, studentName: row.name });
+      return;
+    }
+    if (action === "performance") {
+      navigate("alunos-performance", { studentId: row.id, studentName: row.name });
+      return;
+    }
+    if (action === "approve") {
+      approveStudent(row.id);
+      return;
+    }
+    if (action === "delete") {
+      setDeleteId(row.id);
+    }
+  };
+
+  const renderActionsButton = (item: StudentListItem) => (
+    <TouchableOpacity
+      onPress={() => setMenuStudent(toActionItem(item))}
+      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+      activeOpacity={0.85}
+      accessibilityLabel="Ações do aluno"
+    >
+      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+    </TouchableOpacity>
+  );
+
+  const renderMobileCard = (item: StudentListItem) => (
+    <View
+      key={item.id}
+      className="bg-white border border-gray-200 rounded-xl p-3"
+      style={{
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 1,
+      }}
+    >
+      <View className="flex-row items-start justify-between gap-3">
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text className="text-sm font-semibold text-gray-800" numberOfLines={2}>
+            {item.name}
+          </Text>
+          <Text className="text-xs font-mono text-violet-600 font-semibold mt-0.5">
+            {item.enrollment_number ?? "Sem matrícula"}
+          </Text>
+        </View>
+        {renderActionsButton(item)}
+      </View>
+      <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
+        <Text className="text-xs text-gray-500">Documento: {fmtDocument(item.document) ?? "—"}</Text>
+        <Text className="text-xs text-gray-500">
+          Telefone: {item.phone ? maskPhone(item.phone) : "—"}
+        </Text>
+        <Text className="text-xs text-gray-500">Nascimento: {fmtDate(item.birth_date)}</Text>
+        <Text className="text-xs text-gray-500">E-mail: {fmtEmail(item.email)}</Text>
+        <Text className="text-xs text-gray-500">Cursos: {studentCourseLabel(item)}</Text>
+        <Text className="text-xs text-gray-500">Responsáveis: {fmtNames(item.guardians)}</Text>
+      </View>
+      <View className="mt-2 self-start">
+        <Badge slug={item.status} label={statusLabel(item.status)} />
+      </View>
+    </View>
+  );
+
+  const renderDesktopRow = (item: StudentListItem, index: number) => {
+    const doc = fmtDocument(item.document);
+    return (
+      <DataTableRow key={item.id} index={index}>
+        <Text
+          className={TABLE_CELL_ENROLLMENT}
+          style={colStyle(COLUMNS[0])}
+          numberOfLines={1}
+        >
+          {item.enrollment_number ?? "—"}
+        </Text>
+        <View style={colStyle(COLUMNS[1])}>
+          <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {doc ? (
+            <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
+              {doc}
+            </Text>
+          ) : null}
+        </View>
+        <Text className={TABLE_CELL} style={colStyle(COLUMNS[2])} numberOfLines={1}>
+          {fmtEmail(item.email)}
+        </Text>
+        <Text className={TABLE_CELL} style={colStyle(COLUMNS[3])} numberOfLines={1}>
+          {item.phone ? maskPhone(item.phone) : "—"}
+        </Text>
+        <Text className={TABLE_CELL_MUTED} style={colStyle(COLUMNS[4])} numberOfLines={1}>
+          {fmtDate(item.birth_date)}
+        </Text>
+        <Text className={TABLE_CELL} style={colStyle(COLUMNS[5])} numberOfLines={2}>
+          {studentCourseLabel(item)}
+        </Text>
+        <View style={colStyle(COLUMNS[6])}>
+          <Badge slug={item.status} label={statusLabel(item.status)} />
+        </View>
+        <View style={{ width: COL_ACTION.width }} className="flex-row justify-end">
+          {renderActionsButton(item)}
+        </View>
+      </DataTableRow>
+    );
+  };
+
   return (
     <ScrollView
       className="flex-1"
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
     >
-      {/* Cabeçalho */}
       <View
         className="mb-6"
-        style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}
+        style={{
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
       >
         <View>
           <Text className="text-2xl font-bold text-gray-800">Alunos</Text>
-          <Text className="text-sm text-gray-500">
-            Gerencie os alunos do cursinho
-          </Text>
+          <Text className="text-sm text-gray-500">Gerencie os alunos do cursinho</Text>
         </View>
         <TouchableOpacity
           onPress={() => navigate("alunos-form")}
@@ -173,13 +367,10 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">
-            Novo Aluno
-          </Text>
+          <Text className="text-white font-semibold text-sm ml-1.5">Novo Aluno</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Filtros */}
       <View
         className="mb-4"
         style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}
@@ -207,7 +398,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         </View>
         <select
           value={statusFilter}
-          onChange={(e: any) => {
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
@@ -231,7 +422,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         </select>
         <select
           value={courseFilter}
-          onChange={(e: any) => {
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
             setCourseFilter(e.target.value);
             setPage(1);
           }}
@@ -255,7 +446,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         </select>
         <select
           value={minorFilter}
-          onChange={(e: any) => {
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
             setMinorFilter(e.target.value);
             setPage(1);
           }}
@@ -276,275 +467,94 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         </select>
       </View>
 
-      {/* Tabela / Cards */}
-      <ScrollView
-        horizontal={!isMobile}
-        showsHorizontalScrollIndicator={!isMobile}
-        style={{ width: "100%" }}
-        contentContainerStyle={{ width: "100%" }}
-      >
-      <View
-        className={isMobile ? "gap-3" : "bg-white rounded-2xl overflow-hidden"}
-        style={{
-          width: "100%",
-          minWidth: isMobile ? undefined : tableMinWidth,
-          shadowColor: isMobile ? undefined : "#000",
-          shadowOpacity: isMobile ? undefined : 0.05,
-          shadowRadius: isMobile ? undefined : 10,
-          elevation: isMobile ? undefined : 2,
-        }}
-      >
-        {!isMobile && <View className="flex-row bg-gray-50 border-b border-gray-100 px-3 py-2">
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ width: 112 }}
+      {isMobile ? (
+        <View className="gap-3">
+          {loading ? (
+            <View className="items-center justify-center py-16 bg-white rounded-2xl border border-gray-200">
+              <ActivityIndicator size="large" color="#7C3AED" />
+            </View>
+          ) : rows.length === 0 ? (
+            <View className="items-center justify-center py-14 bg-white rounded-2xl border border-gray-200">
+              <Ionicons name="people-outline" size={40} color="#E5E7EB" />
+              <Text className="text-gray-400 mt-3 text-sm">Nenhum aluno encontrado</Text>
+            </View>
+          ) : (
+            rows.map(renderMobileCard)
+          )}
+          {meta.total > 0 && (
+            <View className="bg-white rounded-2xl border border-gray-200 px-4">
+              <Pagination
+                currentPage={meta.current_page}
+                lastPage={meta.last_page}
+                total={meta.total}
+                perPage={meta.per_page}
+                onPageChange={setPage}
+              />
+            </View>
+          )}
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ width: "100%" }}
+          contentContainerStyle={{ width: "100%" }}
+        >
+          <View
+            className="bg-white rounded-2xl overflow-hidden border border-gray-200"
+            style={{
+              width: "100%",
+              minWidth: TABLE_MIN_WIDTH,
+              shadowColor: "#000",
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 2,
+            }}
           >
-            Matrícula
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
-          >
-            Nome / CPF
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
-          >
-            E-mail
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
-          >
-            Telefone
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
-          >
-            Nascimento
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
-          >
-            Cursos
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
-          >
-            Status
-          </Text>
-          <View style={{ width: 72 }} />
-        </View>}
-
-        {loading ? (
-          <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color="#7C3AED" />
-          </View>
-        ) : rows.length === 0 ? (
-          <View className="items-center justify-center py-16">
-            <Ionicons name="people-outline" size={40} color="#E5E7EB" />
-            <Text className="text-gray-400 mt-3 text-sm">
-              Nenhum aluno encontrado
-            </Text>
-          </View>
-        ) : (
-          rows.map((item, i) => (
-            <View
-              key={item.id}
-              className={
-                isMobile
-                  ? "bg-white border border-gray-200 rounded-xl p-3"
-                  : `flex-row items-center px-3 py-2 border-b border-gray-50 ${
-                      i % 2 === 1 ? "bg-gray-50/40" : ""
-                    }`
-              }
-              style={{
-                shadowColor: isMobile ? "#000" : undefined,
-                shadowOpacity: isMobile ? 0.04 : undefined,
-                shadowRadius: isMobile ? 8 : undefined,
-                elevation: isMobile ? 1 : undefined,
-              }}
-            >
-              {isMobile ? (
-                <>
-                  <View className="flex-row items-start justify-between gap-3">
-                    <View style={{ flex: 1 }}>
-                      <Text className="text-sm font-semibold text-gray-800">{item.name}</Text>
-                      <Text className="text-xs font-mono text-violet-600 font-semibold mt-0.5">
-                        {item.enrollment_number ?? "Sem matrícula"}
-                      </Text>
-                    </View>
-                    <View className="flex-row gap-2">
-                      <TouchableOpacity
-                        onPress={() =>
-                          navigate("alunos-boletim", {
-                            studentId: item.id,
-                            studentName: item.name,
-                          })
-                        }
-                        className="p-1.5 bg-violet-50 rounded-lg"
-                        accessibilityLabel="Boletim"
-                      >
-                        <Ionicons name="ribbon-outline" size={15} color="#7C3AED" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() =>
-                          navigate("alunos-performance", {
-                            studentId: item.id,
-                            studentName: item.name,
-                          })
-                        }
-                        className="p-1.5 bg-blue-50 rounded-lg"
-                        accessibilityLabel="Aproveitamento em simulados"
-                      >
-                        <Ionicons name="stats-chart-outline" size={15} color="#2563EB" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => navigate("alunos-form", { studentId: item.id })} className="p-1.5 bg-violet-50 rounded-lg">
-                        <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
-                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
-                    <Text className="text-xs text-gray-500">Documento: {fmtDocument(item.document)}</Text>
-                    <Text className="text-xs text-gray-500">Telefone: {item.phone ? maskPhone(item.phone) : "—"}</Text>
-                    <Text className="text-xs text-gray-500">Nascimento: {fmtDate(item.birth_date)}</Text>
-                    <Text className="text-xs text-gray-500">E-mail: {fmtEmail(item.email)}</Text>
-                    <Text className="text-xs text-gray-500">Cursos: {courseLabel(item.desired_courses)}</Text>
-                    <Text className="text-xs text-gray-500">Responsáveis: {fmtNames(item.guardians)}</Text>
-                  </View>
-                  <View className="mt-2 self-start">
-                    <Badge slug={item.status} label={statusLabel(item.status)} />
-                  </View>
-                  {item.status === "inactive" && (
-                    <TouchableOpacity
-                      onPress={() => approveStudent(item.id)}
-                      disabled={approvingId === item.id}
-                      className="mt-2 flex-row items-center gap-1.5 self-start rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5"
-                    >
-                      {approvingId === item.id ? (
-                        <ActivityIndicator size="small" color="#047857" />
-                      ) : (
-                        <Ionicons name="checkmark-circle-outline" size={14} color="#047857" />
-                      )}
-                      <Text className="text-xs font-semibold text-emerald-700">Aprovar cadastro</Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              ) : (
-                <>
-              <Text style={{ width: 112 }} className="text-xs font-mono text-violet-600 font-semibold">
-                {item.enrollment_number ?? "—"}
-              </Text>
-              <View style={{ flex: 2 }}>
-                <Text className="text-xs font-medium text-gray-800">
-                  {item.name}
+            <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+              {COLUMNS.map((col) => (
+                <Text key={col.key} className={TABLE_HEADER_CELL} style={colStyle(col)}>
+                  {col.label}
                 </Text>
-                {item.document && (
-                  <Text className="text-[11px] text-gray-400">
-                    {fmtDocument(item.document)}
-                  </Text>
-                )}
+              ))}
+              <View style={{ width: COL_ACTION.width }} />
+            </View>
+
+            {loading ? (
+              <View className="items-center justify-center py-20">
+                <ActivityIndicator size="large" color="#7C3AED" />
               </View>
-              <Text className="text-xs text-gray-600" style={{ flex: 2 }}>
-                {fmtEmail(item.email)}
-              </Text>
-              <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
-                {item.phone ? maskPhone(item.phone) : "—"}
-              </Text>
-              <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
-                {fmtDate(item.birth_date)}
-              </Text>
-              <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
-                {studentCourseLabel(item)}
-              </Text>
-              <View style={{ flex: 1 }}>
-                <Badge
-                  slug={item.status}
-                  label={statusLabel(item.status)}
+            ) : rows.length === 0 ? (
+              <View className="items-center justify-center py-16">
+                <Ionicons name="people-outline" size={40} color="#E5E7EB" />
+                <Text className="text-gray-400 mt-3 text-sm">Nenhum aluno encontrado</Text>
+              </View>
+            ) : (
+              rows.map(renderDesktopRow)
+            )}
+
+            {meta.total > 0 && (
+              <View className="px-4 border-t border-gray-100">
+                <Pagination
+                  currentPage={meta.current_page}
+                  lastPage={meta.last_page}
+                  total={meta.total}
+                  perPage={meta.per_page}
+                  onPageChange={setPage}
                 />
               </View>
-              <View
-                style={{ width: 184 }}
-                className="flex-row justify-end gap-2"
-              >
-                {item.status === "inactive" && (
-                  <TouchableOpacity
-                    onPress={() => approveStudent(item.id)}
-                    disabled={approvingId === item.id}
-                    className="p-1.5 bg-emerald-50 rounded-lg"
-                  >
-                    {approvingId === item.id ? (
-                      <ActivityIndicator size="small" color="#047857" />
-                    ) : (
-                      <Ionicons name="checkmark-circle-outline" size={15} color="#047857" />
-                    )}
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={() =>
-                    navigate("alunos-boletim", {
-                      studentId: item.id,
-                      studentName: item.name,
-                    })
-                  }
-                  className="p-1.5 bg-violet-50 rounded-lg"
-                  accessibilityLabel="Boletim"
-                >
-                  <Ionicons name="ribbon-outline" size={15} color="#7C3AED" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() =>
-                    navigate("alunos-performance", {
-                      studentId: item.id,
-                      studentName: item.name,
-                    })
-                  }
-                  className="p-1.5 bg-blue-50 rounded-lg"
-                  accessibilityLabel="Aproveitamento em simulados"
-                >
-                  <Ionicons name="stats-chart-outline" size={15} color="#2563EB" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() =>
-                    navigate("alunos-form", { studentId: item.id })
-                  }
-                  className="p-1.5 bg-violet-50 rounded-lg"
-                >
-                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setDeleteId(item.id)}
-                  className="p-1.5 bg-red-50 rounded-lg"
-                >
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-                </>
-              )}
-            </View>
-          ))
-        )}
-
-        {meta.total > 0 && (
-          <View className="px-4 border-t border-gray-100">
-            <Pagination
-              currentPage={meta.current_page}
-              lastPage={meta.last_page}
-              total={meta.total}
-              perPage={meta.per_page}
-              onPageChange={setPage}
-            />
+            )}
           </View>
-        )}
-      </View>
-      </ScrollView>
+        </ScrollView>
+      )}
+
+      <StudentActionsModal
+        visible={!!menuStudent}
+        student={menuStudent}
+        onClose={() => setMenuStudent(null)}
+        onSelect={handleStudentAction}
+        statusLabel={statusLabel}
+      />
 
       <ConfirmModal
         visible={!!deleteId}

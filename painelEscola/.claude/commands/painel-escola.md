@@ -255,6 +255,7 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 | Editar aluno | `#/alunos/{id}` |
 | Aproveitamento (simulados) | `#/alunos/{id}/desempenho` → `StudentPerformanceScreen` |
 | Boletim (avaliações presenciais) | `#/alunos/{id}/boletim` → `StudentReportCardScreen` |
+| Ações do aluno (lista/cadastro) | `StudentActionsModal` — botão `ellipsis-horizontal` na última coluna |
 | Legado (redireciona) | `#/alunos-performance` → lista ou desempenho |
 | Cursos / pacotes / matrículas / turmas | `#/{modulo}`, `#/{modulo}/novo`, `#/{modulo}/{id}` |
 | Frequência turma | `#/turmas/{id}/frequencia` |

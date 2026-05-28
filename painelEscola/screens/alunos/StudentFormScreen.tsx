@@ -17,6 +17,11 @@ import DatePickerInput from "../../components/ui/DatePickerInput";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
+import Badge from "../../components/ui/Badge";
+import StudentActionsModal, {
+  type StudentActionKey,
+} from "../../components/alunos/StudentActionsModal";
 import {
   maskPhone,
   maskCPF,
@@ -154,6 +159,9 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
   const [desiredCourses, setDesiredCourses] = useState<DesiredCourseRef[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [approving, setApproving] = useState(false);
+  const [studentActionsOpen, setStudentActionsOpen] = useState(false);
+  const [deleteStudentOpen, setDeleteStudentOpen] = useState(false);
+  const [deletingStudent, setDeletingStudent] = useState(false);
   const [deleteGuardianIndex, setDeleteGuardianIndex] = useState<number | null>(
     null
   );
@@ -419,6 +427,44 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
     setApproving(false);
   };
 
+  const deleteStudent = async () => {
+    if (!studentId) return;
+    setDeletingStudent(true);
+    try {
+      await api.delete(`/students/${studentId}`);
+      navigate("alunos");
+    } catch (e: unknown) {
+      const message =
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Não foi possível excluir o aluno.";
+      setToast({ visible: true, type: "error", message });
+    }
+    setDeletingStudent(false);
+    setDeleteStudentOpen(false);
+  };
+
+  const handleFormStudentAction = (action: StudentActionKey) => {
+    if (!studentId) return;
+    if (action === "boletim") {
+      navigate("alunos-boletim", { studentId, studentName: form.name });
+      return;
+    }
+    if (action === "performance") {
+      navigate("alunos-performance", { studentId, studentName: form.name });
+      return;
+    }
+    if (action === "approve") {
+      approveRegistration();
+      return;
+    }
+    if (action === "delete") {
+      setDeleteStudentOpen(true);
+    }
+  };
+
+  const statusLabel =
+    STATUS_OPTIONS.find((o) => o.value === form.status)?.label ?? form.status;
+
   const save = async () => {
     const localErrors = validateForm(form);
 
@@ -603,62 +649,41 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
         contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
       >
-      {/* Breadcrumb / Header */}
-      <View className="flex-row items-center gap-2 mb-6">
-        <TouchableOpacity
-          onPress={() => navigate("alunos")}
-          className="flex-row items-center gap-1.5 text-gray-500"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-          <Text className="text-sm font-medium text-violet-600">Alunos</Text>
-        </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        <Text className="text-sm text-gray-500">
-          {isEdit ? "Editar Aluno" : "Novo Aluno"}
-        </Text>
-      </View>
+      <ScreenBreadcrumb
+        items={[
+          { label: "Alunos", onPress: () => navigate("alunos") },
+          { label: isEdit ? "Editar aluno" : "Novo aluno" },
+        ]}
+      />
 
-      <View className="flex-row items-center justify-between mb-6">
+      <View
+        className="mb-6"
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <View className="flex-1">
           <Text className="text-2xl font-bold text-gray-800">
             {isEdit ? "Editar Aluno" : "Novo Aluno"}
           </Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-sm text-gray-500 mt-1">
             {isEdit
               ? "Atualize os dados do aluno e seus responsáveis"
               : "Preencha os dados para cadastrar um novo aluno"}
           </Text>
         </View>
         {isEdit && studentId ? (
-          <View className="flex-row flex-wrap gap-2 justify-end">
-            <TouchableOpacity
-              onPress={() =>
-                navigate("alunos-boletim", {
-                  studentId,
-                  studentName: form.name,
-                })
-              }
-              className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-50 border border-violet-100"
-              activeOpacity={0.85}
-            >
-              <Ionicons name="ribbon-outline" size={16} color="#7C3AED" />
-              <Text className="text-sm font-semibold text-violet-700">Boletim</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                navigate("alunos-performance", {
-                  studentId,
-                  studentName: form.name,
-                })
-              }
-              className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-100"
-              activeOpacity={0.85}
-            >
-              <Ionicons name="stats-chart-outline" size={16} color="#2563EB" />
-              <Text className="text-sm font-semibold text-blue-700">Aproveitamento</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => setStudentActionsOpen(true)}
+            className="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200 items-center justify-center"
+            activeOpacity={0.85}
+            accessibilityLabel="Ações do aluno"
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#4B5563" />
+          </TouchableOpacity>
         ) : null}
       </View>
 
@@ -669,6 +694,65 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
         </View>
       ) : (
         <View className="gap-0">
+          {isEdit ? (
+            <View
+              className="bg-white rounded-2xl border border-gray-200 p-4 mb-5"
+              style={{
+                shadowColor: "#000",
+                shadowOpacity: 0.04,
+                shadowRadius: 8,
+                elevation: 1,
+              }}
+            >
+              <View className="flex-row items-start justify-between gap-3">
+                <View className="flex-1" style={{ minWidth: 0 }}>
+                  <Text className="text-lg font-bold text-gray-900" numberOfLines={2}>
+                    {form.name || "—"}
+                  </Text>
+                  {enrollmentNumber ? (
+                    <Text className="text-xs font-mono font-semibold text-violet-600 mt-1">
+                      Matrícula {enrollmentNumber}
+                    </Text>
+                  ) : null}
+                  <View className="flex-row flex-wrap items-center gap-2 mt-2">
+                    <Badge slug={form.status} label={statusLabel} />
+                    {hasAppAccess ? (
+                      <View className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5">
+                        <Text className="text-xs font-semibold text-blue-700">App ativo</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+              <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-gray-100">
+                <Text className="text-xs text-gray-500">
+                  CPF: {form.document.trim() ? form.document : "—"}
+                </Text>
+                <Text className="text-xs text-gray-500">
+                  E-mail: {form.email.trim() ? form.email : "—"}
+                </Text>
+                <Text className="text-xs text-gray-500">
+                  Telefone: {form.phone.trim() ? form.phone : "—"}
+                </Text>
+                <Text className="text-xs text-gray-500">
+                  Nascimento: {form.birth_date.trim() ? form.birth_date : "—"}
+                </Text>
+              </View>
+              {desiredCourses.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2 mt-3">
+                  {desiredCourses.map((course) => (
+                    <View
+                      key={course.id}
+                      className="rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1"
+                    >
+                      <Text className="text-xs font-semibold text-violet-700">{course.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {/* ── Card: Dados pessoais ── */}
           <View
             className="bg-white rounded-2xl p-6 mb-5"
@@ -1268,6 +1352,35 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
         </View>
       )}
       </ScrollView>
+
+      <StudentActionsModal
+        visible={studentActionsOpen}
+        student={
+          studentId
+            ? {
+                id: studentId,
+                name: form.name,
+                enrollment_number: enrollmentNumber,
+                email: form.email,
+                document: onlyDigits(form.document),
+                status: form.status,
+              }
+            : null
+        }
+        hideEdit
+        statusLabel={(s) => STATUS_OPTIONS.find((o) => o.value === s)?.label ?? s}
+        onClose={() => setStudentActionsOpen(false)}
+        onSelect={handleFormStudentAction}
+      />
+
+      <ConfirmModal
+        visible={deleteStudentOpen}
+        title="Excluir Aluno"
+        message="Esta ação não pode ser desfeita. O aluno será removido permanentemente."
+        onConfirm={deleteStudent}
+        onCancel={() => setDeleteStudentOpen(false)}
+        loading={deletingStudent}
+      />
 
       <ConfirmModal
         visible={deleteGuardianIndex !== null}
