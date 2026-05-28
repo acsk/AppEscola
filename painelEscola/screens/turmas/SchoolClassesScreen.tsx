@@ -14,7 +14,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import { usePeriods, domainToOptions } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
 } from "../../components/ui/dataTableStyles";
@@ -379,7 +379,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               className={
                 isMobile
                   ? "bg-white border border-gray-200 rounded-xl p-3"
-                  : TABLE_BODY_ROW
+                  : tableBodyRowClass(i)
               }
               style={{
                 shadowColor: isMobile ? "#000" : undefined,

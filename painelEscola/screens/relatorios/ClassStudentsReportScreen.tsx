@@ -7,7 +7,7 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { domainToOptions, usePeriods, useWeekdays } from "../../hooks/useDomains";
 import GridPdfExportButton, { PdfGroup } from "../../components/ui/GridPdfExportButton";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
@@ -542,7 +542,7 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
               {rows.map((row, idx) => (
                 <View
                   key={`${row.student_id}-${row.school_class_id}-${idx}`}
-                  className={TABLE_BODY_ROW}
+                  className={tableBodyRowClass(idx)}
                   style={{ width: "100%" }}
                 >
                   {TABLE_COLUMNS.map((col) =>

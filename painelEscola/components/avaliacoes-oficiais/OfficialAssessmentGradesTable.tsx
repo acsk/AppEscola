@@ -3,7 +3,7 @@ import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { GradeDraftRow } from "../../types/avaliacoesOficiais";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_ENROLLMENT,
   TABLE_CELL_SEMIBOLD,
@@ -273,7 +273,7 @@ export default function OfficialAssessmentGradesTable({
             {filteredStudents.map((student, i) => (
               <View
                 key={student.student_id}
-                className={TABLE_BODY_ROW}
+                className={tableBodyRowClass(i)}
                 style={{ width: "100%" }}
               >
                 {renderCell(

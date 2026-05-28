@@ -181,7 +181,7 @@ Padrão validado em **Provas anteriores** e outros fluxos:
 
 Padrão de telas como **Disciplinas**, **Turmas**, **Cursos**, **Simulados**, **Avaliações presenciais**, **Provas anteriores**, **Matrículas**, **Relatório turmas** e **Notas da turma**.
 
-**Estilos compartilhados:** importar de `components/ui/dataTableStyles.ts` (`TABLE_HEADER_ROW`, `TABLE_HEADER_CELL`, `TABLE_BODY_ROW`, `TABLE_CELL`, `TABLE_CELL_SEMIBOLD`, `TABLE_CELL_MUTED`, `TABLE_CELL_ENROLLMENT`).
+**Estilos compartilhados:** importar de `components/ui/dataTableStyles.ts` (`TABLE_HEADER_ROW`, `TABLE_HEADER_CELL`, `tableBodyRowClass`, `TABLE_CELL`, etc.).
 
 #### Tipografia (obrigatório — mesmo tamanho em toda a tabela)
 
@@ -196,12 +196,12 @@ Padrão de telas como **Disciplinas**, **Turmas**, **Cursos**, **Simulados**, **
 - **Não** misturar `text-sm` no corpo com `text-[11px]` no cabeçalho.
 - **Não** usar fontes menores que `text-xs` nas linhas da grade.
 
-#### Linhas separadoras (obrigatório)
+#### Zebrado sutil (obrigatório — sem borda entre linhas)
 
-- Cabeçalho: `TABLE_HEADER_ROW` (`border-b border-gray-200`).
-- Cada linha de dados: `TABLE_BODY_ROW` com **`border-b border-gray-200`** em **todas** as linhas (não omitir na última dentro do card com `overflow-hidden`).
-- Evitar depender só de zebra (`bg-gray-50/40`) — a borda horizontal é o principal guia visual.
-- Cor da borda: `border-gray-200` (visível; evitar `border-gray-50` / `border-gray-100` nas linhas de dados).
+- Cabeçalho: `TABLE_HEADER_ROW` (única borda inferior `border-gray-200` abaixo do cabeçalho).
+- Linhas de dados: **`tableBodyRowClass(index)`** — alterna `bg-white` / `bg-slate-50/80`.
+- **Não** usar `border-b` em cada linha do corpo; o zebrado separa visualmente.
+- Índice par (0, 2…): `TABLE_BODY_ROW_EVEN`; ímpar: `TABLE_BODY_ROW_ODD`.
 
 #### Layout
 

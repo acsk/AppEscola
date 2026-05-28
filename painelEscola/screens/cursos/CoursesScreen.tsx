@@ -14,7 +14,7 @@ import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
@@ -210,7 +210,7 @@ export default function CoursesScreen({ navigate }: Props) {
           rows.map((item, i) => (
             <View
               key={item.id}
-              className={TABLE_BODY_ROW}
+              className={tableBodyRowClass(i)}
             >
               <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 2 }}>
                 {item.name}

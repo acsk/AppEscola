@@ -22,7 +22,7 @@ import Modal from "../../components/ui/Modal";
 import { useExamStatuses, useExamTypes } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
@@ -350,7 +350,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           rows.map((exam, i) => (
             <View
               key={exam.id}
-              className={TABLE_BODY_ROW}
+              className={tableBodyRowClass(i)}
             >
               <View style={{ flex: 3 }}>
                 <Text className={TABLE_CELL_SEMIBOLD}>{exam.title}</Text>

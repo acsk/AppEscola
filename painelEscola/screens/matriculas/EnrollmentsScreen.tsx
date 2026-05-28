@@ -13,7 +13,7 @@ import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
@@ -636,7 +636,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             rows.map((item, i) => (
               <View
                 key={item.id}
-                className={TABLE_BODY_ROW}
+                className={tableBodyRowClass(i)}
               >
                 <Text
                   className={TABLE_CELL_SEMIBOLD}

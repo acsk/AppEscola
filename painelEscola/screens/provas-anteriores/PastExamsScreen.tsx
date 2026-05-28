@@ -35,7 +35,7 @@ import ToastBanner from "../../components/ui/ToastBanner";
 import Pagination from "../../components/ui/Pagination";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
@@ -460,7 +460,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     return (
       <View
         key={row.id}
-        className={TABLE_BODY_ROW}
+        className={tableBodyRowClass(index)}
       >
         <View style={{ flex: 3 }}>
           <Text className={TABLE_CELL_SEMIBOLD}>{row.title}</Text>

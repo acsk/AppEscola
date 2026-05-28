@@ -26,7 +26,7 @@ import Pagination from "../components/ui/Pagination";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
@@ -547,7 +547,7 @@ export default function SubjectsScreen() {
           </View>
         ) : (
           rows.map((item, i) => (
-            <View key={item.id} className={TABLE_BODY_ROW}>
+            <View key={item.id} className={tableBodyRowClass(i)}>
               <View className="flex-row items-center gap-3" style={{ flex: 3 }}>
                 <SubjectIcon icon={item.icon} color={item.color} size={18} />
                 <Text className={TABLE_CELL_SEMIBOLD}>{item.name}</Text>

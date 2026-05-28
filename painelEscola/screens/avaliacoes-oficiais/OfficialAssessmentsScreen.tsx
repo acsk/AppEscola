@@ -11,7 +11,7 @@ import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import {
-  TABLE_BODY_ROW,
+  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
@@ -475,7 +475,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
                   key={row.id}
                   onPress={() => openForm(row.id)}
                   activeOpacity={0.85}
-                  className={TABLE_BODY_ROW}
+                  className={tableBodyRowClass(i)}
                 >
                   <View style={{ flex: 1.75, paddingRight: 10, minWidth: 0 }}>
                     <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>
