@@ -181,7 +181,7 @@ Padrão validado em **Provas anteriores** e outros fluxos:
 
 Padrão de telas como **Disciplinas**, **Turmas**, **Cursos**, **Simulados**, **Avaliações presenciais**, **Provas anteriores**, **Matrículas**, **Relatório turmas** e **Notas da turma**.
 
-**Estilos compartilhados:** importar de `components/ui/dataTableStyles.ts` (`TABLE_HEADER_ROW`, `TABLE_HEADER_CELL`, `tableBodyRowClass`, `TABLE_CELL`, etc.).
+**Estilos compartilhados:** `components/ui/dataTableStyles.ts` + linhas com `components/ui/DataTableRow.tsx`.
 
 #### Tipografia (obrigatório — mesmo tamanho em toda a tabela)
 
@@ -196,12 +196,13 @@ Padrão de telas como **Disciplinas**, **Turmas**, **Cursos**, **Simulados**, **
 - **Não** misturar `text-sm` no corpo com `text-[11px]` no cabeçalho.
 - **Não** usar fontes menores que `text-xs` nas linhas da grade.
 
-#### Zebrado sutil (obrigatório — sem borda entre linhas)
+#### Zebrado sutil + hover (obrigatório — sem borda entre linhas)
 
-- Cabeçalho: `TABLE_HEADER_ROW` (única borda inferior `border-gray-200` abaixo do cabeçalho).
-- Linhas de dados: **`tableBodyRowClass(index)`** — alterna `bg-white` / `bg-slate-50/80`.
+- Cabeçalho: `TABLE_HEADER_ROW` + **`style={TABLE_HEADER_ROW_STYLE}`** (fundo `#F3F4F6`).
+- Linhas de dados: **`<DataTableRow index={i}>`** — zebrado via `tableBodyRowStyle` (inline); hover `#EDE9FE` no web.
+- **Não** usar `className` com `bg-slate-50/80` no RN Web (opacidade não aplica de forma confiável).
 - **Não** usar `border-b` em cada linha do corpo; o zebrado separa visualmente.
-- Índice par (0, 2…): `TABLE_BODY_ROW_EVEN`; ímpar: `TABLE_BODY_ROW_ODD`.
+- Índice par (0, 2…): branco; ímpar: `#F1F5F9`. Com `onPress` opcional na linha inteira.
 
 #### Layout
 

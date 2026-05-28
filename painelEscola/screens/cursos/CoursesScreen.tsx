@@ -13,12 +13,13 @@ import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import DataTableRow from "../../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 
 type Course = {
@@ -182,7 +183,7 @@ export default function CoursesScreen({ navigate }: Props) {
           elevation: 2,
         }}
       >
-        <View className={TABLE_HEADER_ROW}>
+        <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
             Nome
           </Text>
@@ -208,10 +209,7 @@ export default function CoursesScreen({ navigate }: Props) {
           </View>
         ) : (
           rows.map((item, i) => (
-            <View
-              key={item.id}
-              className={tableBodyRowClass(i)}
-            >
+            <DataTableRow key={item.id} index={i}>
               <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 2 }}>
                 {item.name}
               </Text>
@@ -243,7 +241,7 @@ export default function CoursesScreen({ navigate }: Props) {
                   <Ionicons name="trash-outline" size={15} color="#EF4444" />
                 </TouchableOpacity>
               </View>
-            </View>
+            </DataTableRow>
           ))
         )}
 

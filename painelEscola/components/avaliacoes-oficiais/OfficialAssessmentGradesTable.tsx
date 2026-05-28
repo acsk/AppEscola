@@ -2,13 +2,14 @@ import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { GradeDraftRow } from "../../types/avaliacoesOficiais";
+import DataTableRow from "../ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_ENROLLMENT,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../ui/dataTableStyles";
 
 type SubjectCol = { id: number; name: string };
@@ -242,7 +243,7 @@ export default function OfficialAssessmentGradesTable({
             className="border border-gray-200 rounded-xl overflow-hidden"
             style={{ width: "100%", minWidth: isMobile ? tableScrollMinWidth : undefined }}
           >
-            <View className={TABLE_HEADER_ROW} style={{ width: "100%" }}>
+            <View className={TABLE_HEADER_ROW} style={[{ width: "100%" }, TABLE_HEADER_ROW_STYLE]}>
               {renderCell(COL_MATRICULA.flex, COL_MATRICULA.minWidth, "Matrícula", { header: true })}
               {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, "Aluno", { header: true })}
               {sortedSubjects.map((s) =>
@@ -271,9 +272,9 @@ export default function OfficialAssessmentGradesTable({
             </View>
 
             {filteredStudents.map((student, i) => (
-              <View
+              <DataTableRow
                 key={student.student_id}
-                className={tableBodyRowClass(i)}
+                index={i}
                 style={{ width: "100%" }}
               >
                 {renderCell(
@@ -334,7 +335,7 @@ export default function OfficialAssessmentGradesTable({
                     </TouchableOpacity>
                   </View>
                 ) : null}
-              </View>
+              </DataTableRow>
             ))}
           </View>
         </ScrollView>

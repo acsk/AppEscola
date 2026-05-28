@@ -13,10 +13,11 @@ import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { usePeriods, domainToOptions } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import DataTableRow from "../../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -341,7 +342,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
         }}
       >
         {!isMobile && (
-          <View className={TABLE_HEADER_ROW}>
+          <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
             <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
               Turma
             </Text>
@@ -373,22 +374,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
             </Text>
           </View>
         ) : (
-          rows.map((item, i) => (
-            <View
-              key={item.id}
-              className={
-                isMobile
-                  ? "bg-white border border-gray-200 rounded-xl p-3"
-                  : tableBodyRowClass(i)
-              }
-              style={{
-                shadowColor: isMobile ? "#000" : undefined,
-                shadowOpacity: isMobile ? 0.04 : undefined,
-                shadowRadius: isMobile ? 8 : undefined,
-                elevation: isMobile ? 1 : undefined,
-              }}
-            >
-              {isMobile ? (
+          rows.map((item, i) => {
+            const rowContent = isMobile ? (
                 <>
                   <View className="flex-row items-start justify-between gap-3">
                     <View style={{ flex: 1 }}>
@@ -512,9 +499,31 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                 </TouchableOpacity>
               </View>
                 </>
-              )}
-            </View>
-          ))
+              );
+
+            if (isMobile) {
+              return (
+                <View
+                  key={item.id}
+                  className="bg-white border border-gray-200 rounded-xl p-3"
+                  style={{
+                    shadowColor: "#000",
+                    shadowOpacity: 0.04,
+                    shadowRadius: 8,
+                    elevation: 1,
+                  }}
+                >
+                  {rowContent}
+                </View>
+              );
+            }
+
+            return (
+              <DataTableRow key={item.id} index={i}>
+                {rowContent}
+              </DataTableRow>
+            );
+          })
         )}
 
         {meta.total > 0 && (

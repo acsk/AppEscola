@@ -1,28 +1,47 @@
+import type { StyleProp, ViewStyle } from "react-native";
+
 /**
  * Padrão visual de tabelas desktop no painel (ver painel-escola.md).
- * Mesmo tamanho de fonte no cabeçalho e nas células; zebrado sutil nas linhas.
+ * Cores via style (RN Web não aplica bem bg com opacidade no className).
  */
 
-/** Linha de cabeçalho da tabela */
-export const TABLE_HEADER_ROW = "flex-row bg-gray-100 border-b border-gray-200 px-3 py-2.5";
+/** Fundos das linhas — usar com tableBodyRowStyle() */
+export const TABLE_ROW_BG = {
+  even: "#FFFFFF",
+  odd: "#F1F5F9",
+  hover: "#EDE9FE",
+  header: "#F3F4F6",
+} as const;
+
+export const TABLE_BODY_ROW_LAYOUT: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  alignSelf: "stretch",
+  width: "100%",
+  paddingHorizontal: 12,
+  paddingVertical: 10,
+};
+
+/** Linha de cabeçalho — className + style */
+export const TABLE_HEADER_ROW = "flex-row border-b border-gray-200 px-3 py-2.5";
+
+export const TABLE_HEADER_ROW_STYLE: ViewStyle = {
+  backgroundColor: TABLE_ROW_BG.header,
+};
 
 /** Texto das colunas do cabeçalho */
 export const TABLE_HEADER_CELL = "text-xs font-semibold text-gray-600 uppercase tracking-wide";
 
-const TABLE_BODY_ROW_BASE = "flex-row items-center px-3 py-2.5";
+/** Fundo zebrado por índice (obrigatório no style da linha) */
+export function tableBodyRowStyle(index: number): ViewStyle {
+  return {
+    backgroundColor: index % 2 === 1 ? TABLE_ROW_BG.odd : TABLE_ROW_BG.even,
+  };
+}
 
-/** Linha par (índice 0, 2, 4…) */
-export const TABLE_BODY_ROW_EVEN = `${TABLE_BODY_ROW_BASE} bg-white`;
-
-/** Linha ímpar — zebrado sutil */
-export const TABLE_BODY_ROW_ODD = `${TABLE_BODY_ROW_BASE} bg-slate-50/80`;
-
-/** @deprecated Use tableBodyRowClass(index) para zebrado */
-export const TABLE_BODY_ROW = TABLE_BODY_ROW_EVEN;
-
-/** Classe da linha conforme índice (zebrado alternado) */
-export function tableBodyRowClass(index: number): string {
-  return index % 2 === 1 ? TABLE_BODY_ROW_ODD : TABLE_BODY_ROW_EVEN;
+/** @deprecated Preferir tableBodyRowStyle(index) + DataTableRow */
+export function tableBodyRowClass(_index: number): string {
+  return "flex-row items-center px-3 py-2.5";
 }
 
 /** Célula padrão */
@@ -43,3 +62,10 @@ export const TABLE_CELL_ENROLLMENT = "text-xs font-mono font-semibold text-viole
 /** Container da tabela dentro do card */
 export const TABLE_CONTAINER =
   "bg-white rounded-2xl overflow-hidden border border-gray-200";
+
+export function mergeTableRowStyle(
+  index: number,
+  extra?: StyleProp<ViewStyle>
+): StyleProp<ViewStyle> {
+  return [TABLE_BODY_ROW_LAYOUT, tableBodyRowStyle(index), extra];
+}

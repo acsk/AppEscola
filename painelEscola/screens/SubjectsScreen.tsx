@@ -25,12 +25,13 @@ import Badge from "../components/ui/Badge";
 import Pagination from "../components/ui/Pagination";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import DataTableRow from "../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../components/ui/dataTableStyles";
 
 // ── Icon registry ────────────────────────────────────────────────────────────
@@ -531,7 +532,7 @@ export default function SubjectsScreen() {
         contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
       >
       <View className="bg-white rounded-2xl overflow-hidden" style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-        <View className={TABLE_HEADER_ROW}>
+        <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>Nome</Text>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>Descrição</Text>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Status</Text>
@@ -547,7 +548,7 @@ export default function SubjectsScreen() {
           </View>
         ) : (
           rows.map((item, i) => (
-            <View key={item.id} className={tableBodyRowClass(i)}>
+            <DataTableRow key={item.id} index={i}>
               <View className="flex-row items-center gap-3" style={{ flex: 3 }}>
                 <SubjectIcon icon={item.icon} color={item.color} size={18} />
                 <Text className={TABLE_CELL_SEMIBOLD}>{item.name}</Text>
@@ -564,7 +565,7 @@ export default function SubjectsScreen() {
                   <Ionicons name="trash-outline" size={15} color="#EF4444" />
                 </TouchableOpacity>
               </View>
-            </View>
+            </DataTableRow>
           ))
         )}
 

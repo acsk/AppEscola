@@ -6,12 +6,13 @@ import Pagination from "../../components/ui/Pagination";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { domainToOptions, usePeriods, useWeekdays } from "../../hooks/useDomains";
 import GridPdfExportButton, { PdfGroup } from "../../components/ui/GridPdfExportButton";
+import DataTableRow from "../../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 
 type Props = {
@@ -534,15 +535,15 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
             }}
           >
             <View style={{ width: "100%", minWidth: isMobile ? tableScrollMinWidth : undefined }}>
-              <View className={TABLE_HEADER_ROW} style={{ width: "100%" }}>
+              <View className={TABLE_HEADER_ROW} style={[{ width: "100%" }, TABLE_HEADER_ROW_STYLE]}>
                 {TABLE_COLUMNS.map((col) =>
                   renderTableCell(col.flex, col.minWidth, col.label, "header")
                 )}
               </View>
               {rows.map((row, idx) => (
-                <View
+                <DataTableRow
                   key={`${row.student_id}-${row.school_class_id}-${idx}`}
-                  className={tableBodyRowClass(idx)}
+                  index={idx}
                   style={{ width: "100%" }}
                 >
                   {TABLE_COLUMNS.map((col) =>
@@ -553,7 +554,7 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
                       col.key === "turma" ? "bodyBold" : col.variant
                     )
                   )}
-                </View>
+                </DataTableRow>
               ))}
             </View>
           </ScrollView>

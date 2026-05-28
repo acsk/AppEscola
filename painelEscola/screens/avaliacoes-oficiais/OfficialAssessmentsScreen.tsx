@@ -10,14 +10,15 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
+import DataTableRow from "../../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_CELL_SUBLINE,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import type { OfficialAssessmentListItem, OfficialAssessmentsScreenProps } from "../../types/avaliacoesOficiais";
@@ -438,7 +439,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
               elevation: 2,
             }}
           >
-            <View className={TABLE_HEADER_ROW}>
+            <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
               <Text className={TABLE_HEADER_CELL} style={{ flex: 1.75 }}>
                 Título
               </Text>
@@ -471,11 +472,10 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
               </View>
             ) : (
               rows.map((row, i) => (
-                <TouchableOpacity
+                <DataTableRow
                   key={row.id}
+                  index={i}
                   onPress={() => openForm(row.id)}
-                  activeOpacity={0.85}
-                  className={tableBodyRowClass(i)}
                 >
                   <View style={{ flex: 1.75, paddingRight: 10, minWidth: 0 }}>
                     <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>
@@ -517,7 +517,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
                       <Ionicons name="chevron-forward" size={16} color="#4B5563" />
                     </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
+                </DataTableRow>
               ))
             )}
 

@@ -21,14 +21,15 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import Modal from "../../components/ui/Modal";
 import { useExamStatuses, useExamTypes } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import DataTableRow from "../../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_CELL_SUBLINE,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
 import { mapApiPreviewQuestion } from "../../components/simulados/examPreviewUtils";
@@ -318,7 +319,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         className="bg-white rounded-2xl overflow-hidden"
         style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
       >
-        <View className={TABLE_HEADER_ROW}>
+        <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>
             Título / Tipo
           </Text>
@@ -348,10 +349,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           </View>
         ) : (
           rows.map((exam, i) => (
-            <View
-              key={exam.id}
-              className={tableBodyRowClass(i)}
-            >
+            <DataTableRow key={exam.id} index={i}>
               <View style={{ flex: 3 }}>
                 <Text className={TABLE_CELL_SEMIBOLD}>{exam.title}</Text>
                 <Text className={TABLE_CELL_SUBLINE}>
@@ -411,7 +409,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                   <Ionicons name="trash-outline" size={15} color="#EF4444" />
                 </TouchableOpacity>
               </View>
-            </View>
+            </DataTableRow>
           ))
         )}
       </View>

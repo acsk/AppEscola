@@ -12,13 +12,14 @@ import { parseApiErrors } from "../../utils/apiErrors";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
+import DataTableRow from "../../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import EnrollmentActionsModal, {
@@ -599,7 +600,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             elevation: 2,
           }}
         >
-          <View className={TABLE_HEADER_ROW}>
+          <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
             <Text className={TABLE_HEADER_CELL} style={{ flex: 1.55 }}>
               Aluno
             </Text>
@@ -634,10 +635,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             </View>
           ) : (
             rows.map((item, i) => (
-              <View
-                key={item.id}
-                className={tableBodyRowClass(i)}
-              >
+              <DataTableRow key={item.id} index={i}>
                 <Text
                   className={TABLE_CELL_SEMIBOLD}
                   style={{ flex: 1.55, paddingRight: 10 }}
@@ -670,7 +668,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                     <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
                   </TouchableOpacity>
                 </View>
-              </View>
+              </DataTableRow>
             ))
           )}
 

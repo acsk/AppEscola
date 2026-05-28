@@ -34,14 +34,15 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import Pagination from "../../components/ui/Pagination";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import DataTableRow from "../../components/ui/DataTableRow";
 import {
-  tableBodyRowClass,
   TABLE_CELL,
   TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_CELL_SUBLINE,
   TABLE_HEADER_CELL,
   TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 import { useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import type { WithNavigate } from "../../types/navigation";
@@ -458,9 +459,9 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     }
 
     return (
-      <View
+      <DataTableRow
         key={row.id}
-        className={tableBodyRowClass(index)}
+        index={index}
       >
         <View style={{ flex: 3 }}>
           <Text className={TABLE_CELL_SEMIBOLD}>{row.title}</Text>
@@ -513,7 +514,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             <Ionicons name="trash-outline" size={15} color="#EF4444" />
           </TouchableOpacity>
         </View>
-      </View>
+      </DataTableRow>
     );
   };
 
@@ -834,7 +835,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           }}
         >
           {!isMobile ? (
-            <View className={TABLE_HEADER_ROW}>
+            <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
               <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>
                 Título / Tipo
               </Text>
