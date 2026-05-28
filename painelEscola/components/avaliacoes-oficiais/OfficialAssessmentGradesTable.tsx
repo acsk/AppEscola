@@ -9,6 +9,7 @@ type Props = {
   subjects: SubjectCol[];
   grades: GradeDraftRow[];
   isMobile: boolean;
+  maxScore?: string;
   readOnly?: boolean;
   onLaunchIndividual?: (studentId: number) => void;
 };
@@ -16,7 +17,42 @@ type Props = {
 const COL_MATRICULA = { flex: 1, minWidth: 112 };
 const COL_ALUNO = { flex: 2.5, minWidth: 180 };
 const COL_SUBJECT = { flex: 1, minWidth: 96 };
+const COL_TOTAL = { flex: 0.85, minWidth: 72 };
 const COL_ACTION = { width: 52 };
+
+function parseGrade(value: string): number | null {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) return null;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+function computeStudentTotal(
+  studentId: number,
+  subjectIds: number[],
+  gradeMap: Map<string, GradeDraftRow>
+): { text: string; tone: "muted" | "absent" | "ok"; sum: number | null } {
+  if (subjectIds.length === 0) return { text: "—", tone: "muted", sum: null };
+
+  const allAbsent = subjectIds.every((id) => gradeMap.get(`${studentId}-${id}`)?.is_absent);
+  if (allAbsent) return { text: "Faltou", tone: "absent", sum: null };
+
+  let sum = 0;
+  let hasGrade = false;
+  subjectIds.forEach((id) => {
+    const row = gradeMap.get(`${studentId}-${id}`);
+    if (!row || row.is_absent) return;
+    const value = parseGrade(row.grade);
+    if (value != null) {
+      sum += value;
+      hasGrade = true;
+    }
+  });
+
+  if (!hasGrade) return { text: "—", tone: "muted", sum: null };
+  const text = sum.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  return { text, tone: "ok", sum };
+}
 
 function formatGradeCell(row: GradeDraftRow | undefined): { text: string; tone: "muted" | "absent" | "ok" } {
   if (!row) return { text: "—", tone: "muted" };
@@ -68,10 +104,12 @@ export default function OfficialAssessmentGradesTable({
   subjects,
   grades,
   isMobile,
+  maxScore,
   readOnly = false,
   onLaunchIndividual,
 }: Props) {
   const showActions = !!onLaunchIndividual && !readOnly;
+  const maxScoreNum = parseGrade(maxScore ?? "") ?? null;
   const [search, setSearch] = useState("");
 
   const students = useMemo(() => {
@@ -114,11 +152,14 @@ export default function OfficialAssessmentGradesTable({
     [subjects]
   );
 
+  const subjectIds = useMemo(() => sortedSubjects.map((s) => s.id), [sortedSubjects]);
+
   const tableScrollMinWidth = useMemo(
     () =>
       COL_ALUNO.minWidth +
       COL_MATRICULA.minWidth +
       sortedSubjects.length * COL_SUBJECT.minWidth +
+      COL_TOTAL.minWidth +
       (showActions ? COL_ACTION.width : 0),
     [sortedSubjects.length, showActions]
   );
@@ -192,6 +233,10 @@ export default function OfficialAssessmentGradesTable({
                   center: true,
                 })
               )}
+              {renderCell(COL_TOTAL.flex, COL_TOTAL.minWidth, "Total", {
+                header: true,
+                center: true,
+              })}
               {showActions ? (
                 <View
                   style={{
@@ -235,6 +280,23 @@ export default function OfficialAssessmentGradesTable({
                     color,
                   });
                 })}
+                {(() => {
+                  const total = computeStudentTotal(student.student_id, subjectIds, gradeMap);
+                  const overMax =
+                    maxScoreNum != null && total.sum != null && total.sum > maxScoreNum;
+                  const totalColor =
+                    total.tone === "absent"
+                      ? "#DC2626"
+                      : overMax
+                        ? "#DC2626"
+                        : total.tone === "ok"
+                          ? "#7C3AED"
+                          : "#9CA3AF";
+                  return renderCell(COL_TOTAL.flex, COL_TOTAL.minWidth, total.text, {
+                    center: true,
+                    color: totalColor,
+                  });
+                })()}
                 {showActions ? (
                   <View
                     style={{

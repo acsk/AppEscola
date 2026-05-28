@@ -789,6 +789,7 @@ export default function OfficialAssessmentFormScreen({
           subjects={selectedSubjects}
           grades={grades}
           isMobile={isMobile}
+          maxScore={form.max_score}
           readOnly={status === "published"}
           onLaunchIndividual={(studentId) => openGradesModal(studentId)}
         />
