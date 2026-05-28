@@ -154,14 +154,13 @@ Padrão validado em **Provas anteriores** e outros fluxos:
 
 ### Tabelas / grids (RN Web)
 
-Padrão de telas como **Alunos**, **Turmas**, **Relatório turmas/alunos** (`screens/relatorios/ClassStudentsReportScreen.tsx`):
+Padrão de telas como **Alunos**, **Turmas**, **Relatório turmas/alunos** (`screens/relatorios/ClassStudentsReportScreen.tsx`), **Notas da turma** (`OfficialAssessmentGradesTable.tsx`):
 
-- Container com `width: "100%"`.
-- Colunas com **`flex` + `minWidth`** (crescem com a tela), não largura fixa total que deixa espaço vazio à direita.
-- Cabeçalho e linhas com **a mesma estrutura** (mesmos `flex`/`minWidth`); não renderizar colunas condicionais que mudam entre filtros.
-- Células: `View` com largura flex + `Text` com `numberOfLines={1}`.
+- **Largura 100% no desktop (padrão obrigatório):** container e linhas com `width: "100%"`; `ScrollView` com `contentContainerStyle={{ width: isMobile ? undefined : "100%" }}` — a tabela deve ocupar todo o card, sem faixa vazia à direita.
+- Colunas com **`flex` + `minWidth`** (proporções que distribuem o espaço — ex.: aluno `flex: 2.5`, matrícula `flex: 1.1`, demais `flex: 1`). **Não** usar `flex` muito baixo que agrupa colunas à esquerda.
+- Cabeçalho e linhas com **a mesma estrutura** (mesmos `flex`/`minWidth` por coluna); células em `View` + `Text` com `numberOfLines={1}`.
 - Evitar `px-4` na linha **e** `width` fixo na célula ao mesmo tempo — desalinha cabeçalho e corpo.
-- Scroll horizontal só em **mobile** (`useResponsiveLayout().isMobile`); desktop preenche 100%.
+- Scroll horizontal **somente em mobile** (`horizontal={isMobile}`); no desktop as colunas expandem até 100% da largura disponível.
 
 ### Padrão de PDF (timbrado)
 
@@ -220,8 +219,8 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 ### Avaliações presenciais (`OfficialAssessmentFormScreen`)
 
 - Avaliação vinculada à **turma** (`school_class_id`) e a uma ou mais **disciplinas** (`subject_ids` no formulário).
-- Abaixo do cadastro: `OfficialAssessmentGradesTable` (aluno × disciplinas: nome, matrícula, nota/falta).
-- Botão **Lançar notas** abre modal (`Modal` size `lg`) com `OfficialAssessmentGradeStepper` (passo a passo por disciplina, alunos em ordem alfabética; Presente/Faltou).
+- Abaixo do cadastro: `OfficialAssessmentGradesTable` (aluno × disciplinas: nome, matrícula, nota/falta; filtro por aluno/matrícula; colunas 100% no desktop).
+- Botão **Lançar notas** abre modal (`Modal` size `lg`) com `OfficialAssessmentGradeStepper` (um aluno por passo, **todas as disciplinas na mesma tela**; nota máxima vale para a **soma** das disciplinas; presença única por aluno).
 - API: `POST /official-assessments/{id}/grades` com `{ student_id, subject_id, grade, is_absent, enrollment_id? }`.
 - Migration `2026_05_28_150000_official_assessment_grades_per_subject`: unique `(official_assessment_id, student_id, subject_id)`.
 

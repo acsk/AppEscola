@@ -227,6 +227,8 @@ class OfficialAssessmentController extends Controller
                 abort(422, 'Cadastre ao menos uma disciplina na avaliação antes de lançar notas.');
             }
 
+            $gradeSumByStudent = [];
+
             foreach ($rows as $row) {
                 $studentId = (int) $row['student_id'];
                 $subjectId = (int) $row['subject_id'];
@@ -238,8 +240,8 @@ class OfficialAssessmentController extends Controller
                 $isAbsent = (bool) ($row['is_absent'] ?? false);
                 $enrollmentId = $row['enrollment_id'] ?? null;
 
-                if ($grade !== null && (float) $grade > $maxScore) {
-                    abort(422, "Nota do aluno {$studentId} excede a nota máxima ({$maxScore}).");
+                if ($grade !== null && ! $isAbsent) {
+                    $gradeSumByStudent[$studentId] = ($gradeSumByStudent[$studentId] ?? 0) + (float) $grade;
                 }
 
                 if ($enrollmentId !== null) {
@@ -272,6 +274,12 @@ class OfficialAssessmentController extends Controller
                 $gradeRow->graded_at = now();
 
                 $gradeRow->save();
+            }
+
+            foreach ($gradeSumByStudent as $studentId => $totalGrade) {
+                if ($totalGrade > $maxScore) {
+                    abort(422, "A soma das notas do aluno {$studentId} excede a nota máxima ({$maxScore}).");
+                }
             }
         });
 

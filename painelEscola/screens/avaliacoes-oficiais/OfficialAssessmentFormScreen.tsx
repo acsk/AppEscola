@@ -62,12 +62,6 @@ export default function OfficialAssessmentFormScreen({
     type: "success",
     message: "",
   });
-  const [selectedReportCard, setSelectedReportCard] = useState<{
-    student: { id: number; name: string; enrollment_number?: string | null };
-    summary: { assessments_count: number; absences_count: number; weighted_average: number | null };
-  } | null>(null);
-  const [loadingReportStudentId, setLoadingReportStudentId] = useState<number | null>(null);
-
   const kindOptions = useMemo(
     () => [
       { value: "presencial_bimestral", label: "Presencial bimestral" },
@@ -415,37 +409,6 @@ export default function OfficialAssessmentFormScreen({
     setGradesModalVisible(true);
   };
 
-  const openStudentReportCard = async (studentId: number) => {
-    setLoadingReportStudentId(studentId);
-    try {
-      const { data } = await api.get(`/students/${studentId}/report-card`);
-      const body = data?.body ?? data?.data ?? data;
-      setSelectedReportCard({
-        student: {
-          id: Number(body?.student?.id ?? studentId),
-          name: String(body?.student?.name ?? `Aluno #${studentId}`),
-          enrollment_number: body?.student?.enrollment_number ?? null,
-        },
-        summary: {
-          assessments_count: Number(body?.summary?.assessments_count ?? 0),
-          absences_count: Number(body?.summary?.absences_count ?? 0),
-          weighted_average:
-            body?.summary?.weighted_average == null
-              ? null
-              : Number(body.summary.weighted_average),
-        },
-      });
-    } catch (e: any) {
-      setToast({
-        visible: true,
-        type: "error",
-        message: e?.response?.data?.message ?? "Erro ao carregar boletim do aluno.",
-      });
-    } finally {
-      setLoadingReportStudentId(null);
-    }
-  };
-
   const pageTitle = isEdit ? "Editar avaliação" : "Nova avaliação";
   const cardShadow = {
     shadowColor: "#000",
@@ -635,7 +598,7 @@ export default function OfficialAssessmentFormScreen({
           </View>
           <View style={{ flex: 1, minWidth: isMobile ? undefined : 0 }}>
             <FormInput
-              label="Nota máxima"
+              label="Nota máxima (soma das disciplinas)"
               value={form.max_score}
               onChangeText={(v) => setField("max_score", v)}
               error={errors.max_score}
@@ -747,19 +710,6 @@ export default function OfficialAssessmentFormScreen({
           </TouchableOpacity>
         </View>
 
-        {selectedReportCard && (
-          <View className="mb-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
-            <Text className="text-sm font-semibold text-violet-900">
-              Boletim: {selectedReportCard.student.name}
-            </Text>
-            <Text className="text-xs text-violet-700 mt-1">
-              Avaliações publicadas: {selectedReportCard.summary.assessments_count} • Faltas:{" "}
-              {selectedReportCard.summary.absences_count} • Média ponderada:{" "}
-              {selectedReportCard.summary.weighted_average ?? "—"}
-            </Text>
-          </View>
-        )}
-
         <OfficialAssessmentGradesTable
           subjects={selectedSubjects}
           grades={grades}
@@ -810,9 +760,7 @@ export default function OfficialAssessmentFormScreen({
           readOnly={status === "published"}
           savingGrades={savingGrades}
           canSaveGrades={!!assessmentBackendId}
-          loadingReportStudentId={loadingReportStudentId}
           onUpdateGrade={updateGradeField}
-          onOpenReportCard={openStudentReportCard}
           hideSaveButton
         />
       </Modal>
