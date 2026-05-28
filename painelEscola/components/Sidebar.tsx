@@ -145,13 +145,20 @@ export default function Sidebar({
       icon: "wallet-outline",
       tone: "violet",
       items: [
-        { id: "cobrancas", label: "Gestão de Pagamentos", icon: "wallet-outline" },
-        { id: "bancos_crud", label: "Cadastro de Bancos", icon: "add-circle-outline" },
-        { id: "pagamentos", label: "Configuração de Provedores", icon: "cog-outline" },
+        { id: "cobrancas", label: "Gestão de pagamentos", icon: "card-outline" },
+        { id: "bancos_crud", label: "Bancos", icon: "business-outline" },
+        { id: "pagamentos", label: "Provedores de pagamento", icon: "link-outline" },
+      ],
+    },
+    {
+      title: "Configurações",
+      icon: "settings-outline",
+      tone: "slate",
+      items: [
         {
           id: "configuracoes-cobranca",
-          label: "Configurações de Cobrança",
-          icon: "settings-outline",
+          label: "Regras de cobrança",
+          icon: "calculator-outline",
         },
         {
           id: "configuracoes-tema-mobile",
