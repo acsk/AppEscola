@@ -25,6 +25,13 @@ import Badge from "../components/ui/Badge";
 import Pagination from "../components/ui/Pagination";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
+import {
+  TABLE_BODY_ROW,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../components/ui/dataTableStyles";
 
 // ── Icon registry ────────────────────────────────────────────────────────────
 
@@ -524,10 +531,10 @@ export default function SubjectsScreen() {
         contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
       >
       <View className="bg-white rounded-2xl overflow-hidden" style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 3 }}>Nome</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 3 }}>Descrição</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Status</Text>
+        <View className={TABLE_HEADER_ROW}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>Nome</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>Descrição</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Status</Text>
           <View style={{ width: 72 }} />
         </View>
 
@@ -540,12 +547,12 @@ export default function SubjectsScreen() {
           </View>
         ) : (
           rows.map((item, i) => (
-            <View key={item.id} className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${i % 2 === 1 ? "bg-gray-50/40" : ""}`}>
+            <View key={item.id} className={TABLE_BODY_ROW}>
               <View className="flex-row items-center gap-3" style={{ flex: 3 }}>
                 <SubjectIcon icon={item.icon} color={item.color} size={18} />
-                <Text className="text-sm font-medium text-gray-800">{item.name}</Text>
+                <Text className={TABLE_CELL_SEMIBOLD}>{item.name}</Text>
               </View>
-              <Text className="text-sm text-gray-600" style={{ flex: 3 }} numberOfLines={1}>{item.description ?? "—"}</Text>
+              <Text className={TABLE_CELL_MUTED} style={{ flex: 3 }} numberOfLines={1}>{item.description ?? "—"}</Text>
               <View style={{ flex: 1 }}>
                 <Badge slug={item.status} label={item.status === "active" ? "Ativo" : "Inativo"} />
               </View>

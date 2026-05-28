@@ -73,31 +73,115 @@ export type ApiEnvelope<T = unknown> = {
   body?: T;
 };
 
+export type ApiToastState = {
+  visible: boolean;
+  type: "success" | "error";
+  message: string;
+};
+
+function asRecord(data: unknown): Record<string, unknown> | null {
+  return data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+}
+
+function readEnvelopeMessage(record: Record<string, unknown> | null): string | null {
+  if (!record) return null;
+  const message = record.message;
+  if (typeof message === "string" && message.trim()) return message;
+  return null;
+}
+
+function readEnvelopeType(record: Record<string, unknown> | null): string | null {
+  if (!record) return null;
+  const type = record.type;
+  return typeof type === "string" ? type : null;
+}
+
+/** Normaliza `axiosResponse.data` (ou objeto equivalente) para o envelope da API. */
+export function normalizeApiEnvelope(data: unknown): ApiEnvelope | null {
+  const root = asRecord(data);
+  if (!root) return null;
+
+  const rootMessage = readEnvelopeMessage(root);
+  if (rootMessage) {
+    return {
+      type: readEnvelopeType(root) ?? "success",
+      message: rootMessage,
+      body: root.body,
+    };
+  }
+
+  const nested = asRecord(root.data);
+  const nestedMessage = readEnvelopeMessage(nested);
+  if (nestedMessage) {
+    return {
+      type: readEnvelopeType(nested) ?? "success",
+      message: nestedMessage,
+      body: nested?.body,
+    };
+  }
+
+  return null;
+}
+
 /** Mensagem de sucesso/erro retornada pela API (campo `message` do envelope). */
 export function getApiResponseMessage(data: unknown, fallback: string): string {
-  if (data && typeof data === "object" && "message" in data) {
-    const message = (data as ApiEnvelope).message;
-    if (typeof message === "string" && message.trim()) return message;
-  }
-  return fallback;
+  return normalizeApiEnvelope(data)?.message ?? fallback;
 }
 
 /** Tipo do toast a partir do campo `type` do envelope (`success` | `error`). */
 export function getApiResponseToastType(data: unknown): "success" | "error" {
-  if (data && typeof data === "object" && "type" in data) {
-    const type = (data as ApiEnvelope).type;
-    if (type === "error") return "error";
-  }
-  return "success";
+  const type = normalizeApiEnvelope(data)?.type;
+  return type === "error" ? "error" : "success";
 }
 
 /** Corpo útil da resposta (`body` ou fallbacks legados). */
 export function getApiResponseBody<T = unknown>(data: unknown): T | undefined {
-  if (!data || typeof data !== "object") return undefined;
-  const envelope = data as ApiEnvelope<T>;
-  if (envelope.body != null) return envelope.body;
-  if ("data" in envelope && (envelope as { data?: T }).data != null) {
-    return (envelope as { data?: T }).data;
+  const envelope = normalizeApiEnvelope(data);
+  if (envelope?.body != null && typeof envelope.body === "object") {
+    return envelope.body as T;
   }
-  return data as T;
+
+  const root = asRecord(data);
+  if (!root) return undefined;
+
+  if (root.body != null && typeof root.body === "object") {
+    return root.body as T;
+  }
+
+  const nested = asRecord(root.data);
+  if (nested?.body != null && typeof nested.body === "object") {
+    return nested.body as T;
+  }
+
+  if (nested && "id" in nested) return nested as T;
+  if ("id" in root && !readEnvelopeMessage(root)) return root as T;
+
+  return undefined;
+}
+
+/** Mensagem de erro a partir de exceção axios (`response.data.message`). */
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  const message = getApiResponseMessage(data, "");
+  return message || fallback;
+}
+
+type ToastSetter = (state: ApiToastState | ((prev: ApiToastState) => ApiToastState)) => void;
+
+/** Toast de sucesso/erro com `message` e `type` vindos da API. */
+export function showApiToast(setToast: ToastSetter, data: unknown, fallback: string) {
+  setToast({
+    visible: true,
+    type: getApiResponseToastType(data),
+    message: getApiResponseMessage(data, fallback),
+  });
+}
+
+/** Toast de erro a partir de exceção axios. */
+export function showApiErrorToast(setToast: ToastSetter, error: unknown, fallback: string) {
+  setToast({
+    visible: true,
+    type: "error",
+    message: getApiErrorMessage(error, fallback),
+  });
 }

@@ -34,6 +34,15 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import Pagination from "../../components/ui/Pagination";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import {
+  TABLE_BODY_ROW,
+  TABLE_CELL,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_CELL_SUBLINE,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../../components/ui/dataTableStyles";
 import { useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import type { WithNavigate } from "../../types/navigation";
 
@@ -451,25 +460,23 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     return (
       <View
         key={row.id}
-        className={`flex-row items-center px-4 py-3 ${
-          index < rows.length - 1 ? "border-b border-gray-50" : ""
-        }`}
+        className={TABLE_BODY_ROW}
       >
         <View style={{ flex: 3 }}>
-          <Text className="text-sm font-medium text-gray-800">{row.title}</Text>
-          <Text className="text-xs text-gray-400 mt-0.5">
+          <Text className={TABLE_CELL_SEMIBOLD}>{row.title}</Text>
+          <Text className={TABLE_CELL_SUBLINE}>
             {row.material_kind_label ?? "Prova"}
             {row.exam_type_label ? ` · ${row.exam_type_label}` : ""}
             {sizeLabel ? ` · ${sizeLabel}` : ""}
           </Text>
         </View>
-        <Text className="text-sm text-gray-600" style={{ width: 108 }}>
+        <Text className={TABLE_CELL_MUTED} style={{ width: 108 }}>
           {dateLabel}
         </Text>
-        <Text className="text-sm text-gray-600" style={{ flex: 2 }} numberOfLines={1}>
+        <Text className={TABLE_CELL_MUTED} style={{ flex: 2 }} numberOfLines={1}>
           {row.subject?.name ?? "—"}
         </Text>
-        <Text className="text-sm text-gray-600" style={{ flex: 2 }} numberOfLines={2}>
+        <Text className={TABLE_CELL_MUTED} style={{ flex: 2 }} numberOfLines={2}>
           {courseNamesForRow(row)}
         </Text>
         <View style={{ width: 100, alignItems: "center" }}>
@@ -827,41 +834,23 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           }}
         >
           {!isMobile ? (
-            <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ flex: 3 }}
-              >
+            <View className={TABLE_HEADER_ROW}>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>
                 Título / Tipo
               </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ width: 108 }}
-              >
+              <Text className={TABLE_HEADER_CELL} style={{ width: 108 }}>
                 Data
               </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ flex: 2 }}
-              >
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
                 Disciplina
               </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ flex: 2 }}
-              >
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
                 Cursos
               </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ width: 100, textAlign: "center" }}
-              >
+              <Text className={TABLE_HEADER_CELL} style={{ width: 100, textAlign: "center" }}>
                 Status
               </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ width: 72, textAlign: "center" }}
-              >
+              <Text className={TABLE_HEADER_CELL} style={{ width: 72, textAlign: "center" }}>
                 Publicar
               </Text>
               <View style={{ width: 108 }} />

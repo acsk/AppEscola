@@ -15,9 +15,9 @@ import OfficialAssessmentGradeStepper from "../../components/avaliacoes-oficiais
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import {
   getApiResponseBody,
-  getApiResponseMessage,
-  getApiResponseToastType,
   parseApiErrors,
+  showApiErrorToast,
+  showApiToast,
 } from "../../utils/apiErrors";
 import { displayToISO, isoToDisplay } from "../../utils/masks";
 import type {
@@ -376,25 +376,19 @@ export default function OfficialAssessmentFormScreen({
         counts_towards_report_card: form.counts_towards_report_card,
         notes: form.notes.trim() || null,
       };
-      let responseData: unknown;
       if (assessmentBackendId) {
-        const { data } = await api.put(`/official-assessments/${assessmentBackendId}`, payload);
-        responseData = data;
+        const response = await api.put(`/official-assessments/${assessmentBackendId}`, payload);
+        showApiToast(setToast, response.data, "Operação realizada com sucesso.");
       } else {
-        const { data } = await api.post("/official-assessments", payload);
-        responseData = data;
-        const body = getApiResponseBody<{ id?: number }>(data);
+        const response = await api.post("/official-assessments", payload);
+        const body = getApiResponseBody<{ id?: number }>(response.data);
         if (body?.id) setAssessmentBackendId(Number(body.id));
+        showApiToast(setToast, response.data, "Operação realizada com sucesso.");
       }
-      setToast({
-        visible: true,
-        type: getApiResponseToastType(responseData),
-        message: getApiResponseMessage(responseData, "Avaliação salva com sucesso."),
-      });
     } catch (e: any) {
       const parsed = parseApiErrors(e?.response?.data?.body?.errors ?? e?.response?.data?.errors ?? {});
       setErrors(parsed);
-      setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Erro ao salvar avaliação." });
+      showApiErrorToast(setToast, e, "Erro ao salvar avaliação.");
     } finally {
       setSaving(false);
     }
@@ -414,10 +408,10 @@ export default function OfficialAssessmentFormScreen({
       return;
     }
     setSavingGrades(true);
-    const isIndividual = gradesModalStudentId != null;
-    const rowsToSave = isIndividual
-      ? grades.filter((g) => g.student_id === gradesModalStudentId)
-      : grades;
+    const rowsToSave =
+      gradesModalStudentId != null
+        ? grades.filter((g) => g.student_id === gradesModalStudentId)
+        : grades;
     try {
       const payload = {
         grades: rowsToSave.map((g) => ({
@@ -429,18 +423,11 @@ export default function OfficialAssessmentFormScreen({
           notes: g.notes.trim() || null,
         })),
       };
-      const { data } = await api.post(`/official-assessments/${assessmentBackendId}/grades`, payload);
+      const response = await api.post(`/official-assessments/${assessmentBackendId}/grades`, payload);
       closeGradesModal();
-      setToast({
-        visible: true,
-        type: getApiResponseToastType(data),
-        message: getApiResponseMessage(
-          data,
-          isIndividual ? "Nota do aluno salva com sucesso." : "Notas salvas com sucesso."
-        ),
-      });
+      showApiToast(setToast, response.data, "Notas salvas com sucesso.");
     } catch (e: any) {
-      setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Erro ao salvar notas." });
+      showApiErrorToast(setToast, e, "Erro ao salvar notas.");
     } finally {
       setSavingGrades(false);
     }
@@ -458,15 +445,11 @@ export default function OfficialAssessmentFormScreen({
     if (!assessmentBackendId) return;
     setPublishing(true);
     try {
-      const { data } = await api.post(`/official-assessments/${assessmentBackendId}/publish`);
+      const response = await api.post(`/official-assessments/${assessmentBackendId}/publish`);
       setStatus("published");
-      setToast({
-        visible: true,
-        type: getApiResponseToastType(data),
-        message: getApiResponseMessage(data, "Avaliação publicada com sucesso."),
-      });
+      showApiToast(setToast, response.data, "Operação realizada com sucesso.");
     } catch (e: any) {
-      setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Erro ao publicar." });
+      showApiErrorToast(setToast, e, "Erro ao publicar.");
     } finally {
       setPublishing(false);
       setPublishModalVisible(false);

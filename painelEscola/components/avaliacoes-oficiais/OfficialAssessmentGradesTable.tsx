@@ -2,6 +2,14 @@ import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { GradeDraftRow } from "../../types/avaliacoesOficiais";
+import {
+  TABLE_BODY_ROW,
+  TABLE_CELL,
+  TABLE_CELL_ENROLLMENT,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../ui/dataTableStyles";
 
 type SubjectCol = { id: number; name: string };
 
@@ -69,11 +77,21 @@ function renderCell(
   flex: number,
   minWidth: number,
   content: string,
-  options?: { header?: boolean; center?: boolean; color?: string; enrollment?: boolean }
+  options?: {
+    header?: boolean;
+    center?: boolean;
+    color?: string;
+    enrollment?: boolean;
+    semibold?: boolean;
+  }
 ) {
-  const bodyClass = options?.enrollment
-    ? "text-xs font-mono text-violet-600 font-semibold"
-    : "text-xs font-semibold text-gray-800";
+  const bodyClass = options?.header
+    ? TABLE_HEADER_CELL
+    : options?.enrollment
+      ? TABLE_CELL_ENROLLMENT
+      : options?.semibold
+        ? TABLE_CELL_SEMIBOLD
+        : TABLE_CELL;
 
   return (
     <View
@@ -87,7 +105,7 @@ function renderCell(
     >
       <Text
         numberOfLines={1}
-        className={options?.header ? "text-[11px] font-bold text-gray-600 uppercase" : bodyClass}
+        className={options?.header ? TABLE_HEADER_CELL : bodyClass}
         style={{
           textAlign: options?.center ? "center" : "left",
           width: "100%",
@@ -224,7 +242,7 @@ export default function OfficialAssessmentGradesTable({
             className="border border-gray-200 rounded-xl overflow-hidden"
             style={{ width: "100%", minWidth: isMobile ? tableScrollMinWidth : undefined }}
           >
-            <View className="flex-row bg-gray-100 border-b border-gray-200 py-2" style={{ width: "100%" }}>
+            <View className={TABLE_HEADER_ROW} style={{ width: "100%" }}>
               {renderCell(COL_MATRICULA.flex, COL_MATRICULA.minWidth, "Matrícula", { header: true })}
               {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, "Aluno", { header: true })}
               {sortedSubjects.map((s) =>
@@ -247,7 +265,7 @@ export default function OfficialAssessmentGradesTable({
                     alignItems: "center",
                   }}
                 >
-                  <Text className="text-[11px] font-bold text-gray-600 uppercase">Ação</Text>
+                  <Text className={TABLE_HEADER_CELL}>Ação</Text>
                 </View>
               ) : null}
             </View>
@@ -255,9 +273,7 @@ export default function OfficialAssessmentGradesTable({
             {filteredStudents.map((student, i) => (
               <View
                 key={student.student_id}
-                className={`flex-row items-center border-b border-gray-200 py-2 ${
-                  i % 2 === 1 ? "bg-slate-50/70" : "bg-white"
-                }`}
+                className={TABLE_BODY_ROW}
                 style={{ width: "100%" }}
               >
                 {renderCell(
@@ -266,7 +282,9 @@ export default function OfficialAssessmentGradesTable({
                   student.enrollment_number ?? "—",
                   { enrollment: true }
                 )}
-                {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, student.student_name)}
+                {renderCell(COL_ALUNO.flex, COL_ALUNO.minWidth, student.student_name, {
+                  semibold: true,
+                })}
                 {sortedSubjects.map((s) => {
                   const cell = formatGradeCell(gradeMap.get(`${student.student_id}-${s.id}`));
                   const color =

@@ -12,6 +12,14 @@ import { parseApiErrors } from "../../utils/apiErrors";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
+import {
+  TABLE_BODY_ROW,
+  TABLE_CELL,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../../components/ui/dataTableStyles";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import EnrollmentActionsModal, {
   type EnrollmentActionKey,
@@ -591,41 +599,23 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             elevation: 2,
           }}
         >
-          <View className="flex-row bg-gray-100 border-b border-gray-200 px-3 py-2">
-            <Text
-              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-              style={{ flex: 1.55 }}
-            >
+          <View className={TABLE_HEADER_ROW}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1.55 }}>
               Aluno
             </Text>
-            <Text
-              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-              style={{ flex: 1.65 }}
-            >
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1.65 }}>
               Curso / Pacote
             </Text>
-            <Text
-              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-              style={{ flex: 0.85 }}
-            >
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.85 }}>
               Nº Matrícula
             </Text>
-            <Text
-              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-              style={{ flex: 0.7 }}
-            >
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.7 }}>
               Início
             </Text>
-            <Text
-              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-              style={{ flex: 0.8 }}
-            >
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.8 }}>
               Mensalidade
             </Text>
-            <Text
-              className="text-[11px] font-bold text-gray-600 uppercase tracking-wide"
-              style={{ flex: 0.65 }}
-            >
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.65 }}>
               Status
             </Text>
             <View style={{ width: 42 }} />
@@ -646,25 +636,23 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             rows.map((item, i) => (
               <View
                 key={item.id}
-                className={`flex-row items-center px-3 py-2 border-b border-gray-100 ${
-                  i % 2 === 1 ? "bg-slate-50/70" : "bg-white"
-                }`}
+                className={TABLE_BODY_ROW}
               >
                 <Text
-                  className="text-xs font-semibold text-gray-800"
+                  className={TABLE_CELL_SEMIBOLD}
                   style={{ flex: 1.55, paddingRight: 10 }}
                   numberOfLines={1}
                 >
                   {limitText(item.student?.name)}
                 </Text>
                 <EnrollmentProductCell item={item} compact flex={1.65} />
-                <Text className="text-xs font-medium text-gray-600" style={{ flex: 0.85 }}>
+                <Text className={TABLE_CELL_MUTED} style={{ flex: 0.85 }}>
                   {item.enrollment_number ?? "—"}
                 </Text>
-                <Text className="text-xs text-gray-600" style={{ flex: 0.7 }}>
+                <Text className={TABLE_CELL_MUTED} style={{ flex: 0.7 }}>
                   {fmt(item.start_date)}
                 </Text>
-                <Text className="text-xs font-semibold text-gray-700" style={{ flex: 0.8 }}>
+                <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 0.8 }}>
                   {formatCurrency(item.monthly_amount)}
                 </Text>
                 <View style={{ flex: 0.65 }}>

@@ -13,6 +13,13 @@ import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import {
+  TABLE_BODY_ROW,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../../components/ui/dataTableStyles";
 
 type Course = {
   id: number;
@@ -175,23 +182,14 @@ export default function CoursesScreen({ navigate }: Props) {
           elevation: 2,
         }}
       >
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
-          >
+        <View className={TABLE_HEADER_ROW}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
             Nome
           </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 3 }}
-          >
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>
             Descrição
           </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
-          >
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>
             Status
           </Text>
           <View style={{ width: 72 }} />
@@ -212,21 +210,12 @@ export default function CoursesScreen({ navigate }: Props) {
           rows.map((item, i) => (
             <View
               key={item.id}
-              className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${
-                i % 2 === 1 ? "bg-gray-50/40" : ""
-              }`}
+              className={TABLE_BODY_ROW}
             >
-              <Text
-                className="text-sm font-medium text-gray-800"
-                style={{ flex: 2 }}
-              >
+              <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 2 }}>
                 {item.name}
               </Text>
-              <Text
-                className="text-sm text-gray-600"
-                style={{ flex: 3 }}
-                numberOfLines={1}
-              >
+              <Text className={TABLE_CELL_MUTED} style={{ flex: 3 }} numberOfLines={1}>
                 {item.description ?? "—"}
               </Text>
               <View style={{ flex: 1 }}>

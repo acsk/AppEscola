@@ -13,6 +13,11 @@ import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { usePeriods, domainToOptions } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import {
+  TABLE_BODY_ROW,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../../components/ui/dataTableStyles";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -335,39 +340,26 @@ export default function SchoolClassesScreen({ navigate }: Props) {
           elevation: isMobile ? undefined : 2,
         }}
       >
-        {!isMobile && <View className="flex-row bg-gray-50 border-b border-gray-100 px-3 py-2">
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
-          >
-            Turma
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
-          >
-            Curso
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
-          >
-            Ano / Período
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 2 }}
-          >
-            Horários
-          </Text>
-          <Text
-            className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-            style={{ flex: 1 }}
-          >
-            Status
-          </Text>
-          <View style={{ width: 176 }} />
-        </View>}
+        {!isMobile && (
+          <View className={TABLE_HEADER_ROW}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
+              Turma
+            </Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
+              Curso
+            </Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>
+              Ano / Período
+            </Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
+              Horários
+            </Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>
+              Status
+            </Text>
+            <View style={{ width: 176 }} />
+          </View>
+        )}
 
         {loading ? (
           <View className="items-center justify-center py-20">
@@ -387,9 +379,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               className={
                 isMobile
                   ? "bg-white border border-gray-200 rounded-xl p-3"
-                  : `flex-row items-center px-3 py-2 border-b border-gray-50 ${
-                      i % 2 === 1 ? "bg-gray-50/40" : ""
-                    }`
+                  : TABLE_BODY_ROW
               }
               style={{
                 shadowColor: isMobile ? "#000" : undefined,

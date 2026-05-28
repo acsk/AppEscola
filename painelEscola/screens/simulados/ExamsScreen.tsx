@@ -21,6 +21,15 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import Modal from "../../components/ui/Modal";
 import { useExamStatuses, useExamTypes } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import {
+  TABLE_BODY_ROW,
+  TABLE_CELL,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_CELL_SUBLINE,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../../components/ui/dataTableStyles";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
 import { mapApiPreviewQuestion } from "../../components/simulados/examPreviewUtils";
 import type {
@@ -309,20 +318,20 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         className="bg-white rounded-2xl overflow-hidden"
         style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
       >
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 3 }}>
+        <View className={TABLE_HEADER_ROW}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>
             Título / Tipo
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
             Curso / Matéria
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: 90, textAlign: "center" }}>
+          <Text className={TABLE_HEADER_CELL} style={{ width: 90, textAlign: "center" }}>
             Questões
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: 90, textAlign: "center" }}>
+          <Text className={TABLE_HEADER_CELL} style={{ width: 90, textAlign: "center" }}>
             Duração
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: 90, textAlign: "center" }}>
+          <Text className={TABLE_HEADER_CELL} style={{ width: 90, textAlign: "center" }}>
             Status
           </Text>
           <View style={{ width: 80 }} />
@@ -341,37 +350,35 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           rows.map((exam, i) => (
             <View
               key={exam.id}
-              className={`flex-row items-center px-4 py-3 ${i < rows.length - 1 ? "border-b border-gray-50" : ""}`}
+              className={TABLE_BODY_ROW}
             >
               <View style={{ flex: 3 }}>
-                <Text className="text-sm font-medium text-gray-800">{exam.title}</Text>
-                <Text className="text-xs text-gray-400 mt-0.5">
+                <Text className={TABLE_CELL_SEMIBOLD}>{exam.title}</Text>
+                <Text className={TABLE_CELL_SUBLINE}>
                   {exam.exam_type_label ?? exam.exam_type}
                 </Text>
               </View>
               <View style={{ flex: 2 }}>
-                <Text className="text-sm text-gray-700">
+                <Text className={TABLE_CELL}>
                   {exam.courses?.length
                     ? exam.courses.map((c) => c.name).join(", ")
-                    : exam.course?.name ?? (
-                        <Text className="text-gray-400">—</Text>
-                      )}
+                    : exam.course?.name ?? "—"}
                 </Text>
                 {exam.subject ? (
                   <View className="flex-row items-center gap-1.5 mt-0.5">
                     <SubjectIcon icon={exam.subject.icon} color={exam.subject.color} size={12} />
-                    <Text className="text-xs text-gray-500">{exam.subject.name}</Text>
+                    <Text className={TABLE_CELL_MUTED}>{exam.subject.name}</Text>
                   </View>
                 ) : (
-                  <Text className="text-xs text-gray-400">—</Text>
+                  <Text className={TABLE_CELL_MUTED}>—</Text>
                 )}
               </View>
               <View style={{ width: 90, alignItems: "center" }}>
-                <Text className="text-sm text-gray-700">{exam.total_questions}</Text>
-                <Text className="text-xs text-gray-400">{exam.total_points} pts</Text>
+                <Text className={TABLE_CELL}>{exam.total_questions}</Text>
+                <Text className={TABLE_CELL_MUTED}>{exam.total_points} pts</Text>
               </View>
               <View style={{ width: 90, alignItems: "center" }}>
-                <Text className="text-sm text-gray-700">
+                <Text className={TABLE_CELL}>
                   {exam.duration_minutes ? `${exam.duration_minutes} min` : "—"}
                 </Text>
               </View>

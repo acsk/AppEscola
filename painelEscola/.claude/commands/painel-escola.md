@@ -79,11 +79,13 @@ Resposta típica da apiEscola:
 - Exibir `message` no `ToastBanner` (sucesso ou erro conforme `type`).
 - Usar `body` para atualizar estado local (ex.: `id` após criar, dados retornados).
 - Helpers em `utils/apiErrors.ts`:
-  - `getApiResponseMessage(data, fallback)` — texto do toast
-  - `getApiResponseToastType(data)` — `"success"` | `"error"`
-  - `getApiResponseBody(data)` — payload em `body`
-- Em `catch`, manter `e?.response?.data?.message` com fallback.
-- **Não** usar apenas `"Salvo com sucesso."` se a API já devolve mensagem específica.
+  - `showApiToast(setToast, response.data, fallback)` — preferir após `await api.*`
+  - `showApiErrorToast(setToast, error, fallback)` — em `catch`
+  - `getApiResponseMessage` / `normalizeApiEnvelope` / `getApiResponseBody` — leitura manual
+- Passar sempre `response.data` do axios (não só o `body` interno).
+- Em `catch`, usar `showApiErrorToast` (lê `response.data.message`).
+- **Não** usar texto fixo tipo `"Avaliação salva com sucesso."` se a API devolve `"Avaliação oficial atualizada com sucesso."`.
+- Fallback genérico alinhado à API: `"Operação realizada com sucesso."`.
 
 ## UI/UX
 
@@ -177,13 +179,36 @@ Padrão validado em **Provas anteriores** e outros fluxos:
 
 ### Tabelas / grids (RN Web)
 
-Padrão de telas como **Alunos**, **Turmas**, **Relatório turmas/alunos** (`screens/relatorios/ClassStudentsReportScreen.tsx`), **Notas da turma** (`OfficialAssessmentGradesTable.tsx`):
+Padrão de telas como **Disciplinas**, **Turmas**, **Cursos**, **Simulados**, **Avaliações presenciais**, **Provas anteriores**, **Matrículas**, **Relatório turmas** e **Notas da turma**.
 
-- **Largura 100% no desktop (padrão obrigatório):** container e linhas com `width: "100%"`; `ScrollView` com `contentContainerStyle={{ width: isMobile ? undefined : "100%" }}` — a tabela deve ocupar todo o card, sem faixa vazia à direita.
-- Colunas com **`flex` + `minWidth`** (proporções que distribuem o espaço — ex.: aluno `flex: 2.5`, matrícula `flex: 1.1`, demais `flex: 1`). **Não** usar `flex` muito baixo que agrupa colunas à esquerda.
-- Cabeçalho e linhas com **a mesma estrutura** (mesmos `flex`/`minWidth` por coluna); células em `View` + `Text` com `numberOfLines={1}`.
-- Evitar `px-4` na linha **e** `width` fixo na célula ao mesmo tempo — desalinha cabeçalho e corpo.
-- Scroll horizontal **somente em mobile** (`horizontal={isMobile}`); no desktop as colunas expandem até 100% da largura disponível.
+**Estilos compartilhados:** importar de `components/ui/dataTableStyles.ts` (`TABLE_HEADER_ROW`, `TABLE_HEADER_CELL`, `TABLE_BODY_ROW`, `TABLE_CELL`, `TABLE_CELL_SEMIBOLD`, `TABLE_CELL_MUTED`, `TABLE_CELL_ENROLLMENT`).
+
+#### Tipografia (obrigatório — mesmo tamanho em toda a tabela)
+
+| Uso | Classe |
+|-----|--------|
+| Cabeçalho da coluna | `TABLE_HEADER_CELL` → `text-xs` uppercase |
+| Célula normal | `TABLE_CELL` → `text-xs` |
+| Célula destaque (nome/título) | `TABLE_CELL_SEMIBOLD` → `text-xs` |
+| Subtítulo na coluna | `TABLE_CELL_SUBLINE` → `text-xs` |
+| Matrícula | `TABLE_CELL_ENROLLMENT` |
+
+- **Não** misturar `text-sm` no corpo com `text-[11px]` no cabeçalho.
+- **Não** usar fontes menores que `text-xs` nas linhas da grade.
+
+#### Linhas separadoras (obrigatório)
+
+- Cabeçalho: `TABLE_HEADER_ROW` (`border-b border-gray-200`).
+- Cada linha de dados: `TABLE_BODY_ROW` com **`border-b border-gray-200`** em **todas** as linhas (não omitir na última dentro do card com `overflow-hidden`).
+- Evitar depender só de zebra (`bg-gray-50/40`) — a borda horizontal é o principal guia visual.
+- Cor da borda: `border-gray-200` (visível; evitar `border-gray-50` / `border-gray-100` nas linhas de dados).
+
+#### Layout
+
+- **Largura 100% no desktop:** container e linhas com `width: "100%"`; `ScrollView` com `contentContainerStyle={{ width: isMobile ? undefined : "100%" }}`.
+- Colunas com **`flex` + `minWidth`**; cabeçalho e corpo com a mesma estrutura.
+- Células: `View` + `Text` com `numberOfLines={1}` quando couber.
+- Scroll horizontal **somente em mobile** (`horizontal={isMobile}`).
 
 ### Padrão de PDF (timbrado)
 

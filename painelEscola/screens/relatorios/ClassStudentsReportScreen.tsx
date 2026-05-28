@@ -6,6 +6,13 @@ import Pagination from "../../components/ui/Pagination";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { domainToOptions, usePeriods, useWeekdays } from "../../hooks/useDomains";
 import GridPdfExportButton, { PdfGroup } from "../../components/ui/GridPdfExportButton";
+import {
+  TABLE_BODY_ROW,
+  TABLE_CELL,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+} from "../../components/ui/dataTableStyles";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -161,10 +168,10 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
         numberOfLines={1}
         className={
           variant === "header"
-            ? "text-[11px] font-semibold text-gray-600"
+            ? TABLE_HEADER_CELL
             : variant === "bodyBold"
-              ? "text-xs font-semibold text-gray-800"
-              : "text-xs text-gray-700"
+              ? TABLE_CELL_SEMIBOLD
+              : TABLE_CELL
         }
       >
         {value}
@@ -527,10 +534,7 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
             }}
           >
             <View style={{ width: "100%", minWidth: isMobile ? tableScrollMinWidth : undefined }}>
-              <View
-                className="flex-row bg-gray-50 border-b border-gray-200 py-3"
-                style={{ width: "100%" }}
-              >
+              <View className={TABLE_HEADER_ROW} style={{ width: "100%" }}>
                 {TABLE_COLUMNS.map((col) =>
                   renderTableCell(col.flex, col.minWidth, col.label, "header")
                 )}
@@ -538,7 +542,7 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
               {rows.map((row, idx) => (
                 <View
                   key={`${row.student_id}-${row.school_class_id}-${idx}`}
-                  className={`flex-row py-3 border-b border-gray-100 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}
+                  className={TABLE_BODY_ROW}
                   style={{ width: "100%" }}
                 >
                   {TABLE_COLUMNS.map((col) =>
