@@ -7,6 +7,15 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
+import DataTableRow from "../../components/ui/DataTableRow";
+import {
+  TABLE_CELL,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../../components/ui/dataTableStyles";
 import { fetchStudentPerformance } from "../../services/performance";
 import type {
   PerformanceBySubject,
@@ -14,6 +23,7 @@ import type {
   StudentPerformance,
 } from "../../types/performance";
 import type { StudentPerformanceScreenProps } from "../../types/alunos";
+import { getApiErrorMessage } from "../../utils/apiErrors";
 import { subjectIconName } from "../../utils/subjectIcon";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
@@ -56,7 +66,7 @@ function BarChart({
         const hasValue = value != null;
         return (
           <View key={`${labels[index]}-${index}`} className="flex-1 items-center min-w-[40px]">
-            <Text className="text-[10px] font-bold text-gray-500 mb-1.5">
+            <Text className="text-xs font-bold text-gray-500 mb-1.5">
               {hasValue ? formatPct(value, 0) : "—"}
             </Text>
             <View
@@ -71,7 +81,7 @@ function BarChart({
                 }}
               />
             </View>
-            <Text className="text-[10px] text-gray-500 mt-1.5 text-center" numberOfLines={1}>
+            <Text className="text-xs text-gray-500 mt-1.5 text-center" numberOfLines={1}>
               {labels[index]}
             </Text>
           </View>
@@ -202,7 +212,15 @@ function SubjectCard({ item, compact = false }: { item: PerformanceBySubject; co
 
 function MonthDetailCard({ month }: { month: PerformanceMonthlyEvolution }) {
   return (
-    <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-2">
+    <View
+      className="bg-white rounded-2xl border border-gray-200 p-4 mb-2"
+      style={{
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 1,
+      }}
+    >
       <View className="flex-row justify-between mb-3">
         <View>
           <Text className="text-sm font-bold text-gray-900">{month.label}</Text>
@@ -215,23 +233,37 @@ function MonthDetailCard({ month }: { month: PerformanceMonthlyEvolution }) {
         </Text>
       </View>
       {month.by_subject.length === 0 ? (
-        <Text className="text-xs text-gray-500 border-t border-gray-50 pt-2">
-          Nenhum simulado neste mês.
-        </Text>
+        <Text className="text-xs text-gray-500 pt-2">Nenhum simulado neste mês.</Text>
       ) : (
-        month.by_subject.map((subject) => (
-          <View
-            key={`${month.month}-${subject.subject_id ?? "g"}`}
-            className="flex-row justify-between py-2 border-t border-gray-50"
-          >
-            <Text className="text-sm text-gray-700 flex-1" numberOfLines={1}>
-              {subject.subject_name}
+        <View className="rounded-xl overflow-hidden border border-gray-200">
+          <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
+              Disciplina
             </Text>
-            <Text className="text-xs font-semibold text-gray-500">
-              {subject.attempts_count} · {formatPct(subject.avg_percentage, 0)}
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.55, textAlign: "center" }}>
+              Qtd
+            </Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.75, textAlign: "right" }}>
+              Média
             </Text>
           </View>
-        ))
+          {month.by_subject.map((subject, idx) => (
+            <DataTableRow
+              key={`${month.month}-${subject.subject_id ?? "g"}`}
+              index={idx}
+            >
+              <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 2, paddingRight: 8 }} numberOfLines={1}>
+                {subject.subject_name}
+              </Text>
+              <Text className={TABLE_CELL} style={{ flex: 0.55, textAlign: "center" }}>
+                {subject.attempts_count}
+              </Text>
+              <Text className={TABLE_CELL} style={{ flex: 0.75, textAlign: "right" }}>
+                {formatPct(subject.avg_percentage, 0)}
+              </Text>
+            </DataTableRow>
+          ))}
+        </View>
       )}
     </View>
   );
@@ -256,8 +288,10 @@ export default function StudentPerformanceScreen({
     try {
       const result = await fetchStudentPerformance(studentId, months);
       setData(result);
-    } catch {
-      setError("Não foi possível carregar o aproveitamento do aluno.");
+    } catch (err) {
+      setError(
+        getApiErrorMessage(err, "Não foi possível carregar o aproveitamento do aluno.")
+      );
       setData(null);
     }
     setLoading(false);
@@ -278,9 +312,7 @@ export default function StudentPerformanceScreen({
   const overview = data?.overview;
   const student = data?.student;
   const displayName = student?.name ?? studentName ?? "";
-  const enrollmentLabel = student?.enrollment_number
-    ? `Matrícula ${student.enrollment_number}`
-    : null;
+  const enrollmentNumber = student?.enrollment_number ?? null;
   const courseLabel =
     student?.active_enrollments?.[0]?.school_class?.name ??
     student?.active_enrollments?.[0]?.course?.name ??
@@ -329,46 +361,82 @@ export default function StudentPerformanceScreen({
   const filteredSubjectsCount = selectedSubject ? 1 : overview?.subjects_count ?? 0;
   const filteredMonthChange = selectedSubject ? selectedSubject.month_change : overview?.month_change;
 
+  const breadcrumbItems = [
+    { label: "Alunos", onPress: () => navigate("alunos") },
+    ...(displayName
+      ? [
+          {
+            label: displayName,
+            onPress: () => navigate("alunos-form", { studentId }),
+          },
+        ]
+      : []),
+    { label: "Aproveitamento" },
+  ];
+
   return (
     <ScrollView
       className="flex-1"
-      style={{ backgroundColor: "#F9FAFB" }}
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
     >
-      <View className="bg-white rounded-3xl border border-gray-100 p-4 mb-4">
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="flex-row items-center gap-3 flex-1">
-            <TouchableOpacity
-              onPress={() => navigate("alunos-form", { studentId })}
-              className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-200 items-center justify-center"
-            >
-              <Ionicons name="arrow-back" size={18} color="#374151" />
-            </TouchableOpacity>
-            <View className="flex-1">
-              <Text className="text-xs font-bold text-violet-700 uppercase tracking-wide">
-                Aproveitamento
-              </Text>
-              {displayName ? (
-                <Text className="text-xl font-extrabold text-gray-900 mt-0.5" numberOfLines={1}>
-                  {displayName}
+      <ScreenBreadcrumb items={breadcrumbItems} />
+
+      <View
+        className="mb-6"
+        style={{
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <View className="flex-1">
+          <Text className="text-2xl font-bold text-gray-800">Aproveitamento</Text>
+          <Text className="text-sm text-gray-500 mt-1">
+            Desempenho em simulados concluídos
+            {displayName ? ` · ${displayName}` : ""}
+          </Text>
+          {(enrollmentNumber || courseLabel) && (
+            <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1 mt-2">
+              {enrollmentNumber ? (
+                <Text className="text-xs font-mono font-semibold text-violet-600">
+                  Matrícula {enrollmentNumber}
                 </Text>
               ) : null}
-              {(enrollmentLabel || courseLabel) && (
-                <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
-                  {[enrollmentLabel, courseLabel].filter(Boolean).join(" · ")}
+              {enrollmentNumber && courseLabel ? (
+                <Text className="text-xs text-gray-400">·</Text>
+              ) : null}
+              {courseLabel ? (
+                <Text className="text-xs text-gray-500" numberOfLines={1}>
+                  {courseLabel}
                 </Text>
-              )}
+              ) : null}
             </View>
-          </View>
-          <TouchableOpacity
-            onPress={load}
-            className="w-10 h-10 rounded-xl bg-violet-50 items-center justify-center"
-          >
-            <Ionicons name="refresh" size={18} color="#7C3AED" />
-          </TouchableOpacity>
+          )}
         </View>
+        <TouchableOpacity
+          onPress={load}
+          disabled={loading}
+          className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 items-center justify-center self-end"
+          accessibilityLabel="Atualizar dados"
+        >
+          <Ionicons name="refresh" size={18} color="#7C3AED" />
+        </TouchableOpacity>
+      </View>
 
-        <View className="flex-row gap-2 mt-4">
+      <View
+        className="bg-white rounded-2xl border border-gray-200 p-4 mb-4"
+        style={{
+          shadowColor: "#000",
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 2,
+        }}
+      >
+        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Período
+        </Text>
+        <View className="flex-row gap-2">
           {MONTH_OPTIONS.map((option) => (
             <TouchableOpacity
               key={option}
@@ -394,12 +462,27 @@ export default function StudentPerformanceScreen({
           <ActivityIndicator size="large" color="#7C3AED" />
         </View>
       ) : error ? (
-        <View className="bg-red-50 border border-red-200 rounded-2xl p-4">
+        <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
           <Text className="text-sm text-red-700">{error}</Text>
+          <TouchableOpacity
+            onPress={load}
+            className="mt-3 self-start px-4 py-2 rounded-xl bg-white border border-red-200"
+            activeOpacity={0.85}
+          >
+            <Text className="text-sm font-semibold text-red-700">Tentar novamente</Text>
+          </TouchableOpacity>
         </View>
       ) : data ? (
         <>
-          <View className="bg-white rounded-2xl border border-gray-100 p-3 mb-4">
+          <View
+            className="bg-white rounded-2xl border border-gray-200 p-3 mb-4"
+            style={{
+              shadowColor: "#000",
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 2,
+            }}
+          >
             <View className="flex-row items-center justify-between gap-3 mb-3">
               <View className="flex-1">
                 <Text className="text-xs font-bold text-gray-500 uppercase tracking-wide">
@@ -468,7 +551,7 @@ export default function StudentPerformanceScreen({
                       >
                         {subject.label}
                       </Text>
-                      <Text className="text-[10px] text-gray-400">{subject.attempts}</Text>
+                      <Text className="text-xs text-gray-400">{subject.attempts}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -490,7 +573,7 @@ export default function StudentPerformanceScreen({
                   Mostrar meses sem simulados
                 </Text>
               </View>
-              <Text className="text-[11px] font-semibold text-gray-400">
+              <Text className="text-xs font-semibold text-gray-400">
                 {emptyMonths.length} mês{emptyMonths.length !== 1 ? "es" : ""}
               </Text>
             </TouchableOpacity>
@@ -553,7 +636,15 @@ export default function StudentPerformanceScreen({
             title="Evolução mensal"
             subtitle="Média de aproveitamento por mês no período selecionado."
           />
-          <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
+          <View
+            className="bg-white rounded-2xl border border-gray-200 p-4 mb-5"
+            style={{
+              shadowColor: "#000",
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 2,
+            }}
+          >
             {filteredMonthlyEvolution.some((m) => m.avg_percentage != null) ? (
               <BarChart
                 values={filteredMonthlyEvolution.map((m) => m.avg_percentage)}
@@ -599,7 +690,7 @@ export default function StudentPerformanceScreen({
             action={
               emptyMonths.length > 0 ? (
                 <View className="rounded-full bg-gray-100 px-2 py-1">
-                  <Text className="text-[11px] font-semibold text-gray-500">
+                  <Text className="text-xs font-semibold text-gray-500">
                     {emptyMonths.length} sem dados
                   </Text>
                 </View>
@@ -620,7 +711,7 @@ export default function StudentPerformanceScreen({
             <View className="flex-row flex-wrap gap-2 mt-2">
               {emptyMonths.map((month) => (
                 <View key={month.month} className="rounded-full bg-gray-100 px-3 py-1.5">
-                  <Text className="text-[11px] font-semibold text-gray-500">
+                  <Text className="text-xs font-semibold text-gray-500">
                     {month.label}: sem simulado
                   </Text>
                 </View>

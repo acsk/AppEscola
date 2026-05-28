@@ -253,7 +253,7 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 | Lista alunos | `#/alunos` |
 | Novo aluno | `#/alunos/novo` |
 | Editar aluno | `#/alunos/{id}` |
-| Aproveitamento | `#/alunos/{id}/desempenho` |
+| Aproveitamento | `#/alunos/{id}/desempenho` → `StudentPerformanceScreen` |
 | Legado (redireciona) | `#/alunos-performance` → lista ou desempenho |
 | Cursos / pacotes / matrículas / turmas | `#/{modulo}`, `#/{modulo}/novo`, `#/{modulo}/{id}` |
 | Frequência turma | `#/turmas/{id}/frequencia` |
@@ -273,6 +273,15 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 - Modal: `OfficialAssessmentGradeStepper` (um aluno por passo no lote, **todas as disciplinas na mesma tela**; nota máxima = **soma** das disciplinas; presença única por aluno).
 - API: `POST /official-assessments/{id}/grades` com `{ student_id, subject_id, grade, is_absent, enrollment_id? }`.
 - Migration `2026_05_28_150100_restore_official_assessment_grades_per_subject`: unique `(official_assessment_id, student_id, subject_id)`.
+
+### Aproveitamento do aluno (`StudentPerformanceScreen`)
+
+- Rota: `#/alunos/{id}/desempenho` (breadcrumb: **Alunos** → nome do aluno → **Aproveitamento**).
+- API: `GET /students/{id}/performance?months=6|12` via `services/performance.ts`.
+- Subtela: cabeçalho (`text-2xl`) **fora** dos cards; fundo do painel (`#EEEEFF`) — sem `bg-gray-50` no `ScrollView`.
+- Filtros: período (6/12 meses), chips por disciplina, opção “meses sem simulados”.
+- Detalhe mensal: mini-tabela com `DataTableRow` + `TABLE_HEADER_ROW_STYLE` (zebrado/hover).
+- Erros de carga: `getApiErrorMessage` + botão “Tentar novamente”.
 
 ### Provas anteriores (`screens/provas-anteriores/PastExamsScreen.tsx`)
 
