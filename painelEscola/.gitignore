@@ -12,6 +12,8 @@ expo-env.d.ts
 # dist/assets/node_modules contém as fontes dos ícones — deve ser commitado
 # fonts/: pasta com fontes de ícones (Ionicons, Feather) — deve ser commitada
 # dist/fonts/: idem, para produção
+# artefatos gerados do Expo web build (hashados)
+dist/_expo/static/
 
 # Native
 .kotlin/

@@ -31,6 +31,10 @@ import InvoicesScreen from "./screens/InvoicesScreen";
 import PaymentProvidersScreen from "./screens/payments/PaymentProvidersScreen";
 import PaymentProvidersCrudScreen from "./screens/payments/PaymentProvidersCrudScreen";
 import { ExamsScreen, ExamFormScreen, ExamAttemptsScreen } from "./screens/simulados";
+import {
+  OfficialAssessmentsScreen,
+  OfficialAssessmentFormScreen,
+} from "./screens/avaliacoes-oficiais";
 import { PastExamsScreen } from "./screens/provas-anteriores";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import ExamTypesScreen from "./screens/admin/ExamTypesScreen";
@@ -102,6 +106,8 @@ const SCREEN_SLUGS = [
   "pacotes",
   "simulados",
   "simulados-tentativas",
+  "avaliacoes-oficiais",
+  "avaliacoes-oficiais-form",
   "provas-anteriores",
   "tenants",
   "users",
@@ -199,6 +205,14 @@ function hashToNav(hash: string): NavState {
     return { screen: "simulados" };
   }
 
+  if (seg0 === "avaliacoes-oficiais") {
+    if (!seg1) return { screen: "avaliacoes-oficiais" };
+    if (seg1 === "nova") return { screen: "avaliacoes-oficiais-form", params: { assessmentId: null } };
+    const id = parseInt(seg1, 10);
+    if (!isNaN(id)) return { screen: "avaliacoes-oficiais-form", params: { assessmentId: id } };
+    return { screen: "avaliacoes-oficiais" };
+  }
+
   if (seg0 === "tenants") {
     if (!seg1) return { screen: "tenants" };
     if (seg1 === "novo") return { screen: "tenants-form", params: { tenantId: null } };
@@ -261,6 +275,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "simulados-tentativas") {
     const status = nav.params?.status;
     return status ? `#/simulados/tentativas/${status}` : "#/simulados/tentativas";
+  }
+  if (nav.screen === "avaliacoes-oficiais-form") {
+    const id = nav.params?.assessmentId as number | null | undefined;
+    return id != null ? `#/avaliacoes-oficiais/${id}` : "#/avaliacoes-oficiais/nova";
   }
   if (nav.screen === "turmas-form") {
     const id = nav.params?.classId;
@@ -640,6 +658,8 @@ function AppContent() {
     ? "relatorios-turmas"
     : nav.screen.startsWith("simulados")
     ? "simulados"
+    : nav.screen.startsWith("avaliacoes-oficiais")
+    ? "avaliacoes-oficiais"
     : nav.screen.startsWith("tipos-prova")
     ? "tipos-prova"
     : nav.screen.startsWith("tenants")
@@ -772,6 +792,7 @@ function AppContent() {
       case "bancos_crud": return <PaymentProvidersCrudScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;
       case "simulados": return <ExamsScreen navigate={navigate} />;
+      case "avaliacoes-oficiais": return <OfficialAssessmentsScreen navigate={navigate} />;
       case "provas-anteriores": return <PastExamsScreen navigate={navigate} />;
       case "configuracoes-cobranca": return <BillingSettingsScreen />;
       case "configuracoes-tema-mobile": return <MobileThemeSettingsScreen />;
@@ -795,6 +816,13 @@ function AppContent() {
         return <CalendarScreen navigate={navigate} />;
       case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
       case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
+      case "avaliacoes-oficiais-form":
+        return (
+          <OfficialAssessmentFormScreen
+            navigate={navigate}
+            assessmentId={(nav.params?.assessmentId as number | null) ?? null}
+          />
+        );
       case "tipos-prova": return <ExamTypesScreen />;
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
