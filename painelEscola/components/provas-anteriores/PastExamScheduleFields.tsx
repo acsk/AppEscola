@@ -1,9 +1,8 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import DatePickerInput from "../ui/DatePickerInput";
-import FormSelect from "../ui/FormSelect";
+import YearPickerInput from "../ui/YearPickerInput";
 import {
-  buildYearOptions,
   type PastExamScheduleMode,
   type PastExamScheduleValue,
 } from "../../utils/pastExamSchedule";
@@ -23,19 +22,11 @@ const MODE_LABELS: Record<PastExamScheduleMode, string> = {
   none: "Não informar",
 };
 
-function modeOptions(materialKind: MaterialKind): { value: PastExamScheduleMode; label: string }[] {
-  if (materialKind === "prova") {
-    return [
-      { value: "year", label: MODE_LABELS.year },
-      { value: "date", label: MODE_LABELS.date },
-    ];
-  }
-  return [
-    { value: "none", label: MODE_LABELS.none },
-    { value: "year", label: MODE_LABELS.year },
-    { value: "date", label: MODE_LABELS.date },
-  ];
-}
+const EXERCICIO_MODE_OPTIONS: { value: PastExamScheduleMode; label: string }[] = [
+  { value: "none", label: MODE_LABELS.none },
+  { value: "year", label: MODE_LABELS.year },
+  { value: "date", label: MODE_LABELS.date },
+];
 
 export default function PastExamScheduleFields({
   materialKind,
@@ -43,10 +34,6 @@ export default function PastExamScheduleFields({
   onChange,
   errors = {},
 }: Props) {
-  const yearOptions = useMemo(() => buildYearOptions(), []);
-  const options = modeOptions(materialKind);
-  const scheduleRequired = materialKind === "prova";
-
   const setMode = (mode: PastExamScheduleMode) => {
     onChange({
       mode,
@@ -55,15 +42,29 @@ export default function PastExamScheduleFields({
     });
   };
 
+  if (materialKind === "prova") {
+    return (
+      <View className="mb-1">
+        <YearPickerInput
+          label="Ano da prova"
+          required
+          value={value.exam_year}
+          onChange={(exam_year) =>
+            onChange({ mode: "year", exam_year, exam_date: "" })
+          }
+          error={errors.exam_year ?? errors.exam_date}
+          modalTitle="Ano da prova"
+        />
+      </View>
+    );
+  }
+
   return (
     <View className="mb-1">
-      <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-        {materialKind === "prova" ? "Quando foi a prova" : "Data do exercício"}
-        {scheduleRequired ? <Text className="text-red-500"> *</Text> : null}
-      </Text>
+      <Text className="text-sm font-semibold text-gray-700 mb-1.5">Data do exercício</Text>
 
       <View className="flex-row flex-wrap gap-2 mb-3">
-        {options.map((opt) => {
+        {EXERCICIO_MODE_OPTIONS.map((opt) => {
           const active = value.mode === opt.value;
           return (
             <TouchableOpacity
@@ -89,30 +90,27 @@ export default function PastExamScheduleFields({
       </View>
 
       {value.mode === "year" ? (
-        <FormSelect
+        <YearPickerInput
           label="Ano"
-          required={scheduleRequired}
           value={value.exam_year}
-          options={[{ value: "", label: "Selecione o ano" }, ...yearOptions]}
-          placeholder="Selecione o ano"
-          onChange={(exam_year) => onChange({ ...value, exam_year })}
-          error={errors.exam_year ?? errors.exam_date}
+          onChange={(exam_year) => onChange({ ...value, mode: "year", exam_year })}
+          error={errors.exam_year}
+          modalTitle="Ano do exercício"
         />
       ) : null}
 
       {value.mode === "date" ? (
         <DatePickerInput
           label="Data"
-          required={scheduleRequired}
           value={value.exam_date}
-          onChangeText={(exam_date) => onChange({ ...value, exam_date })}
+          onChangeText={(exam_date) => onChange({ ...value, mode: "date", exam_date })}
           error={errors.exam_date}
         />
       ) : null}
 
       {value.mode === "none" ? (
         <Text className="text-xs text-gray-400 mt-1 mb-1">
-          Opcional para exercícios sem data definida.
+          Opcional — exercício sem data ou ano definido.
         </Text>
       ) : null}
     </View>

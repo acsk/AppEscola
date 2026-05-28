@@ -16,6 +16,7 @@ import { isoToDisplay } from "../../utils/masks";
 import {
   appendScheduleToFormData,
   defaultScheduleForMaterial,
+  normalizeScheduleForMaterial,
   scheduleFromPastExamRow,
   scheduleToApiPayload,
   validatePastExamSchedule,
@@ -319,7 +320,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           : row.course
             ? [row.course.id]
             : [];
-    const schedule = scheduleFromPastExamRow(row);
+    const materialKind = row.material_kind ?? "prova";
+    const schedule = normalizeScheduleForMaterial(
+      scheduleFromPastExamRow(row),
+      materialKind,
+    );
     setForm({
       title: row.title,
       description: row.description ?? "",
@@ -327,7 +332,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
       exam_year: schedule.exam_year,
       exam_date: schedule.exam_date,
       exam_type: row.exam_type ?? "",
-      material_kind: row.material_kind ?? "prova",
+      material_kind: materialKind,
       course_ids: courseIds,
       subject_id: row.subject ? String(row.subject.id) : "",
       is_published: row.is_published ? "true" : "false",
@@ -534,11 +539,14 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     setSaving(true);
     try {
       if (editingId) {
-        const schedulePayload = scheduleToApiPayload({
-          mode: form.exam_schedule_mode,
-          exam_year: form.exam_year,
-          exam_date: form.exam_date,
-        });
+        const schedulePayload = scheduleToApiPayload(
+          {
+            mode: form.exam_schedule_mode,
+            exam_year: form.exam_year,
+            exam_date: form.exam_date,
+          },
+          form.material_kind,
+        );
         const payload = {
           title: form.title.trim(),
           description: form.description.trim() || null,
@@ -567,11 +575,15 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         const formData = new FormData();
         formData.append("title", form.title.trim());
         if (form.description.trim()) formData.append("description", form.description.trim());
-        appendScheduleToFormData(formData, {
-          mode: form.exam_schedule_mode,
-          exam_year: form.exam_year,
-          exam_date: form.exam_date,
-        });
+        appendScheduleToFormData(
+          formData,
+          {
+            mode: form.exam_schedule_mode,
+            exam_year: form.exam_year,
+            exam_date: form.exam_date,
+          },
+          form.material_kind,
+        );
         formData.append("exam_type", form.exam_type);
         formData.append("material_kind", form.material_kind);
         form.course_ids.forEach((id) => formData.append("course_ids[]", String(id)));
@@ -932,50 +944,6 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             error={errors.title}
           />
 
-          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 12 }}>
-            <View style={{ flex: 1, minWidth: compactStack ? undefined : 280 }}>
-              <PastExamScheduleFields
-                materialKind={form.material_kind}
-                value={{
-                  mode: form.exam_schedule_mode,
-                  exam_year: form.exam_year,
-                  exam_date: form.exam_date,
-                }}
-                onChange={(schedule) => {
-                  setForm((p) => ({
-                    ...p,
-                    exam_schedule_mode: schedule.mode,
-                    exam_year: schedule.exam_year,
-                    exam_date: schedule.exam_date,
-                  }));
-                  if (errors.exam_date || errors.exam_year) {
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.exam_date;
-                      delete next.exam_year;
-                      return next;
-                    });
-                  }
-                }}
-                errors={{
-                  exam_date: errors.exam_date,
-                  exam_year: errors.exam_year,
-                }}
-              />
-            </View>
-            <View style={{ flex: 1, minWidth: compactStack ? undefined : 200 }}>
-              <FormSelect
-                label="Publicar"
-                value={form.is_published}
-                options={[
-                  { value: "true", label: "Sim" },
-                  { value: "false", label: "Não" },
-                ]}
-                onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
-              />
-            </View>
-          </View>
-
           <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
             <View style={{ flex: 1 }}>
               <FormSelect
@@ -986,22 +954,32 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 onChange={(material_kind) => {
                   const kind = material_kind as PastExamMaterialKind;
                   setForm((p) => {
-                    const defaults = defaultScheduleForMaterial(kind);
-                    let mode = p.exam_schedule_mode;
-                    if (kind === "prova" && mode === "none") {
-                      mode = defaults.mode;
+                    if (kind === "prova") {
+                      return {
+                        ...p,
+                        material_kind: kind,
+                        exam_schedule_mode: "year",
+                        exam_date: "",
+                        exam_year: p.material_kind === "prova" ? p.exam_year : "",
+                      };
                     }
-                    if (kind === "exercicio" && mode === "year" && !p.exam_year) {
-                      mode = "none";
-                    }
+                    const defaults = defaultScheduleForMaterial("exercicio");
                     return {
                       ...p,
                       material_kind: kind,
-                      exam_schedule_mode: mode,
-                      exam_year: mode === "year" ? p.exam_year : "",
-                      exam_date: mode === "date" ? p.exam_date : "",
+                      exam_schedule_mode: defaults.mode,
+                      exam_year: "",
+                      exam_date: "",
                     };
                   });
+                  if (errors.exam_date || errors.exam_year) {
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.exam_date;
+                      delete next.exam_year;
+                      return next;
+                    });
+                  }
                 }}
               />
             </View>
@@ -1026,6 +1004,45 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
               />
             </View>
           </View>
+
+          <PastExamScheduleFields
+            materialKind={form.material_kind}
+            value={{
+              mode: form.exam_schedule_mode,
+              exam_year: form.exam_year,
+              exam_date: form.exam_date,
+            }}
+            onChange={(schedule) => {
+              setForm((p) => ({
+                ...p,
+                exam_schedule_mode: schedule.mode,
+                exam_year: schedule.exam_year,
+                exam_date: schedule.exam_date,
+              }));
+              if (errors.exam_date || errors.exam_year) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.exam_date;
+                  delete next.exam_year;
+                  return next;
+                });
+              }
+            }}
+            errors={{
+              exam_date: errors.exam_date,
+              exam_year: errors.exam_year,
+            }}
+          />
+
+          <FormSelect
+            label="Publicar"
+            value={form.is_published}
+            options={[
+              { value: "true", label: "Sim" },
+              { value: "false", label: "Não" },
+            ]}
+            onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
+          />
 
           <View
             style={{

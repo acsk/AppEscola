@@ -62,6 +62,31 @@ export function defaultScheduleForMaterial(
     : { mode: "none", exam_year: "", exam_date: "" };
 }
 
+/** Prova usa somente ano; registros antigos com data viram ano na edição. */
+export function normalizeScheduleForMaterial(
+  schedule: PastExamScheduleValue,
+  materialKind: "prova" | "exercicio",
+): PastExamScheduleValue {
+  if (materialKind !== "prova") {
+    return schedule;
+  }
+
+  if (schedule.mode === "date" && schedule.exam_date.trim()) {
+    const iso = displayToISO(schedule.exam_date.trim());
+    return {
+      mode: "year",
+      exam_year: iso?.slice(0, 4) ?? "",
+      exam_date: "",
+    };
+  }
+
+  return {
+    mode: "year",
+    exam_year: schedule.exam_year,
+    exam_date: "",
+  };
+}
+
 export function validatePastExamSchedule(
   schedule: PastExamScheduleValue,
   materialKind: "prova" | "exercicio",
@@ -69,35 +94,12 @@ export function validatePastExamSchedule(
   const errors: { exam_date?: string; exam_year?: string } = {};
 
   if (materialKind === "prova") {
-    if (schedule.mode === "year") {
-      const year = Number(schedule.exam_year);
-      if (!schedule.exam_year.trim()) {
-        errors.exam_year = "Selecione o ano da prova.";
-      } else if (!Number.isFinite(year) || year < 1990 || year > 2100) {
-        errors.exam_year = "Informe um ano entre 1990 e 2100.";
-      }
-      return errors;
+    const year = Number(schedule.exam_year);
+    if (!schedule.exam_year.trim()) {
+      errors.exam_year = "Selecione o ano da prova.";
+    } else if (!Number.isFinite(year) || year < 1990 || year > 2100) {
+      errors.exam_year = "Informe um ano entre 1990 e 2100.";
     }
-
-    if (schedule.mode === "date") {
-      const trimmed = schedule.exam_date.trim();
-      if (!trimmed) {
-        errors.exam_date = "Informe a data completa da prova.";
-        return errors;
-      }
-      const iso = displayToISO(trimmed);
-      if (!iso) {
-        errors.exam_date = "Informe a data no formato dd/mm/aaaa.";
-        return errors;
-      }
-      const year = Number(iso.slice(0, 4));
-      if (year < 1990 || year > 2100) {
-        errors.exam_date = "A data deve ser de 1990 em diante.";
-      }
-      return errors;
-    }
-
-    errors.exam_year = "Selecione o ano ou a data da prova.";
     return errors;
   }
 
@@ -124,10 +126,20 @@ export function validatePastExamSchedule(
   return errors;
 }
 
-export function scheduleToApiPayload(schedule: PastExamScheduleValue): {
+export function scheduleToApiPayload(
+  schedule: PastExamScheduleValue,
+  materialKind?: "prova" | "exercicio",
+): {
   exam_date: string | null;
   exam_year: number | null;
 } {
+  if (materialKind === "prova" && schedule.exam_year.trim()) {
+    return {
+      exam_date: null,
+      exam_year: Number(schedule.exam_year),
+    };
+  }
+
   if (schedule.mode === "year" && schedule.exam_year.trim()) {
     return {
       exam_date: null,
@@ -149,8 +161,9 @@ export function scheduleToApiPayload(schedule: PastExamScheduleValue): {
 export function appendScheduleToFormData(
   formData: FormData,
   schedule: PastExamScheduleValue,
+  materialKind?: "prova" | "exercicio",
 ): void {
-  const { exam_date, exam_year } = scheduleToApiPayload(schedule);
+  const { exam_date, exam_year } = scheduleToApiPayload(schedule, materialKind);
   if (exam_date) {
     formData.append("exam_date", exam_date);
   }
