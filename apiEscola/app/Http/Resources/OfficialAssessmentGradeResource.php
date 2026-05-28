@@ -12,6 +12,30 @@ class OfficialAssessmentGradeResource extends JsonResource
         return [
             'id' => $this->id,
             'official_assessment_id' => $this->official_assessment_id,
+            'assessment' => $this->whenLoaded('assessment', function () {
+                if (! $this->assessment) {
+                    return null;
+                }
+
+                return [
+                    'id' => $this->assessment->id,
+                    'title' => $this->assessment->title,
+                    'kind' => $this->assessment->kind,
+                    'assessment_date' => $this->assessment->assessment_date?->toDateString(),
+                    'max_score' => $this->assessment->max_score !== null
+                        ? (float) $this->assessment->max_score
+                        : null,
+                    'weight' => $this->assessment->weight !== null
+                        ? (float) $this->assessment->weight
+                        : null,
+                    'school_class' => $this->assessment->relationLoaded('schoolClass') && $this->assessment->schoolClass
+                        ? [
+                            'id' => $this->assessment->schoolClass->id,
+                            'name' => $this->assessment->schoolClass->name,
+                        ]
+                        : null,
+                ];
+            }),
             'student_id' => $this->student_id,
             'subject_id' => $this->subject_id,
             'subject' => $this->whenLoaded('subject', fn () => $this->subject ? [

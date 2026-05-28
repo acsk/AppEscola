@@ -381,12 +381,25 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
                     <View className="flex-row gap-2">
                       <TouchableOpacity
                         onPress={() =>
+                          navigate("alunos-boletim", {
+                            studentId: item.id,
+                            studentName: item.name,
+                          })
+                        }
+                        className="p-1.5 bg-violet-50 rounded-lg"
+                        accessibilityLabel="Boletim"
+                      >
+                        <Ionicons name="ribbon-outline" size={15} color="#7C3AED" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
                           navigate("alunos-performance", {
                             studentId: item.id,
                             studentName: item.name,
                           })
                         }
                         className="p-1.5 bg-blue-50 rounded-lg"
+                        accessibilityLabel="Aproveitamento em simulados"
                       >
                         <Ionicons name="stats-chart-outline" size={15} color="#2563EB" />
                       </TouchableOpacity>
@@ -458,7 +471,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
                 />
               </View>
               <View
-                style={{ width: 148 }}
+                style={{ width: 184 }}
                 className="flex-row justify-end gap-2"
               >
                 {item.status === "inactive" && (
@@ -476,12 +489,25 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
                 )}
                 <TouchableOpacity
                   onPress={() =>
+                    navigate("alunos-boletim", {
+                      studentId: item.id,
+                      studentName: item.name,
+                    })
+                  }
+                  className="p-1.5 bg-violet-50 rounded-lg"
+                  accessibilityLabel="Boletim"
+                >
+                  <Ionicons name="ribbon-outline" size={15} color="#7C3AED" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
                     navigate("alunos-performance", {
                       studentId: item.id,
                       studentName: item.name,
                     })
                   }
                   className="p-1.5 bg-blue-50 rounded-lg"
+                  accessibilityLabel="Aproveitamento em simulados"
                 >
                   <Ionicons name="stats-chart-outline" size={15} color="#2563EB" />
                 </TouchableOpacity>

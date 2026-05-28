@@ -253,7 +253,8 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 | Lista alunos | `#/alunos` |
 | Novo aluno | `#/alunos/novo` |
 | Editar aluno | `#/alunos/{id}` |
-| Aproveitamento | `#/alunos/{id}/desempenho` → `StudentPerformanceScreen` |
+| Aproveitamento (simulados) | `#/alunos/{id}/desempenho` → `StudentPerformanceScreen` |
+| Boletim (avaliações presenciais) | `#/alunos/{id}/boletim` → `StudentReportCardScreen` |
 | Legado (redireciona) | `#/alunos-performance` → lista ou desempenho |
 | Cursos / pacotes / matrículas / turmas | `#/{modulo}`, `#/{modulo}/novo`, `#/{modulo}/{id}` |
 | Frequência turma | `#/turmas/{id}/frequencia` |
@@ -273,6 +274,14 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 - Modal: `OfficialAssessmentGradeStepper` (um aluno por passo no lote, **todas as disciplinas na mesma tela**; nota máxima = **soma** das disciplinas; presença única por aluno).
 - API: `POST /official-assessments/{id}/grades` com `{ student_id, subject_id, grade, is_absent, enrollment_id? }`.
 - Migration `2026_05_28_150100_restore_official_assessment_grades_per_subject`: unique `(official_assessment_id, student_id, subject_id)`.
+
+### Boletim do aluno (`StudentReportCardScreen`)
+
+- Rota: `#/alunos/{id}/boletim` (breadcrumb: **Alunos** → nome → **Boletim**).
+- API: `GET /students/{id}/report-card` via `services/reportCard.ts`.
+- Exibe média ponderada, resumo por disciplina e histórico de lançamentos (avaliações **publicadas** com `counts_towards_report_card`).
+- Acesso: botão **Boletim** no cadastro do aluno, lista de alunos (ícone), detalhe da matrícula.
+- Diferente de **Aproveitamento** (`/performance`), que é só simulados online.
 
 ### Aproveitamento do aluno (`StudentPerformanceScreen`)
 

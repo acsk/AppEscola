@@ -1407,6 +1407,22 @@ export default function EnrollmentDetailScreen({
             </View>
           </View>
           <View className="flex-row gap-2" style={{ alignSelf: isMobile ? "stretch" : "auto" }}>
+            {enrollment.student?.id ? (
+              <TouchableOpacity
+                onPress={() =>
+                  navigate("alunos-boletim", {
+                    studentId: enrollment.student!.id,
+                    studentName: enrollment.student?.name,
+                  })
+                }
+                className="flex-row items-center justify-center bg-violet-50 border border-violet-200 px-3.5 py-2 rounded-lg"
+                style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="ribbon-outline" size={15} color="#7C3AED" />
+                <Text className="text-violet-700 font-semibold text-sm ml-1.5">Boletim</Text>
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity
               onPress={openEdit}
               className="flex-row items-center justify-center bg-violet-600 px-3.5 py-2 rounded-lg"

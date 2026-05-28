@@ -631,19 +631,34 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
           </Text>
         </View>
         {isEdit && studentId ? (
-          <TouchableOpacity
-            onPress={() =>
-              navigate("alunos-performance", {
-                studentId,
-                studentName: form.name,
-              })
-            }
-            className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-100"
-            activeOpacity={0.85}
-          >
-            <Ionicons name="stats-chart-outline" size={16} color="#2563EB" />
-            <Text className="text-sm font-semibold text-blue-700">Aproveitamento</Text>
-          </TouchableOpacity>
+          <View className="flex-row flex-wrap gap-2 justify-end">
+            <TouchableOpacity
+              onPress={() =>
+                navigate("alunos-boletim", {
+                  studentId,
+                  studentName: form.name,
+                })
+              }
+              className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-50 border border-violet-100"
+              activeOpacity={0.85}
+            >
+              <Ionicons name="ribbon-outline" size={16} color="#7C3AED" />
+              <Text className="text-sm font-semibold text-violet-700">Boletim</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                navigate("alunos-performance", {
+                  studentId,
+                  studentName: form.name,
+                })
+              }
+              className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-100"
+              activeOpacity={0.85}
+            >
+              <Ionicons name="stats-chart-outline" size={16} color="#2563EB" />
+              <Text className="text-sm font-semibold text-blue-700">Aproveitamento</Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
       </View>
 
