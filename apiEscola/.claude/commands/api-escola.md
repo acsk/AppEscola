@@ -49,6 +49,7 @@ Implementar e manter endpoints, migrations, validações e regras de negócio **
 - sempre ATUALIZE API_VERSION no api_meta.php a cada mudança de feature
 - Lembrar que o deploy é em servidor compartilhado não executa composer install
 - os comandos php são assim /opt/alt/php83/usr/bin/php
+- após criar classes novas: conferir que o arquivo existe e não está vazio antes de registrar rotas (ver **Integridade de arquivos**)
 
 ## Envelope JSON (padrão do projeto)
 
@@ -124,7 +125,57 @@ Antes de alterar endpoint, campo, paginação ou validação:
 1. Rotas → controllers → services → models/migrations
 2. Verificar Resources e Requests existentes
 3. Plano resumido → passos pequenos → listar arquivos alterados
-4. Sugerir teste manual ou `php artisan test`
+4. **Criar/alterar o arquivo PHP ou migration primeiro; só depois** registrar `use` em `routes/api.php` e referências cruzadas
+5. Após cada arquivo novo ou reescrito, executar a verificação de integridade (seção abaixo)
+6. Sugerir teste manual ou `php artisan test`
+
+## Integridade de arquivos (anti-arquivo vazio)
+
+Bugs recorrentes: `ApplyPatch` falha ou arquivo fica com **0 bytes**; rotas apontam para classe inexistente (`ReflectionException` em produção); migration registrada no batch mas vazia no disco.
+
+### Regras obrigatórias
+
+1. **Nunca encerrar a tarefa** sem confirmar que todo arquivo citado (controller, migration, request, resource) existe no disco e tem conteúdo válido.
+2. **Ordem:** implementar o arquivo → ler de volta → só então wire-up (rotas, imports, versão da API).
+3. Se um patch falhar ou o `Read` mostrar arquivo vazio/incompleto, **regravar o arquivo inteiro** (`Write` ou patch com conteúdo completo) antes de continuar. Não empilhar patches em arquivo zerado.
+4. **Não registrar** em `routes/api.php` `Controller::class` nem `use App\Http\Controllers\...` se o arquivo `.php` correspondente não foi verificado.
+5. Migrations: além de `up()`, o `down()` deve desfazer índices/colunas criados no `up()` (ver item 6 do checklist). Arquivo de migration **nunca** pode ficar vazio após edição.
+
+### Verificação mínima (rodar antes de concluir)
+
+Para cada arquivo PHP novo ou reescrito nesta tarefa:
+
+```bash
+# Substitua CAMINHO pelo arquivo (ex.: app/Http/Controllers/Api/FooController.php)
+wc -l CAMINHO                    # deve ser > 0 (controllers costumam ter dezenas/centenas de linhas)
+head -5 CAMINHO                  # deve mostrar <?php e namespace
+/opt/alt/php83/usr/bin/php -l CAMINHO   # ou: docker compose exec app php -l CAMINHO
+```
+
+Para migrations novas:
+
+```bash
+wc -l database/migrations/NOME_DA_MIGRATION.php
+grep -E "function up|function down" database/migrations/NOME_DA_MIGRATION.php
+```
+
+Para classes referenciadas em rotas:
+
+```bash
+php artisan route:list --path=recurso-novo
+# Se ReflectionException / class does not exist: o controller não está no servidor ou está vazio — conferir deploy e autoload
+```
+
+### Deploy (Hostinger)
+
+Após adicionar classes novas, no servidor:
+
+```bash
+/opt/alt/php83/usr/bin/php /usr/local/bin/composer dump-autoload -o
+/opt/alt/php83/usr/bin/php artisan optimize:clear
+```
+
+Confirmar upload do arquivo (não só `routes/api.php`): `ls -la` + `wc -l` no caminho do controller/migration.
 
 ## Checklist anti-regressão (obrigatório antes de concluir)
 
@@ -152,10 +203,21 @@ Use esta lista para evitar bugs recorrentes de consistência e auditoria:
    - Se recurso publicado não deve ser alterado, bloquear update/delete no controller e documentar a regra.
    - Garantir que endpoints de lançamento respeitem o status (`draft`/`published`).
 
-6. **Verificação final mínima**
+6. **UNIQUE com colunas nullable (MySQL)**
+   - Em índices únicos compostos, `NULL` é tratado como valor distinto: várias linhas com `NULL` na mesma chave **não** violam o índice.
+   - Se a regra de negócio exige unicidade real, a coluna deve ser `NOT NULL` (após backfill) ou deduplicar/remover órfãos antes de criar o índice.
+   - Migration de reparo (`down()` não vazio): desfazer índices/colunas que o `up()` condicional criar.
+
+7. **Arquivo não vazio (controller, migration, request)**
+   - Todo arquivo PHP criado ou reescrito nesta tarefa: `wc -l` > 0, `php -l` sem erro, `Read` confirma classe/`namespace` esperados.
+   - Toda classe usada em `routes/api.php` existe no caminho PSR-4 correto **antes** de dar a tarefa por concluída.
+   - Se o agente detectar arquivo zerado no meio do trabalho, recriar o conteúdo completo; não assumir que um patch anterior “salvou”.
+
+8. **Verificação final mínima**
    - Rodar lints dos arquivos alterados.
-   - Conferir rotas novas com `php artisan route:list`.
+   - Conferir rotas novas com `php artisan route:list` (sem `ReflectionException`).
    - Validar payload de create/update com pelo menos 1 cenário feliz e 1 cenário de erro.
+   - Listar no resumo ao usuário os arquivos PHP/migrations **efetivamente gravados** (não só “planejados”).
 
 ## Ambiente Docker
 
@@ -271,7 +333,7 @@ Se o container não estiver em execução, use `run` em vez de `exec`:
 docker compose run --rm app php artisan test --filter=NomeDoTeste
 ```
 
-**Agentes:** após alterar código PHP da API, rodar os testes relevantes via Docker antes de concluir a tarefa (não assumir que `php` está instalado no host).
+**Agentes:** após alterar código PHP da API, rodar os testes relevantes via Docker antes de concluir a tarefa (não assumir que `php` está instalado no host). Antes dos testes, aplicar a verificação de **Integridade de arquivos** nos arquivos tocados.
 
 ### Produção / Hostinger (sem Docker)
 

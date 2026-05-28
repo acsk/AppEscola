@@ -29,6 +29,16 @@ class OfficialAssessmentResource extends JsonResource
                 'icon' => $this->subject->icon,
                 'color' => $this->subject->color,
             ] : null),
+            'subject_ids' => $this->when(
+                $this->relationLoaded('subjects') || $this->subject_id,
+                fn () => $this->linkedSubjectIds()->all()
+            ),
+            'subjects' => $this->whenLoaded('subjects', fn () => $this->subjects->map(fn ($subject) => [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                'icon' => $subject->icon,
+                'color' => $subject->color,
+            ])->values()),
             'exam_type_id' => $this->exam_type_id,
             'exam_type' => $this->whenLoaded('examType', fn () => $this->examType ? [
                 'id' => $this->examType->id,

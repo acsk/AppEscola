@@ -1,5 +1,12 @@
 import type { WithNavigate } from "./navigation";
 
+export type OfficialAssessmentSubjectRef = {
+  id: number;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+};
+
 export type OfficialAssessmentListItem = {
   id: number;
   title: string;
@@ -11,7 +18,9 @@ export type OfficialAssessmentListItem = {
   status: "draft" | "published";
   school_class_id: number;
   school_class?: { id: number; name: string } | null;
-  subject?: { id: number; name: string } | null;
+  subject?: OfficialAssessmentSubjectRef | null;
+  subjects?: OfficialAssessmentSubjectRef[];
+  subject_ids?: number[];
   grades_count?: number;
 };
 
@@ -20,7 +29,7 @@ export type OfficialAssessmentForm = {
   kind: string;
   assessment_date: string;
   school_class_id: string;
-  subject_id: string;
+  subject_ids: number[];
   exam_type_id: string;
   max_score: string;
   weight: string;
@@ -30,7 +39,9 @@ export type OfficialAssessmentForm = {
 
 export type GradeDraftRow = {
   student_id: number;
+  subject_id: number;
   student_name: string;
+  subject_name: string;
   enrollment_number: string | null;
   enrollment_id: number | null;
   is_absent: boolean;

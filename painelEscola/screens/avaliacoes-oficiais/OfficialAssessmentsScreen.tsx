@@ -29,6 +29,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 const kindLabel = (kind: string) => KIND_LABELS[kind] ?? kind;
 
+const formatSubjectsLabel = (row: OfficialAssessmentListItem): string => {
+  const names = (row.subjects ?? []).map((s) => s.name).filter(Boolean);
+  if (names.length > 0) {
+    return names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2}` : names.join(", ");
+  }
+  return row.subject?.name ?? "Multidisciplinar";
+};
+
 export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessmentsScreenProps) {
   const { isMobile, contentPadding } = useResponsiveLayout();
   const [loading, setLoading] = useState(true);
@@ -181,7 +189,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
           </Text>
           <Text className="text-xs font-semibold text-gray-500 mt-1" numberOfLines={1}>
             {row.school_class?.name ?? "—"}
-            {row.subject?.name ? ` · ${row.subject.name}` : ""}
+            {` · ${formatSubjectsLabel(row)}`}
           </Text>
         </View>
         <Badge slug={row.status} label={STATUS_LABELS[row.status] ?? row.status} />
@@ -493,11 +501,9 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
                     <Text className="text-xs font-semibold text-gray-800" numberOfLines={1}>
                       {row.title}
                     </Text>
-                    {row.subject?.name ? (
-                      <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
-                        {row.subject.name}
-                      </Text>
-                    ) : null}
+                    <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
+                      {formatSubjectsLabel(row)}
+                    </Text>
                   </View>
                   <Text
                     className="text-xs text-gray-600"

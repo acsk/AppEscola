@@ -6,8 +6,10 @@ use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class OfficialAssessment extends Model
 {
@@ -60,6 +62,26 @@ class OfficialAssessment extends Model
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    public function subjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Subject::class, 'official_assessment_subject')
+            ->withTimestamps();
+    }
+
+    /** IDs das disciplinas vinculadas (pivot + legado em subject_id). */
+    public function linkedSubjectIds(): Collection
+    {
+        $ids = $this->relationLoaded('subjects')
+            ? $this->subjects->pluck('id')
+            : $this->subjects()->pluck('subjects.id');
+
+        if ($ids->isNotEmpty()) {
+            return $ids->map(fn ($id) => (int) $id)->values();
+        }
+
+        return $this->subject_id ? collect([(int) $this->subject_id]) : collect();
     }
 
     public function examType(): BelongsTo

@@ -14,6 +14,7 @@ class OfficialAssessmentGrade extends Model
         'tenant_id',
         'official_assessment_id',
         'student_id',
+        'subject_id',
         'enrollment_id',
         'grade',
         'is_absent',
@@ -37,6 +38,11 @@ class OfficialAssessmentGrade extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function subject(): BelongsTo
+    {
+        return $this->belongsTo(Subject::class);
     }
 
     public function enrollment(): BelongsTo

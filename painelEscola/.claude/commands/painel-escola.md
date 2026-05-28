@@ -77,7 +77,7 @@ Toda tela deve ter:
 - clean, profissional, minimalista
 - evitar poluição, sombras e animações em excesso
 - barras de rolagem na cor do tema principal
-- **Data:** `components/ui/DatePickerInput.tsx` (calendário nativo oculto + ícone; não só texto `dd/mm/aaaa`)
+- **Data:** `components/ui/DatePickerInput.tsx` (modal + `Calendar.tsx`; digitação `DD/MM/AAAA` ou seleção no calendário customizado — **não** usar `<input type="date">` nativo)
 - **Ano:** `components/ui/YearPickerInput.tsx` (modal com grade de anos por década; não `FormSelect` com dezenas de opções)
 - **Data/hora:** `components/ui/DateTimePickerInput.tsx` quando aplicável
 - **Listas longas / classificação / curso:** `SearchableSelect` (modal + busca)
@@ -123,6 +123,7 @@ input:focus, select:focus, textarea:focus {
 | Confirmação exclusão | `ConfirmModal.tsx` |
 | Toast | `ToastBanner.tsx` |
 | Breadcrumb (subtelas) | `ScreenBreadcrumb.tsx` |
+| Calendário (grade mensal) | `Calendar.tsx` + `utils/calendar.ts` |
 | Paginação | `Pagination.tsx` |
 | Export PDF em grid | `GridPdfExportButton.tsx` |
 | Upload PDF | `PdfFileUploadField.tsx` |

@@ -13,6 +13,13 @@ class OfficialAssessmentGradeResource extends JsonResource
             'id' => $this->id,
             'official_assessment_id' => $this->official_assessment_id,
             'student_id' => $this->student_id,
+            'subject_id' => $this->subject_id,
+            'subject' => $this->whenLoaded('subject', fn () => $this->subject ? [
+                'id' => $this->subject->id,
+                'name' => $this->subject->name,
+                'icon' => $this->subject->icon,
+                'color' => $this->subject->color,
+            ] : null),
             'student' => $this->whenLoaded('student', fn () => $this->student ? [
                 'id' => $this->student->id,
                 'name' => $this->student->name,

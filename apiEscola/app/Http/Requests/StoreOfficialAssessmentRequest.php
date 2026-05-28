@@ -18,6 +18,8 @@ class StoreOfficialAssessmentRequest extends FormRequest
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
             'school_class_id' => ['required', 'integer', 'exists:school_classes,id'],
             'subject_id' => ['nullable', 'integer', 'exists:subjects,id'],
+            'subject_ids' => ['required', 'array', 'min:1'],
+            'subject_ids.*' => ['integer', 'distinct', 'exists:subjects,id'],
             'exam_type_id' => ['nullable', 'integer', 'exists:exam_types,id'],
             'title' => ['required', 'string', 'max:255'],
             'kind' => ['required', 'string', Rule::in([

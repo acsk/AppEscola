@@ -27,7 +27,13 @@ class OfficialAssessmentController extends Controller
         $this->denyUnlessStaff($request);
 
         $query = OfficialAssessment::query()
-            ->with(['course:id,name', 'schoolClass:id,name', 'subject:id,name,icon,color', 'examType:id,slug,label'])
+            ->with([
+                'course:id,name',
+                'schoolClass:id,name',
+                'subject:id,name,icon,color',
+                'subjects:id,name,icon,color',
+                'examType:id,slug,label',
+            ])
             ->withCount('grades');
 
         $this->applyTenantScope($query, $request);
@@ -39,7 +45,13 @@ class OfficialAssessmentController extends Controller
             ->when($request->query('kind'), fn ($q, $v) => $q->where('kind', $v))
             ->when($request->query('assessment_date_from'), fn ($q, $v) => $q->whereDate('assessment_date', '>=', $v))
             ->when($request->query('assessment_date_to'), fn ($q, $v) => $q->whereDate('assessment_date', '<=', $v))
-            ->when($request->query('search'), fn ($q, $v) => $q->where('title', 'like', "%{$v}%"));
+            ->when($request->query('search'), fn ($q, $v) => $q->where('title', 'like', "%{$v}%"))
+            ->when($request->query('subject_id'), function ($q, $v) {
+                $q->where(function ($inner) use ($v) {
+                    $inner->where('subject_id', $v)
+                        ->orWhereHas('subjects', fn ($sq) => $sq->where('subjects.id', $v));
+                });
+            });
 
         return OfficialAssessmentResource::collection(
             $query->orderByDesc('assessment_date')->orderByDesc('id')->paginate(20)
@@ -52,18 +64,29 @@ class OfficialAssessmentController extends Controller
         $tenantId = $this->requireTenantId($request);
 
         $data = $request->validated();
+        $subjectIds = $this->normalizeSubjectIds($data);
+        unset($data['subject_ids'], $data['subject_id']);
         $this->assertRelatedEntitiesBelongToTenant($tenantId, $data);
+        $this->assertSubjectIdsBelongToTenant($tenantId, $subjectIds);
 
         $assessment = OfficialAssessment::create([
             ...$data,
             'tenant_id' => $tenantId,
+            'subject_id' => $subjectIds[0] ?? null,
             'max_score' => $data['max_score'] ?? 10,
             'weight' => $data['weight'] ?? 1,
             'counts_towards_report_card' => (bool) ($data['counts_towards_report_card'] ?? true),
             'status' => $data['status'] ?? OfficialAssessment::STATUS_DRAFT,
         ]);
+        $this->syncSubjects($assessment, $subjectIds);
 
-        $assessment->load(['course:id,name', 'schoolClass:id,name', 'subject:id,name,icon,color', 'examType:id,slug,label']);
+        $assessment->load([
+            'course:id,name',
+            'schoolClass:id,name',
+            'subject:id,name,icon,color',
+            'subjects:id,name,icon,color',
+            'examType:id,slug,label',
+        ]);
 
         return $this->created(new OfficialAssessmentResource($assessment), 'Avaliação oficial cadastrada com sucesso.');
     }
@@ -77,8 +100,10 @@ class OfficialAssessmentController extends Controller
             'course:id,name',
             'schoolClass:id,name',
             'subject:id,name,icon,color',
+            'subjects:id,name,icon,color',
             'examType:id,slug,label',
             'grades.student:id,name,enrollment_number',
+            'grades.subject:id,name,icon,color',
         ]);
 
         return $this->success(new OfficialAssessmentResource($officialAssessment));
@@ -95,9 +120,26 @@ class OfficialAssessmentController extends Controller
         }
 
         $data = $request->validated();
+        $subjectIds = array_key_exists('subject_ids', $data)
+            ? $this->normalizeSubjectIds($data)
+            : null;
+        unset($data['subject_ids'], $data['subject_id']);
         $this->assertRelatedEntitiesBelongToTenant($tenantId, $data);
+        if ($subjectIds !== null) {
+            $this->assertSubjectIdsBelongToTenant($tenantId, $subjectIds);
+            $data['subject_id'] = $subjectIds[0] ?? null;
+        }
         $officialAssessment->update($data);
-        $officialAssessment->load(['course:id,name', 'schoolClass:id,name', 'subject:id,name,icon,color', 'examType:id,slug,label']);
+        if ($subjectIds !== null) {
+            $this->syncSubjects($officialAssessment, $subjectIds);
+        }
+        $officialAssessment->load([
+            'course:id,name',
+            'schoolClass:id,name',
+            'subject:id,name,icon,color',
+            'subjects:id,name,icon,color',
+            'examType:id,slug,label',
+        ]);
 
         return $this->success(new OfficialAssessmentResource($officialAssessment), 'Avaliação oficial atualizada com sucesso.');
     }
@@ -160,11 +202,15 @@ class OfficialAssessmentController extends Controller
         }
 
         $maxScore = (float) $officialAssessment->max_score;
+        if ($officialAssessment->linkedSubjectIds()->isEmpty()) {
+            return $this->error('Cadastre ao menos uma disciplina na avaliação antes de lançar notas.', null, 422);
+        }
 
         DB::transaction(function () use ($rows, $officialAssessment, $tenantId, $maxScore) {
             $lockedAssessment = OfficialAssessment::query()
                 ->whereKey($officialAssessment->id)
                 ->where('tenant_id', $tenantId)
+                ->with('subjects:id')
                 ->lockForUpdate()
                 ->first();
 
@@ -176,8 +222,18 @@ class OfficialAssessmentController extends Controller
                 abort(422, 'Avaliação já publicada. Não é possível alterar notas.');
             }
 
+            $lockedSubjectIds = $lockedAssessment->linkedSubjectIds()->all();
+            if ($lockedSubjectIds === []) {
+                abort(422, 'Cadastre ao menos uma disciplina na avaliação antes de lançar notas.');
+            }
+
             foreach ($rows as $row) {
                 $studentId = (int) $row['student_id'];
+                $subjectId = (int) $row['subject_id'];
+
+                if (! in_array($subjectId, $lockedSubjectIds, true)) {
+                    abort(422, "A disciplina {$subjectId} não pertence a esta avaliação.");
+                }
                 $grade = array_key_exists('grade', $row) ? $row['grade'] : null;
                 $isAbsent = (bool) ($row['is_absent'] ?? false);
                 $enrollmentId = $row['enrollment_id'] ?? null;
@@ -204,9 +260,11 @@ class OfficialAssessmentController extends Controller
                 $gradeRow = OfficialAssessmentGrade::query()->firstOrNew([
                     'official_assessment_id' => $lockedAssessment->id,
                     'student_id' => $studentId,
+                    'subject_id' => $subjectId,
                 ]);
 
                 $gradeRow->tenant_id = $tenantId;
+                $gradeRow->subject_id = $subjectId;
                 $gradeRow->enrollment_id = $enrollmentId;
                 $gradeRow->grade = $isAbsent ? null : $grade;
                 $gradeRow->is_absent = $isAbsent;
@@ -217,7 +275,10 @@ class OfficialAssessmentController extends Controller
             }
         });
 
-        $officialAssessment->refresh()->load(['grades.student:id,name,enrollment_number']);
+        $officialAssessment->refresh()->load([
+            'grades.student:id,name,enrollment_number',
+            'grades.subject:id,name,icon,color',
+        ]);
 
         return $this->success([
             'assessment' => new OfficialAssessmentResource($officialAssessment),
@@ -260,7 +321,10 @@ class OfficialAssessmentController extends Controller
                 $q->where('status', OfficialAssessment::STATUS_PUBLISHED)
                     ->where('counts_towards_report_card', true);
             })
-            ->with(['assessment.subject:id,name,icon,color', 'assessment.schoolClass:id,name'])
+            ->with([
+                'assessment.schoolClass:id,name',
+                'subject:id,name,icon,color',
+            ])
             ->orderByDesc('id')
             ->get();
 
@@ -268,6 +332,30 @@ class OfficialAssessmentController extends Controller
         $weightedSum = $validGrades->sum(fn ($g) => (float) $g->grade * (float) $g->assessment->weight);
         $weights = $validGrades->sum(fn ($g) => (float) $g->assessment->weight);
         $average = $weights > 0 ? round($weightedSum / $weights, 2) : null;
+
+        $bySubject = $grades
+            ->groupBy('subject_id')
+            ->map(function ($subjectGrades, $subjectId) {
+                $valid = $subjectGrades->where('is_absent', false)->whereNotNull('grade');
+                $sum = $valid->sum(fn ($g) => (float) $g->grade * (float) $g->assessment->weight);
+                $w = $valid->sum(fn ($g) => (float) $g->assessment->weight);
+                $subject = $subjectGrades->first()?->subject;
+
+                return [
+                    'subject_id' => (int) $subjectId,
+                    'subject' => $subject ? [
+                        'id' => $subject->id,
+                        'name' => $subject->name,
+                        'icon' => $subject->icon,
+                        'color' => $subject->color,
+                    ] : null,
+                    'grades_count' => $subjectGrades->count(),
+                    'absences_count' => $subjectGrades->where('is_absent', true)->count(),
+                    'weighted_average' => $w > 0 ? round($sum / $w, 2) : null,
+                ];
+            })
+            ->values()
+            ->all();
 
         return $this->success([
             'student' => [
@@ -279,6 +367,7 @@ class OfficialAssessmentController extends Controller
                 'assessments_count' => $grades->count(),
                 'absences_count' => $grades->where('is_absent', true)->count(),
                 'weighted_average' => $average,
+                'by_subject' => $bySubject,
             ],
             'grades' => OfficialAssessmentGradeResource::collection($grades),
         ]);
@@ -315,6 +404,65 @@ class OfficialAssessmentController extends Controller
             if (! $query->exists()) {
                 abort(422, "{$check['key']} não pertence ao tenant informado.");
             }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<int>
+     */
+    private function normalizeSubjectIds(array $data): array
+    {
+        $ids = collect($data['subject_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $legacyId = isset($data['subject_id']) ? (int) $data['subject_id'] : 0;
+        if ($legacyId > 0) {
+            $ids = $ids->push($legacyId)->unique()->values();
+        }
+
+        return $ids->all();
+    }
+
+    /**
+     * @param  list<int>  $subjectIds
+     */
+    private function syncSubjects(OfficialAssessment $assessment, array $subjectIds): void
+    {
+        $ids = collect($subjectIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $assessment->subjects()->sync(
+            $ids->mapWithKeys(fn (int $id) => [$id => []])->all()
+        );
+
+        $assessment->forceFill(['subject_id' => $ids->first()])->save();
+    }
+
+    /**
+     * @param  list<int>  $subjectIds
+     */
+    private function assertSubjectIdsBelongToTenant(int $tenantId, array $subjectIds): void
+    {
+        if ($subjectIds === []) {
+            abort(422, 'Selecione ao menos uma disciplina para a avaliação.');
+        }
+
+        $valid = DB::table('subjects')
+            ->where('tenant_id', $tenantId)
+            ->whereIn('id', $subjectIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (array_diff($subjectIds, $valid) !== []) {
+            abort(422, 'Uma ou mais disciplinas não pertencem ao tenant informado.');
         }
     }
 
