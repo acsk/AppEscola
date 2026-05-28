@@ -14,6 +14,7 @@ expo-env.d.ts
 # dist/fonts/: idem, para produção
 # artefatos gerados do Expo web build (hashados)
 dist/_expo/static/
+deploy-painel-dist.zip
 
 # Native
 .kotlin/
