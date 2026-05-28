@@ -31,6 +31,7 @@ import {
 import { MenuButton } from '../../../components/navigation/MenuButton';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
+import { isPeriodBlockingStart, resolveExamPeriodStatus } from '../lib/exam-period';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'SimuladosList'>;
 
@@ -120,9 +121,23 @@ export function SimuladosScreen() {
 
   // ── Render: card disponível ────────────────────────────────────────────────
   function renderDisponivel({ item }: { item: SimuladoListItem }) {
-    const cor   = statusColor(item.attempt_status, colors);
-    const label = STATUS_LABEL[item.attempt_status];
-    const icon  = STATUS_ICON[item.attempt_status];
+    const periodStatus = resolveExamPeriodStatus(item);
+    const periodBloqueia = isPeriodBlockingStart(periodStatus, item.attempt_status);
+    const cor   = periodBloqueia
+      ? periodStatus === 'upcoming'
+        ? '#B45309'
+        : '#64748B'
+      : statusColor(item.attempt_status, colors);
+    const label = periodBloqueia
+      ? periodStatus === 'upcoming'
+        ? 'Em breve'
+        : 'Encerrado'
+      : STATUS_LABEL[item.attempt_status];
+    const icon  = periodBloqueia
+      ? periodStatus === 'upcoming'
+        ? 'calendar-outline'
+        : 'lock-closed-outline'
+      : STATUS_ICON[item.attempt_status];
     const subjectColor = item.subject?.color ?? colors.primary;
     const aproveitamentoAprovado =
       item.aproveitamento != null ? item.aproveitamento >= item.passing_score : null;
@@ -179,12 +194,16 @@ export function SimuladosScreen() {
             <Text style={styles.periodoEncerradoTexto}>Período encerrado</Text>
           </View>
         ) : null}
-        {!item.can_start && item.attempt_status === 'not_started' && !item.period_closed && (
+        {periodBloqueia && item.period_message ? (
           <View style={styles.foraPeriodo}>
-            <Ionicons name="lock-closed-outline" size={12} color={colors.muted} />
-            <Text style={styles.foraPeriodoTexto}>Fora do período de início</Text>
+            <Ionicons
+              name={periodStatus === 'upcoming' ? 'calendar-outline' : 'lock-closed-outline'}
+              size={12}
+              color={colors.muted}
+            />
+            <Text style={styles.foraPeriodoTexto} numberOfLines={2}>{item.period_message}</Text>
           </View>
-        )}
+        ) : null}
         <Text style={styles.cardTitulo} numberOfLines={2}>{item.title}</Text>
         <View style={styles.cardRodape}>
           <View style={styles.infoItem}>

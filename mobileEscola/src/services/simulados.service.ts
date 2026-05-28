@@ -2,6 +2,8 @@ import { api } from './api';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+export type ExamPeriodStatus = 'upcoming' | 'open' | 'closed';
+
 export type AttemptStatus =
   | 'not_started'
   | 'in_progress'
@@ -54,6 +56,9 @@ export interface SimuladoListItem {
   total_points: number;
   attempt_status: AttemptStatus;
   period_closed?: boolean;
+  period_not_started?: boolean;
+  period_status?: ExamPeriodStatus;
+  period_message?: string | null;
   can_start: boolean;
   nota?: number | null;
   score_display?: string | null;
@@ -109,6 +114,10 @@ export interface SimuladoDetail {
   expires_at?: string | null;
   time_remaining_seconds?: number | null;
   can_start: boolean;
+  period_closed?: boolean;
+  period_not_started?: boolean;
+  period_status?: ExamPeriodStatus;
+  period_message?: string | null;
   release_results_after_end?: boolean;
   allow_retake?: boolean;
   max_attempts?: number | null;

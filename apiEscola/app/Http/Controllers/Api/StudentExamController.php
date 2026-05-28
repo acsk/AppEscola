@@ -132,11 +132,11 @@ class StudentExamController extends Controller
             }
 
             $visibleStatus = $attempt?->visibleStatusFor($user->role) ?? 'not_started';
-            $periodClosed = $exam->ends_at !== null && $exam->ends_at->lt(now());
+            $periodMeta    = $this->periodMeta($exam);
 
             $resource['total_questions'] = (int) ($exam->questions_count ?? 0);
             $resource['total_points']    = (float) ($exam->total_points_sum ?? 0);
-            $resource['period_closed']   = $periodClosed;
+            $resource                     = array_merge($resource, $periodMeta);
             $score = ($visibleStatus === 'awaiting_release')
                 ? null
                 : ($attempt?->score !== null ? (float) $attempt->score : null);
@@ -149,8 +149,7 @@ class StudentExamController extends Controller
             $resource['nota']             = $score;
             $resource['score_display']    = $this->formatScoreFraction($score, $maxScore);
             $resource['aproveitamento']   = $percentage;
-            $resource['can_start']        = $this->canStart($exam);
-            $resource['_sort_can_start']  = $resource['can_start'] ? 1 : 0;
+            $resource['_sort_can_start']  = $periodMeta['can_start'] ? 1 : 0;
             $resource['_sort_status_rank'] = $statusPriority[$resource['attempt_status']] ?? 99;
 
             return $resource;
@@ -232,7 +231,7 @@ class StudentExamController extends Controller
         $resource['time_remaining_seconds'] = ($attempt?->status === 'in_progress')
             ? $attempt->remainingSeconds()
             : null;
-        $resource['can_start']      = $this->canStart($exam);
+        $resource = array_merge($resource, $this->periodMeta($exam));
 
         // Injetar student_answer em cada questão
         if (! empty($resource['questions'])) {
@@ -455,21 +454,52 @@ class StudentExamController extends Controller
     }
 
     /**
-     * Verifica se o simulado ainda pode ser iniciado
-     * (starts_at <= agora <= ends_at, ou sem datas definidas).
+     * @return array{
+     *   period_status: 'upcoming'|'open'|'closed',
+     *   period_closed: bool,
+     *   period_not_started: bool,
+     *   can_start: bool,
+     *   period_message: string|null
+     * }
      */
-    private function canStart(Exam $exam): bool
+    private function periodMeta(Exam $exam): array
+    {
+        $periodStatus = $this->periodStatus($exam);
+
+        return [
+            'period_status'      => $periodStatus,
+            'period_closed'      => $periodStatus === 'closed',
+            'period_not_started' => $periodStatus === 'upcoming',
+            'can_start'          => $periodStatus === 'open',
+            'period_message'     => $this->periodMessage($exam, $periodStatus),
+        ];
+    }
+
+    private function periodStatus(Exam $exam): string
     {
         $now = now();
 
         if ($exam->starts_at && $exam->starts_at->gt($now)) {
-            return false;
+            return 'upcoming';
         }
 
         if ($exam->ends_at && $exam->ends_at->lt($now)) {
-            return false;
+            return 'closed';
         }
 
-        return true;
+        return 'open';
+    }
+
+    private function periodMessage(Exam $exam, string $periodStatus): ?string
+    {
+        return match ($periodStatus) {
+            'upcoming' => $exam->starts_at
+                ? 'Disponível a partir de ' . $exam->starts_at->timezone(config('app.timezone'))->format('d/m/Y, H:i') . '.'
+                : 'Este simulado ainda não está liberado.',
+            'closed' => $exam->ends_at
+                ? 'Período encerrado em ' . $exam->ends_at->timezone(config('app.timezone'))->format('d/m/Y, H:i') . '.'
+                : 'O prazo para realização foi encerrado.',
+            default => null,
+        };
     }
 }

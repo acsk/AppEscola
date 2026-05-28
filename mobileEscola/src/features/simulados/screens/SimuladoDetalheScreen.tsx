@@ -32,6 +32,12 @@ import {
 } from '../hooks';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
+import {
+  canShowExamPdf,
+  getPeriodStatusDisplay,
+  isPeriodBlockingStart,
+  resolveExamPeriodStatus,
+} from '../lib/exam-period';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoDetalhe'>;
 
@@ -379,9 +385,9 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   }
 
   const subjectColor  = detalhe.subject?.color ?? colors.primary;
-  const statusEfetivo: AttemptStatus = (
-    detalhe.attempt_status || (detalhe.can_start ? 'not_started' : 'in_progress')
-  ) as AttemptStatus;
+  const statusEfetivo: AttemptStatus = (detalhe.attempt_status ?? 'not_started') as AttemptStatus;
+  const periodStatus = resolveExamPeriodStatus(detalhe);
+  const periodBloqueiaInicio = isPeriodBlockingStart(periodStatus, statusEfetivo);
   const emAndamento   = statusEfetivo === 'in_progress';
   const abandonado    = statusEfetivo === 'abandoned';
   const pendingReview = statusEfetivo === 'pending_review';
@@ -389,7 +395,11 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     statusEfetivo === 'awaiting_release' ||
     revisao?.status === 'awaiting_release' ||
     revisao?.result_release_pending === true;
-  const podeIniciar   = detalhe.can_start && (statusEfetivo === 'not_started' || abandonado);
+  const podeIniciar   =
+    detalhe.can_start &&
+    !periodBloqueiaInicio &&
+    (statusEfetivo === 'not_started' || abandonado);
+  const mostrarPdf = canShowExamPdf(periodStatus, statusEfetivo);
   const tempoRestante = emAndamento ? detalhe.time_remaining_seconds : null;
   const concluido     = statusEfetivo === 'completed';
   const concluidoComVisualizacao =
@@ -401,7 +411,9 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     detalhe.starts_at ? `Início: ${formatDate(detalhe.starts_at)}` : null,
     detalhe.ends_at ? `Prazo: ${formatDate(detalhe.ends_at)}` : null,
   ].filter(Boolean).join('  •  ');
-  const statusAtual = statusInfo(statusEfetivo, awaitingRelease, colors);
+  const statusAtual = periodBloqueiaInicio
+    ? getPeriodStatusDisplay(periodStatus, detalhe, colors)
+    : statusInfo(statusEfetivo, awaitingRelease, colors);
   const metricWidth = width < 390 ? '48%' : '23%';
 
   return (
@@ -522,31 +534,32 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           styles={styles}
         />
 
-        {/* Gerar PDF para impressão */}
-        <View style={styles.pdfWrap}>
-          <TouchableOpacity
-            style={[styles.pdfBotao, { borderColor: subjectColor }, gerandoPdf && styles.botaoDisabled]}
-            onPress={handleGerarPdf}
-            disabled={gerandoPdf}
-            activeOpacity={0.85}
-          >
-            {gerandoPdf ? (
-              <ActivityIndicator size="small" color={subjectColor} />
+        {mostrarPdf ? (
+          <View style={styles.pdfWrap}>
+            <TouchableOpacity
+              style={[styles.pdfBotao, { borderColor: subjectColor }, gerandoPdf && styles.botaoDisabled]}
+              onPress={handleGerarPdf}
+              disabled={gerandoPdf}
+              activeOpacity={0.85}
+            >
+              {gerandoPdf ? (
+                <ActivityIndicator size="small" color={subjectColor} />
+              ) : (
+                <>
+                  <Ionicons name="print-outline" size={16} color={subjectColor} style={{ marginRight: 8 }} />
+                  <Text style={[styles.pdfBotaoTexto, { color: subjectColor }]}>Gerar PDF para impressão</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {erroPdf ? (
+              <Text style={styles.pdfErro}>{erroPdf}</Text>
             ) : (
-              <>
-                <Ionicons name="print-outline" size={16} color={subjectColor} style={{ marginRight: 8 }} />
-                <Text style={[styles.pdfBotaoTexto, { color: subjectColor }]}>Gerar PDF para impressão</Text>
-              </>
+              <Text style={styles.pdfHint}>
+                Gere uma versão imprimível do simulado com folha de respostas.
+              </Text>
             )}
-          </TouchableOpacity>
-          {erroPdf ? (
-            <Text style={styles.pdfErro}>{erroPdf}</Text>
-          ) : (
-            <Text style={styles.pdfHint}>
-              Gere uma versão imprimível do simulado com folha de respostas.
-            </Text>
-          )}
-        </View>
+          </View>
+        ) : null}
 
         {/* Erro de ação (ex: iniciar falhou) */}
         {erroAcao ? (
@@ -586,11 +599,6 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                   </Text>
                 </>}
           </TouchableOpacity>
-        ) : (!concluido && !pendingReview && !awaitingRelease && !abandonado) ? (
-          <View style={[styles.banner, { backgroundColor: '#FEF9C3' }]}>
-            <Ionicons name="lock-closed-outline" size={18} color="#B45309" style={{ marginRight: 8 }} />
-            <Text style={[styles.bannerTexto, { color: '#B45309' }]}>Fora do período permitido</Text>
-          </View>
         ) : null}
 
         {concluidoComVisualizacao && (
