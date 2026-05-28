@@ -259,6 +259,14 @@ Lógica central em `utils/pastExamSchedule.ts` + `PastExamScheduleFields.tsx`:
 4. Validar integração com API (422, upload, permissões)
 5. Testar hash (F5) se houver navegação por URL
 
+## Deploy web (Hostinger / `painel.appcurso.com.br`)
+
+Após `npm run web:build`, publicar **toda** a pasta `dist/`, inclusive `dist/_expo/static/` (~11 MB de JS/CSS hashados).
+
+- `dist/_expo/static/` está no `.gitignore` — **não vai no git**; deploy por FTP/rsync/Git Deploy precisa enviar essa pasta manualmente ou gerar o build no servidor.
+- O `.htaccess` na raiz mapeia `/_expo/...` → `dist/_expo/...`. Se o arquivo não existir no servidor, **não** deve cair em `index.html` (senão o browser mostra `Unexpected token '<'` com status 200).
+- Validar produção: `curl -sI https://painel.appcurso.com.br/_expo/static/js/web/index-*.js` deve retornar `content-type: application/javascript`, não `text/html`.
+
 ## Comandos úteis
 
 ```bash

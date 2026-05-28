@@ -11,6 +11,10 @@ Options -Indexes
   RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
   RewriteRule ^(.*)$ dist/$1 [L]
 
-  # Tudo o mais → dist/index.html (SPA)
+  # Assets do Expo (npm run web:build): sem fallback SPA — evita HTML no lugar de .js/.css
+  RewriteCond %{REQUEST_URI} ^/_expo/ [NC]
+  RewriteRule ^ - [L]
+
+  # Rotas do app (hash) → dist/index.html (SPA)
   RewriteRule ^ dist/index.html [L]
 </IfModule>
