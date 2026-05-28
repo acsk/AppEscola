@@ -9,6 +9,8 @@ import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
+import Modal from "../../components/ui/Modal";
+import OfficialAssessmentGradesTable from "../../components/avaliacoes-oficiais/OfficialAssessmentGradesTable";
 import OfficialAssessmentGradeStepper from "../../components/avaliacoes-oficiais/OfficialAssessmentGradeStepper";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { parseApiErrors } from "../../utils/apiErrors";
@@ -24,12 +26,15 @@ const EMPTY_FORM: OfficialAssessmentForm = {
   kind: "presencial_bimestral",
   assessment_date: "",
   school_class_id: "",
+  subject_ids: [],
   exam_type_id: "",
   max_score: "10",
   weight: "1",
   counts_towards_report_card: true,
   notes: "",
 };
+
+const gradeRowKey = (studentId: number, subjectId: number) => `${studentId}-${subjectId}`;
 
 export default function OfficialAssessmentFormScreen({
   navigate,
@@ -49,7 +54,9 @@ export default function OfficialAssessmentFormScreen({
   const [assessmentBackendId, setAssessmentBackendId] = useState<number | null>(assessmentId);
   const [grades, setGrades] = useState<GradeDraftRow[]>([]);
   const [classes, setClasses] = useState<{ value: string; label: string }[]>([]);
+  const [subjectOptions, setSubjectOptions] = useState<{ id: number; name: string }[]>([]);
   const [examTypes, setExamTypes] = useState<{ value: string; label: string }[]>([]);
+  const [gradesModalVisible, setGradesModalVisible] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
     type: "success",
@@ -73,15 +80,25 @@ export default function OfficialAssessmentFormScreen({
   );
 
   const loadDependencies = useCallback(async () => {
-    const [classesRes, examTypesRes] = await Promise.all([
+    const [classesRes, subjectsRes, examTypesRes] = await Promise.all([
       api.get("/school-classes", { params: { per_page: 200, status: "active" } }),
+      api.get("/subjects", { params: { per_page: 200 } }),
       api.get("/admin/exam-types"),
     ]);
 
     const classesList = Array.isArray(classesRes.data?.data) ? classesRes.data.data : [];
+    const subjectsList = Array.isArray(subjectsRes.data?.data) ? subjectsRes.data.data : [];
     const examTypesList = Array.isArray(examTypesRes.data?.body) ? examTypesRes.data.body : examTypesRes.data?.data ?? [];
 
     setClasses(classesList.map((c: any) => ({ value: String(c.id), label: String(c.name ?? `Turma #${c.id}`) })));
+    setSubjectOptions(
+      subjectsList
+        .filter((s: any) => s?.id)
+        .map((s: any) => ({
+          id: Number(s.id),
+          name: String(s.name ?? `Disciplina #${s.id}`),
+        }))
+    );
     setExamTypes((Array.isArray(examTypesList) ? examTypesList : []).map((e: any) => ({ value: String(e.id), label: String(e.label ?? e.slug ?? `Tipo #${e.id}`) })));
   }, []);
 
@@ -91,11 +108,20 @@ export default function OfficialAssessmentFormScreen({
     const body = data?.body ?? data?.data ?? data;
     setAssessmentBackendId(body.id);
     setStatus(body.status);
+    const loadedSubjectIds = Array.isArray(body.subject_ids)
+      ? body.subject_ids.map((id: unknown) => Number(id)).filter((id: number) => id > 0)
+      : Array.isArray(body.subjects)
+        ? body.subjects.map((s: any) => Number(s.id)).filter((id: number) => id > 0)
+        : body.subject_id
+          ? [Number(body.subject_id)]
+          : [];
+
     setForm({
       title: body.title ?? "",
       kind: body.kind ?? "presencial_bimestral",
       assessment_date: isoToDisplay(body.assessment_date ?? ""),
       school_class_id: body.school_class_id ? String(body.school_class_id) : "",
+      subject_ids: loadedSubjectIds,
       exam_type_id: body.exam_type_id ? String(body.exam_type_id) : "",
       max_score: body.max_score != null ? String(body.max_score) : "10",
       weight: body.weight != null ? String(body.weight) : "1",
@@ -103,24 +129,37 @@ export default function OfficialAssessmentFormScreen({
       notes: body.notes ?? "",
     });
     const gradeRows = Array.isArray(body.grades) ? body.grades : [];
-    const byStudent = new Map<number, GradeDraftRow>();
-    gradeRows.forEach((g: any) => {
-      const studentId = Number(g.student_id);
-      if (!Number.isFinite(studentId)) return;
-      byStudent.set(studentId, {
-        student_id: studentId,
-        student_name: String(g.student?.name ?? `Aluno #${studentId}`),
-        enrollment_number: g.student?.enrollment_number ?? null,
-        enrollment_id: g.enrollment_id ?? null,
-        is_absent: !!g.is_absent,
-        grade: g.grade != null ? String(g.grade) : "",
-        notes: g.notes ?? "",
-      });
-    });
-    setGrades(Array.from(byStudent.values()));
+    setGrades(
+      gradeRows
+        .filter((g: any) => Number(g.subject_id) > 0)
+        .map((g: any) => ({
+          student_id: Number(g.student_id),
+          subject_id: Number(g.subject_id),
+          student_name: String(g.student?.name ?? `Aluno #${g.student_id}`),
+          subject_name: String(g.subject?.name ?? `Disciplina #${g.subject_id}`),
+          enrollment_number: g.student?.enrollment_number ?? null,
+          enrollment_id: g.enrollment_id ?? null,
+          is_absent: !!g.is_absent,
+          grade: g.grade != null ? String(g.grade) : "",
+          notes: g.notes ?? "",
+        }))
+    );
   }, [assessmentId]);
 
-  const mergeStudentsGrades = useCallback(
+  const subjectNameById = useMemo(
+    () => new Map(subjectOptions.map((s) => [s.id, s.name])),
+    [subjectOptions]
+  );
+
+  const selectedSubjects = useMemo(
+    () =>
+      form.subject_ids
+        .map((id) => subjectOptions.find((s) => s.id === id))
+        .filter((s): s is { id: number; name: string } => !!s),
+    [form.subject_ids, subjectOptions]
+  );
+
+  const mergeGradeMatrix = useCallback(
     (
       students: Array<{
         student_id: number;
@@ -128,25 +167,34 @@ export default function OfficialAssessmentFormScreen({
         enrollment_number: string | null;
         enrollment_id: number | null;
       }>,
+      subjectIds: number[],
       previous: GradeDraftRow[]
     ): GradeDraftRow[] => {
-      const prevMap = new Map(previous.map((g) => [g.student_id, g]));
-      return students.map(
-        (student) =>
-          prevMap.get(student.student_id) ?? {
-            ...student,
-            is_absent: false,
-            grade: "",
-            notes: "",
-          }
-      );
+      const prevMap = new Map(previous.map((g) => [gradeRowKey(g.student_id, g.subject_id), g]));
+      const rows: GradeDraftRow[] = [];
+      subjectIds.forEach((subjectId) => {
+        students.forEach((student) => {
+          const key = gradeRowKey(student.student_id, subjectId);
+          rows.push(
+            prevMap.get(key) ?? {
+              ...student,
+              subject_id: subjectId,
+              subject_name: subjectNameById.get(subjectId) ?? `Disciplina #${subjectId}`,
+              is_absent: false,
+              grade: "",
+              notes: "",
+            }
+          );
+        });
+      });
+      return rows;
     },
-    []
+    [subjectNameById]
   );
 
   const loadStudentsForClass = useCallback(
-    async (schoolClassId: string) => {
-      if (!schoolClassId) {
+    async (schoolClassId: string, subjectIds: number[]) => {
+      if (!schoolClassId || subjectIds.length === 0) {
         setGrades([]);
         return;
       }
@@ -176,9 +224,9 @@ export default function OfficialAssessmentFormScreen({
           enrollment_id: Number.isFinite(enrollmentId) && enrollmentId > 0 ? enrollmentId : null,
         });
       });
-      setGrades((prev) => mergeStudentsGrades(students, prev));
+      setGrades((prev) => mergeGradeMatrix(students, subjectIds, prev));
     },
-    [mergeStudentsGrades]
+    [mergeGradeMatrix]
   );
 
   useEffect(() => {
@@ -197,10 +245,49 @@ export default function OfficialAssessmentFormScreen({
   }, [loadAssessment, loadDependencies]);
 
   useEffect(() => {
-    if (form.school_class_id && status !== "published") {
-      loadStudentsForClass(form.school_class_id).catch(() => undefined);
+    if (form.school_class_id && form.subject_ids.length > 0 && status !== "published") {
+      loadStudentsForClass(form.school_class_id, form.subject_ids).catch(() => undefined);
     }
-  }, [form.school_class_id, status, loadStudentsForClass]);
+  }, [form.school_class_id, form.subject_ids, status, loadStudentsForClass]);
+
+  useEffect(() => {
+    if (form.subject_ids.length === 0) {
+      setGrades([]);
+      return;
+    }
+    setGrades((prev) => {
+      const students = new Map<
+        number,
+        {
+          student_id: number;
+          student_name: string;
+          enrollment_number: string | null;
+          enrollment_id: number | null;
+        }
+      >();
+      prev.forEach((g) => {
+        if (!students.has(g.student_id)) {
+          students.set(g.student_id, {
+            student_id: g.student_id,
+            student_name: g.student_name,
+            enrollment_number: g.enrollment_number,
+            enrollment_id: g.enrollment_id,
+          });
+        }
+      });
+      if (students.size === 0) return [];
+      return mergeGradeMatrix(Array.from(students.values()), form.subject_ids, prev);
+    });
+  }, [form.subject_ids, mergeGradeMatrix]);
+
+  const toggleSubject = (subjectId: number) => {
+    setForm((prev) => ({
+      ...prev,
+      subject_ids: prev.subject_ids.includes(subjectId)
+        ? prev.subject_ids.filter((id) => id !== subjectId)
+        : [...prev.subject_ids, subjectId],
+    }));
+  };
 
   const setField = (key: keyof OfficialAssessmentForm, value: any) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -222,6 +309,7 @@ export default function OfficialAssessmentFormScreen({
         kind: form.kind,
         assessment_date: displayToISO(form.assessment_date) || form.assessment_date,
         school_class_id: Number(form.school_class_id),
+        subject_ids: form.subject_ids,
         exam_type_id: form.exam_type_id ? Number(form.exam_type_id) : null,
         max_score: Number(form.max_score),
         weight: Number(form.weight),
@@ -263,6 +351,7 @@ export default function OfficialAssessmentFormScreen({
       const payload = {
         grades: grades.map((g) => ({
           student_id: g.student_id,
+          subject_id: g.subject_id,
           enrollment_id: g.enrollment_id,
           grade: g.is_absent || !g.grade ? null : Number(g.grade),
           is_absent: g.is_absent,
@@ -270,6 +359,7 @@ export default function OfficialAssessmentFormScreen({
         })),
       };
       await api.post(`/official-assessments/${assessmentBackendId}/grades`, payload);
+      setGradesModalVisible(false);
       setToast({ visible: true, type: "success", message: "Notas salvas com sucesso." });
     } catch (e: any) {
       setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Erro ao salvar notas." });
@@ -301,10 +391,28 @@ export default function OfficialAssessmentFormScreen({
     }
   };
 
-  const updateGradeField = (studentId: number, patch: Partial<GradeDraftRow>) => {
+  const updateGradeField = (studentId: number, subjectId: number, patch: Partial<GradeDraftRow>) => {
     setGrades((prev) =>
-      prev.map((g) => (g.student_id === studentId ? { ...g, ...patch } : g))
+      prev.map((g) =>
+        g.student_id === studentId && g.subject_id === subjectId ? { ...g, ...patch } : g
+      )
     );
+  };
+
+  const openGradesModal = () => {
+    if (!assessmentBackendId) {
+      setToast({ visible: true, type: "error", message: "Salve a avaliação antes de lançar notas." });
+      return;
+    }
+    if (!form.school_class_id) {
+      setToast({ visible: true, type: "error", message: "Selecione uma turma." });
+      return;
+    }
+    if (form.subject_ids.length === 0) {
+      setToast({ visible: true, type: "error", message: "Selecione ao menos uma disciplina." });
+      return;
+    }
+    setGradesModalVisible(true);
   };
 
   const openStudentReportCard = async (studentId: number) => {
@@ -441,6 +549,60 @@ export default function OfficialAssessmentFormScreen({
           modalTitle="Selecionar turma"
           error={errors.school_class_id}
         />
+
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-gray-700 mb-1">
+            Disciplinas <Text className="text-red-500">*</Text>
+          </Text>
+          <Text className="text-xs text-gray-400 mb-3">
+            Selecione as disciplinas avaliadas. O lançamento de notas é feito por disciplina.
+          </Text>
+          {subjectOptions.length === 0 ? (
+            <Text className="text-sm text-gray-400">Nenhuma disciplina disponível</Text>
+          ) : (
+            <View className="gap-2">
+              {subjectOptions.map((subject) => {
+                const selected = form.subject_ids.includes(subject.id);
+                const disabled = status === "published";
+                return (
+                  <TouchableOpacity
+                    key={subject.id}
+                    onPress={() => !disabled && toggleSubject(subject.id)}
+                    activeOpacity={0.7}
+                    disabled={disabled}
+                    className={`flex-row items-center gap-3 px-4 py-3 rounded-xl border ${
+                      selected ? "bg-violet-50 border-violet-200" : "bg-gray-50 border-gray-100"
+                    }`}
+                    style={{ opacity: disabled ? 0.65 : 1 }}
+                  >
+                    <Ionicons
+                      name={selected ? "checkbox" : "square-outline"}
+                      size={20}
+                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                    />
+                    <Text
+                      className={`text-sm font-medium ${
+                        selected ? "text-violet-700" : "text-gray-700"
+                      }`}
+                    >
+                      {subject.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+          {errors.subject_ids ? (
+            <Text className="text-xs text-red-500 mt-1">{errors.subject_ids}</Text>
+          ) : null}
+          {form.subject_ids.length > 0 ? (
+            <Text className="text-xs text-green-600 mt-2">
+              {form.subject_ids.length} disciplina{form.subject_ids.length !== 1 ? "s" : ""} selecionada
+              {form.subject_ids.length !== 1 ? "s" : ""}
+            </Text>
+          ) : null}
+        </View>
+
         <FormInput
           label="Título"
           required
@@ -553,12 +715,38 @@ export default function OfficialAssessmentFormScreen({
       </View>
 
       <View className="bg-white rounded-2xl p-6 mb-5" style={cardShadow}>
-        <View className="flex-row items-center gap-2 mb-5">
-          <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-            <Ionicons name="school-outline" size={16} color="#7C3AED" />
+        <View
+          className="mb-5"
+          style={{
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <View className="flex-row items-center gap-2 flex-1">
+            <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
+              <Ionicons name="school-outline" size={16} color="#7C3AED" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-semibold text-gray-800">Notas da turma</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">
+                Resumo por aluno e disciplina. Use o assistente para lançar passo a passo.
+              </Text>
+            </View>
           </View>
-          <Text className="text-base font-semibold text-gray-800">Lançamento de notas</Text>
+          <TouchableOpacity
+            onPress={openGradesModal}
+            disabled={status === "published"}
+            className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center justify-center gap-2"
+            activeOpacity={0.85}
+            style={{ opacity: status === "published" ? 0.6 : 1 }}
+          >
+            <Ionicons name="create-outline" size={16} color="white" />
+            <Text className="text-sm font-bold text-white">Lançar notas</Text>
+          </TouchableOpacity>
         </View>
+
         {selectedReportCard && (
           <View className="mb-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
             <Text className="text-sm font-semibold text-violet-900">
@@ -571,22 +759,63 @@ export default function OfficialAssessmentFormScreen({
             </Text>
           </View>
         )}
-        {!form.school_class_id ? (
-          <Text className="text-sm text-gray-500">Selecione uma turma para carregar os alunos.</Text>
-        ) : (
-          <OfficialAssessmentGradeStepper
-            grades={grades}
-            maxScore={form.max_score}
-            readOnly={status === "published"}
-            savingGrades={savingGrades}
-            canSaveGrades={!!assessmentBackendId}
-            loadingReportStudentId={loadingReportStudentId}
-            onUpdateGrade={updateGradeField}
-            onOpenReportCard={openStudentReportCard}
-            onSaveGrades={saveGrades}
-          />
-        )}
+
+        <OfficialAssessmentGradesTable
+          subjects={selectedSubjects}
+          grades={grades}
+          isMobile={isMobile}
+        />
       </View>
+
+      <Modal
+        visible={gradesModalVisible}
+        title="Lançar notas"
+        onClose={() => setGradesModalVisible(false)}
+        size="lg"
+        compact
+        footer={
+          <View
+            className="flex-row flex-wrap gap-2"
+            style={{ justifyContent: isMobile ? "center" : "flex-end" }}
+          >
+            <TouchableOpacity
+              onPress={() => setGradesModalVisible(false)}
+              className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={saveGrades}
+              disabled={!assessmentBackendId || savingGrades || status === "published"}
+              className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+              activeOpacity={0.85}
+              style={{
+                opacity: !assessmentBackendId || savingGrades || status === "published" ? 0.6 : 1,
+              }}
+            >
+              {savingGrades ? <ActivityIndicator size="small" color="white" /> : null}
+              <Ionicons name="save-outline" size={16} color="white" />
+              <Text className="text-sm font-bold text-white">
+                {savingGrades ? "Salvando..." : "Salvar notas"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        }
+      >
+        <OfficialAssessmentGradeStepper
+          subjects={selectedSubjects}
+          grades={grades}
+          maxScore={form.max_score}
+          readOnly={status === "published"}
+          savingGrades={savingGrades}
+          canSaveGrades={!!assessmentBackendId}
+          loadingReportStudentId={loadingReportStudentId}
+          onUpdateGrade={updateGradeField}
+          onOpenReportCard={openStudentReportCard}
+          hideSaveButton
+        />
+      </Modal>
 
       <ConfirmModal
         visible={publishModalVisible}

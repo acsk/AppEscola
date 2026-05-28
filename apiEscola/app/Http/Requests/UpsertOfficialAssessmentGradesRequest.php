@@ -36,7 +36,7 @@ class UpsertOfficialAssessmentGradesRequest extends FormRequest
         return [
             'grades' => ['required', 'array', 'min:1'],
             'grades.*.student_id' => ['required', 'integer', 'exists:students,id'],
-            'grades.*.subject_id' => ['nullable', 'integer', 'exists:subjects,id'],
+            'grades.*.subject_id' => ['required', 'integer', 'exists:subjects,id'],
             'grades.*.enrollment_id' => ['nullable', 'integer', 'exists:enrollments,id'],
             'grades.*.grade' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'grades.*.is_absent' => ['sometimes', 'boolean'],

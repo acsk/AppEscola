@@ -219,10 +219,11 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 
 ### Avaliações presenciais (`OfficialAssessmentFormScreen`)
 
-- Avaliação vinculada à **turma** (`school_class_id`); não exige seleção de disciplinas no formulário.
-- Lançamento de notas: `OfficialAssessmentGradeStepper` — **um aluno por vez** (ordem alfabética), barra de progresso, botões **Presente** / **Faltou**, uma nota por aluno.
-- API: `POST /official-assessments/{id}/grades` com `{ student_id, grade, is_absent, enrollment_id? }` (sem `subject_id` obrigatório).
-- Migration `2026_05_28_140000_official_assessment_grades_per_class`: unique `(official_assessment_id, student_id)`.
+- Avaliação vinculada à **turma** (`school_class_id`) e a uma ou mais **disciplinas** (`subject_ids` no formulário).
+- Abaixo do cadastro: `OfficialAssessmentGradesTable` (aluno × disciplinas: nome, matrícula, nota/falta).
+- Botão **Lançar notas** abre modal (`Modal` size `lg`) com `OfficialAssessmentGradeStepper` (passo a passo por disciplina, alunos em ordem alfabética; Presente/Faltou).
+- API: `POST /official-assessments/{id}/grades` com `{ student_id, subject_id, grade, is_absent, enrollment_id? }`.
+- Migration `2026_05_28_150000_official_assessment_grades_per_subject`: unique `(official_assessment_id, student_id, subject_id)`.
 
 ### Provas anteriores (`screens/provas-anteriores/PastExamsScreen.tsx`)
 
