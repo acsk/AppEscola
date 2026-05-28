@@ -1,12 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import FormInput from "../../components/ui/FormInput";
+import DatePickerInput from "../../components/ui/DatePickerInput";
 import SearchableSelect from "../../components/ui/SearchableSelect";
+import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { parseApiErrors } from "../../utils/apiErrors";
+import { displayToISO, isoToDisplay } from "../../utils/masks";
 import type {
   GradeDraftRow,
   OfficialAssessmentForm,
@@ -30,7 +35,7 @@ export default function OfficialAssessmentFormScreen({
   navigate,
   assessmentId,
 }: OfficialAssessmentFormScreenProps) {
-  const { contentPadding } = useResponsiveLayout();
+  const { contentPadding, isMobile } = useResponsiveLayout();
   const isEdit = assessmentId != null;
   const [loading, setLoading] = useState(isEdit);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -93,7 +98,7 @@ export default function OfficialAssessmentFormScreen({
     setForm({
       title: body.title ?? "",
       kind: body.kind ?? "presencial_bimestral",
-      assessment_date: body.assessment_date ?? "",
+      assessment_date: isoToDisplay(body.assessment_date ?? ""),
       school_class_id: body.school_class_id ? String(body.school_class_id) : "",
       subject_id: body.subject_id ? String(body.subject_id) : "",
       exam_type_id: body.exam_type_id ? String(body.exam_type_id) : "",
@@ -191,7 +196,7 @@ export default function OfficialAssessmentFormScreen({
       const payload = {
         title: form.title.trim(),
         kind: form.kind,
-        assessment_date: form.assessment_date,
+        assessment_date: displayToISO(form.assessment_date) || form.assessment_date,
         school_class_id: Number(form.school_class_id),
         subject_id: form.subject_id ? Number(form.subject_id) : null,
         exam_type_id: form.exam_type_id ? Number(form.exam_type_id) : null,
@@ -308,46 +313,97 @@ export default function OfficialAssessmentFormScreen({
     }
   };
 
+  const pageTitle = isEdit ? "Editar avaliação" : "Nova avaliação";
+  const cardShadow = {
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  } as const;
+
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
-        <ActivityIndicator color="#7C3AED" />
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator size="large" color="#7C3AED" />
       </View>
     );
   }
 
   if (isEdit && loadFailed) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 px-6">
-        <Text className="text-base font-semibold text-gray-900 text-center">
-          Não foi possível carregar esta avaliação.
-        </Text>
-        <Text className="text-sm text-gray-500 text-center mt-2">
-          Verifique sua conexão e tente novamente para evitar sobrescrever dados existentes.
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigate("avaliacoes-oficiais")}
-          className="mt-4 px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
-          activeOpacity={0.8}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
+      >
+        <ScreenBreadcrumb
+          items={[
+            { label: "Avaliações presenciais", onPress: () => navigate("avaliacoes-oficiais") },
+            { label: "Erro ao carregar" },
+          ]}
+        />
+        <View
+          className="bg-white rounded-2xl p-6 items-center"
+          style={cardShadow}
         >
-          <Text className="text-sm font-semibold text-gray-700">Voltar para lista</Text>
-        </TouchableOpacity>
-      </View>
+          <Ionicons name="alert-circle-outline" size={40} color="#E5E7EB" />
+          <Text className="text-base font-semibold text-gray-900 text-center mt-3">
+            Não foi possível carregar esta avaliação.
+          </Text>
+          <Text className="text-sm text-gray-500 text-center mt-2">
+            Verifique sua conexão e tente novamente para evitar sobrescrever dados existentes.
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigate("avaliacoes-oficiais")}
+            className="mt-5 px-5 py-2.5 rounded-xl border border-gray-200"
+            activeOpacity={0.8}
+          >
+            <Text className="text-sm font-semibold text-gray-700">Voltar para lista</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: contentPadding }}>
-      <View className="bg-white border border-gray-100 rounded-2xl p-5">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-xl font-bold text-gray-900">
-            {isEdit ? "Editar avaliação presencial" : "Nova avaliação presencial"}
+    <ScrollView
+      className="flex-1"
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      <ScreenBreadcrumb
+        items={[
+          { label: "Avaliações presenciais", onPress: () => navigate("avaliacoes-oficiais") },
+          { label: pageTitle },
+        ]}
+      />
+
+      <View
+        className="mb-6"
+        style={{
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <View className="flex-1">
+          <Text className="text-2xl font-bold text-gray-800">{pageTitle}</Text>
+          <Text className="text-sm text-gray-500 mt-1">
+            Cadastro da avaliação e lançamento de notas para o boletim
           </Text>
-          <View className={`px-2.5 py-1 rounded-full ${status === "published" ? "bg-emerald-100" : "bg-amber-100"}`}>
-            <Text className={`text-xs font-semibold ${status === "published" ? "text-emerald-700" : "text-amber-700"}`}>
-              {status === "published" ? "Publicada" : "Rascunho"}
-            </Text>
+        </View>
+        <Badge
+          slug={status}
+          label={status === "published" ? "Publicada" : "Rascunho"}
+        />
+      </View>
+
+      <View className="bg-white rounded-2xl p-6 mb-5" style={cardShadow}>
+        <View className="flex-row items-center gap-2 mb-5">
+          <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
+            <Ionicons name="clipboard-outline" size={16} color="#7C3AED" />
           </View>
+          <Text className="text-base font-semibold text-gray-800">Dados da avaliação</Text>
         </View>
 
         <SearchableSelect
@@ -357,9 +413,16 @@ export default function OfficialAssessmentFormScreen({
           options={classes}
           onChange={(v) => setField("school_class_id", v)}
           placeholder="Selecione a turma..."
+          modalTitle="Selecionar turma"
           error={errors.school_class_id}
         />
-        <FormInput label="Título" required value={form.title} onChangeText={(v) => setField("title", v)} error={errors.title} />
+        <FormInput
+          label="Título"
+          required
+          value={form.title}
+          onChangeText={(v) => setField("title", v)}
+          error={errors.title}
+        />
         <SearchableSelect
           label="Tipo"
           value={form.kind}
@@ -368,26 +431,48 @@ export default function OfficialAssessmentFormScreen({
           placeholder="Selecione o tipo..."
           showSelectedPreview={false}
         />
-        <View className="flex-row gap-3">
-          <View className="flex-1">
-            <FormInput
-              label="Data (YYYY-MM-DD)"
+        <View
+          style={{
+            flexDirection: isMobile ? "column" : "row",
+            gap: 12,
+          }}
+        >
+          <View style={{ flex: 1, minWidth: isMobile ? undefined : 0 }}>
+            <DatePickerInput
+              label="Data da avaliação"
               required
               value={form.assessment_date}
               onChangeText={(v) => setField("assessment_date", v)}
               error={errors.assessment_date}
             />
           </View>
-          <View className="flex-1">
-            <FormInput label="Nota máxima" value={form.max_score} onChangeText={(v) => setField("max_score", v)} error={errors.max_score} />
+          <View style={{ flex: 1, minWidth: isMobile ? undefined : 0 }}>
+            <FormInput
+              label="Nota máxima"
+              value={form.max_score}
+              onChangeText={(v) => setField("max_score", v)}
+              error={errors.max_score}
+              keyboardType="numeric"
+            />
           </View>
-          <View className="flex-1">
-            <FormInput label="Peso" value={form.weight} onChangeText={(v) => setField("weight", v)} error={errors.weight} />
+          <View style={{ flex: 1, minWidth: isMobile ? undefined : 0 }}>
+            <FormInput
+              label="Peso"
+              value={form.weight}
+              onChangeText={(v) => setField("weight", v)}
+              error={errors.weight}
+              keyboardType="numeric"
+            />
           </View>
         </View>
 
-        <View className="flex-row gap-3">
-          <View className="flex-1">
+        <View
+          style={{
+            flexDirection: isMobile ? "column" : "row",
+            gap: 12,
+          }}
+        >
+          <View style={{ flex: 1, minWidth: isMobile ? undefined : 0 }}>
             <SearchableSelect
               label="Disciplina"
               value={form.subject_id}
@@ -397,7 +482,7 @@ export default function OfficialAssessmentFormScreen({
               showSelectedPreview={false}
             />
           </View>
-          <View className="flex-1">
+          <View style={{ flex: 1, minWidth: isMobile ? undefined : 0 }}>
             <SearchableSelect
               label="Classificação"
               value={form.exam_type_id}
@@ -409,27 +494,65 @@ export default function OfficialAssessmentFormScreen({
           </View>
         </View>
 
-        <FormInput label="Observações" value={form.notes} onChangeText={(v) => setField("notes", v)} multiline numberOfLines={3} />
+        <FormInput
+          label="Observações"
+          value={form.notes}
+          onChangeText={(v) => setField("notes", v)}
+          multiline
+          numberOfLines={3}
+        />
 
-        <View className="flex-row gap-3 mt-2">
-          <TouchableOpacity onPress={() => navigate("avaliacoes-oficiais")} className="px-4 py-2.5 rounded-xl border border-gray-200">
-            <Text className="text-sm font-semibold text-gray-700">Voltar</Text>
+        <View
+          className="flex-row flex-wrap gap-3 pt-4 mt-2 border-t border-gray-100"
+          style={{ justifyContent: isMobile ? "center" : "flex-start" }}
+        >
+          <TouchableOpacity
+            onPress={() => navigate("avaliacoes-oficiais")}
+            className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white"
+            activeOpacity={0.85}
+          >
+            <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={save} disabled={saving || status === "published"} className="px-5 py-2.5 rounded-xl bg-violet-600">
-            <Text className="text-sm font-semibold text-white">{saving ? "Salvando..." : "Salvar avaliação"}</Text>
+          <TouchableOpacity
+            onPress={save}
+            disabled={saving || status === "published"}
+            className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+            activeOpacity={0.85}
+            style={{ opacity: saving || status === "published" ? 0.6 : 1 }}
+          >
+            {saving ? <ActivityIndicator size="small" color="white" /> : null}
+            <Text className="text-sm font-bold text-white">
+              {saving ? "Salvando..." : "Salvar avaliação"}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setPublishModalVisible(true)}
             disabled={!assessmentBackendId || publishing || status === "published"}
-            className={`px-5 py-2.5 rounded-xl ${status === "published" ? "bg-emerald-600" : "bg-amber-600"}`}
+            className={`px-5 py-2.5 rounded-xl flex-row items-center gap-2 ${
+              status === "published" ? "bg-emerald-600" : "bg-amber-500"
+            }`}
+            activeOpacity={0.85}
+            style={{ opacity: !assessmentBackendId || publishing || status === "published" ? 0.6 : 1 }}
           >
-            <Text className="text-sm font-semibold text-white">{status === "published" ? "Publicada" : "Publicar"}</Text>
+            <Ionicons
+              name={status === "published" ? "checkmark-circle" : "megaphone-outline"}
+              size={16}
+              color="white"
+            />
+            <Text className="text-sm font-bold text-white">
+              {status === "published" ? "Publicada" : "Publicar"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <View className="bg-white border border-gray-100 rounded-2xl p-5 mt-5">
-        <Text className="text-lg font-bold text-gray-900 mb-3">Lançamento de notas</Text>
+      <View className="bg-white rounded-2xl p-6 mb-5" style={cardShadow}>
+        <View className="flex-row items-center gap-2 mb-5">
+          <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
+            <Ionicons name="school-outline" size={16} color="#7C3AED" />
+          </View>
+          <Text className="text-base font-semibold text-gray-800">Lançamento de notas</Text>
+        </View>
         {selectedReportCard && (
           <View className="mb-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
             <Text className="text-sm font-semibold text-violet-900">
@@ -488,9 +611,16 @@ export default function OfficialAssessmentFormScreen({
             <TouchableOpacity
               onPress={saveGrades}
               disabled={!assessmentBackendId || savingGrades || status === "published"}
-              className="mt-2 self-start px-5 py-2.5 rounded-xl bg-violet-600"
+              className="mt-3 self-start px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+              activeOpacity={0.85}
+              style={{
+                opacity: !assessmentBackendId || savingGrades || status === "published" ? 0.6 : 1,
+              }}
             >
-              <Text className="text-sm font-semibold text-white">{savingGrades ? "Salvando notas..." : "Salvar notas"}</Text>
+              {savingGrades ? <ActivityIndicator size="small" color="white" /> : null}
+              <Text className="text-sm font-bold text-white">
+                {savingGrades ? "Salvando notas..." : "Salvar notas"}
+              </Text>
             </TouchableOpacity>
           </View>
         )}

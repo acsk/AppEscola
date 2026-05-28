@@ -122,6 +122,7 @@ input:focus, select:focus, textarea:focus {
 | Modal padrão | `Modal.tsx` (`compact`, `showScrollIndicator`, `maxHeight`) |
 | Confirmação exclusão | `ConfirmModal.tsx` |
 | Toast | `ToastBanner.tsx` |
+| Breadcrumb (subtelas) | `ScreenBreadcrumb.tsx` |
 | Paginação | `Pagination.tsx` |
 | Export PDF em grid | `GridPdfExportButton.tsx` |
 | Upload PDF | `PdfFileUploadField.tsx` |
@@ -174,6 +175,22 @@ Padrão de telas como **Alunos**, **Turmas**, **Relatório turmas/alunos** (`scr
 - Não criar rotas duplicadas nem quebrar fluxo de login/autenticação
 - Respeitar permissões do usuário logado
 - Botões que navegam devem usar `navigate(screen, params)` — testar também **recarregar a página** com o hash (F5)
+
+### Breadcrumbs (obrigatório em subtelas)
+
+Toda **subtela** (formulário novo/editar, detalhe, passo secundário, fluxo aninhado) deve exibir breadcrumb no topo — **não** só o título solto.
+
+- Componente: `components/ui/ScreenBreadcrumb.tsx`
+- Padrão visual (igual Matrículas / Turmas): primeiro nível clicável com `chevron-back` violeta; níveis intermediários clicáveis; último nível = página atual em `text-gray-500`
+- Exemplo avaliação presencial: `Avaliações presenciais` → `Nova avaliação` ou `Editar avaliação`
+- Exemplo matrícula: `Matrículas` → `Nova Matrícula`
+- Listagens principais do menu (ex.: `#/matriculas`, `#/alunos`) **não** precisam de breadcrumb
+
+### Fundo e cards em formulários
+
+- O fundo da área útil vem do `App.tsx` (`#EEEEFF`) — **não** usar `bg-gray-50` no `ScrollView` da página (deixa a tela mais clara que o restante do painel)
+- Conteúdo em cards brancos (`bg-white rounded-2xl p-6`, sombra leve), como `EnrollmentFormScreen` / `SchoolClassFormScreen`
+- Cabeçalho (`text-2xl` + subtítulo) **fora** do card, abaixo do breadcrumb
 
 ### Rotas (hash)
 
