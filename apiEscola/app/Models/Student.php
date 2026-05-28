@@ -90,4 +90,9 @@ class Student extends Model
     {
         return $this->hasMany(StudentNotification::class);
     }
+
+    public function officialAssessmentGrades(): HasMany
+    {
+        return $this->hasMany(OfficialAssessmentGrade::class);
+    }
 }

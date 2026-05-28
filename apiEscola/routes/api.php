@@ -43,6 +43,7 @@ use App\Http\Controllers\Api\StudentNotificationController;
 use App\Http\Controllers\Api\CalendarEventController;
 use App\Http\Controllers\Api\StudentCalendarController;
 use App\Http\Controllers\Api\PastExamController;
+use App\Http\Controllers\Api\OfficialAssessmentController;
 use App\Http\Controllers\Api\StudentPastExamController;
 use App\Http\Controllers\Api\ExamTypeController;
 use App\Http\Controllers\Api\ReportController;
@@ -275,6 +276,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('past-exams/upload', [PastExamController::class, 'uploadFile']);
     Route::post('past-exams/{pastExam}/replace-file', [PastExamController::class, 'replaceFile']);
     Route::apiResource('past-exams', PastExamController::class);
+
+    // Avaliações oficiais (presenciais para boletim)
+    Route::apiResource('official-assessments', OfficialAssessmentController::class);
+    Route::post('official-assessments/{officialAssessment}/grades', [OfficialAssessmentController::class, 'upsertGrades']);
+    Route::post('official-assessments/{officialAssessment}/publish', [OfficialAssessmentController::class, 'publish']);
+    Route::get('students/{student}/report-card', [OfficialAssessmentController::class, 'studentReportCard']);
 
     // Simulados
     Route::apiResource('exams', ExamController::class);

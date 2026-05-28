@@ -126,6 +126,37 @@ Antes de alterar endpoint, campo, paginação ou validação:
 3. Plano resumido → passos pequenos → listar arquivos alterados
 4. Sugerir teste manual ou `php artisan test`
 
+## Checklist anti-regressão (obrigatório antes de concluir)
+
+Use esta lista para evitar bugs recorrentes de consistência e auditoria:
+
+1. **Validação vs migration (NÃO divergir)**
+   - Se um campo é `required` no Form Request, a coluna no banco **não pode ser nullable**.
+   - Se a coluna é `nullable`, o Request deve aceitar `nullable`/`sometimes`.
+   - Sempre comparar Request + migration + regra de negócio antes de finalizar.
+
+2. **`TracksUserActivity` (não duplicar auditoria manual)**
+   - Modelos com `TracksUserActivity` **já** preenchem `created_by` e `updated_by` via `Auth::id()`.
+   - Em controllers desses modelos, não setar `created_by`/`updated_by` manualmente, salvo necessidade excepcional documentada.
+   - Evitar mistura de fontes (`$request->user()?->id` vs `Auth::id()`) para não gerar inconsistência.
+
+3. **`updateOrCreate` e campos de criação**
+   - Nunca passar `created_by` (ou campos “imutáveis de criação”) no array de update do `updateOrCreate`.
+   - Para preservar auditoria, preferir `firstOrNew` + `save()` e setar `created_by` **apenas** quando `!$model->exists`.
+
+4. **Escopo de tenant em FKs**
+   - Não basta `exists:table,id`: validar também se a entidade pertence ao mesmo `tenant_id`.
+   - Aplicar essa verificação para `course_id`, `school_class_id`, `subject_id`, `exam_type_id`, `student_id`, `enrollment_id` etc.
+
+5. **Publicação e imutabilidade**
+   - Se recurso publicado não deve ser alterado, bloquear update/delete no controller e documentar a regra.
+   - Garantir que endpoints de lançamento respeitem o status (`draft`/`published`).
+
+6. **Verificação final mínima**
+   - Rodar lints dos arquivos alterados.
+   - Conferir rotas novas com `php artisan route:list`.
+   - Validar payload de create/update com pelo menos 1 cenário feliz e 1 cenário de erro.
+
 ## Ambiente Docker
 
 Arquivos: `docker-compose.yml` (desenvolvimento local) e `docker-compose.prod.yml` (produção em VPS com imagem baked-in).

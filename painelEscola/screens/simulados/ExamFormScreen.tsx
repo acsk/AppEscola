@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
@@ -26,7 +25,6 @@ import {
   isoToDisplayDateTime,
   isValidDisplayDateTime,
 } from "../../utils/masks";
-import { prepareImageForUpload } from "../../utils/imageCompression";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
 import { mapExamQuestionToPreview } from "../../components/simulados/examPreviewUtils";
@@ -139,8 +137,8 @@ function validateExam(form: ExamForm): Record<string, string> {
 function validateQuestionEnunciado(form: ExamQuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
-  if (!form.question_text.trim() && !form.image_url.trim()) {
-    errs.enunciado = "Informe o texto do enunciado, envie uma imagem, ou ambos.";
+  if (!form.question_text.trim()) {
+    errs.enunciado = "Informe o texto do enunciado.";
   }
   if (form.points) {
     const pts = Number(form.points);
@@ -187,7 +185,6 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const effectiveExamId = examId ?? savedExamId;
   const canManageContent = effectiveExamId != null;
   const scrollRef = useRef<ScrollView>(null);
-  const questionImageInputRef = useRef<HTMLInputElement | null>(null);
   const supportMaterialFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Domain hooks
@@ -202,6 +199,10 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const releaseOptions: SelectOption[] = [
     { value: "false", label: "Liberar assim que corrigir" },
     { value: "true", label: "Liberar só após o fim do período" },
+  ];
+  const supportMaterialTypeOptions: SearchableOption[] = [
+    { value: "link", label: "Link" },
+    { value: "file", label: "Arquivo" },
   ];
 
   // Exam form state
@@ -223,11 +224,9 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const [qForm, setQForm] = useState<ExamQuestionForm>(EMPTY_QUESTION);
   const [qErrors, setQErrors] = useState<Record<string, string>>({});
   const [savingQuestion, setSavingQuestion] = useState(false);
-  const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
-  const [questionImageRatios, setQuestionImageRatios] = useState<Record<string, number>>({});
 
   // Support materials state
   const [supportMaterials, setSupportMaterials] = useState<ExamSupportMaterial[]>([]);
@@ -256,26 +255,6 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
   }, []);
-
-  const ensureQuestionImageRatio = useCallback((imageUrl: string) => {
-    if (!imageUrl || questionImageRatios[imageUrl]) return;
-    Image.getSize(
-      imageUrl,
-      (width, height) => {
-        if (!width || !height) return;
-        setQuestionImageRatios((prev) => {
-          if (prev[imageUrl]) return prev;
-          return { ...prev, [imageUrl]: width / height };
-        });
-      },
-      () => {
-        setQuestionImageRatios((prev) => {
-          if (prev[imageUrl]) return prev;
-          return { ...prev, [imageUrl]: 1.4 };
-        });
-      }
-    );
-  }, [questionImageRatios]);
 
   // ── Loaders ─────────────────────────────────────────────────────────────────
 
@@ -506,46 +485,6 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
   const setQField = (k: keyof ExamQuestionForm, v: any) =>
     setQForm((prev) => ({ ...prev, [k]: v }));
-
-  const uploadQuestionImage = async (file: File) => {
-    if (!effectiveExamId) return;
-    setUploadingQuestionImage(true);
-    try {
-      const compressed = await prepareImageForUpload(file, 100);
-      const formData = new FormData();
-      formData.append("image", compressed);
-      const { data } = await api.post(`/exams/${effectiveExamId}/questions/upload-image`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const response = data.body ?? data.data ?? data;
-      if (response?.image_url) {
-        setQField("image_url", response.image_url);
-        setQErrors((prev) => {
-          const next = { ...prev };
-          delete next.enunciado;
-          delete next.image_url;
-          return next;
-        });
-      }
-    } catch (err: any) {
-      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
-      setQErrors((prev) => ({
-        ...prev,
-        image_url:
-          apiErrs.image ||
-          apiErrs.image_url ||
-          apiErrs.file ||
-          "Não foi possível enviar a imagem.",
-      }));
-      setToast({
-        visible: true,
-        type: "error",
-        message: err?.response?.data?.message || "Não foi possível enviar a imagem.",
-      });
-    } finally {
-      setUploadingQuestionImage(false);
-    }
-  };
 
   const setOptionField = (idx: number, k: keyof ExamOptionForm, v: any) => {
     setQForm((prev) => {
@@ -819,12 +758,6 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     }
     prevExamIdRef.current = examId;
   }, [examId]);
-
-  useEffect(() => {
-    questions.forEach((question) => {
-      if (question.image_url) ensureQuestionImageRatio(question.image_url);
-    });
-  }, [questions, ensureQuestionImageRatio]);
 
   useEffect(() => {
     if (canManageContent) fetchSupportMaterials();
@@ -1726,7 +1659,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               />
               {!qErrors.enunciado && (
                 <Text className="text-xs text-gray-400 mt-1">
-                  Texto e/ou imagem — pelo menos um é necessário.
+                  Campo obrigatório.
                 </Text>
               )}
             </View>
@@ -1785,46 +1718,9 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               }}
             >
               <Text className="text-sm font-semibold text-gray-700 mb-2">Mídia (opcional)</Text>
-              <View className="flex-row items-center gap-3 flex-wrap">
-                <TouchableOpacity
-                  onPress={() => questionImageInputRef.current?.click()}
-                  disabled={uploadingQuestionImage}
-                  className="flex-row items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white"
-                  activeOpacity={0.85}
-                >
-                  {uploadingQuestionImage ? (
-                    <ActivityIndicator color="#7C3AED" size="small" />
-                  ) : (
-                    <Ionicons name="image-outline" size={16} color="#7C3AED" />
-                  )}
-                  <Text className="text-sm font-medium text-gray-700">
-                    {qForm.image_url ? "Trocar imagem" : "Enviar imagem"}
-                  </Text>
-                </TouchableOpacity>
-                {qForm.image_url ? (
-                  <View className="flex-row items-center gap-2">
-                    <Image
-                      source={{ uri: qForm.image_url }}
-                      style={{ width: 80, height: 56, borderRadius: 8, backgroundColor: "#E5E7EB" }}
-                      resizeMode="cover"
-                    />
-                    <TouchableOpacity onPress={() => setQField("image_url", "")} activeOpacity={0.7}>
-                      <Text className="text-xs font-semibold text-red-600">Remover</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-              </View>
-              <input
-                ref={questionImageInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e: any) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadQuestionImage(file);
-                  e.target.value = "";
-                }}
-              />
+              <Text className="text-xs text-gray-500 mb-2">
+                Upload de imagem bloqueado para o enunciado.
+              </Text>
               <View className="mt-3">
                 <FormInput
                   label="URL do vídeo"
@@ -2002,23 +1898,21 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           />
         </View>
 
-        <View className="mb-3">
-          <FormSelect
-            label="Tipo"
-            value={supportMaterialForm.type}
-            options={[
-              { value: "link", label: "Link" },
-              { value: "file", label: "Arquivo" },
-            ]}
-            onChange={(v) =>
-              setSupportMaterialForm((prev) => ({
-                ...prev,
-                type: v as "link" | "file",
-                content: v === "file" && !editSupportMaterialId ? "" : prev.content,
-              }))
-            }
-          />
-        </View>
+        <SearchableSelect
+          label="Tipo"
+          value={supportMaterialForm.type}
+          options={supportMaterialTypeOptions}
+          placeholder="Selecionar tipo..."
+          modalTitle="Selecionar tipo de material"
+          showSelectedPreview={false}
+          onChange={(v) =>
+            setSupportMaterialForm((prev) => ({
+              ...prev,
+              type: v as "link" | "file",
+              content: v === "file" && !editSupportMaterialId ? "" : prev.content,
+            }))
+          }
+        />
 
         {supportMaterialForm.type === "link" ? (
           <FormInput
