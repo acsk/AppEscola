@@ -202,9 +202,6 @@ class OfficialAssessmentController extends Controller
         }
 
         $maxScore = (float) $officialAssessment->max_score;
-        if ($officialAssessment->linkedSubjectIds()->isEmpty()) {
-            return $this->error('Cadastre ao menos uma disciplina na avaliação antes de lançar notas.', null, 422);
-        }
 
         DB::transaction(function () use ($rows, $officialAssessment, $tenantId, $maxScore) {
             $lockedAssessment = OfficialAssessment::query()
@@ -223,25 +220,22 @@ class OfficialAssessmentController extends Controller
             }
 
             $lockedSubjectIds = $lockedAssessment->linkedSubjectIds()->all();
-            if ($lockedSubjectIds === []) {
-                abort(422, 'Cadastre ao menos uma disciplina na avaliação antes de lançar notas.');
-            }
-
-            $gradeSumByStudent = [];
 
             foreach ($rows as $row) {
                 $studentId = (int) $row['student_id'];
-                $subjectId = (int) $row['subject_id'];
+                $subjectId = array_key_exists('subject_id', $row) && $row['subject_id'] !== null
+                    ? (int) $row['subject_id']
+                    : null;
 
-                if (! in_array($subjectId, $lockedSubjectIds, true)) {
+                if ($subjectId !== null && $lockedSubjectIds !== [] && ! in_array($subjectId, $lockedSubjectIds, true)) {
                     abort(422, "A disciplina {$subjectId} não pertence a esta avaliação.");
                 }
                 $grade = array_key_exists('grade', $row) ? $row['grade'] : null;
                 $isAbsent = (bool) ($row['is_absent'] ?? false);
                 $enrollmentId = $row['enrollment_id'] ?? null;
 
-                if ($grade !== null && ! $isAbsent) {
-                    $gradeSumByStudent[$studentId] = ($gradeSumByStudent[$studentId] ?? 0) + (float) $grade;
+                if ($grade !== null && ! $isAbsent && (float) $grade > $maxScore) {
+                    abort(422, "Nota do aluno {$studentId} excede a nota máxima ({$maxScore}).");
                 }
 
                 if ($enrollmentId !== null) {
@@ -259,10 +253,25 @@ class OfficialAssessmentController extends Controller
                     }
                 }
 
-                $gradeRow = OfficialAssessmentGrade::query()->firstOrNew([
+                $existingGrades = OfficialAssessmentGrade::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('official_assessment_id', $lockedAssessment->id)
+                    ->where('student_id', $studentId)
+                    ->orderByRaw('graded_at IS NULL ASC')
+                    ->orderByDesc('graded_at')
+                    ->orderByDesc('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($existingGrades->count() > 1) {
+                    OfficialAssessmentGrade::query()
+                        ->whereIn('id', $existingGrades->slice(1)->pluck('id'))
+                        ->delete();
+                }
+
+                $gradeRow = $existingGrades->first() ?? new OfficialAssessmentGrade([
                     'official_assessment_id' => $lockedAssessment->id,
                     'student_id' => $studentId,
-                    'subject_id' => $subjectId,
                 ]);
 
                 $gradeRow->tenant_id = $tenantId;
@@ -274,12 +283,6 @@ class OfficialAssessmentController extends Controller
                 $gradeRow->graded_at = now();
 
                 $gradeRow->save();
-            }
-
-            foreach ($gradeSumByStudent as $studentId => $totalGrade) {
-                if ($totalGrade > $maxScore) {
-                    abort(422, "A soma das notas do aluno {$studentId} excede a nota máxima ({$maxScore}).");
-                }
             }
         });
 
@@ -459,7 +462,7 @@ class OfficialAssessmentController extends Controller
     private function assertSubjectIdsBelongToTenant(int $tenantId, array $subjectIds): void
     {
         if ($subjectIds === []) {
-            abort(422, 'Selecione ao menos uma disciplina para a avaliação.');
+            return;
         }
 
         $valid = DB::table('subjects')
