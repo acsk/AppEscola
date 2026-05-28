@@ -29,7 +29,6 @@ export type OfficialAssessmentForm = {
   kind: string;
   assessment_date: string;
   school_class_id: string;
-  subject_ids: number[];
   exam_type_id: string;
   max_score: string;
   weight: string;
@@ -37,11 +36,10 @@ export type OfficialAssessmentForm = {
   notes: string;
 };
 
+/** Uma nota por aluno na turma da avaliação. */
 export type GradeDraftRow = {
   student_id: number;
-  subject_id: number;
   student_name: string;
-  subject_name: string;
   enrollment_number: string | null;
   enrollment_id: number | null;
   is_absent: boolean;

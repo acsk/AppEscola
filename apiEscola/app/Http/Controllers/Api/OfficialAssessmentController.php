@@ -202,9 +202,6 @@ class OfficialAssessmentController extends Controller
         }
 
         $maxScore = (float) $officialAssessment->max_score;
-        if ($officialAssessment->linkedSubjectIds()->isEmpty()) {
-            return $this->error('Cadastre ao menos uma disciplina na avaliação antes de lançar notas.', null, 422);
-        }
 
         DB::transaction(function () use ($rows, $officialAssessment, $tenantId, $maxScore) {
             $lockedAssessment = OfficialAssessment::query()
@@ -223,15 +220,14 @@ class OfficialAssessmentController extends Controller
             }
 
             $lockedSubjectIds = $lockedAssessment->linkedSubjectIds()->all();
-            if ($lockedSubjectIds === []) {
-                abort(422, 'Cadastre ao menos uma disciplina na avaliação antes de lançar notas.');
-            }
 
             foreach ($rows as $row) {
                 $studentId = (int) $row['student_id'];
-                $subjectId = (int) $row['subject_id'];
+                $subjectId = array_key_exists('subject_id', $row) && $row['subject_id'] !== null
+                    ? (int) $row['subject_id']
+                    : null;
 
-                if (! in_array($subjectId, $lockedSubjectIds, true)) {
+                if ($subjectId !== null && $lockedSubjectIds !== [] && ! in_array($subjectId, $lockedSubjectIds, true)) {
                     abort(422, "A disciplina {$subjectId} não pertence a esta avaliação.");
                 }
                 $grade = array_key_exists('grade', $row) ? $row['grade'] : null;
@@ -260,7 +256,6 @@ class OfficialAssessmentController extends Controller
                 $gradeRow = OfficialAssessmentGrade::query()->firstOrNew([
                     'official_assessment_id' => $lockedAssessment->id,
                     'student_id' => $studentId,
-                    'subject_id' => $subjectId,
                 ]);
 
                 $gradeRow->tenant_id = $tenantId;
@@ -451,7 +446,7 @@ class OfficialAssessmentController extends Controller
     private function assertSubjectIdsBelongToTenant(int $tenantId, array $subjectIds): void
     {
         if ($subjectIds === []) {
-            abort(422, 'Selecione ao menos uma disciplina para a avaliação.');
+            return;
         }
 
         $valid = DB::table('subjects')

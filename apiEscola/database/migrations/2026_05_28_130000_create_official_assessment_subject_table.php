@@ -25,8 +25,8 @@ return new class extends Migration
                 ->select([
                     'id as official_assessment_id',
                     'subject_id',
-                    DB::raw('NOW() as created_at'),
-                    DB::raw('NOW() as updated_at'),
+                    DB::raw('CURRENT_TIMESTAMP as created_at'),
+                    DB::raw('CURRENT_TIMESTAMP as updated_at'),
                 ])
         );
     }

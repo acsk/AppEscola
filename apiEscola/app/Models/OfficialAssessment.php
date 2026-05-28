@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\TracksUserActivity;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -13,7 +14,7 @@ use Illuminate\Support\Collection;
 
 class OfficialAssessment extends Model
 {
-    use SoftDeletes, TracksUserActivity;
+    use HasFactory, SoftDeletes, TracksUserActivity;
 
     public const STATUS_DRAFT = 'draft';
     public const STATUS_PUBLISHED = 'published';

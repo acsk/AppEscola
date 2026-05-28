@@ -309,14 +309,19 @@ Rodar testes dentro do container PHP (`app`):
 
 ```bash
 cd apiEscola
-docker compose exec app php artisan test
+# Migrations com SQL MySQL: usar phpunit.mysql.xml (banco appescola_test no service db)
+docker compose exec db mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS appescola_test; GRANT ALL ON appescola_test.* TO 'appescola'@'%'; FLUSH PRIVILEGES;"
+docker compose exec app php artisan test -c phpunit.mysql.xml
 ```
 
 Filtrar suíte ou teste:
 
 ```bash
+docker compose exec app php artisan test -c phpunit.mysql.xml --filter=OfficialAssessmentTest
 docker compose exec app php artisan test --filter='PastExamDateTest|StorePastExamRequestScheduleTest'
 ```
+
+**Avaliações presenciais:** `tests/Feature/OfficialAssessmentTest.php` (CRUD, notas por turma, publicação, boletim).
 
 Outros comandos artisan no container:
 
