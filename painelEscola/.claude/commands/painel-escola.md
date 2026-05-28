@@ -261,11 +261,11 @@ Lógica central em `utils/pastExamSchedule.ts` + `PastExamScheduleFields.tsx`:
 
 ## Deploy web (Hostinger / `painel.appcurso.com.br`)
 
-Após `npm run web:build`, publicar **toda** a pasta `dist/`, inclusive `dist/_expo/static/` (~11 MB de JS/CSS hashados).
+Igual ao **mobileEscola**: após `npm run web:build`, commitar **juntos** `dist/index.html` e `dist/_expo/static/**` (o git deploy no Hostinger só puxa o que está no repositório).
 
-- `dist/_expo/static/` está no `.gitignore` — **não vai no git**; deploy por FTP/rsync/Git Deploy precisa enviar essa pasta manualmente ou gerar o build no servidor.
-- O `.htaccess` na raiz mapeia `/_expo/...` → `dist/_expo/...`. Se o arquivo não existir no servidor, **não** deve cair em `index.html` (senão o browser mostra `Unexpected token '<'` com status 200).
-- Validar produção: `curl -sI https://painel.appcurso.com.br/_expo/static/js/web/index-*.js` deve retornar `content-type: application/javascript`, não `text/html`.
+- Não colocar `dist/_expo/static/` no `.gitignore` — isso quebra o deploy se só o HTML for commitado.
+- O `.htaccess` mapeia `/_expo/...` → `dist/_expo/...` quando o arquivo existe em disco.
+- Opcional: `npm run web:pack` gera ZIP para upload manual se não usar git.
 
 ## Comandos úteis
 
