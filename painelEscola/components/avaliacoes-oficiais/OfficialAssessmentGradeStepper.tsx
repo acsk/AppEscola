@@ -18,6 +18,8 @@ type Props = {
   readOnly: boolean;
   savingGrades?: boolean;
   canSaveGrades?: boolean;
+  /** Apenas um aluno (lançamento individual); oculta navegação e barra da turma */
+  focusStudentId?: number | null;
   onUpdateGrade: (studentId: number, subjectId: number, patch: Partial<GradeDraftRow>) => void;
   onSaveGrades?: () => void;
   hideSaveButton?: boolean;
@@ -149,10 +151,12 @@ export default function OfficialAssessmentGradeStepper({
   readOnly,
   savingGrades = false,
   canSaveGrades = true,
+  focusStudentId = null,
   onUpdateGrade,
   onSaveGrades,
   hideSaveButton = false,
 }: Props) {
+  const singleMode = focusStudentId != null;
   const [stepIndex, setStepIndex] = useState(0);
 
   const sortedSubjects = useMemo(
@@ -179,10 +183,14 @@ export default function OfficialAssessmentGradeStepper({
         });
       }
     });
-    return Array.from(studentMap.values()).sort((a, b) =>
+    const list = Array.from(studentMap.values()).sort((a, b) =>
       a.student_name.localeCompare(b.student_name, "pt-BR", { sensitivity: "base" })
     );
-  }, [grades]);
+    if (focusStudentId != null) {
+      return list.filter((s) => s.student_id === focusStudentId);
+    }
+    return list;
+  }, [grades, focusStudentId]);
 
   const totalSteps = steps.length;
   const maxScoreNum = parseGrade(maxScore) ?? 10;
@@ -233,22 +241,24 @@ export default function OfficialAssessmentGradeStepper({
 
   return (
     <View>
-      <View className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 mb-3">
-        <View className="flex-row items-center justify-between mb-1">
-          <Text className="text-xs font-semibold text-gray-800">
-            Aluno {stepIndex + 1} de {totalSteps}
-          </Text>
-          <Text className="text-[11px] font-semibold text-violet-700">
-            {completedCount}/{totalSteps} concluídos
+      {!singleMode ? (
+        <View className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 mb-3">
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-xs font-semibold text-gray-800">
+              Aluno {stepIndex + 1} de {totalSteps}
+            </Text>
+            <Text className="text-[11px] font-semibold text-violet-700">
+              {completedCount}/{totalSteps} concluídos
+            </Text>
+          </View>
+          <View className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+            <View className="h-full rounded-full bg-violet-600" style={{ width: `${progressPct}%` }} />
+          </View>
+          <Text className="text-[10px] text-gray-500 mt-1">
+            Todas as disciplinas na mesma tela • ordem alfabética
           </Text>
         </View>
-        <View className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-          <View className="h-full rounded-full bg-violet-600" style={{ width: `${progressPct}%` }} />
-        </View>
-        <Text className="text-[10px] text-gray-500 mt-1">
-          Todas as disciplinas na mesma tela • ordem alfabética
-        </Text>
-      </View>
+      ) : null}
 
       {current ? (
         <>
@@ -321,28 +331,30 @@ export default function OfficialAssessmentGradeStepper({
         </>
       ) : null}
 
-      <View className="flex-row gap-2">
-        <TouchableOpacity
-          onPress={() => setStepIndex((i) => Math.max(0, i - 1))}
-          disabled={stepIndex === 0}
-          className="flex-1 flex-row items-center justify-center gap-1 px-3 py-2 rounded-lg border border-gray-200 bg-white"
-          activeOpacity={0.85}
-          style={{ opacity: stepIndex === 0 ? 0.45 : 1 }}
-        >
-          <Ionicons name="chevron-back" size={16} color="#4B5563" />
-          <Text className="text-xs font-semibold text-gray-700">Anterior</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setStepIndex((i) => Math.min(totalSteps - 1, i + 1))}
-          disabled={stepIndex >= totalSteps - 1}
-          className="flex-1 flex-row items-center justify-center gap-1 px-3 py-2 rounded-lg bg-violet-600"
-          activeOpacity={0.85}
-          style={{ opacity: stepIndex >= totalSteps - 1 ? 0.45 : 1 }}
-        >
-          <Text className="text-xs font-bold text-white">Próximo</Text>
-          <Ionicons name="chevron-forward" size={16} color="white" />
-        </TouchableOpacity>
-      </View>
+      {!singleMode && totalSteps > 1 ? (
+        <View className="flex-row gap-2">
+          <TouchableOpacity
+            onPress={() => setStepIndex((i) => Math.max(0, i - 1))}
+            disabled={stepIndex === 0}
+            className="flex-1 flex-row items-center justify-center gap-1 px-3 py-2 rounded-lg border border-gray-200 bg-white"
+            activeOpacity={0.85}
+            style={{ opacity: stepIndex === 0 ? 0.45 : 1 }}
+          >
+            <Ionicons name="chevron-back" size={16} color="#4B5563" />
+            <Text className="text-xs font-semibold text-gray-700">Anterior</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setStepIndex((i) => Math.min(totalSteps - 1, i + 1))}
+            disabled={stepIndex >= totalSteps - 1}
+            className="flex-1 flex-row items-center justify-center gap-1 px-3 py-2 rounded-lg bg-violet-600"
+            activeOpacity={0.85}
+            style={{ opacity: stepIndex >= totalSteps - 1 ? 0.45 : 1 }}
+          >
+            <Text className="text-xs font-bold text-white">Próximo</Text>
+            <Ionicons name="chevron-forward" size={16} color="white" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {!hideSaveButton && onSaveGrades ? (
         <TouchableOpacity

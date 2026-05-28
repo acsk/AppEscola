@@ -219,8 +219,9 @@ Telas aninhadas precisam de ramo em **`hashToNav` e `navToHash`** (não basta o 
 ### Avaliações presenciais (`OfficialAssessmentFormScreen`)
 
 - Avaliação vinculada à **turma** (`school_class_id`) e a uma ou mais **disciplinas** (`subject_ids` no formulário).
-- Abaixo do cadastro: `OfficialAssessmentGradesTable` (aluno × disciplinas: nome, matrícula, nota/falta; filtro por aluno/matrícula; colunas 100% no desktop).
-- Botão **Lançar notas** abre modal (`Modal` size `lg`) com `OfficialAssessmentGradeStepper` (um aluno por passo, **todas as disciplinas na mesma tela**; nota máxima vale para a **soma** das disciplinas; presença única por aluno).
+- Abaixo do cadastro: `OfficialAssessmentGradesTable` (aluno × disciplinas: nome, matrícula, nota/falta; filtro por aluno/matrícula; colunas 100% no desktop; ícone **Ação** = lançamento individual).
+- Botão **Lançar notas** abre modal em lote; ícone na linha abre o mesmo formulário só para aquele aluno (`focusStudentId` no stepper).
+- Modal: `OfficialAssessmentGradeStepper` (um aluno por passo no lote, **todas as disciplinas na mesma tela**; nota máxima = **soma** das disciplinas; presença única por aluno).
 - API: `POST /official-assessments/{id}/grades` com `{ student_id, subject_id, grade, is_absent, enrollment_id? }`.
 - Migration `2026_05_28_150000_official_assessment_grades_per_subject`: unique `(official_assessment_id, student_id, subject_id)`.
 

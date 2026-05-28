@@ -9,11 +9,14 @@ type Props = {
   subjects: SubjectCol[];
   grades: GradeDraftRow[];
   isMobile: boolean;
+  readOnly?: boolean;
+  onLaunchIndividual?: (studentId: number) => void;
 };
 
 const COL_ALUNO = { flex: 2.5, minWidth: 180 };
 const COL_MATRICULA = { flex: 1.1, minWidth: 120 };
 const COL_SUBJECT = { flex: 1, minWidth: 96 };
+const COL_ACTION = { width: 52 };
 
 function formatGradeCell(row: GradeDraftRow | undefined): { text: string; tone: "muted" | "absent" | "ok" } {
   if (!row) return { text: "—", tone: "muted" };
@@ -61,7 +64,14 @@ function renderCell(
   );
 }
 
-export default function OfficialAssessmentGradesTable({ subjects, grades, isMobile }: Props) {
+export default function OfficialAssessmentGradesTable({
+  subjects,
+  grades,
+  isMobile,
+  readOnly = false,
+  onLaunchIndividual,
+}: Props) {
+  const showActions = !!onLaunchIndividual && !readOnly;
   const [search, setSearch] = useState("");
 
   const students = useMemo(() => {
@@ -108,8 +118,9 @@ export default function OfficialAssessmentGradesTable({ subjects, grades, isMobi
     () =>
       COL_ALUNO.minWidth +
       COL_MATRICULA.minWidth +
-      sortedSubjects.length * COL_SUBJECT.minWidth,
-    [sortedSubjects.length]
+      sortedSubjects.length * COL_SUBJECT.minWidth +
+      (showActions ? COL_ACTION.width : 0),
+    [sortedSubjects.length, showActions]
   );
 
   if (subjects.length === 0) {
@@ -181,6 +192,19 @@ export default function OfficialAssessmentGradesTable({ subjects, grades, isMobi
                   center: true,
                 })
               )}
+              {showActions ? (
+                <View
+                  style={{
+                    width: COL_ACTION.width,
+                    minWidth: COL_ACTION.width,
+                    paddingHorizontal: 8,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text className="text-[11px] font-bold text-gray-600 uppercase">Ação</Text>
+                </View>
+              ) : null}
             </View>
 
             {filteredStudents.map((student, i) => (
@@ -211,6 +235,25 @@ export default function OfficialAssessmentGradesTable({ subjects, grades, isMobi
                     color,
                   });
                 })}
+                {showActions ? (
+                  <View
+                    style={{
+                      width: COL_ACTION.width,
+                      minWidth: COL_ACTION.width,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => onLaunchIndividual!(student.student_id)}
+                      className="p-1.5 rounded-lg bg-violet-50 border border-violet-200"
+                      activeOpacity={0.85}
+                      accessibilityLabel={`Lançar notas de ${student.student_name}`}
+                    >
+                      <Ionicons name="create-outline" size={16} color="#7C3AED" />
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
               </View>
             ))}
           </View>

@@ -57,6 +57,7 @@ export default function OfficialAssessmentFormScreen({
   const [subjectOptions, setSubjectOptions] = useState<{ id: number; name: string }[]>([]);
   const [examTypes, setExamTypes] = useState<{ value: string; label: string }[]>([]);
   const [gradesModalVisible, setGradesModalVisible] = useState(false);
+  const [gradesModalStudentId, setGradesModalStudentId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
     type: "success",
@@ -152,6 +153,12 @@ export default function OfficialAssessmentFormScreen({
         .filter((s): s is { id: number; name: string } => !!s),
     [form.subject_ids, subjectOptions]
   );
+
+  const gradesModalStudentName = useMemo(() => {
+    if (gradesModalStudentId == null) return null;
+    const row = grades.find((g) => g.student_id === gradesModalStudentId);
+    return row?.student_name ?? null;
+  }, [gradesModalStudentId, grades]);
 
   const mergeGradeMatrix = useCallback(
     (
@@ -341,9 +348,13 @@ export default function OfficialAssessmentFormScreen({
       return;
     }
     setSavingGrades(true);
+    const isIndividual = gradesModalStudentId != null;
+    const rowsToSave = isIndividual
+      ? grades.filter((g) => g.student_id === gradesModalStudentId)
+      : grades;
     try {
       const payload = {
-        grades: grades.map((g) => ({
+        grades: rowsToSave.map((g) => ({
           student_id: g.student_id,
           subject_id: g.subject_id,
           enrollment_id: g.enrollment_id,
@@ -353,8 +364,12 @@ export default function OfficialAssessmentFormScreen({
         })),
       };
       await api.post(`/official-assessments/${assessmentBackendId}/grades`, payload);
-      setGradesModalVisible(false);
-      setToast({ visible: true, type: "success", message: "Notas salvas com sucesso." });
+      closeGradesModal();
+      setToast({
+        visible: true,
+        type: "success",
+        message: isIndividual ? "Nota do aluno salva com sucesso." : "Notas salvas com sucesso.",
+      });
     } catch (e: any) {
       setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Erro ao salvar notas." });
     } finally {
@@ -393,7 +408,12 @@ export default function OfficialAssessmentFormScreen({
     );
   };
 
-  const openGradesModal = () => {
+  const closeGradesModal = () => {
+    setGradesModalVisible(false);
+    setGradesModalStudentId(null);
+  };
+
+  const openGradesModal = (studentId?: number) => {
     if (!assessmentBackendId) {
       setToast({ visible: true, type: "error", message: "Salve a avaliação antes de lançar notas." });
       return;
@@ -406,6 +426,7 @@ export default function OfficialAssessmentFormScreen({
       setToast({ visible: true, type: "error", message: "Selecione ao menos uma disciplina." });
       return;
     }
+    setGradesModalStudentId(studentId ?? null);
     setGradesModalVisible(true);
   };
 
@@ -694,12 +715,12 @@ export default function OfficialAssessmentFormScreen({
             <View className="flex-1">
               <Text className="text-base font-semibold text-gray-800">Notas da turma</Text>
               <Text className="text-xs text-gray-500 mt-0.5">
-                Resumo por aluno e disciplina. Use o assistente para lançar passo a passo.
+                Resumo por aluno e disciplina. Lançamento em lote ou pelo ícone em cada linha.
               </Text>
             </View>
           </View>
           <TouchableOpacity
-            onPress={openGradesModal}
+            onPress={() => openGradesModal()}
             disabled={status === "published"}
             className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center justify-center gap-2"
             activeOpacity={0.85}
@@ -714,13 +735,19 @@ export default function OfficialAssessmentFormScreen({
           subjects={selectedSubjects}
           grades={grades}
           isMobile={isMobile}
+          readOnly={status === "published"}
+          onLaunchIndividual={(studentId) => openGradesModal(studentId)}
         />
       </View>
 
       <Modal
         visible={gradesModalVisible}
-        title="Lançar notas"
-        onClose={() => setGradesModalVisible(false)}
+        title={
+          gradesModalStudentId != null
+            ? `Lançar nota — ${gradesModalStudentName ?? "Aluno"}`
+            : "Lançar notas"
+        }
+        onClose={closeGradesModal}
         size="lg"
         compact
         footer={
@@ -729,7 +756,7 @@ export default function OfficialAssessmentFormScreen({
             style={{ justifyContent: isMobile ? "center" : "flex-end" }}
           >
             <TouchableOpacity
-              onPress={() => setGradesModalVisible(false)}
+              onPress={closeGradesModal}
               className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white"
               activeOpacity={0.85}
             >
@@ -747,7 +774,11 @@ export default function OfficialAssessmentFormScreen({
               {savingGrades ? <ActivityIndicator size="small" color="white" /> : null}
               <Ionicons name="save-outline" size={16} color="white" />
               <Text className="text-sm font-bold text-white">
-                {savingGrades ? "Salvando..." : "Salvar notas"}
+                {savingGrades
+                  ? "Salvando..."
+                  : gradesModalStudentId != null
+                    ? "Salvar nota"
+                    : "Salvar notas"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -760,6 +791,7 @@ export default function OfficialAssessmentFormScreen({
           readOnly={status === "published"}
           savingGrades={savingGrades}
           canSaveGrades={!!assessmentBackendId}
+          focusStudentId={gradesModalStudentId}
           onUpdateGrade={updateGradeField}
           hideSaveButton
         />
