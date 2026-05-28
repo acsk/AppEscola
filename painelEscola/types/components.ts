@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import type { Ionicons } from "@expo/vector-icons";
 
 export type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -38,6 +38,8 @@ export type ConfirmModalProps = {
   cancelLabel?: string;
   iconName?: IoniconName;
   tone?: "danger" | "primary";
+  /** Conteúdo extra abaixo da mensagem (ex.: resumo antes de confirmar) */
+  children?: ReactNode;
 };
 
 export type MessageModalType = "success" | "error" | "info" | "warning";

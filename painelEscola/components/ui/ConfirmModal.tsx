@@ -22,6 +22,7 @@ export default function ConfirmModal({
   cancelLabel = "Cancelar",
   iconName = "trash-outline",
   tone = "danger",
+  children,
 }: ConfirmModalProps) {
   const { width } = useWindowDimensions();
   const isMobile = width < 520;
@@ -52,7 +53,7 @@ export default function ConfirmModal({
           className="bg-white rounded-2xl p-6"
           style={{
             width: "100%",
-            maxWidth: Math.min(width - horizontalPadding * 2, 520),
+            maxWidth: Math.min(width - horizontalPadding * 2, children ? 560 : 520),
           }}
         >
           <View className="items-center mb-5">
@@ -66,6 +67,8 @@ export default function ConfirmModal({
               {message}
             </Text>
           </View>
+
+          {children ? <View className="w-full mb-5">{children}</View> : null}
 
           <View style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
             <TouchableOpacity

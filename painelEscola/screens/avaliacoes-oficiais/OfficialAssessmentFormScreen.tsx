@@ -36,6 +36,17 @@ const EMPTY_FORM: OfficialAssessmentForm = {
 
 const gradeRowKey = (studentId: number, subjectId: number) => `${studentId}-${subjectId}`;
 
+function PublishSummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="flex-row py-1.5 border-b border-gray-100">
+      <Text className="text-xs font-semibold text-gray-500" style={{ width: 118 }}>
+        {label}
+      </Text>
+      <Text className="text-xs font-medium text-gray-800 flex-1">{value}</Text>
+    </View>
+  );
+}
+
 export default function OfficialAssessmentFormScreen({
   navigate,
   assessmentId,
@@ -159,6 +170,49 @@ export default function OfficialAssessmentFormScreen({
     const row = grades.find((g) => g.student_id === gradesModalStudentId);
     return row?.student_name ?? null;
   }, [gradesModalStudentId, grades]);
+
+  const publishSummary = useMemo(() => {
+    const classLabel =
+      classes.find((c) => c.value === form.school_class_id)?.label ?? "Não selecionada";
+    const kindLabel =
+      kindOptions.find((k) => k.value === form.kind)?.label ?? form.kind;
+    const examTypeLabel = form.exam_type_id
+      ? examTypes.find((e) => e.value === form.exam_type_id)?.label ?? "—"
+      : null;
+    const subjectNames =
+      selectedSubjects.length > 0
+        ? selectedSubjects.map((s) => s.name).join(", ")
+        : "Nenhuma selecionada";
+
+    const studentIds = new Set(grades.map((g) => g.student_id));
+    let launchedCount = 0;
+    studentIds.forEach((studentId) => {
+      const complete = form.subject_ids.every((subjectId) => {
+        const row = grades.find(
+          (g) => g.student_id === studentId && g.subject_id === subjectId
+        );
+        if (!row) return false;
+        if (row.is_absent) return true;
+        return row.grade.trim() !== "";
+      });
+      if (complete) launchedCount += 1;
+    });
+
+    return {
+      classLabel,
+      kindLabel,
+      examTypeLabel,
+      subjectNames,
+      title: form.title.trim() || "Sem título",
+      assessmentDate: form.assessment_date || "—",
+      maxScore: form.max_score || "—",
+      weight: form.weight || "—",
+      countsTowardsReportCard: form.counts_towards_report_card ? "Sim" : "Não",
+      studentTotal: studentIds.size,
+      launchedCount,
+      pendingCount: Math.max(0, studentIds.size - launchedCount),
+    };
+  }, [form, classes, kindOptions, examTypes, selectedSubjects, grades]);
 
   const mergeGradeMatrix = useCallback(
     (
@@ -800,14 +854,56 @@ export default function OfficialAssessmentFormScreen({
       <ConfirmModal
         visible={publishModalVisible}
         title="Publicar avaliação"
-        message="Após publicar, as notas não poderão mais ser alteradas. Deseja continuar?"
-        confirmLabel="Publicar agora"
-        iconName="checkmark-circle-outline"
+        message="Tem certeza que deseja publicar? Após publicar, as notas não poderão mais ser alteradas."
+        confirmLabel="Sim, publicar"
+        cancelLabel="Voltar"
+        iconName="megaphone-outline"
         tone="primary"
         onConfirm={publish}
         onCancel={() => setPublishModalVisible(false)}
         loading={publishing}
-      />
+        confirmDisabled={publishSummary.launchedCount === 0}
+      >
+        <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+          <Text className="text-xs font-bold text-gray-700 uppercase mb-1">Resumo da avaliação</Text>
+          <PublishSummaryRow label="Título" value={publishSummary.title} />
+          <PublishSummaryRow label="Turma" value={publishSummary.classLabel} />
+          <PublishSummaryRow label="Disciplinas" value={publishSummary.subjectNames} />
+          <PublishSummaryRow label="Data" value={publishSummary.assessmentDate} />
+          <PublishSummaryRow label="Tipo" value={publishSummary.kindLabel} />
+          {publishSummary.examTypeLabel ? (
+            <PublishSummaryRow label="Classificação" value={publishSummary.examTypeLabel} />
+          ) : null}
+          <PublishSummaryRow
+            label="Nota máxima"
+            value={`${publishSummary.maxScore} (soma das disciplinas)`}
+          />
+          <PublishSummaryRow label="Peso" value={publishSummary.weight} />
+          <PublishSummaryRow
+            label="Boletim"
+            value={publishSummary.countsTowardsReportCard}
+          />
+          <PublishSummaryRow
+            label="Alunos"
+            value={
+              publishSummary.studentTotal > 0
+                ? `${publishSummary.launchedCount} com lançamento completo de ${publishSummary.studentTotal}`
+                : "Nenhum aluno carregado"
+            }
+          />
+        </View>
+        {publishSummary.launchedCount === 0 ? (
+          <Text className="text-xs text-amber-700 font-semibold text-center mt-2">
+            Lance ao menos uma nota antes de publicar.
+          </Text>
+        ) : publishSummary.pendingCount > 0 ? (
+          <Text className="text-xs text-amber-700 text-center mt-2">
+            Ainda há {publishSummary.pendingCount} aluno
+            {publishSummary.pendingCount !== 1 ? "s" : ""} com lançamento pendente. Você pode
+            publicar mesmo assim.
+          </Text>
+        ) : null}
+      </ConfirmModal>
 
       <ToastBanner visible={toast.visible} type={toast.type} message={toast.message} onClose={() => setToast((t) => ({ ...t, visible: false }))} />
     </ScrollView>
