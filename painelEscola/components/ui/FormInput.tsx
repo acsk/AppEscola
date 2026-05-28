@@ -16,6 +16,7 @@ type Props = TextInputProps & {
   valueFormat?: "integer" | "decimal" | "currency" | "dueDay";
   maxDigits?: number;
   decimalPlaces?: number;
+  dense?: boolean;
 };
 
 const VALUE_FORMAT_TO_RESTRICTION: Record<
@@ -38,6 +39,7 @@ export default function FormInput({
   onChangeText,
   keyboardType,
   editable = true,
+  dense = false,
   ...props
 }: Props) {
   const inputRef = useRef<TextInput>(null);
@@ -85,8 +87,10 @@ export default function FormInput({
         : undefined;
 
   return (
-    <View className="mb-4">
-      <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+    <View className={dense ? "mb-2" : "mb-4"}>
+      <Text
+        className={`font-medium text-gray-600 ${dense ? "text-xs mb-1" : "text-sm font-semibold text-gray-700 mb-1.5"}`}
+      >
         {label}
         {required && <Text className="text-red-500"> *</Text>}
       </Text>
@@ -94,9 +98,10 @@ export default function FormInput({
         ref={inputRef}
         {...props}
         editable={editable}
-        className={`border rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-gray-50 ${
+        className={`border rounded-xl px-4 text-sm text-gray-800 bg-gray-50 ${
           error ? "border-red-400" : "border-gray-200"
         } ${props.className ?? ""}`}
+        style={[{ height: 44 }, props.style]}
         placeholderTextColor="#9CA3AF"
         keyboardType={resolvedKeyboardType}
         onChangeText={handleChangeText}

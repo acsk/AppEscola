@@ -101,6 +101,7 @@ export default function YearPickerInput({
           paddingHorizontal: 14,
           height: 44,
           backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
+          width: "100%",
           opacity: disabled ? 0.7 : 1,
         }}
       >

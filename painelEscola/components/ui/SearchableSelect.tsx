@@ -33,6 +33,9 @@ interface Props {
   onSearch?: (query: string) => Promise<SearchableOption[]>;
   /** Opção selecionada quando não está na lista atual (ex.: busca server-side) */
   selectedOption?: SearchableOption;
+  /** Exibe caixa roxa abaixo do trigger (desligar em formulários densos) */
+  showSelectedPreview?: boolean;
+  dense?: boolean;
 }
 
 const MODAL_WIDTH = 380;
@@ -53,6 +56,8 @@ export default function SearchableSelect({
   modalTitle = "Selecionar",
   onSearch,
   selectedOption,
+  showSelectedPreview = true,
+  dense = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -131,15 +136,15 @@ export default function SearchableSelect({
   const borderColor = error ? "#EF4444" : "#E5E7EB";
 
   return (
-    <View>
+    <View style={{ marginBottom: dense ? 8 : 16 }}>
       {/* Label */}
       {label && (
         <Text
           style={{
-            fontSize: 12,
-            fontWeight: "500",
-            color: "#4B5563",
-            marginBottom: 6,
+            fontSize: dense ? 12 : 14,
+            fontWeight: dense ? "500" : "600",
+            color: dense ? "#4B5563" : "#374151",
+            marginBottom: dense ? 4 : 6,
           }}
         >
           {label}
@@ -157,12 +162,11 @@ export default function SearchableSelect({
           justifyContent: "space-between",
           borderWidth: 1,
           borderColor,
-          borderRadius: 8,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          backgroundColor: disabled ? "#F9FAFB" : "white",
+          borderRadius: 12,
+          paddingHorizontal: 14,
+          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
           opacity: disabled ? 0.6 : 1,
-          minHeight: 40,
+          height: 44,
         }}
       >
         <Text
@@ -189,7 +193,7 @@ export default function SearchableSelect({
       </TouchableOpacity>
 
       {/* Preview da opção selecionada */}
-      {selected && (
+      {showSelectedPreview && selected && (
         <View
           style={{
             marginTop: 8,

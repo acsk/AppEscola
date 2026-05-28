@@ -27,6 +27,7 @@ import PastExamScheduleFields from "../../components/provas-anteriores/PastExamS
 import FormSelect from "../../components/ui/FormSelect";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import PdfFileUploadField from "../../components/ui/PdfFileUploadField";
+import { FormFieldFull, FormFieldRow } from "../../components/ui/FormFieldGrid";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -129,7 +130,7 @@ function formatPastExamDate(row: { exam_date?: string | null; exam_year?: number
 export default function PastExamsScreen({ navigate }: WithNavigate) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const { width } = useWindowDimensions();
-  const compactStack = width < 640;
+  const compactStack = width < 768;
   const examTypes = useExamTypes();
   const examTypeFormOptions = domainToOptions(examTypes);
   const examTypeFilterOptions = [
@@ -903,9 +904,9 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         visible={modalOpen}
         title={editingId ? "Editar prova anterior" : "Nova prova anterior"}
         onClose={closeModal}
-        size="md"
+        size="lg"
         compact
-        maxHeight="88%"
+        maxHeight="90%"
         showScrollIndicator
         scrollViewClassName="py-0"
         footer={
@@ -934,107 +935,101 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           </>
         }
       >
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 12 }}>
           {hasFormErrors ? (
-            <View className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex-row items-start gap-2">
+            <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex-row items-start gap-2">
               <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
               <Text className="flex-1 text-xs text-red-700">
                 {Object.values(errors).join(" ")}
               </Text>
             </View>
           ) : null}
-          <FormInput
-            label="Título"
-            required
-            value={form.title}
-            onChangeText={(title) => setForm((p) => ({ ...p, title }))}
-            error={errors.title}
-          />
 
-          <View style={{ flexDirection: compactStack ? "column" : "row", gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <FormSelect
-                label="Tipo"
-                required
-                value={form.material_kind}
-                options={MATERIAL_KIND_FORM_OPTIONS}
-                onChange={(material_kind) => {
-                  const kind = material_kind as PastExamMaterialKind;
-                  setForm((p) => {
-                    if (kind === "prova") {
-                      return {
-                        ...p,
-                        material_kind: kind,
-                        exam_schedule_mode: "year",
-                        exam_date: "",
-                        exam_year: p.material_kind === "prova" ? p.exam_year : "",
-                      };
-                    }
-                    const defaults = defaultScheduleForMaterial("exercicio");
+          <FormFieldFull>
+            <FormInput
+              label="Título"
+              required
+              dense
+              value={form.title}
+              onChangeText={(title) => setForm((p) => ({ ...p, title }))}
+              error={errors.title}
+            />
+          </FormFieldFull>
+
+          <FormFieldRow columns={compactStack ? 1 : 3}>
+            <FormSelect
+              label="Tipo"
+              required
+              dense
+              value={form.material_kind}
+              options={MATERIAL_KIND_FORM_OPTIONS}
+              onChange={(material_kind) => {
+                const kind = material_kind as PastExamMaterialKind;
+                setForm((p) => {
+                  if (kind === "prova") {
                     return {
                       ...p,
                       material_kind: kind,
-                      exam_schedule_mode: defaults.mode,
-                      exam_year: "",
+                      exam_schedule_mode: "year",
                       exam_date: "",
+                      exam_year: p.material_kind === "prova" ? p.exam_year : "",
                     };
+                  }
+                  const defaults = defaultScheduleForMaterial("exercicio");
+                  return {
+                    ...p,
+                    material_kind: kind,
+                    exam_schedule_mode: defaults.mode,
+                    exam_year: "",
+                    exam_date: "",
+                  };
+                });
+                if (errors.exam_date || errors.exam_year) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.exam_date;
+                    delete next.exam_year;
+                    return next;
                   });
-                  if (errors.exam_date || errors.exam_year) {
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.exam_date;
-                      delete next.exam_year;
-                      return next;
-                    });
-                  }
-                }}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <SearchableSelect
-                label="Classificação"
-                required
-                value={form.exam_type}
-                options={examTypeFormOptions}
-                placeholder={
-                  examTypeFormOptions.length === 0
-                    ? "Nenhum tipo cadastrado"
-                    : "Buscar classificação..."
                 }
-                modalTitle="Selecionar classificação"
-                disabled={examTypeFormOptions.length === 0}
-                selectedOption={
-                  form.exam_type
-                    ? examTypeFormOptions.find((o) => o.value === form.exam_type) ?? {
-                        value: form.exam_type,
-                        label: editingExamTypeLabel ?? form.exam_type,
-                      }
-                    : undefined
+              }}
+            />
+            <SearchableSelect
+              label="Classificação"
+              required
+              dense
+              showSelectedPreview={false}
+              value={form.exam_type}
+              options={examTypeFormOptions}
+              placeholder={
+                examTypeFormOptions.length === 0
+                  ? "Nenhum tipo cadastrado"
+                  : "Buscar classificação..."
+              }
+              modalTitle="Selecionar classificação"
+              disabled={examTypeFormOptions.length === 0}
+              selectedOption={
+                form.exam_type
+                  ? examTypeFormOptions.find((o) => o.value === form.exam_type) ?? {
+                      value: form.exam_type,
+                      label: editingExamTypeLabel ?? form.exam_type,
+                    }
+                  : undefined
+              }
+              onChange={(exam_type) => {
+                setForm((p) => ({ ...p, exam_type }));
+                setEditingExamTypeLabel(null);
+                if (errors.exam_type) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.exam_type;
+                    return next;
+                  });
                 }
-                onChange={(exam_type) => {
-                  setForm((p) => ({ ...p, exam_type }));
-                  setEditingExamTypeLabel(null);
-                  if (errors.exam_type) {
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.exam_type;
-                      return next;
-                    });
-                  }
-                }}
-                error={errors.exam_type}
-              />
-            </View>
-          </View>
-
-          <View
-            style={{
-              flexDirection: compactStack ? "column" : "row",
-              gap: 10,
-              alignItems: "flex-start",
-            }}
-          >
-            <View style={{ flex: 1, width: compactStack ? "100%" : undefined }}>
+              }}
+              error={errors.exam_type}
+            />
+            {form.material_kind === "prova" ? (
               <PastExamScheduleFields
                 materialKind={form.material_kind}
                 compact
@@ -1064,10 +1059,10 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                   exam_year: errors.exam_year,
                 }}
               />
-            </View>
-            <View style={{ width: compactStack ? "100%" : 148 }}>
+            ) : (
               <FormSelect
                 label="Publicar"
+                dense
                 value={form.is_published}
                 options={[
                   { value: "true", label: "Sim" },
@@ -1075,20 +1070,63 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 ]}
                 onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
               />
-            </View>
-          </View>
+            )}
+          </FormFieldRow>
 
-          <View
-            style={{
-              flexDirection: compactStack ? "column" : "row",
-              gap: 16,
-              alignItems: "flex-start",
-            }}
-          >
-            <View style={{ flex: 1, width: compactStack ? "100%" : undefined, gap: 8 }}>
+          {form.material_kind === "prova" ? (
+            <FormFieldRow columns={compactStack ? 1 : 3}>
+              <FormSelect
+                label="Publicar"
+                dense
+                value={form.is_published}
+                options={[
+                  { value: "true", label: "Sim" },
+                  { value: "false", label: "Não" },
+                ]}
+                onChange={(is_published) => setForm((p) => ({ ...p, is_published }))}
+              />
+            </FormFieldRow>
+          ) : (
+            <FormFieldFull>
+              <PastExamScheduleFields
+                materialKind={form.material_kind}
+                compact
+                value={{
+                  mode: form.exam_schedule_mode,
+                  exam_year: form.exam_year,
+                  exam_date: form.exam_date,
+                }}
+                onChange={(schedule) => {
+                  setForm((p) => ({
+                    ...p,
+                    exam_schedule_mode: schedule.mode,
+                    exam_year: schedule.exam_year,
+                    exam_date: schedule.exam_date,
+                  }));
+                  if (errors.exam_date || errors.exam_year) {
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.exam_date;
+                      delete next.exam_year;
+                      return next;
+                    });
+                  }
+                }}
+                errors={{
+                  exam_date: errors.exam_date,
+                  exam_year: errors.exam_year,
+                }}
+              />
+            </FormFieldFull>
+          )}
+
+          <FormFieldRow columns={compactStack ? 1 : 2}>
+            <View style={{ gap: 6 }}>
               <SearchableSelect
                 key={coursePickerKey}
                 label="Cursos"
+                dense
+                showSelectedPreview={false}
                 placeholder={
                   courseOptions.length === 0
                     ? "Nenhum curso disponível"
@@ -1130,37 +1168,45 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 </View>
               ) : null}
             </View>
-            <View style={{ flex: 1, width: compactStack ? "100%" : undefined }}>
-              <SearchableSelect
-                label="Disciplina"
-                value={form.subject_id}
-                options={subjectOptions.filter((o) => o.value !== "")}
-                placeholder="Nenhuma (opcional)"
-                modalTitle="Selecionar disciplina"
-                onChange={(subject_id) => setForm((p) => ({ ...p, subject_id }))}
-              />
-            </View>
-          </View>
+            <SearchableSelect
+              label="Disciplina"
+              dense
+              showSelectedPreview={false}
+              value={form.subject_id}
+              options={subjectOptions.filter((o) => o.value !== "")}
+              placeholder="Nenhuma (opcional)"
+              modalTitle="Selecionar disciplina"
+              onChange={(subject_id) => setForm((p) => ({ ...p, subject_id }))}
+            />
+          </FormFieldRow>
 
-          <FormInput
-            label="Descrição"
-            value={form.description}
-            onChangeText={(description) => setForm((p) => ({ ...p, description }))}
-          />
+          <FormFieldFull>
+            <FormInput
+              label="Descrição"
+              dense
+              value={form.description}
+              onChangeText={(description) => setForm((p) => ({ ...p, description }))}
+              multiline
+              numberOfLines={3}
+              style={{ height: 80, paddingTop: 10, textAlignVertical: "top" }}
+            />
+          </FormFieldFull>
 
-          <PdfFileUploadField
-            required={!editingId}
-            compact
-            hint={
-              editingId
-                ? "PDF opcional na edição — em branco mantém o arquivo atual."
-                : "Qualquer tamanho de PDF (limite do servidor pode se aplicar)."
-            }
-            value={pdfFile}
-            onChange={handlePdfFileChange}
-            currentFileLabel={editingPdfLabel}
-            error={errors.file}
-          />
+          <FormFieldFull>
+            <PdfFileUploadField
+              required={!editingId}
+              compact
+              hint={
+                editingId
+                  ? "PDF opcional na edição — em branco mantém o arquivo atual."
+                  : "Qualquer tamanho de PDF (limite do servidor pode se aplicar)."
+              }
+              value={pdfFile}
+              onChange={handlePdfFileChange}
+              currentFileLabel={editingPdfLabel}
+              error={errors.file}
+            />
+          </FormFieldFull>
         </View>
       </Modal>
 

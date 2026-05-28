@@ -118,7 +118,7 @@ export default function Modal({
 
           {/* Body */}
           <ScrollView
-            className={scrollViewClassName}
+            className={`app-scrollbar ${scrollViewClassName}`.trim()}
             style={{
               maxHeight: bodyMaxHeight,
               flexGrow: 0,
