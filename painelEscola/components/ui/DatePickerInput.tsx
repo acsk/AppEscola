@@ -1,13 +1,16 @@
-import React, { useRef } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  Platform,
+  Modal,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { maskDate, displayToISO, isoToDisplay } from "../../utils/masks";
+import Calendar from "./Calendar";
+import { maskDate, displayToISO } from "../../utils/masks";
+import { parseDisplayDate, parseIsoDate } from "../../utils/calendar";
 
 type Props = {
   label: string;
@@ -19,6 +22,9 @@ type Props = {
   required?: boolean;
   disabled?: boolean;
   compact?: boolean;
+  minDate?: Date;
+  maxDate?: Date;
+  modalTitle?: string;
 };
 
 export default function DatePickerInput({
@@ -29,31 +35,42 @@ export default function DatePickerInput({
   required,
   disabled = false,
   compact = false,
+  minDate,
+  maxDate,
+  modalTitle = "Selecionar data",
 }: Props) {
-  // Ref para o input nativo oculto (somente web)
-  const hiddenRef = useRef<any>(null);
+  const { width } = useWindowDimensions();
+  const [open, setOpen] = useState(false);
 
-  const openCalendar = () => {
-    if (disabled || !hiddenRef.current) return;
-    const el = hiddenRef.current as HTMLInputElement & { showPicker?: () => void };
-    try {
-      if (typeof el.showPicker === "function") {
-        el.showPicker();
-        return;
-      }
-    } catch {
-      // showPicker pode falhar fora de gesto do usuário em alguns browsers
-    }
-    el.click();
+  const selectedDate = useMemo(() => {
+    const fromDisplay = parseDisplayDate(value);
+    if (fromDisplay) return fromDisplay;
+    const iso = displayToISO(value);
+    if (iso) return parseIsoDate(iso);
+    return null;
+  }, [value]);
+
+  const openPicker = () => {
+    if (disabled) return;
+    setOpen(true);
   };
 
-  const handleNativeChange = (e: any) => {
-    const iso = e.target.value; // yyyy-mm-dd
-    if (iso) onChangeText(isoToDisplay(iso));
+  const applyDate = (date: Date) => {
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    onChangeText(`${dd}/${mm}/${yyyy}`);
+    setOpen(false);
   };
 
-  // Valor ISO para o input nativo (yyyy-mm-dd)
-  const isoValue = displayToISO(value);
+  const clearDate = () => {
+    if (required) return;
+    onChangeText("");
+    setOpen(false);
+  };
+
+  const borderColor = error ? "#EF4444" : "#E5E7EB";
+  const modalWidth = Math.min(width - 32, 340);
 
   return (
     <View className={compact ? "mb-2" : "mb-4"}>
@@ -65,12 +82,17 @@ export default function DatePickerInput({
       </Text>
 
       <View
-        className={`flex-row items-center border rounded-xl px-4 ${
-          disabled ? "bg-gray-100" : "bg-gray-50"
-        } ${
-          error ? "border-red-400" : "border-gray-200"
-        }`}
-        style={{ height: 44 }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          borderWidth: 1,
+          borderColor,
+          borderRadius: 12,
+          paddingHorizontal: 14,
+          height: 44,
+          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
+          opacity: disabled ? 0.7 : 1,
+        }}
       >
         <TextInput
           value={value}
@@ -83,51 +105,77 @@ export default function DatePickerInput({
           editable={!disabled}
         />
 
-        {Platform.OS === "web" ? (
-          <View className="relative" style={{ width: 40, height: 40 }}>
-            <input
-              ref={hiddenRef}
-              type="date"
-              value={isoValue}
-              onChange={handleNativeChange}
-              disabled={disabled}
-              title="Abrir calendário"
-              style={{
-                position: "absolute",
-                inset: 0,
-                opacity: 0,
-                width: "100%",
-                height: "100%",
-                cursor: disabled ? "not-allowed" : "pointer",
-                zIndex: 2,
-              }}
-            />
-            <View
-              className="absolute inset-0 items-center justify-center"
-              pointerEvents="none"
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color={disabled ? "#D1D5DB" : "#7C3AED"}
-              />
-            </View>
-          </View>
-        ) : (
+        {value && !disabled && !required ? (
           <TouchableOpacity
-            onPress={openCalendar}
-            className="pl-2"
-            activeOpacity={disabled ? 1 : 0.7}
-            disabled={disabled}
+            onPress={clearDate}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginRight: 8 }}
           >
-            <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
+            <Ionicons name="close-circle" size={16} color="#9CA3AF" />
           </TouchableOpacity>
-        )}
+        ) : null}
+
+        <TouchableOpacity onPress={openPicker} disabled={disabled} activeOpacity={0.85}>
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
+        </TouchableOpacity>
       </View>
 
-      {error ? (
-        <Text className="text-xs text-red-500 mt-1">{error}</Text>
-      ) : null}
+      {error ? <Text className="text-xs text-red-500 mt-1">{error}</Text> : null}
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+            <View
+              style={{
+                width: modalWidth,
+                backgroundColor: "white",
+                borderRadius: 16,
+                overflow: "hidden",
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#F3F4F6",
+                }}
+              >
+                <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>
+                  {modalTitle}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setOpen(false)}
+                  style={{ padding: 4, backgroundColor: "#F3F4F6", borderRadius: 8 }}
+                >
+                  <Ionicons name="close" size={18} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ padding: 14 }}>
+                <Calendar
+                  value={selectedDate}
+                  onChange={applyDate}
+                  minDate={minDate}
+                  maxDate={maxDate}
+                  onClear={!required ? clearDate : undefined}
+                />
+              </View>
+            </View>
+        </View>
+      </Modal>
     </View>
   );
 }
