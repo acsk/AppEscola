@@ -63,6 +63,8 @@ export default function OfficialAssessmentFormScreen({
   const [saving, setSaving] = useState(false);
   const [savingGrades, setSavingGrades] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [publishModalVisible, setPublishModalVisible] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<OfficialAssessmentForm>(EMPTY_FORM);
@@ -456,6 +458,21 @@ export default function OfficialAssessmentFormScreen({
     }
   };
 
+  const removeAssessment = async () => {
+    if (!assessmentBackendId) return;
+    setDeleting(true);
+    try {
+      const response = await api.delete(`/official-assessments/${assessmentBackendId}`);
+      setDeleteModalVisible(false);
+      showApiToast(setToast, response.data, "Avaliação removida com sucesso.");
+      navigate("avaliacoes-oficiais");
+    } catch (e: unknown) {
+      showApiErrorToast(setToast, e, "Não foi possível excluir a avaliação.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const updateGradeField = (studentId: number, subjectId: number, patch: Partial<GradeDraftRow>) => {
     setGrades((prev) =>
       prev.map((g) =>
@@ -721,6 +738,17 @@ export default function OfficialAssessmentFormScreen({
           >
             <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
           </TouchableOpacity>
+          {assessmentBackendId && status === "draft" ? (
+            <TouchableOpacity
+              onPress={() => setDeleteModalVisible(true)}
+              disabled={deleting}
+              className="px-5 py-2.5 rounded-xl border border-red-200 bg-red-50 flex-row items-center gap-2"
+              activeOpacity={0.85}
+            >
+              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+              <Text className="text-sm font-semibold text-red-600">Excluir</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             onPress={save}
             disabled={saving || status === "published"}
@@ -853,6 +881,15 @@ export default function OfficialAssessmentFormScreen({
           hideSaveButton
         />
       </Modal>
+
+      <ConfirmModal
+        visible={deleteModalVisible}
+        title="Excluir avaliação"
+        message="Esta ação não pode ser desfeita. O rascunho e as notas lançadas serão removidos."
+        onConfirm={removeAssessment}
+        onCancel={() => setDeleteModalVisible(false)}
+        loading={deleting}
+      />
 
       <ConfirmModal
         visible={publishModalVisible}

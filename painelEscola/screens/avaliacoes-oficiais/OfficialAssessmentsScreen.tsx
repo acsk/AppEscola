@@ -11,6 +11,12 @@ import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import DataTableRow from "../../components/ui/DataTableRow";
+import ConfirmModal from "../../components/ui/ConfirmModal";
+import ToastBanner from "../../components/ui/ToastBanner";
+import OfficialAssessmentActionsModal, {
+  type OfficialAssessmentActionKey,
+} from "../../components/avaliacoes-oficiais/OfficialAssessmentActionsModal";
+import { showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import {
   TABLE_CELL,
   TABLE_CELL_MUTED,
@@ -46,6 +52,14 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [classes, setClasses] = useState<SchoolClassRef[]>([]);
   const [error, setError] = useState("");
+  const [menuAssessment, setMenuAssessment] = useState<OfficialAssessmentListItem | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState({
+    visible: false,
+    type: "success" as "success" | "error",
+    message: "",
+  });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [courseFilter, setCourseFilter] = useState("");
@@ -165,6 +179,46 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
     navigate("avaliacoes-oficiais-form", { assessmentId });
   };
 
+  const remove = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      const { data } = await api.delete(`/official-assessments/${deleteId}`);
+      setDeleteId(null);
+      showApiToast(setToast, data, "Avaliação removida com sucesso.");
+      load();
+    } catch (err) {
+      showApiErrorToast(setToast, err, "Não foi possível excluir a avaliação.");
+    }
+    setDeleting(false);
+  };
+
+  const handleAssessmentAction = (action: OfficialAssessmentActionKey) => {
+    const row = menuAssessment;
+    if (!row) return;
+    if (action === "open") {
+      openForm(row.id);
+      return;
+    }
+    if (action === "delete") {
+      setDeleteId(row.id);
+    }
+  };
+
+  const renderMenuButton = (row: OfficialAssessmentListItem, stopPropagation = false) => (
+    <TouchableOpacity
+      onPress={(event: { stopPropagation?: () => void }) => {
+        if (stopPropagation) event?.stopPropagation?.();
+        setMenuAssessment(row);
+      }}
+      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+      activeOpacity={0.85}
+      accessibilityLabel="Ações da avaliação"
+    >
+      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+    </TouchableOpacity>
+  );
+
   const renderKindBadge = (kind: string) => (
     <View className="self-start rounded-md px-1.5 py-0.5 bg-violet-100">
       <Text className="text-[10px] font-bold uppercase text-violet-700">{kindLabel(kind)}</Text>
@@ -221,19 +275,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
       </View>
 
       <View className="flex-row justify-end gap-2 mt-3">
-        <TouchableOpacity
-          onPress={(event: any) => {
-            event?.stopPropagation?.();
-            openForm(row.id);
-          }}
-          className="h-9 px-3 rounded-lg bg-violet-50 border border-violet-100 flex-row items-center justify-center"
-          activeOpacity={0.85}
-        >
-          <Ionicons name="create-outline" size={15} color="#7C3AED" />
-          <Text className="text-xs font-bold text-violet-700 ml-1.5">
-            {row.status === "published" ? "Ver notas" : "Lançar notas"}
-          </Text>
-        </TouchableOpacity>
+        {renderMenuButton(row, true)}
       </View>
     </TouchableOpacity>
   );
@@ -472,11 +514,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
               </View>
             ) : (
               rows.map((row, i) => (
-                <DataTableRow
-                  key={row.id}
-                  index={i}
-                  onPress={() => openForm(row.id)}
-                >
+                <DataTableRow key={row.id} index={i} onPress={() => openForm(row.id)}>
                   <View style={{ flex: 1.75, paddingRight: 10, minWidth: 0 }}>
                     <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>
                       {row.title}
@@ -506,16 +544,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
                     <Badge slug={row.status} label={STATUS_LABELS[row.status] ?? row.status} />
                   </View>
                   <View style={{ width: 42 }} className="flex-row justify-end">
-                    <TouchableOpacity
-                      onPress={(event: any) => {
-                        event?.stopPropagation?.();
-                        openForm(row.id);
-                      }}
-                      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="chevron-forward" size={16} color="#4B5563" />
-                    </TouchableOpacity>
+                    {renderMenuButton(row, true)}
                   </View>
                 </DataTableRow>
               ))
@@ -535,6 +564,30 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
           </View>
         </ScrollView>
       )}
+      <OfficialAssessmentActionsModal
+        visible={!!menuAssessment}
+        assessment={menuAssessment}
+        kindLabel={kindLabel}
+        statusLabel={(s) => STATUS_LABELS[s] ?? s}
+        onClose={() => setMenuAssessment(null)}
+        onSelect={handleAssessmentAction}
+      />
+
+      <ConfirmModal
+        visible={!!deleteId}
+        title="Excluir avaliação"
+        message="Esta ação não pode ser desfeita. O rascunho e as notas lançadas serão removidos."
+        onConfirm={remove}
+        onCancel={() => setDeleteId(null)}
+        loading={deleting}
+      />
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={() => setToast((t) => ({ ...t, visible: false }))}
+      />
     </ScrollView>
   );
 }
