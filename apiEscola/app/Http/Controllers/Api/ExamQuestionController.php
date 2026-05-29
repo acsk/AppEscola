@@ -11,6 +11,7 @@ use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
 use App\Services\ExamAccessService;
+use App\Services\ExamPublishValidator;
 use App\Services\ExamTypeService;
 use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
@@ -25,6 +26,7 @@ class ExamQuestionController extends Controller
 
     public function __construct(
         private readonly ExamTypeService $examTypeService,
+        private readonly ExamPublishValidator $publishValidator,
     ) {}
 
     /** Lista todas as questões de um simulado */
@@ -252,6 +254,8 @@ class ExamQuestionController extends Controller
         });
 
         $question->load(['subject', 'options', 'examType']);
+        $exam->load('examStatus');
+        $this->publishValidator->assertCanRemainPublished($exam);
 
         return $this->success(new ExamQuestionResource($question));
     }
@@ -260,6 +264,9 @@ class ExamQuestionController extends Controller
     {
         $this->authorizeTenant($request, $exam->tenant_id);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
+
+        $exam->load('examStatus');
+        $this->publishValidator->assertCanRemainPublished($exam, $question->id);
 
         $question->options()->delete();
         $question->delete();

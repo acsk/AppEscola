@@ -66,4 +66,39 @@ class ExamQuestion extends Model
     {
         return $this->type === 'multiple_choice';
     }
+
+    /**
+     * Questão pronta para uso em simulado publicado (enunciado, pontuação e alternativas válidas).
+     */
+    public function isComplete(): bool
+    {
+        if (! $this->hasEnunciado() || (float) $this->points <= 0) {
+            return false;
+        }
+
+        if ($this->type === 'essay') {
+            return true;
+        }
+
+        if ($this->type !== 'multiple_choice') {
+            return false;
+        }
+
+        $filledOptions = $this->relationLoaded('options')
+            ? $this->options->filter(fn ($option) => trim((string) $option->option_text) !== '')
+            : $this->options()->where('option_text', '!=', '')->whereNotNull('option_text')->get()
+                ->filter(fn ($option) => trim((string) $option->option_text) !== '');
+
+        if ($filledOptions->count() < 2) {
+            return false;
+        }
+
+        return $filledOptions->where('is_correct', true)->count() === 1;
+    }
+
+    public function hasEnunciado(): bool
+    {
+        return trim((string) ($this->question_text ?? '')) !== ''
+            || trim((string) ($this->image_url ?? '')) !== '';
+    }
 }

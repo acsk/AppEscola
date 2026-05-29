@@ -53,6 +53,13 @@ class StoreExamRequest extends FormRequest
             if ($this->boolean('release_results_after_end') && ! $this->input('ends_at')) {
                 $validator->errors()->add('ends_at', 'Informe a data final para liberar o resultado somente após o fechamento do período.');
             }
+
+            if (($this->input('status') ?? 'draft') === 'published') {
+                $validator->errors()->add(
+                    'status',
+                    'Não é possível publicar um simulado sem questões. Salve como rascunho, cadastre ao menos uma questão completa e publique em seguida.'
+                );
+            }
         });
     }
 }

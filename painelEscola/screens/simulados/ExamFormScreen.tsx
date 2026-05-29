@@ -37,6 +37,7 @@ import type {
   ExamSupportMaterial,
   ExamSupportMaterialForm,
 } from "../../types/simulados";
+import { countCompleteExamQuestions } from "../../utils/examQuestion";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -84,10 +85,22 @@ const EMPTY_SUPPORT_MATERIAL: ExamSupportMaterialForm = {
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
-function validateExam(form: ExamForm): Record<string, string> {
+function validateExam(
+  form: ExamForm,
+  options?: { questions?: ExamQuestion[]; canManageContent?: boolean }
+): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.title.trim()) errs.title = "Título é obrigatório.";
   if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
+  if (form.status === "published") {
+    if (!options?.canManageContent) {
+      errs.status =
+        "Salve o simulado como rascunho, cadastre ao menos uma questão completa e publique em seguida.";
+    } else if (countCompleteExamQuestions(options.questions ?? []) === 0) {
+      errs.status =
+        "Para publicar, cadastre ao menos uma questão completa (enunciado, pontuação e alternativas corretas).";
+    }
+  }
   if (form.duration_minutes) {
     const dur = Number(form.duration_minutes);
     if (!Number.isInteger(dur) || dur < 1)
@@ -354,7 +367,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   };
 
   const saveExam = async () => {
-    const errs = validateExam(form);
+    const errs = validateExam(form, { questions, canManageContent });
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
