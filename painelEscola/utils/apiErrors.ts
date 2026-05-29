@@ -166,6 +166,26 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   return message || fallback;
 }
 
+/** Erros de campo em resposta 422 (`body.errors` ou `errors` no envelope). */
+export function getApiValidationErrors(error: unknown): Record<string, string> {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  const root = asRecord(data);
+  if (!root) return {};
+
+  const body = asRecord(root.body);
+  const raw = body?.errors ?? root.errors;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return parseApiErrors(raw as Record<string, string | string[]>);
+  }
+  return {};
+}
+
+/** Primeira mensagem de um mapa de erros de validação. */
+export function firstValidationMessage(errors: Record<string, string>): string | null {
+  const first = Object.values(errors).find((msg) => typeof msg === "string" && msg.trim());
+  return first ?? null;
+}
+
 type ToastSetter = (state: ApiToastState | ((prev: ApiToastState) => ApiToastState)) => void;
 
 /** Toast de sucesso/erro com `message` e `type` vindos da API. */
@@ -179,9 +199,11 @@ export function showApiToast(setToast: ToastSetter, data: unknown, fallback: str
 
 /** Toast de erro a partir de exceção axios. */
 export function showApiErrorToast(setToast: ToastSetter, error: unknown, fallback: string) {
+  const fieldErrors = getApiValidationErrors(error);
+  const fieldMessage = firstValidationMessage(fieldErrors);
   setToast({
     visible: true,
     type: "error",
-    message: getApiErrorMessage(error, fallback),
+    message: getApiErrorMessage(error, fallback) || fieldMessage || fallback,
   });
 }

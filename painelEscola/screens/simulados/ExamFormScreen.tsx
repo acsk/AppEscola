@@ -9,7 +9,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
-import { parseApiErrors } from "../../utils/apiErrors";
+import {
+  getApiValidationErrors,
+  showApiErrorToast,
+  showApiToast,
+} from "../../utils/apiErrors";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect, { type SelectOption } from "../../components/ui/FormSelect";
 import SearchableSelect, { SearchableOption } from "../../components/ui/SearchableSelect";
@@ -37,7 +41,6 @@ import type {
   ExamSupportMaterial,
   ExamSupportMaterialForm,
 } from "../../types/simulados";
-import { countCompleteExamQuestions } from "../../utils/examQuestion";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -85,22 +88,10 @@ const EMPTY_SUPPORT_MATERIAL: ExamSupportMaterialForm = {
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
-function validateExam(
-  form: ExamForm,
-  options?: { questions?: ExamQuestion[]; canManageContent?: boolean }
-): Record<string, string> {
+function validateExam(form: ExamForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.title.trim()) errs.title = "Título é obrigatório.";
   if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
-  if (form.status === "published") {
-    if (!options?.canManageContent) {
-      errs.status =
-        "Salve o simulado como rascunho, cadastre ao menos uma questão completa e publique em seguida.";
-    } else if (countCompleteExamQuestions(options.questions ?? []) === 0) {
-      errs.status =
-        "Para publicar, cadastre ao menos uma questão completa (enunciado, pontuação e alternativas corretas).";
-    }
-  }
   if (form.duration_minutes) {
     const dur = Number(form.duration_minutes);
     if (!Number.isInteger(dur) || dur < 1)
@@ -366,11 +357,19 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     }));
   };
 
-  const saveExam = async () => {
-    const errs = validateExam(form, { questions, canManageContent });
+  const showFormErrors = (errs: Record<string, string>, scroll = true) => {
     setErrors(errs);
+    const first = Object.values(errs).find((msg) => msg?.trim());
+    if (first) {
+      setToast({ visible: true, type: "error", message: first });
+    }
+    if (scroll) scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const saveExam = async () => {
+    const errs = validateExam(form);
     if (Object.keys(errs).length > 0) {
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      showFormErrors(errs);
       return;
     }
 
@@ -401,12 +400,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
       if (canManageContent && effectiveExamId) {
         const { data } = await api.put(`/exams/${effectiveExamId}`, payload);
-        const response = data?.body ?? data?.data ?? data;
-        setToast({
-          visible: true,
-          type: "success",
-          message: data?.message || response?.message || "Operação realizada com sucesso.",
-        });
+        showApiToast(setToast, data, "Operação realizada com sucesso.");
       } else {
         const { data } = await api.post("/exams", payload);
         const newId = resolveExamId(data);
@@ -416,21 +410,15 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         setSavedExamId(newId);
         navigate("simulados-form", { examId: newId });
         setPostCreatePrompt(true);
-        setToast({
-          visible: true,
-          type: "success",
-          message: data?.message || "Formulário criado com sucesso.",
-        });
+        showApiToast(setToast, data, "Simulado criado com sucesso.");
       }
       setErrors({});
-    } catch (err: any) {
-      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
-      setErrors(apiErrs);
-      setToast({
-        visible: true,
-        type: "error",
-        message: err?.response?.data?.message || "Não foi possível salvar o simulado.",
-      });
+    } catch (err: unknown) {
+      const apiErrs = getApiValidationErrors(err);
+      if (Object.keys(apiErrs).length > 0) {
+        setErrors(apiErrs);
+      }
+      showApiErrorToast(setToast, err, "Não foi possível salvar o simulado.");
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     } finally {
       setSaving(false);
@@ -582,29 +570,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
       if (editQuestionId) {
         const { data } = await api.put(`/exams/${effectiveExamId}/questions/${editQuestionId}`, payload);
-        setToast({
-          visible: true,
-          type: "success",
-          message: data?.message || "Questão atualizada com sucesso.",
-        });
+        showApiToast(setToast, data, "Questão atualizada com sucesso.");
       } else {
         const { data } = await api.post(`/exams/${effectiveExamId}/questions`, payload);
-        setToast({
-          visible: true,
-          type: "success",
-          message: data?.message || "Questão adicionada com sucesso.",
-        });
+        showApiToast(setToast, data, "Questão adicionada com sucesso.");
       }
       closeQuestionModal();
       fetchQuestions();
-    } catch (err: any) {
-      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
-      setQErrors(apiErrs);
-      setToast({
-        visible: true,
-        type: "error",
-        message: err?.response?.data?.message || "Não foi possível salvar a questão.",
-      });
+    } catch (err: unknown) {
+      const apiErrs = getApiValidationErrors(err);
+      if (Object.keys(apiErrs).length > 0) setQErrors(apiErrs);
+      showApiErrorToast(setToast, err, "Não foi possível salvar a questão.");
     } finally {
       setSavingQuestion(false);
     }
@@ -702,18 +678,10 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             `/exams/${effectiveExamId}/support-materials/${editSupportMaterialId}`,
             payload
           );
-          setToast({
-            visible: true,
-            type: "success",
-            message: data?.message || "Material de apoio atualizado com sucesso.",
-          });
+          showApiToast(setToast, data, "Material de apoio atualizado com sucesso.");
         } else {
           const { data } = await api.post(`/exams/${effectiveExamId}/support-materials`, payload);
-          setToast({
-            visible: true,
-            type: "success",
-            message: data?.message || "Material de apoio criado com sucesso.",
-          });
+          showApiToast(setToast, data, "Material de apoio criado com sucesso.");
         }
       }
 
@@ -721,14 +689,10 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       setSupportMaterialForm(EMPTY_SUPPORT_MATERIAL);
       setSupportMaterialFile(null);
       fetchSupportMaterials();
-    } catch (err: any) {
-      const apiErrs = parseApiErrors(err?.response?.data?.errors ?? {});
-      setSupportMaterialErrors(apiErrs);
-      setToast({
-        visible: true,
-        type: "error",
-        message: err?.response?.data?.message || "Não foi possível salvar o material de apoio.",
-      });
+    } catch (err: unknown) {
+      const apiErrs = getApiValidationErrors(err);
+      if (Object.keys(apiErrs).length > 0) setSupportMaterialErrors(apiErrs);
+      showApiErrorToast(setToast, err, "Não foi possível salvar o material de apoio.");
     } finally {
       setSavingSupportMaterial(false);
       setUploadingSupportMaterialFile(false);
@@ -836,6 +800,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       ];
 
   return (
+    <View className="flex-1">
     <ScrollView
       ref={scrollRef}
       className="flex-1"
@@ -914,6 +879,16 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         >
         <Text className="text-base font-bold text-gray-800 mb-4">Informações do Simulado</Text>
 
+        {Object.keys(errors).length > 0 ? (
+          <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            {Object.entries(errors).map(([field, message]) => (
+              <Text key={field} className="text-sm text-red-700">
+                {message}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
         <View className="flex-row gap-4 flex-wrap">
           <View style={{ flex: 2, minWidth: 280 }}>
             <FormInput
@@ -941,6 +916,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               value={form.status}
               options={examStatusOptions}
               onChange={(v) => setField("status", v)}
+              error={errors.status}
             />
           </View>
         </View>
@@ -2028,12 +2004,14 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         onCancel={() => setDeleteSupportMaterialId(null)}
       />
 
+    </ScrollView>
+
       <ToastBanner
         visible={toast.visible}
         type={toast.type}
         message={toast.message}
         onClose={closeToast}
       />
-    </ScrollView>
+    </View>
   );
 }

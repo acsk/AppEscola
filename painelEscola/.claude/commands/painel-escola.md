@@ -56,7 +56,7 @@ Telas administrativas com UX consistente, responsivas (mobile/tablet/desktop) e 
 { "type": "success|error", "message": "...", "body": {} }
 ```
 
-4. Erros 422: ler `response.data.body?.errors` ou padrão já usado na tela
+4. Erros 422: usar `getApiValidationErrors(error)` em `utils/apiErrors.ts` (`body.errors` ou `errors` no envelope)
 5. 401: interceptor em `services/api.ts` dispara `auth:expired` — não duplicar lógica de logout
 6. Tratar loading, timeout e erros 403/404/500 com mensagens amigáveis
 7. `FormData`: não forçar `Content-Type` manual (já tratado no interceptor)
@@ -80,12 +80,15 @@ Resposta típica da apiEscola:
 - Usar `body` para atualizar estado local (ex.: `id` após criar, dados retornados).
 - Helpers em `utils/apiErrors.ts`:
   - `showApiToast(setToast, response.data, fallback)` — preferir após `await api.*`
-  - `showApiErrorToast(setToast, error, fallback)` — em `catch`
+  - `showApiErrorToast(setToast, error, fallback)` — em `catch` (usa `message` da API + primeiro erro de campo)
+  - `getApiValidationErrors(error)` — mapa de erros 422 para exibir no formulário (`error` nos campos)
   - `getApiResponseMessage` / `normalizeApiEnvelope` / `getApiResponseBody` — leitura manual
 - Passar sempre `response.data` do axios (não só o `body` interno).
-- Em `catch`, usar `showApiErrorToast` (lê `response.data.message`).
-- **Não** usar texto fixo tipo `"Avaliação salva com sucesso."` se a API devolve `"Avaliação oficial atualizada com sucesso."`.
-- Fallback genérico alinhado à API: `"Operação realizada com sucesso."`.
+- Em `catch`: `showApiErrorToast` + `setErrors(getApiValidationErrors(err))` quando houver campos.
+- **Toast fora do `ScrollView`** (irmão no fragment), para não sumir ao rolar a tela.
+- **Regras de negócio críticas** (ex.: publicar simulado sem questões): validar na **API** (`ExamPublishValidator`); o front **não** duplica a regra — só exibe `message` e erros retornados.
+- **Não** usar texto fixo de sucesso/erro se a API devolve `message` diferente.
+- Fallback genérico: `"Operação realizada com sucesso."`.
 
 ## UI/UX
 
