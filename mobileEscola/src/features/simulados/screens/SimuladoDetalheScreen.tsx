@@ -612,31 +612,38 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
             </Text>
 
             {/* Score Card */}
-            {revisao && revisao.score_display && (
+            {revisao && revisao.score_display && (() => {
+              const temCriterioAprovacao = typeof revisao.passed === 'boolean';
+              const passou = revisao.passed === true;
+              const scoreColor = temCriterioAprovacao ? (passou ? '#059669' : '#DC2626') : subjectColor;
+              return (
               <View
                 style={[
                   styles.scoreCard,
-                  revisao.passed ? styles.scoreCardPassed : styles.scoreCardFailed,
+                  temCriterioAprovacao
+                    ? (passou ? styles.scoreCardPassed : styles.scoreCardFailed)
+                    : { backgroundColor: colors.soft, borderColor: colors.border },
                 ]}
               >
                 <View style={styles.scoreCardContent}>
                   <View>
                     <Text style={styles.scoreCardLabel}>Sua pontuação</Text>
-                    <Text style={[styles.scoreCardValue, { color: revisao.passed ? '#059669' : '#DC2626' }]}>
+                    <Text style={[styles.scoreCardValue, { color: scoreColor }]}>
                       {revisao.score_display}
                     </Text>
                   </View>
                   {revisao.percentage != null && (
                     <View>
                       <Text style={styles.scoreCardLabel}>Aproveitamento</Text>
-                      <Text style={[styles.scoreCardPercentage, { color: revisao.passed ? '#059669' : '#DC2626' }]}>
+                      <Text style={[styles.scoreCardPercentage, { color: scoreColor }]}>
                         {revisao.percentage.toFixed(1)}%
                       </Text>
                     </View>
                   )}
                 </View>
               </View>
-            )}
+              );
+            })()}
 
             {carregandoRevisao ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 12 }} />

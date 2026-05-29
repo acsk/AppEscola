@@ -532,22 +532,27 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
       );
     }
 
-    const aprovado = resultado.passed;
+    const temCriterioAprovacao = typeof resultado.passed === 'boolean';
+    const aprovado = resultado.passed === true;
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={[styles.resultadoCard, { borderTopColor: aprovado ? colors.credit : colors.debit }]}>
-          <View style={[styles.resultadoIconCircle, { backgroundColor: aprovado ? '#ECFDF5' : '#FEF2F2' }]}>
+        <View style={[styles.resultadoCard, { borderTopColor: temCriterioAprovacao ? (aprovado ? colors.credit : colors.debit) : colors.primary }]}>
+          <View style={[styles.resultadoIconCircle, { backgroundColor: temCriterioAprovacao ? (aprovado ? '#ECFDF5' : '#FEF2F2') : colors.soft }]}>
             <Ionicons
-              name={aprovado ? 'checkmark-circle' : 'close-circle'}
+              name={temCriterioAprovacao ? (aprovado ? 'checkmark-circle' : 'close-circle') : 'ribbon-outline'}
               size={64}
-              color={aprovado ? colors.credit : colors.debit}
+              color={temCriterioAprovacao ? (aprovado ? colors.credit : colors.debit) : colors.primary}
             />
           </View>
-          <Text style={styles.resultadoTitulo}>{aprovado ? 'Parabéns!' : 'Não foi desta vez'}</Text>
+          <Text style={styles.resultadoTitulo}>
+            {temCriterioAprovacao ? (aprovado ? 'Parabéns!' : 'Não foi desta vez') : 'Simulado concluído'}
+          </Text>
           <Text style={styles.resultadoSub}>
-            {aprovado
-              ? 'Você atingiu a pontuação mínima e foi aprovado.'
-              : `Você não atingiu a pontuação mínima de ${detalhe?.passing_score ?? 0}%.`}
+            {temCriterioAprovacao
+              ? aprovado
+                ? 'Você atingiu a pontuação mínima e foi aprovado.'
+                : `Você não atingiu a pontuação mínima de ${detalhe?.passing_score ?? 0}%.`
+              : 'Este simulado não possui nota mínima para aprovação.'}
           </Text>
 
           <View style={styles.resultadoNumeros}>

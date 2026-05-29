@@ -60,10 +60,7 @@ class ExamAttemptResource extends JsonResource
             }),
             'total_questions'      => $this->whenLoaded('answers', fn () => $this->answers->count()),
             'result_release_pending' => $studentAwaitingRelease,
-            'passed'               => $this->when(
-                ! $studentAwaitingRelease && $visibleStatus === 'completed' && $this->exam?->passing_score !== null,
-                fn () => $this->percentage >= $this->exam->passing_score
-            ),
+            'passed'               => $this->resolvePassed($studentAwaitingRelease, $visibleStatus),
             'answers'     => $this->whenLoaded('answers', function () use ($studentAwaitingRelease) {
                 $questions = $this->relationLoaded('exam') && $this->exam
                     ? $this->exam->questions->keyBy('id')
@@ -85,6 +82,21 @@ class ExamAttemptResource extends JsonResource
             'created_at'  => $this->created_at?->toISOString(),
             'updated_at'  => $this->updated_at?->toISOString(),
         ];
+    }
+
+    private function resolvePassed(bool $studentAwaitingRelease, ?string $visibleStatus): ?bool
+    {
+        if ($studentAwaitingRelease || $visibleStatus !== 'completed') {
+            return null;
+        }
+
+        $passingScore = $this->exam?->passing_score;
+
+        if ($passingScore === null || $this->percentage === null) {
+            return null;
+        }
+
+        return (float) $this->percentage >= (float) $passingScore;
     }
 
     private function formatScoreFraction(?float $score, ?float $maxScore): ?string

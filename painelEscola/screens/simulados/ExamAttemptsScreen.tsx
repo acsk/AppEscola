@@ -324,7 +324,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                 )}
               </View>
               <View style={{ width: 90, alignItems: "center" }}>
-                {a.status === "completed" && a.passed !== null ? (
+                {a.status === "completed" && typeof a.passed === "boolean" ? (
                   <Badge
                     label={a.passed ? "Aprovado" : "Reprovado"}
                     variant={a.passed ? "success" : "error"}
@@ -420,7 +420,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                     label={STATUS_LABEL[detail.status] ?? detail.status}
                     slug={STATUS_SLUG[detail.status] ?? "default"}
                   />
-                  {detail.status === "completed" && detail.passed !== null && (
+                  {detail.status === "completed" && typeof detail.passed === "boolean" && (
                     <View
                       style={{
                         flexDirection: 'row',

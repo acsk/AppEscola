@@ -110,6 +110,7 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
 
   const exam = resultado.exam;
   const subjectColor = exam?.subject?.color ?? colors.primary;
+  const temCriterioAprovacao = typeof resultado.passed === 'boolean';
   const passou = resultado.passed === true;
   const duracao = (resultado.started_at && resultado.finished_at)
     ? calcularDuracao(resultado.started_at, resultado.finished_at)
@@ -148,21 +149,25 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
         {podeExibirScore && (
           <View style={[
             styles.scoreCard,
-            { backgroundColor: passou ? '#ECFDF5' : '#FEF2F2', borderColor: passou ? '#86EFAC' : '#FECACA' }
+            temCriterioAprovacao
+              ? { backgroundColor: passou ? '#ECFDF5' : '#FEF2F2', borderColor: passou ? '#86EFAC' : '#FECACA' }
+              : { backgroundColor: colors.soft, borderColor: colors.border },
           ]}>
             <View style={styles.scoreLeft}>
               <Ionicons
-                name={passou ? 'checkmark-circle' : 'close-circle'}
+                name={temCriterioAprovacao ? (passou ? 'checkmark-circle' : 'close-circle') : 'ribbon-outline'}
                 size={32}
-                color={passou ? '#16A34A' : '#DC2626'}
+                color={temCriterioAprovacao ? (passou ? '#16A34A' : '#DC2626') : colors.primary}
               />
               <View style={styles.scoreTextos}>
                 <Text style={styles.scorePrincipal}>
                   {resultado.score_display || `${resultado.score ?? 0}/${resultado.max_score ?? 0}`}
                 </Text>
-                <Text style={[styles.scoreLabel, { color: passou ? '#166534' : '#991B1B' }]}>
-                  {passou ? 'Aprovado' : 'Reprovado'}
-                </Text>
+                {temCriterioAprovacao ? (
+                  <Text style={[styles.scoreLabel, { color: passou ? '#166534' : '#991B1B' }]}>
+                    {passou ? 'Aprovado' : 'Reprovado'}
+                  </Text>
+                ) : null}
               </View>
             </View>
             <View style={styles.scoreRight}>

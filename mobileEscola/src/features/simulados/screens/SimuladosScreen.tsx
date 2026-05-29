@@ -140,7 +140,9 @@ export function SimuladosScreen() {
       : STATUS_ICON[item.attempt_status];
     const subjectColor = item.subject?.color ?? colors.primary;
     const aproveitamentoAprovado =
-      item.aproveitamento != null ? item.aproveitamento >= item.passing_score : null;
+      item.aproveitamento != null && item.passing_score != null
+        ? item.aproveitamento >= item.passing_score
+        : null;
     const aproveitamentoColor =
       aproveitamentoAprovado === true
         ? '#22C55E'
