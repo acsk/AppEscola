@@ -53,7 +53,7 @@ const CHECKLIST_STEPS: { key: ChecklistStepKey; label: string }[] = [
 export function LoginScreen() {
   const { signIn } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
   const [senhaVisivel, setSenhaVisivel] = useState(false);
@@ -82,6 +82,8 @@ export function LoginScreen() {
 
   const isEmail = login.includes('@');
   const isWide = width >= 768;
+  const isCompactHeight = !isWide && height < 820;
+  const isVeryCompactHeight = !isWide && height < 720;
 
   function showChecklistStep(step: ChecklistStepKey) {
     setLoginChecklistStep(step);
@@ -290,39 +292,57 @@ export function LoginScreen() {
     >
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isCompactHeight && styles.scrollContentCompact,
+        ]}
       >
         <View style={[styles.inner, isWide && styles.innerWide]}>
-          <View style={[styles.hero, isWide && styles.heroWide]}>
+          <View
+            style={[
+              styles.hero,
+              isCompactHeight && styles.heroCompact,
+              isVeryCompactHeight && styles.heroVeryCompact,
+              isWide && styles.heroWide,
+            ]}
+          >
             <View style={styles.heroAccent} />
-            <View style={styles.logoBadge}>
-              <Ionicons name="school" size={38} color={colors.surface} />
+            <View style={styles.heroHeader}>
+              <View style={[styles.logoBadge, isCompactHeight && styles.logoBadgeCompact]}>
+                <Ionicons
+                  name="school"
+                  size={isCompactHeight ? 26 : 30}
+                  color={colors.surface}
+                />
+              </View>
+              <Text style={[styles.heroTitle, isCompactHeight && styles.heroTitleCompact]}>
+                App Curso
+              </Text>
             </View>
-            <Text style={styles.heroTitle}>App Curso</Text>
-            <Text style={styles.heroText}>
+            <Text style={[styles.heroText, isCompactHeight && styles.heroTextCompact]}>
               Acesse sua rotina escolar com uma experiência mais simples, clara e segura.
             </Text>
-
-            <View style={styles.heroStats}>
-              <View style={styles.statItem}>
-                <Ionicons name="people-outline" size={18} color={colors.surface} />
-                <Text style={styles.statText}>Alunos</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Ionicons name="albums-outline" size={18} color={colors.surface} />
-                <Text style={styles.statText}>Professores</Text>
-              </View>
-            </View>
           </View>
 
-          <View style={[styles.formPanel, isWide && styles.formPanelWide]}>
-            <View style={styles.formHeader}>
-              <View style={styles.formIcon}>
-                <Ionicons name="log-in-outline" size={24} color={colors.primary} />
+          <View
+            style={[
+              styles.formPanel,
+              isCompactHeight && styles.formPanelCompact,
+              isWide && styles.formPanelWide,
+            ]}
+          >
+            <View style={[styles.formHeader, isCompactHeight && styles.formHeaderCompact]}>
+              <View style={[styles.formIcon, isCompactHeight && styles.formIconCompact]}>
+                <Ionicons
+                  name="log-in-outline"
+                  size={isCompactHeight ? 22 : 24}
+                  color={colors.primary}
+                />
               </View>
               <View style={styles.formTitleGroup}>
-                <Text style={styles.titulo}>Entrar na conta</Text>
+                <Text style={[styles.titulo, isCompactHeight && styles.tituloCompact]}>
+                  Entrar na conta
+                </Text>
                 <Text style={styles.subtitulo}>Informe seus dados para continuar</Text>
               </View>
             </View>
@@ -353,7 +373,7 @@ export function LoginScreen() {
               </View>
             ) : null}
 
-            <View style={styles.campo}>
+            <View style={[styles.campo, isCompactHeight && styles.campoCompact]}>
               <Ionicons
                 name={isEmail ? 'mail-outline' : 'card-outline'}
                 size={20}
@@ -375,7 +395,7 @@ export function LoginScreen() {
               />
             </View>
 
-            <View style={styles.campo}>
+            <View style={[styles.campo, isCompactHeight && styles.campoCompact]}>
               <Ionicons
                 name="lock-closed-outline"
                 size={20}
@@ -407,7 +427,7 @@ export function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.dicaContainer}>
+            <View style={[styles.dicaContainer, isCompactHeight && styles.dicaContainerCompact]}>
               <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
               <Text style={styles.dica}>
                 {isEmail
@@ -433,6 +453,7 @@ export function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.botao,
+                isCompactHeight && styles.botaoCompact,
                 (carregando || mustUpdate) && styles.botaoDesabilitado,
               ]}
               onPress={handleLogin}
@@ -450,7 +471,7 @@ export function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.botaoCadastro}
+              style={[styles.botaoCadastro, isCompactHeight && styles.botaoCadastroCompact]}
               onPress={() => navigation.navigate('PublicRegister')}
               activeOpacity={0.85}
             >
@@ -459,7 +480,7 @@ export function LoginScreen() {
             </TouchableOpacity>
 
             {/* Rodapé do card: versões */}
-            <View style={styles.metaFooter}>
+            <View style={[styles.metaFooter, isCompactHeight && styles.metaFooterCompact]}>
               {metaLoading ? (
                 <Text style={styles.metaFooterText}>Carregando informações da API…</Text>
               ) : (
@@ -482,7 +503,7 @@ export function LoginScreen() {
             </View>
           </View>
 
-          <View style={styles.versionFooter}>
+          <View style={[styles.versionFooter, isCompactHeight && styles.versionFooterCompact]}>
             <Text style={styles.versionFooterText}>App {APP_BUILD_VERSION}</Text>
           </View>
         </View>
@@ -552,11 +573,20 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingVertical: 24,
+    justifyContent: 'center',
+  },
+  scrollContentCompact: {
+    paddingHorizontal: 18,
+    paddingVertical: 16,
   },
   versionFooter: {
     alignItems: 'center',
     paddingTop: 18,
     paddingBottom: 6,
+  },
+  versionFooterCompact: {
+    paddingTop: 10,
+    paddingBottom: 0,
   },
   versionFooterText: {
     fontSize: 11,
@@ -576,13 +606,24 @@ const styles = StyleSheet.create({
     gap: 28,
   },
   hero: {
-    minHeight: 250,
-    borderRadius: 28,
+    minHeight: 170,
+    borderRadius: 24,
     backgroundColor: colors.ink,
-    padding: 24,
-    marginBottom: 18,
+    padding: 20,
+    marginBottom: 14,
     overflow: 'hidden',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+  },
+  heroCompact: {
+    minHeight: 142,
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 12,
+  },
+  heroVeryCompact: {
+    minHeight: 122,
+    padding: 16,
+    marginBottom: 10,
   },
   heroWide: {
     flex: 1,
@@ -600,23 +641,38 @@ const styles = StyleSheet.create({
     right: -110,
     transform: [{ rotate: '-18deg' }],
   },
+  heroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   logoBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginRight: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
   },
+  logoBadgeCompact: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    marginRight: 12,
+  },
   heroTitle: {
-    fontSize: 34,
-    lineHeight: 40,
+    flex: 1,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: '800',
     color: colors.surface,
-    marginBottom: 10,
+  },
+  heroTitleCompact: {
+    fontSize: 27,
+    lineHeight: 32,
   },
   heroText: {
     fontSize: 15,
@@ -624,25 +680,9 @@ const styles = StyleSheet.create({
     color: '#C7D2FE',
     maxWidth: 430,
   },
-  heroStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginTop: 28,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  statItem: { flexDirection: 'row', alignItems: 'center' },
-  statText: { color: colors.surface, fontSize: 13, fontWeight: '700', marginLeft: 7 },
-  statDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    marginHorizontal: 14,
+  heroTextCompact: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   formPanel: {
     backgroundColor: colors.surface,
@@ -651,6 +691,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     elevation: 5,
+  },
+  formPanelCompact: {
+    borderRadius: 22,
+    padding: 18,
   },
   formPanelWide: {
     width: 430,
@@ -662,6 +706,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 28,
   },
+  formHeaderCompact: {
+    marginBottom: 18,
+  },
   formIcon: {
     width: 52,
     height: 52,
@@ -671,8 +718,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 14,
   },
+  formIconCompact: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    marginRight: 12,
+  },
   formTitleGroup: { flex: 1 },
   titulo: { fontSize: 24, fontWeight: '800', color: colors.ink, marginBottom: 4 },
+  tituloCompact: { fontSize: 22, lineHeight: 27 },
   subtitulo: { fontSize: 14, color: colors.muted, lineHeight: 19 },
   campo: {
     flexDirection: 'row',
@@ -684,6 +738,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 56,
     marginBottom: 14,
+  },
+  campoCompact: {
+    minHeight: 52,
+    marginBottom: 10,
+    borderRadius: 14,
+    paddingHorizontal: 14,
   },
   icone: { marginRight: 10 },
   input: { flex: 1, fontSize: 15, color: colors.ink, minHeight: 52 },
@@ -702,6 +762,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 18,
   },
+  dicaContainerCompact: {
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
   dica: {
     flex: 1,
     fontSize: 12,
@@ -716,6 +780,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 3,
   },
+  botaoCompact: {
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
   botaoDesabilitado: { opacity: 0.6 },
   botaoCadastro: {
     marginTop: 10,
@@ -728,6 +796,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  botaoCadastroCompact: {
+    minHeight: 46,
+    borderRadius: 14,
   },
   botaoCadastroTexto: {
     color: colors.primary,
@@ -780,6 +852,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     alignItems: 'center',
+  },
+  metaFooterCompact: {
+    marginTop: 12,
+    paddingTop: 10,
   },
   metaFooterText: {
     fontSize: 11,
