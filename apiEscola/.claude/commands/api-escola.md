@@ -104,6 +104,7 @@ Erro / validação:
 
 - Validar inputs; não expor stack trace, senhas ou tokens.
 - Sanctum Bearer nas rotas autenticadas.
+- Expiração do token: `config/sanctum.php` → `SANCTUM_TOKEN_EXPIRATION_MINUTES` no `.env` (padrão **10080** = 7 dias). Respostas `401` com `code: session_expired` e mensagem amigável para o app.
 - CORS, rate limit e permissões conforme padrão do módulo.
 
 ## Integração com frontends

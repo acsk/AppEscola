@@ -26,7 +26,11 @@ import buildInfo from '../../buildInfo.json';
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? '-');
 const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 const DEFAULT_SESSION_LOST_MESSAGE =
-  'Sua conexão com o servidor foi perdida ou seu login expirou. Faça login novamente para continuar usando o app.';
+  'Para sua segurança, encerramos sua sessão. Entre novamente com seu login e senha para continuar usando o app.';
+const FORCE_RELOGIN_MESSAGE =
+  'Por segurança, sua sessão foi encerrada no servidor. Entre novamente para continuar.';
+const FORBIDDEN_SESSION_MESSAGE =
+  'Não foi possível manter sua sessão ativa. Entre novamente para continuar.';
 const AUTH_DEBUG_PREFIX = '[AuthDebug]';
 
 function logAuthDebug(message: string, extra?: unknown) {
@@ -73,19 +77,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Disparado pelo interceptor 401/419/force_relogin ──────────────────
   const handleSessionLost = useCallback(
-    (reason: SessionLostReason) => {
-      logAuthDebug('handleSessionLost acionado', { reason });
+    (reason: SessionLostReason, message?: string) => {
+      logAuthDebug('handleSessionLost acionado', { reason, message });
 
-      if (reason === 'force_relogin') {
-        setSessionLostMessage(
-          'Sua sessão foi encerrada pelo servidor. Faça login novamente para continuar.',
-        );
+      if (message) {
+        setSessionLostMessage(message);
+      } else if (reason === 'force_relogin') {
+        setSessionLostMessage(FORCE_RELOGIN_MESSAGE);
+      } else if (reason === 'forbidden') {
+        setSessionLostMessage(FORBIDDEN_SESSION_MESSAGE);
       } else {
         setSessionLostMessage(DEFAULT_SESSION_LOST_MESSAGE);
       }
 
-      // Só exibe se havia sessão ativa (evita modal em telas públicas)
-      setSessionExpired((prev) => prev || true);
+      setSessionExpired(true);
       void clearSession();
     },
     [clearSession],
@@ -288,12 +293,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             <View style={modalStyles.iconCircle}>
               <Ionicons name="lock-closed-outline" size={32} color="#DC2626" />
             </View>
-            <Text style={modalStyles.title}>Sessão expirada</Text>
+            <Text style={modalStyles.title}>Hora de entrar de novo</Text>
             <Text style={modalStyles.message}>
               {sessionLostMessage}
             </Text>
+            <Text style={modalStyles.hint}>
+              Use o mesmo login de sempre. Seus dados continuam salvos com segurança.
+            </Text>
             <TouchableOpacity
-              style={modalStyles.button}
+              style={[modalStyles.button, modalStyles.buttonPrimary]}
               onPress={() => {
                 setSessionExpired(false);
                 setSessionLostMessage(DEFAULT_SESSION_LOST_MESSAGE);
@@ -301,7 +309,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }}
               activeOpacity={0.85}
             >
-              <Text style={modalStyles.buttonText}>Ir para o login</Text>
+              <Text style={modalStyles.buttonText}>Entrar com minha conta</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -395,7 +403,15 @@ const modalStyles = StyleSheet.create({
     color: colors.muted,
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 12,
+  },
+  hint: {
+    fontSize: 13,
+    color: colors.muted,
+    textAlign: 'center',
+    lineHeight: 18,
     marginBottom: 20,
+    opacity: 0.9,
   },
   actionsRow: {
     width: '100%',

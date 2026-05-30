@@ -3,6 +3,7 @@
 use App\Http\Middleware\IdentifyTenant;
 use App\Http\Middleware\AddApiVersionHeaders;
 use App\Http\Middleware\TrustProxies;
+use App\Support\ApiAuthenticationResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -29,7 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
             if ($request->expectsJson() || $request->is('api/*')) {
-                return response()->json(['message' => 'Não autenticado.'], 401);
+                return ApiAuthenticationResponse::json($request);
             }
         });
 

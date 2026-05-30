@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('exams:release-pending-results')->everyFiveMinutes();
 Schedule::command('exams:abandon-timed-out')->everyMinute();
+Schedule::command('sanctum:prune-expired --hours=24')->daily();

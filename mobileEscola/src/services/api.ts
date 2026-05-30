@@ -47,10 +47,11 @@ api.interceptors.request.use(async (config) => {
 // O callback de logout é registrado pelo AuthContext para evitar
 // dependência circular entre api.ts e o contexto React.
 export type SessionLostReason = 'unauthorized' | 'forbidden' | 'force_relogin';
-type LogoutCallback = (reason: SessionLostReason) => void;
+type LogoutCallback = (reason: SessionLostReason, message?: string) => void;
 let _onUnauthorized: LogoutCallback | null = null;
 let _notified = false;
 let _pendingSessionLostReason: SessionLostReason | null = null;
+let _pendingSessionLostMessage: string | null = null;
 
 const AUTH_DEBUG_PREFIX = '[AuthDebug]';
 
@@ -83,24 +84,31 @@ function isForceReloginEnabled(headers: any): boolean {
   return enabled;
 }
 
-async function notifySessionLost(reason: SessionLostReason) {
+function extractSessionMessage(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const message = (data as { message?: unknown }).message;
+  return typeof message === 'string' && message.trim() !== '' ? message.trim() : undefined;
+}
+
+async function notifySessionLost(reason: SessionLostReason, message?: string) {
   if (_notified) {
     logAuthDebug('notifySessionLost ignorado (ja notificado)', { reason });
     return;
   }
 
   _notified = true;
-  logAuthDebug('Limpando storage de auth por perda de sessao', { reason });
+  logAuthDebug('Limpando storage de auth por perda de sessao', { reason, message });
   await clearAuthStorage();
 
   if (_onUnauthorized) {
     logAuthDebug('Disparando callback de sessao perdida', { reason });
-    _onUnauthorized(reason);
+    _onUnauthorized(reason, message);
     return;
   }
 
   // Se o handler ainda nao foi registrado, preserva o motivo e executa no registro.
   _pendingSessionLostReason = reason;
+  _pendingSessionLostMessage = message ?? null;
   logAuthDebug('Handler de auth indisponivel, sessao pendente registrada', { reason });
 }
 
@@ -110,15 +118,18 @@ export function registerUnauthorizedHandler(cb: LogoutCallback) {
 
   if (_pendingSessionLostReason) {
     const reason = _pendingSessionLostReason;
+    const message = _pendingSessionLostMessage ?? undefined;
     _pendingSessionLostReason = null;
+    _pendingSessionLostMessage = null;
     logAuthDebug('Executando sessao pendente apos registro do handler', { reason });
-    _onUnauthorized(reason);
+    _onUnauthorized(reason, message);
   }
 }
 
 export function resetUnauthorizedNotice() {
   _notified = false;
   _pendingSessionLostReason = null;
+  _pendingSessionLostMessage = null;
   logAuthDebug('Reset de notificacao de sessao');
 }
 
@@ -126,7 +137,10 @@ api.interceptors.response.use(
   (response) => {
     if (isForceReloginEnabled(response.headers)) {
       logAuthDebug('Force relogin detectado em resposta de sucesso');
-      void notifySessionLost('force_relogin');
+      void notifySessionLost(
+        'force_relogin',
+        'Por segurança, sua sessão foi encerrada. Entre novamente para continuar usando o app.',
+      );
     }
     return response;
   },
@@ -145,13 +159,34 @@ api.interceptors.response.use(
 
     if (isForceReloginEnabled(error.response?.headers)) {
       logAuthDebug('Force relogin detectado em resposta de erro', { url, status });
-      await notifySessionLost('force_relogin');
+      await notifySessionLost(
+        'force_relogin',
+        extractSessionMessage(error.response?.data) ??
+          'Por segurança, sua sessão foi encerrada. Entre novamente para continuar usando o app.',
+      );
       return Promise.reject(error);
     }
 
     if (!isLoginCall && (status === 401 || status === 419)) {
-      logAuthDebug('Sessao expirada por status HTTP', { status, url });
-      await notifySessionLost(status === 401 ? 'unauthorized' : 'forbidden');
+      const apiMessage = extractSessionMessage(error.response?.data);
+      const code =
+        error.response?.data && typeof error.response.data === 'object'
+          ? (error.response.data as { code?: unknown }).code
+          : undefined;
+
+      logAuthDebug('Sessao expirada por status HTTP', { status, url, code });
+
+      const fallbackMessage =
+        code === 'session_expired'
+          ? 'Sua sessão expirou por segurança. Entre novamente com seu login e senha para continuar.'
+          : code === 'session_invalid'
+            ? 'Não foi possível validar seu acesso. Faça login novamente para continuar.'
+            : 'Para sua segurança, encerramos sua sessão. Entre novamente para continuar usando o app.';
+
+      await notifySessionLost(
+        status === 401 ? 'unauthorized' : 'forbidden',
+        apiMessage ?? fallbackMessage,
+      );
     }
     return Promise.reject(error);
   }
