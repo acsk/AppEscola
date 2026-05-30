@@ -287,8 +287,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         animationType="fade"
         statusBarTranslucent
         onRequestClose={() => {}}
+        supportedOrientations={['portrait', 'landscape']}
       >
-        <View style={modalStyles.backdrop}>
+        <View style={modalStyles.backdrop} accessibilityViewIsModal>
           <View style={modalStyles.card}>
             <View style={modalStyles.iconCircle}>
               <Ionicons name="lock-closed-outline" size={32} color="#DC2626" />
@@ -300,17 +301,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             <Text style={modalStyles.hint}>
               Use o mesmo login de sempre. Seus dados continuam salvos com segurança.
             </Text>
-            <TouchableOpacity
-              style={[modalStyles.button, modalStyles.buttonPrimary]}
-              onPress={() => {
-                setSessionExpired(false);
-                setSessionLostMessage(DEFAULT_SESSION_LOST_MESSAGE);
-                resetUnauthorizedNotice();
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={modalStyles.buttonText}>Entrar com minha conta</Text>
-            </TouchableOpacity>
+            <View style={modalStyles.sessionActions}>
+              <TouchableOpacity
+                style={modalStyles.sessionButton}
+                onPress={() => {
+                  setSessionExpired(false);
+                  setSessionLostMessage(DEFAULT_SESSION_LOST_MESSAGE);
+                  resetUnauthorizedNotice();
+                }}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Entrar com minha conta"
+              >
+                <Text style={modalStyles.sessionButtonText}>Entrar com minha conta</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -373,6 +378,7 @@ const modalStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    ...(Platform.OS === 'web' ? { zIndex: 99999 } : null),
   },
   card: {
     width: '100%',
@@ -381,6 +387,14 @@ const modalStyles = StyleSheet.create({
     borderRadius: 20,
     padding: 28,
     alignItems: 'center',
+    ...(Platform.OS === 'web'
+      ? {
+          shadowColor: '#000',
+          shadowOpacity: 0.15,
+          shadowRadius: 24,
+          elevation: 8,
+        }
+      : null),
   },
   iconCircle: {
     width: 64,
@@ -412,6 +426,25 @@ const modalStyles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 20,
     opacity: 0.9,
+  },
+  sessionActions: {
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  sessionButton: {
+    width: '100%',
+    minHeight: 48,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
   actionsRow: {
     width: '100%',

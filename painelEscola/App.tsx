@@ -482,9 +482,11 @@ function AppContent() {
 
     const onAuthExpired = (event: Event) => {
       const custom = event as CustomEvent<{ message?: string }>;
+      const rawMessage = custom?.detail?.message;
       const message =
-        custom?.detail?.message ||
-        "Sua sessão expirou ou a comunicação com o servidor foi perdida. Faça login novamente.";
+        typeof rawMessage === "string" && rawMessage.trim() !== ""
+          ? rawMessage.trim()
+          : "Para sua segurança, sua sessão foi encerrada. Entre novamente com seu login e senha.";
 
       setSessionExpiredDialog({
         visible: true,
@@ -556,15 +558,19 @@ function AppContent() {
           <View className="w-full max-w-md rounded-2xl bg-white px-6 py-5 border border-gray-100">
             <View className="flex-row items-center gap-2 mb-3">
               <Ionicons name="warning-outline" size={18} color="#B45309" />
-              <Text className="text-base font-bold text-gray-800">Sessão encerrada</Text>
+              <Text className="text-base font-bold text-gray-800">Hora de entrar de novo</Text>
             </View>
-            <Text className="text-sm text-gray-600 mb-5">{sessionExpiredDialog.message}</Text>
+            <Text className="text-sm text-gray-600 mb-2">{sessionExpiredDialog.message}</Text>
+            <Text className="text-xs text-gray-500 mb-5">
+              Use o mesmo login de sempre para continuar.
+            </Text>
             <TouchableOpacity
               onPress={forceBackToLogin}
-              className="w-full rounded-xl bg-violet-600 py-3 items-center"
+              className="w-full rounded-xl bg-violet-600 py-3 items-center justify-center min-h-[48px]"
               activeOpacity={0.85}
+              accessibilityRole="button"
             >
-              <Text className="text-sm font-semibold text-white">Ir para login</Text>
+              <Text className="text-sm font-semibold text-white">Entrar com minha conta</Text>
             </TouchableOpacity>
           </View>
         </View>
