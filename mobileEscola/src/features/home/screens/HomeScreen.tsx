@@ -424,8 +424,28 @@ export function HomeScreen() {
       <View style={[styles.header, isCompact && styles.headerCompact]}>
         <View style={styles.headerGlowPrimary} />
         <View style={styles.headerGlowSecondary} />
-        <View style={[styles.headerProfileRow, isCompact && styles.headerProfileRowCompact]}>
+
+        <View style={styles.headerTopActions}>
           <MenuButton style={isCompact ? styles.menuBtnCompact : undefined} />
+          {user?.role === 'aluno' ? (
+            <TouchableOpacity
+              style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}
+              onPress={() => navigation.navigate('Notificacoes')}
+              accessibilityLabel="Notificações"
+            >
+              <Ionicons name="notifications-outline" size={isCompact ? 23 : 25} color={colors.ink} />
+              {unreadNotifications > 0 ? (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={[styles.headerProfileRow, isCompact && styles.headerProfileRowCompact]}>
           <View style={[styles.studentBlock, isCompact && styles.studentBlockCompact]}>
             <TouchableOpacity
               style={[styles.avatarWrap, isCompact && styles.avatarWrapCompact]}
@@ -466,35 +486,16 @@ export function HomeScreen() {
                 <Text style={[styles.userRole, isCompact && styles.userRoleCompact]}>{roleLabel}</Text>
               ) : null}
               {avatarFeedback ? <Text style={styles.avatarFeedback}>{avatarFeedback}</Text> : null}
-            </View>
-          </View>
 
-          {user?.role === 'aluno' && matriculaDisplay ? (
-            <View style={[styles.matriculaHighlight, isCompact && styles.matriculaHighlightCompact]}>
-              <Text style={styles.matriculaHighlightLabel}>Matrícula</Text>
-              <Text style={styles.matriculaHighlightValue} numberOfLines={1}>
-                {matriculaDisplay}
-              </Text>
+              {user?.role === 'aluno' && matriculaDisplay ? (
+                <View style={[styles.matriculaHighlight, isCompact && styles.matriculaHighlightCompact]}>
+                  <Text style={styles.matriculaHighlightLabel}>Matrícula</Text>
+                  <Text style={styles.matriculaHighlightValue} numberOfLines={1}>
+                    {matriculaDisplay}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-          ) : null}
-
-          <View style={[styles.headerIcons, isCompact && styles.headerIconsCompact]}>
-            {user?.role === 'aluno' ? (
-              <TouchableOpacity
-                style={[styles.iconBtn, isCompact && styles.iconBtnCompact]}
-                onPress={() => navigation.navigate('Notificacoes')}
-                accessibilityLabel="Notificações"
-              >
-                <Ionicons name="notifications-outline" size={isCompact ? 24 : 27} color={colors.ink} />
-                {unreadNotifications > 0 ? (
-                  <View style={styles.notifBadge}>
-                    <Text style={styles.notifBadgeText}>
-                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                    </Text>
-                  </View>
-                ) : null}
-              </TouchableOpacity>
-            ) : null}
           </View>
         </View>
 
@@ -800,8 +801,8 @@ function createHomeStyles(colors: ThemeColors) {
   header: {
     backgroundColor: '#FBFAFF',
     paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 26,
+    paddingTop: 18,
+    paddingBottom: 22,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     overflow: 'hidden',
@@ -809,8 +810,8 @@ function createHomeStyles(colors: ThemeColors) {
   },
   headerCompact: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 22,
+    paddingTop: 14,
+    paddingBottom: 18,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
@@ -834,30 +835,40 @@ function createHomeStyles(colors: ThemeColors) {
     backgroundColor: '#F7F2FF',
     opacity: 0.95,
   },
-  headerProfileRow: {
+  headerTopActions: {
+    position: 'relative',
+    zIndex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 26,
+    marginBottom: 12,
+    minHeight: 40,
+  },
+  headerProfileRow: {
+    position: 'relative',
+    zIndex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
   },
   headerProfileRowCompact: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: 0,
-    marginBottom: 18,
+    gap: 10,
   },
   menuBtnCompact: {
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
   },
-  studentBlock: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
-  studentBlockCompact: { width: '100%', alignItems: 'center' },
-  headerIcons: { flexDirection: 'row', gap: 8, flexShrink: 0 },
-  headerIconsCompact: {
-    alignSelf: 'flex-end',
-    gap: 6,
-    marginTop: 10,
+  studentBlock: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  studentBlockCompact: {
+    width: '100%',
+    alignItems: 'center',
   },
   iconBtn: {
     width: 44, height: 44, borderRadius: 22,
@@ -868,9 +879,9 @@ function createHomeStyles(colors: ThemeColors) {
     position: 'relative',
   },
   iconBtnCompact: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   notifBadge: {
     position: 'absolute',
@@ -892,22 +903,22 @@ function createHomeStyles(colors: ThemeColors) {
     color: colors.surface,
     lineHeight: 12,
   },
-  avatarWrap:    { position: 'relative', marginRight: 18 },
+  avatarWrap:    { position: 'relative', marginRight: 16 },
   avatarWrapCompact: { marginRight: 12 },
   avatarCircle:  {
-    width: 104, height: 104, borderRadius: 52,
+    width: 88, height: 88, borderRadius: 44,
     backgroundColor: '#E9DDFF', justifyContent: 'center', alignItems: 'center',
     borderWidth: 4, borderColor: '#F5F0FF', overflow: 'hidden',
   },
   avatarCircleCompact: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 3,
   },
   avatarImage: { width: '100%', height: '100%' },
-  avatarInitials: { fontSize: 32, fontWeight: '800', color: colors.primary },
-  avatarInitialsCompact: { fontSize: 26 },
+  avatarInitials: { fontSize: 29, fontWeight: '800', color: colors.primary },
+  avatarInitialsCompact: { fontSize: 23 },
   avatarEditBtn:  {
     position: 'absolute', bottom: 4, right: 4,
     width: 28, height: 28, borderRadius: 14,
@@ -922,28 +933,28 @@ function createHomeStyles(colors: ThemeColors) {
     bottom: 2,
     right: 2,
   },
-  userInfo:   { flex: 1, minWidth: 0 },
-  userName:   { fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 3 },
-  userNameCompact: { fontSize: 22, lineHeight: 24 },
+  userInfo:   { flex: 1, minWidth: 0, alignItems: 'flex-start' },
+  userName:   { fontSize: 23, lineHeight: 28, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  userNameCompact: { fontSize: 20, lineHeight: 23, marginBottom: 8 },
   userRole:   { fontSize: 14, color: '#525A76', marginBottom: 10 },
   userRoleCompact: { fontSize: 13, marginBottom: 6 },
   matriculaHighlight: {
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
     flexShrink: 0,
-    alignItems: 'flex-end',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
     borderColor: colors.primary,
-    maxWidth: 140,
+    maxWidth: 160,
     ...(platformShadow({ color: colors.primary, opacity: 0.12, radius: 8, elevation: 2 }) as object),
   },
   matriculaHighlightCompact: {
-    alignSelf: 'flex-end',
-    marginTop: 8,
-    maxWidth: '100%',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    maxWidth: 150,
   },
   matriculaHighlightLabel: {
     fontSize: 9,
