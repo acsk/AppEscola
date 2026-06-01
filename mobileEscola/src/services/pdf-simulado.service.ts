@@ -19,8 +19,9 @@ function nl2br(value: string): string {
   return escapeHtml(value).replace(/\n/g, '<br/>');
 }
 
-function textBlocksHtml(value: string): string {
-  const paragraphs = value
+function textBlocksHtml(value: string | number | null | undefined): string {
+  const text = escapeHtml(value);
+  const paragraphs = text
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
@@ -28,7 +29,7 @@ function textBlocksHtml(value: string): string {
   if (paragraphs.length === 0) return '';
 
   return paragraphs
-    .map((paragraph) => `<p>${nl2br(paragraph)}</p>`)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br/>')}</p>`)
     .join('');
 }
 
