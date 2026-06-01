@@ -154,6 +154,11 @@ export type ExamAttemptDetail = ExamAttempt & {
     text_answer: string | null;
     is_correct: boolean | null;
     points_earned: number | null;
+    image_url?: string | null;
+    question_image_url?: string | null;
+    question?: {
+      image_url?: string | null;
+    } | null;
   }[];
 };
 

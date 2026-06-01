@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
@@ -167,6 +168,15 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     const text = answer.question_text?.trim();
     if (text) return text;
     return "[Enunciado em imagem]";
+  };
+
+  const getAnswerQuestionImageUrl = (answer: ExamAttemptDetail["answers"][number]) => {
+    return (
+      answer.image_url ??
+      answer.question_image_url ??
+      answer.question?.image_url ??
+      null
+    );
   };
 
   return (
@@ -527,6 +537,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                     const needsReview = ans.is_correct === null;
                     const isCorreta   = ans.is_correct === true;
                     const isErrada    = ans.is_correct === false;
+                    const imageUrl = getAnswerQuestionImageUrl(ans);
                     return (
                       <View
                         key={ans.question_id}
@@ -560,17 +571,35 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                           >
                             {idx + 1}.
                           </Text>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              flex: 1,
-                              fontWeight: '600',
-                              lineHeight: 20,
-                              color: isCorreta ? '#14532D' : isErrada ? '#7F1D1D' : '#374151',
-                            }}
-                          >
-                            {getAnswerQuestionLabel(ans)}
-                          </Text>
+                          <View style={{ flex: 1, gap: 8 }}>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                lineHeight: 20,
+                                color: isCorreta ? '#14532D' : isErrada ? '#7F1D1D' : '#374151',
+                              }}
+                            >
+                              {getAnswerQuestionLabel(ans)}
+                            </Text>
+                            {imageUrl ? (
+                              <View
+                                style={{
+                                  borderWidth: 1,
+                                  borderColor: '#E5E7EB',
+                                  borderRadius: 10,
+                                  overflow: 'hidden',
+                                  backgroundColor: '#F8FAFC',
+                                }}
+                              >
+                                <Image
+                                  source={{ uri: imageUrl }}
+                                  style={{ width: '100%', height: 180, backgroundColor: '#F3F4F6' }}
+                                  resizeMode="contain"
+                                />
+                              </View>
+                            ) : null}
+                          </View>
                           {!needsReview && (
                             <Ionicons
                               name={isCorreta ? "checkmark-circle" : "close-circle"}
