@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { BASE_URL } from './api';
+import { storage, STORAGE_KEYS } from './storage';
 import { formatExamDuration, type SimuladoDetail, type Question } from './simulados.service';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,6 +74,33 @@ function nomeArquivoPdf(title: string | null | undefined): string {
     .toLowerCase();
 
   return `${base || 'simulado'}.pdf`;
+}
+
+function resolveImageUrl(uri: string): string {
+  const value = uri.trim();
+  if (!value) return value;
+  if (/^https?:\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value;
+  }
+
+  const base = BASE_URL.replace(/\/+$/, '');
+  const path = value.startsWith('/') ? value : `/${value}`;
+  return `${base}${path}`;
+}
+
+function imageUrlCandidates(uri: string): string[] {
+  const resolved = resolveImageUrl(uri);
+  const candidates = [resolved];
+
+  if (
+    typeof window !== 'undefined' &&
+    window.location?.protocol === 'https:' &&
+    resolved.startsWith('http://')
+  ) {
+    candidates.unshift(`https://${resolved.slice('http://'.length)}`);
+  }
+
+  return Array.from(new Set(candidates));
 }
 
 // ── Geração de HTML ───────────────────────────────────────────────────────────
@@ -411,9 +440,41 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
 // ── Ações públicas ────────────────────────────────────────────────────────────
 
 async function imageToDataUrl(uri: string): Promise<{ dataUrl: string; width: number; height: number; format: string } | null> {
+  const urls = imageUrlCandidates(uri);
+  const token = await storage.getItem(STORAGE_KEYS.TOKEN);
+  const requestOptions: RequestInit[] = [
+    {
+      headers: {
+        Accept: 'image/*',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
+    },
+    {
+      headers: { Accept: 'image/*' },
+      credentials: 'include',
+    },
+  ];
+
   try {
-    const response = await fetch(uri);
-    if (!response.ok) return null;
+    let response: Response | null = null;
+
+    for (const url of urls) {
+      for (const options of requestOptions) {
+        try {
+          const nextResponse = await fetch(url, options);
+          if (nextResponse.ok) {
+            response = nextResponse;
+            break;
+          }
+        } catch {
+          // Tenta a próxima estratégia sem interromper a geração do PDF.
+        }
+      }
+      if (response) break;
+    }
+
+    if (!response) return null;
 
     const blob = await response.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -435,7 +496,7 @@ async function imageToDataUrl(uri: string): Promise<{ dataUrl: string; width: nu
 
     return { dataUrl, format, ...dimensions };
   } catch (e) {
-    console.warn('[PDF web] não foi possível carregar imagem', uri, e);
+    console.warn('[PDF web] não foi possível carregar imagem', urls, e);
     return null;
   }
 }
