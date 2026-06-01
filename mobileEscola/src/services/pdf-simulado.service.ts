@@ -69,7 +69,7 @@ function questaoHtml(q: Question, numero: number): string {
               (op, idx) => `
             <li>
               <span class="opt-marker">${letraOpcao(idx)})</span>
-              <span class="opt-text">${textBlocksHtml(op.option_text)}</span>
+              <div class="opt-text">${textBlocksHtml(op.option_text)}</div>
             </li>`,
             )
             .join('')}
@@ -227,7 +227,6 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
     .question-header {
       display: flex;
       align-items: baseline;
-      gap: 10px;
       margin-bottom: 8px;
       font-size: 10.5pt;
       color: #475569;
@@ -244,6 +243,7 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
       border-radius: 999px;
       padding: 2px 8px;
       font-size: 9.5pt;
+      margin-left: 10px;
     }
     .q-points { margin-left: auto; font-weight: 600; color: #0F172A; }
     .question-text {
@@ -276,7 +276,6 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
     }
     .options li {
       display: flex;
-      gap: 8px;
       margin: 6px 0;
       align-items: flex-start;
       line-height: 1.45;
@@ -285,6 +284,7 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
       font-weight: 700;
       min-width: 22px;
       color: #0F172A;
+      margin-right: 8px;
     }
     .opt-text {
       flex: 1;
