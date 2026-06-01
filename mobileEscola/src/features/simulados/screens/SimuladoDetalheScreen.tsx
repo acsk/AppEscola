@@ -517,26 +517,66 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 
         <View style={styles.grid}>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="help-circle-outline" size={22} color={subjectColor} />
+            <Ionicons name="help-circle-outline" size={18} color={subjectColor} />
             <Text style={styles.gridValor}>{detalhe.total_questions}</Text>
             <Text style={styles.gridLabel}>questões</Text>
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="time-outline" size={22} color={subjectColor} />
+            <Ionicons name="time-outline" size={18} color={subjectColor} />
             <Text style={styles.gridValor}>{formatExamDuration(detalhe.duration_minutes)}</Text>
             <Text style={styles.gridLabel}>duração</Text>
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="ribbon-outline" size={22} color={subjectColor} />
+            <Ionicons name="ribbon-outline" size={18} color={subjectColor} />
             <Text style={styles.gridValor}>{detalhe.passing_score}%</Text>
             <Text style={styles.gridLabel}>mínimo</Text>
           </View>
           <View style={[styles.gridItem, { width: metricWidth }]}>
-            <Ionicons name="star-outline" size={22} color={subjectColor} />
+            <Ionicons name="star-outline" size={18} color={subjectColor} />
             <Text style={styles.gridValor}>{detalhe.total_points}</Text>
             <Text style={styles.gridLabel}>pontos</Text>
           </View>
         </View>
+
+        {/* Erro de ação (ex: iniciar falhou) */}
+        {erroAcao ? (
+          <View style={styles.erroInline}>
+            <Ionicons name="alert-circle-outline" size={15} color="#DC2626" style={{ marginRight: 6 }} />
+            <Text style={styles.erroInlineTexto}>{erroAcao}</Text>
+          </View>
+        ) : null}
+
+        {/* Ação principal */}
+        {emAndamento ? (
+          <TouchableOpacity
+            style={[styles.botaoAcao, { backgroundColor: subjectColor }]}
+            onPress={handleContinuar}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="play-forward" size={18} color={colors.surface} style={{ marginRight: 8 }} />
+            <Text style={styles.botaoAcaoTexto}>Continuar simulado</Text>
+          </TouchableOpacity>
+        ) : podeIniciar ? (
+          <TouchableOpacity
+            style={[styles.botaoAcao, { backgroundColor: subjectColor }, iniciando && styles.botaoDisabled]}
+            onPress={handleIniciar}
+            disabled={iniciando}
+            activeOpacity={0.8}
+          >
+            {iniciando
+              ? <ActivityIndicator color={colors.surface} size="small" />
+              : <>
+                  <Ionicons
+                    name={abandonado ? 'refresh' : 'play'}
+                    size={18} color={colors.surface}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={styles.botaoAcaoTexto}>
+                    {abandonado ? 'Tentar novamente' : 'Iniciar simulado'}
+                  </Text>
+                </>}
+          </TouchableOpacity>
+        ) : null}
 
         <View style={styles.rulesBox}>
           <View style={[styles.statusNotice, { backgroundColor: statusAtual.bg }]}>
@@ -585,52 +625,8 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
             </TouchableOpacity>
             {erroPdf ? (
               <Text style={styles.pdfErro}>{erroPdf}</Text>
-            ) : (
-              <Text style={styles.pdfHint}>
-                Baixe uma versão do simulado com folha de respostas.
-              </Text>
-            )}
+            ) : null}
           </View>
-        ) : null}
-
-        {/* Erro de ação (ex: iniciar falhou) */}
-        {erroAcao ? (
-          <View style={styles.erroInline}>
-            <Ionicons name="alert-circle-outline" size={15} color="#DC2626" style={{ marginRight: 6 }} />
-            <Text style={styles.erroInlineTexto}>{erroAcao}</Text>
-          </View>
-        ) : null}
-
-        {/* Ação principal */}
-        {emAndamento ? (
-          <TouchableOpacity
-            style={[styles.botaoAcao, { backgroundColor: subjectColor }]}
-            onPress={handleContinuar}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="play-forward" size={18} color={colors.surface} style={{ marginRight: 8 }} />
-            <Text style={styles.botaoAcaoTexto}>Continuar simulado</Text>
-          </TouchableOpacity>
-        ) : podeIniciar ? (
-          <TouchableOpacity
-            style={[styles.botaoAcao, { backgroundColor: subjectColor }, iniciando && styles.botaoDisabled]}
-            onPress={handleIniciar}
-            disabled={iniciando}
-            activeOpacity={0.8}
-          >
-            {iniciando
-              ? <ActivityIndicator color={colors.surface} size="small" />
-              : <>
-                  <Ionicons
-                    name={abandonado ? 'refresh' : 'play'}
-                    size={18} color={colors.surface}
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={styles.botaoAcaoTexto}>
-                    {abandonado ? 'Tentar novamente' : 'Iniciar simulado'}
-                  </Text>
-                </>}
-          </TouchableOpacity>
         ) : null}
 
         {concluidoComVisualizacao && (
@@ -816,7 +812,7 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
   return StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6F7FB' },
   scroll: { flex: 1 },
-  content:   { padding: 16 },
+  content:   { padding: 16, paddingTop: 14, paddingBottom: 18 },
   headerWrap: {
     backgroundColor: '#FBFAFF',
     paddingHorizontal: 20,
@@ -895,7 +891,7 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
   botaoTentarTexto: { color: colors.surface, fontWeight: '600', fontSize: 15 },
 
   card: {
-    backgroundColor: colors.surface, borderRadius: 20, padding: 20,
+    backgroundColor: colors.surface, borderRadius: 20, padding: 18,
     borderWidth: 1, borderColor: colors.border,
     borderTopWidth: 4,
     overflow: 'hidden',
@@ -915,7 +911,7 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 8,
     flexWrap: 'wrap',
   },
   titleGroup: { flex: 1, minWidth: 220 },
@@ -925,52 +921,52 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
     alignSelf: 'flex-start',
     gap: 5,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginBottom: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    marginBottom: 6,
   },
-  subjectBadgeText: { fontSize: 12, fontWeight: '800' },
+  subjectBadgeText: { fontSize: 11, fontWeight: '800' },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   statusBadgeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
-  titulo:    { fontSize: 22, fontWeight: '800', color: colors.ink, lineHeight: 28 },
-  descricao: { fontSize: 14, color: colors.muted, lineHeight: 20, marginBottom: 16 },
+  titulo:    { fontSize: 21, fontWeight: '800', color: colors.ink, lineHeight: 25 },
+  descricao: { fontSize: 13, color: colors.muted, lineHeight: 17, marginBottom: 10 },
 
   metaBox: {
     backgroundColor: 'rgba(255,255,255,0.72)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 14,
-    padding: 12,
-    gap: 10,
-    marginBottom: 14,
+    borderRadius: 12,
+    padding: 10,
+    gap: 6,
+    marginBottom: 10,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 7,
   },
   metaLabel: {
-    width: 58,
-    fontSize: 12,
+    width: 54,
+    fontSize: 11,
     fontWeight: '800',
     color: colors.muted,
     textTransform: 'uppercase',
   },
   metaValue: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     color: colors.text,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   metaValueUrgente: {
     color: '#DC2626',
@@ -981,56 +977,56 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 14,
+    gap: 6,
+    marginBottom: 10,
   },
   gridItem:  {
     alignItems: 'flex-start',
-    gap: 4,
+    gap: 2,
     backgroundColor: 'rgba(255,255,255,0.64)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 14,
-    padding: 12,
-    minHeight: 94,
+    borderRadius: 12,
+    padding: 10,
+    minHeight: 76,
   },
-  gridValor: { fontSize: 17, fontWeight: '800', color: colors.ink, marginTop: 4 },
-  gridLabel: { fontSize: 12, color: colors.muted, textTransform: 'uppercase', fontWeight: '700' },
+  gridValor: { fontSize: 16, fontWeight: '800', color: colors.ink, marginTop: 2 },
+  gridLabel: { fontSize: 10.5, color: colors.muted, textTransform: 'uppercase', fontWeight: '700' },
 
   rulesBox: {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 2,
-    marginBottom: 2,
+    marginTop: 10,
+    marginBottom: 0,
   },
   statusNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
+    gap: 7,
+    padding: 10,
   },
   statusNoticeText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   ruleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
+    gap: 7,
+    padding: 10,
     borderTopWidth: 1,
     borderTopColor: '#E5E7F3',
     backgroundColor: 'rgba(255,255,255,0.72)',
   },
   ruleText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     color: colors.muted,
-    lineHeight: 18,
+    lineHeight: 16,
   },
 
   dataLinha: {
@@ -1043,7 +1039,7 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
 
   botaoAcao: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24, marginTop: 16,
+    borderRadius: 14, paddingVertical: 13, paddingHorizontal: 24, marginTop: 2,
   },
   botaoAcaoTexto: { color: colors.surface, fontWeight: '600', fontSize: 16 },
   botaoDisabled:  { opacity: 0.6 },
@@ -1278,8 +1274,8 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
 
   // ── Materiais de apoio ──
   materiaisWrap: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E7F3',
   },
@@ -1288,12 +1284,12 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
     alignItems: 'center',
   },
   materiaisTitulo: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.ink,
   },
   materiaisLista: {
-    marginTop: 10,
+    marginTop: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
@@ -1301,23 +1297,23 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
   materialChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
     borderRadius: 999,
     borderWidth: 1.5,
     backgroundColor: 'rgba(255,255,255,0.74)',
     maxWidth: '100%',
   },
   materialChipTexto: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     flexShrink: 1,
   },
 
   // ── PDF ──
   pdfWrap: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E7F3',
   },
@@ -1325,7 +1321,7 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: colors.primary,
@@ -1333,7 +1329,7 @@ function createSimuladoDetalheStyles(colors: ThemeColors) {
   },
   pdfBotaoTexto: {
     color: colors.primary,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   pdfHint: {
