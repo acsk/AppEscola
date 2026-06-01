@@ -17,6 +17,7 @@ import type {
   ExamAttempt,
   ExamAttemptDetail,
   ExamQuestion,
+  ExamQuestionOption,
   ExamAttemptsScreenProps,
 } from "../../types/simulados";
 
@@ -71,7 +72,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
   const [detailId, setDetailId] = useState<number | null>(null);
   const [detail, setDetail] = useState<ExamAttemptDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailQuestionImages, setDetailQuestionImages] = useState<Record<number, string | null>>({});
+  const [detailQuestionsById, setDetailQuestionsById] = useState<Record<number, ExamQuestion | null>>({});
 
   // Correction state
   const [correctingId, setCorrectingId] = useState<number | null>(null);
@@ -101,7 +102,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
   const openDetail = async (id: number) => {
     setDetailId(id);
     setDetail(null);
-    setDetailQuestionImages({});
+    setDetailQuestionsById({});
     setLoadingDetail(true);
     setDetailNeedsCorrection(false);
     try {
@@ -121,12 +122,12 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
               ? rawQuestions.data
               : [];
 
-          const imagesById = questions.reduce((acc: Record<number, string | null>, question: ExamQuestion) => {
-            acc[question.id] = question.image_url ?? null;
+          const questionsById = questions.reduce((acc: Record<number, ExamQuestion | null>, question: ExamQuestion) => {
+            acc[question.id] = question;
             return acc;
           }, {});
 
-          setDetailQuestionImages(imagesById);
+          setDetailQuestionsById(questionsById);
         } catch {}
       }
     } catch {}
@@ -194,14 +195,20 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     return "[Enunciado em imagem]";
   };
 
-  const getAnswerQuestionImageUrl = (answer: ExamAttemptDetail["answers"][number]) => {
+  const getAnswerQuestion = (answer: ExamAttemptDetail["answers"][number]) => {
     return (
-      answer.image_url ??
-      answer.question_image_url ??
-      answer.question?.image_url ??
-      detailQuestionImages[answer.question_id] ??
+      detailQuestionsById[answer.question_id] ??
+      answer.question ??
       null
     );
+  };
+
+  const getOptionLetter = (index: number) => String.fromCharCode(65 + index);
+
+  const getOptionLabel = (option: ExamQuestionOption | null, fallbackIndex?: number) => {
+    if (!option) return null;
+    const letter = fallbackIndex != null ? getOptionLetter(fallbackIndex) : null;
+    return letter ? `${letter} - ${option.option_text}` : option.option_text;
   };
 
   return (
@@ -562,7 +569,14 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                     const needsReview = ans.is_correct === null;
                     const isCorreta   = ans.is_correct === true;
                     const isErrada    = ans.is_correct === false;
-                    const imageUrl = getAnswerQuestionImageUrl(ans);
+                    const question = getAnswerQuestion(ans);
+                    const imageUrl = question?.image_url ?? ans.image_url ?? ans.question_image_url ?? ans.question?.image_url ?? null;
+                    const selectedOption = question?.options.find((option) => option.id != null && option.id === ans.option_id)
+                      ?? question?.options.find((option) => option.option_text === ans.option_text)
+                      ?? null;
+                    const selectedOptionIndex = selectedOption ? question?.options.findIndex((option) => option === selectedOption) : -1;
+                    const correctOption = question?.options.find((option) => option.is_correct) ?? null;
+                    const correctOptionIndex = correctOption ? question?.options.findIndex((option) => option === correctOption) : -1;
                     return (
                       <View
                         key={ans.question_id}
@@ -645,11 +659,20 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                             paddingTop: 8,
                           }}
                         >
-                          {ans.option_id != null && ans.option_text && (
+                          {selectedOption ? (
                             <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', marginBottom: 4 }}>
-                              Opção: <Text style={{ fontWeight: '600' }}>{ans.option_text}</Text>
+                              Resposta do aluno: <Text style={{ fontWeight: '600' }}>{getOptionLabel(selectedOption, selectedOptionIndex >= 0 ? selectedOptionIndex : undefined)}</Text>
                             </Text>
-                          )}
+                          ) : ans.option_id != null && ans.option_text ? (
+                            <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', marginBottom: 4 }}>
+                              Resposta do aluno: <Text style={{ fontWeight: '600' }}>{ans.option_text}</Text>
+                            </Text>
+                          ) : null}
+                          {correctOption ? (
+                            <Text style={{ fontSize: 13, color: '#7C3AED', marginBottom: 4 }}>
+                              Gabarito: <Text style={{ fontWeight: '600' }}>{getOptionLabel(correctOption, correctOptionIndex >= 0 ? correctOptionIndex : undefined)}</Text>
+                            </Text>
+                          ) : null}
                           {ans.text_answer != null && (
                             <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', fontStyle: 'italic' }}>
                               "{ans.text_answer}"
