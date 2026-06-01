@@ -163,6 +163,12 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     minWidth: isMobile ? "100%" : 160,
   };
 
+  const getAnswerQuestionLabel = (answer: ExamAttemptDetail["answers"][number]) => {
+    const text = answer.question_text?.trim();
+    if (text) return text;
+    return "[Enunciado em imagem]";
+  };
+
   return (
     <ScrollView
       className="flex-1"
@@ -563,7 +569,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                               color: isCorreta ? '#14532D' : isErrada ? '#7F1D1D' : '#374151',
                             }}
                           >
-                            {ans.question_text ?? "Questão indisponível"}
+                            {getAnswerQuestionLabel(ans)}
                           </Text>
                           {!needsReview && (
                             <Ionicons
