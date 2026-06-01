@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  Platform,
   Text,
   TouchableOpacity,
   View,
@@ -23,6 +24,7 @@ export default function ToastBanner({
   message,
   onClose,
 }: Props) {
+  const isWeb = Platform.OS === "web";
   const [mounted, setMounted] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-18)).current;
@@ -42,24 +44,31 @@ export default function ToastBanner({
       translateY.setValue(-18);
       scale.setValue(0.96);
 
+      if (isWeb) {
+        opacity.setValue(1);
+        translateY.setValue(0);
+        scale.setValue(1);
+        return;
+      }
+
       Animated.parallel([
         Animated.timing(opacity, {
           toValue: 1,
           duration: 280,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(translateY, {
           toValue: 0,
           duration: 280,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(scale, {
           toValue: 1,
           duration: 280,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]).start();
 
@@ -68,27 +77,32 @@ export default function ToastBanner({
 
     if (!mounted) return;
 
+    if (isWeb) {
+      setMounted(false);
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 0,
         duration: 220,
         easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(translateY, {
         toValue: -10,
         duration: 220,
         easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(scale, {
         toValue: 0.98,
         duration: 220,
         easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start(() => setMounted(false));
-  }, [mounted, opacity, scale, translateY, visible]);
+  }, [isWeb, mounted, opacity, scale, translateY, visible]);
 
   if (!mounted) return null;
 

@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Modal as RNModal,
+  Platform,
   View,
   Text,
   TouchableOpacity,
@@ -54,6 +55,7 @@ export default function Modal({
   scrollViewClassName = "",
   compact = false,
 }: Props) {
+  const isWeb = Platform.OS === "web";
   const { width, height } = useWindowDimensions();
   const isMobile = width < 640;
   const horizontalPadding = isMobile ? 12 : width < 1024 ? 24 : 40;
@@ -66,6 +68,109 @@ export default function Modal({
 
   if (!visible) return null;
 
+  const content = (
+    <View
+      className="items-center justify-center"
+      style={{
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.45)",
+        padding: horizontalPadding,
+      }}
+    >
+      <View
+        className="bg-white rounded-2xl overflow-hidden"
+        style={{
+          width: "100%",
+          maxWidth: Math.min(width - horizontalPadding * 2, widths[size]),
+          maxHeight: shellMaxHeight,
+          flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <View
+          className="border-b border-gray-100"
+          style={{
+            flexShrink: 0,
+            paddingHorizontal: horizontalInset,
+            paddingVertical: compact ? 10 : 12,
+          }}
+        >
+          <View className="flex-row items-center justify-between">
+            <Text
+              className={`font-bold text-gray-800 ${compact ? "text-sm" : "text-base"}`}
+            >
+              {title}
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              className="p-1 rounded-lg bg-gray-100"
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={18} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+          {headerContent}
+        </View>
+
+        {/* Body */}
+        <ScrollView
+          className={`app-scrollbar ${scrollViewClassName}`.trim()}
+          style={{
+            maxHeight: bodyMaxHeight,
+            flexGrow: 0,
+            flexShrink: 1,
+            paddingHorizontal: horizontalInset,
+          }}
+          contentContainerStyle={{
+            paddingTop: bodyPaddingY,
+            paddingBottom: bodyPaddingY,
+          }}
+          showsVerticalScrollIndicator={showScrollIndicator}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        >
+          {children}
+        </ScrollView>
+
+        {/* Footer */}
+        {footer && (
+          <View
+            className="border-t border-gray-100 bg-white"
+            style={{
+              flexShrink: 0,
+              width: "100%",
+              flexDirection: isMobile ? "column" : "row",
+              alignItems: "stretch",
+              gap: compact ? 8 : 10,
+              paddingHorizontal: horizontalInset,
+              paddingVertical: compact ? 10 : 12,
+              ...footerStyle,
+            }}
+          >
+            {footer}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
+  if (isWeb) {
+    return (
+      <View
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 1000,
+        }}
+      >
+        {content}
+      </View>
+    );
+  }
+
   return (
     <RNModal
       visible={visible}
@@ -73,89 +178,7 @@ export default function Modal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View
-        className="items-center justify-center"
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.45)",
-          padding: horizontalPadding,
-        }}
-      >
-        <View
-          className="bg-white rounded-2xl overflow-hidden"
-          style={{
-            width: "100%",
-            maxWidth: Math.min(width - horizontalPadding * 2, widths[size]),
-            maxHeight: shellMaxHeight,
-            flexDirection: "column",
-          }}
-        >
-          {/* Header */}
-          <View
-            className="border-b border-gray-100"
-            style={{
-              flexShrink: 0,
-              paddingHorizontal: horizontalInset,
-              paddingVertical: compact ? 10 : 12,
-            }}
-          >
-            <View className="flex-row items-center justify-between">
-              <Text
-                className={`font-bold text-gray-800 ${compact ? "text-sm" : "text-base"}`}
-              >
-                {title}
-              </Text>
-              <TouchableOpacity
-                onPress={onClose}
-                className="p-1 rounded-lg bg-gray-100"
-                activeOpacity={0.7}
-              >
-                <Ionicons name="close" size={18} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-            {headerContent}
-          </View>
-
-          {/* Body */}
-          <ScrollView
-            className={`app-scrollbar ${scrollViewClassName}`.trim()}
-            style={{
-              maxHeight: bodyMaxHeight,
-              flexGrow: 0,
-              flexShrink: 1,
-              paddingHorizontal: horizontalInset,
-            }}
-            contentContainerStyle={{
-              paddingTop: bodyPaddingY,
-              paddingBottom: bodyPaddingY,
-            }}
-            showsVerticalScrollIndicator={showScrollIndicator}
-            keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled
-          >
-            {children}
-          </ScrollView>
-
-          {/* Footer */}
-          {footer && (
-            <View
-              className="border-t border-gray-100 bg-white"
-              style={{
-                flexShrink: 0,
-                width: "100%",
-                flexDirection: isMobile ? "column" : "row",
-                alignItems: "stretch",
-                gap: compact ? 8 : 10,
-                paddingHorizontal: horizontalInset,
-                paddingVertical: compact ? 10 : 12,
-                ...footerStyle,
-              }}
-            >
-              {footer}
-            </View>
-          )}
-        </View>
-      </View>
+      {content}
     </RNModal>
   );
 }

@@ -606,6 +606,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     setSupportMaterialForm(EMPTY_SUPPORT_MATERIAL);
     setSupportMaterialErrors({});
     setSupportMaterialFile(null);
+    setUploadingSupportMaterialFile(false);
     setSupportMaterialModal(true);
   };
 
@@ -619,6 +620,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     });
     setSupportMaterialErrors({});
     setSupportMaterialFile(null);
+    setUploadingSupportMaterialFile(false);
     setSupportMaterialModal(true);
   };
 
@@ -1839,12 +1841,18 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       <Modal
         visible={supportMaterialModal}
         title={editSupportMaterialId ? "Editar Material de Apoio" : "Novo Material de Apoio"}
-        onClose={() => setSupportMaterialModal(false)}
+        onClose={() => {
+          setSupportMaterialModal(false);
+          setUploadingSupportMaterialFile(false);
+        }}
         size="lg"
         footer={
           <View className="flex-row gap-3 px-6 py-4 border-t border-gray-100">
             <TouchableOpacity
-              onPress={() => setSupportMaterialModal(false)}
+              onPress={() => {
+                setSupportMaterialModal(false);
+                setUploadingSupportMaterialFile(false);
+              }}
               className="flex-1 border border-gray-200 py-2.5 rounded-xl items-center"
               activeOpacity={0.7}
             >
