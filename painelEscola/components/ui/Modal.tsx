@@ -58,11 +58,13 @@ export default function Modal({
   const isWeb = Platform.OS === "web";
   const { width, height } = useWindowDimensions();
   const isMobile = width < 640;
-  const horizontalPadding = isMobile ? 12 : width < 1024 ? 24 : 40;
+  const viewportPaddingX = isMobile ? 12 : width < 1024 ? 24 : 40;
+  const viewportPaddingY = isMobile ? 12 : width < 1024 ? 20 : 28;
   const shellMaxHeight = resolveShellMaxHeight(maxHeight, height);
+  const panelMaxHeight = Math.max(240, Math.min(shellMaxHeight, height - viewportPaddingY * 2));
   const headerBlockHeight = compact ? 44 : 52;
   const footerBlockHeight = footer ? (isMobile ? (compact ? 96 : 110) : compact ? 52 : 60) : 0;
-  const bodyMaxHeight = Math.max(180, shellMaxHeight - headerBlockHeight - footerBlockHeight);
+  const bodyMaxHeight = Math.max(160, panelMaxHeight - headerBlockHeight - footerBlockHeight);
   const horizontalInset = compact ? (isMobile ? 14 : 18) : isMobile ? 16 : 24;
   const bodyPaddingY = compact ? 10 : 16;
 
@@ -74,16 +76,18 @@ export default function Modal({
       style={{
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.45)",
-        padding: horizontalPadding,
+        paddingHorizontal: viewportPaddingX,
+        paddingVertical: viewportPaddingY,
       }}
     >
       <View
         className="bg-white rounded-2xl overflow-hidden"
         style={{
           width: "100%",
-          maxWidth: Math.min(width - horizontalPadding * 2, widths[size]),
-          maxHeight: shellMaxHeight,
+          maxWidth: Math.min(width - viewportPaddingX * 2, widths[size]),
+          maxHeight: panelMaxHeight,
           flexDirection: "column",
+          overflow: "hidden",
         }}
       >
         {/* Header */}
@@ -159,11 +163,9 @@ export default function Modal({
       <View
         style={{
           position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
+          inset: 0,
           zIndex: 1000,
+          overflow: "hidden",
         }}
       >
         {content}
