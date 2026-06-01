@@ -546,8 +546,8 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                 <ActivityIndicator size="small" color={subjectColor} />
               ) : (
                 <>
-                  <Ionicons name="print-outline" size={16} color={subjectColor} style={{ marginRight: 8 }} />
-                  <Text style={[styles.pdfBotaoTexto, { color: subjectColor }]}>Gerar PDF para impressão</Text>
+                  <Ionicons name="download-outline" size={16} color={subjectColor} style={{ marginRight: 8 }} />
+                  <Text style={[styles.pdfBotaoTexto, { color: subjectColor }]}>Baixar PDF</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -555,7 +555,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
               <Text style={styles.pdfErro}>{erroPdf}</Text>
             ) : (
               <Text style={styles.pdfHint}>
-                Gere uma versão imprimível do simulado com folha de respostas.
+                Baixe uma versão do simulado com folha de respostas.
               </Text>
             )}
           </View>

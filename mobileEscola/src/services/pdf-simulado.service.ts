@@ -51,6 +51,29 @@ function formatDate(iso: string | null): string {
   }
 }
 
+function plainText(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function textParagraphs(value: string | number | null | undefined): string[] {
+  return plainText(value)
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+}
+
+function nomeArquivoPdf(title: string | null | undefined): string {
+  const base = plainText(title)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+  return `${base || 'simulado'}.pdf`;
+}
+
 // ── Geração de HTML ───────────────────────────────────────────────────────────
 
 function questaoHtml(q: Question, numero: number): string {
@@ -387,76 +410,233 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
 
 // ── Ações públicas ────────────────────────────────────────────────────────────
 
-function imprimirNaWeb(html: string, titulo: string): void {
-  // Usa um iframe oculto para imprimir SOMENTE o HTML do simulado,
-  // sem abrir nenhuma janela visível para o usuário.
-  const iframe = document.createElement('iframe');
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  iframe.style.opacity = '0';
-  iframe.style.pointerEvents = 'none';
-  iframe.title = titulo;
-  document.body.appendChild(iframe);
+async function imageToDataUrl(uri: string): Promise<{ dataUrl: string; width: number; height: number; format: string } | null> {
+  try {
+    const response = await fetch(uri);
+    if (!response.ok) return null;
 
-  let limpou = false;
-  const cleanup = () => {
-    if (limpou) return;
-    limpou = true;
-    setTimeout(() => {
-      try { document.body.removeChild(iframe); } catch {}
-    }, 1000);
-  };
+    const blob = await response.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
 
-  const disparar = () => {
-    try {
-      const cw = iframe.contentWindow;
-      if (!cw) { cleanup(); return; }
-      cw.focus();
-      // Pequeno delay para garantir que imagens/estilos estejam aplicados.
-      setTimeout(() => {
-        try {
-          cw.print();
-        } catch (e) {
-          console.warn('[PDF web] print() falhou', e);
-        }
-        cleanup();
-      }, 350);
-    } catch (e) {
-      console.warn('[PDF web] iframe falhou', e);
-      cleanup();
-    }
-  };
+    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
 
-  iframe.onload = disparar;
+    const mimeType = blob.type || dataUrl.match(/^data:([^;]+)/)?.[1] || '';
+    const format = mimeType.includes('png') ? 'PNG' : mimeType.includes('webp') ? 'WEBP' : 'JPEG';
 
-  const doc = iframe.contentWindow?.document;
-  if (doc) {
-    doc.open();
-    doc.write(html);
-    doc.close();
-    // Em alguns navegadores o onload não dispara para document.write — fallback por timer
-    setTimeout(() => {
-      if (!limpou) disparar();
-    }, 1500);
-  } else {
-    cleanup();
+    return { dataUrl, format, ...dimensions };
+  } catch (e) {
+    console.warn('[PDF web] não foi possível carregar imagem', uri, e);
+    return null;
   }
 }
 
-export async function gerarPdfSimulado(detalhe: SimuladoDetail): Promise<void> {
-  const html = gerarHtmlSimulado(detalhe);
+async function gerarPdfNaWeb(detalhe: SimuladoDetail): Promise<void> {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 48;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
 
+  const addPageIfNeeded = (heightNeeded: number) => {
+    if (y + heightNeeded <= pageHeight - margin) return;
+    doc.addPage();
+    y = margin;
+  };
+
+  const writeWrapped = (
+    text: string,
+    options: { x?: number; size?: number; style?: 'normal' | 'bold'; color?: [number, number, number]; maxWidth?: number; lineHeight?: number } = {},
+  ) => {
+    const x = options.x ?? margin;
+    const size = options.size ?? 11;
+    const lineHeight = options.lineHeight ?? size * 1.35;
+    const maxWidth = options.maxWidth ?? contentWidth - (x - margin);
+    doc.setFont('helvetica', options.style ?? 'normal');
+    doc.setFontSize(size);
+    doc.setTextColor(...(options.color ?? [17, 24, 39]));
+
+    const lines = doc.splitTextToSize(text, maxWidth) as string[];
+    addPageIfNeeded(lines.length * lineHeight);
+    doc.text(lines, x, y, { baseline: 'top' });
+    y += lines.length * lineHeight;
+  };
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(15, 23, 42);
+  writeWrapped(detalhe.title, { size: 18, style: 'bold', lineHeight: 24 });
+  y += 8;
+
+  const meta: Array<[string, string]> = [];
+  if (detalhe.course?.name) meta.push(['Curso', detalhe.course.name]);
+  if (detalhe.subject?.name) meta.push(['Disciplina', detalhe.subject.name]);
+  if (detalhe.exam_type_label) meta.push(['Tipo', detalhe.exam_type_label]);
+  meta.push(['Duração', formatExamDuration(detalhe.duration_minutes)]);
+  meta.push(['Questões', String(detalhe.total_questions)]);
+  meta.push(['Pontuação total', String(detalhe.total_points)]);
+  if (detalhe.starts_at) meta.push(['Início', formatDate(detalhe.starts_at)]);
+  if (detalhe.ends_at) meta.push(['Prazo', formatDate(detalhe.ends_at)]);
+
+  meta.forEach(([label, value], index) => {
+    const col = index % 2;
+    const rowY = y + Math.floor(index / 2) * 16;
+    const x = margin + col * (contentWidth / 2);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(31, 41, 55);
+    doc.text(`${label}:`, x, rowY, { baseline: 'top' });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    doc.text(value, x + 62, rowY, { baseline: 'top', maxWidth: contentWidth / 2 - 68 });
+  });
+  y += Math.ceil(meta.length / 2) * 16 + 12;
+
+  if (detalhe.description) {
+    textParagraphs(detalhe.description).forEach((paragraph) => {
+      writeWrapped(paragraph, { size: 10.5, color: [71, 85, 105], lineHeight: 15 });
+      y += 4;
+    });
+  }
+
+  y += 8;
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(margin, y, contentWidth, 54);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(31, 41, 55);
+  doc.text('Aluno(a):', margin + 10, y + 12, { baseline: 'top' });
+  doc.text('Data:', margin + contentWidth * 0.7, y + 12, { baseline: 'top' });
+  doc.text('Turma:', margin + 10, y + 34, { baseline: 'top' });
+  doc.text('Nota:', margin + contentWidth * 0.7, y + 34, { baseline: 'top' });
+  doc.line(margin + 68, y + 24, margin + contentWidth * 0.65, y + 24);
+  doc.line(margin + contentWidth * 0.75, y + 24, margin + contentWidth - 10, y + 24);
+  doc.line(margin + 58, y + 46, margin + contentWidth * 0.65, y + 46);
+  doc.line(margin + contentWidth * 0.74, y + 46, margin + contentWidth - 10, y + 46);
+  y += 76;
+
+  const questoes = (detalhe.questions ?? [])
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const [idx, q] of questoes.entries()) {
+    addPageIfNeeded(80);
+    const numero = idx + 1;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, y - 8, pageWidth - margin, y - 8);
+
+    const badges = [
+      q.subject?.name,
+      q.type === 'essay' ? 'Discursiva' : 'Objetiva',
+      `${q.points} pt${q.points !== 1 ? 's' : ''}`,
+    ].filter(Boolean).join('  •  ');
+
+    writeWrapped(`${numero}. ${badges}`, { size: 10.5, style: 'bold', color: [15, 23, 42], lineHeight: 15 });
+    y += 4;
+
+    const paragraphs = textParagraphs(q.question_text);
+    if (paragraphs.length) {
+      paragraphs.forEach((paragraph) => {
+        writeWrapped(paragraph, { size: 11, lineHeight: 16 });
+        y += 4;
+      });
+    }
+
+    if (q.image_url) {
+      const image = await imageToDataUrl(q.image_url);
+      if (image) {
+        const imageWidth = Math.min(contentWidth, 360);
+        const imageHeight = Math.min((imageWidth * image.height) / image.width, 255);
+        addPageIfNeeded(imageHeight + 14);
+        doc.addImage(image.dataUrl, image.format, margin, y, imageWidth, imageHeight);
+        y += imageHeight + 12;
+      }
+    }
+
+    if (q.type === 'multiple_choice') {
+      const opcoes = (q.options ?? [])
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+      opcoes.forEach((op, optionIndex) => {
+        const marker = `${letraOpcao(optionIndex)})`;
+        const optionText = plainText(op.option_text).trim();
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        addPageIfNeeded(18);
+        doc.text(marker, margin, y, { baseline: 'top' });
+        writeWrapped(optionText || ' ', { x: margin + 28, size: 10.5, maxWidth: contentWidth - 28, lineHeight: 15 });
+        y += 2;
+      });
+
+      if (q.allow_text_answer) {
+        y += 6;
+        writeWrapped('Justificativa / Resposta:', { size: 9.5, color: [71, 85, 105], lineHeight: 13 });
+        for (let i = 0; i < 4; i += 1) {
+          addPageIfNeeded(20);
+          doc.line(margin, y + 12, pageWidth - margin, y + 12);
+          y += 20;
+        }
+      }
+    } else {
+      y += 6;
+      writeWrapped('Resposta:', { size: 9.5, color: [71, 85, 105], lineHeight: 13 });
+      for (let i = 0; i < 8; i += 1) {
+        addPageIfNeeded(20);
+        doc.line(margin, y + 12, pageWidth - margin, y + 12);
+        y += 20;
+      }
+    }
+
+    y += 16;
+  }
+
+  const totalObjetivas = questoes.filter((q) => q.type === 'multiple_choice').length;
+  if (totalObjetivas > 0) {
+    doc.addPage();
+    y = margin;
+    writeWrapped('Folha de Respostas', { size: 14, style: 'bold', lineHeight: 20 });
+    y += 8;
+    writeWrapped('Marque com X a alternativa escolhida em cada questão.', { size: 10.5, color: [71, 85, 105], lineHeight: 15 });
+    y += 10;
+
+    for (let i = 0; i < totalObjetivas; i += 1) {
+      addPageIfNeeded(28);
+      const x = i % 2 === 0 ? margin : margin + contentWidth / 2;
+      if (i % 2 === 0 && i > 0) y += 28;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(String(i + 1), x, y, { baseline: 'middle' });
+      ['A', 'B', 'C', 'D', 'E'].forEach((letter, letterIndex) => {
+        const cellX = x + 30 + letterIndex * 28;
+        doc.rect(cellX, y - 9, 20, 20);
+        doc.text(letter, cellX + 6, y - 3, { baseline: 'top' });
+      });
+    }
+  }
+
+  doc.save(nomeArquivoPdf(detalhe.title));
+}
+
+export async function gerarPdfSimulado(detalhe: SimuladoDetail): Promise<void> {
   if (Platform.OS === 'web') {
-    imprimirNaWeb(html, detalhe.title);
+    await gerarPdfNaWeb(detalhe);
     return;
   }
 
   // Mobile: gera arquivo PDF e oferece compartilhamento
+  const html = gerarHtmlSimulado(detalhe);
   const { uri } = await Print.printToFileAsync({ html, base64: false });
 
   if (await Sharing.isAvailableAsync()) {
