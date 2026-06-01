@@ -91,6 +91,11 @@ function resolveImageUrl(uri: string): string {
 function imageUrlCandidates(uri: string): string[] {
   const resolved = resolveImageUrl(uri);
   const candidates = [resolved];
+  const storagePathMatch = resolved.match(/\/storage\/(.+)$/);
+
+  if (storagePathMatch?.[1]) {
+    candidates.unshift(`${BASE_URL.replace(/\/+$/, '')}/api/media/storage/${storagePathMatch[1]}`);
+  }
 
   if (
     typeof window !== 'undefined' &&

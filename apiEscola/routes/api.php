@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\StudentPastExamController;
 use App\Http\Controllers\Api\ExamTypeController;
 use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 // Health check (público)
 Route::get('/health', [HealthController::class, 'check']);
@@ -113,6 +114,28 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('/dashboard', [AdminDashboardController::class, 'show']);
     Route::match(['post', 'put', 'patch'], '/me/password', [AuthController::class, 'updatePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Proxy autenticado para arquivos públicos que precisam ser lidos pelo app web
+    // sem depender do CORS do servidor estático /storage.
+    Route::get('media/storage/{path}', function (string $path) {
+        $normalized = trim(preg_replace('#/+#', '/', $path) ?? '', '/');
+
+        if ($normalized === '' || str_contains($normalized, '..')) {
+            abort(404);
+        }
+
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($normalized)) {
+            abort(404);
+        }
+
+        return response($disk->get($normalized), 200, [
+            'Content-Type' => $disk->mimeType($normalized) ?: 'application/octet-stream',
+            'Cache-Control' => 'public, max-age=3600',
+            'Content-Disposition' => 'inline; filename="'.basename($normalized).'"',
+        ]);
+    })->where('path', '.*');
 
     // Tenants (somente super_admin)
     Route::apiResource('tenants', TenantController::class);
