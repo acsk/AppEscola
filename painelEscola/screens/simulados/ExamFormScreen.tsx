@@ -29,6 +29,7 @@ import {
   isoToDisplayDateTime,
   isValidDisplayDateTime,
 } from "../../utils/masks";
+import { prepareImageForUpload } from "../../utils/imageCompression";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
 import { mapExamQuestionToPreview } from "../../components/simulados/examPreviewUtils";
@@ -141,8 +142,8 @@ function validateExam(form: ExamForm): Record<string, string> {
 function validateQuestionEnunciado(form: ExamQuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
-  if (!form.question_text.trim()) {
-    errs.enunciado = "Informe o texto do enunciado.";
+  if (!form.question_text.trim() && !form.image_url.trim()) {
+    errs.enunciado = "Informe o enunciado em texto, imagem, ou ambos.";
   }
   if (form.points) {
     const pts = Number(form.points);
@@ -190,6 +191,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const canManageContent = effectiveExamId != null;
   const scrollRef = useRef<ScrollView>(null);
   const supportMaterialFileInputRef = useRef<HTMLInputElement | null>(null);
+  const questionImageInputRef = useRef<HTMLInputElement | null>(null);
 
   // Domain hooks
   const examStatuses = useExamStatuses();
@@ -228,6 +230,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const [qForm, setQForm] = useState<ExamQuestionForm>(EMPTY_QUESTION);
   const [qErrors, setQErrors] = useState<Record<string, string>>({});
   const [savingQuestion, setSavingQuestion] = useState(false);
+  const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
   const [deleteQuestionId, setDeleteQuestionId] = useState<number | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(1);
@@ -583,6 +586,51 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       showApiErrorToast(setToast, err, "Não foi possível salvar a questão.");
     } finally {
       setSavingQuestion(false);
+    }
+  };
+
+  const uploadQuestionImage = async (file: File) => {
+    if (!effectiveExamId) return;
+
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setQErrors((prev) => ({
+        ...prev,
+        image_url: "A imagem deve ter no máximo 5MB.",
+      }));
+      return;
+    }
+
+    setUploadingQuestionImage(true);
+    try {
+      const optimized = await prepareImageForUpload(file, 5000);
+      const formData = new FormData();
+      formData.append("image", optimized as File);
+
+      const { data } = await api.post(
+        `/exams/${effectiveExamId}/questions/upload-image`,
+        formData
+      );
+
+      const imageUrl = data?.image_url;
+      if (!imageUrl) throw new Error("Resposta sem image_url.");
+
+      setQField("image_url", imageUrl);
+      setQErrors((prev) => {
+        const next = { ...prev };
+        delete next.image_url;
+        delete next.enunciado;
+        return next;
+      });
+      showApiToast(setToast, data, "Imagem do enunciado enviada com sucesso.");
+    } catch (err: unknown) {
+      const apiErrs = getApiValidationErrors(err);
+      if (Object.keys(apiErrs).length > 0) {
+        setQErrors((prev) => ({ ...prev, ...apiErrs }));
+      }
+      showApiErrorToast(setToast, err, "Não foi possível enviar a imagem da questão.");
+    } finally {
+      setUploadingQuestionImage(false);
     }
   };
 
@@ -1650,7 +1698,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               />
               {!qErrors.enunciado && (
                 <Text className="text-xs text-gray-400 mt-1">
-                  Campo obrigatório.
+                  Informe texto, imagem, ou ambos.
                 </Text>
               )}
             </View>
@@ -1709,9 +1757,68 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               }}
             >
               <Text className="text-sm font-semibold text-gray-700 mb-2">Mídia (opcional)</Text>
-              <Text className="text-xs text-gray-500 mb-2">
-                Upload de imagem bloqueado para o enunciado.
+              <View className="flex-row items-center gap-3 flex-wrap">
+                <TouchableOpacity
+                  onPress={() => questionImageInputRef.current?.click()}
+                  disabled={uploadingQuestionImage || !effectiveExamId}
+                  className="px-4 py-2.5 rounded-xl bg-violet-600"
+                  activeOpacity={0.85}
+                  style={{ opacity: uploadingQuestionImage || !effectiveExamId ? 0.7 : 1 }}
+                >
+                  {uploadingQuestionImage ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-sm font-semibold text-white">
+                      {qForm.image_url ? "Trocar imagem" : "Enviar imagem"}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                {qForm.image_url ? (
+                  <TouchableOpacity
+                    onPress={() => setQField("image_url", "")}
+                    className="px-3 py-2 rounded-xl border border-gray-200 bg-white"
+                    activeOpacity={0.7}
+                  >
+                    <Text className="text-xs font-semibold text-gray-600">Remover imagem</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {qForm.image_url ? (
+                  <Text className="text-xs text-emerald-700" numberOfLines={1}>
+                    Imagem pronta para uso no enunciado.
+                  </Text>
+                ) : (
+                  <Text className="text-xs text-gray-400">Nenhuma imagem enviada</Text>
+                )}
+              </View>
+              <Text className="text-xs text-gray-400 mt-2">
+                Tipos aceitos: JPG, JPEG, PNG, WEBP e GIF. Máximo: 5 MB.
               </Text>
+              <input
+                ref={questionImageInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                style={{ display: "none" }}
+                onChange={(e: any) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadQuestionImage(file);
+                  e.target.value = "";
+                }}
+              />
+              {qErrors.image_url && (
+                <Text className="text-xs text-red-500 mt-1">{qErrors.image_url}</Text>
+              )}
+
+              {qForm.image_url ? (
+                <View className="mt-3">
+                  <FormInput
+                    label="URL da imagem"
+                    value={qForm.image_url}
+                    onChangeText={(v) => setQField("image_url", v)}
+                    placeholder="https://..."
+                  />
+                </View>
+              ) : null}
+
               <View className="mt-3">
                 <FormInput
                   label="URL do vídeo"
