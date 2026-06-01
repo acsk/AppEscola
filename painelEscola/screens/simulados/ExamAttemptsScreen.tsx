@@ -197,13 +197,31 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
 
   const attemptsTableMinWidth = isMobile ? 880 : 1040;
   const attemptColumns = {
-    student: isMobile ? 260 : 290,
-    exam: isMobile ? 190 : 230,
+    student: isMobile ? 260 : 300,
+    exam: isMobile ? 190 : 240,
     score: 108,
-    result: 102,
+    result: 108,
     status: 128,
-    started: 136,
-    action: 48,
+    started: 148,
+    action: 56,
+  };
+  const studentColumnStyle = {
+    width: attemptColumns.student,
+    flexGrow: isMobile ? 0 : 1.15,
+    flexShrink: 1,
+    paddingRight: 18,
+  };
+  const examColumnStyle = {
+    width: attemptColumns.exam,
+    flexGrow: isMobile ? 0 : 0.9,
+    flexShrink: 1,
+    paddingRight: 18,
+  };
+  const startedColumnStyle = {
+    width: attemptColumns.started,
+    flexGrow: isMobile ? 0 : 0.35,
+    flexShrink: 0,
+    paddingLeft: 8,
   };
   const headerTextStyle = {
     fontSize: 11,
@@ -384,10 +402,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
         }}
       >
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-          <Text style={[headerTextStyle, { width: attemptColumns.student }]}>
+          <Text style={[headerTextStyle, studentColumnStyle]}>
             Aluno
           </Text>
-          <Text style={[headerTextStyle, { width: attemptColumns.exam }]}>
+          <Text style={[headerTextStyle, examColumnStyle]}>
             Simulado
           </Text>
           <Text style={[headerTextStyle, { width: attemptColumns.score, textAlign: "center" }]}>
@@ -399,7 +417,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
           <Text style={[headerTextStyle, { width: attemptColumns.status, textAlign: "center" }]}>
             Status
           </Text>
-          <Text style={[headerTextStyle, { width: attemptColumns.started }]}>
+          <Text style={[headerTextStyle, startedColumnStyle]}>
             Início
           </Text>
           <View style={{ width: attemptColumns.action }} />
@@ -421,7 +439,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
               className={`flex-row items-center px-4 py-2.5 ${i < rows.length - 1 ? "border-b border-gray-50" : ""}`}
               style={{ minHeight: 58 }}
             >
-              <View style={{ width: attemptColumns.student, paddingRight: 18 }}>
+              <View style={studentColumnStyle}>
                 <Text
                   className="font-semibold text-gray-800"
                   style={{ fontSize: 13, lineHeight: 17 }}
@@ -433,7 +451,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                   {a.student?.enrollment_number ?? "—"}
                 </Text>
               </View>
-              <View style={{ width: attemptColumns.exam, paddingRight: 18 }}>
+              <View style={examColumnStyle}>
                 <Text
                   className="text-gray-700"
                   style={{ fontSize: 13, lineHeight: 17 }}
@@ -479,7 +497,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                   return renderTablePill(STATUS_LABEL[a.status] ?? a.status, colors.bg, colors.color);
                 })()}
               </View>
-              <View style={{ width: attemptColumns.started, paddingLeft: 8 }}>
+              <View style={startedColumnStyle}>
                 <Text className="text-gray-500" style={{ fontSize: 12, lineHeight: 16 }}>
                   {fmtDate(a.started_at)}
                 </Text>
