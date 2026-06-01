@@ -19,6 +19,19 @@ function nl2br(value: string): string {
   return escapeHtml(value).replace(/\n/g, '<br/>');
 }
 
+function textBlocksHtml(value: string): string {
+  const paragraphs = value
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length === 0) return '';
+
+  return paragraphs
+    .map((paragraph) => `<p>${nl2br(paragraph)}</p>`)
+    .join('');
+}
+
 function letraOpcao(index: number): string {
   return String.fromCharCode(65 + index); // A, B, C, ...
 }
@@ -56,7 +69,7 @@ function questaoHtml(q: Question, numero: number): string {
               (op, idx) => `
             <li>
               <span class="opt-marker">${letraOpcao(idx)})</span>
-              <span class="opt-text">${nl2br(op.option_text)}</span>
+              <span class="opt-text">${textBlocksHtml(op.option_text)}</span>
             </li>`,
             )
             .join('')}
@@ -86,7 +99,7 @@ function questaoHtml(q: Question, numero: number): string {
         <span class="q-type">${q.type === 'essay' ? 'Discursiva' : 'Objetiva'}</span>
         <span class="q-points">${q.points} pt${q.points !== 1 ? 's' : ''}</span>
       </header>
-      <div class="question-text">${nl2br(q.question_text)}</div>
+      <div class="question-text">${textBlocksHtml(q.question_text)}</div>
       ${imagem}
       ${corpo}
     </article>
@@ -205,21 +218,26 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
       color: #1F2937;
     }
     .question {
-      margin: 14px 0 18px 0;
+      margin: 16px 0 20px 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #E2E8F0;
       page-break-inside: avoid;
     }
+    .question:last-child { border-bottom: 0; }
     .question-header {
       display: flex;
       align-items: baseline;
       gap: 10px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       font-size: 10.5pt;
       color: #475569;
+      page-break-after: avoid;
     }
     .q-number {
       font-weight: 700;
       color: #0F172A;
       font-size: 12pt;
+      min-width: 24px;
     }
     .q-subject, .q-type, .q-points {
       background: #F1F5F9;
@@ -229,32 +247,53 @@ export function gerarHtmlSimulado(detalhe: SimuladoDetail): string {
     }
     .q-points { margin-left: auto; font-weight: 600; color: #0F172A; }
     .question-text {
-      margin: 6px 0 8px 0;
+      margin: 0 0 10px 0;
       text-align: justify;
+      color: #111827;
+      line-height: 1.55;
+    }
+    .question-text p {
+      margin: 0 0 7px 0;
+    }
+    .question-text p:last-child {
+      margin-bottom: 0;
     }
     .question-image {
-      margin: 8px 0;
-      text-align: center;
+      margin: 8px 0 12px 0;
+      text-align: left;
     }
     .question-image img {
+      display: block;
       max-width: 100%;
       max-height: 90mm;
       object-fit: contain;
+      margin: 0;
     }
     .options {
       list-style: none;
-      padding-left: 6px;
-      margin: 6px 0;
+      padding-left: 0;
+      margin: 8px 0 0 0;
     }
     .options li {
       display: flex;
       gap: 8px;
-      margin: 4px 0;
+      margin: 6px 0;
       align-items: flex-start;
+      line-height: 1.45;
     }
     .opt-marker {
       font-weight: 700;
-      min-width: 18px;
+      min-width: 22px;
+      color: #0F172A;
+    }
+    .opt-text {
+      flex: 1;
+    }
+    .opt-text p {
+      margin: 0 0 4px 0;
+    }
+    .opt-text p:last-child {
+      margin-bottom: 0;
     }
     .answer-area {
       margin-top: 10px;
