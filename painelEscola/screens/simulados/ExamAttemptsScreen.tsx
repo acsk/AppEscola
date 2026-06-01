@@ -222,6 +222,17 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     return `${letter} - ${text}`;
   };
 
+  const getOptionDisplay = (label: string | null) => {
+    if (!label) return { letter: null, text: null };
+    const trimmed = label.trim();
+    const match = trimmed.match(/^([A-Z])(?:\s*[-.)]\s*(.*))?$/i);
+    if (!match) return { letter: null, text: trimmed };
+    return {
+      letter: match[1].toUpperCase(),
+      text: match[2]?.trim() || null,
+    };
+  };
+
   return (
     <ScrollView
       className="flex-1"
@@ -589,15 +600,28 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                     const selectedOptionIndex = selectedOption ? questionOptions.findIndex((option: ExamQuestionOption) => option === selectedOption) : -1;
                     const correctOption = questionOptions.find((option: ExamQuestionOption) => option.is_correct) ?? null;
                     const correctOptionIndex = correctOption ? questionOptions.findIndex((option: ExamQuestionOption) => option === correctOption) : -1;
+                    const selectedLabel = selectedOption
+                      ? getOptionLabel(selectedOption, selectedOptionIndex >= 0 ? selectedOptionIndex : undefined)
+                      : ans.option_id != null && ans.option_text
+                        ? ans.option_text
+                        : null;
+                    const correctLabel = correctOption
+                      ? getOptionLabel(correctOption, correctOptionIndex >= 0 ? correctOptionIndex : undefined)
+                      : null;
+                    const selectedDisplay = getOptionDisplay(selectedLabel);
+                    const correctDisplay = getOptionDisplay(correctLabel);
+                    const statusColor = isCorreta ? '#16A34A' : isErrada ? '#EF4444' : '#F59E0B';
                     return (
                       <View
                         key={ans.question_id}
                         style={{
-                          marginBottom: 12,
-                          borderRadius: 12,
-                          borderWidth: 1.5,
-                          borderColor: isCorreta ? '#86EFAC' : isErrada ? '#FECACA' : '#E5E7EB',
-                          backgroundColor: isCorreta ? '#F0FDF4' : isErrada ? '#FFF5F5' : '#FAFAFA',
+                          marginBottom: 14,
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderLeftWidth: 4,
+                          borderColor: '#E5E7EB',
+                          borderLeftColor: statusColor,
+                          backgroundColor: '#FFFFFF',
                           overflow: 'hidden',
                         }}
                       >
@@ -617,7 +641,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                               fontWeight: '700',
                               minWidth: 22,
                               marginTop: 1,
-                              color: isCorreta ? '#15803D' : isErrada ? '#DC2626' : '#9CA3AF',
+                              color: statusColor,
                             }}
                           >
                             {idx + 1}.
@@ -628,7 +652,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                 fontSize: 14,
                                 fontWeight: '600',
                                 lineHeight: 20,
-                                color: isCorreta ? '#14532D' : isErrada ? '#7F1D1D' : '#374151',
+                                color: '#1F2937',
                               }}
                             >
                               {getAnswerQuestionLabel(ans)}
@@ -638,7 +662,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                 style={{
                                   borderWidth: 1,
                                   borderColor: '#E5E7EB',
-                                  borderRadius: 10,
+                                  borderRadius: 12,
                                   overflow: 'hidden',
                                   backgroundColor: '#F8FAFC',
                                 }}
@@ -667,46 +691,164 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                             marginBottom: 12,
                             marginLeft: 42,
                             borderTopWidth: 1,
-                            borderTopColor: isCorreta ? '#BBF7D0' : isErrada ? '#FECACA' : '#E5E7EB',
-                            paddingTop: 8,
+                            borderTopColor: '#EEF2F7',
+                            paddingTop: 12,
                           }}
                         >
-                          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 6 }}>
-                            <View style={{ flex: 1, minWidth: 0 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: isCorreta ? '#15803D' : isErrada ? '#B91C1C' : '#0369A1', marginBottom: 4 }}>
-                                Resposta do aluno
-                              </Text>
-                              <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280' }} numberOfLines={2}>
-                                {selectedOption
-                                  ? getOptionLabel(selectedOption, selectedOptionIndex >= 0 ? selectedOptionIndex : undefined)
-                                  : ans.option_id != null && ans.option_text
-                                    ? ans.option_text
-                                    : "—"}
-                              </Text>
+                          <View style={{ flexDirection: isMobile ? 'column' : 'row', gap: 10, marginBottom: 8 }}>
+                            <View
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: isErrada ? '#FECACA' : isCorreta ? '#BBF7D0' : '#E0E7FF',
+                                backgroundColor: isErrada ? '#FFF7F7' : isCorreta ? '#F7FEF9' : '#F8FAFF',
+                                padding: 12,
+                              }}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                <View
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 999,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: isErrada ? '#FEE2E2' : isCorreta ? '#DCFCE7' : '#E0E7FF',
+                                  }}
+                                >
+                                  <Ionicons
+                                    name={isErrada ? "close" : isCorreta ? "checkmark" : "ellipse-outline"}
+                                    size={14}
+                                    color={isErrada ? "#DC2626" : isCorreta ? "#16A34A" : "#4F46E5"}
+                                  />
+                                </View>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#475569', textTransform: 'uppercase' }}>
+                                  Opção marcada
+                                </Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                {selectedDisplay.letter && (
+                                  <View
+                                    style={{
+                                      width: 34,
+                                      height: 34,
+                                      borderRadius: 10,
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      backgroundColor: isErrada ? '#DC2626' : isCorreta ? '#16A34A' : '#6366F1',
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>
+                                      {selectedDisplay.letter}
+                                    </Text>
+                                  </View>
+                                )}
+                                <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: '#334155' }}>
+                                  {selectedDisplay.text ?? "Alternativa selecionada"}
+                                </Text>
+                              </View>
                             </View>
-                            <View style={{ flex: 1, minWidth: 0 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#6D28D9', marginBottom: 4 }}>
-                                Gabarito
-                              </Text>
-                              <Text style={{ fontSize: 13, color: '#6D28D9' }} numberOfLines={2}>
-                                {correctOption
-                                  ? getOptionLabel(correctOption, correctOptionIndex >= 0 ? correctOptionIndex : undefined)
-                                  : "—"}
-                              </Text>
+
+                            <View
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                borderRadius: 12,
+                                borderWidth: 1,
+                                borderColor: '#DDD6FE',
+                                backgroundColor: '#FAF7FF',
+                                padding: 12,
+                              }}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                <View
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: 999,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#EDE9FE',
+                                  }}
+                                >
+                                  <Ionicons name="ribbon-outline" size={14} color="#7C3AED" />
+                                </View>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#6D28D9', textTransform: 'uppercase' }}>
+                                  Gabarito
+                                </Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                {correctDisplay.letter && (
+                                  <View
+                                    style={{
+                                      width: 34,
+                                      height: 34,
+                                      borderRadius: 10,
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      backgroundColor: '#7C3AED',
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>
+                                      {correctDisplay.letter}
+                                    </Text>
+                                  </View>
+                                )}
+                                <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: '#5B21B6' }}>
+                                  {correctDisplay.text ?? "Resposta correta"}
+                                </Text>
+                              </View>
                             </View>
                           </View>
                           {ans.text_answer != null && (
-                            <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', fontStyle: 'italic' }}>
-                              "{ans.text_answer}"
-                            </Text>
+                            <View
+                              style={{
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: '#E5E7EB',
+                                backgroundColor: '#F8FAFC',
+                                padding: 10,
+                                marginBottom: 8,
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 4 }}>
+                                Resposta discursiva
+                              </Text>
+                              <Text style={{ fontSize: 13, lineHeight: 18, color: '#334155', fontStyle: 'italic' }}>
+                                "{ans.text_answer}"
+                              </Text>
+                            </View>
                           )}
                           {ans.option_id == null && ans.text_answer == null && (
-                            <Text style={{ fontSize: 13, color: '#9CA3AF' }}>Não respondida</Text>
+                            <View
+                              style={{
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: '#E5E7EB',
+                                backgroundColor: '#F8FAFC',
+                                padding: 10,
+                              }}
+                            >
+                              <Text style={{ fontSize: 13, color: '#94A3B8', fontWeight: '600' }}>Não respondida</Text>
+                            </View>
                           )}
                           {!needsReview && ans.points_earned != null && (
-                            <Text style={{ fontSize: 12, fontWeight: '700', marginTop: 4, color: isCorreta ? '#16A34A' : '#DC2626' }}>
-                              +{ans.points_earned.toFixed(1)} pts
-                            </Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2 }}>
+                              <View
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 5,
+                                  borderRadius: 999,
+                                  backgroundColor: isCorreta ? '#DCFCE7' : '#FEE2E2',
+                                }}
+                              >
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: isCorreta ? '#15803D' : '#DC2626' }}>
+                                  +{ans.points_earned.toFixed(1)} pts
+                                </Text>
+                              </View>
+                            </View>
                           )}
 
                           {/* Botões de correção manual */}
