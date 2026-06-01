@@ -61,14 +61,7 @@ export function SimuladosNavigator() {
       <Stack.Screen
         name="SimuladoDetalhe"
         component={SimuladoDetalheScreen}
-        options={{
-          title: 'Simulado',
-          headerBackTitle: 'Voltar',
-          headerStyle: { backgroundColor: '#FBFAFF' },
-          headerTintColor: colors.ink,
-          headerTitleStyle: { fontWeight: '800', color: '#111827' },
-          headerShadowVisible: false,
-        }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="SimuladoExam"

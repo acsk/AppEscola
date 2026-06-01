@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
 import {
   AttemptStatus,
@@ -267,6 +268,7 @@ function SupportMaterialsSection({
 export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => createSimuladoDetalheStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const { examId } = route.params;
   const { width } = useWindowDimensions();
   const [erroAcao, setErroAcao] = useState<string | null>(null);
@@ -298,32 +300,54 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     ? getApiErrorMessage(detalheError, 'Não foi possível carregar o simulado.')
     : null;
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity
-          onPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.navigate('SimuladosList');
-            }
-          }}
-          style={styles.headerBackButton}
-          activeOpacity={0.7}
-          hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation]);
-
-  useEffect(() => {
-    if (detalhe?.title) {
-      navigation.setOptions({ title: detalhe.title });
+  function voltarParaLista() {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('SimuladosList');
     }
-  }, [detalhe?.title, navigation]);
+  }
+
+  function renderHeader(title = 'Simulado') {
+    return (
+      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+        <View style={styles.headerGlowPrimary} />
+        <View style={styles.headerGlowSecondary} />
+        <View style={styles.headerTituloRow}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={voltarParaLista}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.ink} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerTituloBtn}
+            onPress={voltarParaLista}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar para Simulados"
+          >
+            <Text style={styles.headerTitulo} numberOfLines={1}>{title}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerLinkBtn}
+            onPress={() => navigation.navigate('SimuladosList')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Ir para Simulados"
+          >
+            <Ionicons name="clipboard-outline" size={16} color={colors.surface} />
+            <Text style={styles.headerLinkTexto}>Simulados</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   async function handleIniciar() {
     if (!detalhe) return;
@@ -364,9 +388,12 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   // ── Carregando ──────────────────────────────────────────────────────────────
   if (carregando) {
     return (
-      <View style={styles.centrado}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.carregandoTexto}>Carregando simulado…</Text>
+      <View style={styles.container}>
+        {renderHeader()}
+        <View style={styles.centrado}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.carregandoTexto}>Carregando simulado…</Text>
+        </View>
       </View>
     );
   }
@@ -374,12 +401,15 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   // ── Erro ────────────────────────────────────────────────────────────────────
   if (erroMsg || !detalhe) {
     return (
-      <View style={styles.centrado}>
-        <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
-        <Text style={styles.erroTexto}>{erroMsg ?? 'Simulado não encontrado.'}</Text>
-        <TouchableOpacity style={styles.botaoTentar} onPress={() => refetchDetalhe()} activeOpacity={0.8}>
-          <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        {renderHeader()}
+        <View style={styles.centrado}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.border} />
+          <Text style={styles.erroTexto}>{erroMsg ?? 'Simulado não encontrado.'}</Text>
+          <TouchableOpacity style={styles.botaoTentar} onPress={() => refetchDetalhe()} activeOpacity={0.8}>
+            <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -417,7 +447,9 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const metricWidth = width < 390 ? '48%' : '23%';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+      {renderHeader(detalhe.title)}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <View
         style={[
           styles.card,
@@ -775,19 +807,77 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
           </View>
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 function createSimuladoDetalheStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerBackButton: {
-    marginLeft: -6,
-    paddingRight: 12,
-    paddingVertical: 8,
-  },
   container: { flex: 1, backgroundColor: '#F6F7FB' },
+  scroll: { flex: 1 },
   content:   { padding: 16 },
+  headerWrap: {
+    backgroundColor: '#FBFAFF',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  headerGlowPrimary: {
+    position: 'absolute',
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    right: -104,
+    top: -150,
+    backgroundColor: '#F0E9FF',
+    opacity: 0.92,
+  },
+  headerGlowSecondary: {
+    position: 'absolute',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    left: -76,
+    top: 58,
+    backgroundColor: '#F7F2FF',
+    opacity: 0.98,
+  },
+  headerTituloRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 18,
+    paddingBottom: 14,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
+  },
+  headerTituloBtn: { flex: 1, justifyContent: 'center', minWidth: 0 },
+  headerTitulo: { fontSize: 22, fontWeight: '800', color: '#111827' },
+  headerLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  headerLinkTexto: { fontSize: 11, fontWeight: '700', color: colors.surface },
 
   centrado: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
