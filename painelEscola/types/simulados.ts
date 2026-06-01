@@ -156,9 +156,7 @@ export type ExamAttemptDetail = ExamAttempt & {
     points_earned: number | null;
     image_url?: string | null;
     question_image_url?: string | null;
-    question?: {
-      image_url?: string | null;
-    } | null;
+    question?: Pick<ExamQuestion, "id" | "image_url" | "options"> | null;
   }[];
 };
 

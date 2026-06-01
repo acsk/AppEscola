@@ -53,6 +53,8 @@ function fmtPct(v: number | null) {
   return `${v.toFixed(1)}%`;
 }
 
+type AttemptDetailQuestion = Pick<ExamQuestion, "id" | "image_url" | "options">;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" }: ExamAttemptsScreenProps) {
@@ -72,7 +74,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
   const [detailId, setDetailId] = useState<number | null>(null);
   const [detail, setDetail] = useState<ExamAttemptDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailQuestionsById, setDetailQuestionsById] = useState<Record<number, ExamQuestion | null>>({});
+  const [detailQuestionsById, setDetailQuestionsById] = useState<Record<number, AttemptDetailQuestion | null>>({});
 
   // Correction state
   const [correctingId, setCorrectingId] = useState<number | null>(null);
@@ -122,8 +124,12 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
               ? rawQuestions.data
               : [];
 
-          const questionsById = questions.reduce((acc: Record<number, ExamQuestion | null>, question: ExamQuestion) => {
-            acc[question.id] = question;
+          const questionsById = questions.reduce((acc: Record<number, AttemptDetailQuestion | null>, question: ExamQuestion) => {
+            acc[question.id] = {
+              id: question.id,
+              image_url: question.image_url,
+              options: question.options,
+            };
             return acc;
           }, {});
 
@@ -195,7 +201,9 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     return "[Enunciado em imagem]";
   };
 
-  const getAnswerQuestion = (answer: ExamAttemptDetail["answers"][number]) => {
+  const getAnswerQuestion = (
+    answer: ExamAttemptDetail["answers"][number]
+  ): AttemptDetailQuestion | null => {
     return (
       detailQuestionsById[answer.question_id] ??
       answer.question ??
@@ -208,7 +216,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
   const getOptionLabel = (option: ExamQuestionOption | null, fallbackIndex?: number) => {
     if (!option) return null;
     const letter = fallbackIndex != null ? getOptionLetter(fallbackIndex) : null;
-    return letter ? `${letter} - ${option.option_text}` : option.option_text;
+    const text = option.option_text.trim();
+    if (!letter) return text;
+    if (text.toUpperCase() === letter) return letter;
+    return `${letter} - ${text}`;
   };
 
   return (
@@ -569,14 +580,15 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                     const needsReview = ans.is_correct === null;
                     const isCorreta   = ans.is_correct === true;
                     const isErrada    = ans.is_correct === false;
-                    const question = getAnswerQuestion(ans);
+                    const question = getAnswerQuestion(ans) as any;
                     const imageUrl = question?.image_url ?? ans.image_url ?? ans.question_image_url ?? ans.question?.image_url ?? null;
-                    const selectedOption = question?.options.find((option) => option.id != null && option.id === ans.option_id)
-                      ?? question?.options.find((option) => option.option_text === ans.option_text)
+                    const questionOptions = (question?.options ?? []) as ExamQuestionOption[];
+                    const selectedOption = questionOptions.find((option: ExamQuestionOption) => option.id != null && option.id === ans.option_id)
+                      ?? questionOptions.find((option: ExamQuestionOption) => option.option_text === ans.option_text)
                       ?? null;
-                    const selectedOptionIndex = selectedOption ? question?.options.findIndex((option) => option === selectedOption) : -1;
-                    const correctOption = question?.options.find((option) => option.is_correct) ?? null;
-                    const correctOptionIndex = correctOption ? question?.options.findIndex((option) => option === correctOption) : -1;
+                    const selectedOptionIndex = selectedOption ? questionOptions.findIndex((option: ExamQuestionOption) => option === selectedOption) : -1;
+                    const correctOption = questionOptions.find((option: ExamQuestionOption) => option.is_correct) ?? null;
+                    const correctOptionIndex = correctOption ? questionOptions.findIndex((option: ExamQuestionOption) => option === correctOption) : -1;
                     return (
                       <View
                         key={ans.question_id}
@@ -660,18 +672,66 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                           }}
                         >
                           {selectedOption ? (
-                            <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', marginBottom: 4 }}>
-                              Resposta do aluno: <Text style={{ fontWeight: '600' }}>{getOptionLabel(selectedOption, selectedOptionIndex >= 0 ? selectedOptionIndex : undefined)}</Text>
-                            </Text>
+                            <View style={{ marginBottom: 6 }}>
+                              <View
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 999,
+                                  backgroundColor: isCorreta ? '#DCFCE7' : isErrada ? '#FEE2E2' : '#E0F2FE',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: isCorreta ? '#15803D' : isErrada ? '#B91C1C' : '#0369A1' }}>
+                                  Resposta do aluno
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280' }}>
+                                {getOptionLabel(selectedOption, selectedOptionIndex >= 0 ? selectedOptionIndex : undefined)}
+                              </Text>
+                            </View>
                           ) : ans.option_id != null && ans.option_text ? (
-                            <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', marginBottom: 4 }}>
-                              Resposta do aluno: <Text style={{ fontWeight: '600' }}>{ans.option_text}</Text>
-                            </Text>
+                            <View style={{ marginBottom: 6 }}>
+                              <View
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 999,
+                                  backgroundColor: isCorreta ? '#DCFCE7' : isErrada ? '#FEE2E2' : '#E0F2FE',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: isCorreta ? '#15803D' : isErrada ? '#B91C1C' : '#0369A1' }}>
+                                  Resposta do aluno
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280' }}>
+                                {ans.option_text}
+                              </Text>
+                            </View>
                           ) : null}
                           {correctOption ? (
-                            <Text style={{ fontSize: 13, color: '#7C3AED', marginBottom: 4 }}>
-                              Gabarito: <Text style={{ fontWeight: '600' }}>{getOptionLabel(correctOption, correctOptionIndex >= 0 ? correctOptionIndex : undefined)}</Text>
-                            </Text>
+                            <View style={{ marginBottom: 6 }}>
+                              <View
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 999,
+                                  backgroundColor: '#EDE9FE',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#6D28D9' }}>
+                                  Gabarito
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 13, color: '#6D28D9' }}>
+                                {getOptionLabel(correctOption, correctOptionIndex >= 0 ? correctOptionIndex : undefined)}
+                              </Text>
+                            </View>
                           ) : null}
                           {ans.text_answer != null && (
                             <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', fontStyle: 'italic' }}>
