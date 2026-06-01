@@ -39,7 +39,7 @@ function resolveShellMaxHeight(
   return screenHeight * 0.94;
 }
 
-const widths = { sm: 560, md: 760, lg: 980, xl: 1180 };
+const widths = { sm: 504, md: 684, lg: 882, xl: 1062 };
 
 export default function Modal({
   visible,
@@ -60,7 +60,7 @@ export default function Modal({
   const isMobile = width < 640;
   const viewportPaddingX = isMobile ? 12 : width < 1024 ? 24 : 40;
   const viewportPaddingY = isMobile ? 12 : width < 1024 ? 20 : 28;
-  const shellMaxHeight = resolveShellMaxHeight(maxHeight, height);
+  const shellMaxHeight = resolveShellMaxHeight(maxHeight, height) * 0.9;
   const panelMaxHeight = Math.max(240, Math.min(shellMaxHeight, height - viewportPaddingY * 2));
   const headerBlockHeight = compact ? 44 : 52;
   const footerBlockHeight = footer ? (isMobile ? (compact ? 96 : 110) : compact ? 52 : 60) : 0;
@@ -96,7 +96,8 @@ export default function Modal({
           style={{
             flexShrink: 0,
             paddingHorizontal: horizontalInset,
-            paddingVertical: compact ? 10 : 12,
+            paddingTop: compact ? 14 : 16,
+            paddingBottom: compact ? 14 : 16,
           }}
         >
           <View className="flex-row items-center justify-between">

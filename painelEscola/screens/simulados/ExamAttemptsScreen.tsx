@@ -671,68 +671,30 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                             paddingTop: 8,
                           }}
                         >
-                          {selectedOption ? (
-                            <View style={{ marginBottom: 6 }}>
-                              <View
-                                style={{
-                                  alignSelf: 'flex-start',
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 999,
-                                  backgroundColor: isCorreta ? '#DCFCE7' : isErrada ? '#FEE2E2' : '#E0F2FE',
-                                  marginBottom: 4,
-                                }}
-                              >
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: isCorreta ? '#15803D' : isErrada ? '#B91C1C' : '#0369A1' }}>
-                                  Resposta do aluno
-                                </Text>
-                              </View>
-                              <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280' }}>
-                                {getOptionLabel(selectedOption, selectedOptionIndex >= 0 ? selectedOptionIndex : undefined)}
+                          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 6 }}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: isCorreta ? '#15803D' : isErrada ? '#B91C1C' : '#0369A1', marginBottom: 4 }}>
+                                Resposta do aluno
+                              </Text>
+                              <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280' }} numberOfLines={2}>
+                                {selectedOption
+                                  ? getOptionLabel(selectedOption, selectedOptionIndex >= 0 ? selectedOptionIndex : undefined)
+                                  : ans.option_id != null && ans.option_text
+                                    ? ans.option_text
+                                    : "—"}
                               </Text>
                             </View>
-                          ) : ans.option_id != null && ans.option_text ? (
-                            <View style={{ marginBottom: 6 }}>
-                              <View
-                                style={{
-                                  alignSelf: 'flex-start',
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 999,
-                                  backgroundColor: isCorreta ? '#DCFCE7' : isErrada ? '#FEE2E2' : '#E0F2FE',
-                                  marginBottom: 4,
-                                }}
-                              >
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: isCorreta ? '#15803D' : isErrada ? '#B91C1C' : '#0369A1' }}>
-                                  Resposta do aluno
-                                </Text>
-                              </View>
-                              <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280' }}>
-                                {ans.option_text}
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#6D28D9', marginBottom: 4 }}>
+                                Gabarito
+                              </Text>
+                              <Text style={{ fontSize: 13, color: '#6D28D9' }} numberOfLines={2}>
+                                {correctOption
+                                  ? getOptionLabel(correctOption, correctOptionIndex >= 0 ? correctOptionIndex : undefined)
+                                  : "—"}
                               </Text>
                             </View>
-                          ) : null}
-                          {correctOption ? (
-                            <View style={{ marginBottom: 6 }}>
-                              <View
-                                style={{
-                                  alignSelf: 'flex-start',
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 999,
-                                  backgroundColor: '#EDE9FE',
-                                  marginBottom: 4,
-                                }}
-                              >
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#6D28D9' }}>
-                                  Gabarito
-                                </Text>
-                              </View>
-                              <Text style={{ fontSize: 13, color: '#6D28D9' }}>
-                                {getOptionLabel(correctOption, correctOptionIndex >= 0 ? correctOptionIndex : undefined)}
-                              </Text>
-                            </View>
-                          ) : null}
+                          </View>
                           {ans.text_answer != null && (
                             <Text style={{ fontSize: 13, color: isCorreta ? '#166534' : isErrada ? '#991B1B' : '#6B7280', fontStyle: 'italic' }}>
                               "{ans.text_answer}"
