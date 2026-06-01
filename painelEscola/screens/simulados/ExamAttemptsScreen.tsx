@@ -195,6 +195,24 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     minWidth: isMobile ? "100%" : 160,
   };
 
+  const attemptsTableMinWidth = isMobile ? 880 : 1040;
+  const attemptColumns = {
+    student: isMobile ? 260 : 290,
+    exam: isMobile ? 190 : 230,
+    score: 108,
+    result: 102,
+    status: 128,
+    started: 136,
+    action: 48,
+  };
+  const headerTextStyle = {
+    fontSize: 11,
+    fontWeight: '800' as const,
+    color: '#64748B',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.2,
+  };
+
   const getAnswerQuestionLabel = (answer: ExamAttemptDetail["answers"][number]) => {
     const text = answer.question_text?.trim();
     if (text) return text;
@@ -231,6 +249,33 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       letter: match[1].toUpperCase(),
       text: match[2]?.trim() || null,
     };
+  };
+
+  const renderTablePill = (label: string, bg: string, color: string) => (
+    <View
+      style={{
+        backgroundColor: bg,
+        borderRadius: 999,
+        paddingHorizontal: 9,
+        paddingVertical: 3,
+        alignSelf: "center",
+        maxWidth: "100%",
+      }}
+    >
+      <Text
+        style={{ color, fontSize: 11, lineHeight: 14, fontWeight: "700" }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
+  const getStatusPillColors = (status: string) => {
+    if (status === "completed") return { bg: "#ECFDF5", color: "#047857" };
+    if (status === "pending_review" || status === "in_progress") return { bg: "#F3F4F6", color: "#374151" };
+    if (status === "awaiting_release") return { bg: "#ECFEFF", color: "#0E7490" };
+    return { bg: "#F3F4F6", color: "#374151" };
   };
 
   return (
@@ -327,28 +372,37 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       >
       <View
         className="bg-white rounded-2xl overflow-hidden"
-        style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        style={{
+          width: "100%",
+          minWidth: Math.max(tableMinWidth ?? 0, attemptsTableMinWidth),
+          borderWidth: 1,
+          borderColor: '#EEF2F7',
+          shadowColor: "#000",
+          shadowOpacity: 0.04,
+          shadowRadius: 10,
+          elevation: 2,
+        }}
       >
         <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>
+          <Text style={[headerTextStyle, { width: attemptColumns.student }]}>
             Aluno
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>
+          <Text style={[headerTextStyle, { width: attemptColumns.exam }]}>
             Simulado
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: 100, textAlign: "center" }}>
+          <Text style={[headerTextStyle, { width: attemptColumns.score, textAlign: "center" }]}>
             Pontuação
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: 90, textAlign: "center" }}>
+          <Text style={[headerTextStyle, { width: attemptColumns.result, textAlign: "center" }]}>
             Resultado
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: 120, textAlign: "center" }}>
+          <Text style={[headerTextStyle, { width: attemptColumns.status, textAlign: "center" }]}>
             Status
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>
+          <Text style={[headerTextStyle, { width: attemptColumns.started }]}>
             Início
           </Text>
-          <View style={{ width: 48 }} />
+          <View style={{ width: attemptColumns.action }} />
         </View>
 
         {loading ? (
@@ -364,59 +418,82 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
           rows.map((a, i) => (
             <View
               key={a.id}
-              className={`flex-row items-center px-4 py-3 ${i < rows.length - 1 ? "border-b border-gray-50" : ""}`}
+              className={`flex-row items-center px-4 py-2.5 ${i < rows.length - 1 ? "border-b border-gray-50" : ""}`}
+              style={{ minHeight: 58 }}
             >
-              <View style={{ flex: 2 }}>
-                <Text className="text-sm font-medium text-gray-800">{a.student?.name ?? "—"}</Text>
-                <Text className="text-xs text-gray-400">{a.student?.enrollment_number ?? "—"}</Text>
+              <View style={{ width: attemptColumns.student, paddingRight: 18 }}>
+                <Text
+                  className="font-semibold text-gray-800"
+                  style={{ fontSize: 13, lineHeight: 17 }}
+                  numberOfLines={1}
+                >
+                  {a.student?.name ?? "—"}
+                </Text>
+                <Text className="text-gray-400" style={{ fontSize: 11, lineHeight: 15 }}>
+                  {a.student?.enrollment_number ?? "—"}
+                </Text>
               </View>
-              <View style={{ flex: 2 }}>
-                <Text className="text-sm text-gray-700" numberOfLines={1}>{a.exam?.title ?? "Simulado removido"}</Text>
+              <View style={{ width: attemptColumns.exam, paddingRight: 18 }}>
+                <Text
+                  className="text-gray-700"
+                  style={{ fontSize: 13, lineHeight: 17 }}
+                  numberOfLines={1}
+                >
+                  {a.exam?.title ?? "Simulado removido"}
+                </Text>
               </View>
-              <View style={{ width: 100, alignItems: "center" }}>
+              <View style={{ width: attemptColumns.score, alignItems: "center" }}>
                 {a.status === "completed" ? (
                   <>
-                    <Text className="text-sm font-semibold text-gray-800">
+                    <Text className="font-bold text-gray-800" style={{ fontSize: 13, lineHeight: 16 }}>
                       {a.score?.toFixed(1) ?? "—"} / {a.max_score.toFixed(1)}
                     </Text>
-                    <Text className="text-xs text-gray-400">{fmtPct(a.percentage)}</Text>
+                    <Text className="text-gray-400" style={{ fontSize: 11, lineHeight: 15 }}>{fmtPct(a.percentage)}</Text>
                   </>
                 ) : a.status === "pending_review" ? (
-                  <Text className="text-xs text-amber-500">
+                  <Text className="text-amber-500 text-center" style={{ fontSize: 11, lineHeight: 15 }}>
                     {a.pending_answers_count ? `${a.pending_answers_count} pendente${a.pending_answers_count !== 1 ? "s" : ""}` : "Pendente"}
                   </Text>
                 ) : a.status === "awaiting_release" ? (
-                  <Text className="text-xs" style={{ color: '#0891B2' }}>
-                    Corrigido, aguardando liberação
+                  <Text className="text-center" style={{ color: '#0891B2', fontSize: 11, lineHeight: 15 }}>
+                    Aguardando liberação
                   </Text>
                 ) : (
-                  <Text className="text-sm text-gray-400">—</Text>
+                  <Text className="text-gray-400" style={{ fontSize: 13 }}>—</Text>
                 )}
               </View>
-              <View style={{ width: 90, alignItems: "center" }}>
+              <View style={{ width: attemptColumns.result, alignItems: "center" }}>
                 {a.status === "completed" && typeof a.passed === "boolean" ? (
-                  <Badge
-                    label={a.passed ? "Aprovado" : "Reprovado"}
-                    variant={a.passed ? "success" : "error"}
-                  />
+                  renderTablePill(
+                    a.passed ? "Aprovado" : "Reprovado",
+                    a.passed ? "#ECFDF5" : "#FEF2F2",
+                    a.passed ? "#047857" : "#B91C1C",
+                  )
                 ) : (
-                  <Text className="text-sm text-gray-400">—</Text>
+                  <Text className="text-gray-400" style={{ fontSize: 13 }}>—</Text>
                 )}
               </View>
-              <View style={{ width: 120, alignItems: "center" }}>
-                <Badge
-                  label={STATUS_LABEL[a.status] ?? a.status}
-                  slug={STATUS_SLUG[a.status] ?? "default"}
-                />
+              <View style={{ width: attemptColumns.status, alignItems: "center" }}>
+                {(() => {
+                  const colors = getStatusPillColors(a.status);
+                  return renderTablePill(STATUS_LABEL[a.status] ?? a.status, colors.bg, colors.color);
+                })()}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text className="text-xs text-gray-500">{fmtDate(a.started_at)}</Text>
+              <View style={{ width: attemptColumns.started, paddingLeft: 8 }}>
+                <Text className="text-gray-500" style={{ fontSize: 12, lineHeight: 16 }}>
+                  {fmtDate(a.started_at)}
+                </Text>
               </View>
               <TouchableOpacity
                 onPress={() => openDetail(a.id)}
-                className="p-2 rounded-lg bg-violet-50"
+                className="rounded-lg bg-violet-50"
                 activeOpacity={0.7}
-                style={{ width: 48, alignItems: "center" }}
+                style={{
+                  width: attemptColumns.action,
+                  height: 34,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
                 <Ionicons name="eye-outline" size={15} color="#7C3AED" />
               </TouchableOpacity>
