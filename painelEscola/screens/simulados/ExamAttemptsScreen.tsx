@@ -16,6 +16,7 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import type {
   ExamAttempt,
   ExamAttemptDetail,
+  ExamQuestion,
   ExamAttemptsScreenProps,
 } from "../../types/simulados";
 
@@ -70,6 +71,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
   const [detailId, setDetailId] = useState<number | null>(null);
   const [detail, setDetail] = useState<ExamAttemptDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailQuestionImages, setDetailQuestionImages] = useState<Record<number, string | null>>({});
 
   // Correction state
   const [correctingId, setCorrectingId] = useState<number | null>(null);
@@ -99,12 +101,34 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
   const openDetail = async (id: number) => {
     setDetailId(id);
     setDetail(null);
+    setDetailQuestionImages({});
     setLoadingDetail(true);
     setDetailNeedsCorrection(false);
     try {
       const { data } = await api.get(`/exam-attempts/${id}`);
-      setDetail(data);
+      const attemptData = data as ExamAttemptDetail;
+      setDetail(attemptData);
       setDetailNeedsCorrection(data.status === 'pending_review');
+
+      const examId = attemptData.exam?.id;
+      if (examId) {
+        try {
+          const questionsResponse = await api.get(`/exams/${examId}/questions`);
+          const rawQuestions = questionsResponse.data?.body ?? questionsResponse.data;
+          const questions = Array.isArray(rawQuestions)
+            ? rawQuestions
+            : Array.isArray(rawQuestions?.data)
+              ? rawQuestions.data
+              : [];
+
+          const imagesById = questions.reduce((acc: Record<number, string | null>, question: ExamQuestion) => {
+            acc[question.id] = question.image_url ?? null;
+            return acc;
+          }, {});
+
+          setDetailQuestionImages(imagesById);
+        } catch {}
+      }
     } catch {}
     setLoadingDetail(false);
   };
@@ -175,6 +199,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       answer.image_url ??
       answer.question_image_url ??
       answer.question?.image_url ??
+      detailQuestionImages[answer.question_id] ??
       null
     );
   };
