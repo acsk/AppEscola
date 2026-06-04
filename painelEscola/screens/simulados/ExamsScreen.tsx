@@ -160,6 +160,14 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     minWidth: isMobile ? "100%" : 160,
   };
 
+  const GRID = {
+    questions: 110,
+    duration: 110,
+    status: 110,
+    delivered: 140,
+    actions: 108,
+  };
+
   return (
     <ScrollView
       className="flex-1"
@@ -322,28 +330,35 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       >
       <View
         className="bg-white rounded-2xl overflow-hidden"
-        style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+        style={{
+          width: "100%",
+          minWidth: isMobile ? tableMinWidth : 1220,
+          shadowColor: "#000",
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 2,
+        }}
       >
         <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
-          <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 3, minWidth: 260 }}>
             Título / Tipo
           </Text>
-          <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 2, minWidth: 220 }}>
             Curso / Matéria
           </Text>
-          <Text className={TABLE_HEADER_CELL} style={{ width: 90, textAlign: "center" }}>
+          <Text className={TABLE_HEADER_CELL} style={{ width: GRID.questions, textAlign: "center" }}>
             Questões
           </Text>
-          <Text className={TABLE_HEADER_CELL} style={{ width: 90, textAlign: "center" }}>
+          <Text className={TABLE_HEADER_CELL} style={{ width: GRID.duration, textAlign: "center" }}>
             Duração
           </Text>
-          <Text className={TABLE_HEADER_CELL} style={{ width: 90, textAlign: "center" }}>
+          <Text className={TABLE_HEADER_CELL} style={{ width: GRID.status, textAlign: "center" }}>
             Status
           </Text>
-          <Text className={TABLE_HEADER_CELL} style={{ width: 120, textAlign: "center" }}>
+          <Text className={TABLE_HEADER_CELL} style={{ width: GRID.delivered, textAlign: "center" }}>
             Entregues
           </Text>
-          <View style={{ width: 80 }} />
+          <View style={{ width: GRID.actions }} />
         </View>
 
         {loading ? (
@@ -358,13 +373,13 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         ) : (
           rows.map((exam, i) => (
             <DataTableRow key={exam.id} index={i}>
-              <View style={{ flex: 3 }}>
+              <View style={{ flex: 3, minWidth: 260 }}>
                 <Text className={TABLE_CELL_SEMIBOLD}>{exam.title}</Text>
                 <Text className={TABLE_CELL_SUBLINE}>
                   {exam.exam_type_label ?? exam.exam_type}
                 </Text>
               </View>
-              <View style={{ flex: 2 }}>
+              <View style={{ flex: 2, minWidth: 220 }}>
                 <Text className={TABLE_CELL}>
                   {exam.courses?.length
                     ? exam.courses.map((c) => c.name).join(", ")
@@ -379,22 +394,22 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                   <Text className={TABLE_CELL_MUTED}>—</Text>
                 )}
               </View>
-              <View style={{ width: 90, alignItems: "center" }}>
+              <View style={{ width: GRID.questions, alignItems: "center" }}>
                 <Text className={TABLE_CELL}>{exam.total_questions}</Text>
                 <Text className={TABLE_CELL_MUTED}>{exam.total_points} pts</Text>
               </View>
-              <View style={{ width: 90, alignItems: "center" }}>
+              <View style={{ width: GRID.duration, alignItems: "center" }}>
                 <Text className={TABLE_CELL}>
                   {exam.duration_minutes ? `${exam.duration_minutes} min` : "—"}
                 </Text>
               </View>
-              <View style={{ width: 90, alignItems: "center" }}>
+              <View style={{ width: GRID.status, alignItems: "center" }}>
                 <Badge
                   label={exam.status_label ?? exam.status}
                   slug={exam.status}
                 />
               </View>
-              <View style={{ width: 120, alignItems: "center" }}>
+              <View style={{ width: GRID.delivered, alignItems: "center" }}>
                 <Text className={TABLE_CELL_SEMIBOLD}>
                   {fmtRespondedPct(exam.responded_students_percentage)}
                 </Text>
@@ -402,7 +417,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                   {(exam.responded_students_count ?? 0)}/{(exam.eligible_students_count ?? 0)} alunos
                 </Text>
               </View>
-              <View className="flex-row gap-1" style={{ width: 108, justifyContent: "flex-end" }}>
+              <View className="flex-row gap-1" style={{ width: GRID.actions, justifyContent: "flex-end" }}>
                 <TouchableOpacity
                   onPress={() => openPreview(exam)}
                   className="p-2 rounded-lg bg-blue-50"
