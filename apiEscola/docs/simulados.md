@@ -149,6 +149,9 @@ Lista os simulados do tenant com paginação (20 por página).
       "allow_retake": true,
       "max_attempts": 3,
       "min_score_to_retake": 70.0,
+      "eligible_students_count": 120,
+      "responded_students_count": 36,
+      "responded_students_percentage": 30.0,
       "total_questions": 10,
       "total_points": 10.0,
       "course": { "id": 2, "name": "ENEM" },
@@ -158,6 +161,14 @@ Lista os simulados do tenant com paginação (20 por página).
   "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 1 }
 }
 ```
+
+**Campos adicionais de progresso (lista de simulados):**
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `eligible_students_count` | integer | Quantidade de alunos ativos e vigentes elegíveis para o simulado (com base nos cursos vinculados) |
+| `responded_students_count` | integer | Quantidade de alunos distintos que já finalizaram tentativa (`finished_at` preenchido) |
+| `responded_students_percentage` | number | Percentual de respondidos sobre elegíveis (`responded / eligible * 100`) |
 
 ---
 

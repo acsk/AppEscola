@@ -9,6 +9,8 @@ class ExamResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $hasAnsweredMetrics = array_key_exists('responded_students_count', $this->resource->getAttributes());
+
         return [
             'id'               => $this->id,
             'tenant_id'        => $this->tenant_id,
@@ -48,6 +50,9 @@ class ExamResource extends JsonResource
             'min_score_to_retake' => $this->min_score_to_retake !== null ? (float) $this->min_score_to_retake : null,
             'starts_at'           => $this->starts_at?->toISOString(),
             'ends_at'             => $this->ends_at?->toISOString(),
+            'eligible_students_count' => $this->when($hasAnsweredMetrics, fn () => (int) $this->eligible_students_count),
+            'responded_students_count' => $this->when($hasAnsweredMetrics, fn () => (int) $this->responded_students_count),
+            'responded_students_percentage' => $this->when($hasAnsweredMetrics, fn () => (float) $this->responded_students_percentage),
             'total_questions'  => $this->whenLoaded('questions', fn () => $this->questions->count()),
             'total_points'     => $this->whenLoaded('questions', fn () => (float) $this->questions->sum('points')),
             'questions'        => $this->whenLoaded('questions', fn () => ExamQuestionResource::collection($this->questions)),

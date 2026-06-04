@@ -201,9 +201,15 @@ export function showApiToast(setToast: ToastSetter, data: unknown, fallback: str
 export function showApiErrorToast(setToast: ToastSetter, error: unknown, fallback: string) {
   const fieldErrors = getApiValidationErrors(error);
   const fieldMessage = firstValidationMessage(fieldErrors);
+  const apiMessage = getApiErrorMessage(error, fallback);
+  const message =
+    fieldMessage && (!apiMessage || apiMessage === "Dados inválidos.")
+      ? fieldMessage
+      : apiMessage || fieldMessage || fallback;
+
   setToast({
     visible: true,
     type: "error",
-    message: getApiErrorMessage(error, fallback) || fieldMessage || fallback,
+    message,
   });
 }

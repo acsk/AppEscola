@@ -348,8 +348,15 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
   // ── Exam Save ────────────────────────────────────────────────────────────────
 
-  const setField = (k: keyof ExamForm, v: string) =>
+  const setField = (k: keyof ExamForm, v: string) => {
     setForm((prev) => ({ ...prev, [k]: v }));
+    setErrors((prev) => {
+      if (!prev[k]) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
+  };
 
   const toggleCourse = (courseId: number) => {
     setForm((prev) => ({
@@ -419,10 +426,14 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     } catch (err: unknown) {
       const apiErrs = getApiValidationErrors(err);
       if (Object.keys(apiErrs).length > 0) {
-        setErrors(apiErrs);
+        if (apiErrs.exam_type) {
+          setForm((prev) => ({ ...prev, exam_type: "" }));
+        }
+        showFormErrors(apiErrs);
+      } else {
+        showApiErrorToast(setToast, err, "Não foi possível salvar o simulado.");
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
       }
-      showApiErrorToast(setToast, err, "Não foi possível salvar o simulado.");
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
     } finally {
       setSaving(false);
     }

@@ -8,12 +8,15 @@ use Illuminate\Validation\ValidationException;
 
 class ExamTypeService
 {
-    public function resolveActiveBySlug(string $slug): ExamType
+    public function resolveAny(string|int $value): ExamType
     {
-        $type = ExamType::query()
-            ->where('slug', $slug)
-            ->where('is_active', true)
-            ->first();
+        $query = ExamType::query();
+
+        if (is_int($value) || ctype_digit((string) $value)) {
+            $type = $query->where('id', (int) $value)->first();
+        } else {
+            $type = $query->where('slug', mb_strtolower(trim((string) $value)))->first();
+        }
 
         if (! $type) {
             throw ValidationException::withMessages([
@@ -22,6 +25,24 @@ class ExamTypeService
         }
 
         return $type;
+    }
+
+    public function resolveActive(string|int $value): ExamType
+    {
+        $type = $this->resolveAny($value);
+
+        if (! $type->is_active) {
+            throw ValidationException::withMessages([
+                'exam_type' => ['Classificação de prova inválida ou inativa.'],
+            ]);
+        }
+
+        return $type;
+    }
+
+    public function resolveActiveBySlug(string $slug): ExamType
+    {
+        return $this->resolveActive($slug);
     }
 
     public function generateUniqueSlug(string $label, ?int $ignoreId = null): string

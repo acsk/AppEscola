@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ExamQuestionController extends Controller
 {
@@ -146,7 +147,7 @@ class ExamQuestionController extends Controller
 
         $question = DB::transaction(function () use ($request, $exam, $tenantId) {
             $nextOrder = $exam->questions()->max('order') + 1;
-            $examType = $this->examTypeService->resolveActiveBySlug($request->exam_type);
+            $examType = $this->examTypeService->resolveActive($request->exam_type);
 
             $question = ExamQuestion::create([
                 'tenant_id'         => $tenantId,
@@ -233,7 +234,21 @@ class ExamQuestionController extends Controller
         DB::transaction(function () use ($request, $question) {
             $data = $request->except('options');
             if (isset($data['exam_type'])) {
-                $data['exam_type_id'] = $this->examTypeService->resolveActiveBySlug($data['exam_type'])->id;
+                $requestedExamType = null;
+
+                try {
+                    $requestedExamType = $this->examTypeService->resolveActive($data['exam_type']);
+                } catch (ValidationException $e) {
+                    $requestedAnyType = $this->examTypeService->resolveAny($data['exam_type']);
+
+                    if ((int) $requestedAnyType->id !== (int) $question->exam_type_id) {
+                        throw $e;
+                    }
+
+                    $requestedExamType = $requestedAnyType;
+                }
+
+                $data['exam_type_id'] = $requestedExamType->id;
                 unset($data['exam_type']);
             }
             $question->update($data);

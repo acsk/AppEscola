@@ -14,7 +14,7 @@ class StoreExamQuestionRequest extends FormRequest
     {
         return [
             'subject_id'    => ['nullable', 'exists:subjects,id'],
-            'exam_type'     => ['required', 'string', new ActiveExamTypeSlug()],
+            'exam_type'     => ['required', new ActiveExamTypeSlug()],
             'type'          => ['required', 'in:multiple_choice,essay'],
             'question_text' => ['nullable', 'string'],
             'image_url'     => ['nullable', 'url', 'max:500'],

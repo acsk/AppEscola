@@ -15,6 +15,8 @@ use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ExamController extends Controller
 {
@@ -43,7 +45,11 @@ class ExamController extends Controller
             ->when($request->query('subject_id'), fn ($q, $v) => $q->where('subject_id', $v))
             ->when($request->query('search'),     fn ($q, $v) => $q->where('title', 'like', "%{$v}%"));
 
-        return ExamResource::collection($query->orderByDesc('created_at')->paginate(20));
+        $paginator = $query->orderByDesc('created_at')->paginate(20);
+
+        $this->appendAnsweredMetrics($paginator->getCollection());
+
+        return ExamResource::collection($paginator);
     }
 
     public function store(StoreExamRequest $request): JsonResponse
@@ -174,6 +180,115 @@ class ExamController extends Controller
         $tenantId = $this->getTenantId($request);
         if ($tenantId !== null && $tenantId !== $resourceTenantId) {
             abort(403, 'Acesso negado.');
+        }
+    }
+
+    private function appendAnsweredMetrics(Collection $exams): void
+    {
+        if ($exams->isEmpty()) {
+            return;
+        }
+
+        $examIds = $exams->pluck('id')->map(fn ($id) => (int) $id)->values();
+
+        $respondedByExam = DB::table('exam_attempts')
+            ->select('exam_id', DB::raw('COUNT(DISTINCT student_id) as responded_count'))
+            ->whereIn('exam_id', $examIds)
+            ->whereNull('deleted_at')
+            ->whereNotNull('finished_at')
+            ->groupBy('exam_id')
+            ->pluck('responded_count', 'exam_id');
+
+        $tenantIds = $exams
+            ->pluck('tenant_id')
+            ->map(fn ($tenantId) => (int) $tenantId)
+            ->unique()
+            ->values();
+
+        $courseIdsByExam = $exams->mapWithKeys(function (Exam $exam) {
+            return [$exam->id => $exam->linkedCourseIds()->unique()->values()];
+        });
+
+        $allCourseIds = $courseIdsByExam->flatten()->unique()->values();
+
+        $studentsByTenantCourse = [];
+
+        if ($allCourseIds->isNotEmpty()) {
+            $today = now()->toDateString();
+
+            $fromEnrollment = DB::table('enrollments')
+                ->leftJoin('course_plans', 'enrollments.course_plan_id', '=', 'course_plans.id')
+                ->leftJoin('school_classes', 'enrollments.school_class_id', '=', 'school_classes.id')
+                ->whereIn('enrollments.tenant_id', $tenantIds)
+                ->where('enrollments.status', 'active')
+                ->where('enrollments.start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('enrollments.end_date')
+                        ->orWhere('enrollments.end_date', '>=', $today);
+                })
+                ->whereNull('enrollments.deleted_at')
+                ->whereIn(DB::raw('COALESCE(course_plans.course_id, school_classes.course_id)'), $allCourseIds)
+                ->selectRaw('enrollments.tenant_id, enrollments.student_id, COALESCE(course_plans.course_id, school_classes.course_id) as course_id')
+                ->get();
+
+            $fromPivot = DB::table('enrollment_school_classes')
+                ->join('enrollments', 'enrollment_school_classes.enrollment_id', '=', 'enrollments.id')
+                ->join('school_classes', 'enrollment_school_classes.school_class_id', '=', 'school_classes.id')
+                ->whereIn('enrollments.tenant_id', $tenantIds)
+                ->where('enrollments.status', 'active')
+                ->where('enrollments.start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('enrollments.end_date')
+                        ->orWhere('enrollments.end_date', '>=', $today);
+                })
+                ->whereNull('enrollments.deleted_at')
+                ->whereIn('school_classes.course_id', $allCourseIds)
+                ->select('enrollments.tenant_id', 'enrollments.student_id', 'school_classes.course_id')
+                ->get();
+
+            $activeStudentCourseRows = $fromEnrollment
+                ->concat($fromPivot)
+                ->map(function ($row) {
+                    return [
+                        'tenant_id' => (int) $row->tenant_id,
+                        'course_id' => (int) $row->course_id,
+                        'student_id' => (int) $row->student_id,
+                    ];
+                })
+                ->unique(fn (array $row) => $row['tenant_id'] . '|' . $row['course_id'] . '|' . $row['student_id']);
+
+            foreach ($activeStudentCourseRows as $row) {
+                $key = $row['tenant_id'] . '|' . $row['course_id'];
+                $studentsByTenantCourse[$key][$row['student_id']] = true;
+            }
+        }
+
+        foreach ($exams as $exam) {
+            $tenantId = (int) $exam->tenant_id;
+            $courseIds = $courseIdsByExam->get($exam->id, collect());
+
+            $eligibleStudents = [];
+
+            foreach ($courseIds as $courseId) {
+                $key = $tenantId . '|' . (int) $courseId;
+                if (! isset($studentsByTenantCourse[$key])) {
+                    continue;
+                }
+
+                foreach (array_keys($studentsByTenantCourse[$key]) as $studentId) {
+                    $eligibleStudents[$studentId] = true;
+                }
+            }
+
+            $eligibleStudentsCount = count($eligibleStudents);
+            $respondedStudentsCount = (int) ($respondedByExam[$exam->id] ?? 0);
+            $respondedStudentsPercentage = $eligibleStudentsCount > 0
+                ? min(100, round(($respondedStudentsCount / $eligibleStudentsCount) * 100, 1))
+                : 0.0;
+
+            $exam->setAttribute('eligible_students_count', $eligibleStudentsCount);
+            $exam->setAttribute('responded_students_count', $respondedStudentsCount);
+            $exam->setAttribute('responded_students_percentage', $respondedStudentsPercentage);
         }
     }
 }
