@@ -59,6 +59,11 @@ function SubjectIcon({ icon, color, size = 18 }: { icon?: string | null; color?:
   );
 }
 
+function fmtRespondedPct(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return "0%";
+  return `${value.toFixed(1)}%`;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExamsScreen({ navigate }: ExamsScreenProps) {
@@ -335,6 +340,9 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           <Text className={TABLE_HEADER_CELL} style={{ width: 90, textAlign: "center" }}>
             Status
           </Text>
+          <Text className={TABLE_HEADER_CELL} style={{ width: 120, textAlign: "center" }}>
+            Entregues
+          </Text>
           <View style={{ width: 80 }} />
         </View>
 
@@ -385,6 +393,14 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                   label={exam.status_label ?? exam.status}
                   slug={exam.status}
                 />
+              </View>
+              <View style={{ width: 120, alignItems: "center" }}>
+                <Text className={TABLE_CELL_SEMIBOLD}>
+                  {fmtRespondedPct(exam.responded_students_percentage)}
+                </Text>
+                <Text className={TABLE_CELL_MUTED}>
+                  {(exam.responded_students_count ?? 0)}/{(exam.eligible_students_count ?? 0)} alunos
+                </Text>
               </View>
               <View className="flex-row gap-1" style={{ width: 108, justifyContent: "flex-end" }}>
                 <TouchableOpacity

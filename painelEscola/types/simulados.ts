@@ -96,6 +96,9 @@ export type ExamListItem = {
   courses?: { id: number; name: string }[];
   course_ids?: number[];
   subject: { id: number; name: string; icon: string | null; color: string | null } | null;
+  eligible_students_count?: number | null;
+  responded_students_count?: number | null;
+  responded_students_percentage?: number | null;
 };
 
 export type ExamPreviewQuestion = {
