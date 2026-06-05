@@ -668,7 +668,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Provas anteriores</Text>
+          <Text className="text-2xl font-bold text-gray-800">Provas/Exercicios</Text>
           <Text className="text-sm text-gray-500">
             Biblioteca de provas e exercícios em PDF visível no app do aluno
           </Text>
@@ -892,7 +892,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
 
     <Modal
         visible={modalOpen}
-        title={editingId ? "Editar prova anterior" : "Nova prova anterior"}
+      title={editingId ? "Editar Prova/Exercicio" : "Nova Prova/Exercicio"}
         onClose={closeModal}
         size="lg"
         compact
