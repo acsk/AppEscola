@@ -178,7 +178,7 @@ export default function ExamTypesScreen() {
         <View>
           <Text className="text-2xl font-bold text-gray-900">Tipos de prova</Text>
           <Text className="text-sm text-gray-500 mt-1">
-            Classificações (ENEM, Vestibular, etc.) usadas em simulados, questões e provas anteriores
+            Classificações (ENEM, Vestibular, etc.) usadas em simulados, questões e provas/exercícios
           </Text>
         </View>
         <TouchableOpacity
@@ -302,7 +302,7 @@ export default function ExamTypesScreen() {
       <ConfirmModal
         visible={deleteId !== null}
         title="Remover classificação"
-        message="Só é possível remover se não houver simulados, provas anteriores ou questões vinculados. Desative o tipo se ainda estiver em uso."
+        message="Só é possível remover se não houver simulados, provas/exercícios ou questões vinculados. Desative o tipo se ainda estiver em uso."
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}
       />
