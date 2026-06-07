@@ -638,7 +638,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             keyboardType="decimal-pad"
           />
           <Text className="text-xs text-gray-500 mt-1">
-            Esse valor será usado na invoice da matrícula vinculada a este plano.
+            Valor usado na cobrança de matrícula vinculada a este plano. Obrigatório quando a escola cobra taxa de matrícula.
           </Text>
         </View>
 
@@ -651,20 +651,6 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             </Text>
           </View>
         )}
-
-        <View className="mt-2">
-          <FormInput
-            label="Taxa de matrícula (R$)"
-            value={planForm.enrollment_fee_amount}
-            onChangeText={(v) => setPlanForm({ ...planForm, enrollment_fee_amount: v })}
-            error={planErrors.enrollment_fee_amount}
-            placeholder="Ex: 150,00"
-            keyboardType="decimal-pad"
-          />
-          <Text className="text-xs text-gray-500 mt-1">
-            Valor usado para a invoice da matrícula vinculada a este plano.
-          </Text>
-        </View>
 
         <View className="mt-2">
           <Text className="text-xs font-medium text-gray-600 mb-1.5">

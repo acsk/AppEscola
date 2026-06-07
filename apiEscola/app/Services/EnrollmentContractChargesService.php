@@ -354,7 +354,7 @@ class EnrollmentContractChargesService
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
         $netAmount = $enrollment->netMonthlyAmount();
         $feeAmount = $plan
-            ? $this->resolveEnrollmentFeeAmount($plan, $enrollment)
+            ? $plan->netEnrollmentFeeAmount((float) ($enrollment->discount_amount ?? 0))
             : $this->resolveBundleEnrollmentFeeAmount($bundle, $enrollment);
         $enrollmentFeeCoversFirstMonth = ! empty($billing['charges_enrollment_fee'])
             && ! empty($billing['enrollment_fee_covers_first_month']);
@@ -447,7 +447,7 @@ class EnrollmentContractChargesService
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
         $netAmount = $enrollment->netMonthlyAmount();
         $feeAmount = $plan
-            ? $this->resolveEnrollmentFeeAmount($plan, $enrollment)
+            ? $plan->netEnrollmentFeeAmount((float) ($enrollment->discount_amount ?? 0))
             : $this->resolveBundleEnrollmentFeeAmount($bundle, $enrollment);
 
         $monthliesBlocked = ! empty($billing['charges_enrollment_fee'])
@@ -553,24 +553,6 @@ class EnrollmentContractChargesService
             'existing' => $existing,
             'items' => $items,
         ];
-    }
-
-    private function resolveEnrollmentFeeAmount(CoursePlan $plan, Enrollment $enrollment): ?float
-    {
-        $planFee = $plan->enrollment_fee_amount;
-
-        if ($planFee === null) {
-            return null;
-        }
-
-        $amount = (float) $planFee;
-        if ($amount <= 0) {
-            return null;
-        }
-
-        $net = max($amount - (float) ($enrollment->discount_amount ?? 0), 0);
-
-        return $net > 0 ? $net : null;
     }
 
     private function resolveBundleEnrollmentFeeAmount(CourseBundle $bundle, Enrollment $enrollment): ?float

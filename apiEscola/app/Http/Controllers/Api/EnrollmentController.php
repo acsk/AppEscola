@@ -260,7 +260,7 @@ class EnrollmentController extends Controller
         $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
         $netAmount = $enrollment->netMonthlyAmount();
         $enrollmentFeeAmount = $plan
-            ? $this->resolveEnrollmentFeeAmount($plan, $enrollment)
+            ? $plan->netEnrollmentFeeAmount((float) ($enrollment->discount_amount ?? 0))
             : $this->resolveBundleEnrollmentFeeAmount($bundle, $enrollment);
 
         // Sem taxa no plano ou escola não cobra → remove enrollment_fee do lote
@@ -415,27 +415,6 @@ class EnrollmentController extends Controller
             'charges_generated_at' => $enrollment->fresh()->charges_generated_at?->toISOString(),
             'generated'            => $generated,
         ], $created > 0 ? 'Cobranças locais geradas em lote com sucesso.' : 'Cobranças locais já existiam e o lote foi marcado como processado.', 200);
-    }
-
-    private function resolveEnrollmentFeeAmount(CoursePlan $plan, ?Enrollment $enrollment = null): ?float
-    {
-        $planFee = $plan->enrollment_fee_amount;
-
-        if ($planFee === null) {
-            return null;
-        }
-
-        $amount = (float) $planFee;
-        if ($amount <= 0) {
-            return null;
-        }
-
-        $discount = $enrollment !== null
-            ? (float) ($enrollment->discount_amount ?? 0)
-            : 0.0;
-        $net = max($amount - $discount, 0);
-
-        return $net > 0 ? $net : null;
     }
 
     private function resolveBundleEnrollmentFeeAmount(CourseBundle $bundle, ?Enrollment $enrollment = null): ?float
@@ -940,27 +919,20 @@ class EnrollmentController extends Controller
 
         $plan        = CoursePlan::with('course')->findOrFail($request->course_plan_id);
         $schoolClass = SchoolClass::findOrFail($request->school_class_id);
+        $effectiveTenantId = (int) ($tenantId ?? $plan->tenant_id);
         $this->authorizeTenant($request, $plan->tenant_id);
 
-        $effectiveTenantId = (int) ($tenantId ?? $plan->tenant_id);
+        $billing = $this->billingScope($effectiveTenantId);
         $this->assertSubscribeEntities($request, $plan, $schoolClass, $effectiveTenantId);
 
-        // Regra: bloquear matrícula se o plano não tiver taxa de matrícula líquida > 0.
-        // Isso evita a geração automática de cobranças (mensalidades) quando não há taxa configurada.
-        $planEnrollmentFee = $plan->enrollment_fee_amount;
         $discountAmount = (float) ($request->discount_amount ?? 0);
-        $netEnrollmentFee = null;
-        if ($planEnrollmentFee !== null) {
-            $amount = (float) $planEnrollmentFee;
-            if ($amount > 0) {
-                $net = max($amount - $discountAmount, 0);
-                $netEnrollmentFee = $net > 0 ? $net : null;
-            }
-        }
+        $netEnrollmentFee = $plan->netEnrollmentFeeAmount($discountAmount);
 
-        if ($netEnrollmentFee === null) {
+        if (! empty($billing['charges_enrollment_fee']) && $netEnrollmentFee === null) {
+            $planLabel = $plan->name ?: "plano #{$plan->id}";
+
             return $this->error(
-                'Não é possível concluir a matrícula: o plano precisa ter taxa de matrícula cadastrada (enrollment_fee_amount > 0).',
+                "Não é possível concluir a matrícula: o plano \"{$planLabel}\" precisa ter taxa de matrícula cadastrada (valor maior que zero). Edite o plano do curso e informe a taxa antes de matricular.",
                 ['course_plan_id' => $plan->id],
                 422
             );
@@ -1012,7 +984,7 @@ class EnrollmentController extends Controller
             ]);
 
             $netAmount = $enrollment->netMonthlyAmount();
-            $enrollmentFeeAmount = $this->resolveEnrollmentFeeAmount($plan, $enrollment);
+            $enrollmentFeeAmount = $plan->netEnrollmentFeeAmount((float) ($enrollment->discount_amount ?? 0));
 
             $paymentData = $this->normalizeEnrollmentPaymentData($request);
 

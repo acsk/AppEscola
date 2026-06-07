@@ -121,10 +121,38 @@ class EnrollmentSubscribeTest extends TestCase
             ->assertJsonFragment([
                 'type' => 'error',
             ])
-            ->assertJsonPath('message', 'Não é possível concluir a matrícula: o plano precisa ter taxa de matrícula cadastrada (enrollment_fee_amount > 0).');
+            ->assertJsonPath('message', 'Não é possível concluir a matrícula: o plano "Plano mensal" precisa ter taxa de matrícula cadastrada (valor maior que zero). Edite o plano do curso e informe a taxa antes de matricular.');
 
         $this->assertDatabaseCount('enrollments', 0);
         $this->assertDatabaseCount('invoices', 0);
+    }
+
+    public function test_subscribe_allows_plan_without_enrollment_fee_when_tenant_does_not_charge_it(): void
+    {
+        [$user, $payload, $context] = $this->seedSubscribeContext(
+            returnContext: true,
+            planEnrollmentFeeAmount: null,
+        );
+
+        app(\App\Services\TenantBillingSettingsService::class)->updateScope(
+            $context['tenant'],
+            'billing',
+            ['charges_enrollment_fee' => false],
+        );
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/enrollments/subscribe', $payload)
+            ->assertCreated();
+
+        $this->assertDatabaseHas('enrollments', [
+            'student_id' => $payload['student_id'],
+            'course_plan_id' => $payload['course_plan_id'],
+        ]);
+
+        $this->assertDatabaseMissing('invoices', [
+            'type' => 'enrollment_fee',
+        ]);
     }
 
     /**

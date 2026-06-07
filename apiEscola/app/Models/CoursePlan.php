@@ -86,4 +86,23 @@ class CoursePlan extends Model
     {
         return self::CYCLE_LABELS[$this->billing_cycle] ?? $this->billing_cycle;
     }
+
+    /**
+     * Taxa de matrícula líquida do plano após desconto (null se não configurada ou zerada).
+     */
+    public function netEnrollmentFeeAmount(float $discountAmount = 0): ?float
+    {
+        if ($this->enrollment_fee_amount === null) {
+            return null;
+        }
+
+        $amount = (float) $this->enrollment_fee_amount;
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $net = max($amount - $discountAmount, 0);
+
+        return $net > 0 ? $net : null;
+    }
 }

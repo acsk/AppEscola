@@ -37,13 +37,8 @@ class EnrollmentInvoiceAmountSyncService
 
     private function syncPendingEnrollmentFee(Enrollment $enrollment, CoursePlan $plan): int
     {
-        $planFee = $plan->enrollment_fee_amount;
-        if ($planFee === null) {
-            return 0;
-        }
-
-        $netFee = max((float) $planFee - (float) ($enrollment->discount_amount ?? 0), 0);
-        if ($netFee <= 0) {
+        $netFee = $plan->netEnrollmentFeeAmount((float) ($enrollment->discount_amount ?? 0));
+        if ($netFee === null) {
             return 0;
         }
 
