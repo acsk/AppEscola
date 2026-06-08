@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateExamRequest;
 use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Models\ExamStatus;
+use App\Services\ExamDeliveryReportService;
 use App\Services\ExamTypeService;
 use App\Services\ExamAttemptIntegrityService;
 use App\Services\ExamCourseService;
@@ -25,6 +26,7 @@ class ExamController extends Controller
     public function __construct(
         private readonly ExamCourseService $examCourseService,
         private readonly ExamTypeService $examTypeService,
+        private readonly ExamDeliveryReportService $deliveryReportService,
     ) {
     }
 
@@ -116,6 +118,17 @@ class ExamController extends Controller
         $exam->delete();
 
         return response()->json(['message' => 'Simulado removido com sucesso.']);
+    }
+
+    /** Relatório de entregas: alunos que finalizaram o simulado e pendentes. */
+    public function deliveryReport(Request $request, Exam $exam): JsonResponse
+    {
+        $this->authorizeTenant($request, $exam->tenant_id);
+
+        return $this->success(
+            $this->deliveryReportService->build($exam),
+            'Relatório de entregas do simulado.'
+        );
     }
 
     /** Estatísticas agregadas para gráficos: por questão, por matéria, por aluno */

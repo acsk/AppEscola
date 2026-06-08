@@ -32,7 +32,12 @@ import {
   TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
+import ExamActionsModal, { type ExamActionKey } from "../../components/simulados/ExamActionsModal";
 import { mapApiPreviewQuestion } from "../../components/simulados/examPreviewUtils";
+import { fetchExamDeliveryReport } from "../../services/examDeliveryReport";
+import { exportExamDeliveryPdf } from "../../utils/examDeliveryPdf";
+import ToastBanner from "../../components/ui/ToastBanner";
+import { showApiErrorToast } from "../../utils/apiErrors";
 import type {
   ExamListItem,
   ExamPreviewPlayerQuestion,
@@ -86,6 +91,13 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [menuExam, setMenuExam] = useState<ExamListItem | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
 
   // Summary de tentativas
   type Summary = { in_progress: number; pending_review: number; awaiting_release: number; completed: number; total: number };
@@ -149,6 +161,54 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     setDeleting(false);
   };
 
+  const handleExportDeliveryPdf = async (exam: ExamListItem) => {
+    setExportingPdf(true);
+    try {
+      const report = await fetchExamDeliveryReport(exam.id);
+      await exportExamDeliveryPdf(report);
+      setMenuExam(null);
+      setToast({ visible: true, type: "success", message: "PDF de entregas gerado com sucesso." });
+    } catch (err) {
+      showApiErrorToast(setToast, err, "Não foi possível gerar o PDF de entregas.");
+    }
+    setExportingPdf(false);
+  };
+
+  const handleExamAction = (action: ExamActionKey) => {
+    const exam = menuExam;
+    if (!exam) return;
+
+    if (action === "preview") {
+      openPreview(exam);
+      return;
+    }
+    if (action === "edit") {
+      navigate("simulados-form", { examId: exam.id });
+      return;
+    }
+    if (action === "export_delivery_pdf") {
+      void handleExportDeliveryPdf(exam);
+      return;
+    }
+    if (action === "delete") {
+      setDeleteId(exam.id);
+    }
+  };
+
+  const renderMenuButton = (exam: ExamListItem, stopPropagation = false) => (
+    <TouchableOpacity
+      onPress={(event: { stopPropagation?: () => void }) => {
+        if (stopPropagation) event?.stopPropagation?.();
+        setMenuExam(exam);
+      }}
+      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+      activeOpacity={0.85}
+      accessibilityLabel="Ações do simulado"
+    >
+      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+    </TouchableOpacity>
+  );
+
   const selectStyle = {
     border: "1px solid #E5E7EB",
     borderRadius: 12,
@@ -165,7 +225,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     duration: 110,
     status: 110,
     delivered: 140,
-    actions: 108,
+    actions: 42,
   };
 
   return (
@@ -372,7 +432,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           </View>
         ) : (
           rows.map((exam, i) => (
-            <DataTableRow key={exam.id} index={i}>
+            <DataTableRow key={exam.id} index={i} onPress={() => setMenuExam(exam)}>
               <View style={{ flex: 3, minWidth: 260 }}>
                 <Text className={TABLE_CELL_SEMIBOLD}>{exam.title}</Text>
                 <Text className={TABLE_CELL_SUBLINE}>
@@ -417,28 +477,8 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                   {(exam.responded_students_count ?? 0)}/{(exam.eligible_students_count ?? 0)} alunos
                 </Text>
               </View>
-              <View className="flex-row gap-1" style={{ width: GRID.actions, justifyContent: "flex-end" }}>
-                <TouchableOpacity
-                  onPress={() => openPreview(exam)}
-                  className="p-2 rounded-lg bg-blue-50"
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="eye-outline" size={15} color="#3B82F6" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => navigate("simulados-form", { examId: exam.id })}
-                  className="p-2 rounded-lg bg-violet-50"
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setDeleteId(exam.id)}
-                  className="p-2 rounded-lg bg-red-50"
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                </TouchableOpacity>
+              <View style={{ width: GRID.actions }} className="flex-row justify-end">
+                {renderMenuButton(exam, true)}
               </View>
             </DataTableRow>
           ))
@@ -466,6 +506,16 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         </Text>
       )}
 
+      <ExamActionsModal
+        visible={!!menuExam}
+        exam={menuExam}
+        exportingPdf={exportingPdf}
+        onClose={() => {
+          if (!exportingPdf) setMenuExam(null);
+        }}
+        onSelect={handleExamAction}
+      />
+
       <ConfirmModal
         visible={deleteId !== null}
         title="Remover simulado"
@@ -473,6 +523,13 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         loading={deleting}
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}
+      />
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
 
       {/* ── Modal de teste do simulado ───────────────────────────────────────── */}
