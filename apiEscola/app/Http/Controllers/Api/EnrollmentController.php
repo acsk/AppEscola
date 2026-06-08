@@ -922,21 +922,7 @@ class EnrollmentController extends Controller
         $effectiveTenantId = (int) ($tenantId ?? $plan->tenant_id);
         $this->authorizeTenant($request, $plan->tenant_id);
 
-        $billing = $this->billingScope($effectiveTenantId);
         $this->assertSubscribeEntities($request, $plan, $schoolClass, $effectiveTenantId);
-
-        $discountAmount = (float) ($request->discount_amount ?? 0);
-        $netEnrollmentFee = $plan->netEnrollmentFeeAmount($discountAmount);
-
-        if (! empty($billing['charges_enrollment_fee']) && $netEnrollmentFee === null) {
-            $planLabel = $plan->name ?: "plano #{$plan->id}";
-
-            return $this->error(
-                "Não é possível concluir a matrícula: o plano \"{$planLabel}\" precisa ter taxa de matrícula cadastrada (valor maior que zero). Edite o plano do curso e informe a taxa antes de matricular.",
-                ['course_plan_id' => $plan->id],
-                422
-            );
-        }
 
         // Prioridade de datas:
         // start_date: request > hoje (data da matrícula — não o início da turma)
@@ -1003,6 +989,29 @@ class EnrollmentController extends Controller
                     ),
                     amount: $enrollmentFeeAmount,
                     dueDate: $startDate->toDateString(),
+                    paymentData: $paymentData,
+                );
+            } elseif (
+                $enrollmentFeeAmount === null
+                && ! empty($billing['charge_first_monthly_at_enrollment'])
+                && $netAmount > 0
+            ) {
+                // Plano sem taxa: 1ª mensalidade no ato (regra billing.charge_first_monthly_at_enrollment)
+                $monthlyDueDate = $this->firstMonthlyDueDate($startDate, $dueDay)->toDateString();
+
+                $this->createEnrollmentInvoice(
+                    tenantId: $effectiveTenantId,
+                    enrollmentId: $enrollment->id,
+                    studentId: $request->student_id,
+                    guardianId: $guardianId,
+                    type: 'monthly',
+                    description: $this->invoiceDescriptions->forEnrollmentCharge(
+                        $enrollment,
+                        'monthly',
+                        $monthlyDueDate
+                    ),
+                    amount: $netAmount,
+                    dueDate: $monthlyDueDate,
                     paymentData: $paymentData,
                 );
             }

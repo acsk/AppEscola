@@ -110,20 +110,49 @@ class EnrollmentSubscribeTest extends TestCase
             ->assertJsonValidationErrors(['course_plan_id']);
     }
 
-    public function test_subscribe_blocks_when_plan_has_no_enrollment_fee(): void
+    public function test_subscribe_creates_first_monthly_when_plan_has_no_enrollment_fee(): void
     {
         [$user, $payload] = $this->seedSubscribeContext(planEnrollmentFeeAmount: null);
 
         Sanctum::actingAs($user);
 
         $this->postJson('/api/enrollments/subscribe', $payload)
-            ->assertStatus(422)
-            ->assertJsonFragment([
-                'type' => 'error',
-            ])
-            ->assertJsonPath('message', 'Não é possível concluir a matrícula: o plano "Plano mensal" precisa ter taxa de matrícula cadastrada (valor maior que zero). Edite o plano do curso e informe a taxa antes de matricular.');
+            ->assertCreated();
 
-        $this->assertDatabaseCount('enrollments', 0);
+        $this->assertDatabaseHas('enrollments', [
+            'student_id' => $payload['student_id'],
+            'course_plan_id' => $payload['course_plan_id'],
+        ]);
+
+        $this->assertDatabaseMissing('invoices', [
+            'type' => 'enrollment_fee',
+        ]);
+
+        $this->assertDatabaseHas('invoices', [
+            'type' => 'monthly',
+            'amount' => 300,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_subscribe_without_enrollment_fee_and_without_first_monthly_at_enrollment_creates_no_invoice(): void
+    {
+        [$user, $payload, $context] = $this->seedSubscribeContext(
+            returnContext: true,
+            planEnrollmentFeeAmount: null,
+        );
+
+        app(\App\Services\TenantBillingSettingsService::class)->updateScope(
+            $context['tenant'],
+            'billing',
+            ['charge_first_monthly_at_enrollment' => false],
+        );
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/enrollments/subscribe', $payload)
+            ->assertCreated();
+
         $this->assertDatabaseCount('invoices', 0);
     }
 
