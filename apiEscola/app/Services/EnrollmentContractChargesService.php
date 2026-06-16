@@ -443,8 +443,6 @@ class EnrollmentContractChargesService
             'billing'
         );
         $guardianId = $this->resolveGuardianId($enrollment);
-        $startDate = Carbon::parse($enrollment->start_date ?? now());
-        $dueDay = (int) ($enrollment->payment_due_day ?? $billing['default_payment_due_day'] ?? 10);
         $netAmount = $enrollment->netMonthlyAmount();
         $feeAmount = $plan
             ? $plan->netEnrollmentFeeAmount((float) ($enrollment->discount_amount ?? 0))
@@ -475,10 +473,8 @@ class EnrollmentContractChargesService
             $generateKeys,
             $allowedKeys,
             $guardianId,
-            $startDate,
             $netAmount,
             $feeAmount,
-            $courseName,
             &$created,
             &$existing,
             &$items
