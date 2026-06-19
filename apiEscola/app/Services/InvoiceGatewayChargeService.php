@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\Gateways\CoraPaymentGateway;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
@@ -161,6 +162,17 @@ class InvoiceGatewayChargeService
             ['provider' => $provider, 'environment' => $environment]
         );
 
+        $dueDateAdjustment = $this->reconcileProviderDueDate($invoice, $provider, $payloadToPersist);
+        if ($dueDateAdjustment !== null) {
+            $payloadToPersist['integration'] = array_merge(
+                (array) ($payloadToPersist['integration'] ?? []),
+                [
+                    'due_date_adjusted_from' => $dueDateAdjustment['original_due_date'],
+                    'provider_due_date' => $dueDateAdjustment['provider_due_date'],
+                ]
+            );
+        }
+
         $invoice->update([
             'payment_method' => $storedMethod,
             'cora_charge_id' => $result['external_id'],
@@ -198,6 +210,23 @@ class InvoiceGatewayChargeService
         $payment = $this->billingSettings->scope($tenant, 'payment');
 
         return strtolower(trim((string) ($payment['default_provider'] ?? 'cora')));
+    }
+
+    /**
+     * @return array{original_due_date: ?string, provider_due_date: string}|null
+     */
+    private function reconcileProviderDueDate(Invoice $invoice, string $provider, array $payload): ?array
+    {
+        if ($provider !== 'cora') {
+            return null;
+        }
+
+        $gateway = $this->factory->resolve($provider);
+        if (! $gateway instanceof CoraPaymentGateway) {
+            return null;
+        }
+
+        return $gateway->reconcileInvoiceDueDateAfterCharge($invoice, $payload);
     }
 
     private function canReuseOpenCharge(Invoice $invoice): bool

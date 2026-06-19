@@ -23,3 +23,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Credenciais MySQL remoto (Hostinger) — preencher localmente
+/database/remote-hostinger.env

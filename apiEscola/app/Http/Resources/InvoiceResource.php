@@ -13,6 +13,9 @@ class InvoiceResource extends JsonResource
     {
         $lifecycleService = app(InvoiceLifecycleService::class);
         $lifecycle = $lifecycleService->permissions($this->resource);
+        $providerDueDate = data_get($this->cora_payload, 'payment_terms.due_date')
+            ?? data_get($this->cora_payload, 'integration.provider_due_date');
+        $dueDateAdjustedFrom = data_get($this->cora_payload, 'integration.due_date_adjusted_from');
 
         return [
             'id' => $this->id,
@@ -52,6 +55,8 @@ class InvoiceResource extends JsonResource
                     ?? data_get($this->cora_payload, 'qr_code_image_url'),
                 'boleto_number' => $this->boleto_number,
                 'boleto_digitable' => $this->boleto_digitable,
+                'provider_due_date' => is_string($providerDueDate) ? $providerDueDate : null,
+                'due_date_adjusted_from' => is_string($dueDateAdjustedFrom) ? $dueDateAdjustedFrom : null,
                 'last_synced_at' => $this->cora_last_synced_at?->toISOString(),
             ],
             'created_at' => $this->created_at?->toISOString(),

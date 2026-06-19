@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Models\Invoice;
 use App\Services\CoraTokenService;
 use App\Services\Gateways\CoraPaymentGateway;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionMethod;
 use RuntimeException;
@@ -64,5 +65,51 @@ class CoraPaymentGatewayChargeValidationTest extends TestCase
         $result = $this->invokePrivate($gateway, 'truncateServiceDescription', $longText);
 
         $this->assertSame(100, mb_strlen($result));
+    }
+
+    #[Test]
+    public function it_keeps_future_due_date_for_provider_payload(): void
+    {
+        Carbon::setTestNow('2026-06-16 12:00:00');
+
+        $gateway = new CoraPaymentGateway($this->createMock(CoraTokenService::class));
+        $invoice = new Invoice(['due_date' => '2026-07-15']);
+
+        $resolution = $gateway->resolveProviderDueDateResolution($invoice);
+
+        $this->assertSame('2026-07-15', $resolution['local_due_date']);
+        $this->assertSame('2026-07-15', $resolution['provider_due_date']);
+        $this->assertFalse($resolution['adjusted']);
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
+    public function it_adjusts_past_due_date_to_tomorrow_for_cora_minimum(): void
+    {
+        Carbon::setTestNow('2026-06-16 12:00:00');
+
+        $gateway = new CoraPaymentGateway($this->createMock(CoraTokenService::class));
+        $invoice = new Invoice(['due_date' => '2026-05-27']);
+
+        $resolution = $gateway->resolveProviderDueDateResolution($invoice);
+
+        $this->assertSame('2026-05-27', $resolution['local_due_date']);
+        $this->assertSame('2026-06-17', $resolution['provider_due_date']);
+        $this->assertTrue($resolution['adjusted']);
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
+    public function it_extracts_provider_due_date_from_cora_payload(): void
+    {
+        $gateway = new CoraPaymentGateway($this->createMock(CoraTokenService::class));
+
+        $dueDate = $gateway->extractDueDateFromCoraPayload([
+            'payment_terms' => ['due_date' => '2026-06-17'],
+        ]);
+
+        $this->assertSame('2026-06-17', $dueDate);
     }
 }

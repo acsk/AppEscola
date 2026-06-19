@@ -85,6 +85,8 @@ class CoraPaymentGateway implements PaymentGatewayContract
             $payload = $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment, 'hybrid');
         }
 
+        $dueDateResolution = $this->resolveProviderDueDateResolution($invoice);
+
         Log::info('Cora createCharge request prepared', [
             'invoice_id' => $invoice->id,
             'tenant_id' => $invoice->tenant_id,
@@ -93,6 +95,9 @@ class CoraPaymentGateway implements PaymentGatewayContract
             'endpoint' => $baseUrl . $endpoint,
             'amount' => (string) $invoice->amount,
             'amount_cents' => $this->resolveServiceAmountInCents($invoice),
+            'local_due_date' => $dueDateResolution['local_due_date'],
+            'provider_due_date' => $dueDateResolution['provider_due_date'],
+            'due_date_adjusted' => $dueDateResolution['adjusted'],
         ]);
 
         $httpOptions = $this->resolveHttpClientOptions($invoice->tenant, $environment);
@@ -706,6 +711,77 @@ class CoraPaymentGateway implements PaymentGatewayContract
         string $environment
     ): array {
         return $this->buildBoletoPayload($invoice, $payerName, $payerDocument, $payerEmail, $environment, 'pix');
+    }
+
+    /**
+     * @return array{local_due_date: ?string, provider_due_date: string, adjusted: bool}
+     */
+    public function resolveProviderDueDateResolution(Invoice $invoice): array
+    {
+        $localDueDate = $invoice->due_date instanceof Carbon
+            ? $invoice->due_date->toDateString()
+            : null;
+        $providerDueDate = $this->resolveProviderDueDate($invoice);
+
+        return [
+            'local_due_date' => $localDueDate,
+            'provider_due_date' => $providerDueDate,
+            'adjusted' => $localDueDate !== null && $localDueDate !== $providerDueDate,
+        ];
+    }
+
+    public function extractDueDateFromCoraPayload(array $payload): ?string
+    {
+        $candidates = [
+            data_get($payload, 'payment_terms.due_date'),
+            $payload['due_date'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            try {
+                return Carbon::parse($candidate)->toDateString();
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Alinha due_date local ao vencimento efetivo retornado pela Cora.
+     *
+     * @return array{original_due_date: ?string, provider_due_date: string}|null
+     */
+    public function reconcileInvoiceDueDateAfterCharge(Invoice $invoice, array $coraPayload): ?array
+    {
+        $providerDueDate = $this->extractDueDateFromCoraPayload($coraPayload);
+        if ($providerDueDate === null) {
+            return null;
+        }
+
+        $localDueDate = $invoice->due_date?->toDateString();
+        if ($localDueDate === $providerDueDate) {
+            return null;
+        }
+
+        $invoice->update(['due_date' => $providerDueDate]);
+
+        Log::info('Cora invoice due_date reconciled with provider', [
+            'invoice_id' => $invoice->id,
+            'tenant_id' => $invoice->tenant_id,
+            'original_due_date' => $localDueDate,
+            'provider_due_date' => $providerDueDate,
+        ]);
+
+        return [
+            'original_due_date' => $localDueDate,
+            'provider_due_date' => $providerDueDate,
+        ];
     }
 
     private function resolveProviderDueDate(Invoice $invoice): string

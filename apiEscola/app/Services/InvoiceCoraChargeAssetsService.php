@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Services\Gateways\CoraPaymentGateway;
 use App\Services\PaymentGatewayFactory;
 
 /**
@@ -94,14 +95,30 @@ class InvoiceCoraChargeAssetsService
         ], fn ($value) => $this->coerceScalarString($value) !== null));
 
         $existingPayload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $mergedPayload = array_replace_recursive($existingPayload, $external);
         try {
-            $storedMethod = $this->resolveChargeMethodFromExternal(array_replace_recursive($existingPayload, $external));
+            $storedMethod = $this->resolveChargeMethodFromExternal($mergedPayload);
         } catch (\Throwable) {
             $storedMethod = $this->resolveChargeMethodFromInvoice($invoice) ?? 'bank_slip';
         }
 
+        $dueDateAdjustment = null;
+        $gateway = $factory->resolve('cora');
+        if ($gateway instanceof CoraPaymentGateway) {
+            $dueDateAdjustment = $gateway->reconcileInvoiceDueDateAfterCharge($invoice, $mergedPayload);
+            if ($dueDateAdjustment !== null) {
+                $mergedPayload['integration'] = array_merge(
+                    (array) ($mergedPayload['integration'] ?? []),
+                    [
+                        'due_date_adjusted_from' => $dueDateAdjustment['original_due_date'],
+                        'provider_due_date' => $dueDateAdjustment['provider_due_date'],
+                    ]
+                );
+            }
+        }
+
         $invoice->update([
-            'cora_payload' => array_replace_recursive($existingPayload, $external),
+            'cora_payload' => $mergedPayload,
             'cora_payment_url' => $this->coerceScalarString($mergedAssets['boleto_url'] ?? null)
                 ?? $this->coerceScalarString($invoice->cora_payment_url),
             'cora_pix_copy_paste' => $this->coerceScalarString($mergedAssets['pix_copy_paste'] ?? null)

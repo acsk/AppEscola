@@ -14,6 +14,7 @@ use App\Services\InvoiceCoraChargeAssetsService;
 use App\Services\PaymentGatewayFactory;
 use App\Services\CoraCredentialService;
 use App\Services\CoraTokenService;
+use App\Services\Gateways\CoraPaymentGateway;
 use App\Services\PaymentProviderRegistry;
 use App\Services\TenantBillingSettingsService;
 use Illuminate\Http\Client\ConnectionException;
@@ -946,6 +947,24 @@ class PaymentProviderController extends Controller
             ]
         );
 
+        $dueDateAdjustment = null;
+        if ($resolvedProvider === 'cora') {
+            $coraGateway = $factory->resolve('cora');
+            if ($coraGateway instanceof CoraPaymentGateway) {
+                $dueDateAdjustment = $coraGateway->reconcileInvoiceDueDateAfterCharge($invoice, $payloadToPersist);
+            }
+        }
+
+        if ($dueDateAdjustment !== null) {
+            $payloadToPersist['integration'] = array_merge(
+                (array) ($payloadToPersist['integration'] ?? []),
+                [
+                    'due_date_adjusted_from' => $dueDateAdjustment['original_due_date'],
+                    'provider_due_date' => $dueDateAdjustment['provider_due_date'],
+                ]
+            );
+        }
+
         $invoice->update([
             'payment_method' => $storedMethod,
             'cora_charge_id' => $result['external_id'],
@@ -985,7 +1004,12 @@ class PaymentProviderController extends Controller
                 ?? data_get($invoice->fresh()->cora_payload, 'payment_options.pix.qr_code_url'),
             'expires_at' => null,
             'reused_existing_charge' => false,
-        ], 'Cobrança gerada com sucesso.');
+            'due_date' => $invoice->fresh()->due_date?->toDateString(),
+            'due_date_adjusted' => $dueDateAdjustment !== null,
+            'due_date_adjusted_from' => $dueDateAdjustment['original_due_date'] ?? null,
+        ], $dueDateAdjustment !== null
+            ? 'Cobrança gerada com sucesso. O vencimento foi ajustado para a data mínima aceita pela Cora.'
+            : 'Cobrança gerada com sucesso.');
     }
 
     private function shouldReuseExistingCharge(Invoice $invoice, ?string $storedMethod): bool
