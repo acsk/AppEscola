@@ -66,6 +66,7 @@ import MarkInvoicePaidModal from "../../components/finance/MarkInvoicePaidModal"
 import InvoiceActionsModal, { type InvoiceActionKey } from "../../components/finance/InvoiceActionsModal";
 import ContractChargesModal from "../../components/finance/ContractChargesModal";
 import EnrollmentCarneModal from "../../components/finance/EnrollmentCarneModal";
+import CoraDueDatePolicyBanner from "../../components/finance/CoraDueDatePolicyBanner";
 import EnrollmentEditModal from "../../components/matriculas/EnrollmentEditModal";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
 import type {
@@ -1061,6 +1062,12 @@ export default function EnrollmentDetailScreen({
   const canUseBoleto = allowedChargeMethods.includes("boleto");
   const canUseHybrid = allowedChargeMethods.includes("hybrid");
   const canGenerateBoleto = canUseBoleto || canUseHybrid;
+  const coraDueDateInfo = chargePaymentOptions?.cora_due_date ?? null;
+  const showCoraDueDateHintOnSelect =
+    chargeModalStep === "select" && !!coraDueDateInfo && canGenerateBoleto;
+  const showCoraDueDateHintForBoleto =
+    !!coraDueDateInfo &&
+    (pendingChargeMethod === "boleto" || pendingChargeMethod === "hybrid");
   const hasPixAssets = !!(pixCopyPaste || pixQrCodeImageUrl);
   const hasBoletoAssets = !!(boletoDigitable || boletoPaymentUrl);
   const hasHybridBoletoPdf =
@@ -1205,6 +1212,11 @@ export default function EnrollmentDetailScreen({
             {item.description}
           </Text>
           <Text className="text-xs text-gray-500 mt-0.5">Vence {fmt(item.due_date)}</Text>
+          {item.cora_due_date_hint ? (
+            <Text className="text-[11px] text-sky-800 mt-1 leading-relaxed">
+              {item.cora_due_date_hint}
+            </Text>
+          ) : null}
         </View>
         <Badge slug={item.status} label={INVOICE_STATUS_LABELS[item.status] ?? item.status} />
       </View>
@@ -1906,6 +1918,19 @@ export default function EnrollmentDetailScreen({
       >
         {chargeModalStep === "select" && (
           <>
+            {showCoraDueDateHintOnSelect && coraDueDateInfo ? (
+              <View className="mb-3">
+                <CoraDueDatePolicyBanner
+                  message={coraDueDateInfo.policy_hint}
+                  emphasized={coraDueDateInfo.would_adjust}
+                />
+                {coraDueDateInfo.would_adjust ? (
+                  <Text className="text-xs text-amber-800 mt-2 leading-relaxed">
+                    {`Vencimento local ${isoToDisplayDate(coraDueDateInfo.local_due_date)} será enviado à Cora como ${isoToDisplayDate(coraDueDateInfo.provider_due_date_preview)}.`}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
             <View className="mb-3">
               <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                 Escolha a forma de pagamento
@@ -2451,7 +2476,13 @@ export default function EnrollmentDetailScreen({
         title="Confirmar forma de pagamento"
         message={
           chargeInvoice
-            ? `Gerar cobrança de ${money(chargeInvoice.amount)} via ${pendingChargeMethodLabel}? Após gerar, o método desta cobrança ficará bloqueado.`
+            ? `Gerar cobrança de ${money(chargeInvoice.amount)} via ${pendingChargeMethodLabel}? Após gerar, o método desta cobrança ficará bloqueado.${
+                showCoraDueDateHintForBoleto && coraDueDateInfo?.would_adjust
+                  ? `\n\nVencimento na Cora: ${isoToDisplayDate(coraDueDateInfo.provider_due_date_preview)} (em vez de ${isoToDisplayDate(coraDueDateInfo.local_due_date)}). ${coraDueDateInfo.policy_hint}`
+                  : showCoraDueDateHintForBoleto && coraDueDateInfo
+                    ? `\n\n${coraDueDateInfo.policy_hint}`
+                    : ""
+              }`
             : `Gerar cobrança via ${pendingChargeMethodLabel}?`
         }
         onConfirm={confirmGenerateCharge}

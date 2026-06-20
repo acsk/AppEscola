@@ -2,8 +2,10 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Gateways\CoraPaymentGateway;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceSettlementService;
+use App\Services\PaymentGatewayFactory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,6 +18,7 @@ class InvoiceResource extends JsonResource
         $providerDueDate = data_get($this->cora_payload, 'payment_terms.due_date')
             ?? data_get($this->cora_payload, 'integration.provider_due_date');
         $dueDateAdjustedFrom = data_get($this->cora_payload, 'integration.due_date_adjusted_from');
+        $coraDueDateHint = $this->resolveCoraDueDateHint($dueDateAdjustedFrom);
 
         return [
             'id' => $this->id,
@@ -30,6 +33,7 @@ class InvoiceResource extends JsonResource
             'description' => $this->description,
             'amount' => $this->amount,
             'due_date' => $this->due_date?->toDateString(),
+            'cora_due_date_hint' => $coraDueDateHint,
             'paid_at' => $this->paid_at?->toISOString(),
             'status' => $this->status,
             'payment_method' => $this->payment_method,
@@ -74,5 +78,29 @@ class InvoiceResource extends JsonResource
             'will_cancel_gateway_on_settlement' => $lifecycleService->shouldCancelOnGateway($this->resource),
             'settlement_hint' => app(InvoiceSettlementService::class)->settlementHint($this->resource),
         ];
+    }
+
+    private function resolveCoraDueDateHint(mixed $dueDateAdjustedFrom): ?string
+    {
+        if (is_string($dueDateAdjustedFrom) && $dueDateAdjustedFrom !== '') {
+            return CoraPaymentGateway::DUE_DATE_POLICY_HINT;
+        }
+
+        if (! in_array($this->status, ['pending', 'overdue'], true) || ! $this->due_date) {
+            return null;
+        }
+
+        if ($this->cora_charge_id) {
+            return null;
+        }
+
+        $gateway = app(PaymentGatewayFactory::class)->resolve('cora');
+        if (! $gateway instanceof CoraPaymentGateway) {
+            return null;
+        }
+
+        $resolution = $gateway->resolveProviderDueDateResolution($this->resource);
+
+        return $resolution['adjusted'] ? CoraPaymentGateway::DUE_DATE_POLICY_HINT : null;
     }
 }

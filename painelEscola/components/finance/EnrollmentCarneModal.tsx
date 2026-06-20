@@ -19,6 +19,7 @@ import {
   type CarnePreviewInvoice,
 } from "../../services/enrollmentCarne";
 import { isoToDisplay } from "../../utils/masks";
+import CoraDueDatePolicyBanner from "./CoraDueDatePolicyBanner";
 
 type Props = {
   visible: boolean;
@@ -143,6 +144,8 @@ export default function EnrollmentCarneModal({
   const readyCount = preview?.ready_for_bundle_count ?? 0;
   const needsPdfCount =
     preview?.invoices.filter((inv) => inv.needs_pdf_sync).length ?? 0;
+  const dueDateWouldAdjustCount = preview?.due_date_would_adjust_count ?? 0;
+  const coraDueDateHint = preview?.cora_due_date_policy_hint;
 
   const toggle = (id: number) => {
     setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -295,8 +298,11 @@ export default function EnrollmentCarneModal({
           <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
             {inv.description}
           </Text>
-          <Text className="text-xs text-gray-500" numberOfLines={1}>
+          <Text className="text-xs text-gray-500 mt-0.5">
             {`Venc. ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)} · `}
+            {inv.due_date_would_adjust && inv.provider_due_date_preview
+              ? `Cora: ${isoToDisplay(inv.provider_due_date_preview)} · `
+              : ""}
             <Text style={{ color: statusColor, fontWeight: "600" }}>{statusText}</Text>
           </Text>
         </View>
@@ -365,6 +371,19 @@ export default function EnrollmentCarneModal({
       <Text className="text-xs text-gray-500 leading-relaxed">
         {preview?.archive_format_hint}
       </Text>
+      {coraDueDateHint ? (
+        <View className="mt-3">
+          <CoraDueDatePolicyBanner
+            message={coraDueDateHint}
+            emphasized={dueDateWouldAdjustCount > 0}
+          />
+        </View>
+      ) : null}
+      {dueDateWouldAdjustCount > 0 ? (
+        <Text className="text-xs text-amber-800 mt-2 leading-relaxed">
+          {`${dueDateWouldAdjustCount} parcela(s) com vencimento no passado: na emissão, a Cora usará a data mínima permitida (geralmente o dia seguinte).`}
+        </Text>
+      ) : null}
       {needsPdfCount > 0 ? (
         <View className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex-row gap-2">
           <Ionicons name="warning-outline" size={18} color="#B45309" />
@@ -434,6 +453,11 @@ export default function EnrollmentCarneModal({
       <Text className="text-sm text-gray-600 mb-3 px-1">
         Como o sistema deve tratar parcelas sem PDF ou com falha?
       </Text>
+      {issueMissing && coraDueDateHint ? (
+        <View className="mb-3">
+          <CoraDueDatePolicyBanner message={coraDueDateHint} emphasized />
+        </View>
+      ) : null}
       <TouchableOpacity
         onPress={() => setRequireAll((v) => !v)}
         activeOpacity={0.85}

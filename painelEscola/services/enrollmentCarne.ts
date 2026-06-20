@@ -17,6 +17,8 @@ export type CarnePreviewInvoice = {
   needs_boleto_issue?: boolean;
   needs_pdf_sync?: boolean;
   cora_charge_id: string | null;
+  due_date_would_adjust?: boolean;
+  provider_due_date_preview?: string | null;
 };
 
 export type CarneExcludedInvoice = {
@@ -42,6 +44,8 @@ export type CarnePreview = {
   excluded_count?: number;
   archive_format?: "pdf" | "zip";
   archive_format_hint?: string;
+  cora_due_date_policy_hint?: string;
+  due_date_would_adjust_count?: number;
   invoices: CarnePreviewInvoice[];
   excluded_invoices?: CarneExcludedInvoice[];
 };

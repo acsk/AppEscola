@@ -27,6 +27,11 @@ class CoraPaymentGateway implements PaymentGatewayContract
     /** Limite da descrição do serviço na API Cora v2. */
     private const MAX_SERVICE_DESCRIPTION_LENGTH = 100;
 
+    /**
+     * Texto exibido ao operador quando a Cora pode alterar o vencimento do boleto.
+     */
+    public const DUE_DATE_POLICY_HINT = 'Emita boletos antes do vencimento. Se a emissão for atrasada, o vencimento no boleto será no mínimo o dia seguinte — exigência da Cora, não do sistema.';
+
     public function __construct(private readonly CoraTokenService $tokenService)
     {
     }

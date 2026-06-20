@@ -569,6 +569,20 @@ class PaymentProviderController extends Controller
             $currentMethod = $configuredDefaultMethod;
         }
 
+        $coraDueDate = null;
+        if ($defaultProvider === 'cora' && $invoice->due_date) {
+            $coraGateway = $factory->resolve('cora');
+            if ($coraGateway instanceof CoraPaymentGateway) {
+                $resolution = $coraGateway->resolveProviderDueDateResolution($invoice);
+                $coraDueDate = [
+                    'policy_hint' => CoraPaymentGateway::DUE_DATE_POLICY_HINT,
+                    'would_adjust' => $resolution['adjusted'],
+                    'local_due_date' => $resolution['local_due_date'],
+                    'provider_due_date_preview' => $resolution['provider_due_date'],
+                ];
+            }
+        }
+
         return $this->success([
             'invoice' => [
                 'id'             => $invoice->id,
@@ -594,6 +608,7 @@ class PaymentProviderController extends Controller
                 'method' => $lockedUiMethod,
                 'reason' => $lockReason,
             ],
+            'cora_due_date' => $coraDueDate,
             'payment_assets' => $paymentAssets,
         ], 'Opções de pagamento carregadas com sucesso.');
     }
@@ -1007,6 +1022,9 @@ class PaymentProviderController extends Controller
             'due_date' => $invoice->fresh()->due_date?->toDateString(),
             'due_date_adjusted' => $dueDateAdjustment !== null,
             'due_date_adjusted_from' => $dueDateAdjustment['original_due_date'] ?? null,
+            'due_date_hint' => in_array($coraMethod, ['boleto', 'hybrid'], true)
+                ? CoraPaymentGateway::DUE_DATE_POLICY_HINT
+                : null,
         ], $dueDateAdjustment !== null
             ? 'Cobrança gerada com sucesso. O vencimento foi ajustado para a data mínima aceita pela Cora.'
             : 'Cobrança gerada com sucesso.');

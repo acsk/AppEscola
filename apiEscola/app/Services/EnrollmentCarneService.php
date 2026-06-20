@@ -61,6 +61,7 @@ class EnrollmentCarneService
             'archive_format_hint' => $archiveFormat === 'pdf'
                 ? 'Um único PDF com todos os boletos em sequência.'
                 : 'Arquivo ZIP com um PDF por parcela (ideal para imprimir todos).',
+            'cora_due_date_policy_hint' => CoraPaymentGateway::DUE_DATE_POLICY_HINT,
             ...$this->buildPreviewInvoiceLists($eligible, $environment),
             'excluded_invoices' => $excluded->values()->all(),
         ];
@@ -294,6 +295,7 @@ class EnrollmentCarneService
 
         return [
             'ready_for_bundle_count' => $warmed->filter(fn (Invoice $invoice) => $this->isCarneReady($invoice))->count(),
+            'due_date_would_adjust_count' => $warmed->filter(fn (Invoice $invoice) => $this->invoiceDueDateWouldAdjust($invoice))->count(),
             'invoices' => $warmed->map(fn (Invoice $invoice) => $this->invoiceRow($invoice))->all(),
         ];
     }
@@ -303,6 +305,7 @@ class EnrollmentCarneService
         $assets = $this->chargeAssets->paymentAssetsFromInvoice($invoice);
         $hasBoleto = $this->chargeAssets->hasBoletoAssets($assets);
         $carneReady = $this->isCarneReady($invoice);
+        $dueDateResolution = $this->resolveDueDateResolution($invoice);
 
         return [
             'invoice_id' => $invoice->id,
@@ -315,7 +318,31 @@ class EnrollmentCarneService
             'needs_boleto_issue' => ! $hasBoleto,
             'needs_pdf_sync' => $hasBoleto && ! $carneReady,
             'cora_charge_id' => $invoice->cora_charge_id,
+            'due_date_would_adjust' => $dueDateResolution['adjusted'] ?? false,
+            'provider_due_date_preview' => $dueDateResolution['provider_due_date'] ?? null,
         ];
+    }
+
+    /**
+     * @return array{local_due_date: ?string, provider_due_date: string, adjusted: bool}|null
+     */
+    private function resolveDueDateResolution(Invoice $invoice): ?array
+    {
+        if (! $invoice->due_date) {
+            return null;
+        }
+
+        $gateway = $this->factory->resolve('cora');
+        if (! $gateway instanceof CoraPaymentGateway) {
+            return null;
+        }
+
+        return $gateway->resolveProviderDueDateResolution($invoice);
+    }
+
+    private function invoiceDueDateWouldAdjust(Invoice $invoice): bool
+    {
+        return (bool) ($this->resolveDueDateResolution($invoice)['adjusted'] ?? false);
     }
 
     private function isCarneReady(Invoice $invoice): bool

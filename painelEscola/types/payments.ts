@@ -72,6 +72,10 @@ export type GeneratedCharge = {
   boleto_digitable?: string | null;
   qr_code_image_url: string | null;
   expires_at: string | null;
+  due_date?: string | null;
+  due_date_adjusted?: boolean;
+  due_date_adjusted_from?: string | null;
+  due_date_hint?: string | null;
   raw?: Record<string, unknown>;
 };
 
@@ -129,6 +133,12 @@ export type InvoicePaymentOptionsResponse = {
     method: string | null;
     reason: string | null;
   };
+  cora_due_date?: {
+    policy_hint: string;
+    would_adjust: boolean;
+    local_due_date: string | null;
+    provider_due_date_preview: string;
+  } | null;
   payment_assets: InvoicePaymentAssets;
 };
 
