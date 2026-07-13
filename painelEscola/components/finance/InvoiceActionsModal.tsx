@@ -253,6 +253,10 @@ export default function InvoiceActionsModal({
             <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
               {invoice.description}
             </Text>
+            <Text className="text-xs font-mono font-semibold text-violet-600 mt-0.5" numberOfLines={1}>
+              #{invoice.id}
+              {invoice.cora?.charge_id ? ` · ${invoice.cora.charge_id}` : ""}
+            </Text>
             <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
               {fmtMoney(invoice.amount)} · {fmtDate(invoice.due_date)}
               {invoice.student?.name ? ` · ${invoice.student.name}` : ""}

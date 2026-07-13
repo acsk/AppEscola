@@ -20,6 +20,16 @@ import PaymentProviderSelectField from "../components/payments/PaymentProviderSe
 import Badge from "../components/ui/Badge";
 import Pagination from "../components/ui/Pagination";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import DataTableRow from "../components/ui/DataTableRow";
+import {
+  TABLE_CELL,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_CELL_SUBLINE,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../components/ui/dataTableStyles";
 import {
   ChargeStatusResponse,
   GeneratedCharge,
@@ -860,14 +870,20 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
           {renderInvoiceListState()}
           {!loading &&
             rows.map((item) => (
-              <View
+              <TouchableOpacity
                 key={item.id}
+                onPress={() => setActionsInvoice(item)}
+                activeOpacity={0.85}
                 className="bg-white rounded-xl border border-gray-200 px-3 py-3"
                 style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
               >
                 <View className="flex-row items-start justify-between gap-3">
-                  <View className="flex-1">
-                    <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+                  <View className="flex-1" style={{ minWidth: 0 }}>
+                    <Text className="text-xs font-mono font-semibold text-violet-600">
+                      #{item.id}
+                      {item.cora?.charge_id ? ` · ${item.cora.charge_id}` : ""}
+                    </Text>
+                    <Text className="text-sm font-bold text-gray-900 mt-0.5" numberOfLines={1}>
                       {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
                     </Text>
                     <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
@@ -875,7 +891,10 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                     </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => setActionsInvoice(item)}
+                    onPress={(event: any) => {
+                      event?.stopPropagation?.();
+                      setActionsInvoice(item);
+                    }}
                     className="w-8 h-8 items-center justify-center bg-gray-100 rounded-lg border border-gray-200"
                     activeOpacity={0.85}
                   >
@@ -890,7 +909,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
 
                 <View className="flex-row flex-wrap gap-2 mt-3">
                   <View className="rounded-lg bg-gray-50 px-2.5 py-1.5">
-                    <Text className="text-[10px] uppercase font-semibold text-gray-500">
+                    <Text className="text-xs uppercase font-semibold text-gray-500">
                       {listView === "paid" ? "Pago em" : "Vencimento"}
                     </Text>
                     <Text className="text-xs font-semibold text-gray-700 mt-0.5">
@@ -898,14 +917,14 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                     </Text>
                   </View>
                   <View className="rounded-lg bg-gray-50 px-2.5 py-1.5">
-                    <Text className="text-[10px] uppercase font-semibold text-gray-500">Forma</Text>
+                    <Text className="text-xs uppercase font-semibold text-gray-500">Forma</Text>
                     <Text className="text-xs font-semibold text-gray-700 mt-0.5">
                       {paymentMethodLabel(item.payment_method)}
                     </Text>
                   </View>
                   {listView === "paid" ? (
                     <View className="rounded-lg bg-gray-50 px-2.5 py-1.5 flex-1 min-w-[140px]">
-                      <Text className="text-[10px] uppercase font-semibold text-gray-500">
+                      <Text className="text-xs uppercase font-semibold text-gray-500">
                         Identificador
                       </Text>
                       <Text className="text-xs font-semibold text-gray-700 mt-0.5" numberOfLines={1}>
@@ -914,7 +933,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                     </View>
                   ) : null}
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
 
           {meta.total > 0 && (
@@ -940,79 +959,112 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             className="bg-white rounded-2xl overflow-hidden border border-gray-200"
             style={{
               width: "100%",
-              minWidth: tableMinWidth ?? (listView === "paid" ? 1160 : 1040),
+              minWidth: tableMinWidth ?? (listView === "paid" ? 1260 : 1140),
               shadowColor: "#000",
               shadowOpacity: 0.05,
               shadowRadius: 10,
               elevation: 2,
             }}
           >
-            <View className="flex-row bg-gray-100 border-b border-gray-200 px-3 py-2">
-              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 1.6 }}>Aluno</Text>
-              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 1.8 }}>Descrição</Text>
-              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.75 }}>Valor</Text>
-              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.85 }}>
+            <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+              <Text className={TABLE_HEADER_CELL} style={{ width: 88, minWidth: 88 }}>
+                ID
+              </Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.55, minWidth: 140 }}>
+                Aluno
+              </Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.65, minWidth: 150 }}>
+                Descrição
+              </Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.75, minWidth: 88 }}>
+                Valor
+              </Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.85, minWidth: 96 }}>
                 {listView === "paid" ? "Pago em" : "Vencimento"}
               </Text>
-              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.9 }}>Forma</Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.9, minWidth: 96 }}>
+                Forma
+              </Text>
               {listView === "paid" ? (
-                <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 1 }}>
+                <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 110 }}>
                   Identificador
                 </Text>
               ) : null}
-              <Text className="text-[11px] font-bold text-gray-600 uppercase tracking-wide" style={{ flex: 0.65 }}>Status</Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.65, minWidth: 88 }}>
+                Status
+              </Text>
               <View style={{ width: 42 }} />
             </View>
 
             {renderInvoiceListState() ??
               rows.map((item, i) => (
-                <View
+                <DataTableRow
                   key={item.id}
-                  className={`flex-row items-center px-3 py-2 border-b border-gray-100 ${
-                    i % 2 === 1 ? "bg-slate-50/70" : "bg-white"
-                  }`}
+                  index={i}
+                  onPress={() => setActionsInvoice(item)}
                 >
+                  <View style={{ width: 88, minWidth: 88, paddingRight: 8 }}>
+                    <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+                      #{item.id}
+                    </Text>
+                    {item.cora?.charge_id ? (
+                      <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
+                        {item.cora.charge_id}
+                      </Text>
+                    ) : null}
+                  </View>
                   <Text
-                    className="text-xs font-semibold text-gray-800"
-                    style={{ flex: 1.6, paddingRight: 10 }}
+                    className={TABLE_CELL_SEMIBOLD}
+                    style={{ flex: 1.55, minWidth: 140, paddingRight: 10 }}
                     numberOfLines={1}
                   >
                     {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
                   </Text>
                   <Text
-                    className="text-xs text-gray-600"
-                    style={{ flex: 1.8, paddingRight: 10 }}
+                    className={TABLE_CELL}
+                    style={{ flex: 1.65, minWidth: 150, paddingRight: 10 }}
                     numberOfLines={1}
                   >
                     {limitText(item.description, DESCRIPTION_LIMIT)}
                   </Text>
-                  <Text className="text-xs font-bold text-gray-800" style={{ flex: 0.75 }}>
+                  <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 0.75, minWidth: 88 }}>
                     {fmtMoney(item.amount)}
                   </Text>
-                  <Text className="text-xs text-gray-600" style={{ flex: 0.85 }}>
+                  <Text className={TABLE_CELL_MUTED} style={{ flex: 0.85, minWidth: 96 }}>
                     {listView === "paid" ? fmtDateTime(item.paid_at) : fmt(item.due_date)}
                   </Text>
-                  <Text className="text-xs text-gray-600" style={{ flex: 0.9 }} numberOfLines={1}>
+                  <Text
+                    className={TABLE_CELL}
+                    style={{ flex: 0.9, minWidth: 96 }}
+                    numberOfLines={1}
+                  >
                     {paymentMethodLabel(item.payment_method)}
                   </Text>
                   {listView === "paid" ? (
-                    <Text className="text-xs text-gray-600" style={{ flex: 1, paddingRight: 10 }} numberOfLines={1}>
+                    <Text
+                      className={TABLE_CELL_MUTED}
+                      style={{ flex: 1, minWidth: 110, paddingRight: 10 }}
+                      numberOfLines={1}
+                    >
                       {item.payment_reference ?? "—"}
                     </Text>
                   ) : null}
-                  <View style={{ flex: 0.65 }}>
+                  <View style={{ flex: 0.65, minWidth: 88 }}>
                     <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
                   </View>
                   <View style={{ width: 42 }} className="flex-row justify-end">
                     <TouchableOpacity
-                      onPress={() => setActionsInvoice(item)}
+                      onPress={(event: any) => {
+                        event?.stopPropagation?.();
+                        setActionsInvoice(item);
+                      }}
                       className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
                       activeOpacity={0.85}
                     >
                       <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </DataTableRow>
               ))}
 
             {meta.total > 0 && (
