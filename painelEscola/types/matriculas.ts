@@ -102,6 +102,7 @@ export type InvoiceListItem = {
   cancel_block_reason?: string | null;
   delete_block_reason?: string | null;
   is_local_invoice?: boolean;
+  imported_from_cora_sync?: boolean;
   lifecycle_hint?: string | null;
   cora_due_date_hint?: string | null;
   has_active_gateway_charge?: boolean;

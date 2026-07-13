@@ -8,8 +8,6 @@ use App\Models\Enrollment;
 use App\Models\Invoice;
 use App\Models\Tenant;
 use Carbon\Carbon;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -17,7 +15,6 @@ class EnrollmentContractChargesService
 {
     public function __construct(
         private readonly TenantBillingSettingsService $billingSettings,
-        private readonly CoraEnrollmentInvoiceSyncService $coraSync,
         private readonly InvoiceLifecycleService $invoiceLifecycle,
         private readonly ContractChargesPreviewDebugService $previewDebug,
         private readonly EnrollmentInvoiceDescriptionService $invoiceDescriptions,
@@ -86,6 +83,7 @@ class EnrollmentContractChargesService
         $localInvoices = $this->mapLocalInvoices($enrollment);
         $toGenerate = $this->planLocalCharges($enrollment, $invoiceTypes, $billing, $blocked);
 
+        // Importação/sync da Cora desativada: preview só planeja parcelas locais do app.
         $externalPreview = [
             'items' => [],
             'provider_boleto_list' => [],
@@ -96,46 +94,21 @@ class EnrollmentContractChargesService
             'fetch_error' => null,
         ];
 
-        try {
-            $externalPreview = $this->coraSync->previewExternalBoletoCharges($enrollment, $environment);
-        } catch (ConnectionException|RequestException $e) {
-            $externalPreview['fetch_error'] = 'Não foi possível consultar cobranças no provedor: ' . $e->getMessage();
-            $warnings[] = $externalPreview['fetch_error'];
-        } catch (RuntimeException $e) {
-            $externalPreview['fetch_error'] = $e->getMessage();
-            $warnings[] = $externalPreview['fetch_error'];
-        }
+        $syncCandidates = [];
+        $providerBoletoList = [];
 
-        $syncCandidates = $externalPreview['items'];
-        $providerBoletoList = $externalPreview['provider_boleto_list'] ?? $syncCandidates;
-
-        $toGenerate = $this->deferLocalGenerationWhenProviderHasBoleto($toGenerate, $providerBoletoList);
         $toGenerateSelectable = array_values(array_filter(
             $toGenerate,
             static fn (array $row) => empty($row['already_exists']) && empty($row['disabled'])
         ));
 
-        $deferredForProvider = array_values(array_filter(
-            $toGenerate,
-            static fn (array $row) => ! empty($row['provider_has_boleto'])
+        $importedLocalCount = count(array_filter(
+            $localInvoices,
+            static fn (array $row) => ! empty($row['imported_from_cora_sync'])
         ));
-        if ($deferredForProvider !== []) {
-            $warnings[] = 'Parcelas com boleto na Cora na mesma data não vêm marcadas para gerar local. '
-                . 'Prefira importar/sincronizar pelo provedor ou marque manualmente se ainda quiser criar no sistema.';
-        }
-
-        $externalBoletoTotal = (int) ($externalPreview['external_boleto_total'] ?? 0);
-        $externalMatchesPayer = (int) ($externalPreview['external_matches_payer'] ?? 0);
-        if ($externalBoletoTotal > 0 && $externalMatchesPayer === 0 && $syncCandidates === []) {
-            $warnings[] = "A Cora retornou {$externalBoletoTotal} boleto(s) da conta, mas nenhum com o CPF do aluno/responsável "
-                . 'desta matrícula (ou com metadata de vínculo). Confira o CPF do responsável financeiro no cadastro '
-                . 'ou gere novas cobranças pelo sistema (elas passam a incluir metadata e o CPF correto).';
-        }
-
-        $localLinkedInPreview = (int) ($externalPreview['local_linked_in_preview'] ?? 0);
-        if ($localLinkedInPreview > 0) {
-            $warnings[] = "{$localLinkedInPreview} cobrança(s) já gerada(s) pelo sistema aparecem como "
-                . '"Vinculada" na lista Cora (não é necessário sincronizar de novo).';
+        if ($importedLocalCount > 0) {
+            $warnings[] = "{$importedLocalCount} cobrança(s) importada(s) da Cora ainda vinculadas. "
+                . 'Remova-as para manter só as geradas pelo AppCurso.';
         }
 
         $payload = [
@@ -151,16 +124,14 @@ class EnrollmentContractChargesService
                     $localInvoices,
                     static fn (array $row) => ! empty($row['cora_charge_id'])
                 )),
+                'imported_from_cora_sync_count' => $importedLocalCount,
                 'to_generate_count' => count($toGenerateSelectable),
-                'to_sync_count' => count(array_filter(
-                    $syncCandidates,
-                    static fn (array $row) => ! empty($row['syncable'])
-                )),
-                'external_total' => $externalPreview['external_total'],
-                'external_boleto_total' => $externalPreview['external_boleto_total'] ?? 0,
-                'external_for_enrollment' => $externalPreview['external_for_enrollment'] ?? count($syncCandidates),
-                'external_matches_payer' => $externalPreview['external_matches_payer'] ?? 0,
-                'provider_fetch_error' => $externalPreview['fetch_error'],
+                'to_sync_count' => 0,
+                'external_total' => 0,
+                'external_boleto_total' => 0,
+                'external_for_enrollment' => 0,
+                'external_matches_payer' => 0,
+                'provider_fetch_error' => null,
             ],
             'warnings' => $warnings,
             'blocked' => $blocked,
@@ -199,12 +170,18 @@ class EnrollmentContractChargesService
         $syncChargeIds = array_values(array_unique(array_filter(array_map('strval', $syncChargeIds))));
 
         if ($generateKeys === [] && $syncChargeIds === []) {
-            throw new RuntimeException('Selecione ao menos uma cobrança para gerar ou sincronizar.');
+            throw new RuntimeException('Selecione ao menos uma cobrança para gerar.');
+        }
+
+        if ($syncChargeIds !== []) {
+            throw new RuntimeException(
+                'A importação de cobranças da Cora foi desativada. Gere as parcelas no AppCurso e emita o boleto pela ação “gerar cobrança”.'
+            );
         }
 
         if ($enrollment->charges_generated_at !== null && $generateKeys !== []) {
             throw new RuntimeException(
-                'As cobranças do contrato já foram geradas em lote. Use a sincronização com o provedor ou crie cobranças avulsas.'
+                'As cobranças do contrato já foram geradas em lote. Crie cobranças avulsas se precisar de parcelas extras.'
             );
         }
 
@@ -219,22 +196,48 @@ class EnrollmentContractChargesService
             $enrollment->update(['charges_generated_at' => now()]);
         }
 
-        $syncResult = null;
-        if ($syncChargeIds !== []) {
-            $syncResult = $this->coraSync->syncEnrollmentCharges(
-                $enrollment,
-                $environment,
-                $syncChargeIds,
-                $createMissingOnSync
-            );
-        }
-
         return [
             'enrollment_id' => $enrollment->id,
             'environment' => $environment,
             'generated' => $generated,
-            'sync' => $syncResult,
+            'sync' => null,
             'charges_generated_at' => $enrollment->fresh()->charges_generated_at?->toISOString(),
+        ];
+    }
+
+    /**
+     * Remove vínculos locais de cobranças importadas da Cora (origin cora_sync).
+     * Não cancela boletos na Cora.
+     *
+     * @return array{deleted: int, skipped: array<int, array{invoice_id: int, reason: string}>}
+     */
+    public function purgeImportedCharges(Enrollment $enrollment): array
+    {
+        $enrollment->loadMissing(['invoices' => fn ($q) => $q->orderBy('due_date')]);
+
+        $deleted = 0;
+        $skipped = [];
+
+        foreach ($enrollment->invoices as $invoice) {
+            if (! $this->invoiceLifecycle->wasImportedFromCoraSync($invoice)) {
+                continue;
+            }
+
+            try {
+                $this->invoiceLifecycle->assertCanDelete($invoice);
+                $invoice->delete();
+                $deleted++;
+            } catch (RuntimeException $e) {
+                $skipped[] = [
+                    'invoice_id' => (int) $invoice->id,
+                    'reason' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return [
+            'deleted' => $deleted,
+            'skipped' => $skipped,
         ];
     }
 
@@ -271,7 +274,10 @@ class EnrollmentContractChargesService
                 'cora_charge_id' => $invoice->cora_charge_id,
                 'cora_status' => $invoice->cora_status,
                 'has_active_gateway_charge' => $hasGateway,
-                'source' => $invoice->cora_charge_id ? 'local_with_provider' : 'local_only',
+                'imported_from_cora_sync' => $this->invoiceLifecycle->wasImportedFromCoraSync($invoice),
+                'source' => $this->invoiceLifecycle->wasImportedFromCoraSync($invoice)
+                    ? 'imported_from_cora_sync'
+                    : ($invoice->cora_charge_id ? 'local_with_provider' : 'local_only'),
             ];
         })->values()->all();
     }

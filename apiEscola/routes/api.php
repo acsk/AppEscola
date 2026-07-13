@@ -219,6 +219,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('enrollments/subscribe-bundle', [EnrollmentController::class, 'subscribeBundle']);
     Route::get('enrollments/{enrollment}/contract-charges/preview', [EnrollmentController::class, 'contractChargesPreview']);
     Route::post('enrollments/{enrollment}/contract-charges/apply', [EnrollmentController::class, 'contractChargesApply']);
+    Route::post('enrollments/{enrollment}/contract-charges/purge-imported', [EnrollmentController::class, 'contractChargesPurgeImported']);
     Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
     Route::post('enrollments/{enrollment}/generate-charges',  [EnrollmentController::class, 'generateCharges']);
     Route::get('enrollments/{enrollment}/carne/preview', [EnrollmentController::class, 'carnePreview']);

@@ -48,6 +48,7 @@ export type ContractChargesPreview = {
   summary: {
     local_count: number;
     local_with_gateway: number;
+    imported_from_cora_sync_count?: number;
     to_generate_count: number;
     to_sync_count: number;
     external_total: number;
@@ -72,6 +73,7 @@ export type ContractChargesPreview = {
     cora_charge_id: string | null;
     cora_status: string | null;
     has_active_gateway_charge: boolean;
+    imported_from_cora_sync?: boolean;
     source: string;
   }>;
   to_generate: ContractChargePreviewRow[];
@@ -139,8 +141,6 @@ export async function applyContractCharges(
   payload: {
     environment?: "stage" | "prod";
     generate_keys?: string[];
-    sync_charge_ids?: string[];
-    create_missing?: boolean;
   }
 ): Promise<{ result: ContractChargesApplyResult; message: string }> {
   const { data } = await api.post<ApiEnvelope<ContractChargesApplyResult>>(
@@ -153,5 +153,23 @@ export async function applyContractCharges(
   return {
     result: unwrapBody(data),
     message: envelope?.message ?? "Operação concluída.",
+  };
+}
+
+export async function purgeImportedContractCharges(
+  enrollmentId: number
+): Promise<{ result: { deleted: number; skipped: Array<{ invoice_id: number; reason: string }> }; message: string }> {
+  const { data } = await api.post<
+    ApiEnvelope<{ deleted: number; skipped: Array<{ invoice_id: number; reason: string }> }>
+  >(`/enrollments/${enrollmentId}/contract-charges/purge-imported`);
+
+  const envelope = data as ApiEnvelope<{
+    deleted: number;
+    skipped: Array<{ invoice_id: number; reason: string }>;
+  }>;
+
+  return {
+    result: unwrapBody(data),
+    message: envelope?.message ?? "Importadas removidas.",
   };
 }

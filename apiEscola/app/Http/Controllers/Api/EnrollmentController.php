@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Exceptions\CarneGenerationException;
-use App\Jobs\SyncEnrollmentCoraChargesJob;
 use App\Http\Controllers\Controller;
 use OpenApi\Attributes as OA;
 use App\Http\Requests\StoreEnrollmentRequest;
@@ -37,7 +36,6 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -669,14 +667,27 @@ class EnrollmentController extends Controller
         }
 
         $created = (int) ($result['generated']['created'] ?? 0);
-        $syncCreated = (int) ($result['sync']['created'] ?? 0);
-        $syncUpdated = (int) ($result['sync']['updated'] ?? 0);
+
+        $message = $created > 0
+            ? "Cobranças do contrato geradas: {$created}."
+            : 'Operação concluída.';
+
+        return $this->success($result, $message);
+    }
+
+    public function contractChargesPurgeImported(Request $request, Enrollment $enrollment): JsonResponse
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+
+        $result = $this->contractCharges->purgeImportedCharges($enrollment);
+        $deleted = (int) ($result['deleted'] ?? 0);
+        $skipped = count($result['skipped'] ?? []);
 
         $message = match (true) {
-            $created > 0 && $syncCreated + $syncUpdated > 0 => "Contrato: {$created} cobrança(s) gerada(s). Cora: {$syncCreated} criada(s), {$syncUpdated} atualizada(s).",
-            $created > 0 => "Cobranças do contrato geradas: {$created}.",
-            $syncCreated + $syncUpdated > 0 => "Sincronização concluída: {$syncCreated} criada(s), {$syncUpdated} atualizada(s).",
-            default => 'Operação concluída.',
+            $deleted > 0 && $skipped > 0 => "Removidas {$deleted} cobrança(s) importada(s). {$skipped} não removida(s).",
+            $deleted > 0 => "Removidas {$deleted} cobrança(s) importada(s) da Cora.",
+            $skipped > 0 => 'Nenhuma cobrança importada removida.',
+            default => 'Não há cobranças importadas da Cora nesta matrícula.',
         };
 
         return $this->success($result, $message);
@@ -735,71 +746,14 @@ class EnrollmentController extends Controller
     {
         $this->authorizeTenant($request, $enrollment->tenant_id);
 
-        $data = $request->validate([
-            'environment' => ['nullable', 'string', 'in:stage,prod,production'],
-            'charge_ids' => ['nullable', 'array'],
-            'charge_ids.*' => ['string', 'max:255'],
-            'create_missing' => ['nullable', 'boolean'],
-            'async' => ['nullable', 'boolean'],
-        ]);
-
-        $requestedEnv = (string) ($data['environment'] ?? 'prod');
-        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
-
-        $environment = app()->environment('production') ? $requestedEnv : 'stage';
-
-        $chargeIds = array_values(array_filter(array_map(
-            static fn ($value) => trim((string) $value),
-            $data['charge_ids'] ?? []
-        )));
-
-        $createMissing = (bool) ($data['create_missing'] ?? true);
-        $async = (bool) ($data['async'] ?? false);
-
-        $job = new SyncEnrollmentCoraChargesJob(
-            enrollmentId: $enrollment->id,
-            environment: $environment,
-            chargeIds: $chargeIds,
-            createMissing: $createMissing,
+        return $this->error(
+            'A importação/sincronização de cobranças da Cora foi desativada. Gere as parcelas no AppCurso e emita o boleto pela ação “gerar cobrança”.',
+            [
+                'enrollment_id' => $enrollment->id,
+                'disabled' => true,
+            ],
+            422
         );
-
-        if ($async) {
-            dispatch($job);
-
-            return $this->success([
-                'enrollment_id' => $enrollment->id,
-                'tenant_id' => $enrollment->tenant_id,
-                'environment' => $environment,
-                'queued' => true,
-                'charge_ids' => $chargeIds,
-                'create_missing' => $createMissing,
-            ], 'Sincronizacao de cobrancas da Cora enfileirada com sucesso.', 202);
-        }
-
-        // Executa sincronizacao de forma síncrona
-        try {
-            /** @var array<string, mixed> $result */
-            $result = Bus::dispatchSync($job);
-            
-            return $this->success([
-                'enrollment_id' => $result['enrollment_id'] ?? $enrollment->id,
-                'tenant_id' => $result['tenant_id'] ?? $enrollment->tenant_id,
-                'environment' => $result['environment'] ?? $environment,
-                'external_total' => $result['external_total'] ?? 0,
-                'created' => $result['created'] ?? 0,
-                'updated' => $result['updated'] ?? 0,
-                'ignored' => $result['ignored'] ?? 0,
-                'processed_charge_ids' => $result['processed_charge_ids'] ?? [],
-            ], 'Sincronizacao de cobrancas da Cora concluida com sucesso.');
-        } catch (\Throwable $e) {
-            Log::error('Erro ao sincronizar cobrancas Cora:', [
-                'enrollment_id' => $enrollment->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            
-            return $this->error('Erro ao sincronizar cobranças da Cora: ' . $e->getMessage(), null, 500);
-        }
     }
 
     #[OA\Put(

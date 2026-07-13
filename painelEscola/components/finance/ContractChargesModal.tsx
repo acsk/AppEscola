@@ -12,9 +12,9 @@ import Modal from "../ui/Modal";
 import {
   applyContractCharges,
   fetchContractChargesPreview,
+  purgeImportedContractCharges,
   type ContractChargePreviewRow,
   type ContractChargesPreview,
-  type ContractExternalChargeRow,
 } from "../../services/enrollmentContractCharges";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
 import { useAuth } from "../../contexts/AuthContext";
@@ -380,7 +380,9 @@ function LocalInvoiceCard({
         <CardBadges>
           <StatusPill status={row.status} />
           {providerVisible ? (
-            row.cora_status && !providerAlignedWithLocal(row.status, row.cora_status) ? (
+            row.imported_from_cora_sync ? (
+              <Pill label="Importada Cora" tone="amber" />
+            ) : row.cora_status && !providerAlignedWithLocal(row.status, row.cora_status) ? (
               <StatusPill status={row.cora_status} prefix="Cora" />
             ) : (
               <Pill label="Com Cora" tone="emerald" />
@@ -444,85 +446,6 @@ function CompactTableHeader({
   );
 }
 
-function CoraChargesCompactList({
-  rows,
-  selectedKeys,
-  onToggle,
-}: {
-  rows: ContractExternalChargeRow[];
-  selectedKeys: Set<string>;
-  onToggle: (key: string) => void;
-}) {
-  if (rows.length === 0) {
-    return (
-      <EmptyState
-        icon="cloud-offline-outline"
-        title="Nenhum boleto na Cora"
-        description="A API da Cora não retornou boletos para esta escola."
-      />
-    );
-  }
-
-  return (
-    <View className="rounded-lg border border-emerald-200 bg-white overflow-hidden">
-      <CompactTableHeader
-        columns={[
-          { label: "Venc.", width: 68 },
-          { label: "Valor", width: 82 },
-          { label: "Vínculo", width: 72 },
-          { label: "Status", flex: 1 },
-          { label: "Sync", width: 64, align: "right" },
-        ]}
-      />
-      {rows.map((row, index) => {
-        const syncDisabled = row.syncable !== true;
-        const selected = selectedKeys.has(row.key);
-        const actionLabel =
-          row.syncable === true
-            ? LINK_STATUS_LABELS[row.link_status] ?? "Sincronizar"
-            : row.link_status === "linked"
-              ? LINK_STATUS_LABELS.linked
-              : "—";
-        const actionTone = LINK_STATUS_TONES[row.link_status] ?? "violet";
-        const statusLabel = getStatusDisplay(row.status).label;
-
-        return (
-          <View
-            key={row.key}
-            className={`flex-row items-center px-1 py-1.5 ${
-              index < rows.length - 1 ? "border-b border-gray-50" : ""
-            } ${selected ? "bg-violet-50/80" : syncDisabled ? "opacity-75" : ""}`}
-          >
-            <TouchableOpacity
-              onPress={() => onToggle(row.key)}
-              disabled={syncDisabled}
-              activeOpacity={0.75}
-              style={{ width: 28 }}
-            >
-              <RowCheckbox checked={selected} disabled={syncDisabled} />
-            </TouchableOpacity>
-            <Text className="text-[11px] text-gray-700" style={{ width: 68 }}>
-              {fmtDate(row.due_date)}
-            </Text>
-            <Text className="text-[11px] font-semibold text-gray-900" style={{ width: 82 }}>
-              {fmtMoney(row.amount)}
-            </Text>
-            <View style={{ width: 72 }}>
-              <Pill label={providerLinkLabel(row)} tone={providerLinkTone(row)} />
-            </View>
-            <Text className="flex-1 text-[10px] text-gray-600 pr-1" numberOfLines={1}>
-              {statusLabel}
-            </Text>
-            <View style={{ width: 64 }} className="items-end">
-              <Pill label={actionLabel} tone={actionTone} />
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 function ExecutionPreviewSummary({
   preview,
   selectedKeys,
@@ -543,15 +466,6 @@ function ExecutionPreviewSummary({
     lines.push({
       icon: "add-circle-outline",
       text: `Criar ${tipo.toLowerCase()} ${fmtDate(row.due_date)} — ${fmtMoney(row.amount)}`,
-    });
-  });
-
-  (preview.provider_boleto_list ?? preview.external_charges).forEach((row) => {
-    if (!selectedKeys.has(row.key) || row.syncable !== true) return;
-    const acao = LINK_STATUS_LABELS[row.link_status] ?? "Sincronizar";
-    lines.push({
-      icon: "cloud-download-outline",
-      text: `${acao} boleto Cora ${fmtDate(row.due_date)} — ${fmtMoney(row.amount)}`,
     });
   });
 
@@ -577,12 +491,11 @@ function ExecutionPreviewSummary({
   );
 }
 
-type ContractChargesStep = "overview" | "generate" | "cora" | "review";
+type ContractChargesStep = "overview" | "generate" | "review";
 
 const WIZARD_STEPS: { id: ContractChargesStep; label: string }[] = [
   { id: "overview", label: "Visão geral" },
   { id: "generate", label: "Gerar local" },
-  { id: "cora", label: "Cora" },
   { id: "review", label: "Revisão" },
 ];
 
@@ -637,22 +550,20 @@ function ContractChargesStepIndicator({ current }: { current: ContractChargesSte
 
 function OverviewSummaryCards({
   preview,
-  providerBoletoCount,
-  syncSelectableCount,
 }: {
   preview: ContractChargesPreview;
-  providerBoletoCount: number;
-  syncSelectableCount: number;
 }) {
+  const importedCount = preview.summary.imported_from_cora_sync_count
+    ?? preview.local_invoices.filter((r) => r.imported_from_cora_sync).length;
   const cards = [
     { label: "No sistema", value: preview.summary.local_count, icon: "folder-outline" as const },
     { label: "A gerar", value: preview.summary.to_generate_count, icon: "add-circle-outline" as const },
     {
-      label: "Boletos Cora",
-      value: preview.summary.external_boleto_total ?? providerBoletoCount,
+      label: "Com Cora (app)",
+      value: preview.summary.local_with_gateway,
       icon: "cloud-outline" as const,
     },
-    { label: "Sync disponível", value: syncSelectableCount, icon: "sync-outline" as const },
+    { label: "Importadas", value: importedCount, icon: "warning-outline" as const },
   ];
 
   return (
@@ -671,35 +582,6 @@ function OverviewSummaryCards({
       ))}
     </View>
   );
-}
-
-const LINK_STATUS_LABELS: Record<string, string> = {
-  new: "Importar",
-  linked: "Já vinculada",
-  updatable: "Atualizar",
-  other: "—",
-};
-
-const LINK_STATUS_TONES: Record<string, PillTone> = {
-  new: "violet",
-  linked: "emerald",
-  updatable: "blue",
-  other: "gray",
-};
-
-function providerLinkLabel(row: ContractExternalChargeRow): string {
-  if (row.link_status === "linked" && row.linked_invoice_id) {
-    return `Fatura #${row.linked_invoice_id}`;
-  }
-  if (row.for_this_enrollment) return "Matrícula";
-  if (row.matches_payer) return "Mesmo CPF";
-  return "Outro";
-}
-
-function providerLinkTone(row: ContractExternalChargeRow): PillTone {
-  if (row.for_this_enrollment) return "violet";
-  if (row.matches_payer) return "blue";
-  return "gray";
 }
 
 function ContractChargesDebugPanel({ debug }: { debug: Record<string, unknown> }) {
@@ -903,6 +785,7 @@ export default function ContractChargesModal({
   const [showLocalInvoices, setShowLocalInvoices] = useState(false);
   const [debugPayload, setDebugPayload] = useState<Record<string, unknown> | null>(null);
   const [step, setStep] = useState<ContractChargesStep>("overview");
+  const [purgingImported, setPurgingImported] = useState(false);
 
   const loadPreview = useCallback(async () => {
     setLoading(true);
@@ -915,8 +798,8 @@ export default function ContractChargesModal({
       setPreview(data);
 
       const defaults = new Set<string>();
-      (data.provider_boleto_list ?? data.external_charges)
-        .filter((row) => row.syncable === true && row.selected_by_default === true)
+      data.to_generate
+        .filter((row) => !row.disabled && !row.already_exists && row.selected_by_default === true)
         .forEach((row) => defaults.add(row.key));
       setSelectedKeys(defaults);
       setExpandedKeys(new Set());
@@ -980,14 +863,9 @@ export default function ContractChargesModal({
     [preview]
   );
 
-  const providerBoletoRows = useMemo(
-    () => preview?.provider_boleto_list ?? preview?.external_charges ?? [],
+  const importedInvoices = useMemo(
+    () => preview?.local_invoices.filter((r) => r.imported_from_cora_sync) ?? [],
     [preview]
-  );
-
-  const selectableSync = useMemo(
-    () => providerBoletoRows.filter((r) => r.syncable === true),
-    [providerBoletoRows]
   );
 
   const toggleKey = (key: string) => {
@@ -1017,15 +895,27 @@ export default function ContractChargesModal({
   };
 
   const selectedGenerateKeys = [...selectedKeys].filter((k) => k.startsWith("generate:"));
-  const selectedSyncIds = [...selectedKeys]
-    .filter((k) => k.startsWith("sync:"))
-    .map((k) => k.slice(5));
-  const selectedActionCount = selectedGenerateKeys.length + selectedSyncIds.length;
-  const selectedSyncSelectableCount = selectableSync.filter((r) => selectedKeys.has(r.key)).length;
+  const selectedActionCount = selectedGenerateKeys.length;
+
+  const purgeImported = async () => {
+    if (importedInvoices.length === 0) return;
+    setPurgingImported(true);
+    setError(null);
+    try {
+      const { message } = await purgeImportedContractCharges(enrollmentId);
+      onSuccess(message);
+      await loadPreview();
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.message ?? e?.message ?? "Falha ao remover cobranças importadas."
+      );
+    }
+    setPurgingImported(false);
+  };
 
   const submit = async () => {
-    if (selectedGenerateKeys.length === 0 && selectedSyncIds.length === 0) {
-      setError("Marque ao menos uma cobrança para gerar ou sincronizar.");
+    if (selectedGenerateKeys.length === 0) {
+      setError("Marque ao menos uma parcela para gerar no sistema.");
       return;
     }
 
@@ -1035,8 +925,6 @@ export default function ContractChargesModal({
       const { message } = await applyContractCharges(enrollmentId, {
         environment,
         generate_keys: selectedGenerateKeys,
-        sync_charge_ids: selectedSyncIds,
-        create_missing: true,
       });
       onSuccess(message);
       onClose();
@@ -1057,27 +945,36 @@ export default function ContractChargesModal({
         return (
           <View className="gap-3">
             <Text className="text-xs text-gray-600 leading-5">
-              Analise o contrato em etapas: escolha o que gerar no sistema, o que sincronizar da Cora e
-              confirme antes de executar.
+              Gere as parcelas no sistema conforme o contrato. Depois, emita boleto/PIX na Cora pela
+              ação “gerar cobrança” de cada fatura. Importação de boletos da Cora não é mais usada.
             </Text>
-            <OverviewSummaryCards
-              preview={preview}
-              providerBoletoCount={providerBoletoRows.length}
-              syncSelectableCount={selectableSync.length}
-            />
+            <OverviewSummaryCards preview={preview} />
             <PreviewAlerts
               warnings={preview.warnings}
               providerError={preview.summary.provider_fetch_error}
             />
-            {preview.summary.external_total > 0 ? (
-              <View className="rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2">
-                <Text className="text-xs text-violet-900">
-                  Cora: {preview.summary.external_total} cobrança
-                  {preview.summary.external_total === 1 ? "" : "s"} no tenant ·{" "}
-                  {preview.summary.external_boleto_total ?? providerBoletoRows.length} boleto
-                  {(preview.summary.external_boleto_total ?? 0) === 1 ? "" : "s"} ·{" "}
-                  {preview.summary.external_for_enrollment ?? 0} desta matrícula
+            {importedInvoices.length > 0 ? (
+              <View className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 gap-2">
+                <Text className="text-xs font-semibold text-amber-950">
+                  {importedInvoices.length} cobrança(s) importada(s) da Cora nesta matrícula
                 </Text>
+                <Text className="text-[11px] leading-4 text-amber-900">
+                  Remover apaga só o vínculo local. O boleto permanece na conta Cora.
+                </Text>
+                <TouchableOpacity
+                  onPress={purgeImported}
+                  disabled={loading || applying || purgingImported}
+                  className={`self-start flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg ${
+                    purgingImported ? "bg-amber-200" : "bg-amber-600"
+                  }`}
+                >
+                  {purgingImported ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Ionicons name="trash-outline" size={14} color="white" />
+                  )}
+                  <Text className="text-xs font-semibold text-white">Remover importadas</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
             <View className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
@@ -1124,8 +1021,8 @@ export default function ContractChargesModal({
               <View className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
                 <Ionicons name="lock-closed-outline" size={16} color="#B45309" />
                 <Text className="flex-1 text-xs text-amber-800">
-                  O lote do contrato já foi gerado. Novas parcelas locais estão bloqueadas; você ainda
-                  pode sincronizar boletos na etapa Cora.
+                  O lote do contrato já foi gerado. Novas parcelas locais estão bloqueadas; use cobranças
+                  avulsas se precisar de parcelas extras.
                 </Text>
               </View>
             ) : null}
@@ -1153,8 +1050,8 @@ export default function ContractChargesModal({
         return (
           <View className="gap-2">
             <Text className="text-xs text-gray-600 leading-5">
-              Crie parcelas no sistema conforme o contrato. Se já existir boleto na Cora na mesma data, a
-              linha não vem marcada por padrão.
+              Crie parcelas no sistema conforme o contrato. Em seguida, emita o boleto na Cora pela
+              fatura (gerar cobrança).
             </Text>
             <SectionPanel accent="violet">
               <SectionHeader
@@ -1192,69 +1089,6 @@ export default function ContractChargesModal({
           </View>
         );
 
-      case "cora":
-        return (
-          <View className="gap-2">
-            <Text className="text-xs text-gray-600 leading-5">
-              Importe ou atualize boletos já emitidos na Cora para esta matrícula. Itens já vinculados
-              não podem ser selecionados.
-            </Text>
-            <SectionPanel accent="emerald">
-              <SectionHeader
-                title={`Boletos Cora (${preview.summary.external_boleto_total ?? providerBoletoRows.length})`}
-                action={
-                  selectableSync.length > 0 ? (
-                    <TouchableOpacity
-                      className="px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100"
-                      onPress={() =>
-                        toggleAll(
-                          selectableSync.map((r) => r.key),
-                          selectedSyncSelectableCount !== selectableSync.length
-                        )
-                      }
-                    >
-                      <Text className="text-xs font-semibold text-emerald-800">
-                        {selectedSyncSelectableCount === selectableSync.length
-                          ? "Desmarcar"
-                          : "Marcar sync"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null
-                }
-              />
-              {providerBoletoRows.length === 0 &&
-              (preview.summary.external_boleto_total ?? 0) > 0 ? (
-                <View className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 gap-1">
-                  <Text className="text-xs font-semibold text-amber-900">
-                    {preview.summary.external_boleto_total} boleto(s) na Cora, nenhum vinculável a esta
-                    matrícula
-                  </Text>
-                  <Text className="text-[11px] leading-4 text-amber-800">
-                    Sincronização exige CPF do aluno/responsável ou cobrança criada pelo AppCurso. Boletos
-                    manuais com outro CPF não aparecem aqui.
-                    {canRequestDebug
-                      ? " Use Debug na visão geral para ver o motivo."
-                      : ""}
-                  </Text>
-                </View>
-              ) : providerBoletoRows.length === 0 && (preview.summary.external_total ?? 0) > 0 ? (
-                <Text className="text-xs text-amber-800">
-                  {preview.summary.external_total} cobrança(s) na API, nenhuma como boleto.
-                </Text>
-              ) : (
-                <CoraChargesCompactList
-                  rows={providerBoletoRows}
-                  selectedKeys={selectedKeys}
-                  onToggle={toggleKey}
-                />
-              )}
-            </SectionPanel>
-            <Text className="text-[10px] text-gray-500 text-center">
-              {selectedSyncSelectableCount} boleto(s) marcado(s) para sincronizar
-            </Text>
-          </View>
-        );
-
       case "review":
         return (
           <View className="gap-3">
@@ -1266,7 +1100,7 @@ export default function ContractChargesModal({
               <EmptyState
                 icon="hand-left-outline"
                 title="Nenhuma ação selecionada"
-                description="Volte e marque parcelas para gerar e/ou boletos para sincronizar."
+                description="Volte e marque parcelas para gerar no sistema."
               />
             ) : (
               <View className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 flex-row items-center gap-2">

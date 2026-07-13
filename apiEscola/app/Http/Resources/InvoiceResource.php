@@ -74,6 +74,7 @@ class InvoiceResource extends JsonResource
             'cancel_block_reason' => $lifecycle['cancel_block_reason'],
             'delete_block_reason' => $lifecycle['delete_block_reason'],
             'is_local_invoice' => $lifecycle['is_local_invoice'],
+            'imported_from_cora_sync' => $lifecycleService->wasImportedFromCoraSync($this->resource),
             'lifecycle_hint' => $lifecycle['lifecycle_hint'],
             'has_active_gateway_charge' => $lifecycleService->hasActiveGatewayCharge($this->resource),
             'will_cancel_gateway_on_settlement' => $lifecycleService->shouldCancelOnGateway($this->resource),

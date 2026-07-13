@@ -86,19 +86,23 @@ class InvoiceLifecycleServiceTest extends TestCase
         $this->assertTrue($permissions['is_local_invoice']);
     }
 
-    public function test_cora_sync_imported_invoice_cannot_delete(): void
+    public function test_cora_sync_imported_invoice_can_delete_without_gateway_cancel(): void
     {
         $invoice = new Invoice([
             'status' => 'pending',
+            'cora_charge_id' => 'chg_imported',
+            'cora_status' => 'OPEN',
             'cora_payload' => ['integration' => ['origin' => 'cora_sync']],
         ]);
 
         $service = $this->makeService();
         $permissions = $service->permissions($invoice);
 
-        $this->assertFalse($permissions['can_delete']);
+        $this->assertTrue($permissions['can_delete']);
         $this->assertFalse($permissions['is_local_invoice']);
-        $this->assertStringContainsString('Cora', (string) $permissions['delete_block_reason']);
+        $this->assertFalse($permissions['requires_cora_cancel_before_delete']);
+        $this->assertFalse($service->shouldCancelOnGateway($invoice));
+        $this->assertStringContainsString('Importada', (string) $permissions['lifecycle_hint']);
     }
 
     public function test_active_pix_requires_cancel_before_delete(): void

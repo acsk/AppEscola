@@ -67,7 +67,11 @@ class InvoiceLifecycleService
             $canCancel = true;
         }
 
-        $requiresCoraCancelBeforeDelete = $hasActiveGatewayCharge && $status !== 'cancelled';
+        $importedFromCoraSync = $this->wasImportedFromCoraSync($invoice);
+        // Importadas: exclusão remove só o vínculo local — boleto permanece na Cora.
+        $requiresCoraCancelBeforeDelete = $hasActiveGatewayCharge
+            && $status !== 'cancelled'
+            && ! $importedFromCoraSync;
         $isLocalInvoice = $this->isLocallyCreatedInvoice($invoice);
 
         $canDelete = false;
@@ -75,10 +79,10 @@ class InvoiceLifecycleService
 
         if ($status === 'paid') {
             $deleteBlockReason = 'Não é possível excluir uma cobrança paga.';
+        } elseif ($importedFromCoraSync) {
+            $canDelete = true;
         } elseif (! $isLocalInvoice) {
-            if ($this->wasImportedFromCoraSync($invoice)) {
-                $deleteBlockReason = 'Cobranças importadas da Cora não podem ser excluídas. Use cancelar para manter o histórico.';
-            } elseif ($hasGeneratedCharge) {
+            if ($hasGeneratedCharge) {
                 $deleteBlockReason = 'Só é possível excluir cobranças criadas no sistema sem boleto ou PIX gerado.';
             } elseif ($requiresCoraCancelBeforeDelete) {
                 $deleteBlockReason = 'Cancele a cobrança no provedor antes de excluir do sistema.';
@@ -90,6 +94,7 @@ class InvoiceLifecycleService
         }
 
         $lifecycleHint = match (true) {
+            $importedFromCoraSync && $canDelete => 'Importada da Cora. Excluir remove só o vínculo local; o boleto permanece na Cora.',
             $status === 'cancelled' && $isLocalInvoice => 'Cobrança local cancelada. Pode ser excluída para remover da listagem.',
             $status === 'cancelled' => 'Cancelada no sistema.',
             $hasActiveGatewayCharge && $canCancel => 'Cancelar invalida o boleto/PIX no provedor e mantém o histórico.',
@@ -365,6 +370,11 @@ class InvoiceLifecycleService
 
     public function shouldCancelOnGateway(Invoice $invoice): bool
     {
+        // Cobranças importadas (cora_sync) não devem cancelar o boleto real na Cora.
+        if ($this->wasImportedFromCoraSync($invoice)) {
+            return false;
+        }
+
         return $this->hasActiveGatewayCharge($invoice);
     }
 
