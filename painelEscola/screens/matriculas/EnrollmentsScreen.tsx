@@ -635,7 +635,11 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             </View>
           ) : (
             rows.map((item, i) => (
-              <DataTableRow key={item.id} index={i}>
+              <DataTableRow
+                key={item.id}
+                index={i}
+                onPress={() => setMenuEnrollment(item)}
+              >
                 <Text
                   className={TABLE_CELL_SEMIBOLD}
                   style={{ flex: 1.55, paddingRight: 10 }}
@@ -661,7 +665,10 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                 </View>
                 <View style={{ width: 42 }} className="flex-row justify-end">
                   <TouchableOpacity
-                    onPress={() => setMenuEnrollment(item)}
+                    onPress={(event: any) => {
+                      event?.stopPropagation?.();
+                      setMenuEnrollment(item);
+                    }}
                     className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
                     activeOpacity={0.85}
                   >
