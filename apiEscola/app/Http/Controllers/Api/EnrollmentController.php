@@ -172,7 +172,7 @@ class EnrollmentController extends Controller
             'schoolClasses.course',
             'coursePlan.course',
             'bundle',
-            'invoices' => fn ($q) => $q->orderBy('due_date'),
+            'invoices' => fn ($q) => $q->excludingImportedFromCoraSync()->orderBy('due_date'),
         ]);
 
         return response()->json(new EnrollmentResource($enrollment));
@@ -985,7 +985,12 @@ class EnrollmentController extends Controller
             return $this->error($this->friendlySubscribeDatabaseMessage($e), null, 422);
         }
 
-        $enrollment->load(['student', 'schoolClass.course', 'coursePlan.course', 'invoices']);
+        $enrollment->load([
+            'student',
+            'schoolClass.course',
+            'coursePlan.course',
+            'invoices' => fn ($q) => $q->excludingImportedFromCoraSync()->orderBy('due_date'),
+        ]);
 
         return response()->json(array_merge(
             (new EnrollmentResource($enrollment))->resolve($request),

@@ -353,7 +353,8 @@ class AdminDashboardService
 
         $invoicesBase = Invoice::query()
             ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at');
+            ->whereNull('deleted_at')
+            ->excludingImportedFromCoraSync();
 
         $openInvoices = (clone $invoicesBase)->whereIn('status', ['pending', 'overdue']);
         $overdueInvoices = (clone $invoicesBase)->where('status', 'overdue');

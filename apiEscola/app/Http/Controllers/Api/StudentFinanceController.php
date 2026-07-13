@@ -40,7 +40,8 @@ class StudentFinanceController extends Controller
 
         $baseQuery = Invoice::query()
             ->where('tenant_id', $user->tenant_id)
-            ->where('student_id', $student->id);
+            ->where('student_id', $student->id)
+            ->excludingImportedFromCoraSync();
 
         $pagas = (clone $baseQuery)
             ->where('status', 'paid')

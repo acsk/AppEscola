@@ -55,6 +55,7 @@ class InvoiceController extends Controller
     {
         $query = Invoice::query()->with(['student', 'guardian']);
         $this->applyTenantScope($query, $request);
+        $query->excludingImportedFromCoraSync();
 
         $view = $request->query('view', 'all');
 
@@ -105,6 +106,7 @@ class InvoiceController extends Controller
     {
         $query = Invoice::query();
         $this->applyTenantScope($query, $request);
+        $query->excludingImportedFromCoraSync();
 
         return response()->json(
             $this->settlement->summary(

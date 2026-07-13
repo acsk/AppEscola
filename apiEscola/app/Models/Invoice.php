@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\TracksUserActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -47,6 +48,19 @@ class Invoice extends Model
         'cora_payload' => 'array',
         'cora_last_synced_at' => 'datetime',
     ];
+
+    /**
+     * Exclui cobranças importadas via sync Cora (vínculos externos).
+     * Mantém as geradas pelo app (com ou sem boleto emitido).
+     */
+    public function scopeExcludingImportedFromCoraSync(Builder $query): Builder
+    {
+        return $query->where(function (Builder $inner) {
+            $inner->whereNull('cora_payload')
+                ->orWhereNull('cora_payload->integration->origin')
+                ->orWhere('cora_payload->integration->origin', '<>', 'cora_sync');
+        });
+    }
 
     public function tenant(): BelongsTo
     {

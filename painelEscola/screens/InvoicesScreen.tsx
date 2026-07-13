@@ -284,7 +284,10 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         if (paidAtTo) params.paid_at_to = paidAtTo;
       }
       const { data } = await api.get("/invoices", { params });
-      setRows(data.data);
+      const invoices = (data.data ?? []).filter(
+        (invoice: Invoice) => invoice.imported_from_cora_sync !== true
+      );
+      setRows(invoices);
       setMeta(data.meta);
     } catch {}
     setLoading(false);
