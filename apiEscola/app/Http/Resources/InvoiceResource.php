@@ -62,6 +62,7 @@ class InvoiceResource extends JsonResource
                 'provider_due_date' => is_string($providerDueDate) ? $providerDueDate : null,
                 'due_date_adjusted_from' => is_string($dueDateAdjustedFrom) ? $dueDateAdjustedFrom : null,
                 'last_synced_at' => $this->cora_last_synced_at?->toISOString(),
+                'environment' => $this->resolveGatewayEnvironment(),
             ],
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
@@ -78,6 +79,21 @@ class InvoiceResource extends JsonResource
             'will_cancel_gateway_on_settlement' => $lifecycleService->shouldCancelOnGateway($this->resource),
             'settlement_hint' => app(InvoiceSettlementService::class)->settlementHint($this->resource),
         ];
+    }
+
+    private function resolveGatewayEnvironment(): ?string
+    {
+        $stored = data_get($this->cora_payload, 'integration.environment');
+        if (! is_string($stored) || trim($stored) === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim($stored));
+        if ($normalized === 'production') {
+            return 'prod';
+        }
+
+        return in_array($normalized, ['stage', 'prod'], true) ? $normalized : null;
     }
 
     private function resolveCoraDueDateHint(mixed $dueDateAdjustedFrom): ?string

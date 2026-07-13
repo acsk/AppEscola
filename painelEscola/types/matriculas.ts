@@ -72,6 +72,8 @@ export type InvoiceCoraAssets = {
   qr_code_image_url?: string;
   boleto_number?: string;
   boleto_digitable?: string;
+  /** Ambiente em que a cobrança foi emitida (stage|prod). */
+  environment?: "stage" | "prod" | string | null;
 };
 
 export type InvoiceListItem = {

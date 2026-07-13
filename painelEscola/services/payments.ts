@@ -215,10 +215,14 @@ export const generateUnifiedCharge = async (
 };
 
 export const getUnifiedChargeStatus = async (
-  invoiceId: number
+  invoiceId: number,
+  options?: { environment?: "stage" | "prod" }
 ): Promise<ChargeStatusResponse> => {
   const { data } = await api.get<ApiEnvelope<ChargeStatusResponse>>(
-    `/invoices/${invoiceId}/charge-status`
+    `/invoices/${invoiceId}/charge-status`,
+    {
+      params: options?.environment ? { environment: options.environment } : undefined,
+    }
   );
   return unwrapApi<ChargeStatusResponse>(data);
 };

@@ -69,6 +69,7 @@ import EnrollmentCarneModal from "../../components/finance/EnrollmentCarneModal"
 import CoraDueDatePolicyBanner from "../../components/finance/CoraDueDatePolicyBanner";
 import EnrollmentEditModal from "../../components/matriculas/EnrollmentEditModal";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
+import { resolveInvoiceGatewayEnvironment } from "../../utils/paymentEnvironment";
 import type {
   EnrollmentDetail,
   EnrollmentDetailScreenProps,
@@ -653,7 +654,7 @@ export default function EnrollmentDetailScreen({
         : "Não é possível gerar cobrança para uma fatura paga ou cancelada."
     );
     if (!chargeProvider && providers.length > 0) setChargeProvider(providers[0].slug);
-    setChargeEnvironment(defaultChargeEnvironment);
+    setChargeEnvironment(resolveInvoiceGatewayEnvironment(invoice));
     setChargeMethod(method);
     setChargeModalVisible(true);
 
@@ -837,7 +838,9 @@ export default function EnrollmentDetailScreen({
     setCheckingStatus(true);
     setChargeActionError(null);
     try {
-      const result = await getUnifiedChargeStatus(chargeInvoice.id);
+      const result = await getUnifiedChargeStatus(chargeInvoice.id, {
+        environment: resolveInvoiceGatewayEnvironment(chargeInvoice),
+      });
       setChargeStatusResult(result);
       const statusLabel = formatChargeStatusLabel(result.status);
       const providerLabel = result.provider ? result.provider.charAt(0).toUpperCase() + result.provider.slice(1) : "—";

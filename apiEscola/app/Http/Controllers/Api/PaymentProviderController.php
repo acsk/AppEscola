@@ -1170,24 +1170,49 @@ class PaymentProviderController extends Controller
         return in_array($providerStatus, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true);
     }
 
-    private function resolveChargeEnvironment(Request $request): string
+    /**
+     * Resolve o ambiente Cora da operação.
+     * Prioridade: parâmetro explícito → ambiente salvo na fatura → padrão do app.
+     * Em API local/dev sempre usa stage (credenciais de teste).
+     */
+    private function resolveChargeEnvironment(Request $request, ?Invoice $invoice = null): string
     {
         $data = $request->validate([
             'environment' => ['nullable', 'string', 'in:stage,prod,production'],
         ]);
 
-        $requestedEnv = $data['environment'] ?? 'stage';
-        $requestedEnv = $requestedEnv === 'production' ? 'prod' : $requestedEnv;
+        $normalize = static function (?string $env): ?string {
+            if ($env === null || $env === '') {
+                return null;
+            }
+            $env = strtolower(trim($env));
+            if ($env === 'production') {
+                return 'prod';
+            }
+            return in_array($env, ['stage', 'prod'], true) ? $env : null;
+        };
 
-        $user = $request->user();
+        $requestedEnv = $normalize($data['environment'] ?? null);
+        $storedEnv = $normalize(
+            is_string(data_get($invoice?->cora_payload, 'integration.environment'))
+                ? (string) data_get($invoice->cora_payload, 'integration.environment')
+                : null
+        );
+        $appDefault = app()->environment('production') ? 'prod' : 'stage';
+
+        $resolved = $requestedEnv ?? $storedEnv ?? $appDefault;
+
+        // Fora de production Laravel: mantém stage (homologação local).
         if (! app()->environment('production')) {
             return 'stage';
         }
 
+        $user = $request->user();
         if ($user && $user->isSuperAdmin()) {
-            return $requestedEnv ?: 'prod';
+            return $resolved;
         }
 
+        // Admins de tenant em produção sempre usam prod.
         return 'prod';
     }
 
@@ -1203,7 +1228,7 @@ class PaymentProviderController extends Controller
             ], 'Status da cobrança carregado com sucesso.');
         }
 
-        $environment = $this->resolveChargeEnvironment($request);
+        $environment = $this->resolveChargeEnvironment($request, $invoice);
 
         $invoice->loadMissing('tenant');
 

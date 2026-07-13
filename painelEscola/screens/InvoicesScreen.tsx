@@ -476,21 +476,42 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         ? "hybrid"
       : invoice.payment_method === "bank_slip" || invoice.payment_method === "boleto"
         ? "boleto"
-        : "pix";
+        : invoice.payment_method === "pix"
+          ? "pix"
+          : "boleto";
+
+    const existingResult: GeneratedCharge | null = invoice.cora?.charge_id
+      ? {
+          invoice_id: invoice.id,
+          provider: "cora",
+          charge_id: invoice.cora.charge_id ?? "",
+          status: invoice.cora.status ?? "",
+          payment_url: invoice.cora.payment_url ?? null,
+          pix_copy_paste: invoice.cora.pix_copy_paste ?? null,
+          qr_code_image_url: invoice.cora.qr_code_image_url ?? null,
+          boleto_number: invoice.cora.boleto_number ?? null,
+          boleto_digitable: invoice.cora.boleto_digitable ?? null,
+          expires_at: null,
+          environment: resolveInvoiceGatewayEnvironment(invoice),
+        }
+      : null;
 
     setChargeInvoice(invoice);
-    setChargeResult(null);
+    setChargeResult(existingResult);
     setChargeStatusResult(null);
     setPaidChargeResult(null);
     setChargeActionError(
-      canGenerateChargeForInvoice(invoice)
+      canGenerateChargeForInvoice(invoice) || existingResult
         ? null
         : "Não é possível gerar cobrança para uma fatura paga ou cancelada."
     );
-    if (!chargeProvider && providers.length > 0) {
-      setChargeProvider(providers[0].slug);
-    }
-    setChargeEnvironment("stage");
+    const provider =
+      chargeProvider ||
+      providers.find((p) => p.slug === "cora")?.slug ||
+      providers[0]?.slug ||
+      "cora";
+    setChargeProvider(provider);
+    setChargeEnvironment(resolveInvoiceGatewayEnvironment(invoice));
     setChargeMethod(normalizedMethod);
     setChargeModalVisible(true);
   };
@@ -553,12 +574,15 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     setCheckingStatus(true);
     setChargeActionError(null);
     try {
-      const result = await getUnifiedChargeStatus(chargeInvoice.id);
+      const result = await getUnifiedChargeStatus(chargeInvoice.id, {
+        environment: resolveInvoiceGatewayEnvironment(chargeInvoice),
+      });
       setChargeStatusResult(result);
       fetch();
     } catch (e: any) {
       setChargeStatusResult(null);
-      const message = e?.response?.data?.message ?? "Não foi possível consultar o status da cobrança.";
+      const message =
+        e?.response?.data?.message ?? "Não foi possível consultar o status da cobrança.";
       setChargeActionError(message);
     }
     setCheckingStatus(false);
@@ -589,9 +613,10 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
   };
 
   const copyPixCode = async () => {
-    if (!chargeResult?.pix_copy_paste) return;
+    const code = chargeResult?.pix_copy_paste || chargeInvoice?.cora?.pix_copy_paste;
+    if (!code) return;
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(chargeResult.pix_copy_paste);
+      await navigator.clipboard.writeText(code);
     }
   };
 
@@ -1173,95 +1198,170 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             <TouchableOpacity onPress={closeChargeModal} className="px-5 py-2.5 rounded-xl border border-gray-200">
               <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={onCheckChargeStatus} disabled={checkingStatus || !chargeInvoice} className="px-5 py-2.5 rounded-xl border border-violet-200">
-              {checkingStatus ? <ActivityIndicator size="small" color="#7C3AED" /> : <Text className="text-sm font-semibold text-violet-700">Consultar status</Text>}
-            </TouchableOpacity>
             <TouchableOpacity
-              onPress={onPayCharge}
-              disabled={payingCharge || !chargeInvoice || chargeEnvironment !== "stage"}
-              className="px-5 py-2.5 rounded-xl border border-emerald-300"
+              onPress={onCheckChargeStatus}
+              disabled={checkingStatus || !chargeInvoice || !chargeInvoice.cora?.charge_id}
+              className="px-5 py-2.5 rounded-xl border border-violet-200"
             >
-              {payingCharge ? (
-                <ActivityIndicator size="small" color="#059669" />
+              {checkingStatus ? (
+                <ActivityIndicator size="small" color="#7C3AED" />
               ) : (
-                <Text className="text-sm font-semibold text-emerald-700">Simular pagamento</Text>
+                <Text className="text-sm font-semibold text-violet-700">Consultar status</Text>
               )}
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onGenerateCharge}
-              disabled={generatingCharge || !chargeInvoice || !chargeProvider || !canGenerateChargeForInvoice(chargeInvoice)}
-              className={`px-5 py-2.5 rounded-xl ${canGenerateChargeForInvoice(chargeInvoice) ? "bg-violet-600" : "bg-gray-300"}`}
-            >
-              {generatingCharge ? <ActivityIndicator color="white" size="small" /> : <Text className="text-sm font-bold text-white">Gerar cobrança</Text>}
-            </TouchableOpacity>
+            {chargeEnvironment === "stage" ? (
+              <TouchableOpacity
+                onPress={onPayCharge}
+                disabled={payingCharge || !chargeInvoice || !chargeInvoice.cora?.charge_id}
+                className="px-5 py-2.5 rounded-xl border border-emerald-300"
+              >
+                {payingCharge ? (
+                  <ActivityIndicator size="small" color="#059669" />
+                ) : (
+                  <Text className="text-sm font-semibold text-emerald-700">Simular pagamento</Text>
+                )}
+              </TouchableOpacity>
+            ) : null}
+            {!chargeInvoice?.cora?.charge_id ? (
+              <TouchableOpacity
+                onPress={onGenerateCharge}
+                disabled={
+                  generatingCharge ||
+                  !chargeInvoice ||
+                  !chargeProvider ||
+                  !canGenerateChargeForInvoice(chargeInvoice)
+                }
+                className={`px-5 py-2.5 rounded-xl ${
+                  canGenerateChargeForInvoice(chargeInvoice) ? "bg-violet-600" : "bg-gray-300"
+                }`}
+              >
+                {generatingCharge ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text className="text-sm font-bold text-white">Gerar cobrança</Text>
+                )}
+              </TouchableOpacity>
+            ) : null}
           </>
         }
       >
-        <View className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-          <Text className="text-xs text-gray-600">Contrato unificado: /generate-charge e /charge-status</Text>
-          <Text className="text-xs text-gray-500 mt-1">No ambiente stage, use "Simular pagamento" para testar /pay-charge.</Text>
-        </View>
-
-        <View className="flex-row gap-4 flex-wrap">
-          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 260 }}>
-            <PaymentProviderSelectField
-              label="Provedor"
-              required
-              value={chargeProvider}
-              options={providerSlugs}
-              onChange={setChargeProvider}
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
-            <FormSelect
-              label="Método"
-              required
-              value={chargeMethod}
-              options={chargeMethodOptions}
-              onChange={setChargeMethod}
-            />
-          </View>
-        </View>
-
-        <FormSelect
-          label="Ambiente"
-          required
-          value={chargeEnvironment}
-          options={[
-            { value: "stage", label: "Ambiente de teste" },
-            { value: "prod", label: "Ambiente de produção" },
-          ]}
-          onChange={(v) => setChargeEnvironment(v === "prod" ? "prod" : "stage")}
-        />
-
-        <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 mb-3">
-          <Text className="text-xs text-gray-600">
-            A cobrança vai usar a credencial do ambiente selecionado no tenant.
-          </Text>
-          {!!chargeInvoice && !canGenerateChargeForInvoice(chargeInvoice) && (
-            <Text className="text-xs text-red-600 mt-2">
-              Esta fatura está {STATUS_LABELS[chargeInvoice.status] ?? chargeInvoice.status} e não permite nova geração de cobrança.
+        {chargeInvoice ? (
+          <View className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+              {chargeInvoice.description}
             </Text>
-          )}
-        </View>
+            <Text className="text-xs text-gray-500 mt-1" numberOfLines={1}>
+              {chargeInvoice.student?.name ?? "—"} ·{" "}
+              {fmtMoney(chargeInvoice.amount)} · venc. {fmt(chargeInvoice.due_date)}
+            </Text>
+            {chargeInvoice.cora?.charge_id ? (
+              <Text className="text-xs font-mono font-semibold text-violet-600 mt-1.5" numberOfLines={1}>
+                Cora {chargeInvoice.cora.charge_id}
+              </Text>
+            ) : (
+              <Text className="text-xs text-amber-700 mt-1.5">
+                Ainda sem cobrança no provedor. Confirme e gere abaixo.
+              </Text>
+            )}
+          </View>
+        ) : null}
+
+        {!chargeInvoice?.cora?.charge_id ? (
+          <>
+            {providers.length > 1 || chargeEnvironment === "stage" ? (
+              <View className="flex-row gap-4 flex-wrap">
+                {providers.length > 1 ? (
+                  <View style={{ flex: 1, minWidth: isMobile ? "100%" : 260 }}>
+                    <PaymentProviderSelectField
+                      label="Provedor"
+                      required
+                      value={chargeProvider}
+                      options={providerSlugs}
+                      onChange={setChargeProvider}
+                    />
+                  </View>
+                ) : null}
+                <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
+                  <FormSelect
+                    label="Método"
+                    required
+                    value={chargeMethod}
+                    options={chargeMethodOptions}
+                    onChange={setChargeMethod}
+                  />
+                </View>
+              </View>
+            ) : (
+              <View className="rounded-xl border border-gray-200 bg-white px-4 py-3 mb-3">
+                <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Configuração automática
+                </Text>
+                <Text className="text-sm text-gray-800 mt-1">
+                  {chargeProvider || "Cora"} · {paymentMethodLabel(chargeMethod)} · produção
+                </Text>
+                <Text className="text-xs text-gray-500 mt-1">
+                  Usa a credencial Cora já cadastrada no tenant.
+                </Text>
+              </View>
+            )}
+
+            {chargeEnvironment === "stage" ? (
+              <FormSelect
+                label="Ambiente"
+                required
+                value={chargeEnvironment}
+                options={[
+                  { value: "stage", label: "Ambiente de teste" },
+                  { value: "prod", label: "Ambiente de produção" },
+                ]}
+                onChange={(v) => setChargeEnvironment(v === "prod" ? "prod" : "stage")}
+              />
+            ) : null}
+
+            {!!chargeInvoice && !canGenerateChargeForInvoice(chargeInvoice) ? (
+              <View className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 mb-3">
+                <Text className="text-xs text-red-700">
+                  Esta fatura está {STATUS_LABELS[chargeInvoice.status] ?? chargeInvoice.status} e não
+                  permite nova geração de cobrança.
+                </Text>
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <View className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 mb-3">
+            <Text className="text-xs text-violet-800">
+              Consulta direta na Cora ({chargeEnvironment === "prod" ? "produção" : "teste"}) com as
+              credenciais do tenant — sem selecionar provedor ou ambiente.
+            </Text>
+          </View>
+        )}
 
         {!!chargeResult && (
           <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 mb-3">
-            <Text className="text-sm font-semibold text-emerald-700">Cobrança gerada</Text>
-            <Text className="text-xs text-emerald-700 mt-1">ID cobrança: {chargeResult.charge_id || "—"}</Text>
-            <Text className="text-xs text-emerald-700 mt-1">Ambiente: {chargeResult.environment || chargeEnvironment}</Text>
-            <Text className="text-xs text-emerald-700 mt-1">Status: {chargeResult.status || "—"}</Text>
-            {!!chargeResult.payment_url && (
+            <Text className="text-sm font-semibold text-emerald-700">Cobrança no provedor</Text>
+            <Text className="text-xs text-emerald-700 mt-1">
+              ID: {chargeResult.charge_id || chargeInvoice?.cora?.charge_id || "—"}
+            </Text>
+            <Text className="text-xs text-emerald-700 mt-1">
+              Ambiente: {chargeResult.environment || chargeEnvironment}
+            </Text>
+            <Text className="text-xs text-emerald-700 mt-1">
+              Status: {chargeResult.status || chargeInvoice?.cora?.status || "—"}
+            </Text>
+            {!!(chargeResult.payment_url || chargeInvoice?.cora?.payment_url) && (
               <View style={{ flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                 <TouchableOpacity
-                  onPress={() => openPreviewModal(chargeResult.payment_url || null)}
+                  onPress={() =>
+                    openPreviewModal(chargeResult.payment_url || chargeInvoice?.cora?.payment_url || null)
+                  }
                   className="px-3 py-2 rounded-lg bg-emerald-600 self-start"
                 >
                   <Text className="text-xs font-semibold text-white">Visualizar documento</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => {
-                    if (typeof window !== "undefined") window.open(chargeResult.payment_url || "", "_blank");
+                    const url = chargeResult.payment_url || chargeInvoice?.cora?.payment_url || "";
+                    if (typeof window !== "undefined") window.open(url, "_blank");
                   }}
                   className="px-3 py-2 rounded-lg border border-emerald-300 self-start"
                 >
@@ -1269,7 +1369,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                 </TouchableOpacity>
               </View>
             )}
-            {!!chargeResult.pix_copy_paste && (
+            {!!(chargeResult.pix_copy_paste || chargeInvoice?.cora?.pix_copy_paste) && (
               <TouchableOpacity onPress={copyPixCode} className="mt-2 px-3 py-2 rounded-lg border border-emerald-300 self-start">
                 <Text className="text-xs font-semibold text-emerald-700">Copiar Pix copia e cola</Text>
               </TouchableOpacity>
