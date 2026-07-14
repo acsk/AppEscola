@@ -254,10 +254,14 @@ export default function InvoiceActionsModal({
               {invoice.description}
             </Text>
             <Text className="text-xs font-mono font-semibold text-violet-600 mt-0.5" numberOfLines={1}>
-              #{invoice.id}
-              {invoice.cora?.charge_id ? ` · ${invoice.cora.charge_id}` : ""}
+              ID #{invoice.id}
             </Text>
-            <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+            {invoice.cora?.charge_id ? (
+              <Text className="text-[11px] font-mono text-blue-700 mt-0.5" numberOfLines={1}>
+                Cora {invoice.cora.charge_id}
+              </Text>
+            ) : null}
+            <Text className="text-xs text-gray-500 mt-1" numberOfLines={1}>
               {fmtMoney(invoice.amount)} · {fmtDate(invoice.due_date)}
               {invoice.student?.name ? ` · ${invoice.student.name}` : ""}
             </Text>
@@ -270,14 +274,15 @@ export default function InvoiceActionsModal({
         </View>
 
         <View className="flex-row flex-wrap gap-1.5 mt-2">
+          <InfoPill label="ID" value={`#${invoice.id}`} tone="blue" />
+          {invoice.cora?.charge_id ? (
+            <InfoPill label="Cora" value={invoice.cora.charge_id} tone="emerald" />
+          ) : (
+            <InfoPill label="Provedor" value="Local" tone="gray" />
+          )}
           {invoice.payment_method ? (
             <InfoPill label="Forma" value={paymentMethodLabel(invoice.payment_method)} />
           ) : null}
-          <InfoPill
-            label="Provedor"
-            value={invoice.cora?.charge_id ? "Com Cora" : "Local"}
-            tone={invoice.cora?.charge_id ? "blue" : "gray"}
-          />
         </View>
       </View>
 

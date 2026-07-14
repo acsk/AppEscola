@@ -368,13 +368,17 @@ function LocalInvoiceCard({
         </View>
         <View className="flex-1">
           <View className="flex-row items-center gap-1.5">
-            <Text className="flex-1 text-xs font-bold text-gray-900" numberOfLines={1}>
-              {row.description}
+            <Text className="text-[10px] font-mono font-semibold text-violet-600" numberOfLines={1}>
+              ID #{row.invoice_id}
             </Text>
             <DueDateBadge date={row.due_date} />
           </View>
+          <Text className="text-xs font-bold text-gray-900 mt-0.5" numberOfLines={1}>
+            {row.description}
+          </Text>
           <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
             {fmtMoney(row.amount)}
+            {providerVisible && row.cora_charge_id ? ` · Cora ${row.cora_charge_id}` : ""}
           </Text>
         </View>
         <CardBadges>
@@ -397,13 +401,14 @@ function LocalInvoiceCard({
       {expanded ? (
         <View className="mt-2 pt-2 border-t border-gray-100">
           <View className="flex-row flex-wrap gap-1.5">
+            <DetailBlock icon="pricetag-outline" label="ID" value={`#${row.invoice_id}`} />
             <DetailBlock icon="calendar-outline" label="Vencimento" value={fmtDate(row.due_date)} />
             <DetailBlock icon="cash-outline" label="Valor" value={fmtMoney(row.amount)} />
             <DetailBlock icon="card-outline" label="Método" value={paymentMethodLabel(row.payment_method)} />
             <DetailBlock
               icon="cloud-done-outline"
               label="Cora"
-              value={providerVisible ? truncateProviderChargeId(row.cora_charge_id!) : "Sem cobrança vinculada"}
+              value={providerVisible ? String(row.cora_charge_id) : "Sem cobrança vinculada"}
             />
             {row.cora_status ? (
               <DetailBlock icon="pulse-outline" label="Status Cora" value={getStatusDisplay(row.cora_status).label} />

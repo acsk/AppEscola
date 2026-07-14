@@ -124,7 +124,11 @@ export default function MarkInvoicePaidModal({
       {invoice ? (
         <View className="gap-3">
           <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <Text className="text-sm font-semibold text-gray-800" numberOfLines={2}>
+            <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+              ID #{invoice.id}
+              {invoice.cora?.charge_id ? ` · Cora ${invoice.cora.charge_id}` : ""}
+            </Text>
+            <Text className="text-sm font-semibold text-gray-800 mt-0.5" numberOfLines={2}>
               {invoice.description}
             </Text>
             <Text className="text-xs text-gray-500 mt-1">

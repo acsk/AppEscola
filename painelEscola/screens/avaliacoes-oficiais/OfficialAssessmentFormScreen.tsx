@@ -96,12 +96,20 @@ export default function OfficialAssessmentFormScreen({
     const [classesRes, subjectsRes, examTypesRes] = await Promise.all([
       api.get("/school-classes", { params: { per_page: 200, status: "active" } }),
       api.get("/subjects", { params: { per_page: 200 } }),
-      api.get("/admin/exam-types"),
+      // Público (ativos) — /admin/exam-types é só super_admin (CRUD global)
+      api.get("/exam-types"),
     ]);
 
     const classesList = Array.isArray(classesRes.data?.data) ? classesRes.data.data : [];
     const subjectsList = Array.isArray(subjectsRes.data?.data) ? subjectsRes.data.data : [];
-    const examTypesList = Array.isArray(examTypesRes.data?.body) ? examTypesRes.data.body : examTypesRes.data?.data ?? [];
+    const examTypesRaw = examTypesRes.data;
+    const examTypesList = Array.isArray(examTypesRaw)
+      ? examTypesRaw
+      : Array.isArray(examTypesRaw?.body)
+        ? examTypesRaw.body
+        : Array.isArray(examTypesRaw?.data)
+          ? examTypesRaw.data
+          : [];
 
     setClasses(classesList.map((c: any) => ({ value: String(c.id), label: String(c.name ?? `Turma #${c.id}`) })));
     setSubjectOptions(
@@ -112,7 +120,14 @@ export default function OfficialAssessmentFormScreen({
           name: String(s.name ?? `Disciplina #${s.id}`),
         }))
     );
-    setExamTypes((Array.isArray(examTypesList) ? examTypesList : []).map((e: any) => ({ value: String(e.id), label: String(e.label ?? e.slug ?? `Tipo #${e.id}`) })));
+    setExamTypes(
+      examTypesList
+        .filter((e: any) => e?.id != null)
+        .map((e: any) => ({
+          value: String(e.id),
+          label: String(e.label ?? e.slug ?? `Tipo #${e.id}`),
+        }))
+    );
   }, []);
 
   const loadAssessment = useCallback(async () => {

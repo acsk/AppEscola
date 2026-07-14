@@ -722,7 +722,9 @@ function AppContent() {
               <Text className="text-base font-semibold text-amber-800">Acesso negado</Text>
             </View>
             <Text className="text-sm text-amber-700 mb-4">
-              Somente usuários com perfil super admin podem acessar a gestão de tenants.
+              {nav.screen === "tipos-prova"
+                ? "Somente usuários com perfil super admin podem gerenciar os tipos de prova (classificações globais)."
+                : "Somente usuários com perfil super admin podem acessar a gestão de tenants."}
             </Text>
             <TouchableOpacity
               onPress={() => navigate("dashboard")}

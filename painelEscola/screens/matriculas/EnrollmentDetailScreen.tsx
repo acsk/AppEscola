@@ -318,6 +318,7 @@ export default function EnrollmentDetailScreen({
   ${enrollmentHtml}
 
   <section class="card">
+    <div class="row"><span class="label">ID cobrança:</span><span><strong>#${r.invoice.id ?? "—"}</strong>${r.invoice.cora_charge_id ? ` · Cora ${r.invoice.cora_charge_id}` : ""}</span></div>
     <div class="row"><span class="label">Descrição:</span><span><strong>${r.invoice.description}</strong></span></div>
     <div class="row"><span class="label">Vencimento:</span><span>${isoToDisplay(r.invoice.due_date)}</span></div>
     <div class="row"><span class="label">Pagamento:</span><span>${isoToDisplay(r.invoice.paid_at_date)} às ${r.invoice.paid_at_time}</span></div>
@@ -1211,7 +1212,11 @@ export default function EnrollmentDetailScreen({
     <View key={item.id} className="bg-white rounded-xl border border-gray-100 p-3 gap-3">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-gray-800" numberOfLines={2}>
+          <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+            ID #{item.id}
+            {item.cora?.charge_id ? ` · Cora ${item.cora.charge_id}` : ""}
+          </Text>
+          <Text className="text-sm font-semibold text-gray-800 mt-0.5" numberOfLines={2}>
             {item.description}
           </Text>
           <Text className="text-xs text-gray-500 mt-0.5">Vence {fmt(item.due_date)}</Text>
@@ -1252,8 +1257,8 @@ export default function EnrollmentDetailScreen({
             size={14}
             color="#7C3AED"
           />
-          <Text className="text-xs font-semibold text-violet-700 flex-1">
-            Cobrança Cora
+          <Text className="text-xs font-semibold text-violet-700 flex-1" numberOfLines={1}>
+            Cobrança Cora · {item.cora.charge_id}
           </Text>
           <Text className="text-xs text-violet-500">{item.cora.status ?? "—"}</Text>
           <Ionicons name="chevron-forward-outline" size={13} color="#7C3AED" />
@@ -1617,6 +1622,12 @@ export default function EnrollmentDetailScreen({
           }}
         >
           <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-2.5">
+            <Text
+              className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+              style={{ width: 88, minWidth: 88 }}
+            >
+              ID
+            </Text>
             <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2.2 }}>
               Descrição
             </Text>
@@ -1645,6 +1656,16 @@ export default function EnrollmentDetailScreen({
                 i % 2 === 1 ? "bg-gray-50/40" : ""
               }`}
             >
+              <View style={{ width: 88, minWidth: 88, paddingRight: 8 }}>
+                <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+                  #{item.id}
+                </Text>
+                {item.cora?.charge_id ? (
+                  <Text className="text-[10px] text-gray-400 mt-0.5" numberOfLines={1}>
+                    {item.cora.charge_id}
+                  </Text>
+                ) : null}
+              </View>
               <Text className="text-xs font-semibold text-gray-800" style={{ flex: 2.2 }} numberOfLines={1}>
                 {item.description}
               </Text>
@@ -1686,7 +1707,7 @@ export default function EnrollmentDetailScreen({
       {/* ── Invoice Modal ────────────────────────────────────────────────────── */}
       <Modal
         visible={invoiceModalVisible}
-        title={invoiceEditId ? "Editar Cobrança" : "Nova Cobrança"}
+        title={invoiceEditId ? `Editar Cobrança #${invoiceEditId}` : "Nova Cobrança"}
         onClose={() => setInvoiceModalVisible(false)}
         size="lg"
         footer={
@@ -1826,8 +1847,13 @@ export default function EnrollmentDetailScreen({
                   <View className="flex-1">
                     <View className="flex-row items-center gap-2 flex-wrap">
                       <Text className="text-xs text-slate-500 uppercase font-bold" numberOfLines={1}>
-                        Cobrança #{chargeInvoice.id}
+                        Cobrança ID #{chargeInvoice.id}
                       </Text>
+                      {chargeInvoice.cora?.charge_id ? (
+                        <Text className="text-[11px] font-mono text-violet-700" numberOfLines={1}>
+                          Cora {chargeInvoice.cora.charge_id}
+                        </Text>
+                      ) : null}
                       <View className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 flex-row items-center gap-1.5">
                         <Ionicons name="calendar-outline" size={12} color="#7C3AED" />
                         <Text className="text-xs font-bold text-violet-700">
@@ -2402,6 +2428,11 @@ export default function EnrollmentDetailScreen({
               </Text>
               <View className="gap-2">
                 {[
+                  { label: "ID", value: `#${auditInvoice.id}` },
+                  {
+                    label: "ID Cora",
+                    value: auditInvoice.cora?.charge_id ?? "—",
+                  },
                   { label: "Descrição", value: auditInvoice.description },
                   {
                     label: "Valor",
@@ -2412,9 +2443,11 @@ export default function EnrollmentDetailScreen({
                   { label: "Vencimento", value: fmt(auditInvoice.due_date) },
                   { label: "Status", value: INVOICE_STATUS_LABELS[auditInvoice.status] ?? auditInvoice.status },
                 ].map((row) => (
-                  <View key={row.label} className="flex-row justify-between">
+                  <View key={row.label} className="flex-row justify-between gap-3">
                     <Text className="text-xs text-gray-500">{row.label}</Text>
-                    <Text className="text-xs font-semibold text-gray-800">{row.value}</Text>
+                    <Text className="text-xs font-semibold text-gray-800 text-right flex-1" numberOfLines={2}>
+                      {row.value}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -2499,7 +2532,11 @@ export default function EnrollmentDetailScreen({
       />
       <ConfirmModal
         visible={!!cancelInvoiceId}
-        title="Cancelar Cobrança"
+        title={
+          cancelInvoiceId
+            ? `Cancelar cobrança #${cancelInvoiceId}`
+            : "Cancelar Cobrança"
+        }
         message={
           cancelInvoiceTarget?.lifecycle_hint ??
           (cancelInvoiceTarget?.requires_cora_cancel_before_delete
@@ -2515,7 +2552,11 @@ export default function EnrollmentDetailScreen({
       />
       <ConfirmModal
         visible={!!deleteInvoiceId}
-        title="Excluir cobrança local"
+        title={
+          deleteInvoiceId
+            ? `Excluir cobrança #${deleteInvoiceId}`
+            : "Excluir cobrança local"
+        }
         message={
           deleteInvoiceTarget?.delete_block_reason
             ? deleteInvoiceTarget.delete_block_reason
@@ -2671,6 +2712,15 @@ export default function EnrollmentDetailScreen({
 
             {/* Dados da cobrança */}
             <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3 gap-1.5">
+              <View className="flex-row gap-1">
+                <Text className="text-xs text-gray-500 w-20">ID:</Text>
+                <Text className="text-xs font-mono font-semibold text-violet-700 flex-1">
+                  #{receiptData.invoice.id}
+                  {receiptData.invoice.cora_charge_id
+                    ? ` · Cora ${receiptData.invoice.cora_charge_id}`
+                    : ""}
+                </Text>
+              </View>
               <View className="flex-row gap-1">
                 <Text className="text-xs text-gray-500 w-20">Descrição:</Text>
                 <Text className="text-xs font-semibold text-gray-800 flex-1">{receiptData.invoice.description}</Text>
