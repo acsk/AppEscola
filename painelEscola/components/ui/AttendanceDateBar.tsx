@@ -199,7 +199,7 @@ export default function AttendanceDateBar({
             </View>
 
             <View className="flex-row mb-2">
-              {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
+              {["Dom", "Seg", "Ter", "Qua", "Qui", "Sext", "Sáb"].map((day) => (
                 <Text key={day} className="flex-1 text-center text-xs font-semibold text-gray-500">
                   {day}
                 </Text>

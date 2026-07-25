@@ -48,7 +48,7 @@ const WEEKDAY_SHORT: Record<string, string> = {
   tuesday: "Ter",
   wednesday: "Qua",
   thursday: "Qui",
-  friday: "Sex",
+  friday: "Sext",
   saturday: "Sáb",
   sunday: "Dom",
 };

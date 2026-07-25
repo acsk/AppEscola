@@ -24,7 +24,8 @@ import {
 import { useStudentCalendar } from '../hooks/useStudentCalendar';
 import type { AlunoStackParamList } from '../../../navigation/stacks/AlunoStack';
 
-const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+/** "Sext" evita Chrome Translate: Sex → Sexo. */
+const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sext', 'Sáb', 'Dom'];
 
 type Props = {
   enabled?: boolean;

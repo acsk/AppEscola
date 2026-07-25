@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { loadAsync } from "expo-font";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator, Text, TouchableOpacity, useWindowDimensions } from "react-native";
+import { View, ActivityIndicator, Text, TouchableOpacity, useWindowDimensions, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Sidebar from "./components/Sidebar";
@@ -923,6 +923,13 @@ function AppContent() {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    // Página em pt-BR: evita Chrome Translate transformar "Sex" (sexta) em "Sexo".
+    document.documentElement.lang = "pt-BR";
+    document.documentElement.setAttribute("translate", "no");
+  }, []);
+
   return (
     <AuthProvider>
       <AppContent />

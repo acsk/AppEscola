@@ -26,7 +26,8 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
-      "name": "AppCurso — Gerência de Cursinho"
+      "name": "AppCurso — Gerência de Cursinho",
+      "lang": "pt-BR"
     }
   }
 }

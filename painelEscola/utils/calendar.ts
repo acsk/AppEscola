@@ -1,6 +1,18 @@
 /** Utilitários de calendário (pt-BR) para o painel web. */
 
-export const WEEKDAY_LABELS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
+/** "Sext" evita que o Chrome Translate confunda sexta com "sex" → "Sexo". */
+export const WEEKDAY_LABELS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sext", "Sáb"] as const;
+
+/** Abreviações por slug do domínio (monday…sunday). */
+export const WEEKDAY_SHORT_BY_SLUG: Record<string, string> = {
+  monday: "Seg",
+  tuesday: "Ter",
+  wednesday: "Qua",
+  thursday: "Qui",
+  friday: "Sext",
+  saturday: "Sáb",
+  sunday: "Dom",
+};
 
 export const MONTH_NAMES = [
   "Janeiro",

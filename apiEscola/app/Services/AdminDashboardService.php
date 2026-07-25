@@ -155,7 +155,8 @@ class AdminDashboardService
             2 => 'Ter',
             3 => 'Qua',
             4 => 'Qui',
-            5 => 'Sex',
+            // "Sext" evita que tradução automática do Chrome confunda com "sex" → "Sexo".
+            5 => 'Sext',
         ];
 
         $start = Carbon::now()->startOfWeek(Carbon::MONDAY)->startOfDay();

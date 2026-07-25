@@ -33,7 +33,8 @@ import type { AlunoStackParamList } from '../../../navigation/stacks/AlunoStack'
 
 type Route = RouteProp<AlunoStackParamList, 'Calendario'>;
 
-const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+/** "Sext" evita Chrome Translate: Sex → Sexo. */
+const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sext', 'Sáb', 'Dom'];
 const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
 const cardShadow = platformShadow({ color: '#6D4DE6', opacity: 0.06, radius: 14, elevation: 2 });
 

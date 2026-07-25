@@ -584,7 +584,7 @@ export default function LoginScreen() {
 
         {/* Email */}
         <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+          <Text className="text-sm font-semibold text-gray-700 mb-1.5" >
             E-mail ou matrícula
           </Text>
           <View
@@ -600,6 +600,9 @@ export default function LoginScreen() {
                 setError("");
                 setVerificationBadge((prev) => ({ ...prev, visible: false }));
               }}
+              nativeID="login-email-input"
+              testID="login-email-input"
+              accessibilityLabel="E-mail ou matrícula"
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="off"
@@ -631,6 +634,9 @@ export default function LoginScreen() {
                 setError("");
                 setVerificationBadge((prev) => ({ ...prev, visible: false }));
               }}
+              nativeID="login-password-input"
+              testID="login-password-input"
+              accessibilityLabel="Senha"
               secureTextEntry={!showPass}
               autoComplete="off"
               textContentType="none"
@@ -641,7 +647,14 @@ export default function LoginScreen() {
               className="flex-1 ml-2 py-3 text-sm text-gray-800"
               onSubmitEditing={handleLogin}
             />
-            <TouchableOpacity onPress={() => setShowPass(!showPass)} className="p-1">
+            <TouchableOpacity
+              onPress={() => setShowPass(!showPass)}
+              className="p-1"
+           
+              testID="login-password-toggle"
+              accessibilityLabel={showPass ? "Ocultar senha" : "Mostrar senha"}
+              accessibilityRole="button"
+            >
               <Ionicons
                 name={showPass ? "eye-off-outline" : "eye-outline"}
                 size={18}
@@ -668,6 +681,9 @@ export default function LoginScreen() {
                 setTenantId(v.replace(/\D/g, ""));
                 setError("");
               }}
+              nativeID="login-tenant-id-input"
+              testID="login-tenant-id-input"
+              accessibilityLabel="Tenant ID opcional"
               keyboardType="numeric"
               autoCapitalize="none"
               autoComplete="off"
@@ -716,6 +732,10 @@ export default function LoginScreen() {
           disabled={loading || metaLoading || mustUpdate}
           className="bg-violet-600 rounded-xl py-3.5 items-center"
           activeOpacity={0.85}
+         
+          testID="login-submit-button"
+          accessibilityLabel={mustUpdate ? "Atualização obrigatória" : "Entrar"}
+          accessibilityRole="button"
           style={{ opacity: loading || metaLoading || mustUpdate ? 0.75 : 1 }}
         >
           {loading || metaLoading ? (

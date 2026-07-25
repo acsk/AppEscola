@@ -30,7 +30,7 @@ import {
 import type { WithNavigate } from "../../types/navigation";
 import CalendarColorLegend from "../../components/calendar/CalendarColorLegend";
 
-const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sext", "Sáb", "Dom"];
 
 type FormState = {
   type: CalendarEventType;
