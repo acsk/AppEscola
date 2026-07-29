@@ -1344,9 +1344,12 @@ class PaymentProviderController extends Controller
     {
         $candidates = [
             $externalInvoice['paid_at'] ?? null,
+            $externalInvoice['occurrence_date'] ?? null,
             data_get($externalInvoice, 'payment.paid_at'),
             data_get($externalInvoice, 'payment_date'),
             data_get($externalInvoice, 'paidAt'),
+            data_get($externalInvoice, 'payments.0.finalized_at'),
+            data_get($externalInvoice, 'payments.0.created_at'),
         ];
 
         foreach ($candidates as $candidate) {

@@ -117,7 +117,8 @@ class InvoiceCoraChargeAssetsService
             }
         }
 
-        $invoice->update([
+        $providerStatus = strtoupper(trim((string) ($external['status'] ?? '')));
+        $updates = [
             'cora_payload' => $mergedPayload,
             'cora_payment_url' => $this->coerceScalarString($mergedAssets['boleto_url'] ?? null)
                 ?? $this->coerceScalarString($invoice->cora_payment_url),
@@ -133,9 +134,57 @@ class InvoiceCoraChargeAssetsService
                 default => $invoice->payment_method ?: 'bank_slip',
             },
             'cora_last_synced_at' => now(),
-        ]);
+        ];
+
+        if ($providerStatus !== '') {
+            $updates['cora_status'] = $providerStatus;
+        }
+
+        // Refresh de assets também reconcilia status local (evita payload PAID com status pending).
+        if (in_array($providerStatus, ['PAID', 'IN_PAYMENT', 'COMPLETED', 'RECEIVED'], true)
+            && $invoice->status !== 'paid'
+        ) {
+            $updates['status'] = 'paid';
+            $updates['paid_at'] = $this->extractPaidAtFromExternal($external) ?? $invoice->paid_at ?? now();
+        } elseif (
+            in_array($providerStatus, ['CANCELLED', 'CANCELED', 'VOIDED', 'EXPIRED'], true)
+            && ! in_array($invoice->status, ['paid', 'cancelled'], true)
+        ) {
+            $updates['status'] = 'cancelled';
+        }
+
+        $invoice->update($updates);
 
         return $this->paymentAssetsFromInvoice($invoice->fresh());
+    }
+
+    /**
+     * @param  array<string, mixed>  $externalInvoice
+     */
+    private function extractPaidAtFromExternal(array $externalInvoice): ?\Illuminate\Support\Carbon
+    {
+        $candidates = [
+            $externalInvoice['paid_at'] ?? null,
+            $externalInvoice['occurrence_date'] ?? null,
+            data_get($externalInvoice, 'payment.paid_at'),
+            data_get($externalInvoice, 'payment_date'),
+            data_get($externalInvoice, 'payments.0.finalized_at'),
+            data_get($externalInvoice, 'payments.0.created_at'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            try {
+                return \Illuminate\Support\Carbon::parse($candidate);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
     }
 
     public function paymentAssetsFromInvoice(Invoice $invoice): array
