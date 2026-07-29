@@ -594,6 +594,8 @@ export default function EnrollmentDetailScreen({
     } catch (e: any) {
       const msg = e.response?.data?.message ?? "Não foi possível cancelar a cobrança.";
       setCancelInvoiceId(null);
+      // Status local pode ter sido reconciliado (ex.: já paga na Cora).
+      fetch();
       showToast("error", msg, "Erro ao cancelar cobrança");
     }
     setCancellingInvoice(false);

@@ -280,6 +280,8 @@ class InvoiceController extends Controller
         try {
             $result = $this->lifecycle->cancelInvoice($invoice, $request);
         } catch (RuntimeException $e) {
+            $invoice->refresh();
+
             return $this->error($e->getMessage(), $this->lifecycle->permissions($invoice), 422);
         } catch (ConnectionException $e) {
             return $this->error(
@@ -288,13 +290,29 @@ class InvoiceController extends Controller
                 502
             );
         } catch (RequestException $e) {
+            $invoice->loadMissing('tenant');
+            $tenant = $invoice->tenant;
+            $chargeId = (string) ($invoice->cora_charge_id ?? '');
+            $environment = $this->lifecycle->resolveCoraEnvironment($request, $invoice);
+
+            $message = ($tenant instanceof \App\Models\Tenant && $chargeId !== '')
+                ? $this->lifecycle->buildGatewayCancelRefusalMessage(
+                    $e,
+                    $invoice,
+                    $tenant,
+                    $chargeId,
+                    $environment
+                )
+                : 'O provedor recusou o cancelamento da cobrança.';
+
             return $this->error(
-                'O provedor recusou o cancelamento da cobrança.',
+                $message,
                 [
                     'http_status' => $e->response?->status(),
                     'detail' => $e->response?->json(),
+                    'permissions' => $this->lifecycle->permissions($invoice->fresh()),
                 ],
-                502
+                422
             );
         }
 

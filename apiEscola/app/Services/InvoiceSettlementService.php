@@ -50,6 +50,25 @@ class InvoiceSettlementService
                     $e
                 );
             } catch (RequestException $e) {
+                $invoice->loadMissing('tenant');
+                $tenant = $invoice->tenant;
+                $chargeId = (string) $invoice->cora_charge_id;
+                $environment = $this->lifecycle->resolveCoraEnvironment($request, $invoice);
+
+                if ($tenant instanceof \App\Models\Tenant && $chargeId !== '') {
+                    throw new RuntimeException(
+                        $this->lifecycle->buildGatewayCancelRefusalMessage(
+                            $e,
+                            $invoice,
+                            $tenant,
+                            $chargeId,
+                            $environment
+                        ) . ' A baixa não foi registrada.',
+                        0,
+                        $e
+                    );
+                }
+
                 throw new RuntimeException(
                     'O provedor recusou o cancelamento da cobrança. A baixa não foi registrada.',
                     0,

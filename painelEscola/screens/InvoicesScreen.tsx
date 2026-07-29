@@ -453,6 +453,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
       const msg = e.response?.data?.message ?? "Não foi possível cancelar a cobrança.";
       setActionError(msg);
       setCancelId(null);
+      fetch();
     }
     setCancelling(false);
   };

@@ -247,9 +247,18 @@ class InvoiceLifecycleService
             }
 
             $chargeId = (string) $invoice->cora_charge_id;
-            $this->cancelChargeOnGateway($tenant, $chargeId, $environment);
-            $this->assertGatewayChargeCancelledOnProvider($tenant, $chargeId, $environment);
-            $cancelledOnGateway = true;
+
+            try {
+                $this->cancelChargeOnGateway($tenant, $chargeId, $environment);
+                $this->assertGatewayChargeCancelledOnProvider($tenant, $chargeId, $environment);
+                $cancelledOnGateway = true;
+            } catch (RequestException $e) {
+                throw new RuntimeException(
+                    $this->buildGatewayCancelRefusalMessage($e, $invoice, $tenant, $chargeId, $environment),
+                    0,
+                    $e
+                );
+            }
         }
 
         $invoice->update([
@@ -400,8 +409,16 @@ class InvoiceLifecycleService
         $environment = $this->resolveCoraEnvironment($request, $invoice);
         $chargeId = (string) $invoice->cora_charge_id;
 
-        $this->cancelChargeOnGateway($tenant, $chargeId, $environment);
-        $this->assertGatewayChargeCancelledOnProvider($tenant, $chargeId, $environment);
+        try {
+            $this->cancelChargeOnGateway($tenant, $chargeId, $environment);
+            $this->assertGatewayChargeCancelledOnProvider($tenant, $chargeId, $environment);
+        } catch (RequestException $e) {
+            throw new RuntimeException(
+                $this->buildGatewayCancelRefusalMessage($e, $invoice, $tenant, $chargeId, $environment),
+                0,
+                $e
+            );
+        }
 
         $invoice->update([
             'cora_status' => 'CANCELLED',
@@ -409,6 +426,148 @@ class InvoiceLifecycleService
         ]);
 
         return true;
+    }
+
+    /**
+     * Traduz recusa de cancelamento do provedor (ex.: Cora PAY-0005) e reconcilia status local quando possível.
+     */
+    public function buildGatewayCancelRefusalMessage(
+        RequestException $e,
+        Invoice $invoice,
+        Tenant $tenant,
+        string $chargeId,
+        string $environment,
+    ): string {
+        $providerPayload = $e->response?->json();
+        $providerCode = strtoupper(trim((string) (
+            data_get($providerPayload, 'code')
+            ?? data_get($providerPayload, 'error.code')
+            ?? data_get($providerPayload, 'error')
+            ?? ''
+        )));
+        $providerMessage = trim((string) (
+            data_get($providerPayload, 'message')
+            ?? data_get($providerPayload, 'error.message')
+            ?? ''
+        ));
+
+        $external = $this->safeFetchProviderInvoice($tenant, $chargeId, $environment);
+        $providerStatus = strtoupper(trim((string) ($external['status'] ?? $invoice->cora_status ?? '')));
+
+        if (
+            $providerCode === 'PAY-0005'
+            || str_contains(strtolower($providerMessage), "can't be cancelled")
+            || str_contains(strtolower($providerMessage), 'cannot be cancelled')
+            || in_array($providerStatus, self::TERMINAL_CORA_STATUSES, true)
+        ) {
+            if (in_array($providerStatus, ['PAID', 'IN_PAYMENT', 'COMPLETED', 'RECEIVED'], true)) {
+                $paidAt = $this->extractPaidAtFromProviderPayload($external) ?? $invoice->paid_at ?? now();
+                $invoice->update([
+                    'status' => 'paid',
+                    'paid_at' => $paidAt,
+                    'cora_status' => $providerStatus !== '' ? $providerStatus : 'PAID',
+                    'cora_payload' => $this->mergeProviderPayloadSnapshot($invoice, $external),
+                    'cora_last_synced_at' => now(),
+                ]);
+
+                $paidAtLabel = $paidAt instanceof \Illuminate\Support\Carbon
+                    ? $paidAt->timezone(config('app.timezone'))->format('d/m/Y H:i')
+                    : \Illuminate\Support\Carbon::parse($paidAt)->timezone(config('app.timezone'))->format('d/m/Y H:i');
+
+                return "Não é possível cancelar: esta cobrança já foi paga no provedor em {$paidAtLabel}. "
+                    . 'O status no sistema foi atualizado para paga. Atualize a tela.';
+            }
+
+            if (in_array($providerStatus, self::PROVIDER_CANCELLED_STATUSES, true)) {
+                $invoice->update([
+                    'status' => 'cancelled',
+                    'cora_status' => $providerStatus !== '' ? $providerStatus : 'CANCELLED',
+                    'cora_payload' => $this->mergeProviderPayloadSnapshot($invoice, $external),
+                    'cora_last_synced_at' => now(),
+                ]);
+
+                return 'Não é possível cancelar novamente: a cobrança já está cancelada/expirada no provedor. '
+                    . 'O status no sistema foi atualizado. Atualize a tela.';
+            }
+
+            if ($providerStatus !== '') {
+                return "Não é possível cancelar esta cobrança no provedor (status atual: {$providerStatus}).";
+            }
+        }
+
+        if ($providerCode === 'PAY-0005') {
+            return 'Não é possível cancelar: o provedor informou que esta cobrança não pode ser cancelada '
+                . '(geralmente porque já foi paga). Consulte o status na Cora ou atualize a cobrança.';
+        }
+
+        if ($providerMessage !== '') {
+            return 'O provedor recusou o cancelamento da cobrança: ' . $providerMessage;
+        }
+
+        if ($providerCode !== '') {
+            return "O provedor recusou o cancelamento da cobrança (código {$providerCode}).";
+        }
+
+        return 'O provedor recusou o cancelamento da cobrança.';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function safeFetchProviderInvoice(Tenant $tenant, string $chargeId, string $environment): array
+    {
+        try {
+            $provider = $this->resolveGatewayProviderForInvoice($tenant, $chargeId);
+            $external = $this->gatewayFactory->resolve($provider)->getInvoiceById($tenant, $chargeId, $environment);
+
+            return is_array($external) ? $external : [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $external
+     * @return array<string, mixed>|null
+     */
+    private function mergeProviderPayloadSnapshot(Invoice $invoice, array $external): ?array
+    {
+        if ($external === []) {
+            return is_array($invoice->cora_payload) ? $invoice->cora_payload : null;
+        }
+
+        $existing = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+
+        return array_replace_recursive($existing, $external);
+    }
+
+    /**
+     * @param  array<string, mixed>  $external
+     */
+    private function extractPaidAtFromProviderPayload(array $external): ?\Illuminate\Support\Carbon
+    {
+        $candidates = [
+            $external['paid_at'] ?? null,
+            $external['occurrence_date'] ?? null,
+            data_get($external, 'payment.paid_at'),
+            data_get($external, 'payment_date'),
+            data_get($external, 'payments.0.finalized_at'),
+            data_get($external, 'payments.0.created_at'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_string($candidate) || trim($candidate) === '') {
+                continue;
+            }
+
+            try {
+                return \Illuminate\Support\Carbon::parse($candidate);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
     }
 
     private function assertGatewayChargeCancelledOnProvider(Tenant $tenant, string $chargeId, string $environment): void
