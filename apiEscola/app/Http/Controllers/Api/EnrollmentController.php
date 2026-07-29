@@ -1076,9 +1076,9 @@ class EnrollmentController extends Controller
             ]);
         }
 
-        if ($requireCpf && empty($guardian->document)) {
+        if ($requireCpf && ! $this->hasChargeableDocument($guardian->document)) {
             throw ValidationException::withMessages([
-                'guardian_id' => ['O responsável financeiro deve ter CPF cadastrado para realizar a matrícula.'],
+                'guardian_id' => ['O responsável financeiro deve ter CPF (11 dígitos) ou CNPJ (14 dígitos) cadastrado para realizar a matrícula.'],
             ]);
         }
 
@@ -1160,9 +1160,9 @@ class EnrollmentController extends Controller
                 ]);
             }
 
-            if ($guardian && $requireCpf && empty($guardian->document)) {
+            if ($guardian && $requireCpf && ! $this->hasChargeableDocument($guardian->document)) {
                 throw ValidationException::withMessages([
-                    'student_id' => ['O responsável financeiro deve ter CPF cadastrado para realizar a matrícula.'],
+                    'student_id' => ['O responsável financeiro deve ter CPF (11 dígitos) ou CNPJ (14 dígitos) cadastrado para realizar a matrícula.'],
                 ]);
             }
 
@@ -1170,9 +1170,9 @@ class EnrollmentController extends Controller
                 return ['guardian_id' => $guardian->id];
             }
 
-            if ($requireCpf && empty($student->document)) {
+            if ($requireCpf && ! $this->hasChargeableDocument($student->document)) {
                 throw ValidationException::withMessages([
-                    'student_id' => ['O aluno deve ter CPF cadastrado para realizar a matrícula.'],
+                    'student_id' => ['O aluno deve ter CPF (11 dígitos) ou CNPJ (14 dígitos) cadastrado para realizar a matrícula.'],
                 ]);
             }
 
@@ -1180,13 +1180,20 @@ class EnrollmentController extends Controller
         }
 
         // Maior de idade — aluno é o próprio pagador
-        if ($requireCpf && empty($student->document)) {
+        if ($requireCpf && ! $this->hasChargeableDocument($student->document)) {
             throw ValidationException::withMessages([
-                'student_id' => ['O aluno deve ter CPF cadastrado para realizar a matrícula.'],
+                'student_id' => ['O aluno deve ter CPF (11 dígitos) ou CNPJ (14 dígitos) cadastrado para realizar a matrícula.'],
             ]);
         }
 
         return ['guardian_id' => null];
+    }
+
+    private function hasChargeableDocument(?string $document): bool
+    {
+        $digits = preg_replace('/\D/', '', (string) $document);
+
+        return in_array(strlen($digits), [11, 14], true);
     }
 
     private function authorizeTenant(Request $request, int $resourceTenantId): void

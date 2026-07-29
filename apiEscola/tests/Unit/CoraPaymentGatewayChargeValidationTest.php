@@ -57,6 +57,47 @@ class CoraPaymentGatewayChargeValidationTest extends TestCase
     }
 
     #[Test]
+    public function it_rejects_invalid_length_payer_document(): void
+    {
+        $gateway = new CoraPaymentGateway($this->createMock(CoraTokenService::class));
+        $invoice = new Invoice(['amount' => '50.00']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Documento informado tem 9 dígito(s).');
+
+        $this->invokePrivate($gateway, 'assertChargeableInvoice', $invoice, '080425184', 'A MÃE');
+    }
+
+    #[Test]
+    public function it_prefers_financial_guardian_with_valid_document_when_invoice_guardian_is_invalid(): void
+    {
+        $gateway = new CoraPaymentGateway($this->createMock(CoraTokenService::class));
+
+        $invalidGuardian = new \App\Models\Guardian([
+            'id' => 16,
+            'name' => 'A MÃE',
+            'document' => '080425184',
+        ]);
+        $validGuardian = new \App\Models\Guardian([
+            'id' => 138,
+            'name' => 'ANYELLE PEREIRA BISPO',
+            'document' => '07517879499',
+        ]);
+        $validGuardian->setRelation('pivot', (object) ['is_financial_responsible' => true]);
+
+        $student = new \App\Models\Student(['is_minor' => true]);
+        $student->setRelation('guardians', collect([$validGuardian]));
+
+        $invoice = new Invoice();
+        $invoice->setRelation('guardian', $invalidGuardian);
+        $invoice->setRelation('student', $student);
+
+        $resolved = $this->invokePrivate($gateway, 'resolvePayerGuardian', $invoice);
+
+        $this->assertSame(138, $resolved?->id);
+    }
+
+    #[Test]
     public function it_truncates_long_service_description(): void
     {
         $gateway = new CoraPaymentGateway($this->createMock(CoraTokenService::class));

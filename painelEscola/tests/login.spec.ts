@@ -25,14 +25,15 @@ async function loginViaUI(page: Page) {
 }
 
 /**
- * Aceita tanto JWT clássico (header.payload.signature) quanto tokens
- * opacos usados com Bearer (ex.: Laravel Sanctum "id|hash"). Apenas
- * exige uma string não vazia e sem espaços.
+ * Valida o formato do token Laravel Sanctum: "<id>|<hash>",
+ * onde <id> é numérico e <hash> é uma string alfanumérica longa.
+ * Ex.: "42|8kQ...aZ"
  */
-function isBearerToken(token: string | null): boolean {
+const SANCTUM_TOKEN_REGEX = /^\d+\|[A-Za-z0-9]{20,}$/;
+
+function isSanctumToken(token: string | null): boolean {
   if (!token) return false;
-  if (/\s/.test(token)) return false;
-  return token.length >= 16;
+  return SANCTUM_TOKEN_REGEX.test(token);
 }
 
 /** Rotas públicas que não usam o interceptor com Authorization. */
@@ -78,8 +79,8 @@ test.describe('Login e JWT', () => {
 
     expect(stored.token, 'auth_token deve existir no localStorage').toBeTruthy();
     expect(
-      isBearerToken(stored.token),
-      'auth_token deve ser uma string não vazia sem espaços'
+      isSanctumToken(stored.token),
+      'auth_token deve seguir o formato Sanctum "<id>|<hash>"'
     ).toBe(true);
     expect(stored.user, 'auth_user deve existir no localStorage').toBeTruthy();
 
@@ -108,8 +109,8 @@ test.describe('Login e JWT', () => {
 
     const tokenFromHeader = authHeader.replace(/^Bearer\s+/, '');
     expect(
-      isBearerToken(tokenFromHeader),
-      'token no header deve ser uma string não vazia'
+      isSanctumToken(tokenFromHeader),
+      'token no header deve seguir o formato Sanctum "<id>|<hash>"'
     ).toBe(true);
 
     const tokenFromStorage = await page.evaluate(() =>

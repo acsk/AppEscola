@@ -78,7 +78,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
             throw new RuntimeException('Não é possível emitir boleto/hybrid sem data de vencimento na fatura.');
         }
 
-        $this->assertChargeableInvoice($invoice, $payerDocument);
+        $this->assertChargeableInvoice($invoice, $payerDocument, $payerName);
 
         $endpoint = '/v2/invoices';
         if ($normalizedMethod === 'boleto') {
@@ -653,7 +653,7 @@ class CoraPaymentGateway implements PaymentGatewayContract
         return (int) round((float) $amount * 100);
     }
 
-    private function assertChargeableInvoice(Invoice $invoice, string $payerDocument): void
+    private function assertChargeableInvoice(Invoice $invoice, string $payerDocument, ?string $payerName = null): void
     {
         $amountInCents = $this->resolveServiceAmountInCents($invoice);
 
@@ -665,12 +665,29 @@ class CoraPaymentGateway implements PaymentGatewayContract
             );
         }
 
-        $documentLength = strlen($payerDocument);
-        if (! in_array($documentLength, [11, 14], true)) {
-            throw new RuntimeException(
-                'CPF (11 dígitos) ou CNPJ (14 dígitos) do responsável financeiro é obrigatório para gerar cobrança na Cora.'
-            );
+        if ($this->isChargeableDocument($payerDocument)) {
+            return;
         }
+
+        $documentLength = strlen($payerDocument);
+        $payerLabel = $payerName !== null && trim($payerName) !== ''
+            ? ' (' . trim($payerName) . ')'
+            : '';
+        $digitHint = $documentLength > 0
+            ? " Documento informado tem {$documentLength} dígito(s)."
+            : ' Nenhum documento válido foi encontrado.';
+
+        throw new RuntimeException(
+            'CPF (11 dígitos) ou CNPJ (14 dígitos) do responsável financeiro'
+            . $payerLabel
+            . ' é obrigatório para gerar cobrança na Cora.'
+            . $digitHint
+        );
+    }
+
+    private function isChargeableDocument(string $documentDigits): bool
+    {
+        return in_array(strlen($documentDigits), [11, 14], true);
     }
 
     private function truncateServiceDescription(string $description): string
@@ -690,15 +707,35 @@ class CoraPaymentGateway implements PaymentGatewayContract
 
     private function resolvePayerGuardian(Invoice $invoice): ?\App\Models\Guardian
     {
+        $candidates = [];
+
         if ($invoice->guardian) {
-            return $invoice->guardian;
+            $candidates[] = $invoice->guardian;
         }
 
         $financialGuardian = $invoice->student?->guardians
             ?->first(fn ($guardian) => (bool) data_get($guardian, 'pivot.is_financial_responsible', false));
 
-        if ($financialGuardian) {
-            return $financialGuardian;
+        if ($financialGuardian !== null) {
+            $alreadyListed = collect($candidates)->contains(
+                fn (\App\Models\Guardian $guardian) => (int) $guardian->id === (int) $financialGuardian->id
+            );
+
+            if (! $alreadyListed) {
+                $candidates[] = $financialGuardian;
+            }
+        }
+
+        foreach ($candidates as $guardian) {
+            $documentDigits = $this->digitsOnly((string) ($guardian->document ?? ''));
+
+            if ($this->isChargeableDocument($documentDigits)) {
+                return $guardian;
+            }
+        }
+
+        if ($candidates !== []) {
+            return $candidates[0];
         }
 
         if ($invoice->student?->is_minor) {
