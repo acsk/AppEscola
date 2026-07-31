@@ -116,7 +116,7 @@ export default function Sidebar({
         { id: "cursos", label: "Cursos", icon: "book-outline" },
         { id: "simulados", label: "Simulados", icon: "document-text-outline" },
         { id: "avaliacoes-oficiais", label: "Avaliações presenciais", icon: "clipboard-outline" },
-        { id: "provas-anteriores", label: "Provas/Exercícios", icon: "archive-outline" },
+        { id: "provas-anteriores", label: "Provas/Materiais", icon: "archive-outline" },
         { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
       ],
     },

@@ -27,7 +27,7 @@ class StorePastExamRequestScheduleTest extends TestCase
             [
                 'exam_year'     => ['nullable', 'integer', 'min:1990', 'max:2100'],
                 'exam_date'     => ['nullable', 'date_format:Y-m-d'],
-                'material_kind' => ['nullable', 'in:prova,exercicio'],
+                'material_kind' => ['nullable', 'in:prova,exercicio,material'],
             ],
             $form->messages(),
         );
@@ -74,6 +74,20 @@ class StorePastExamRequestScheduleTest extends TestCase
             'content'       => 'https://example.com/lista.pdf',
             'exam_year'     => '',
             'material_kind' => 'exercicio',
+        ]);
+
+        $this->assertTrue($validator->passes());
+        $this->assertNull($validator->getData()['exam_year']);
+    }
+
+    public function test_empty_exam_year_is_allowed_for_material(): void
+    {
+        $validator = $this->validateAfterPrepare([
+            'title'         => 'Apostila 1',
+            'type'          => 'file',
+            'content'       => 'https://example.com/apostila.pdf',
+            'exam_year'     => '',
+            'material_kind' => 'material',
         ]);
 
         $this->assertTrue($validator->passes());

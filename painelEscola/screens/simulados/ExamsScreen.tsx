@@ -35,7 +35,10 @@ import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
 import ExamActionsModal, { type ExamActionKey } from "../../components/simulados/ExamActionsModal";
 import { mapApiPreviewQuestion } from "../../components/simulados/examPreviewUtils";
 import { fetchExamDeliveryReport } from "../../services/examDeliveryReport";
-import { exportExamDeliveryPdf } from "../../utils/examDeliveryPdf";
+import {
+  exportExamDeliveryPdf,
+  type ExamDeliveryPdfKind,
+} from "../../utils/examDeliveryPdf";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { showApiErrorToast } from "../../utils/apiErrors";
 import type {
@@ -43,6 +46,22 @@ import type {
   ExamPreviewPlayerQuestion,
   ExamsScreenProps,
 } from "../../types/simulados";
+
+const PDF_ACTION_TO_KIND: Partial<Record<ExamActionKey, ExamDeliveryPdfKind>> = {
+  export_delivery_pdf_pending: "pending",
+  export_delivery_pdf_delivered: "delivered",
+  export_delivery_pdf_completed: "completed",
+  export_delivery_pdf_pending_review: "pending_review",
+  export_delivery_pdf_awaiting_release: "awaiting_release",
+};
+
+const PDF_KIND_SUCCESS_MESSAGE: Record<ExamDeliveryPdfKind, string> = {
+  pending: "PDF de quem não entregou gerado com sucesso.",
+  delivered: "PDF de quem entregou gerado com sucesso.",
+  completed: "PDF de resultado completo gerado com sucesso.",
+  pending_review: "PDF parcial (aguardando correção) gerado com sucesso.",
+  awaiting_release: "PDF parcial (aguardando liberação) gerado com sucesso.",
+};
 
 // ── Subject icon helpers ──────────────────────────────────────────────────────
 
@@ -92,7 +111,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [menuExam, setMenuExam] = useState<ExamListItem | null>(null);
-  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingPdfKind, setExportingPdfKind] = useState<ExamDeliveryPdfKind | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
     type: "success",
@@ -161,17 +180,24 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     setDeleting(false);
   };
 
-  const handleExportDeliveryPdf = async (exam: ExamListItem) => {
-    setExportingPdf(true);
+  const handleExportDeliveryPdf = async (
+    exam: ExamListItem,
+    kind: ExamDeliveryPdfKind,
+  ) => {
+    setExportingPdfKind(kind);
     try {
       const report = await fetchExamDeliveryReport(exam.id);
-      await exportExamDeliveryPdf(report);
+      await exportExamDeliveryPdf(report, kind);
       setMenuExam(null);
-      setToast({ visible: true, type: "success", message: "PDF de entregas gerado com sucesso." });
+      setToast({
+        visible: true,
+        type: "success",
+        message: PDF_KIND_SUCCESS_MESSAGE[kind],
+      });
     } catch (err) {
       showApiErrorToast(setToast, err, "Não foi possível gerar o PDF de entregas.");
     }
-    setExportingPdf(false);
+    setExportingPdfKind(null);
   };
 
   const handleExamAction = (action: ExamActionKey) => {
@@ -186,8 +212,9 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       navigate("simulados-form", { examId: exam.id });
       return;
     }
-    if (action === "export_delivery_pdf") {
-      void handleExportDeliveryPdf(exam);
+    const pdfKind = PDF_ACTION_TO_KIND[action];
+    if (pdfKind) {
+      void handleExportDeliveryPdf(exam, pdfKind);
       return;
     }
     if (action === "delete") {
@@ -509,9 +536,9 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       <ExamActionsModal
         visible={!!menuExam}
         exam={menuExam}
-        exportingPdf={exportingPdf}
+        exportingPdfKind={exportingPdfKind}
         onClose={() => {
-          if (!exportingPdf) setMenuExam(null);
+          if (!exportingPdfKind) setMenuExam(null);
         }}
         onSelect={handleExamAction}
       />

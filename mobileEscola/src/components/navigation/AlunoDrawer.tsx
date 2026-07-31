@@ -40,6 +40,7 @@ type MenuId =
   | 'simulados'
   | 'provas-anteriores'
   | 'exercicios'
+  | 'materiais'
   | 'financeiro';
 
 type MenuItem =
@@ -48,12 +49,13 @@ type MenuItem =
       label: string;
       icon: IconName;
       tab: TabName;
-      nestedScreen?: 'ProvasAnteriores' | 'Exercicios' | 'SimuladosList';
+      nestedScreen?: 'ProvasAnteriores' | 'Exercicios' | 'Materiais' | 'SimuladosList';
     }
   | { id: MenuId; label: string; icon: IconName; stack: keyof Pick<AlunoStackParamList, 'Calendario'> };
 
 const PROVAS_ANTERIORES_SCREENS = new Set(['ProvasAnteriores', 'ProvaAnteriorDetalhe']);
 const EXERCICIOS_SCREENS = new Set(['Exercicios']);
+const MATERIAIS_SCREENS = new Set(['Materiais']);
 const SIMULADOS_SCREENS = new Set(['SimuladosList', 'SimuladoDetalhe', 'SimuladoExam']);
 
 const MENU_ITEMS: MenuItem[] = [
@@ -63,6 +65,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'simulados', label: 'Simulados', tab: 'Simulados', icon: 'clipboard-outline' },
   { id: 'provas-anteriores', label: 'Provas anteriores', tab: 'Simulados', nestedScreen: 'ProvasAnteriores', icon: 'archive-outline' },
   { id: 'exercicios', label: 'Exercícios', tab: 'Simulados', nestedScreen: 'Exercicios', icon: 'create-outline' },
+  { id: 'materiais', label: 'Materiais', tab: 'Simulados', nestedScreen: 'Materiais', icon: 'folder-open-outline' },
   { id: 'financeiro', label: 'Financeiro', tab: 'Financeiro', icon: 'wallet-outline' },
 ];
 
@@ -122,14 +125,22 @@ function getActiveMenuId(state: NavigationStateSnapshot): MenuId | null {
     const simScreen = getActiveSimuladosScreen(state);
     if (!simScreen) return 'simulados';
     if (simScreen.name === 'Exercicios') return 'exercicios';
+    if (simScreen.name === 'Materiais') return 'materiais';
     if (
       simScreen.name === 'ProvaAnteriorDetalhe' &&
       simScreen.params?.listScreen === 'Exercicios'
     ) {
       return 'exercicios';
     }
+    if (
+      simScreen.name === 'ProvaAnteriorDetalhe' &&
+      simScreen.params?.listScreen === 'Materiais'
+    ) {
+      return 'materiais';
+    }
     if (PROVAS_ANTERIORES_SCREENS.has(simScreen.name)) return 'provas-anteriores';
     if (EXERCICIOS_SCREENS.has(simScreen.name)) return 'exercicios';
+    if (MATERIAIS_SCREENS.has(simScreen.name)) return 'materiais';
     if (SIMULADOS_SCREENS.has(simScreen.name)) return 'simulados';
     return 'simulados';
   }

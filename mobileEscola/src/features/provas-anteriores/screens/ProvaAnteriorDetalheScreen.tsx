@@ -39,8 +39,13 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
     materialKind = 'prova',
   } = route.params;
   const isExercicio = materialKind === 'exercicio';
-  const listTitle = isExercicio ? 'Exercícios' : 'Provas anteriores';
-  const detailTitle = isExercicio ? 'Exercício' : 'Prova';
+  const isMaterial = materialKind === 'material';
+  const listTitle = isMaterial
+    ? 'Materiais'
+    : isExercicio
+      ? 'Exercícios'
+      : 'Provas anteriores';
+  const detailTitle = isMaterial ? 'Material' : isExercicio ? 'Exercício' : 'Prova';
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { data: prova, isLoading, isError, error, refetch } = useProvaAnteriorDetail(pastExamId);
@@ -78,7 +83,11 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
         <View style={styles.centro}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.carregandoTexto}>
-            {isExercicio ? 'Carregando exercício…' : 'Carregando prova…'}
+            {isMaterial
+              ? 'Carregando material…'
+              : isExercicio
+                ? 'Carregando exercício…'
+                : 'Carregando prova…'}
           </Text>
         </View>
       </View>
@@ -127,15 +136,21 @@ export function ProvaAnteriorDetalheScreen({ route, navigation }: Props) {
   const botaoLabel =
     prova.type === 'file'
       ? prova.file_type === 'pdf'
-        ? isExercicio
-          ? 'Abrir PDF do exercício'
-          : 'Abrir PDF da prova'
+        ? isMaterial
+          ? 'Abrir PDF do material'
+          : isExercicio
+            ? 'Abrir PDF do exercício'
+            : 'Abrir PDF da prova'
+        : isMaterial
+          ? 'Abrir arquivo do material'
+          : isExercicio
+            ? 'Abrir arquivo do exercício'
+            : 'Abrir arquivo da prova'
+      : isMaterial
+        ? 'Abrir material no navegador'
         : isExercicio
-          ? 'Abrir arquivo do exercício'
-          : 'Abrir arquivo da prova'
-      : isExercicio
-        ? 'Abrir exercício no navegador'
-        : 'Abrir prova no navegador';
+          ? 'Abrir exercício no navegador'
+          : 'Abrir prova no navegador';
 
   return (
     <View style={styles.container}>

@@ -2,7 +2,7 @@ import { api } from './api';
 import type { SimuladoSubject } from './simulados.service';
 
 export type PastExamType = 'link' | 'file';
-export type PastExamMaterialKind = 'prova' | 'exercicio';
+export type PastExamMaterialKind = 'prova' | 'exercicio' | 'material';
 export type PastExamFileType = 'pdf' | 'image' | 'document' | null;
 
 export interface PastExamListItem {

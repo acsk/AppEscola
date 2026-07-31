@@ -7,7 +7,7 @@ import {
   type PastExamScheduleValue,
 } from "../../utils/pastExamSchedule";
 
-type MaterialKind = "prova" | "exercicio";
+type MaterialKind = "prova" | "exercicio" | "material";
 
 type Props = {
   materialKind: MaterialKind;
@@ -67,7 +67,7 @@ export default function PastExamScheduleFields({
       <Text
         className={`font-semibold text-gray-700 ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
       >
-        Data do exercício
+        {materialKind === "material" ? "Data do material" : "Data do exercício"}
       </Text>
 
       <View className={`flex-row flex-wrap gap-2 ${compact ? "mb-2" : "mb-3"}`}>
@@ -103,7 +103,7 @@ export default function PastExamScheduleFields({
           value={value.exam_year}
           onChange={(exam_year) => onChange({ ...value, mode: "year", exam_year })}
           error={errors.exam_year}
-          modalTitle="Ano do exercício"
+          modalTitle={materialKind === "material" ? "Ano do material" : "Ano do exercício"}
         />
       ) : null}
 
@@ -119,7 +119,9 @@ export default function PastExamScheduleFields({
 
       {value.mode === "none" ? (
         <Text className="text-xs text-gray-400 mt-1 mb-1">
-          Opcional — exercício sem data ou ano definido.
+          {materialKind === "material"
+            ? "Opcional — material sem data ou ano definido."
+            : "Opcional — exercício sem data ou ano definido."}
         </Text>
       ) : null}
     </View>

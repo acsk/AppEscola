@@ -11,7 +11,7 @@ import type { ThemeColors } from '../../../theme';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList>;
 
-type ListScreenName = 'ProvasAnteriores' | 'Exercicios';
+type ListScreenName = 'ProvasAnteriores' | 'Exercicios' | 'Materiais';
 
 type ProvasAnterioresHeaderProps = {
   /** Lista = menu + título; detalhe = voltar + título curto. */

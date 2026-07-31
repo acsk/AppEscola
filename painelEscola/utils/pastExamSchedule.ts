@@ -54,8 +54,10 @@ export function scheduleFromPastExamRow(row: {
   return { mode: "none", exam_year: "", exam_date: "" };
 }
 
+export type PastExamMaterialKind = "prova" | "exercicio" | "material";
+
 export function defaultScheduleForMaterial(
-  materialKind: "prova" | "exercicio",
+  materialKind: PastExamMaterialKind,
 ): PastExamScheduleValue {
   return materialKind === "prova"
     ? { mode: "year", exam_year: "", exam_date: "" }
@@ -65,7 +67,7 @@ export function defaultScheduleForMaterial(
 /** Prova usa somente ano; registros antigos com data viram ano na edição. */
 export function normalizeScheduleForMaterial(
   schedule: PastExamScheduleValue,
-  materialKind: "prova" | "exercicio",
+  materialKind: PastExamMaterialKind,
 ): PastExamScheduleValue {
   if (materialKind !== "prova") {
     return schedule;
@@ -89,7 +91,7 @@ export function normalizeScheduleForMaterial(
 
 export function validatePastExamSchedule(
   schedule: PastExamScheduleValue,
-  materialKind: "prova" | "exercicio",
+  materialKind: PastExamMaterialKind,
 ): { exam_date?: string; exam_year?: string } {
   const errors: { exam_date?: string; exam_year?: string } = {};
 
@@ -103,7 +105,7 @@ export function validatePastExamSchedule(
     return errors;
   }
 
-  // Exercício — opcional
+  // Exercício / Material — opcional
   if (schedule.mode === "year" && schedule.exam_year.trim()) {
     const year = Number(schedule.exam_year);
     if (!Number.isFinite(year) || year < 1990 || year > 2100) {
@@ -128,7 +130,7 @@ export function validatePastExamSchedule(
 
 export function scheduleToApiPayload(
   schedule: PastExamScheduleValue,
-  materialKind?: "prova" | "exercicio",
+  materialKind?: PastExamMaterialKind,
 ): {
   exam_date: string | null;
   exam_year: number | null;
@@ -161,7 +163,7 @@ export function scheduleToApiPayload(
 export function appendScheduleToFormData(
   formData: FormData,
   schedule: PastExamScheduleValue,
-  materialKind?: "prova" | "exercicio",
+  materialKind?: PastExamMaterialKind,
 ): void {
   const { exam_date, exam_year } = scheduleToApiPayload(schedule, materialKind);
   if (exam_date) {

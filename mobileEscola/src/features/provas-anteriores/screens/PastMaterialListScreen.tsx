@@ -27,7 +27,7 @@ import { PastMaterialCard } from '../components/PastMaterialCard';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 
-type ListScreenName = 'ProvasAnteriores' | 'Exercicios';
+type ListScreenName = 'ProvasAnteriores' | 'Exercicios' | 'Materiais';
 
 type Nav = NativeStackNavigationProp<SimuladosStackParamList>;
 
@@ -57,6 +57,17 @@ const COPY = {
       n === 1 ? '1 exercício encontrado' : `${n} exercícios encontrados`,
     emptyTitle: 'Nenhum exercício disponível',
     emptySub: 'Quando sua escola publicar exercícios, eles aparecerão aqui.',
+    dateLabel: 'Data',
+  },
+  material: {
+    title: 'Materiais',
+    searchPlaceholder: 'Buscar material...',
+    loading: 'Carregando materiais…',
+    error: 'Não foi possível carregar os materiais.',
+    counter: (n: number) =>
+      n === 1 ? '1 material encontrado' : `${n} materiais encontrados`,
+    emptyTitle: 'Nenhum material disponível',
+    emptySub: 'Quando sua escola publicar materiais, eles aparecerão aqui.',
     dateLabel: 'Data',
   },
 } as const;

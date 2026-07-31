@@ -47,7 +47,7 @@ import {
 import { useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import type { WithNavigate } from "../../types/navigation";
 
-type PastExamMaterialKind = "prova" | "exercicio";
+type PastExamMaterialKind = "prova" | "exercicio" | "material";
 
 type PastExamRow = {
   id: number;
@@ -77,14 +77,16 @@ const PUBLISHED_FILTER_OPTIONS = [
 ];
 
 const MATERIAL_KIND_OPTIONS = [
-  { value: "", label: "Prova e exercício" },
+  { value: "", label: "Todos os tipos" },
   { value: "prova", label: "Prova" },
   { value: "exercicio", label: "Exercício" },
+  { value: "material", label: "Material" },
 ];
 
 const MATERIAL_KIND_FORM_OPTIONS = [
   { value: "prova", label: "Prova" },
   { value: "exercicio", label: "Exercício" },
+  { value: "material", label: "Material" },
 ];
 
 const EMPTY_FORM = {
@@ -668,7 +670,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Provas/Exercicios</Text>
+          <Text className="text-2xl font-bold text-gray-800">Provas/Materiais</Text>
           <Text className="text-sm text-gray-500">
             Biblioteca de provas e exercícios em PDF visível no app do aluno
           </Text>
@@ -892,7 +894,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
 
     <Modal
         visible={modalOpen}
-      title={editingId ? "Editar Prova/Exercicio" : "Nova Prova/Exercicio"}
+      title={editingId ? "Editar Prova/Material" : "Nova Prova/Material"}
         onClose={closeModal}
         size="lg"
         compact

@@ -35,6 +35,7 @@ const linking: LinkingOptions<any> = {
               SimuladosList: '',
               ProvasAnteriores: 'provas-anteriores',
               Exercicios: 'exercicios',
+              Materiais: 'materiais',
               ProvaAnteriorDetalhe: {
                 path: 'provas-anteriores/:pastExamId',
                 parse: { pastExamId: (id: string) => Number(id) },

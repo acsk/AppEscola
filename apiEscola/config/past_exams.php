@@ -6,8 +6,9 @@
  */
 return [
     'material_kinds' => [
-        'prova'      => 'Prova',
-        'exercicio'  => 'Exercício',
+        'prova'     => 'Prova',
+        'exercicio' => 'Exercício',
+        'material'  => 'Material',
     ],
 
     'exam_types' => [
