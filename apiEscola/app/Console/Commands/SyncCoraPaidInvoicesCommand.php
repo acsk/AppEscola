@@ -11,7 +11,7 @@ class SyncCoraPaidInvoicesCommand extends Command
                             {--tenant= : Filtrar por tenant_id}
                             {--environment=prod : Ambiente Cora (prod ou stage)}
                             {--limit= : Limite de faturas a consultar}
-                            {--sleep-ms=150 : Pausa entre consultas à Cora (ms)}
+                            {--sleep-ms=800 : Pausa entre consultas à Cora (ms)}
                             {--dry-run : Apenas simula, sem gravar alterações}';
 
     protected $description = 'Consulta cobranças abertas na Cora e atualiza faturas pagas/canceladas no sistema';

@@ -22,7 +22,7 @@ $kernel->bootstrap();
 
 $status = $kernel->call('cora:sync-paid-invoices', [
     '--environment' => getenv('CORA_SYNC_ENVIRONMENT') ?: 'prod',
-    '--sleep-ms' => getenv('CORA_SYNC_SLEEP_MS') ?: '150',
+    '--sleep-ms' => getenv('CORA_SYNC_SLEEP_MS') ?: '800',
 ]);
 
 echo $kernel->output();

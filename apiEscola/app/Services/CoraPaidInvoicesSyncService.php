@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\Tenant;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -17,6 +18,9 @@ class CoraPaidInvoicesSyncService
     private const PAID_STATUSES = ['PAID', 'IN_PAYMENT', 'COMPLETED', 'RECEIVED'];
 
     private const CANCELLED_STATUSES = ['CANCELLED', 'CANCELED', 'VOIDED', 'EXPIRED'];
+
+    /** Tentativas extras quando a Cora responde 429 (rate limit). */
+    private const RATE_LIMIT_RETRIES = 4;
 
     public function __construct(
         private readonly PaymentGatewayFactory $gatewayFactory,
@@ -42,7 +46,7 @@ class CoraPaidInvoicesSyncService
         string $environment = 'prod',
         bool $dryRun = false,
         ?int $limit = null,
-        int $sleepMs = 150,
+        int $sleepMs = 800,
     ): array {
         $environment = $environment === 'production' ? 'prod' : $environment;
         if (! in_array($environment, ['prod', 'stage'], true)) {
@@ -101,9 +105,7 @@ class CoraPaidInvoicesSyncService
             $chargeId = trim((string) $invoice->cora_charge_id);
 
             try {
-                $external = $this->gatewayFactory
-                    ->resolve('cora')
-                    ->getInvoiceById($tenant, $chargeId, $env);
+                $external = $this->fetchInvoiceWithRetry($tenant, $chargeId, $env);
 
                 $result = $this->applyExternalStatus($invoice, $external, $dryRun);
 
@@ -152,6 +154,42 @@ class CoraPaidInvoicesSyncService
         ]);
 
         return $summary;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fetchInvoiceWithRetry(Tenant $tenant, string $chargeId, string $environment): array
+    {
+        $attempt = 0;
+        $lastException = null;
+
+        while ($attempt <= self::RATE_LIMIT_RETRIES) {
+            try {
+                return $this->gatewayFactory
+                    ->resolve('cora')
+                    ->getInvoiceById($tenant, $chargeId, $environment);
+            } catch (RequestException $e) {
+                $lastException = $e;
+                $status = $e->response?->status();
+
+                if ($status !== 429 || $attempt >= self::RATE_LIMIT_RETRIES) {
+                    throw $e;
+                }
+
+                // Backoff: 2s, 4s, 8s, 16s
+                $waitSeconds = 2 ** ($attempt + 1);
+                Log::warning('CoraPaidInvoicesSyncService rate limited, retrying', [
+                    'cora_charge_id' => $chargeId,
+                    'attempt' => $attempt + 1,
+                    'wait_seconds' => $waitSeconds,
+                ]);
+                sleep($waitSeconds);
+                $attempt++;
+            }
+        }
+
+        throw $lastException ?? new \RuntimeException('Falha ao consultar cobrança na Cora.');
     }
 
     private function isCoraCharge(Invoice $invoice, Tenant $tenant): bool
@@ -226,8 +264,6 @@ class CoraPaidInvoicesSyncService
             return $outcome;
         }
 
-        // Evita update desnecessário quando só sincroniza snapshot sem mudança de status
-        // e o payload/status já estão alinhados — ainda assim atualiza last_synced_at.
         $invoice->update($updates);
 
         if ($outcome !== 'unchanged') {
