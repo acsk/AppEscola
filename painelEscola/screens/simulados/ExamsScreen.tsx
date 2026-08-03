@@ -32,7 +32,10 @@ import {
   TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
-import ExamActionsModal, { type ExamActionKey } from "../../components/simulados/ExamActionsModal";
+import ExamActionsModal, {
+  ExamDeliveryReportsModal,
+  type ExamActionKey,
+} from "../../components/simulados/ExamActionsModal";
 import { mapApiPreviewQuestion } from "../../components/simulados/examPreviewUtils";
 import { fetchExamDeliveryReport } from "../../services/examDeliveryReport";
 import {
@@ -46,14 +49,6 @@ import type {
   ExamPreviewPlayerQuestion,
   ExamsScreenProps,
 } from "../../types/simulados";
-
-const PDF_ACTION_TO_KIND: Partial<Record<ExamActionKey, ExamDeliveryPdfKind>> = {
-  export_delivery_pdf_pending: "pending",
-  export_delivery_pdf_delivered: "delivered",
-  export_delivery_pdf_completed: "completed",
-  export_delivery_pdf_pending_review: "pending_review",
-  export_delivery_pdf_awaiting_release: "awaiting_release",
-};
 
 const PDF_KIND_SUCCESS_MESSAGE: Record<ExamDeliveryPdfKind, string> = {
   pending: "PDF de quem não entregou gerado com sucesso.",
@@ -111,6 +106,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [menuExam, setMenuExam] = useState<ExamListItem | null>(null);
+  const [reportsExam, setReportsExam] = useState<ExamListItem | null>(null);
   const [exportingPdfKind, setExportingPdfKind] = useState<ExamDeliveryPdfKind | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
@@ -188,6 +184,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     try {
       const report = await fetchExamDeliveryReport(exam.id);
       await exportExamDeliveryPdf(report, kind);
+      setReportsExam(null);
       setMenuExam(null);
       setToast({
         visible: true,
@@ -212,9 +209,9 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       navigate("simulados-form", { examId: exam.id });
       return;
     }
-    const pdfKind = PDF_ACTION_TO_KIND[action];
-    if (pdfKind) {
-      void handleExportDeliveryPdf(exam, pdfKind);
+    if (action === "open_delivery_reports") {
+      setReportsExam(exam);
+      setMenuExam(null);
       return;
     }
     if (action === "delete") {
@@ -536,11 +533,26 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       <ExamActionsModal
         visible={!!menuExam}
         exam={menuExam}
+        onClose={() => setMenuExam(null)}
+        onSelect={handleExamAction}
+      />
+
+      <ExamDeliveryReportsModal
+        visible={!!reportsExam}
+        exam={reportsExam}
         exportingPdfKind={exportingPdfKind}
         onClose={() => {
-          if (!exportingPdfKind) setMenuExam(null);
+          if (!exportingPdfKind) setReportsExam(null);
         }}
-        onSelect={handleExamAction}
+        onBack={() => {
+          if (exportingPdfKind || !reportsExam) return;
+          setMenuExam(reportsExam);
+          setReportsExam(null);
+        }}
+        onSelect={(kind) => {
+          if (!reportsExam) return;
+          void handleExportDeliveryPdf(reportsExam, kind);
+        }}
       />
 
       <ConfirmModal

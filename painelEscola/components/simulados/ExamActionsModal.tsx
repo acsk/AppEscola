@@ -9,11 +9,7 @@ import type { ExamDeliveryPdfKind } from "../../utils/examDeliveryPdf";
 export type ExamActionKey =
   | "preview"
   | "edit"
-  | "export_delivery_pdf_pending"
-  | "export_delivery_pdf_delivered"
-  | "export_delivery_pdf_completed"
-  | "export_delivery_pdf_pending_review"
-  | "export_delivery_pdf_awaiting_release"
+  | "open_delivery_reports"
   | "delete";
 
 type ActionDef = {
@@ -21,16 +17,13 @@ type ActionDef = {
   label: string;
   description?: string;
   icon: keyof typeof Ionicons.glyphMap;
-  tone: "blue" | "violet" | "emerald" | "amber" | "red";
-  group: "main" | "reports" | "danger";
-  disabled?: boolean;
-  exporting?: boolean;
+  tone: "blue" | "violet" | "emerald" | "red";
+  group: "main" | "danger";
 };
 
 type Props = {
   visible: boolean;
   exam: ExamListItem | null;
-  exportingPdfKind?: ExamDeliveryPdfKind | null;
   onClose: () => void;
   onSelect: (action: ExamActionKey) => void;
 };
@@ -39,16 +32,7 @@ const toneStyles: Record<ActionDef["tone"], { bg: string; icon: string }> = {
   blue: { bg: "bg-blue-50", icon: "#3B82F6" },
   violet: { bg: "bg-violet-50", icon: "#7C3AED" },
   emerald: { bg: "bg-emerald-50", icon: "#059669" },
-  amber: { bg: "bg-amber-50", icon: "#D97706" },
   red: { bg: "bg-red-50", icon: "#EF4444" },
-};
-
-const PDF_ACTION_KIND: Partial<Record<ExamActionKey, ExamDeliveryPdfKind>> = {
-  export_delivery_pdf_pending: "pending",
-  export_delivery_pdf_delivered: "delivered",
-  export_delivery_pdf_completed: "completed",
-  export_delivery_pdf_pending_review: "pending_review",
-  export_delivery_pdf_awaiting_release: "awaiting_release",
 };
 
 function fmtRespondedPct(value: number | null | undefined) {
@@ -59,18 +43,14 @@ function fmtRespondedPct(value: number | null | undefined) {
 export default function ExamActionsModal({
   visible,
   exam,
-  exportingPdfKind = null,
   onClose,
   onSelect,
 }: Props) {
   if (!exam) return null;
 
-  const exportingAny = exportingPdfKind != null;
   const courseLabel = exam.courses?.length
     ? exam.courses.map((c) => c.name).join(", ")
     : exam.course?.name ?? "—";
-
-  const isExporting = (kind: ExamDeliveryPdfKind) => exportingPdfKind === kind;
 
   const actions: ActionDef[] = [
     {
@@ -90,58 +70,12 @@ export default function ExamActionsModal({
       group: "main",
     },
     {
-      key: "export_delivery_pdf_delivered",
-      label: isExporting("delivered") ? "Gerando PDF..." : "PDF — quem entregou",
-      description: "Todos os alunos que finalizaram a entrega",
-      icon: "checkmark-done-outline",
+      key: "open_delivery_reports",
+      label: "Relatórios de entregas (PDF)",
+      description: "Quem entregou, pendentes e resultados",
+      icon: "document-attach-outline",
       tone: "emerald",
-      group: "reports",
-      disabled: exportingAny,
-      exporting: isExporting("delivered"),
-    },
-    {
-      key: "export_delivery_pdf_pending",
-      label: isExporting("pending") ? "Gerando PDF..." : "PDF — quem não entregou",
-      description: "Alunos elegíveis ainda sem entrega",
-      icon: "hourglass-outline",
-      tone: "amber",
-      group: "reports",
-      disabled: exportingAny,
-      exporting: isExporting("pending"),
-    },
-    {
-      key: "export_delivery_pdf_completed",
-      label: isExporting("completed") ? "Gerando PDF..." : "PDF — resultado completo",
-      description: "Entregas com resultado liberado",
-      icon: "ribbon-outline",
-      tone: "emerald",
-      group: "reports",
-      disabled: exportingAny,
-      exporting: isExporting("completed"),
-    },
-    {
-      key: "export_delivery_pdf_pending_review",
-      label: isExporting("pending_review")
-        ? "Gerando PDF..."
-        : "PDF — parcial (aguardando correção)",
-      description: "Entregas aguardando correção manual",
-      icon: "create-outline",
-      tone: "amber",
-      group: "reports",
-      disabled: exportingAny,
-      exporting: isExporting("pending_review"),
-    },
-    {
-      key: "export_delivery_pdf_awaiting_release",
-      label: isExporting("awaiting_release")
-        ? "Gerando PDF..."
-        : "PDF — parcial (aguardando liberação)",
-      description: "Entregas corrigidas aguardando liberação",
-      icon: "lock-closed-outline",
-      tone: "amber",
-      group: "reports",
-      disabled: exportingAny,
-      exporting: isExporting("awaiting_release"),
+      group: "main",
     },
     {
       key: "delete",
@@ -155,11 +89,6 @@ export default function ExamActionsModal({
 
   const groups = [
     { key: "main", title: "Ações", items: actions.filter((a) => a.group === "main") },
-    {
-      key: "reports",
-      title: "Relatórios de entregas (PDF)",
-      items: actions.filter((a) => a.group === "reports"),
-    },
     { key: "danger", title: "Zona de risco", items: actions.filter((a) => a.group === "danger") },
   ];
 
@@ -191,33 +120,24 @@ export default function ExamActionsModal({
             <View className="gap-1.5">
               {group.items.map((action) => {
                 const style = toneStyles[action.tone];
-                const disabled = action.disabled;
-                const isPdfAction = Boolean(PDF_ACTION_KIND[action.key]);
                 return (
                   <TouchableOpacity
                     key={action.key}
                     onPress={() => {
-                      if (disabled) return;
                       onSelect(action.key);
-                      if (!isPdfAction) {
+                      if (action.key !== "open_delivery_reports") {
                         onClose();
                       }
                     }}
-                    disabled={disabled}
                     className={`flex-row items-center gap-2.5 rounded-xl border px-3 py-2 ${
                       action.group === "danger"
                         ? "border-red-100 bg-white"
                         : "border-gray-100 bg-white"
                     }`}
-                    style={{ opacity: disabled ? 0.6 : 1 }}
                     activeOpacity={0.85}
                   >
                     <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
-                      {action.exporting ? (
-                        <ActivityIndicator size="small" color={style.icon} />
-                      ) : (
-                        <Ionicons name={action.icon} size={17} color={style.icon} />
-                      )}
+                      <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
                       <Text className="text-sm font-bold text-gray-900">{action.label}</Text>
@@ -225,8 +145,166 @@ export default function ExamActionsModal({
                         <Text className="text-xs text-gray-500 mt-0.5">{action.description}</Text>
                       ) : null}
                     </View>
+                    <Ionicons name="chevron-forward-outline" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </View>
+    </Modal>
+  );
+}
+
+type ReportOption = {
+  kind: ExamDeliveryPdfKind;
+  label: string;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  tone: "emerald" | "amber";
+};
+
+const REPORT_GROUPS: { title: string; items: ReportOption[] }[] = [
+  {
+    title: "Entregas",
+    items: [
+      {
+        kind: "delivered",
+        label: "Quem entregou",
+        description: "Todos os alunos que finalizaram a entrega",
+        icon: "checkmark-done-outline",
+        tone: "emerald",
+      },
+      {
+        kind: "pending",
+        label: "Quem não entregou",
+        description: "Alunos elegíveis ainda sem entrega",
+        icon: "hourglass-outline",
+        tone: "amber",
+      },
+    ],
+  },
+  {
+    title: "Resultados",
+    items: [
+      {
+        kind: "completed",
+        label: "Resultado completo",
+        description: "Entregas com resultado liberado",
+        icon: "ribbon-outline",
+        tone: "emerald",
+      },
+      {
+        kind: "pending_review",
+        label: "Parcial — aguardando correção",
+        description: "Entregas aguardando correção manual",
+        icon: "create-outline",
+        tone: "amber",
+      },
+      {
+        kind: "awaiting_release",
+        label: "Parcial — aguardando liberação",
+        description: "Entregas corrigidas aguardando liberação",
+        icon: "lock-closed-outline",
+        tone: "amber",
+      },
+    ],
+  },
+];
+
+type ReportsModalProps = {
+  visible: boolean;
+  exam: ExamListItem | null;
+  exportingPdfKind?: ExamDeliveryPdfKind | null;
+  onClose: () => void;
+  onBack?: () => void;
+  onSelect: (kind: ExamDeliveryPdfKind) => void;
+};
+
+export function ExamDeliveryReportsModal({
+  visible,
+  exam,
+  exportingPdfKind = null,
+  onClose,
+  onBack,
+  onSelect,
+}: ReportsModalProps) {
+  if (!exam) return null;
+
+  const exportingAny = exportingPdfKind != null;
+  const reportToneStyles = {
+    emerald: { bg: "bg-emerald-50", icon: "#059669" },
+    amber: { bg: "bg-amber-50", icon: "#D97706" },
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      title="Relatórios de entregas"
+      onClose={() => {
+        if (!exportingAny) onClose();
+      }}
+      size="md"
+    >
+      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
+        <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+          {exam.title}
+        </Text>
+        <Text className="text-xs text-gray-500 mt-1">
+          Escolha o tipo de PDF. Cada opção gera um arquivo separado.
+        </Text>
+      </View>
+
+      {onBack && !exportingAny ? (
+        <TouchableOpacity
+          onPress={onBack}
+          className="flex-row items-center gap-1.5 mb-3 self-start"
+          activeOpacity={0.85}
+        >
+          <Ionicons name="arrow-back-outline" size={16} color="#6B7280" />
+          <Text className="text-xs font-semibold text-gray-500">Voltar às ações</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      <View className="gap-3">
+        {REPORT_GROUPS.map((group) => (
+          <View key={group.title}>
+            <Text className="text-xs uppercase font-bold text-gray-500 tracking-wide mb-1.5">
+              {group.title}
+            </Text>
+            <View className="gap-1.5">
+              {group.items.map((item) => {
+                const style = reportToneStyles[item.tone];
+                const exporting = exportingPdfKind === item.kind;
+                const disabled = exportingAny;
+                return (
+                  <TouchableOpacity
+                    key={item.kind}
+                    onPress={() => {
+                      if (disabled) return;
+                      onSelect(item.kind);
+                    }}
+                    disabled={disabled}
+                    className="flex-row items-center gap-2.5 rounded-xl border border-gray-100 bg-white px-3 py-2.5"
+                    style={{ opacity: disabled && !exporting ? 0.55 : 1 }}
+                    activeOpacity={0.85}
+                  >
+                    <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
+                      {exporting ? (
+                        <ActivityIndicator size="small" color={style.icon} />
+                      ) : (
+                        <Ionicons name={item.icon} size={17} color={style.icon} />
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-sm font-bold text-gray-900">
+                        {exporting ? "Gerando PDF..." : item.label}
+                      </Text>
+                      <Text className="text-xs text-gray-500 mt-0.5">{item.description}</Text>
+                    </View>
                     {!disabled ? (
-                      <Ionicons name="chevron-forward-outline" size={16} color="#9CA3AF" />
+                      <Ionicons name="download-outline" size={16} color="#9CA3AF" />
                     ) : null}
                   </TouchableOpacity>
                 );
