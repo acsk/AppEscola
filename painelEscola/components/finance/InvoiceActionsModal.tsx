@@ -141,15 +141,25 @@ export default function InvoiceActionsModal({
   const actions: ActionItem[] = [];
 
   if (isOpen) {
+    const canManualSettle =
+      invoice.can_manual_settle ??
+      !(invoice.cora?.charge_id || invoice.cora?.boleto_digitable || invoice.cora?.boleto_number);
+    const settleBlockReason =
+      invoice.manual_settle_block_reason ??
+      invoice.settlement_hint ??
+      "Cobrança já gerada na Cora. Aguarde a confirmação do pagamento no provedor.";
+
     actions.push({
       key: "settle",
       label: "Registrar baixa manual",
-      description:
-        invoice.settlement_hint ??
-        "Registrar pagamento recebido fora da Cora.",
+      description: canManualSettle
+        ? invoice.settlement_hint ?? "Registrar pagamento recebido fora da Cora."
+        : settleBlockReason,
       icon: "cash-outline",
-      tone: "emerald",
+      tone: canManualSettle ? "emerald" : "gray",
       group: "primary",
+      disabled: !canManualSettle,
+      disabledReason: canManualSettle ? undefined : settleBlockReason,
     });
   }
 

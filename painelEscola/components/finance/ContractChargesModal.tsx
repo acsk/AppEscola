@@ -141,7 +141,7 @@ function getStatusMismatchHint(row: LocalInvoiceRow): string | null {
   }
 
   if (localKey === "pending" && providerKey === "PAID") {
-    return "Provedor indica pago; dê baixa no sistema se o valor foi recebido.";
+    return "Provedor indica pago; o sync diário (ou reconciliação) atualiza o status no sistema — baixa manual não é permitida com ID Cora.";
   }
 
   return "Status do sistema e do provedor divergem — confira ambos os lados.";

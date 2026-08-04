@@ -864,9 +864,9 @@ Content-Type: application/json
 | `paid_at` | ❌ | data do pagamento (padrão: agora) |
 | `payment_reference` | Condicional | **Obrigatório** para `credit_card` (NSU, autorização, etc.) |
 | `notes` | ❌ | observações |
-| `environment` | ❌ | `stage` ou `prod` — usado ao cancelar boleto ativo na Cora antes da baixa |
+| `environment` | ❌ | legado (ignorado); baixa manual não cancela cobrança Cora |
 
-**Comportamento com cobrança ativa na Cora (boleto, PIX ou híbrido):** a API **cancela no provedor**, **confirma** o cancelamento (consulta status) e **só então** marca como paga. Se o cancelamento falhar ou não for confirmado, a baixa **não** é registrada. Cobrança só local (`cora_charge_id` vazio): baixa direta.
+**Comportamento:** baixa manual **só é permitida** em cobranças locais (sem `cora_charge_id` / boleto-PIX gerado). Se já existe ID Cora, a API responde **422** e o painel desabilita a ação — o status pago/cancelado vem do provedor (sync diário `cora:sync-paid-invoices` ou reconciliação).
 
 **Resposta:** envelope `{ type, message, body: { invoice, cancelled_on_gateway } }`.
 

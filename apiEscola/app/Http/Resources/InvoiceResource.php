@@ -15,6 +15,7 @@ class InvoiceResource extends JsonResource
     {
         $lifecycleService = app(InvoiceLifecycleService::class);
         $lifecycle = $lifecycleService->permissions($this->resource);
+        $settlementService = app(InvoiceSettlementService::class);
         $providerDueDate = data_get($this->cora_payload, 'payment_terms.due_date')
             ?? data_get($this->cora_payload, 'integration.provider_due_date');
         $dueDateAdjustedFrom = data_get($this->cora_payload, 'integration.due_date_adjusted_from');
@@ -77,8 +78,10 @@ class InvoiceResource extends JsonResource
             'imported_from_cora_sync' => $lifecycleService->wasImportedFromCoraSync($this->resource),
             'lifecycle_hint' => $lifecycle['lifecycle_hint'],
             'has_active_gateway_charge' => $lifecycleService->hasActiveGatewayCharge($this->resource),
-            'will_cancel_gateway_on_settlement' => $lifecycleService->shouldCancelOnGateway($this->resource),
-            'settlement_hint' => app(InvoiceSettlementService::class)->settlementHint($this->resource),
+            'will_cancel_gateway_on_settlement' => false,
+            'can_manual_settle' => $settlementService->allowsManualSettlement($this->resource),
+            'manual_settle_block_reason' => $settlementService->manualSettlementBlockReason($this->resource),
+            'settlement_hint' => $settlementService->settlementHint($this->resource),
         ];
     }
 

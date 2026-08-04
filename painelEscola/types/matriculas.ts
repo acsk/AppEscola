@@ -107,6 +107,8 @@ export type InvoiceListItem = {
   cora_due_date_hint?: string | null;
   has_active_gateway_charge?: boolean;
   will_cancel_gateway_on_settlement?: boolean;
+  can_manual_settle?: boolean;
+  manual_settle_block_reason?: string | null;
   settlement_hint?: string | null;
 };
 

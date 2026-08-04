@@ -92,22 +92,51 @@ class InvoiceSettlementTest extends TestCase
         ]);
     }
 
+    public function test_mark_as_paid_blocked_when_cora_charge_id_exists(): void
+    {
+        [$user, $invoice] = $this->seedPendingInvoice([
+            'cora_charge_id' => 'inv_xRV07B6nT4uRGhJErKEY3w',
+            'cora_status' => 'OPEN',
+            'payment_method' => 'bank_slip',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/invoices/{$invoice->id}/mark-as-paid", [
+            'payment_method' => 'cash',
+            'paid_at' => '2026-08-04',
+        ])
+            ->assertStatus(422)
+            ->assertJsonFragment([
+                'message' => 'Cobrança já gerada na Cora (boleto/PIX). A baixa manual não é permitida; '
+                    . 'o status será atualizado automaticamente quando o pagamento for confirmado no provedor '
+                    . '(ou pelo sync diário).',
+            ]);
+
+        $this->assertDatabaseHas('invoices', [
+            'id' => $invoice->id,
+            'status' => 'pending',
+            'payment_method' => 'bank_slip',
+        ]);
+    }
+
     /**
+     * @param  array<string, mixed>  $invoiceOverrides
      * @return array{0: User, 1: Invoice}
      */
-    private function seedPendingInvoice(): array
+    private function seedPendingInvoice(array $invoiceOverrides = []): array
     {
         $tenant = Tenant::factory()->create();
         $user = User::factory()->create(['tenant_id' => $tenant->id]);
         $student = Student::factory()->create(['tenant_id' => $tenant->id]);
 
-        $invoice = Invoice::factory()->create([
+        $invoice = Invoice::factory()->create(array_merge([
             'tenant_id' => $tenant->id,
             'student_id' => $student->id,
             'status' => 'pending',
             'amount' => 150.00,
             'due_date' => now()->addDays(5),
-        ]);
+        ], $invoiceOverrides));
 
         return [$user, $invoice];
     }

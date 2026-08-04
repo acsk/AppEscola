@@ -23,6 +23,38 @@ class InvoiceSettlementService
     }
 
     /**
+     * Baixa manual só para cobranças locais (sem ID Cora / boleto-PIX gerado).
+     * Com cobrança no provedor, o pagamento deve reconciliar via Cora/sync.
+     */
+    public function allowsManualSettlement(Invoice $invoice): bool
+    {
+        if (in_array($invoice->status, ['paid', 'cancelled'], true)) {
+            return false;
+        }
+
+        return ! $this->lifecycle->hasGeneratedPaymentCharge($invoice);
+    }
+
+    public function manualSettlementBlockReason(Invoice $invoice): ?string
+    {
+        if ($invoice->status === 'paid') {
+            return 'Cobrança já está paga.';
+        }
+
+        if ($invoice->status === 'cancelled') {
+            return 'Não é possível dar baixa em uma cobrança cancelada.';
+        }
+
+        if ($this->lifecycle->hasGeneratedPaymentCharge($invoice)) {
+            return 'Cobrança já gerada na Cora (boleto/PIX). A baixa manual não é permitida; '
+                . 'o status será atualizado automaticamente quando o pagamento for confirmado no provedor '
+                . '(ou pelo sync diário).';
+        }
+
+        return null;
+    }
+
+    /**
      * @param  array{paid_at?: mixed, payment_method: string, payment_reference?: ?string, notes?: ?string, environment?: ?string}  $data
      * @return array{invoice: Invoice, cancelled_on_gateway: bool}
      */
@@ -36,9 +68,18 @@ class InvoiceSettlementService
             throw new RuntimeException('Não é possível dar baixa em uma cobrança cancelada.');
         }
 
+        if (! $this->allowsManualSettlement($invoice)) {
+            throw new RuntimeException(
+                (string) ($this->manualSettlementBlockReason($invoice)
+                    ?? 'Baixa manual não permitida para esta cobrança.')
+            );
+        }
+
         $request = $request ?? request();
         $cancelledOnGateway = false;
 
+        // Caminho legado: cobranças com gateway ativo não chegam aqui (bloqueadas acima).
+        // Mantido para cobranças locais sem ID Cora.
         if ($this->lifecycle->shouldCancelOnGateway($invoice)) {
             try {
                 $cancelledOnGateway = $this->lifecycle->invalidateGatewayChargeBeforeSettlement($invoice, $request);
@@ -111,15 +152,11 @@ class InvoiceSettlementService
             return null;
         }
 
-        if ($this->lifecycle->shouldCancelOnGateway($invoice)) {
-            return 'Cobrança ativa na Cora (boleto ou PIX). A baixa só é registrada após cancelamento confirmado no provedor.';
+        if (! $this->allowsManualSettlement($invoice)) {
+            return $this->manualSettlementBlockReason($invoice);
         }
 
-        if (! $invoice->cora_charge_id) {
-            return 'Cobrança apenas local: a baixa manual não envia nada ao provedor.';
-        }
-
-        return null;
+        return 'Cobrança apenas local: a baixa manual não envia nada ao provedor.';
     }
 
     /**
