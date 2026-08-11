@@ -17,7 +17,7 @@ class UpdateEnrollmentRequest extends FormRequest
         return [
             'school_class_id' => ['sometimes', 'exists:school_classes,id'],
             'enrollment_number' => ['nullable', 'string', 'max:50'],
-            'start_date' => ['sometimes', 'date'],
+            'start_date' => ['sometimes', 'nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'status' => ['sometimes', 'exists:domain_enrollment_statuses,slug'],
             'monthly_amount' => ['nullable', 'numeric', 'min:0'],
@@ -28,10 +28,21 @@ class UpdateEnrollmentRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'start_date' => $this->normalizeDate($this->input('start_date')),
-            'end_date' => $this->normalizeDate($this->input('end_date')),
-        ]);
+        $merge = [];
+
+        // Só normaliza datas enviadas no payload. Sem isso, merge de null
+        // faz o "sometimes|date" falhar ao editar só a turma (datas bloqueadas).
+        if ($this->exists('start_date')) {
+            $merge['start_date'] = $this->normalizeDate($this->input('start_date'));
+        }
+
+        if ($this->exists('end_date')) {
+            $merge['end_date'] = $this->normalizeDate($this->input('end_date'));
+        }
+
+        if ($merge !== []) {
+            $this->merge($merge);
+        }
     }
 
     private function normalizeDate(mixed $value): mixed
