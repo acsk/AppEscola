@@ -185,13 +185,58 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   const bypassRemoveRef            = useRef(false);
   const tempoEsgotadoRef            = useRef(false);
 
-  // Modal de confirmação de saída
+  // Modal de confirmação (sair ou entregar com questões em branco)
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const [confirmAction, setConfirmAction]   = useState<(() => void) | null>(null);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    confirmDestructive: boolean;
+    icon: React.ComponentProps<typeof Ionicons>['name'];
+    iconColor: string;
+  }>({
+    title: 'Sair do simulado?',
+    message: 'Suas respostas ainda não foram enviadas e serão perdidas.',
+    confirmLabel: 'Sair',
+    cancelLabel: 'Cancelar',
+    confirmDestructive: true,
+    icon: 'exit-outline',
+    iconColor: '#DC2626',
+  });
 
-  function pedirConfirmacaoSaida(onConfirm: () => void) {
+  function abrirConfirmacao(
+    config: typeof confirmConfig,
+    onConfirm: () => void,
+  ) {
+    setConfirmConfig(config);
     setConfirmAction(() => onConfirm);
     setConfirmVisible(true);
+  }
+
+  function pedirConfirmacaoSaida(onConfirm: () => void) {
+    abrirConfirmacao(
+      {
+        title: 'Sair do simulado?',
+        message: 'Suas respostas ainda não foram enviadas e serão perdidas.',
+        confirmLabel: 'Sair',
+        cancelLabel: 'Cancelar',
+        confirmDestructive: true,
+        icon: 'exit-outline',
+        iconColor: colors.debit,
+      },
+      onConfirm,
+    );
+  }
+
+  function isQuestaoRespondida(q: Question, r: Resposta | undefined): boolean {
+    if (!r) return false;
+    if (q.type === 'essay') return !!r.textAnswer?.trim();
+    if (r.optionId === undefined) return false;
+    const op = q.options.find((o) => o.id === r.optionId);
+    const exigeTexto = q.allow_text_answer || !!op?.triggers_text_input;
+    return exigeTexto ? !!r.textAnswer?.trim() : true;
   }
 
   // Botão voltar customizado: garante que sempre há botão, mesmo via deep link
@@ -335,6 +380,32 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
     }
   }
 
+  async function enviarEFinalizar() {
+    if (!detalhe) return;
+
+    setFase('finalizando');
+    try {
+      for (const questao of detalhe.questions) {
+        const resp = respostas[questao.id];
+        if (!resp) continue;
+        if (questao.type === 'essay') {
+          if (resp.textAnswer?.trim()) {
+            await enviarResposta(attemptId, questao.id, undefined, resp.textAnswer);
+          }
+        } else if (resp.optionId !== undefined) {
+          await enviarResposta(attemptId, questao.id, resp.optionId, resp.textAnswer);
+        }
+      }
+      const res = await finalizarSimulado(attemptId);
+      invalidateSimuladosQueries(queryClient, { examId, attemptId });
+      setResultado(res);
+      setFase('resultado');
+    } catch (e: unknown) {
+      setErroMsg(getApiErrorMessage(e, 'Erro ao finalizar. Tente novamente.'));
+      setFase('realizando');
+    }
+  }
+
   async function handleFinalizar() {
     if (!detalhe) return;
 
@@ -359,29 +430,31 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
       return;
     }
 
-    setFase('finalizando');
-    try {
-      for (const questao of detalhe.questions) {
-        const resp = respostas[questao.id];
-        if (!resp) continue;
-        if (questao.type === 'essay') {
-          if (resp.textAnswer?.trim()) {
-            await enviarResposta(attemptId, questao.id, undefined, resp.textAnswer);
-          }
-        } else {
-          if (resp.optionId !== undefined) {
-            await enviarResposta(attemptId, questao.id, resp.optionId, resp.textAnswer);
-          }
-        }
-      }
-      const res = await finalizarSimulado(attemptId);
-      invalidateSimuladosQueries(queryClient, { examId, attemptId });
-      setResultado(res);
-      setFase('resultado');
-    } catch (e: unknown) {
-      setErroMsg(getApiErrorMessage(e, 'Erro ao finalizar. Tente novamente.'));
-      setFase('realizando');
+    const semResposta = detalhe.questions.filter((q) => !isQuestaoRespondida(q, respostas[q.id]));
+    if (semResposta.length > 0) {
+      const numeros = semResposta.map((q) => q.order).join(', ');
+      const qtd = semResposta.length;
+      abrirConfirmacao(
+        {
+          title: 'Há perguntas sem resposta',
+          message:
+            qtd === 1
+              ? `A questão ${numeros} está sem resposta. Deseja entregar o simulado mesmo assim?`
+              : `Há ${qtd} perguntas sem resposta (questões ${numeros}). Deseja entregar o simulado mesmo assim?`,
+          confirmLabel: 'Entregar mesmo assim',
+          cancelLabel: 'Voltar e responder',
+          confirmDestructive: false,
+          icon: 'help-circle-outline',
+          iconColor: '#F59E0B',
+        },
+        () => {
+          void enviarEFinalizar();
+        },
+      );
+      return;
     }
+
+    await enviarEFinalizar();
   }
 
   function setResposta(questionId: number, resp: Resposta) {
@@ -596,15 +669,9 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
   // ── Realizando / Finalizando ────────────────────────────────────────────────
   if ((fase === 'realizando' || fase === 'finalizando') && detalhe) {
-    const respondidas = detalhe.questions.filter((q) => {
-      const r = respostas[q.id];
-      if (!r) return false;
-      if (q.type === 'essay') return !!r.textAnswer?.trim();
-      if (r.optionId === undefined) return false;
-      const op = q.options.find((o) => o.id === r.optionId);
-      const exigeTexto = q.allow_text_answer || !!op?.triggers_text_input;
-      return exigeTexto ? !!r.textAnswer?.trim() : true;
-    }).length;
+    const respondidas = detalhe.questions.filter((q) =>
+      isQuestaoRespondida(q, respostas[q.id]),
+    ).length;
     const total = detalhe.questions.length;
     const pct   = total > 0 ? (respondidas / total) * 100 : 0;
 
@@ -680,13 +747,13 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
         <ConfirmModal
           visible={confirmVisible}
-          title="Sair do simulado?"
-          message="Suas respostas ainda não foram enviadas e serão perdidas."
-          confirmLabel="Sair"
-          cancelLabel="Cancelar"
-          confirmDestructive
-          icon="exit-outline"
-          iconColor={colors.debit}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel={confirmConfig.confirmLabel}
+          cancelLabel={confirmConfig.cancelLabel}
+          confirmDestructive={confirmConfig.confirmDestructive}
+          icon={confirmConfig.icon}
+          iconColor={confirmConfig.iconColor}
           onConfirm={() => {
             setConfirmVisible(false);
             confirmAction?.();

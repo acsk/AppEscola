@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { ExamPreviewPlayerQuestion } from "../../types/simulados";
 import { hasAnswerKey } from "./examPreviewUtils";
+import ConfirmModal from "../ui/ConfirmModal";
 
 type Phase = "answering" | "results";
 
@@ -84,6 +85,7 @@ export default function ExamPreviewPlayer({
   const [selected, setSelected] = useState<Record<number, number | null>>({});
   const [texts, setTexts] = useState<Record<number, string>>({});
   const [brokenImages, setBrokenImages] = useState<Record<number, boolean>>({});
+  const [confirmUnansweredVisible, setConfirmUnansweredVisible] = useState(false);
 
   const canGrade = gradeObjective && hasAnswerKey(questions);
 
@@ -139,6 +141,26 @@ export default function ExamPreviewPlayer({
       return false;
     }).length;
   }, [questions, selected, texts]);
+
+  const unansweredQuestions = useMemo(() => {
+    return questions.filter((q) => {
+      if (q.type === "essay") return (texts[q.id] ?? "").trim().length === 0;
+      return selected[q.id] == null;
+    });
+  }, [questions, selected, texts]);
+
+  const finalizeTest = useCallback(() => {
+    setConfirmUnansweredVisible(false);
+    setPhase("results");
+  }, []);
+
+  const handleFinalizePress = useCallback(() => {
+    if (unansweredQuestions.length > 0) {
+      setConfirmUnansweredVisible(true);
+      return;
+    }
+    finalizeTest();
+  }, [finalizeTest, unansweredQuestions.length]);
 
   if (loading) {
     return (
@@ -235,7 +257,9 @@ export default function ExamPreviewPlayer({
                   <Ionicons name="close-circle" size={16} color="#DC2626" />
                 )}
                 {showGabarito && qResult?.status === "unanswered" && (
-                  <Text className="text-[10px] text-amber-700 font-semibold">Sem resposta</Text>
+                  <Text className="text-[10px] text-amber-700 font-semibold">
+                    Não assinalou a opção
+                  </Text>
                 )}
               </View>
               <Text className="text-xs text-violet-600 font-semibold">
@@ -380,6 +404,22 @@ export default function ExamPreviewPlayer({
                   </View>
                 )}
 
+              {phase === "results" && qResult?.status === "unanswered" && (
+                <View className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+                  <Text className="text-xs text-amber-800 font-semibold">
+                    O aluno não assinalou a opção.
+                  </Text>
+                </View>
+              )}
+
+              {phase === "results" && q.type === "essay" && !(texts[q.id] ?? "").trim() && (
+                <View className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
+                  <Text className="text-xs text-amber-800 font-semibold">
+                    O aluno não respondeu esta questão.
+                  </Text>
+                </View>
+              )}
+
               {phase === "results" && q.explanation?.trim() ? (
                 <View className="mt-4 rounded-xl border border-violet-100 bg-violet-50 px-3 py-3">
                   <Text className="text-[10px] font-bold text-violet-700 uppercase mb-1">
@@ -389,13 +429,13 @@ export default function ExamPreviewPlayer({
                 </View>
               ) : null}
 
-              {phase === "results" && q.type === "essay" && (
+              {phase === "results" && q.type === "essay" && (texts[q.id] ?? "").trim() ? (
                 <View className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
                   <Text className="text-xs text-amber-800">
                     Discursiva: na versão do aluno, aguardaria correção manual.
                   </Text>
                 </View>
-              )}
+              ) : null}
             </View>
           </View>
         );
@@ -405,7 +445,7 @@ export default function ExamPreviewPlayer({
         {phase === "answering" ? (
           <>
             <TouchableOpacity
-              onPress={() => setPhase("results")}
+              onPress={handleFinalizePress}
               className="px-6 py-3 rounded-xl bg-violet-600 flex-row items-center gap-2"
               activeOpacity={0.85}
             >
@@ -436,6 +476,24 @@ export default function ExamPreviewPlayer({
           </>
         )}
       </View>
+
+      <ConfirmModal
+        visible={confirmUnansweredVisible}
+        title="Há perguntas sem resposta"
+        message={
+          unansweredQuestions.length === 1
+            ? `A questão ${unansweredQuestions[0]?.order} está sem resposta. Deseja entregar o simulado mesmo assim?`
+            : `Há ${unansweredQuestions.length} perguntas sem resposta (questões ${unansweredQuestions
+                .map((q) => q.order)
+                .join(", ")}). Deseja entregar o simulado mesmo assim?`
+        }
+        confirmLabel="Entregar mesmo assim"
+        cancelLabel="Voltar e responder"
+        tone="primary"
+        iconName="help-circle-outline"
+        onConfirm={finalizeTest}
+        onCancel={() => setConfirmUnansweredVisible(false)}
+      />
     </View>
   );
 }

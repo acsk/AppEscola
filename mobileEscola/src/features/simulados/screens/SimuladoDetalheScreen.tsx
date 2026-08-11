@@ -782,15 +782,22 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                         </View>
                       ) : null}
 
-                      {!q.student_answer && (
-                        <Text style={styles.previewNaoRespondida}>Não respondida</Text>
+                      {(!q.student_answer ||
+                        (!q.student_answer.option_id && !q.student_answer.text_answer)) && (
+                        <Text style={styles.previewNaoRespondida}>
+                          {q.type === 'essay'
+                            ? 'Você não respondeu esta questão.'
+                            : 'Você não assinalou a opção.'}
+                        </Text>
                       )}
                     </View>
                   ) : (
                     <View style={styles.previewTextoResposta}>
                       <Text style={styles.previewTextoLabel}>Texto enviado:</Text>
                       <Text style={styles.previewTextoConteudo}>
-                        {q.student_answer?.text_answer?.trim() ? q.student_answer.text_answer : 'Não respondida'}
+                        {q.student_answer?.text_answer?.trim()
+                          ? q.student_answer.text_answer
+                          : 'Você não respondeu esta questão.'}
                       </Text>
                     </View>
                   )}

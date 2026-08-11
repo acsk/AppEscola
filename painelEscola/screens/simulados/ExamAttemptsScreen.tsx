@@ -841,7 +841,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                   </View>
                                 )}
                                 <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: '#334155' }}>
-                                  {selectedDisplay.text ?? "Alternativa selecionada"}
+                                  {selectedDisplay.text
+                                    ?? (ans.option_id == null && ans.text_answer == null
+                                      ? "O aluno não assinalou a opção."
+                                      : "Alternativa selecionada")}
                                 </Text>
                               </View>
                             </View>
@@ -926,7 +929,9 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                 padding: 10,
                               }}
                             >
-                              <Text style={{ fontSize: 13, color: '#94A3B8', fontWeight: '600' }}>Não respondida</Text>
+                              <Text style={{ fontSize: 13, color: '#94A3B8', fontWeight: '600' }}>
+                                O aluno não assinalou a opção.
+                              </Text>
                             </View>
                           )}
                           {!needsReview && ans.points_earned != null && (

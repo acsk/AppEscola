@@ -338,7 +338,11 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
 
                 {/* Não respondida */}
                 {(!q.student_answer || (!q.student_answer.option_id && !q.student_answer.text_answer)) && (
-                  <Text style={styles.naoRespondida}>Não respondida</Text>
+                  <Text style={styles.naoRespondida}>
+                    {q.type === 'essay'
+                      ? 'Você não respondeu esta questão.'
+                      : 'Você não assinalou a opção.'}
+                  </Text>
                 )}
 
                 {/* Resultado */}
