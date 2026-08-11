@@ -48,6 +48,7 @@ import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 import { ClassStudentsReportScreen } from "./screens/relatorios";
 
 import type { NavState } from "./types/navigation";
+import { canManageExams as roleCanManageExams } from "./utils/permissions";
 
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
 
@@ -648,6 +649,7 @@ function AppContent() {
 
   const canManageTenants = user?.role === "super_admin";
   const canManageUsers = user?.role === "super_admin" || user?.role === "admin";
+  const canManageExams = roleCanManageExams(user?.role);
   const canSendNotifications =
     user?.role === "super_admin" ||
     user?.role === "admin" ||
@@ -749,6 +751,35 @@ function AppContent() {
             </View>
             <Text className="text-sm text-amber-700 mb-4">
               Seu perfil não possui permissão para acessar a gestão de usuários.
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigate("dashboard")}
+              className="self-start px-4 py-2 rounded-xl bg-amber-600"
+              activeOpacity={0.85}
+            >
+              <Text className="text-sm font-semibold text-white">Voltar ao dashboard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (
+      !canManageExams &&
+      (nav.screen === "simulados" ||
+        nav.screen === "simulados-form" ||
+        nav.screen === "simulados-tentativas")
+    ) {
+      return (
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="shield-outline" size={18} color="#B45309" />
+              <View style={{ width: 8 }} />
+              <Text className="text-base font-semibold text-amber-800">Acesso negado</Text>
+            </View>
+            <Text className="text-sm text-amber-700 mb-4">
+              Seu perfil não possui permissão para gerenciar simulados. Professores, secretaria e administradores podem criar e editar.
             </Text>
             <TouchableOpacity
               onPress={() => navigate("dashboard")}
@@ -885,6 +916,7 @@ function AppContent() {
             onSelectItem={(s) => navigate(s)}
             canManageTenants={canManageTenants}
             canManageUsers={canManageUsers}
+            canManageExams={canManageExams}
             canSendNotifications={canSendNotifications}
             apiVersion={apiVersion}
           />
@@ -904,6 +936,7 @@ function AppContent() {
               onSelectItem={(s) => navigate(s)}
               canManageTenants={canManageTenants}
               canManageUsers={canManageUsers}
+              canManageExams={canManageExams}
               canSendNotifications={canSendNotifications}
               apiVersion={apiVersion}
               isMobile

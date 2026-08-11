@@ -9,6 +9,7 @@ use App\Http\Requests\UploadSupportMaterialFileRequest;
 use App\Http\Resources\SupportMaterialResource;
 use App\Models\Exam;
 use App\Models\SupportMaterial;
+use App\Services\ExamAccessService;
 use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,7 @@ class SupportMaterialController extends Controller
     )]
     public function index(Request $request, Exam $exam): AnonymousResourceCollection
     {
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         $materials = $exam->supportMaterials()
@@ -67,6 +69,7 @@ class SupportMaterialController extends Controller
     )]
     public function store(StoreSupportMaterialRequest $request, Exam $exam): JsonResponse
     {
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         $data = $request->validated();
@@ -95,6 +98,7 @@ class SupportMaterialController extends Controller
     )]
     public function show(Request $request, Exam $exam, SupportMaterial $material): SupportMaterialResource
     {
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         if ($material->exam_id !== $exam->id) {
@@ -121,6 +125,7 @@ class SupportMaterialController extends Controller
     )]
     public function update(UpdateSupportMaterialRequest $request, Exam $exam, SupportMaterial $material): SupportMaterialResource
     {
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         if ($material->exam_id !== $exam->id) {
@@ -151,6 +156,7 @@ class SupportMaterialController extends Controller
     )]
     public function destroy(Request $request, Exam $exam, SupportMaterial $material): JsonResponse
     {
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         if ($material->exam_id !== $exam->id) {
@@ -197,6 +203,7 @@ class SupportMaterialController extends Controller
         Exam $exam,
         TenantUploadSettingsService $uploadSettings
     ): JsonResponse {
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         $data = $request->validated();

@@ -11,6 +11,7 @@ use App\Models\ExamStatus;
 use App\Services\ExamDeliveryReportService;
 use App\Services\ExamTypeService;
 use App\Services\ExamAttemptIntegrityService;
+use App\Services\ExamAccessService;
 use App\Services\ExamCourseService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -27,11 +28,14 @@ class ExamController extends Controller
         private readonly ExamCourseService $examCourseService,
         private readonly ExamTypeService $examTypeService,
         private readonly ExamDeliveryReportService $deliveryReportService,
+        private readonly ExamAccessService $examAccess,
     ) {
     }
 
     public function index(Request $request): AnonymousResourceCollection
     {
+        $this->examAccess->assertCanManageExams($request->user());
+
         $query = Exam::with(['course', 'courses', 'subject', 'examStatus', 'examType']);
         $this->applyTenantScope($query, $request);
 
@@ -56,6 +60,8 @@ class ExamController extends Controller
 
     public function store(StoreExamRequest $request): JsonResponse
     {
+        $this->examAccess->assertCanManageExams($request->user());
+
         $tenantId = $this->getTenantId($request);
 
         $data = $request->validated();
@@ -75,6 +81,7 @@ class ExamController extends Controller
 
     public function show(Request $request, Exam $exam): JsonResponse
     {
+        $this->examAccess->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject', 'questions.examType']);
@@ -84,6 +91,7 @@ class ExamController extends Controller
 
     public function update(UpdateExamRequest $request, Exam $exam): JsonResponse
     {
+        $this->examAccess->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         $data = $request->validated();
@@ -112,6 +120,7 @@ class ExamController extends Controller
 
     public function destroy(Request $request, Exam $exam): JsonResponse
     {
+        $this->examAccess->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         // Cascata: questões e opções são removidas via cascadeOnDelete na FK
@@ -123,6 +132,7 @@ class ExamController extends Controller
     /** Relatório de entregas: alunos que finalizaram o simulado e pendentes. */
     public function deliveryReport(Request $request, Exam $exam): JsonResponse
     {
+        $this->examAccess->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         return $this->success(
@@ -134,6 +144,7 @@ class ExamController extends Controller
     /** Estatísticas agregadas para gráficos: por questão, por matéria, por aluno */
     public function stats(Request $request, Exam $exam, ExamAttemptIntegrityService $integrity): JsonResponse
     {
+        $this->examAccess->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
         $tenantId = $this->getTenantId($request);

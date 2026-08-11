@@ -8,6 +8,7 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 
 | Data | O que mudou |
 |---|---|
+| 2026-08-11 | Gestão de simulados (CRUD) exige papel staff: `super_admin`, `admin`, `secretaria`, `professor` |
 | 2026-05-10 | Endpoint `GET /api/aluno/exams` passou a retornar `nota`, `score_display` e `aproveitamento` da tentativa mais recente (quando visível) |
 | 2026-05-04 | Status `pending_review`: resultado bloqueado até correção manual de questões discursivas/`allow_text_answer` |
 | 2026-05-04 | Status `awaiting_release` + flag `release_results_after_end` para segurar o resultado até o fim do período |
@@ -114,6 +115,8 @@ Lista todos os tipos disponíveis.
 ---
 
 ### Simulados
+
+**Permissões (painel):** criar, editar, listar e excluir simulados exige um dos papéis staff: `super_admin`, `admin`, `secretaria`, `professor`. Alunos usam as rotas `/api/aluno/exams`.
 
 #### `GET /api/exams`
 Lista os simulados do tenant com paginação (20 por página).

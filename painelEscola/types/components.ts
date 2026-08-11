@@ -20,6 +20,7 @@ export type SidebarProps = {
   onSelectItem?: (id: string) => void;
   canManageTenants?: boolean;
   canManageUsers?: boolean;
+  canManageExams?: boolean;
   canSendNotifications?: boolean;
   isMobile?: boolean;
   onClose?: () => void;

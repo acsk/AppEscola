@@ -26,6 +26,8 @@ type Props = {
   exam: ExamListItem | null;
   onClose: () => void;
   onSelect: (action: ExamActionKey) => void;
+  /** Se false, oculta editar/excluir (apenas visualização/relatórios). Default: true */
+  canManage?: boolean;
 };
 
 const toneStyles: Record<ActionDef["tone"], { bg: string; icon: string }> = {
@@ -45,6 +47,7 @@ export default function ExamActionsModal({
   exam,
   onClose,
   onSelect,
+  canManage = true,
 }: Props) {
   if (!exam) return null;
 
@@ -61,14 +64,18 @@ export default function ExamActionsModal({
       tone: "blue",
       group: "main",
     },
-    {
-      key: "edit",
-      label: "Editar simulado",
-      description: "Abrir cadastro e questões",
-      icon: "pencil-outline",
-      tone: "violet",
-      group: "main",
-    },
+    ...(canManage
+      ? ([
+          {
+            key: "edit",
+            label: "Editar simulado",
+            description: "Abrir cadastro e questões",
+            icon: "pencil-outline",
+            tone: "violet",
+            group: "main",
+          },
+        ] as ActionDef[])
+      : []),
     {
       key: "open_delivery_reports",
       label: "Relatórios de entregas (PDF)",
@@ -77,20 +84,24 @@ export default function ExamActionsModal({
       tone: "emerald",
       group: "main",
     },
-    {
-      key: "delete",
-      label: "Excluir simulado",
-      description: "Remove o simulado permanentemente",
-      icon: "trash-outline",
-      tone: "red",
-      group: "danger",
-    },
+    ...(canManage
+      ? ([
+          {
+            key: "delete",
+            label: "Excluir simulado",
+            description: "Remove o simulado permanentemente",
+            icon: "trash-outline",
+            tone: "red",
+            group: "danger",
+          },
+        ] as ActionDef[])
+      : []),
   ];
 
   const groups = [
     { key: "main", title: "Ações", items: actions.filter((a) => a.group === "main") },
     { key: "danger", title: "Zona de risco", items: actions.filter((a) => a.group === "danger") },
-  ];
+  ].filter((group) => group.items.length > 0);
 
   return (
     <Modal visible={visible} title="Ações do simulado" onClose={onClose} size="md">

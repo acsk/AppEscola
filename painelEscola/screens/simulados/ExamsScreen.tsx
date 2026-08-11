@@ -44,6 +44,8 @@ import {
 } from "../../utils/examDeliveryPdf";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { showApiErrorToast } from "../../utils/apiErrors";
+import { canManageExams } from "../../utils/permissions";
+import { useAuth } from "../../contexts/AuthContext";
 import type {
   ExamListItem,
   ExamPreviewPlayerQuestion,
@@ -86,6 +88,8 @@ function fmtRespondedPct(value: number | null | undefined) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExamsScreen({ navigate }: ExamsScreenProps) {
+  const { user } = useAuth();
+  const allowManageExams = canManageExams(user?.role);
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const examStatuses = useExamStatuses();
   const examTypes = useExamTypes();
@@ -266,16 +270,18 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             Crie e gerencie simulados com questões objetivas e discursivas
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={() => navigate("simulados-form", { examId: null })}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">
-            Novo Simulado
-          </Text>
-        </TouchableOpacity>
+        {allowManageExams && (
+          <TouchableOpacity
+            onPress={() => navigate("simulados-form", { examId: null })}
+            className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <Text className="text-white font-semibold text-sm ml-1.5">
+              Novo Simulado
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Cards de resumo de tentativas */}
@@ -535,6 +541,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         exam={menuExam}
         onClose={() => setMenuExam(null)}
         onSelect={handleExamAction}
+        canManage={allowManageExams}
       />
 
       <ExamDeliveryReportsModal

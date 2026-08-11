@@ -78,6 +78,7 @@ export default function Sidebar({
   onSelectItem,
   canManageTenants = false,
   canManageUsers = false,
+  canManageExams = false,
   canSendNotifications = false,
   isMobile = false,
   onClose,
@@ -114,7 +115,9 @@ export default function Sidebar({
         { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
         { id: "turmas", label: "Turmas", icon: "grid-outline" },
         { id: "cursos", label: "Cursos", icon: "book-outline" },
-        { id: "simulados", label: "Simulados", icon: "document-text-outline" },
+        ...(canManageExams
+          ? [{ id: "simulados", label: "Simulados", icon: "document-text-outline" as const }]
+          : []),
         { id: "avaliacoes-oficiais", label: "Avaliações presenciais", icon: "clipboard-outline" },
         { id: "provas-anteriores", label: "Provas/Materiais", icon: "archive-outline" },
         { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
