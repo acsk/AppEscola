@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Modal as RNModal,
   Platform,
@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   ViewStyle,
 } from "react-native";
+import { createPortal } from "react-dom";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -67,6 +68,17 @@ export default function Modal({
   const bodyMaxHeight = Math.max(160, panelMaxHeight - headerBlockHeight - footerBlockHeight);
   const horizontalInset = compact ? (isMobile ? 14 : 18) : isMobile ? 16 : 24;
   const bodyPaddingY = compact ? 10 : 16;
+
+  // Evita scroll do body/layout enquanto o modal cobre a tela no web.
+  useEffect(() => {
+    if (!isWeb || !visible || typeof document === "undefined") return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isWeb, visible]);
 
   if (!visible) return null;
 
@@ -160,17 +172,26 @@ export default function Modal({
   );
 
   if (isWeb) {
-    return (
+    // Portal no body: position:fixed dentro de overflow/transform do layout
+    // (sidebar + ScrollView) fica preso e cortado no container.
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
       <View
         style={{
           position: "fixed",
-          inset: 0,
-          zIndex: 1000,
-          overflow: "hidden",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 10000,
+          width: "100vw",
+          height: "100vh",
         }}
       >
         {content}
-      </View>
+      </View>,
+      document.body
     );
   }
 

@@ -20,86 +20,136 @@ function fmtPct(value: number | null | undefined): string {
   return `${value.toFixed(1)}%`;
 }
 
+const TABLE_HEAD = {
+  fillColor: [243, 244, 246] as [number, number, number],
+  textColor: [55, 65, 81] as [number, number, number],
+  fontStyle: "bold" as const,
+};
+
+const SUMMARY_HEAD = {
+  fillColor: [249, 250, 251] as [number, number, number],
+  textColor: [55, 65, 81] as [number, number, number],
+  fontStyle: "bold" as const,
+};
+
 export async function exportExamQuestionErrorsPdf(
-  report: ExamQuestionErrorsReport
+  report: ExamQuestionErrorsReport,
 ): Promise<void> {
-  if (Platform.OS !== "web") {
-    Alert.alert(
-      "Indisponível",
-      "A exportação em PDF deste relatório está disponível na versão web do painel."
-    );
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    Alert.alert("Exportação disponível apenas na versão web.");
     return;
   }
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const margin = 14;
-  let y = 16;
+  let cursorY = 14;
 
   doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.text("Relatório — questões com mais erros", margin, y);
-  y += 7;
+  doc.setTextColor(17, 24, 39);
+  doc.text("Relatório — questões com mais erros", 14, cursorY);
+  cursorY += 6;
 
   doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(report.exam.title || "Simulado", margin, y);
-  y += 5;
+  doc.setTextColor(107, 114, 128);
+  doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, cursorY);
+  cursorY += 5;
 
-  const courses = report.exam.courses?.length ? report.exam.courses.join(", ") : "—";
-  const subject = report.exam.subject?.name ?? "—";
-  doc.setFontSize(9);
-  doc.setTextColor(80);
-  doc.text(`Cursos: ${courses}  ·  Disciplina: ${subject}`, margin, y);
-  y += 5;
-  doc.text(
-    `Alunos com resultado: ${report.summary.graded_students_count}  ·  Questões com erro: ${report.summary.questions_with_errors}/${report.summary.total_questions}  ·  Taxa média de erro: ${fmtPct(report.summary.avg_error_rate)}`,
-    margin,
-    y
-  );
-  y += 4;
-  doc.setTextColor(100);
-  doc.text(
-    "Base: melhor tentativa concluída por aluno. Apenas respostas já corrigidas entram no cálculo.",
-    margin,
-    y
-  );
-  y += 6;
-  doc.setTextColor(0);
-
-  const rows = report.questions.map((q, idx) => [
-    String(idx + 1),
-    String(q.order),
-    q.question_text_preview || "—",
-    q.subject || "—",
-    String(q.wrong_count),
-    String(q.correct_count),
-    String(q.total_answers),
-    fmtPct(q.error_rate),
-    fmtPct(q.hit_rate),
-  ]);
+  const exam = report.exam;
+  const coursesLabel = exam.courses?.length ? exam.courses.join(", ") : "—";
+  const summary = report.summary;
 
   autoTable(doc, {
-    startY: y,
-    head: [["#", "Ord.", "Enunciado", "Disciplina", "Erros", "Acertos", "Resp.", "% Erro", "% Acerto"]],
-    body: rows.length
-      ? rows
-      : [["—", "—", "Nenhuma questão neste simulado", "—", "—", "—", "—", "—", "—"]],
+    startY: cursorY,
+    head: [[
+      "Simulado",
+      "Tipo",
+      "Status",
+      "Curso(s)",
+      "Matéria",
+      "Alunos c/ resultado",
+      "Questões",
+      "Com erro",
+    ]],
+    body: [[
+      exam.title,
+      exam.exam_type_label ?? exam.exam_type ?? "—",
+      exam.status_label ?? exam.status ?? "—",
+      coursesLabel,
+      exam.subject?.name ?? "—",
+      String(summary.graded_students_count),
+      String(summary.total_questions),
+      String(summary.questions_with_errors),
+    ]],
+    theme: "grid",
     styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [124, 58, 237], textColor: 255 },
+    headStyles: SUMMARY_HEAD,
+    bodyStyles: { textColor: [17, 24, 39], fontStyle: "bold" },
+    margin: { left: 14, right: 14 },
+  });
+
+  cursorY = (doc as any).lastAutoTable.finalY + 3;
+
+  autoTable(doc, {
+    startY: cursorY,
+    head: [["Taxa média de erro", "Taxa média de acerto", "Questões respondidas", "Critério"]],
+    body: [[
+      fmtPct(summary.avg_error_rate),
+      fmtPct(summary.avg_hit_rate),
+      String(summary.questions_with_answers),
+      "Melhor tentativa concluída por aluno",
+    ]],
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: SUMMARY_HEAD,
+    bodyStyles: { textColor: [17, 24, 39] },
+    margin: { left: 14, right: 14 },
+  });
+
+  cursorY = (doc as any).lastAutoTable.finalY + 4;
+
+  autoTable(doc, {
+    startY: cursorY,
+    head: [["Questões ordenadas por maior taxa de erro", "", "", "", "", "", "", ""]],
+    body: [],
+    theme: "plain",
+    styles: { fontSize: 9, cellPadding: 1 },
+    headStyles: TABLE_HEAD,
+    margin: { left: 14, right: 14 },
+  });
+
+  cursorY = (doc as any).lastAutoTable.finalY + 1;
+
+  const questions = report.questions;
+  autoTable(doc, {
+    startY: cursorY,
+    head: [["#", "Ord.", "Enunciado", "Disciplina", "Erros", "Acertos", "Resp.", "% Erro", "% Acerto"]],
+    body: questions.length > 0
+      ? questions.map((q, index) => [
+          String(index + 1),
+          String(q.order),
+          q.question_text_preview || "—",
+          q.subject || "—",
+          String(q.wrong_count),
+          String(q.correct_count),
+          String(q.total_answers),
+          fmtPct(q.error_rate),
+          fmtPct(q.hit_rate),
+        ])
+      : [["—", "—", "Nenhuma questão neste simulado", "—", "", "", "", "", ""]],
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: TABLE_HEAD,
     columnStyles: {
       0: { cellWidth: 10 },
       1: { cellWidth: 12 },
       2: { cellWidth: 90 },
-      3: { cellWidth: 32 },
-      4: { cellWidth: 16, halign: "right" },
-      5: { cellWidth: 18, halign: "right" },
-      6: { cellWidth: 16, halign: "right" },
-      7: { cellWidth: 18, halign: "right" },
-      8: { cellWidth: 20, halign: "right" },
+      4: { halign: "right" },
+      5: { halign: "right" },
+      6: { halign: "right" },
+      7: { halign: "right" },
+      8: { halign: "right" },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: 14, right: 14 },
   });
 
-  const filename = `questoes-mais-erros-${safeTitleSlug(report.exam.title)}-${report.exam.id}.pdf`;
-  doc.save(filename);
+  doc.save(`questoes-mais-erros-${safeTitleSlug(exam.title)}.pdf`);
 }

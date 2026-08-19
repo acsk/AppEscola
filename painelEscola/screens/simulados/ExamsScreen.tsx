@@ -264,6 +264,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
   };
 
   return (
+    <View className="flex-1">
     <ScrollView
       className="flex-1"
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
@@ -542,6 +543,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           {meta.total} simulado{meta.total !== 1 ? "s" : ""} encontrado{meta.total !== 1 ? "s" : ""}
         </Text>
       )}
+    </ScrollView>
 
       <ExamActionsModal
         visible={!!menuExam}
@@ -676,6 +678,6 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           />
         )}
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
