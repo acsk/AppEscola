@@ -311,6 +311,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::apiResource('exams', ExamController::class);
     Route::get('exams/{exam}/stats',           [ExamController::class, 'stats']);
     Route::get('exams/{exam}/delivery-report', [ExamController::class, 'deliveryReport']);
+    Route::get('exams/{exam}/question-errors-report', [ExamController::class, 'questionErrorsReport']);
 
     // Domínios de simulados (lookup tables)
     Route::get('exam-statuses', fn () => response()->json(\App\Models\ExamStatus::orderBy('order')->get(['id', 'slug', 'label'])));

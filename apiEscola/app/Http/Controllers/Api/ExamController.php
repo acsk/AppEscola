@@ -13,6 +13,7 @@ use App\Services\ExamTypeService;
 use App\Services\ExamAttemptIntegrityService;
 use App\Services\ExamAccessService;
 use App\Services\ExamCourseService;
+use App\Services\ExamQuestionErrorsReportService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class ExamController extends Controller
         private readonly ExamCourseService $examCourseService,
         private readonly ExamTypeService $examTypeService,
         private readonly ExamDeliveryReportService $deliveryReportService,
+        private readonly ExamQuestionErrorsReportService $questionErrorsReportService,
         private readonly ExamAccessService $examAccess,
     ) {
     }
@@ -138,6 +140,18 @@ class ExamController extends Controller
         return $this->success(
             $this->deliveryReportService->build($exam),
             'Relatório de entregas do simulado.'
+        );
+    }
+
+    /** Relatório de questões com mais erros (melhor tentativa concluída por aluno). */
+    public function questionErrorsReport(Request $request, Exam $exam): JsonResponse
+    {
+        $this->examAccess->assertCanManageExams($request->user());
+        $this->authorizeTenant($request, $exam->tenant_id);
+
+        return $this->success(
+            $this->questionErrorsReportService->build($exam, $this->getTenantId($request)),
+            'Relatório de questões com mais erros.'
         );
     }
 

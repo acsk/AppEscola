@@ -10,6 +10,7 @@ export type ExamActionKey =
   | "preview"
   | "edit"
   | "open_delivery_reports"
+  | "open_question_errors_report"
   | "delete";
 
 type ActionDef = {
@@ -82,6 +83,14 @@ export default function ExamActionsModal({
       description: "Quem entregou, pendentes e resultados",
       icon: "document-attach-outline",
       tone: "emerald",
+      group: "main",
+    },
+    {
+      key: "open_question_errors_report",
+      label: "Questões com mais erros",
+      description: "Ranking das questões com maior taxa de erro",
+      icon: "analytics-outline",
+      tone: "violet",
       group: "main",
     },
     ...(canManage

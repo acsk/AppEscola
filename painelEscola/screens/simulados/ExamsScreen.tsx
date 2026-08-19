@@ -36,6 +36,7 @@ import ExamActionsModal, {
   ExamDeliveryReportsModal,
   type ExamActionKey,
 } from "../../components/simulados/ExamActionsModal";
+import ExamQuestionErrorsReportModal from "../../components/simulados/ExamQuestionErrorsReportModal";
 import { mapApiPreviewQuestion } from "../../components/simulados/examPreviewUtils";
 import { fetchExamDeliveryReport } from "../../services/examDeliveryReport";
 import {
@@ -111,6 +112,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
   const [deleting, setDeleting] = useState(false);
   const [menuExam, setMenuExam] = useState<ExamListItem | null>(null);
   const [reportsExam, setReportsExam] = useState<ExamListItem | null>(null);
+  const [errorsReportExam, setErrorsReportExam] = useState<ExamListItem | null>(null);
   const [exportingPdfKind, setExportingPdfKind] = useState<ExamDeliveryPdfKind | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
@@ -215,6 +217,11 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     }
     if (action === "open_delivery_reports") {
       setReportsExam(exam);
+      setMenuExam(null);
+      return;
+    }
+    if (action === "open_question_errors_report") {
+      setErrorsReportExam(exam);
       setMenuExam(null);
       return;
     }
@@ -542,6 +549,14 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         onClose={() => setMenuExam(null)}
         onSelect={handleExamAction}
         canManage={allowManageExams}
+      />
+
+      <ExamQuestionErrorsReportModal
+        visible={!!errorsReportExam}
+        examId={errorsReportExam?.id ?? null}
+        examTitle={errorsReportExam?.title}
+        onClose={() => setErrorsReportExam(null)}
+        setToast={setToast}
       />
 
       <ExamDeliveryReportsModal

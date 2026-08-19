@@ -8,6 +8,7 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 
 | Data | O que mudou |
 |---|---|
+| 2026-08-19 | Relatório `GET /api/exams/{exam}/question-errors-report`: questões com mais erros (melhor tentativa concluída por aluno) |
 | 2026-08-11 | Gestão de simulados (CRUD) exige papel staff: `super_admin`, `admin`, `secretaria`, `professor` |
 | 2026-05-10 | Endpoint `GET /api/aluno/exams` passou a retornar `nota`, `score_display` e `aproveitamento` da tentativa mais recente (quando visível) |
 | 2026-05-04 | Status `pending_review`: resultado bloqueado até correção manual de questões discursivas/`allow_text_answer` |
@@ -293,6 +294,63 @@ Ranking dos alunos por percentual de acerto.
   ]
 }
 ```
+
+---
+
+#### `GET /api/exams/{exam}/question-errors-report`
+Relatório das questões com mais erros no simulado.
+
+**Papéis:** staff (`super_admin`, `admin`, `secretaria`, `professor`).
+
+**Critério:** melhor tentativa `completed` por aluno (mesmo critério do ranking). Só entram respostas com `is_correct` preenchido.
+
+**Resposta `200` (envelope `type` / `message` / `body`):**
+```json
+{
+  "type": "success",
+  "message": "Relatório de questões com mais erros.",
+  "body": {
+    "exam": {
+      "id": 1,
+      "title": "Simulado ENEM – Matemática",
+      "exam_type": "enem",
+      "exam_type_label": "ENEM",
+      "status": "published",
+      "status_label": "Publicado",
+      "courses": ["ENEM"],
+      "subject": { "id": 5, "name": "Matemática" }
+    },
+    "summary": {
+      "attempt_scope": "best_completed_per_student",
+      "graded_students_count": 30,
+      "total_questions": 10,
+      "questions_with_answers": 10,
+      "questions_with_errors": 7,
+      "avg_error_rate": 42.5,
+      "avg_hit_rate": 57.5
+    },
+    "questions": [
+      {
+        "question_id": 12,
+        "order": 3,
+        "type": "multiple_choice",
+        "question_text": "Qual é a raiz…",
+        "question_text_preview": "Qual é a raiz…",
+        "image_url": null,
+        "subject": "Matemática",
+        "points": 1.0,
+        "correct_count": 8,
+        "wrong_count": 22,
+        "total_answers": 30,
+        "hit_rate": 26.7,
+        "error_rate": 73.3
+      }
+    ]
+  }
+}
+```
+
+`questions` vem ordenado por `error_rate` descendente (questões sem respostas corrigidas ficam no fim).
 
 ---
 

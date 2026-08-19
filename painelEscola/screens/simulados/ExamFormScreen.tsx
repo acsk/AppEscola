@@ -32,6 +32,7 @@ import {
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
+import ExamQuestionErrorsReportModal from "../../components/simulados/ExamQuestionErrorsReportModal";
 import { mapExamQuestionToPreview } from "../../components/simulados/examPreviewUtils";
 import type {
   ExamForm,
@@ -258,6 +259,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     type: "success",
     message: "",
   });
+  const [errorsReportOpen, setErrorsReportOpen] = useState(false);
 
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
@@ -890,10 +892,22 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           </View>
         </View>
         {canManageContent && (
-          <Badge
-            label={examStatuses.find((s) => s.slug === form.status)?.label ?? form.status}
-            slug={form.status}
-          />
+          <View className="flex-row items-center gap-2 flex-wrap justify-end">
+            <TouchableOpacity
+              onPress={() => setErrorsReportOpen(true)}
+              className="flex-row items-center bg-white border border-violet-200 px-3 py-2 rounded-xl"
+              activeOpacity={0.85}
+            >
+              <Ionicons name="analytics-outline" size={16} color="#7C3AED" />
+              <Text className="text-violet-700 font-semibold text-xs ml-1.5">
+                Questões com mais erros
+              </Text>
+            </TouchableOpacity>
+            <Badge
+              label={examStatuses.find((s) => s.slug === form.status)?.label ?? form.status}
+              slug={form.status}
+            />
+          </View>
         )}
       </View>
 
@@ -2131,6 +2145,14 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       />
 
     </ScrollView>
+
+      <ExamQuestionErrorsReportModal
+        visible={errorsReportOpen}
+        examId={effectiveExamId}
+        examTitle={form.title}
+        onClose={() => setErrorsReportOpen(false)}
+        setToast={setToast}
+      />
 
       <ToastBanner
         visible={toast.visible}
