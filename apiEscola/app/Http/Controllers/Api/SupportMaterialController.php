@@ -34,8 +34,7 @@ class SupportMaterialController extends Controller
     )]
     public function index(Request $request, Exam $exam): AnonymousResourceCollection
     {
-        app(ExamAccessService::class)->assertCanManageExams($request->user());
-        $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanViewSupportMaterials($request, $exam);
 
         $materials = $exam->supportMaterials()
             ->orderBy('created_at', 'desc')
@@ -98,8 +97,7 @@ class SupportMaterialController extends Controller
     )]
     public function show(Request $request, Exam $exam, SupportMaterial $material): SupportMaterialResource
     {
-        app(ExamAccessService::class)->assertCanManageExams($request->user());
-        $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanViewSupportMaterials($request, $exam);
 
         if ($material->exam_id !== $exam->id) {
             abort(404);

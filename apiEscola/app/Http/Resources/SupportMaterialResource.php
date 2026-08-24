@@ -15,7 +15,7 @@ class SupportMaterialResource extends JsonResource
             'title'       => $this->title,
             'description' => $this->description,
             'type'        => $this->type,
-            'content'     => $this->content,
+            'content'     => $this->normalizeContentUrl($this->content),
             'file_type'   => $this->file_type,
             'file_size'   => $this->file_size,
             'created_by'  => $this->created_by,
@@ -23,5 +23,26 @@ class SupportMaterialResource extends JsonResource
             'created_at'  => $this->created_at?->toISOString(),
             'updated_at'  => $this->updated_at?->toISOString(),
         ];
+    }
+
+    private function normalizeContentUrl(?string $url): ?string
+    {
+        if ($url === null || trim($url) === '') {
+            return $url;
+        }
+
+        $value = trim($url);
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
+        }
+
+        $normalized = ltrim($value, '/');
+
+        if (str_starts_with($normalized, 'storage/')) {
+            return asset($normalized);
+        }
+
+        return asset('storage/'.$normalized);
     }
 }

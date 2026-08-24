@@ -95,6 +95,21 @@ export interface Question {
   subject: { id: number; name: string } | null;
 }
 
+export type SupportMaterialType = 'link' | 'file';
+export type SupportMaterialFileType = 'pdf' | 'image' | 'video' | 'document' | null;
+
+export interface SupportMaterial {
+  id: number;
+  exam_id: number;
+  title: string;
+  description: string | null;
+  type: SupportMaterialType;
+  content: string;
+  file_type: SupportMaterialFileType;
+  file_size: number | null;
+  created_at: string;
+}
+
 export interface SimuladoDetail {
   id: number;
   title: string;
@@ -125,6 +140,7 @@ export interface SimuladoDetail {
   questions: Question[];
   subject: SimuladoSubject | null;
   course: { id: number; name: string } | null;
+  support_materials?: SupportMaterial[];
 }
 
 export interface AttemptStart {
@@ -410,21 +426,6 @@ export async function listarTentativas(status?: string): Promise<AttemptHistoryI
 }
 
 // ── Materiais de Apoio ────────────────────────────────────────────────────────
-
-export type SupportMaterialType = 'link' | 'file';
-export type SupportMaterialFileType = 'pdf' | 'image' | 'video' | 'document' | null;
-
-export interface SupportMaterial {
-  id: number;
-  exam_id: number;
-  title: string;
-  description: string | null;
-  type: SupportMaterialType;
-  content: string;
-  file_type: SupportMaterialFileType;
-  file_size: number | null;
-  created_at: string;
-}
 
 export async function listarMateriaisApoio(examId: number): Promise<SupportMaterial[]> {
   const { data } = await api.get<any>(`/api/exams/${examId}/support-materials`);

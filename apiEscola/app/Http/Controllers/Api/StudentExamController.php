@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ExamAttemptResource;
 use App\Http\Resources\ExamResource;
+use App\Http\Resources\SupportMaterialResource;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Student;
@@ -206,7 +207,16 @@ class StudentExamController extends Controller
             return $this->forbidden('Você não possui matrícula ativa neste curso.');
         }
 
-        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject']);
+        $exam->load([
+            'course',
+            'courses',
+            'subject',
+            'examStatus',
+            'examType',
+            'questions.options',
+            'questions.subject',
+            'supportMaterials',
+        ]);
 
         $attempt = ExamAttempt::with(['attemptStatus', 'exam:id,release_results_after_end,ends_at'])
             ->where('exam_id', $exam->id)
@@ -232,6 +242,9 @@ class StudentExamController extends Controller
             ? $attempt->remainingSeconds()
             : null;
         $resource = array_merge($resource, $this->periodMeta($exam));
+        $resource['support_materials'] = SupportMaterialResource::collection(
+            $exam->supportMaterials->sortByDesc('created_at')->values()
+        )->resolve($request);
 
         // Injetar student_answer em cada questão
         if (! empty($resource['questions'])) {

@@ -283,7 +283,20 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
     refetch: refetchDetalhe,
   } = useSimuladoDetail(examId);
 
-  const { data: materiais = [], isLoading: carregandoMateriais } = useSimuladoMateriais(examId);
+  const { data: materiaisLista = [], isLoading: carregandoMateriaisLista } = useSimuladoMateriais(examId);
+
+  const materiais = useMemo(() => {
+    const fromDetail = detalhe?.support_materials;
+    if (Array.isArray(fromDetail)) {
+      return fromDetail;
+    }
+    return materiaisLista;
+  }, [detalhe?.support_materials, materiaisLista]);
+
+  const carregandoMateriais =
+    !!detalhe &&
+    !Array.isArray(detalhe.support_materials) &&
+    carregandoMateriaisLista;
 
   const precisaRevisao = detalhe != null && needsReview(detalhe);
 

@@ -8,6 +8,7 @@ Permite criar simulados com questões objetivas e/ou discursivas, classificados 
 
 | Data | O que mudou |
 |---|---|
+| 2026-08-24 | Alunos elegíveis podem listar materiais de apoio; `GET /api/aluno/exams/{exam}` inclui `support_materials` |
 | 2026-08-19 | Relatório `GET /api/exams/{exam}/question-errors-report`: questões com mais erros (melhor tentativa concluída por aluno) |
 | 2026-08-11 | Gestão de simulados (CRUD) exige papel staff: `super_admin`, `admin`, `secretaria`, `professor` |
 | 2026-05-10 | Endpoint `GET /api/aluno/exams` passou a retornar `nota`, `score_display` e `aproveitamento` da tentativa mais recente (quando visível) |

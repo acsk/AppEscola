@@ -48,6 +48,40 @@ class ExamAccessService
         }
     }
 
+    /**
+     * Staff gerencia; aluno autenticado e elegível ao simulado publicado pode listar/ver materiais.
+     */
+    public function assertCanViewSupportMaterials(Request $request, Exam $exam): void
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            throw new AccessDeniedHttpException('Não autenticado.');
+        }
+
+        $this->assertTenantMatch($request, $exam->tenant_id);
+
+        if ($this->isStaff($user)) {
+            return;
+        }
+
+        if ($user->role !== 'aluno') {
+            throw new AccessDeniedHttpException('Sem permissão para visualizar materiais de apoio.');
+        }
+
+        $student = $this->resolveActiveStudent($user);
+
+        if (! $student) {
+            throw new AccessDeniedHttpException('Aluno não encontrado ou inativo.');
+        }
+
+        if (! $exam->isPublished()) {
+            throw new AccessDeniedHttpException('Simulado não disponível.');
+        }
+
+        $this->assertActiveEnrollmentForExam($student, $exam);
+    }
+
     public function assertTenantMatch(Request $request, ?int $resourceTenantId): void
     {
         $user = $request->user();
