@@ -3,11 +3,11 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Modal,
   ScrollView,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import OverlayPortal from "./OverlayPortal";
 
 const DEFAULT_MIN_YEAR = 1990;
 
@@ -137,16 +137,7 @@ export default function YearPickerInput({
 
       {error ? <Text className="text-xs text-red-500 mt-1">{error}</Text> : null}
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-        >
+      <OverlayPortal open={open} onClose={() => setOpen(false)} contentPadding={16}>
           <View
             style={{
               width: modalWidth,
@@ -248,8 +239,7 @@ export default function YearPickerInput({
               })}
             </ScrollView>
           </View>
-        </View>
-      </Modal>
+      </OverlayPortal>
     </View>
   );
 }

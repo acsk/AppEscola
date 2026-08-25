@@ -2,12 +2,14 @@ import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Platform,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import OverlayPortal from "./OverlayPortal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -135,6 +137,238 @@ export default function SearchableSelect({
 
   const borderColor = error ? "#EF4444" : "#E5E7EB";
 
+  const closePicker = () => {
+    setOpen(false);
+    setQuery("");
+    setAsyncOptions([]);
+  };
+
+  const pickerContent = (
+      <View
+        style={{
+          width: MODAL_WIDTH,
+          height: MODAL_HEIGHT,
+          maxWidth: "92vw" as unknown as number,
+          backgroundColor: "white",
+          borderRadius: 16,
+          overflow: "hidden",
+          flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 20,
+            paddingVertical: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: "#F3F4F6",
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>
+            {modalTitle}
+          </Text>
+          <TouchableOpacity
+            onPress={closePicker}
+            style={{
+              padding: 4,
+              backgroundColor: "#F3F4F6",
+              borderRadius: 8,
+            }}
+          >
+            <Ionicons name="close" size={18} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Input de busca */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: "#F3F4F6",
+            gap: 8,
+          }}
+        >
+          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          {Platform.OS === "web" ? (
+            <input
+              autoFocus
+              placeholder="Buscar..."
+              value={query}
+              onChange={(e: any) => setQuery(e.target.value)}
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontSize: 14,
+                color: "#374151",
+                backgroundColor: "transparent",
+              }}
+            />
+          ) : (
+            <TextInput
+              autoFocus
+              placeholder="Buscar..."
+              value={query}
+              onChangeText={setQuery}
+              style={{
+                flex: 1,
+                fontSize: 14,
+                color: "#374151",
+                padding: 0,
+              }}
+              placeholderTextColor="#9CA3AF"
+            />
+          )}
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery("")}>
+              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Contador */}
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 6,
+            backgroundColor: "#FAFAFA",
+            borderBottomWidth: 1,
+            borderBottomColor: "#F3F4F6",
+          }}
+        >
+          <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+            {searching
+              ? "Buscando..."
+              : `${filtered.length} opção${filtered.length !== 1 ? "ões" : ""} encontrada${filtered.length !== 1 ? "s" : ""}`}
+          </Text>
+        </View>
+
+        {/* Lista (altura fixa para rolagem) */}
+        <ScrollView
+          style={{ height: LIST_HEIGHT }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator
+          keyboardShouldPersistTaps="handled"
+        >
+          {searching && filtered.length === 0 ? (
+            <View
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 40,
+              }}
+            >
+              <ActivityIndicator size="small" color="#7C3AED" />
+              <Text
+                style={{ fontSize: 13, color: "#9CA3AF", marginTop: 8 }}
+              >
+                Buscando...
+              </Text>
+            </View>
+          ) : filtered.length === 0 ? (
+            <View
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 40,
+              }}
+            >
+              <Ionicons name="search-outline" size={28} color="#E5E7EB" />
+              <Text
+                style={{ fontSize: 13, color: "#9CA3AF", marginTop: 8 }}
+              >
+                Nenhuma opção encontrada
+              </Text>
+            </View>
+          ) : (
+            filtered.map((opt) => {
+              const isSelected = opt.value === value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => handleSelect(opt)}
+                  activeOpacity={0.75}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    backgroundColor: isSelected ? "#F5F3FF" : "transparent",
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#F9FAFB",
+                    borderLeftWidth: 3,
+                    borderLeftColor: isSelected ? "#7C3AED" : "transparent",
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        fontWeight: isSelected ? "600" : "400",
+                        color: isSelected ? "#5B21B6" : "#374151",
+                      }}
+                    >
+                      {opt.label}
+                    </Text>
+                    {opt.sublabel && (
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: isSelected ? "#7C3AED" : "#9CA3AF",
+                          marginTop: 2,
+                        }}
+                      >
+                        {opt.sublabel}
+                      </Text>
+                    )}
+                  </View>
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color="#7C3AED"
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+
+        {/* Footer */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderTopWidth: 1,
+            borderTopColor: "#F3F4F6",
+          }}
+        >
+          <TouchableOpacity
+            onPress={closePicker}
+            style={{
+              paddingHorizontal: 20,
+              paddingVertical: 8,
+              borderRadius: 8,
+              backgroundColor: "#F3F4F6",
+            }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151" }}>
+              Fechar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+  );
+
   return (
     <View style={{ marginBottom: dense ? 8 : 16 }}>
       {/* Label */}
@@ -223,229 +457,10 @@ export default function SearchableSelect({
         </Text>
       )}
 
-      {/* Modal de seleção */}
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => { setOpen(false); setQuery(""); setAsyncOptions([]); }}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <View
-            style={{
-              width: MODAL_WIDTH,
-              height: MODAL_HEIGHT,
-              backgroundColor: "white",
-              borderRadius: 16,
-              overflow: "hidden",
-              flexDirection: "column",
-            }}
-          >
-            {/* Header */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingHorizontal: 20,
-                paddingVertical: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: "#F3F4F6",
-              }}
-            >
-              <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>
-                {modalTitle}
-              </Text>
-              <TouchableOpacity
-                onPress={() => { setOpen(false); setQuery(""); setAsyncOptions([]); }}
-                style={{
-                  padding: 4,
-                  backgroundColor: "#F3F4F6",
-                  borderRadius: 8,
-                }}
-              >
-                <Ionicons name="close" size={18} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Input de busca */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderBottomWidth: 1,
-                borderBottomColor: "#F3F4F6",
-                gap: 8,
-              }}
-            >
-              <Ionicons name="search-outline" size={16} color="#9CA3AF" />
-              <input
-                autoFocus
-                placeholder="Buscar..."
-                value={query}
-                onChange={(e: any) => setQuery(e.target.value)}
-                style={{
-                  flex: 1,
-                  border: "none",
-                  outline: "none",
-                  fontSize: 14,
-                  color: "#374151",
-                  backgroundColor: "transparent",
-                }}
-              />
-              {query.length > 0 && (
-                <TouchableOpacity onPress={() => setQuery("")}>
-                  <Ionicons name="close-circle" size={16} color="#9CA3AF" />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Contador */}
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-                backgroundColor: "#FAFAFA",
-                borderBottomWidth: 1,
-                borderBottomColor: "#F3F4F6",
-              }}
-            >
-              <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
-                {searching
-                  ? "Buscando..."
-                  : `${filtered.length} opção${filtered.length !== 1 ? "ões" : ""} encontrada${filtered.length !== 1 ? "s" : ""}`}
-              </Text>
-            </View>
-
-            {/* Lista (altura fixa para rolagem) */}
-            <ScrollView
-              style={{ height: LIST_HEIGHT }}
-              contentContainerStyle={{ flexGrow: 1 }}
-              showsVerticalScrollIndicator
-              keyboardShouldPersistTaps="handled"
-            >
-              {searching && filtered.length === 0 ? (
-                <View
-                  style={{
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 40,
-                  }}
-                >
-                  <ActivityIndicator size="small" color="#7C3AED" />
-                  <Text
-                    style={{ fontSize: 13, color: "#9CA3AF", marginTop: 8 }}
-                  >
-                    Buscando...
-                  </Text>
-                </View>
-              ) : filtered.length === 0 ? (
-                <View
-                  style={{
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 40,
-                  }}
-                >
-                  <Ionicons name="search-outline" size={28} color="#E5E7EB" />
-                  <Text
-                    style={{ fontSize: 13, color: "#9CA3AF", marginTop: 8 }}
-                  >
-                    Nenhuma opção encontrada
-                  </Text>
-                </View>
-              ) : (
-                filtered.map((opt) => {
-                  const isSelected = opt.value === value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      onPress={() => handleSelect(opt)}
-                      activeOpacity={0.75}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        backgroundColor: isSelected ? "#F5F3FF" : "transparent",
-                        borderBottomWidth: 1,
-                        borderBottomColor: "#F9FAFB",
-                        borderLeftWidth: 3,
-                        borderLeftColor: isSelected ? "#7C3AED" : "transparent",
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{
-                            fontSize: 15,
-                            fontWeight: isSelected ? "600" : "400",
-                            color: isSelected ? "#5B21B6" : "#374151",
-                          }}
-                        >
-                          {opt.label}
-                        </Text>
-                        {opt.sublabel && (
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              color: isSelected ? "#7C3AED" : "#9CA3AF",
-                              marginTop: 2,
-                            }}
-                          >
-                            {opt.sublabel}
-                          </Text>
-                        )}
-                      </View>
-                      {isSelected && (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={18}
-                          color="#7C3AED"
-                        />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
-
-            {/* Footer */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderTopWidth: 1,
-                borderTopColor: "#F3F4F6",
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => { setOpen(false); setQuery(""); setAsyncOptions([]); }}
-                style={{
-                  paddingHorizontal: 20,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  backgroundColor: "#F3F4F6",
-                }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151" }}>
-                  Fechar
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Modal de seleção — no web porta para body (acima do Modal do formulário) */}
+      <OverlayPortal open={open} onClose={closePicker}>
+        {pickerContent}
+      </OverlayPortal>
     </View>
   );
 }

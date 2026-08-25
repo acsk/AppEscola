@@ -4,11 +4,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Modal,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Calendar from "./Calendar";
+import OverlayPortal from "./OverlayPortal";
 import { maskDate, displayToISO } from "../../utils/masks";
 import { parseDisplayDate, parseIsoDate } from "../../utils/calendar";
 
@@ -122,16 +122,7 @@ export default function DatePickerInput({
 
       {error ? <Text className="text-xs text-red-500 mt-1">{error}</Text> : null}
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-        >
+      <OverlayPortal open={open} onClose={() => setOpen(false)} contentPadding={16}>
             <View
               style={{
                 width: modalWidth,
@@ -174,8 +165,7 @@ export default function DatePickerInput({
                 />
               </View>
             </View>
-        </View>
-      </Modal>
+      </OverlayPortal>
     </View>
   );
 }
