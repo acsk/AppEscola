@@ -148,7 +148,7 @@ export function readTenantLetterheadFromStorage(): TenantLetterhead | null {
 }
 
 async function fetchTenantLetterhead(tenantId: number): Promise<TenantLetterhead | null> {
-  const cacheKey = `pdf_tenant_letterhead_v2_${tenantId}`;
+  const cacheKey = `pdf_tenant_letterhead_v3_${tenantId}`;
   if (typeof sessionStorage !== "undefined") {
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
@@ -162,9 +162,11 @@ async function fetchTenantLetterhead(tenantId: number): Promise<TenantLetterhead
 
   try {
     const { data } = await api.get(`/tenants/${tenantId}`);
+    // Compatível com envelope {body}, Laravel {data} e payload cru
     const body =
       getApiResponseBody<AuthTenantPayload>(data) ??
       (data as { data?: AuthTenantPayload })?.data ??
+      (data as { body?: AuthTenantPayload })?.body ??
       (data as AuthTenantPayload);
     if (
       !body ||
@@ -240,6 +242,26 @@ async function blobToPngDataUrl(blob: Blob): Promise<string | null> {
 }
 
 export async function imageUrlToDataUrl(url: string): Promise<string | null> {
+  const absolute = resolveAbsoluteAssetUrl(url) ?? url.trim();
+  if (!absolute) return null;
+
+  // Preferência: proxy autenticado /api/media/storage/{path} (evita CORS do /storage).
+  const storagePath = extractPublicStoragePath(absolute);
+  if (storagePath) {
+    try {
+      const { data } = await api.get(`/media/storage/${storagePath}`, {
+        responseType: "blob",
+        headers: { Accept: "*/*" },
+      });
+      if (data instanceof Blob && data.size > 0) {
+        const png = await blobToPngDataUrl(data);
+        if (png) return png;
+      }
+    } catch {
+      // tenta fetch direto abaixo
+    }
+  }
+
   const token =
     typeof localStorage !== "undefined"
       ? localStorage.getItem("auth_token")
@@ -247,7 +269,7 @@ export async function imageUrlToDataUrl(url: string): Promise<string | null> {
 
   const tryFetch = async (withAuth: boolean): Promise<Blob | null> => {
     try {
-      const res = await fetch(url, {
+      const res = await fetch(absolute, {
         method: "GET",
         cache: "no-cache",
         mode: "cors",
@@ -263,12 +285,35 @@ export async function imageUrlToDataUrl(url: string): Promise<string | null> {
 
   try {
     const blob =
-      (await tryFetch(true)) ?? (token ? await tryFetch(false) : null);
-    if (!blob) return null;
+      (await tryFetch(false)) ?? (token ? await tryFetch(true) : null);
+    if (!blob || blob.size <= 0) return null;
     return await blobToPngDataUrl(blob);
   } catch {
     return null;
   }
+}
+
+/** Extrai path relativo após `/storage/` para o proxy autenticado. */
+function extractPublicStoragePath(url: string): string | null {
+  const trimmed = String(url ?? "").trim();
+  if (!trimmed) return null;
+
+  try {
+    const base = String(api.defaults.baseURL ?? "http://localhost");
+    const parsed = new URL(trimmed, base);
+    const marker = "/storage/";
+    const idx = parsed.pathname.indexOf(marker);
+    if (idx >= 0) {
+      const path = decodeURIComponent(parsed.pathname.slice(idx + marker.length));
+      return path.replace(/^\/+/, "") || null;
+    }
+  } catch {
+    // segue regex
+  }
+
+  const match = trimmed.match(/\/storage\/(.+?)(?:\?|#|$)/i);
+  if (!match?.[1]) return null;
+  return decodeURIComponent(match[1]).replace(/^\/+/, "") || null;
 }
 
 /**
