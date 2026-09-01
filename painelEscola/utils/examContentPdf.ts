@@ -78,15 +78,15 @@ export async function exportExamContentPdf(
     showGeneratedAt: false,
   });
 
-  // Título da prova
+  // Título compacto
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
   const titleLines = doc.splitTextToSize(meta.title || "Simulado", contentWidth);
   doc.text(titleLines, marginLeft, cursorY);
-  cursorY += titleLines.length * 6 + 2;
+  cursorY += titleLines.length * 4.2 + 1.5;
 
-  // Metadados compactos (como cabeçalho de prova)
+  // Metadados em uma linha compacta
   const metaParts = [
     meta.courses?.length ? `Curso: ${meta.courses.join(", ")}` : null,
     meta.subject ? `Disciplina: ${meta.subject}` : null,
@@ -99,44 +99,26 @@ export async function exportExamContentPdf(
   ].filter(Boolean) as string[];
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.setTextColor(51, 65, 85);
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
   const metaText = metaParts.join("  ·  ");
   const metaLines = doc.splitTextToSize(metaText, contentWidth);
   doc.text(metaLines, marginLeft, cursorY);
-  cursorY += metaLines.length * 4.2 + 2;
+  cursorY += metaLines.length * 3.4 + 1;
 
   if (meta.description?.trim()) {
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
     const descLines = doc.splitTextToSize(meta.description.trim(), contentWidth);
     doc.text(descLines, marginLeft, cursorY);
-    cursorY += descLines.length * 4 + 2;
+    cursorY += descLines.length * 3.4 + 1;
   }
 
-  // Campos do aluno
-  cursorY = ensureSpace(doc, cursorY, 22, marginBottom);
-  doc.setDrawColor(203, 213, 225);
+  // Separação antes das questões
+  doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.4);
-  doc.roundedRect(marginLeft, cursorY, contentWidth, 18, 2, 2, "S");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.setTextColor(31, 41, 55);
-  doc.text("Aluno(a):", marginLeft + 3, cursorY + 7);
-  doc.setDrawColor(71, 85, 105);
-  doc.line(marginLeft + 22, cursorY + 7.5, marginLeft + contentWidth * 0.62, cursorY + 7.5);
-
-  doc.text("Data:", marginLeft + contentWidth * 0.66, cursorY + 7);
-  doc.line(marginLeft + contentWidth * 0.66 + 12, cursorY + 7.5, marginLeft + contentWidth - 3, cursorY + 7.5);
-
-  doc.text("Turma:", marginLeft + 3, cursorY + 14);
-  doc.line(marginLeft + 18, cursorY + 14.5, marginLeft + contentWidth * 0.62, cursorY + 14.5);
-
-  doc.text("Nota:", marginLeft + contentWidth * 0.66, cursorY + 14);
-  doc.line(marginLeft + contentWidth * 0.66 + 12, cursorY + 14.5, marginLeft + contentWidth - 3, cursorY + 14.5);
-
-  cursorY += 24;
+  doc.line(marginLeft, cursorY, pageWidth - marginRight, cursorY);
+  cursorY += 5;
 
   // Questões
   for (let index = 0; index < sorted.length; index += 1) {

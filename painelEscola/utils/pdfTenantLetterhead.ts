@@ -2,9 +2,29 @@ import type { jsPDF } from "jspdf";
 import api from "../services/api";
 import { getApiResponseBody } from "./apiErrors";
 
+function resolveAbsoluteAssetUrl(value?: string | null): string | null {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+
+  if (/^(data:|blob:|https?:\/\/)/i.test(trimmed)) return trimmed;
+
+  if (trimmed.startsWith("//")) {
+    if (typeof window !== "undefined") {
+      return `${window.location.protocol}${trimmed}`;
+    }
+    return `https:${trimmed}`;
+  }
+
+  const apiBase = String(api.defaults.baseURL ?? "").replace(/\/api\/?$/, "");
+  const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return apiBase ? `${apiBase}${normalizedPath}` : normalizedPath;
+}
+
 export type TenantLetterhead = {
-  /** Razão social (preferencial) ou nome fantasia */
-  corporateName: string;
+  /** Nome de exibição (prioridade: nome fantasia) */
+  displayName: string;
+  /** Razão social (quando diferente do display) */
+  corporateName: string | null;
   tradeName: string | null;
   cnpj: string | null;
   email: string | null;
@@ -21,15 +41,17 @@ type AuthTenantPayload = {
   email?: string;
   phone?: string;
   whatsapp?: string;
-  address?: string | {
-    zip_code?: string | null;
-    street?: string | null;
-    number?: string | null;
-    complement?: string | null;
-    neighborhood?: string | null;
-    city?: string | null;
-    state?: string | null;
-  };
+  address?:
+    | string
+    | {
+        zip_code?: string | null;
+        street?: string | null;
+        number?: string | null;
+        complement?: string | null;
+        neighborhood?: string | null;
+        city?: string | null;
+        state?: string | null;
+      };
   photo_url?: string;
 };
 
@@ -56,13 +78,20 @@ function formatTenantAddress(address: AuthTenantPayload["address"]): string | nu
 }
 
 function mapTenantToLetterhead(tenant: AuthTenantPayload): TenantLetterhead {
-  const corporateName = String(
-    tenant.corporate_name || tenant.name || tenant.trade_name || "Escola"
-  ).trim();
+  const tradeName = tenant.trade_name ? String(tenant.trade_name).trim() : "";
+  const corporateName = tenant.corporate_name
+    ? String(tenant.corporate_name).trim()
+    : "";
+  const fallbackName = tenant.name ? String(tenant.name).trim() : "";
+
+  // Prioridade: Nome Fantasia → name → Razão Social
+  const displayName = tradeName || fallbackName || corporateName || "Escola";
 
   return {
-    corporateName: corporateName || "Escola",
-    tradeName: tenant.trade_name ? String(tenant.trade_name) : null,
+    displayName,
+    corporateName:
+      corporateName && corporateName !== displayName ? corporateName : null,
+    tradeName: tradeName || null,
     cnpj: tenant.cnpj ? String(tenant.cnpj) : null,
     email: tenant.email ? String(tenant.email) : null,
     phone: tenant.phone
@@ -71,7 +100,7 @@ function mapTenantToLetterhead(tenant: AuthTenantPayload): TenantLetterhead {
         ? String(tenant.whatsapp)
         : null,
     address: formatTenantAddress(tenant.address),
-    logoUrl: tenant.photo_url ? String(tenant.photo_url) : null,
+    logoUrl: resolveAbsoluteAssetUrl(tenant.photo_url),
   };
 }
 
@@ -119,7 +148,7 @@ export function readTenantLetterheadFromStorage(): TenantLetterhead | null {
 }
 
 async function fetchTenantLetterhead(tenantId: number): Promise<TenantLetterhead | null> {
-  const cacheKey = `pdf_tenant_letterhead_${tenantId}`;
+  const cacheKey = `pdf_tenant_letterhead_v2_${tenantId}`;
   if (typeof sessionStorage !== "undefined") {
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
@@ -137,7 +166,11 @@ async function fetchTenantLetterhead(tenantId: number): Promise<TenantLetterhead
       getApiResponseBody<AuthTenantPayload>(data) ??
       (data as { data?: AuthTenantPayload })?.data ??
       (data as AuthTenantPayload);
-    if (!body || typeof body !== "object" || (!("name" in body) && !("corporate_name" in body))) {
+    if (
+      !body ||
+      typeof body !== "object" ||
+      (!("name" in body) && !("corporate_name" in body) && !("trade_name" in body))
+    ) {
       return null;
     }
     const letterhead = mapTenantToLetterhead(body);
@@ -150,53 +183,96 @@ async function fetchTenantLetterhead(tenantId: number): Promise<TenantLetterhead
   }
 }
 
-/** Resolve timbrado: tenant do usuário ou tenant selecionado (super_admin). */
+/** Resolve timbrado: prioriza tenant selecionado (completo, com logo). */
 export async function resolveTenantLetterhead(): Promise<TenantLetterhead | null> {
-  const fromAuth = readTenantLetterheadFromStorage();
-  if (fromAuth) return fromAuth;
-
   const tenantId = resolveSelectedTenantId();
-  if (tenantId == null) return null;
+  if (tenantId != null) {
+    const fetched = await fetchTenantLetterhead(tenantId);
+    if (fetched) return fetched;
+  }
 
-  return fetchTenantLetterhead(tenantId);
+  return readTenantLetterheadFromStorage();
+}
+
+async function blobToPngDataUrl(blob: Blob): Promise<string | null> {
+  if (typeof document === "undefined") {
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result ?? "") || null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Falha ao carregar imagem."));
+      el.src = objectUrl;
+    });
+
+    const maxSide = 256;
+    const scale = Math.min(1, maxSide / Math.max(img.width || 1, img.height || 1));
+    const width = Math.max(1, Math.round((img.width || 1) * scale));
+    const height = Math.max(1, Math.round((img.height || 1) * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result ?? "") || null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 export async function imageUrlToDataUrl(url: string): Promise<string | null> {
+  const token =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("auth_token")
+      : null;
+
+  const tryFetch = async (withAuth: boolean): Promise<Blob | null> => {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        cache: "no-cache",
+        mode: "cors",
+        headers:
+          withAuth && token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) return null;
+      return await res.blob();
+    } catch {
+      return null;
+    }
+  };
+
   try {
-    const token =
-      typeof localStorage !== "undefined"
-        ? localStorage.getItem("auth_token")
-        : null;
-    const res = await fetch(url, {
-      method: "GET",
-      cache: "no-cache",
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    if (!res.ok) return null;
-    const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(new Error("Falha ao converter imagem."));
-      reader.readAsDataURL(blob);
-    });
+    const blob =
+      (await tryFetch(true)) ?? (token ? await tryFetch(false) : null);
+    if (!blob) return null;
+    return await blobToPngDataUrl(blob);
   } catch {
     return null;
   }
 }
 
-function buildTenantLine(letterhead: TenantLetterhead): string {
-  const parts = [
-    letterhead.cnpj ? `CNPJ ${letterhead.cnpj}` : null,
-    letterhead.phone,
-    letterhead.email,
-    letterhead.address,
-  ].filter(Boolean);
-  return parts.join(" • ");
-}
-
 /**
- * Desenha o timbrado do tenant (logo + razão social) e retorna o Y seguinte.
+ * Desenha o timbrado do tenant (logo + nome fantasia) e retorna o Y seguinte.
  */
 export async function drawTenantPdfHeader(
   doc: jsPDF,
@@ -216,58 +292,80 @@ export async function drawTenantPdfHeader(
   const letterhead = await resolveTenantLetterhead();
   const generatedAt = new Date().toLocaleString("pt-BR");
 
-  let logoDataUrl: string | null = null;
+  const logoSize = 22;
+  let logoDrawn = false;
   if (letterhead?.logoUrl?.trim()) {
-    logoDataUrl = await imageUrlToDataUrl(letterhead.logoUrl.trim());
-  }
-
-  if (logoDataUrl) {
-    try {
-      doc.addImage(logoDataUrl, "PNG", marginLeft, cursorY - 2, 16, 16);
-    } catch {
+    const logoDataUrl = await imageUrlToDataUrl(letterhead.logoUrl.trim());
+    if (logoDataUrl) {
       try {
-        doc.addImage(logoDataUrl, "JPEG", marginLeft, cursorY - 2, 16, 16);
+        doc.addImage(logoDataUrl, "PNG", marginLeft, cursorY, logoSize, logoSize);
+        logoDrawn = true;
       } catch {
-        logoDataUrl = null;
+        logoDrawn = false;
       }
     }
   }
 
-  const textStartX = logoDataUrl ? marginLeft + 20 : marginLeft;
-  const displayName = letterhead?.corporateName ?? "Escola";
+  const textStartX = logoDrawn ? marginLeft + logoSize + 5 : marginLeft;
+  const textMaxWidth = pageWidth - textStartX - marginRight;
+  const displayName = letterhead?.displayName ?? "Escola";
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(31, 41, 55);
-  doc.text(displayName, textStartX, cursorY + 3);
+  doc.setFontSize(13);
+  doc.setTextColor(15, 23, 42);
+  doc.text(displayName, textStartX, cursorY + 5);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(107, 114, 128);
+  let lineY = cursorY + 10;
 
-  let lineY = cursorY + 8;
-  if (letterhead?.tradeName && letterhead.tradeName !== displayName) {
-    doc.text(letterhead.tradeName, textStartX, lineY);
-    lineY += 4;
+  if (letterhead?.corporateName) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    const corpLines = doc.splitTextToSize(letterhead.corporateName, textMaxWidth);
+    doc.text(corpLines, textStartX, lineY);
+    lineY += corpLines.length * 3.4 + 0.5;
   }
 
-  const tenantLine = letterhead ? buildTenantLine(letterhead) : "";
-  if (tenantLine) {
-    const maxWidth = pageWidth - textStartX - marginRight;
-    const wrapped = doc.splitTextToSize(tenantLine, maxWidth);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(107, 114, 128);
+
+  const contactParts = [
+    letterhead?.cnpj ? `CNPJ ${letterhead.cnpj}` : null,
+    letterhead?.phone,
+    letterhead?.email,
+  ].filter(Boolean) as string[];
+
+  if (contactParts.length) {
+    const contactLine = contactParts.join("  ·  ");
+    const wrapped = doc.splitTextToSize(contactLine, textMaxWidth);
     doc.text(wrapped, textStartX, lineY);
-    lineY += wrapped.length * 3.6;
+    lineY += wrapped.length * 3.2;
+  }
+
+  if (letterhead?.address) {
+    const addrLines = doc.splitTextToSize(letterhead.address, textMaxWidth);
+    doc.text(addrLines, textStartX, lineY);
+    lineY += addrLines.length * 3.2;
   }
 
   if (showGeneratedAt) {
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
     doc.text(`Gerado em: ${generatedAt}`, textStartX, lineY);
-    lineY += 4;
+    lineY += 3.2;
   }
 
-  const dividerY = Math.max(lineY + 1, logoDataUrl ? cursorY + 16 : lineY + 1);
-  doc.setDrawColor(229, 231, 235);
-  doc.setLineWidth(0.3);
-  doc.line(marginLeft, dividerY, pageWidth - marginRight, dividerY);
+  const contentBottom = Math.max(lineY, logoDrawn ? cursorY + logoSize : lineY);
+  const dividerY = contentBottom + 3;
 
-  return dividerY + 6;
+  // Separação reforçada do cabeçalho
+  doc.setDrawColor(15, 23, 42);
+  doc.setLineWidth(0.7);
+  doc.line(marginLeft, dividerY, pageWidth - marginRight, dividerY);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, dividerY + 1.2, pageWidth - marginRight, dividerY + 1.2);
+
+  return dividerY + 5;
 }
