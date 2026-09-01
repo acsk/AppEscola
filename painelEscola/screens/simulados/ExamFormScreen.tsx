@@ -1514,6 +1514,26 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               questions={questions.map(mapExamQuestionToPreview)}
               gradeObjective
               emptyMessage="Adicione questões na etapa anterior para testar o simulado."
+              examMeta={{
+                title: form.title || "Simulado",
+                exam_type_label:
+                  examTypeOptions.find((o) => o.value === form.exam_type)?.label ?? form.exam_type,
+                exam_type: form.exam_type,
+                status_label:
+                  examStatuses.find((s) => s.slug === form.status)?.label ?? form.status,
+                status: form.status,
+                duration_minutes: form.duration_minutes
+                  ? Number(form.duration_minutes)
+                  : null,
+                passing_score: form.passing_score ? Number(form.passing_score) : null,
+                total_points: totalPoints,
+                courses: form.course_ids
+                  .map((id) => courseOptions.find((o) => o.id === id)?.name)
+                  .filter(Boolean) as string[],
+                subject: form.subject_id
+                  ? subjectOptions.find((o) => o.value === form.subject_id)?.label ?? null
+                  : null,
+              }}
               header={
                 <View className="mb-5 p-5 rounded-2xl border border-violet-100 bg-violet-50">
                   <Text className="text-lg font-bold text-violet-900">

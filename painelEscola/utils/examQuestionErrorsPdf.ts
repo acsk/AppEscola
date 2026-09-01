@@ -2,6 +2,7 @@ import { Alert, Platform } from "react-native";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { ExamQuestionErrorsReport } from "../services/examQuestionErrorsReport";
+import { drawTenantPdfHeader } from "./pdfTenantLetterhead";
 
 function safeTitleSlug(title: string): string {
   return (
@@ -41,17 +42,12 @@ export async function exportExamQuestionErrorsPdf(
   }
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  let cursorY = 14;
+  let cursorY = await drawTenantPdfHeader(doc);
 
   doc.setFontSize(14);
   doc.setTextColor(17, 24, 39);
   doc.text("Relatório — questões com mais erros", 14, cursorY);
   cursorY += 6;
-
-  doc.setFontSize(10);
-  doc.setTextColor(107, 114, 128);
-  doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, cursorY);
-  cursorY += 5;
 
   const exam = report.exam;
   const coursesLabel = exam.courses?.length ? exam.courses.join(", ") : "—";

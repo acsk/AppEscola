@@ -610,6 +610,22 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             loading={previewLoading}
             gradeObjective
             emptyMessage="Nenhuma questão cadastrada"
+            examMeta={{
+              title: previewExam.title,
+              exam_type_label: previewExam.exam_type_label,
+              exam_type: previewExam.exam_type,
+              status_label: previewExam.status_label,
+              status: previewExam.status,
+              duration_minutes: previewExam.duration_minutes,
+              passing_score: previewExam.passing_score,
+              total_points: previewExam.total_points,
+              courses: previewExam.courses?.length
+                ? previewExam.courses.map((c) => c.name)
+                : previewExam.course?.name
+                  ? [previewExam.course.name]
+                  : [],
+              subject: previewExam.subject?.name ?? null,
+            }}
             header={
               <View
                 className="mb-2 p-5 rounded-2xl border border-gray-100"

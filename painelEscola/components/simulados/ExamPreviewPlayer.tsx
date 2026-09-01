@@ -8,11 +8,16 @@ import {
   TextInput,
   Platform,
   Linking,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { ExamPreviewPlayerQuestion } from "../../types/simulados";
 import { hasAnswerKey } from "./examPreviewUtils";
 import ConfirmModal from "../ui/ConfirmModal";
+import {
+  exportExamContentPdf,
+  type ExamContentPdfMeta,
+} from "../../utils/examContentPdf";
 
 type Phase = "answering" | "results";
 
@@ -23,6 +28,8 @@ type Props = {
   gradeObjective?: boolean;
   emptyMessage?: string;
   header?: React.ReactNode;
+  /** Metadados do simulado para o PDF */
+  examMeta?: ExamContentPdfMeta | null;
 };
 
 const textAreaStyle = {
@@ -80,12 +87,14 @@ export default function ExamPreviewPlayer({
   gradeObjective = true,
   emptyMessage = "Nenhuma questão para testar.",
   header,
+  examMeta = null,
 }: Props) {
   const [phase, setPhase] = useState<Phase>("answering");
   const [selected, setSelected] = useState<Record<number, number | null>>({});
   const [texts, setTexts] = useState<Record<number, string>>({});
   const [brokenImages, setBrokenImages] = useState<Record<number, boolean>>({});
   const [confirmUnansweredVisible, setConfirmUnansweredVisible] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const canGrade = gradeObjective && hasAnswerKey(questions);
 
@@ -161,6 +170,37 @@ export default function ExamPreviewPlayer({
     }
     finalizeTest();
   }, [finalizeTest, unansweredQuestions.length]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (exportingPdf) return;
+    if (Platform.OS !== "web") {
+      Alert.alert("Exportação disponível apenas na versão web.");
+      return;
+    }
+    setExportingPdf(true);
+    try {
+      const totalPoints = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
+      await exportExamContentPdf(
+        {
+          title: examMeta?.title || "Simulado",
+          exam_type_label: examMeta?.exam_type_label,
+          exam_type: examMeta?.exam_type,
+          status_label: examMeta?.status_label,
+          status: examMeta?.status,
+          duration_minutes: examMeta?.duration_minutes,
+          passing_score: examMeta?.passing_score,
+          total_points: examMeta?.total_points ?? totalPoints,
+          courses: examMeta?.courses,
+          subject: examMeta?.subject,
+        },
+        questions,
+      );
+    } catch {
+      Alert.alert("Não foi possível gerar o PDF do simulado.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }, [examMeta, exportingPdf, questions]);
 
   if (loading) {
     return (
@@ -441,7 +481,7 @@ export default function ExamPreviewPlayer({
         );
       })}
 
-      <View className="mt-2 flex-row flex-wrap gap-3 justify-center">
+      <View className="mt-2 flex-row flex-wrap gap-3 justify-center items-center">
         {phase === "answering" ? (
           <>
             <TouchableOpacity
@@ -451,6 +491,22 @@ export default function ExamPreviewPlayer({
             >
               <Ionicons name="checkmark-done-outline" size={18} color="#FFFFFF" />
               <Text className="text-sm font-bold text-white">Finalizar teste</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleExportPdf}
+              disabled={exportingPdf}
+              className="px-5 py-3 rounded-xl border border-violet-200 bg-violet-50 flex-row items-center gap-2"
+              activeOpacity={0.85}
+              style={{ opacity: exportingPdf ? 0.7 : 1 }}
+            >
+              {exportingPdf ? (
+                <ActivityIndicator size="small" color="#7C3AED" />
+              ) : (
+                <Ionicons name="download-outline" size={18} color="#7C3AED" />
+              )}
+              <Text className="text-sm font-bold text-violet-700">
+                {exportingPdf ? "Gerando PDF..." : "Gerar PDF"}
+              </Text>
             </TouchableOpacity>
             <Text className="text-xs text-gray-400 self-center">
               {answeredCount}/{questions.length} respondida{answeredCount !== 1 ? "s" : ""}
@@ -472,6 +528,22 @@ export default function ExamPreviewPlayer({
               activeOpacity={0.85}
             >
               <Text className="text-sm font-semibold text-gray-700">Revisar respostas</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleExportPdf}
+              disabled={exportingPdf}
+              className="px-5 py-3 rounded-xl border border-violet-200 bg-violet-50 flex-row items-center gap-2"
+              activeOpacity={0.85}
+              style={{ opacity: exportingPdf ? 0.7 : 1 }}
+            >
+              {exportingPdf ? (
+                <ActivityIndicator size="small" color="#7C3AED" />
+              ) : (
+                <Ionicons name="download-outline" size={18} color="#7C3AED" />
+              )}
+              <Text className="text-sm font-bold text-violet-700">
+                {exportingPdf ? "Gerando PDF..." : "Gerar PDF"}
+              </Text>
             </TouchableOpacity>
           </>
         )}
