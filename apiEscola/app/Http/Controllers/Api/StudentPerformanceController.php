@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
+use App\Services\StudentAcademicHistoryService;
 use App\Services\StudentPerformanceService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -13,8 +14,10 @@ class StudentPerformanceController extends Controller
 {
     use ScopedByTenant;
 
-    public function __construct(private readonly StudentPerformanceService $performance)
-    {
+    public function __construct(
+        private readonly StudentPerformanceService $performance,
+        private readonly StudentAcademicHistoryService $academicHistory,
+    ) {
     }
 
     /**
@@ -66,6 +69,25 @@ class StudentPerformanceController extends Controller
                 $this->resolveSubjectId($request),
             ),
             'Métricas de aproveitamento carregadas.'
+        );
+    }
+
+    /**
+     * Histórico acadêmico completo do aluno (painel).
+     */
+    public function academicHistory(Request $request, Student $student): JsonResponse
+    {
+        $this->authorizeTenant($request, $student->tenant_id);
+
+        $user = $request->user();
+
+        if (! in_array($user->role, ['admin', 'super_admin', 'professor', 'secretaria'], true)) {
+            return $this->forbidden('Sem permissão para visualizar o histórico deste aluno.');
+        }
+
+        return $this->success(
+            $this->academicHistory->build($student),
+            'Histórico acadêmico carregado.'
         );
     }
 

@@ -946,6 +946,21 @@ Retorna médias de `percentage` das tentativas concluídas, agrupadas por discip
 
 `student_id` permanece no topo por compatibilidade.
 
+### Histórico acadêmico do aluno (painel)
+
+```http
+GET /api/students/{student_id}/academic-history
+Authorization: Bearer {token}
+```
+
+Disponível para `admin`, `super_admin`, `professor` e `secretaria`.
+
+Retorna no `body`:
+- `student` — dados cadastrais + responsáveis
+- `summary` — contadores (matrículas, tentativas, média, aprovados/reprovados)
+- `enrollments` — cursos, turmas, plano/pacote, status e período
+- `exam_attempts` — simulados online com nota, percentual e `answers` detalhadas
+
 ### Fluxo recomendado para o frontend
 
 1. Criar matrícula por `subscribe` ou `subscribe-bundle`.

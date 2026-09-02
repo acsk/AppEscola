@@ -7,6 +7,7 @@ import { maskCPF } from "../../utils/masks";
 
 export type StudentActionKey =
   | "edit"
+  | "history"
   | "boletim"
   | "performance"
   | "approve"
@@ -70,6 +71,14 @@ export default function StudentActionsModal({
           },
         ]
       : []),
+    {
+      key: "history",
+      label: "Histórico acadêmico",
+      description: "Cursos, turmas e simulados online",
+      icon: "library-outline",
+      tone: "blue",
+      group: "main",
+    },
     {
       key: "boletim",
       label: "Boletim",

@@ -234,6 +234,10 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
       navigate("alunos-form", { studentId: row.id });
       return;
     }
+    if (action === "history") {
+      navigate("alunos-historico", { studentId: row.id, studentName: row.name });
+      return;
+    }
     if (action === "boletim") {
       navigate("alunos-boletim", { studentId: row.id, studentName: row.name });
       return;
@@ -253,7 +257,10 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
 
   const renderActionsButton = (item: StudentListItem) => (
     <TouchableOpacity
-      onPress={() => setMenuStudent(toActionItem(item))}
+      onPress={(event: any) => {
+        event?.stopPropagation?.();
+        setMenuStudent(toActionItem(item));
+      }}
       className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
       activeOpacity={0.85}
       accessibilityLabel="Ações do aluno"
@@ -262,9 +269,15 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
     </TouchableOpacity>
   );
 
+  const openStudentMenu = (item: StudentListItem) => {
+    setMenuStudent(toActionItem(item));
+  };
+
   const renderMobileCard = (item: StudentListItem) => (
-    <View
+    <TouchableOpacity
       key={item.id}
+      onPress={() => openStudentMenu(item)}
+      activeOpacity={0.9}
       className="bg-white border border-gray-200 rounded-xl p-3"
       style={{
         shadowColor: "#000",
@@ -297,13 +310,13 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
       <View className="mt-2 self-start">
         <Badge slug={item.status} label={statusLabel(item.status)} />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderDesktopRow = (item: StudentListItem, index: number) => {
     const doc = fmtDocument(item.document);
     return (
-      <DataTableRow key={item.id} index={index}>
+      <DataTableRow key={item.id} index={index} onPress={() => openStudentMenu(item)}>
         <Text
           className={TABLE_CELL_ENROLLMENT}
           style={colStyle(COLUMNS[0])}

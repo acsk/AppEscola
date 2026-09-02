@@ -445,6 +445,10 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
   const handleFormStudentAction = (action: StudentActionKey) => {
     if (!studentId) return;
+    if (action === "history") {
+      navigate("alunos-historico", { studentId, studentName: form.name });
+      return;
+    }
     if (action === "boletim") {
       navigate("alunos-boletim", { studentId, studentName: form.name });
       return;

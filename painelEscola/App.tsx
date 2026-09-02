@@ -16,6 +16,7 @@ import StudentsScreen from "./screens/alunos";
 import StudentFormScreen from "./screens/alunos/StudentFormScreen";
 import StudentPerformanceScreen from "./screens/alunos/StudentPerformanceScreen";
 import StudentReportCardScreen from "./screens/alunos/StudentReportCardScreen";
+import StudentAcademicHistoryScreen from "./screens/alunos/StudentAcademicHistoryScreen";
 import GuardiansScreen from "./screens/GuardiansScreen";
 import CoursesScreen from "./screens/cursos";
 import CourseFormScreen from "./screens/cursos/CourseFormScreen";
@@ -154,6 +155,9 @@ function hashToNav(hash: string): NavState {
       if (seg2 === "boletim") {
         return { screen: "alunos-boletim", params: { studentId: id } };
       }
+      if (seg2 === "historico") {
+        return { screen: "alunos-historico", params: { studentId: id } };
+      }
       return { screen: "alunos-form", params: { studentId: id } };
     }
     return { screen: "alunos" };
@@ -263,6 +267,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "alunos-boletim") {
     const id = nav.params?.studentId;
     return id != null ? `#/alunos/${id}/boletim` : "#/alunos";
+  }
+  if (nav.screen === "alunos-historico") {
+    const id = nav.params?.studentId;
+    return id != null ? `#/alunos/${id}/historico` : "#/alunos";
   }
   if (nav.screen === "cursos-form") {
     const id = nav.params?.courseId;
@@ -840,6 +848,33 @@ function AppContent() {
         }
         return (
           <StudentReportCardScreen
+            navigate={navigate}
+            studentId={studentId}
+            studentName={
+              typeof nav.params?.studentName === "string"
+                ? nav.params.studentName
+                : undefined
+            }
+          />
+        );
+      }
+      case "alunos-historico": {
+        const studentId = Number(nav.params?.studentId);
+        if (!Number.isFinite(studentId) || studentId <= 0) {
+          return (
+            <View className="flex-1 items-center justify-center px-6">
+              <Text className="text-sm text-gray-600 mb-4">Aluno inválido ou não informado.</Text>
+              <TouchableOpacity
+                onPress={() => navigate("alunos")}
+                className="px-4 py-2 rounded-xl bg-violet-600"
+              >
+                <Text className="text-sm font-semibold text-white">Voltar à lista</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }
+        return (
+          <StudentAcademicHistoryScreen
             navigate={navigate}
             studentId={studentId}
             studentName={

@@ -86,6 +86,16 @@ class StudentPerformanceService
     }
 
     /**
+     * Matrícula formatada para histórico acadêmico (qualquer status).
+     *
+     * @return array<string, mixed>
+     */
+    public function mapEnrollmentForHistory(Enrollment $enrollment): array
+    {
+        return $this->mapActiveEnrollment($enrollment);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function mapActiveEnrollment(Enrollment $enrollment): array

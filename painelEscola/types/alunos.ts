@@ -65,3 +65,8 @@ export type StudentReportCardScreenProps = WithNavigate & {
   studentId: number;
   studentName?: string;
 };
+
+export type StudentAcademicHistoryScreenProps = WithNavigate & {
+  studentId: number;
+  studentName?: string;
+};

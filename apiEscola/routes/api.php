@@ -164,6 +164,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     // Alunos
     Route::apiResource('students', StudentController::class);
     Route::get('students/{student}/performance', [StudentPerformanceController::class, 'forStudent']);
+    Route::get('students/{student}/academic-history', [StudentPerformanceController::class, 'academicHistory']);
     Route::post('students/{student}/upload-photo', [StudentController::class, 'uploadPhoto']);
     Route::post('students/{student}/provision-app-access', [StudentController::class, 'provisionAppAccess']);
 
