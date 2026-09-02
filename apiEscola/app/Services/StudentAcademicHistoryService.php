@@ -137,13 +137,60 @@ class StudentAcademicHistoryService
             $passed = $percentage >= $passingScore;
         }
 
-        $questions = $attempt->exam?->relationLoaded('questions')
-            ? $attempt->exam->questions->keyBy('id')
-            : collect();
-        $options = $questions->flatMap->options->keyBy('id');
+        $answersByQuestion = $attempt->answers->keyBy('question_id');
+        $showKey = in_array($status, ['completed', 'pending_review', 'awaiting_release', 'abandoned'], true);
 
-        $answers = $attempt->answers->map(function ($answer) use ($questions, $options) {
-            $question = $questions->get($answer->question_id);
+        $questions = collect();
+        if ($attempt->exam?->relationLoaded('questions')) {
+            $questions = $attempt->exam->questions
+                ->sortBy('order')
+                ->values()
+                ->map(function ($question) use ($answersByQuestion, $showKey, $status) {
+                    $answer = $answersByQuestion->get($question->id);
+                    $correctOption = $question->options->firstWhere('is_correct', true);
+                    $pendingCorrection = $status === 'pending_review'
+                        || ($answer !== null && $answer->is_correct === null && $question->type !== 'multiple_choice');
+
+                    return [
+                        'id' => (int) $question->id,
+                        'type' => $question->type,
+                        'question_text' => $question->question_text,
+                        'image_url' => $question->image_url,
+                        'points' => $question->points !== null ? (float) $question->points : null,
+                        'order' => (int) ($question->order ?? 0),
+                        'allow_text_answer' => (bool) $question->allow_text_answer,
+                        'options' => $question->options
+                            ->sortBy('order')
+                            ->values()
+                            ->map(fn ($option) => [
+                                'id' => (int) $option->id,
+                                'option_text' => (string) $option->option_text,
+                                'order' => (int) ($option->order ?? 0),
+                                'selected' => $answer?->option_id === $option->id,
+                                'is_correct' => $showKey ? (bool) $option->is_correct : null,
+                            ])
+                            ->all(),
+                        'student_answer' => $answer ? [
+                            'option_id' => $answer->option_id !== null ? (int) $answer->option_id : null,
+                            'text_answer' => $answer->text_answer,
+                        ] : null,
+                        'correction' => [
+                            'is_correct' => $pendingCorrection ? null : $answer?->is_correct,
+                            'points_earned' => $answer?->points_earned !== null
+                                ? (float) $answer->points_earned
+                                : null,
+                            'max_points' => $question->points !== null ? (float) $question->points : null,
+                            'correct_option_id' => $showKey && $correctOption
+                                ? (int) $correctOption->id
+                                : null,
+                        ],
+                    ];
+                });
+        }
+
+        $legacyAnswers = $attempt->answers->map(function ($answer) use ($attempt) {
+            $question = $attempt->exam?->questions?->firstWhere('id', $answer->question_id);
+            $option = $question?->options?->firstWhere('id', $answer->option_id);
 
             return [
                 'id' => (int) $answer->id,
@@ -153,9 +200,7 @@ class StudentAcademicHistoryService
                 'type' => $question?->type,
                 'points' => $question?->points !== null ? (float) $question->points : null,
                 'option_id' => $answer->option_id !== null ? (int) $answer->option_id : null,
-                'option_text' => $answer->option_id
-                    ? ($options->get($answer->option_id)?->option_text)
-                    : null,
+                'option_text' => $option?->option_text,
                 'text_answer' => $answer->text_answer,
                 'is_correct' => $answer->is_correct,
                 'points_earned' => $answer->points_earned !== null
@@ -164,8 +209,12 @@ class StudentAcademicHistoryService
             ];
         })->values()->all();
 
-        $correctCount = collect($answers)->where('is_correct', true)->count();
-        $totalQuestions = count($answers);
+        $correctCount = $questions
+            ->filter(fn (array $q) => ($q['correction']['is_correct'] ?? null) === true)
+            ->count();
+        $totalQuestions = $questions->count() > 0
+            ? $questions->count()
+            : count($legacyAnswers);
 
         return [
             'id' => (int) $attempt->id,
@@ -195,7 +244,8 @@ class StudentAcademicHistoryService
             'passed' => $passed,
             'correct_answers' => $totalQuestions > 0 ? $correctCount : null,
             'total_questions' => $totalQuestions > 0 ? $totalQuestions : null,
-            'answers' => $answers,
+            'questions' => $questions->values()->all(),
+            'answers' => $legacyAnswers,
         ];
     }
 

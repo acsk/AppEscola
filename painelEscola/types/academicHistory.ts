@@ -40,6 +40,35 @@ export type AcademicHistoryAnswer = {
   points_earned?: number | null;
 };
 
+export type AcademicHistoryReviewOption = {
+  id: number;
+  option_text: string;
+  order?: number;
+  selected?: boolean;
+  is_correct?: boolean | null;
+};
+
+export type AcademicHistoryReviewQuestion = {
+  id: number;
+  type?: string | null;
+  question_text?: string | null;
+  image_url?: string | null;
+  points?: number | null;
+  order?: number;
+  allow_text_answer?: boolean;
+  options: AcademicHistoryReviewOption[];
+  student_answer?: {
+    option_id?: number | null;
+    text_answer?: string | null;
+  } | null;
+  correction?: {
+    is_correct?: boolean | null;
+    points_earned?: number | null;
+    max_points?: number | null;
+    correct_option_id?: number | null;
+  } | null;
+};
+
 export type AcademicHistoryAttempt = {
   id: number;
   exam_id: number;
@@ -68,6 +97,7 @@ export type AcademicHistoryAttempt = {
   passed?: boolean | null;
   correct_answers?: number | null;
   total_questions?: number | null;
+  questions?: AcademicHistoryReviewQuestion[];
   answers?: AcademicHistoryAnswer[];
 };
 

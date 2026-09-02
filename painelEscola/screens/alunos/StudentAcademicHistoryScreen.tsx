@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
 import Badge from "../../components/ui/Badge";
 import DataTableRow from "../../components/ui/DataTableRow";
+import StudentAttemptReviewModal from "../../components/alunos/StudentAttemptReviewModal";
 import {
   TABLE_CELL,
   TABLE_CELL_MUTED,
@@ -28,6 +29,7 @@ import type { StudentAcademicHistoryScreenProps } from "../../types/alunos";
 import { getApiErrorMessage } from "../../utils/apiErrors";
 import { isoToDisplay, maskCPF, maskPhone } from "../../utils/masks";
 import { exportStudentAcademicHistoryPdf } from "../../utils/studentAcademicHistoryPdf";
+import { exportStudentAttemptReviewPdf } from "../../utils/studentAttemptReviewPdf";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 const ATTEMPT_STATUS_LABELS: Record<string, string> = {
@@ -90,9 +92,10 @@ export default function StudentAcademicHistoryScreen({
   const { isMobile, contentPadding } = useResponsiveLayout();
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportingAttemptId, setExportingAttemptId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<StudentAcademicHistory | null>(null);
-  const [expandedAttemptId, setExpandedAttemptId] = useState<number | null>(null);
+  const [reviewAttempt, setReviewAttempt] = useState<AcademicHistoryAttempt | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,56 +141,19 @@ export default function StudentAcademicHistoryScreen({
     }
   };
 
-  const renderAttemptDetail = (attempt: AcademicHistoryAttempt) => {
-    const answers = [...(attempt.answers ?? [])].sort(
-      (a, b) => (a.question_order ?? 0) - (b.question_order ?? 0)
-    );
-
-    if (answers.length === 0) {
-      return (
-        <Text className="text-xs text-gray-500 px-3 py-2">
-          Sem respostas detalhadas para esta tentativa.
-        </Text>
-      );
+  const handleExportAttemptPdf = async (attempt: AcademicHistoryAttempt) => {
+    if (!history?.student) return;
+    setExportingAttemptId(attempt.id);
+    try {
+      await exportStudentAttemptReviewPdf({
+        student: history.student,
+        attempt,
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Não foi possível gerar o PDF do simulado."));
+    } finally {
+      setExportingAttemptId(null);
     }
-
-    return (
-      <View className="gap-2 px-3 pb-3">
-        {answers.map((answer, index) => {
-          const tone =
-            answer.is_correct === true
-              ? "border-emerald-200 bg-emerald-50"
-              : answer.is_correct === false
-                ? "border-red-200 bg-red-50"
-                : "border-gray-200 bg-gray-50";
-          return (
-            <View key={answer.id} className={`rounded-xl border px-3 py-2 ${tone}`}>
-              <Text className="text-xs font-bold text-gray-800">
-                {index + 1}. {answer.question_text || `Questão #${answer.question_id}`}
-              </Text>
-              <Text className="text-xs text-gray-600 mt-1">
-                Resposta:{" "}
-                {answer.option_text ||
-                  answer.text_answer ||
-                  (answer.option_id != null ? `Opção #${answer.option_id}` : "—")}
-              </Text>
-              <Text className="text-xs text-gray-500 mt-0.5">
-                {answer.is_correct == null
-                  ? "Correção pendente"
-                  : answer.is_correct
-                    ? "Correta"
-                    : "Incorreta"}
-                {answer.points_earned != null
-                  ? ` · ${answer.points_earned} pt(s)`
-                  : answer.points != null
-                    ? ` · ${answer.points} pt(s)`
-                    : ""}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    );
   };
 
   return (
@@ -404,7 +370,7 @@ export default function StudentAcademicHistoryScreen({
             <View className="px-4 py-3 border-b border-gray-100">
               <Text className="text-sm font-bold text-gray-900">Simulados online</Text>
               <Text className="text-xs text-gray-500 mt-0.5">
-                Clique em uma tentativa para ver o detalhamento das respostas
+                Clique para abrir a correção completa · PDF com dados do aluno e horário de entrega
               </Text>
             </View>
             {history.exam_attempts.length === 0 ? (
@@ -413,65 +379,90 @@ export default function StudentAcademicHistoryScreen({
                 <Text className="text-sm text-gray-400 mt-2">Nenhum simulado encontrado</Text>
               </View>
             ) : (
-              history.exam_attempts.map((attempt, index) => {
-                const expanded = expandedAttemptId === attempt.id;
-                return (
-                  <View key={attempt.id} className="border-b border-gray-100">
-                    <DataTableRow
-                      index={index}
-                      onPress={() =>
-                        setExpandedAttemptId(expanded ? null : attempt.id)
-                      }
-                    >
-                      <View style={{ flex: 1.8, paddingRight: 8 }}>
-                        <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={2}>
-                          {attempt.exam?.title ?? `Simulado #${attempt.exam_id}`}
-                        </Text>
-                        <Text className={TABLE_CELL_MUTED} numberOfLines={1}>
-                          {attempt.exam?.subject?.name ?? "Sem disciplina"}
-                          {attempt.exam?.exam_type_label
-                            ? ` · ${attempt.exam.exam_type_label}`
-                            : ""}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 0.9 }}>
-                        <Badge
-                          slug={attempt.status ?? "completed"}
-                          label={
-                            ATTEMPT_STATUS_LABELS[attempt.status ?? ""] ??
-                            attempt.status ??
-                            "—"
-                          }
-                        />
-                      </View>
-                      <Text className={TABLE_CELL} style={{ flex: 0.7 }} numberOfLines={1}>
-                        {attempt.score_display ?? "—"}
-                      </Text>
-                      <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 0.6 }} numberOfLines={1}>
-                        {fmtPct(attempt.percentage)}
-                      </Text>
-                      <Text className={TABLE_CELL} style={{ flex: 0.6 }} numberOfLines={1}>
-                        {attempt.passed == null ? "—" : attempt.passed ? "Sim" : "Não"}
-                      </Text>
-                      <Text className={TABLE_CELL_MUTED} style={{ flex: 1 }} numberOfLines={2}>
-                        {fmtDateTime(attempt.finished_at ?? attempt.started_at)}
-                      </Text>
-                      <View style={{ width: 28 }} className="items-center justify-center">
-                        <Ionicons
-                          name={expanded ? "chevron-up" : "chevron-down"}
-                          size={16}
-                          color="#9CA3AF"
-                        />
-                      </View>
-                    </DataTableRow>
-                    {expanded ? renderAttemptDetail(attempt) : null}
+              history.exam_attempts.map((attempt, index) => (
+                <DataTableRow
+                  key={attempt.id}
+                  index={index}
+                  onPress={() => setReviewAttempt(attempt)}
+                >
+                  <View style={{ flex: 1.7, paddingRight: 8 }}>
+                    <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={2}>
+                      {attempt.exam?.title ?? `Simulado #${attempt.exam_id}`}
+                    </Text>
+                    <Text className={TABLE_CELL_MUTED} numberOfLines={1}>
+                      {attempt.exam?.subject?.name ?? "Sem disciplina"}
+                      {attempt.exam?.exam_type_label
+                        ? ` · ${attempt.exam.exam_type_label}`
+                        : ""}
+                    </Text>
                   </View>
-                );
-              })
+                  <View style={{ flex: 0.85 }}>
+                    <Badge
+                      slug={attempt.status ?? "completed"}
+                      label={
+                        ATTEMPT_STATUS_LABELS[attempt.status ?? ""] ??
+                        attempt.status ??
+                        "—"
+                      }
+                    />
+                  </View>
+                  <Text className={TABLE_CELL} style={{ flex: 0.65 }} numberOfLines={1}>
+                    {attempt.score_display ?? "—"}
+                  </Text>
+                  <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 0.55 }} numberOfLines={1}>
+                    {fmtPct(attempt.percentage)}
+                  </Text>
+                  <Text className={TABLE_CELL} style={{ flex: 0.55 }} numberOfLines={1}>
+                    {attempt.passed == null ? "—" : attempt.passed ? "Sim" : "Não"}
+                  </Text>
+                  <Text className={TABLE_CELL_MUTED} style={{ flex: 0.95 }} numberOfLines={2}>
+                    {fmtDateTime(attempt.finished_at ?? attempt.started_at)}
+                  </Text>
+                  <View style={{ width: 86 }} className="flex-row justify-end gap-1">
+                    <TouchableOpacity
+                      onPress={(event: any) => {
+                        event?.stopPropagation?.();
+                        handleExportAttemptPdf(attempt);
+                      }}
+                      className="p-1.5 bg-violet-50 rounded-lg border border-violet-200"
+                      activeOpacity={0.85}
+                      accessibilityLabel="Gerar PDF do simulado"
+                    >
+                      {exportingAttemptId === attempt.id ? (
+                        <ActivityIndicator size="small" color="#7C3AED" />
+                      ) : (
+                        <Ionicons name="download-outline" size={15} color="#7C3AED" />
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(event: any) => {
+                        event?.stopPropagation?.();
+                        setReviewAttempt(attempt);
+                      }}
+                      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+                      activeOpacity={0.85}
+                      accessibilityLabel="Ver correção"
+                    >
+                      <Ionicons name="eye-outline" size={15} color="#4B5563" />
+                    </TouchableOpacity>
+                  </View>
+                </DataTableRow>
+              ))
             )}
           </View>
         </View>
       ) : null}
+
+      <StudentAttemptReviewModal
+        visible={!!reviewAttempt}
+        student={history?.student ?? null}
+        attempt={reviewAttempt}
+        onClose={() => setReviewAttempt(null)}
+        exporting={!!reviewAttempt && exportingAttemptId === reviewAttempt.id}
+        onExportPdf={() => {
+          if (reviewAttempt) handleExportAttemptPdf(reviewAttempt);
+        }}
+      />
     </ScrollView>
   );
 }

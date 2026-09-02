@@ -959,7 +959,7 @@ Retorna no `body`:
 - `student` — dados cadastrais + responsáveis
 - `summary` — contadores (matrículas, tentativas, média, aprovados/reprovados)
 - `enrollments` — cursos, turmas, plano/pacote, status e período
-- `exam_attempts` — simulados online com nota, percentual e `answers` detalhadas
+- `exam_attempts` — simulados online com nota, percentual, `questions` (opções com marcação do aluno e gabarito) e `answers` (legado)
 
 ### Fluxo recomendado para o frontend
 
