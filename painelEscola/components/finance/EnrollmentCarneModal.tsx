@@ -18,7 +18,6 @@ import {
   type CarnePreview,
   type CarnePreviewInvoice,
 } from "../../services/enrollmentCarne";
-import { ensureSingleBoletoPdf } from "../../utils/mergeBoletoPdfs";
 import { isoToDisplay } from "../../utils/masks";
 import CoraDueDatePolicyBanner from "./CoraDueDatePolicyBanner";
 
@@ -193,6 +192,7 @@ export default function EnrollmentCarneModal({
       let format: "pdf" | "zip" = archive.format;
 
       try {
+        const { ensureSingleBoletoPdf } = await import("../../utils/mergeBoletoPdfs");
         const unified = await ensureSingleBoletoPdf({
           blob: archive.blob,
           format: archive.format,
