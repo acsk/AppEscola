@@ -527,6 +527,11 @@ class PaymentProviderController extends Controller
             $invoice->refresh();
         }
 
+        // Corrige payment_method legado (ex.: hybrid com URL de QR PIX e sem boleto real).
+        $chargeAssets->reconcileStoredPaymentMethod($invoice);
+        $invoice->refresh();
+        $paymentAssets = $chargeAssets->paymentAssetsFromInvoice($invoice);
+
         $resolvedMethod = $chargeAssets->resolveChargeMethodFromInvoice($invoice);
 
         $lockedSyncedMethod = $this->resolveLockedMethodForSyncedInvoice($invoice, $chargeAssets);

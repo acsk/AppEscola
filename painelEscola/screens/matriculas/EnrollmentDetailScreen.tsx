@@ -70,6 +70,11 @@ import CoraDueDatePolicyBanner from "../../components/finance/CoraDueDatePolicyB
 import EnrollmentEditModal from "../../components/matriculas/EnrollmentEditModal";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
 import { resolveInvoiceGatewayEnvironment } from "../../utils/paymentEnvironment";
+import {
+  isHybridBoletoUrl,
+  isPixQrImageUrl,
+  resolveBoletoPaymentUrl,
+} from "../../utils/coraPaymentAssets";
 import type {
   EnrollmentDetail,
   EnrollmentDetailScreenProps,
@@ -732,9 +737,9 @@ export default function EnrollmentDetailScreen({
     if (chargePaymentOptions && !chargePaymentOptions.actions.can_change_method) {
       const assets = chargePaymentOptions.payment_assets;
       const canShowExisting =
-        (methodToGenerate === "pix" && !!(assets?.pix_copy_paste || assets?.pix_qr_image_url)) ||
+        (methodToGenerate === "pix" && !!(assets?.pix_copy_paste || assets?.pix_qr_image_url || isPixQrImageUrl(assets?.boleto_url))) ||
         (methodToGenerate !== "pix" &&
-          !!(assets?.boleto_digitable || assets?.boleto_url || assets?.boleto_number));
+          !!(assets?.boleto_digitable || assets?.boleto_number || resolveBoletoPaymentUrl([assets?.boleto_url])));
       if (canShowExisting) {
         const existing = toGeneratedChargeFromAssets(
           chargeInvoice.id,
@@ -963,9 +968,6 @@ export default function EnrollmentDetailScreen({
     return null;
   };
 
-  const isHybridBoletoUrl = (url?: string | null) =>
-    !!url && /boleto-qrcode|qrcode|qr-code/i.test(url);
-
   const toGeneratedChargeFromAssets = (
     invoiceId: number,
     assets?: InvoicePaymentAssets | null,
@@ -973,12 +975,16 @@ export default function EnrollmentDetailScreen({
     fallbackStatus = ""
   ): GeneratedCharge | null => {
     if (!assets) return null;
+    const boletoUrl = resolveBoletoPaymentUrl([assets.boleto_url]);
+    const pixQr =
+      assets.pix_qr_image_url ||
+      (isPixQrImageUrl(assets.boleto_url) ? assets.boleto_url : null);
     const hasAnyAsset = !!(
       assets.charge_id ||
       assets.pix_copy_paste ||
-      assets.pix_qr_image_url ||
+      pixQr ||
       assets.boleto_digitable ||
-      assets.boleto_url ||
+      boletoUrl ||
       assets.boleto_number
     );
     if (!hasAnyAsset) return null;
@@ -989,11 +995,11 @@ export default function EnrollmentDetailScreen({
       environment: undefined,
       charge_id: assets.charge_id ?? "",
       status: assets.charge_status ?? fallbackStatus,
-      payment_url: assets.boleto_url ?? null,
+      payment_url: boletoUrl,
       pix_copy_paste: assets.pix_copy_paste ?? null,
       boleto_number: assets.boleto_number ?? null,
       boleto_digitable: assets.boleto_digitable ?? null,
-      qr_code_image_url: assets.pix_qr_image_url ?? null,
+      qr_code_image_url: pixQr ?? null,
       expires_at: null,
     };
   };
@@ -1051,13 +1057,16 @@ export default function EnrollmentDetailScreen({
   const resultQrCodeImageUrl = pickAsset(chargeResult?.qr_code_image_url);
   const pixQrCodeImageUrl = pickAsset(
     chargeAssets?.pix_qr_image_url,
-    resultQrCodeImageUrl && isImagePreviewUrl(resultQrCodeImageUrl) ? resultQrCodeImageUrl : null
+    resultQrCodeImageUrl && isImagePreviewUrl(resultQrCodeImageUrl) ? resultQrCodeImageUrl : null,
+    isPixQrImageUrl(chargeAssets?.boleto_url) ? chargeAssets?.boleto_url : null,
+    isPixQrImageUrl(resultPaymentUrl) ? resultPaymentUrl : null,
+    isPixQrImageUrl(resultQrCodeImageUrl) ? resultQrCodeImageUrl : null
   );
   const boletoDigitable = pickAsset(chargeAssets?.boleto_digitable, chargeResult?.boleto_digitable);
-  const boletoPaymentUrl = pickAsset(
+  const boletoPaymentUrl = resolveBoletoPaymentUrl([
     chargeAssets?.boleto_url,
-    resultPaymentUrlIsPix ? null : resultPaymentUrl
-  );
+    resultPaymentUrlIsPix ? null : resultPaymentUrl,
+  ]);
   const lockedChargeMethod = normalizeChargeMethod(chargePaymentOptions?.method_lock?.method);
   const isChargeMethodLocked = !!chargePaymentOptions?.method_lock?.locked;
   const canGenerateChargeAction = chargePaymentOptions?.actions?.can_generate_charge ?? true;
@@ -1078,9 +1087,9 @@ export default function EnrollmentDetailScreen({
   const hasBoletoAssets = !!(boletoDigitable || boletoPaymentUrl);
   const hasHybridBoletoPdf =
     isHybridBoletoUrl(boletoPaymentUrl) ||
-    normalizeChargeMethod(chargePaymentOptions?.current_method) === "hybrid" ||
-    normalizeChargeMethod(chargePaymentOptions?.method_lock?.method) === "hybrid" ||
-    chargeInvoice?.payment_method === "hybrid";
+    (normalizeChargeMethod(chargePaymentOptions?.current_method) === "hybrid" && hasBoletoAssets) ||
+    (normalizeChargeMethod(chargePaymentOptions?.method_lock?.method) === "hybrid" && hasBoletoAssets) ||
+    (chargeInvoice?.payment_method === "hybrid" && hasBoletoAssets);
   const hasDualPaymentAssets = hasPixAssets && hasBoletoAssets;
   const selectedChargeMethod = normalizeChargeMethod(chargeMethod);
   const resultDisplayMethod: "pix" | "boleto" | "hybrid" | null = (() => {

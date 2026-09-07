@@ -3,6 +3,11 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Modal from "../ui/Modal";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
+import {
+  isHybridBoletoUrl,
+  isPixQrImageUrl,
+  resolveBoletoPaymentUrl,
+} from "../../utils/coraPaymentAssets";
 
 import type { InvoiceListItem } from "../../types/matriculas";
 
@@ -114,22 +119,24 @@ export default function InvoiceActionsModal({
   const canCancel = invoice.can_cancel ?? (invoice.status !== "cancelled" && invoice.status !== "paid");
   const canDelete = invoice.can_delete ?? invoice.status !== "paid";
 
-  const boletoUrl = invoice.cora?.payment_url ?? "";
-  const isHybridBoletoUrl =
-    /boleto-qrcode|qrcode|qr-code/i.test(boletoUrl);
+  const boletoUrl = resolveBoletoPaymentUrl([invoice.cora?.payment_url]);
+  const pixQrUrl = isPixQrImageUrl(invoice.cora?.payment_url)
+    ? invoice.cora?.payment_url
+    : invoice.cora?.qr_code_image_url;
   const hasBoletoAssets = !!(
     invoice.cora?.boleto_digitable ||
     invoice.cora?.boleto_number ||
-    invoice.cora?.payment_url
+    boletoUrl
   );
-  const hasPixAssets = !!(
-    invoice.cora?.pix_copy_paste ||
-    invoice.cora?.qr_code_image_url
-  );
+  const hasPixAssets = !!(invoice.cora?.pix_copy_paste || pixQrUrl);
   const hasChargeAssets = !!invoice.cora?.charge_id && (hasBoletoAssets || hasPixAssets);
-  const chargeActionLabel = hasChargeAssets ? "Ver boleto" : "Cobrança no provedor (PIX / Boleto)";
+  const chargeActionLabel = hasChargeAssets
+    ? hasBoletoAssets
+      ? "Ver boleto"
+      : "Ver PIX"
+    : "Cobrança no provedor (PIX / Boleto)";
   const chargeActionDescription = hasChargeAssets
-    ? isHybridBoletoUrl || invoice.payment_method === "hybrid"
+    ? isHybridBoletoUrl(boletoUrl) || (invoice.payment_method === "hybrid" && hasBoletoAssets)
       ? "Abrir boleto com QR Code PIX."
       : hasBoletoAssets
         ? "Abrir PDF do boleto e linha digitável."

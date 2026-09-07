@@ -192,6 +192,17 @@ class InvoiceCoraChargeAssetsService
         $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
         $fromPayload = $this->paymentAssetsFromExternal($payload);
 
+        $boletoUrl = $this->coerceScalarString($invoice->cora_payment_url)
+            ?: $fromPayload['boleto_url'];
+        $pixQrImageUrl = $fromPayload['pix_qr_image_url'];
+
+        // payment_url da Cora em cobrança PIX pura costuma ser PNG (cobranca-qrcode-*.png).
+        // Não pode ser tratado como boleto_url.
+        if ($this->isPixQrImageUrl($boletoUrl)) {
+            $pixQrImageUrl = $pixQrImageUrl ?: $boletoUrl;
+            $boletoUrl = null;
+        }
+
         return [
             'charge_id' => $invoice->cora_charge_id,
             'charge_status' => $invoice->cora_status,
@@ -199,20 +210,27 @@ class InvoiceCoraChargeAssetsService
                 ?: $fromPayload['boleto_number'],
             'boleto_digitable' => $this->coerceScalarString($invoice->boleto_digitable)
                 ?: $fromPayload['boleto_digitable'],
-            'boleto_url' => $this->coerceScalarString($invoice->cora_payment_url)
-                ?: $fromPayload['boleto_url'],
+            'boleto_url' => $boletoUrl,
             'pix_copy_paste' => $this->coerceScalarString($invoice->cora_pix_copy_paste)
                 ?: $fromPayload['pix_copy_paste'],
-            'pix_qr_image_url' => $fromPayload['pix_qr_image_url'],
+            'pix_qr_image_url' => $pixQrImageUrl,
             'last_synced_at' => $invoice->cora_last_synced_at?->toISOString(),
         ];
     }
 
     public function hasBoletoAssets(array $assets): bool
     {
-        return $this->coerceScalarString($assets['boleto_digitable'] ?? null) !== null
-            || $this->coerceScalarString($assets['boleto_number'] ?? null) !== null
-            || $this->coerceScalarString($assets['boleto_url'] ?? null) !== null;
+        if ($this->coerceScalarString($assets['boleto_digitable'] ?? null) !== null
+            || $this->coerceScalarString($assets['boleto_number'] ?? null) !== null) {
+            return true;
+        }
+
+        $url = $this->coerceScalarString($assets['boleto_url'] ?? null);
+        if ($url === null || $this->isPixQrImageUrl($url)) {
+            return false;
+        }
+
+        return $this->looksLikeBoletoDocumentUrl($url);
     }
 
     /**
@@ -408,11 +426,54 @@ class InvoiceCoraChargeAssetsService
     private function looksLikePdfUrl(string $url): bool
     {
         $path = strtolower((string) parse_url($url, PHP_URL_PATH));
+        $normalized = strtolower($url);
 
         return str_ends_with($path, '.pdf')
-            || str_contains(strtolower($url), '.pdf')
-            || str_contains(strtolower($url), 'boleto-qrcode')
-            || str_contains(strtolower($url), '/bank_slip');
+            || str_contains($normalized, '.pdf')
+            || str_contains($normalized, '/bank_slip');
+    }
+
+    /**
+     * URL de documento de boleto (PDF) — exclui imagem de QR PIX.
+     */
+    public function looksLikeBoletoDocumentUrl(?string $url): bool
+    {
+        $normalized = $this->coerceScalarString($url);
+        if ($normalized === null || $this->isPixQrImageUrl($normalized)) {
+            return false;
+        }
+
+        $lower = strtolower($normalized);
+        $path = strtolower((string) parse_url($normalized, PHP_URL_PATH));
+
+        return $this->looksLikePdfUrl($normalized)
+            || str_contains($path, 'boleto-')
+            || str_contains($lower, 'boleto-qrcode')
+            || str_contains($lower, '/boleto');
+    }
+
+    /**
+     * Imagem de QR Code PIX da Cora (não é PDF de boleto).
+     */
+    public function isPixQrImageUrl(?string $url): bool
+    {
+        $normalized = $this->coerceScalarString($url);
+        if ($normalized === null) {
+            return false;
+        }
+
+        $lower = strtolower($normalized);
+        $path = strtolower((string) parse_url($normalized, PHP_URL_PATH));
+
+        if (str_contains($lower, 'cobranca-qrcode')) {
+            return true;
+        }
+
+        if (str_ends_with($path, '.png') || str_ends_with($path, '.jpg') || str_ends_with($path, '.jpeg') || str_ends_with($path, '.webp')) {
+            return str_contains($lower, 'qrcode') || str_contains($lower, 'qr-code') || str_contains($lower, 'qr_code');
+        }
+
+        return false;
     }
 
     public function hasPixAssets(array $assets): bool
@@ -482,14 +543,15 @@ class InvoiceCoraChargeAssetsService
         $hasBoleto = $this->hasBoletoAssets($assets);
         $hasPix = $this->hasPixAssets($assets);
         $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
+        $boletoUrl = $this->coerceScalarString($assets['boleto_url'] ?? null);
         $hybridIndicator = $this->indicatesHybridCharge($payload)
-            || $this->isHybridBoletoUrl($this->coerceScalarString($assets['boleto_url'] ?? null));
+            || $this->isHybridBoletoUrl($boletoUrl);
 
         if ($hasBoleto && ($hasPix || $hybridIndicator)) {
             return 'hybrid';
         }
 
-        if ($hasPix) {
+        if ($hasPix && ! $hasBoleto) {
             return 'pix';
         }
 
@@ -498,6 +560,11 @@ class InvoiceCoraChargeAssetsService
         }
 
         $paymentMethod = strtolower((string) $invoice->payment_method);
+
+        // Corrige classificação antiga: hybrid sem assets de boleto real = PIX.
+        if ($paymentMethod === 'hybrid' && $hasPix && ! $hasBoleto) {
+            return 'pix';
+        }
 
         return match (true) {
             $paymentMethod === 'hybrid' => 'hybrid',
@@ -520,6 +587,38 @@ class InvoiceCoraChargeAssetsService
             'pix' => 'pix',
             default => null,
         };
+    }
+
+    /**
+     * Persiste correção de payment_method quando assets não batem com o valor salvo
+     * (ex.: hybrid antigo com apenas QR PIX / sem boleto).
+     */
+    public function reconcileStoredPaymentMethod(Invoice $invoice): void
+    {
+        if (! $invoice->cora_charge_id) {
+            return;
+        }
+
+        $resolved = $this->resolveChargeMethodFromInvoice($invoice);
+        if ($resolved === null) {
+            return;
+        }
+
+        $desired = match ($resolved) {
+            'hybrid' => 'hybrid',
+            'pix' => 'pix',
+            'bank_slip' => 'bank_slip',
+            default => null,
+        };
+
+        if ($desired === null || $invoice->payment_method === $desired) {
+            return;
+        }
+
+        // Só corrige casos claramente inconsistentes (hybrid sem boleto → pix).
+        if ($invoice->payment_method === 'hybrid' && $desired === 'pix') {
+            $invoice->update(['payment_method' => 'pix']);
+        }
     }
 
     /**
@@ -550,6 +649,7 @@ class InvoiceCoraChargeAssetsService
 
         $boletoUrl = $this->extractPaymentUrl($externalInvoice);
 
+        // boleto-qrcode-*.pdf = híbrido real da Cora; cobranca-qrcode-*.png = só PIX.
         if ($this->isHybridBoletoUrl($boletoUrl)) {
             return true;
         }
@@ -567,9 +667,12 @@ class InvoiceCoraChargeAssetsService
 
         $normalized = strtolower(trim($url));
 
-        return str_contains($normalized, 'boleto-qrcode')
-            || str_contains($normalized, 'qrcode')
-            || str_contains($normalized, 'qr-code');
+        if ($this->isPixQrImageUrl($normalized)) {
+            return false;
+        }
+
+        // Nome típico do PDF híbrido Cora (boleto com QR PIX embutido).
+        return str_contains($normalized, 'boleto-qrcode');
     }
 
     /**
@@ -627,9 +730,16 @@ class InvoiceCoraChargeAssetsService
 
         foreach ($candidates as $value) {
             $normalized = $this->coerceScalarString($value);
-            if ($normalized !== null) {
-                return $normalized;
+            if ($normalized === null) {
+                continue;
             }
+
+            // Não promove imagem de QR PIX a boleto_url.
+            if ($this->isPixQrImageUrl($normalized)) {
+                continue;
+            }
+
+            return $normalized;
         }
 
         return null;
@@ -671,11 +781,22 @@ class InvoiceCoraChargeAssetsService
             data_get($externalInvoice, 'payment_options.pix.qr_code_url'),
             $externalInvoice['qr_code_image_url'] ?? null,
             $externalInvoice['qr_code_url'] ?? null,
+            // Em cobrança PIX pura a Cora coloca o PNG no payment_url (cobranca-qrcode-*.png).
+            $externalInvoice['payment_url'] ?? null,
         ];
 
         foreach ($candidates as $value) {
             $normalized = $this->coerceScalarString($value);
-            if ($normalized !== null) {
+            if ($normalized === null) {
+                continue;
+            }
+
+            if ($this->isPixQrImageUrl($normalized)
+                || (! str_contains(strtolower($normalized), '.pdf')
+                    && (str_contains(strtolower($normalized), 'qrcode')
+                        || str_contains(strtolower($normalized), 'qr-code')
+                        || str_contains(strtolower($normalized), 'qr_code')))
+            ) {
                 return $normalized;
             }
         }

@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Modal as RNModal,
   View,
   Text,
   TouchableOpacity,
@@ -8,8 +7,20 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { MessageModalProps, MessageModalType } from "../../types/components";
+import OverlayPortal from "./OverlayPortal";
 
-const config: Record<MessageModalType, { icon: any; iconColor: string; bg: string; titleColor: string; msgColor: string; btnBg: string; btnText: string }> = {
+const config: Record<
+  MessageModalType,
+  {
+    icon: any;
+    iconColor: string;
+    bg: string;
+    titleColor: string;
+    msgColor: string;
+    btnBg: string;
+    btnText: string;
+  }
+> = {
   error: {
     icon: "alert-circle-outline",
     iconColor: "#EF4444",
@@ -60,116 +71,99 @@ export default function MessageModal({
   const horizontalPadding = isMobile ? 16 : 40;
   const c = config[type];
 
-  if (!visible) return null;
-
   return (
-    <RNModal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <OverlayPortal open={visible} onClose={onClose} contentPadding={horizontalPadding}>
       <View
         style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.45)",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: horizontalPadding,
+          width: "100%",
+          maxWidth: Math.min(width - horizontalPadding * 2, 500),
+          backgroundColor: "white",
+          borderRadius: 24,
+          overflow: "hidden",
+          borderWidth: 1,
+          borderColor: "rgba(17,24,39,0.08)",
+          shadowColor: "#111827",
+          shadowOpacity: 0.18,
+          shadowRadius: 26,
+          shadowOffset: { width: 0, height: 14 },
+          elevation: 10,
         }}
       >
         <View
           style={{
-            width: "100%",
-            maxWidth: Math.min(width - horizontalPadding * 2, 500),
-            backgroundColor: "white",
-            borderRadius: 24,
-            overflow: "hidden",
-            borderWidth: 1,
-            borderColor: "rgba(17,24,39,0.08)",
-            shadowColor: "#111827",
-            shadowOpacity: 0.18,
-            shadowRadius: 26,
-            shadowOffset: { width: 0, height: 14 },
-            elevation: 10,
+            height: 104,
+            backgroundColor: c.bg,
+            alignItems: "center",
+            justifyContent: "center",
+            borderBottomWidth: 1,
+            borderBottomColor: c.iconColor + "18",
           }}
         >
           <View
             style={{
-              height: 104,
-              backgroundColor: c.bg,
+              width: 70,
+              height: 70,
+              borderRadius: 22,
+              backgroundColor: "white",
               alignItems: "center",
               justifyContent: "center",
-              borderBottomWidth: 1,
-              borderBottomColor: c.iconColor + "18",
+              borderWidth: 1,
+              borderColor: c.iconColor + "25",
+              shadowColor: c.iconColor,
+              shadowOpacity: 0.16,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 3,
             }}
           >
-            <View
-              style={{
-                width: 70,
-                height: 70,
-                borderRadius: 22,
-                backgroundColor: "white",
-                alignItems: "center",
-                justifyContent: "center",
-                borderWidth: 1,
-                borderColor: c.iconColor + "25",
-                shadowColor: c.iconColor,
-                shadowOpacity: 0.16,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 6 },
-                elevation: 3,
-              }}
-            >
-              <Ionicons name={c.icon} size={40} color={c.iconColor} />
-            </View>
-          </View>
-
-          <View style={{ padding: isMobile ? 22 : 28 }}>
-            {!!title && (
-              <Text
-                style={{
-                  fontSize: 17,
-                  fontWeight: "800",
-                  color: c.titleColor,
-                  textAlign: "center",
-                  marginBottom: 8,
-                }}
-              >
-                {title}
-              </Text>
-            )}
-
-            <Text
-              style={{
-                fontSize: 15,
-                color: c.msgColor,
-                textAlign: "center",
-                lineHeight: 23,
-                marginBottom: 24,
-              }}
-            >
-              {message}
-            </Text>
-
-            <TouchableOpacity
-              onPress={onClose}
-              activeOpacity={0.85}
-              style={{
-                backgroundColor: c.btnBg,
-                borderRadius: 12,
-                paddingVertical: 12,
-                alignItems: "center",
-                outlineStyle: "none" as any,
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 14, fontWeight: "800" }}>
-                {c.btnText}
-              </Text>
-            </TouchableOpacity>
+            <Ionicons name={c.icon} size={40} color={c.iconColor} />
           </View>
         </View>
+
+        <View style={{ padding: isMobile ? 22 : 28 }}>
+          {!!title && (
+            <Text
+              style={{
+                fontSize: 17,
+                fontWeight: "800",
+                color: c.titleColor,
+                textAlign: "center",
+                marginBottom: 8,
+              }}
+            >
+              {title}
+            </Text>
+          )}
+
+          <Text
+            style={{
+              fontSize: 15,
+              color: c.msgColor,
+              textAlign: "center",
+              lineHeight: 23,
+              marginBottom: 24,
+            }}
+          >
+            {message}
+          </Text>
+
+          <TouchableOpacity
+            onPress={onClose}
+            activeOpacity={0.85}
+            style={{
+              backgroundColor: c.btnBg,
+              borderRadius: 12,
+              paddingVertical: 12,
+              alignItems: "center",
+              outlineStyle: "none" as any,
+            }}
+          >
+            <Text style={{ color: "white", fontSize: 14, fontWeight: "800" }}>
+              {c.btnText}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </RNModal>
+    </OverlayPortal>
   );
 }
