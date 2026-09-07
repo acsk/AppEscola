@@ -59,8 +59,8 @@ class EnrollmentCarneService
             'excluded_count' => $excluded->count(),
             'archive_format' => $archiveFormat,
             'archive_format_hint' => $archiveFormat === 'pdf'
-                ? 'Um único PDF com todos os boletos em sequência.'
-                : 'Arquivo ZIP com um PDF por parcela (ideal para imprimir todos).',
+                ? 'Um único PDF com todos os boletos em sequência (todos_os_boletos_nome_do_aluno.pdf).'
+                : 'Os boletos saem agrupados; o painel monta um PDF único (todos_os_boletos_nome_do_aluno.pdf).',
             'cora_due_date_policy_hint' => CoraPaymentGateway::DUE_DATE_POLICY_HINT,
             ...$this->buildPreviewInvoiceLists($eligible, $environment),
             'excluded_invoices' => $excluded->values()->all(),
@@ -443,19 +443,10 @@ class EnrollmentCarneService
 
     private function buildCarneFilename(Enrollment $enrollment, string $format, int $boletoCount): string
     {
-        $ref = preg_replace('/[^a-zA-Z0-9\-]+/', '-', (string) ($enrollment->enrollment_number ?? ('matricula-' . $enrollment->id)));
-        $ref = trim($ref, '-') ?: 'matricula';
         $studentSlug = $this->slugifyForFilename((string) ($enrollment->student?->name ?? 'aluno'));
         $extension = $format === 'zip' ? 'zip' : 'pdf';
 
-        return sprintf(
-            'carne-%s-%s-%d-parcelas-%s.%s',
-            $ref,
-            $studentSlug,
-            max(1, $boletoCount),
-            now()->format('Y-m-d'),
-            $extension
-        );
+        return sprintf('todos_os_boletos_%s.%s', $studentSlug, $extension);
     }
 
     private function slugifyForFilename(string $value): string

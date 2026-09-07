@@ -18,6 +18,7 @@ import {
   type CarnePreview,
   type CarnePreviewInvoice,
 } from "../../services/enrollmentCarne";
+import { ensureSingleBoletoPdf } from "../../utils/mergeBoletoPdfs";
 import { isoToDisplay } from "../../utils/masks";
 import CoraDueDatePolicyBanner from "./CoraDueDatePolicyBanner";
 
@@ -180,24 +181,45 @@ export default function EnrollmentCarneModal({
   const runGenerate = async () => {
     setGenerating(true);
     try {
-      const { blob, filename, format, generatedCount, errorCount, errors } =
-        await generateCarneArchive(enrollmentId, {
-          environment,
-          invoiceIds: selectedIds,
-          issueMissing,
-          requireAll,
+      const archive = await generateCarneArchive(enrollmentId, {
+        environment,
+        invoiceIds: selectedIds,
+        issueMissing,
+        requireAll,
+      });
+
+      let blob = archive.blob;
+      let filename = archive.filename;
+      let format: "pdf" | "zip" = archive.format;
+
+      try {
+        const unified = await ensureSingleBoletoPdf({
+          blob: archive.blob,
+          format: archive.format,
+          filename: archive.filename,
+          studentName: preview?.student_name,
         });
+        blob = unified.blob;
+        filename = unified.filename;
+        format = unified.format;
+      } catch {
+        // Se a unificação falhar, mantém o arquivo original (ZIP ou PDF).
+        if (format === "zip" && !filename.toLowerCase().endsWith(".zip")) {
+          filename = `${filename.replace(/\.(pdf|zip)$/i, "")}.zip`;
+        }
+      }
+
       downloadBlob(blob, filename);
       let message = buildCarneSuccessMessage({
         studentName: preview?.student_name,
         enrollmentNumber: preview?.enrollment_number,
         filename,
         format,
-        generatedCount,
-        errorCount,
+        generatedCount: archive.generatedCount,
+        errorCount: archive.errorCount,
       });
-      if (errorCount > 0 && errors.length > 0) {
-        const detail = errors
+      if (archive.errorCount > 0 && archive.errors.length > 0) {
+        const detail = archive.errors
           .slice(0, 2)
           .map((row) => row.description || row.message)
           .filter(Boolean)
@@ -344,8 +366,7 @@ export default function EnrollmentCarneModal({
   );
 
   const studentLabel = preview?.student_name ?? "Aluno";
-  const archiveLabel =
-    preview?.archive_format === "zip" ? "ZIP (um PDF por parcela)" : "PDF único";
+  const archiveLabel = "PDF único (todos os boletos)";
 
   const renderIntro = () => (
     <View>
@@ -526,7 +547,7 @@ export default function EnrollmentCarneModal({
   );
 
   const stepTitle: Record<Step, string> = {
-    intro: "Gerar carnê",
+    intro: "Todos os boletos",
     select: "Selecionar parcelas",
     options: "Opções",
     confirm: "Confirmar e baixar",

@@ -119,11 +119,8 @@ export type CarneGenerateErrorRow = {
 /** Espelha o padrão do backend para exibir nome do arquivo antes do download. */
 export function predictCarneFilename(
   preview: Pick<CarnePreview, "enrollment_id" | "enrollment_number" | "student_name" | "archive_format">,
-  parcelCount: number
+  _parcelCount?: number
 ): string {
-  const ref = (preview.enrollment_number ?? `matricula-${preview.enrollment_id}`)
-    .replace(/[^a-zA-Z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "matricula";
   const slug = (preview.student_name ?? "aluno")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -131,11 +128,9 @@ export function predictCarneFilename(
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40) || "aluno";
-  const date = new Date().toISOString().slice(0, 10);
-  const ext = preview.archive_format === "pdf" ? "pdf" : "zip";
-  const count = Math.max(1, parcelCount);
 
-  return `carne-${ref}-${slug}-${count}-parcelas-${date}.${ext}`;
+  // O painel unifica ZIP em PDF; o nome previsível é sempre .pdf.
+  return `todos_os_boletos_${slug}.pdf`;
 }
 
 export function buildCarneSuccessMessage(options: {
@@ -154,7 +149,7 @@ export function buildCarneSuccessMessage(options: {
       ? "Abra o ZIP e imprima cada PDF."
       : "Imprima o PDF único em sequência.";
 
-  let message = `Carnê de ${who}${ref}: ${options.generatedCount} boleto(s) em "${options.filename}". ${formatHint}`;
+  let message = `Todos os boletos de ${who}${ref}: ${options.generatedCount} boleto(s) em "${options.filename}". ${formatHint}`;
 
   if ((options.errorCount ?? 0) > 0) {
     message += ` (${options.errorCount} parcela(s) não incluída(s).)`;
@@ -213,7 +208,7 @@ export async function generateCarneArchive(
   const filename =
     filenameHeader ||
     match?.[1]?.trim() ||
-    `carne-matricula-${enrollmentId}.${format === "zip" ? "zip" : "pdf"}`;
+    `todos_os_boletos_matricula-${enrollmentId}.${format === "zip" ? "zip" : "pdf"}`;
 
   let generatedCount = Number(headerValue(headers, "x-carne-generated-count") || 0);
   let errorCount = Number(headerValue(headers, "x-carne-error-count") || 0);

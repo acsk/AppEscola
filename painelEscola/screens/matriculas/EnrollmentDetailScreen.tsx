@@ -1584,7 +1584,7 @@ export default function EnrollmentDetailScreen({
           >
             <Ionicons name="newspaper-outline" size={16} color="#059669" />
             <Text className="font-bold text-sm ml-1 text-emerald-800">
-              Gerar carnê
+              Todos os boletos
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
