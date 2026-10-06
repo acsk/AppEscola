@@ -46,6 +46,9 @@ use App\Http\Controllers\Api\PastExamController;
 use App\Http\Controllers\Api\OfficialAssessmentController;
 use App\Http\Controllers\Api\StudentPastExamController;
 use App\Http\Controllers\Api\ExamTypeController;
+use App\Http\Controllers\Api\QuestionBankController;
+use App\Http\Controllers\Api\QuestionCatalogController;
+use App\Http\Controllers\Api\SubjectTopicController;
 use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -323,6 +326,28 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('admin/exam-types', [ExamTypeController::class, 'store']);
     Route::put('admin/exam-types/{examType}', [ExamTypeController::class, 'update']);
     Route::delete('admin/exam-types/{examType}', [ExamTypeController::class, 'destroy']);
+
+    // Banco de questões (avulsas e de simulados): listagem e classificação
+    Route::prefix('question-bank')->group(function () {
+        Route::get('questions',                          [QuestionBankController::class, 'index']);
+        Route::get('questions/ids',                      [QuestionBankController::class, 'ids']);
+        Route::get('questions/years',                    [QuestionBankController::class, 'years']);
+        Route::patch('questions/classification',         [QuestionBankController::class, 'batchClassification']);
+        Route::get('questions/{question}',               [QuestionBankController::class, 'show'])->whereNumber('question');
+        Route::patch('questions/{question}/classification', [QuestionBankController::class, 'updateClassification'])->whereNumber('question');
+
+        Route::get('subjects',          [SubjectTopicController::class, 'subjects']);
+        Route::get('topics',            [SubjectTopicController::class, 'index']);
+        Route::post('topics',           [SubjectTopicController::class, 'store']);
+        Route::put('topics/{id}',       [SubjectTopicController::class, 'update'])->whereNumber('id');
+        Route::delete('topics/{id}',    [SubjectTopicController::class, 'destroy'])->whereNumber('id');
+
+        Route::get('catalogs',                     [QuestionCatalogController::class, 'catalogs']);
+        Route::get('catalogs/{catalog}',           [QuestionCatalogController::class, 'index']);
+        Route::post('catalogs/{catalog}',          [QuestionCatalogController::class, 'store']);
+        Route::put('catalogs/{catalog}/{id}',      [QuestionCatalogController::class, 'update'])->whereNumber('id');
+        Route::delete('catalogs/{catalog}/{id}',   [QuestionCatalogController::class, 'destroy'])->whereNumber('id');
+    });
 
     // Questões de um simulado (nested)
     Route::get('exams/{exam}/questions',               [ExamQuestionController::class, 'index']);

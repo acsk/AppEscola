@@ -40,6 +40,7 @@ import {
 import { PastExamsScreen } from "./screens/provas-anteriores";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import ExamTypesScreen from "./screens/admin/ExamTypesScreen";
+import { QuestionBankScreen, QuestionClassifyScreen, QuestionTaxonomyScreen } from "./screens/banco-questoes";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
 import { BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/configuracoes";
@@ -123,8 +124,16 @@ const SCREEN_SLUGS = [
 ];
 
 function hashToNav(hash: string): NavState {
-  const path = hash.replace(/^#\/?/, "");
+  const [path, query = ""] = hash.replace(/^#\/?/, "").split("?");
   const [seg0, seg1] = path.split("/").filter(Boolean);
+
+  // Banco de questões: o estado da listagem (filtros, aba, ordem, página) fica na query do hash.
+  if (seg0 === "questoes") {
+    const id = seg1 ? parseInt(seg1, 10) : NaN;
+    if (!isNaN(id) && id > 0) return { screen: "questoes-classificar", params: { questionId: id, query } };
+    return { screen: "questoes", params: { query } };
+  }
+  if (seg0 === "questoes-taxonomia") return { screen: "questoes-taxonomia" };
 
   if (seg0 === "bancos") {
     return { screen: "bancos_crud" };
@@ -254,6 +263,14 @@ function hashToNav(hash: string): NavState {
 }
 
 function navToHash(nav: NavState): string {
+  if (nav.screen === "questoes") {
+    const query = nav.params?.query;
+    return query ? `#/questoes?${query}` : "#/questoes";
+  }
+  if (nav.screen === "questoes-classificar") {
+    const query = nav.params?.query;
+    return `#/questoes/${nav.params?.questionId}${query ? `?${query}` : ""}`;
+  }
   if (nav.screen === "bancos_crud") return "#/bancos";
   if (nav.screen === "pagamentos") return "#/configuracao-provedores";
   if (nav.screen === "alunos-form") {
@@ -682,6 +699,8 @@ function AppContent() {
     ? "relatorios-turmas"
     : nav.screen.startsWith("simulados")
     ? "simulados"
+    : nav.screen.startsWith("questoes")
+    ? "questoes"
     : nav.screen.startsWith("avaliacoes-oficiais")
     ? "avaliacoes-oficiais"
     : nav.screen.startsWith("tipos-prova")
@@ -776,7 +795,8 @@ function AppContent() {
       !canManageExams &&
       (nav.screen === "simulados" ||
         nav.screen === "simulados-form" ||
-        nav.screen === "simulados-tentativas")
+        nav.screen === "simulados-tentativas" ||
+        nav.screen.startsWith("questoes"))
     ) {
       return (
         <View className="flex-1 items-center justify-center px-6">
@@ -933,6 +953,17 @@ function AppContent() {
           />
         );
       case "tipos-prova": return <ExamTypesScreen />;
+      case "questoes": return <QuestionBankScreen navigate={navigate} />;
+      case "questoes-classificar":
+        return (
+          <QuestionClassifyScreen
+            key={String(nav.params?.questionId)}
+            navigate={navigate}
+            questionId={Number(nav.params?.questionId)}
+            listQuery={String(nav.params?.query ?? "")}
+          />
+        );
+      case "questoes-taxonomia": return <QuestionTaxonomyScreen navigate={navigate} />;
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;

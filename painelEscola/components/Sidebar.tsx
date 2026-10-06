@@ -116,7 +116,10 @@ export default function Sidebar({
         { id: "turmas", label: "Turmas", icon: "grid-outline" },
         { id: "cursos", label: "Cursos", icon: "book-outline" },
         ...(canManageExams
-          ? [{ id: "simulados", label: "Simulados", icon: "document-text-outline" as const }]
+          ? [
+              { id: "simulados", label: "Simulados", icon: "document-text-outline" as const },
+              { id: "questoes", label: "Banco de questões", icon: "help-circle-outline" as const },
+            ]
           : []),
         { id: "avaliacoes-oficiais", label: "Avaliações presenciais", icon: "clipboard-outline" },
         { id: "provas-anteriores", label: "Provas/Materiais", icon: "archive-outline" },

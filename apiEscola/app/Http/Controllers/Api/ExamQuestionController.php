@@ -187,6 +187,7 @@ class ExamQuestionController extends Controller
     public function show(Request $request, Exam $exam, ExamQuestion $question): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        $this->assertQuestionBelongsToExam($exam, $question);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         $question->load(['subject', 'options', 'examType']);
@@ -229,6 +230,7 @@ class ExamQuestionController extends Controller
     public function update(UpdateExamQuestionRequest $request, Exam $exam, ExamQuestion $question): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        $this->assertQuestionBelongsToExam($exam, $question);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         DB::transaction(function () use ($request, $question) {
@@ -252,6 +254,14 @@ class ExamQuestionController extends Controller
                 unset($data['exam_type']);
             }
             $question->update($data);
+
+            // Disciplina trocada: descarta assuntos de outra disciplina (classificação do banco de questões).
+            if ($question->wasChanged('subject_id')) {
+                $staleTopicIds = $question->topics()
+                    ->when($question->subject_id, fn ($q, $subjectId) => $q->where('subject_topics.subject_id', '!=', $subjectId))
+                    ->pluck('subject_topics.id');
+                $question->topics()->detach($staleTopicIds);
+            }
 
             if ($request->has('options') && $request->options !== null) {
                 // Remove as antigas e recria
@@ -278,6 +288,7 @@ class ExamQuestionController extends Controller
     public function destroy(Request $request, Exam $exam, ExamQuestion $question): JsonResponse
     {
         $this->authorizeTenant($request, $exam->tenant_id);
+        $this->assertQuestionBelongsToExam($exam, $question);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
         $exam->load('examStatus');
@@ -287,6 +298,14 @@ class ExamQuestionController extends Controller
         $question->delete();
 
         return response()->json(['message' => 'Questão removida com sucesso.']);
+    }
+
+    /** Impede acessar, pela rota do simulado, questão de outro simulado ou questão avulsa. */
+    private function assertQuestionBelongsToExam(Exam $exam, ExamQuestion $question): void
+    {
+        if ((int) $question->exam_id !== (int) $exam->id) {
+            abort(404, 'Questão não encontrada neste simulado.');
+        }
     }
 
     private function authorizeTenant(Request $request, int $resourceTenantId): void

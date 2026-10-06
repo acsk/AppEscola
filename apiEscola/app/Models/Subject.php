@@ -37,6 +37,11 @@ class Subject extends Model
         return $this->hasMany(ClassSchedule::class);
     }
 
+    public function topics(): HasMany
+    {
+        return $this->hasMany(SubjectTopic::class)->orderBy('name');
+    }
+
     public function professors(): BelongsToMany
     {
         return $this->belongsToMany(User::class)

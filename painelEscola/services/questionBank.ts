@@ -1,0 +1,141 @@
+import api from "./api";
+import type {
+  BatchItem,
+  BatchResult,
+  CatalogDefinition,
+  CatalogItem,
+  CatalogKey,
+  ClassificationPatch,
+  ExamTypeSummary,
+  QuestionBankQuestion,
+  QuestionBankTabCounts,
+  SubjectSummary,
+  SubjectTopic,
+} from "../types/questionBank";
+import { BATCH_CHUNK_SIZE, chunk } from "../utils/questionBankQuery";
+
+/** Banco de questões — integração com /question-bank (apiEscola). */
+
+export type QuestionBankPage = {
+  data: QuestionBankQuestion[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    tab_counts: QuestionBankTabCounts;
+  };
+};
+
+export async function fetchQuestionBankPage(params: Record<string, string | number>): Promise<QuestionBankPage> {
+  const { data } = await api.get("/question-bank/questions", { params });
+  return data;
+}
+
+export async function fetchQuestionBankIds(params: Record<string, string | number>) {
+  const { data } = await api.get("/question-bank/questions/ids", { params });
+  return data.body as { ids: number[]; truncated: boolean };
+}
+
+export async function fetchQuestionBankYears(): Promise<number[]> {
+  const { data } = await api.get("/question-bank/questions/years");
+  return data.body ?? [];
+}
+
+export async function fetchQuestionBankQuestion(id: number): Promise<QuestionBankQuestion> {
+  const { data } = await api.get(`/question-bank/questions/${id}`);
+  return data.body;
+}
+
+/** Devolve o envelope completo (para o toast usar a mensagem da API). */
+export async function patchQuestionClassification(id: number, patch: ClassificationPatch) {
+  const { data } = await api.patch(`/question-bank/questions/${id}/classification`, patch);
+  return data as { type: string; message: string; body: QuestionBankQuestion };
+}
+
+/**
+ * Classificação em lote, em blocos sequenciais. Um bloco que falha inteiro (rede, 5xx)
+ * vira falha de cada item dele; os demais blocos continuam.
+ */
+export async function patchClassificationBatch(
+  items: BatchItem[],
+  onProgress?: (done: number, total: number) => void
+): Promise<BatchResult[]> {
+  const results: BatchResult[] = [];
+  for (const part of chunk(items, BATCH_CHUNK_SIZE)) {
+    try {
+      const { data } = await api.patch("/question-bank/questions/classification", { items: part });
+      results.push(...(data.body?.results ?? []));
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? "Falha de comunicação com o servidor.";
+      results.push(...part.map((item) => ({ id: item.id, ok: false, message })));
+    }
+    onProgress?.(results.length, items.length);
+  }
+  return results;
+}
+
+// ── Cadastros e taxonomia ───────────────────────────────────────────────────
+
+export async function fetchCatalogDefinitions(): Promise<CatalogDefinition[]> {
+  const { data } = await api.get("/question-bank/catalogs");
+  return data.body ?? [];
+}
+
+export async function fetchCatalog(catalog: CatalogKey, search?: string): Promise<CatalogItem[]> {
+  const { data } = await api.get(`/question-bank/catalogs/${catalog}`, { params: search ? { search } : {} });
+  return data.body ?? [];
+}
+
+export async function saveCatalogItem(
+  catalog: CatalogKey,
+  payload: { name: string; description?: string | null },
+  id?: number
+) {
+  const { data } = id
+    ? await api.put(`/question-bank/catalogs/${catalog}/${id}`, payload)
+    : await api.post(`/question-bank/catalogs/${catalog}`, payload);
+  return data;
+}
+
+export async function deleteCatalogItem(catalog: CatalogKey, id: number) {
+  const { data } = await api.delete(`/question-bank/catalogs/${catalog}/${id}`);
+  return data;
+}
+
+export async function fetchTopics(subjectIds?: number[]): Promise<SubjectTopic[]> {
+  const params = subjectIds?.length ? { subject_id: subjectIds.join(",") } : {};
+  const { data } = await api.get("/question-bank/topics", { params });
+  return data.body ?? [];
+}
+
+export async function saveTopic(
+  payload: { subject_id?: number; name?: string; description?: string | null },
+  id?: number
+) {
+  const { data } = id
+    ? await api.put(`/question-bank/topics/${id}`, payload)
+    : await api.post("/question-bank/topics", payload);
+  return data;
+}
+
+export async function deleteTopic(id: number) {
+  const { data } = await api.delete(`/question-bank/topics/${id}`);
+  return data;
+}
+
+/** Disciplinas ativas com a contagem de questões (árvore da taxonomia). */
+export async function fetchSubjectsWithCounts(): Promise<(SubjectSummary & { questions_count: number })[]> {
+  const { data } = await api.get("/question-bank/subjects");
+  return data.body ?? [];
+}
+
+export async function fetchActiveSubjects(): Promise<SubjectSummary[]> {
+  const { data } = await api.get("/subjects", { params: { status: "active", per_page: 200 } });
+  return (data.data ?? data).map((s: SubjectSummary) => ({ id: s.id, name: s.name }));
+}
+
+export async function fetchActiveExamTypes(): Promise<ExamTypeSummary[]> {
+  const { data } = await api.get("/exam-types");
+  return (Array.isArray(data) ? data : data.body ?? []).map((t: ExamTypeSummary) => ({ id: t.id, label: t.label }));
+}

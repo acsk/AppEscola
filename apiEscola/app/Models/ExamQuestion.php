@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Traits\TracksUserActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -18,6 +20,11 @@ class ExamQuestion extends Model
         'exam_id',
         'subject_id',
         'exam_type_id',
+        'difficulty_id',
+        'board_id',
+        'year',
+        'is_annulled',
+        'is_outdated',
         'type',
         'question_text',
         'image_url',
@@ -35,6 +42,9 @@ class ExamQuestion extends Model
         'points'            => 'decimal:2',
         'order'             => 'integer',
         'allow_text_answer' => 'boolean',
+        'year'              => 'integer',
+        'is_annulled'       => 'boolean',
+        'is_outdated'       => 'boolean',
     ];
 
     public function exam(): BelongsTo
@@ -52,6 +62,28 @@ class ExamQuestion extends Model
         return $this->belongsTo(ExamType::class);
     }
 
+    public function difficulty(): BelongsTo
+    {
+        return $this->belongsTo(QuestionDifficulty::class, 'difficulty_id');
+    }
+
+    public function board(): BelongsTo
+    {
+        return $this->belongsTo(QuestionBoard::class, 'board_id');
+    }
+
+    public function topics(): BelongsToMany
+    {
+        return $this->belongsToMany(SubjectTopic::class, 'exam_question_topic', 'exam_question_id', 'subject_topic_id')
+            ->orderBy('subject_topics.name');
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(QuestionTag::class, 'exam_question_tag', 'exam_question_id', 'question_tag_id')
+            ->orderBy('question_tags.name');
+    }
+
     public function options(): HasMany
     {
         return $this->hasMany(ExamQuestionOption::class, 'question_id')->orderBy('order');
@@ -60,6 +92,14 @@ class ExamQuestion extends Model
     public function answers(): HasMany
     {
         return $this->hasMany(ExamAnswer::class, 'question_id');
+    }
+
+    /** Banco de questões: avulsas e de simulados não excluídos (questões de simulado excluído ficam de fora). */
+    public function scopeInQuestionBank(Builder $query, int $tenantId): Builder
+    {
+        return $query->where('exam_questions.tenant_id', $tenantId)
+            ->where(fn (Builder $q) => $q->whereNull('exam_questions.exam_id')
+                ->orWhereHas('exam'));
     }
 
     public function isMultipleChoice(): bool
