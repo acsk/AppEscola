@@ -44,7 +44,8 @@ class QuestionImageService
                 'topics' => $source->topics->pluck('name')->all(),
             ];
             $prompt = "Compreenda a imagem e sua função pedagógica na questão. Não invente medidas nem informações ilegíveis.\n"
-                ."Documentos oficiais, fotografias de identificação, figuras complexas ou ilegíveis: status NEEDS_REVIEW e motivo.\n"
+                ."Imagens com texto, enunciado, fórmulas ou expressões matemáticas que você consegue ler são READY (mesmo que sejam o próprio enunciado).\n"
+                ."NEEDS_REVIEW só para: documentos oficiais, fotografias de identificação, ou imagem que você realmente não consegue ler; informe o motivo.\n"
                 .AiPromptGuard::wrap('questao_original', json_encode($sourceData, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR))
                 ."\nFormato JSON obrigatório:\n".json_encode([
                     'status' => 'READY | NEEDS_REVIEW', 'motivo' => null,
