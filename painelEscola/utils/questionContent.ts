@@ -88,7 +88,7 @@ export function contentFromSuggestion(s: AiQuestionSuggestion): ContentForm {
   return {
     type: s.type,
     question_text: s.question_text ?? "",
-    image_url: "",
+    image_url: s.image_url ?? "",
     explanation: s.explanation ?? "",
     options: s.type === "multiple_choice" && options.length ? options : emptyOptions(),
   };

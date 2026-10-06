@@ -704,6 +704,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                           type: menuRow.type,
                           optionsCount: menuRow.options?.length ?? 0,
                           difficultyId: menuRow.difficulty_id,
+                          imageUrl: menuRow.image_url,
                         });
                         setMenuRow(null);
                       },

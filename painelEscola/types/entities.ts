@@ -15,12 +15,17 @@ export type StudentRef = {
   id: number;
   name: string;
   enrollment_number?: string | null;
+  document?: string | null;
+  email?: string | null;
+  phone?: string | null;
 };
 
 export type SchoolClassRef = {
   id: number;
   name: string;
   course?: CourseRef;
+  /** morning | afternoon | night | full_time */
+  period?: string | null;
 };
 
 export type DesiredCourseRef = {

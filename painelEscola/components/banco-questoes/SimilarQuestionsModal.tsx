@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react-native";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
@@ -11,7 +11,9 @@ import DeleteIconButton from "../ui/DeleteIconButton";
 import ClassificationFields from "./ClassificationFields";
 import OptionsEditor from "./OptionsEditor";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
-import { aiSimilarQuestions } from "../../services/questionAi";
+import { aiSimilarQuestions, aiRegenerateImage } from "../../services/questionAi";
+import type { AiImageReview } from "../../types/questionAi";
+import { imageContentSignature, imageQuestionContent, imageReviewIssue } from "../../utils/questionImageReview";
 import { createStandaloneQuestion } from "../../services/questionBank";
 import { getApiErrorMessage, getApiValidationErrors } from "../../utils/apiErrors";
 import {
@@ -34,6 +36,7 @@ export type SimilarSource = {
   type: "multiple_choice" | "essay";
   optionsCount: number;
   difficultyId: number | null;
+  imageUrl?: string | null;
 };
 
 type Draft = {
@@ -43,6 +46,10 @@ type Draft = {
   classification: ClassificationForm;
   errors: Record<string, string>;
   showClassification: boolean;
+  image?: AiImageReview;
+  imageSignature?: string;
+  imageInstructions: string;
+  imageLoadError: boolean;
 };
 
 type Props = {
@@ -73,6 +80,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   const [optionsCount, setOptionsCount] = useState(5);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
@@ -90,6 +98,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   }, [visible, source]);
 
   const included = drafts.filter((d) => d.include);
+  const busy = generating || saving || regenerating !== null;
   const isEssay = source?.type === "essay";
 
   const difficultyOptions = useMemo(
@@ -119,7 +128,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         difficulty_id: difficulty === SAME_DIFFICULTY ? undefined : Number(difficulty),
         options_count: isEssay ? undefined : optionsCount,
         instructions: instructions.trim() || undefined,
-      });
+      }, Boolean(source.imageUrl));
       setDrafts(
         response.body.questions.map((q) => ({
           key: `draft-${draftSeq++}`,
@@ -128,6 +137,12 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
           classification: classificationFromSuggestion(q),
           errors: {},
           showClassification: false,
+          image: q.generation_id && q.image_generation
+            ? { generation_id: q.generation_id, image_url: q.image_url ?? null, image_generation: q.image_generation }
+            : undefined,
+          imageSignature: imageContentSignature(contentFromSuggestion(q)),
+          imageInstructions: "",
+          imageLoadError: false,
         }))
       );
       setStep("review");
@@ -140,12 +155,39 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     }
   };
 
+  const regenerateImage = async (draft: Draft) => {
+    if (!draft.image || busy) return;
+    const errors = validateContent(draft.content);
+    if (Object.keys(errors).length) {
+      updateDraft(draft.key, { errors });
+      return;
+    }
+    setRegenerating(draft.key);
+    try {
+      const response = await aiRegenerateImage(draft.image.generation_id, imageQuestionContent(draft.content), draft.imageInstructions.trim() || undefined);
+      updateDraft(draft.key, {
+        image: response.body,
+        content: { ...draft.content, image_url: response.body.image_url ?? "" },
+        imageSignature: imageContentSignature(draft.content),
+        imageLoadError: false,
+        errors: {},
+      });
+      setToast({ visible: true, type: response.body.image_generation.status === "READY" ? "success" : "error", message: response.message });
+    } catch (err) {
+      updateDraft(draft.key, { errors: { image: getApiErrorMessage(err, "Não foi possível regenerar a imagem.") } });
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
   /** Salva as marcadas uma a uma; as salvas saem da lista e as com erro ficam para correção. */
   const includeQuestions = async () => {
     let hasClientErrors = false;
     const checked = drafts.map((d) => {
       if (!d.include) return d;
       const errors = validateContent(d.content);
+      const imageIssue = imageReviewIssue(d.content, d.image, d.imageSignature);
+      if (imageIssue || d.imageLoadError) errors.image = imageIssue || "Não foi possível visualizar a imagem. Regenere antes de aprovar.";
       if (Object.keys(errors).length) hasClientErrors = true;
       return { ...d, errors };
     });
@@ -167,6 +209,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         await createStandaloneQuestion({
           ...contentPayload(draft.content),
           ...diffClassification(EMPTY_CLASSIFICATION_FORM, draft.classification),
+          ...(draft.image ? { generation_id: draft.image.generation_id } : {}),
         });
         saved++;
       } catch (err) {
@@ -193,14 +236,14 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
       </>
     ) : (
       <>
-        <Button icon={Sparkles} label="Gerar de novo" onPress={() => setStep("config")} disabled={saving} />
+        <Button icon={Sparkles} label="Gerar de novo" onPress={() => setStep("config")} disabled={busy} />
         <Button
           variant="primary"
           icon={Check}
           label={included.length === 1 ? "Incluir 1 questão" : `Incluir ${included.length} questões`}
           onPress={() => void includeQuestions()}
           loading={saving}
-          disabled={included.length === 0}
+          disabled={busy || included.length === 0 || included.some((draft) => imageReviewIssue(draft.content, draft.image, draft.imageSignature) !== null || draft.imageLoadError)}
         />
       </>
     );
@@ -209,7 +252,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     <Modal
       visible={visible}
       title={step === "config" ? `Criar questões semelhantes à #${source?.id ?? ""}` : "Revisar questões geradas"}
-      onClose={() => !generating && !saving && onClose()}
+      onClose={() => !busy && onClose()}
       size={step === "config" ? "sm" : "lg"}
       compact
       maxHeight="92%"
@@ -222,6 +265,13 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
             A IA cria questões inéditas sobre o mesmo conteúdo, já com gabarito, explicação e classificação. Você revisa
             tudo antes de incluir.
           </Text>
+          {source?.imageUrl ? (
+            <Text className="text-sm text-warning" style={{ marginBottom: 12 }}>
+              A referência possui imagem: a IA fará análise visual, recriação, geração e validação.
+              O modelo principal pode gerar cobrança no OpenRouter. No MVP síncrono, prefira uma questão por vez:
+              lotes maiores podem exceder o timeout do servidor, mesmo com o painel aguardando.
+            </Text>
+          ) : null}
           <FormSelect label="Quantidade de questões" value={quantity} options={QUANTITY_OPTIONS} onChange={(v) => setQuantity(Number(v))} />
           <FormSelect label="Dificuldade" value={difficulty} options={difficultyOptions} onChange={setDifficulty} />
           {!isEssay && (
@@ -280,6 +330,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                   role="checkbox"
                   aria-checked={draft.include}
                   onPress={() => updateDraft(draft.key, { include: !draft.include })}
+                  disabled={busy}
                   className="flex-row items-center"
                   style={{ gap: 8 }}
                 >
@@ -302,6 +353,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                 <DeleteIconButton
                   label={`Descartar questão ${index + 1}`}
                   onPress={() => setDrafts((prev) => prev.filter((d) => d.key !== draft.key))}
+                  disabled={busy}
                 />
               </View>
 
@@ -317,14 +369,59 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                     value={draft.content.question_text}
                     onChange={(v) => updateDraft(draft.key, { content: { ...draft.content, question_text: v } })}
                     error={draft.errors.question_text}
+                    disabled={busy}
                     minHeight={100}
                   />
+                  {draft.image ? (
+                    <View style={{ gap: 8, marginBottom: 14 }}>
+                      {draft.content.image_url ? (
+                        <Image
+                          source={{ uri: draft.content.image_url }}
+                          accessibilityLabel={`Imagem gerada para a questão ${index + 1}`}
+                          resizeMode="contain"
+                          style={{ width: "100%", height: 240 }}
+                          onError={() => updateDraft(draft.key, { imageLoadError: true })}
+                        />
+                      ) : null}
+                      <Text className="text-xs text-ink-muted">
+                        Modelo: {draft.image.image_generation.model ?? "—"} · Tentativas: {draft.image.image_generation.attempts}
+                      </Text>
+                      {imageReviewIssue(draft.content, draft.image, draft.imageSignature) || draft.imageLoadError ? (
+                        <Text className="text-sm text-danger" aria-live="polite">
+                          {imageReviewIssue(draft.content, draft.image, draft.imageSignature) || "Não foi possível visualizar a imagem."}
+                        </Text>
+                      ) : (
+                        <Text className="text-xs text-ink-muted">
+                          {draft.image.image_generation.validation
+                            ? `IA: imagem validada — ${Math.round(draft.image.image_generation.validation.confidence * 100)}%. Avaliação auxiliar; confira os dados.`
+                            : "Sem validação automática. Confira todos os dados da imagem antes de aprovar."}
+                        </Text>
+                      )}
+                      <FormInput
+                        label="Preferência de estilo para regenerar"
+                        value={draft.imageInstructions}
+                        onChangeText={(value) => updateDraft(draft.key, { imageInstructions: value })}
+                        maxLength={500}
+                        placeholder="Ex.: fundo simples e labels maiores"
+                        editable={!busy}
+                      />
+                      <Button
+                        icon={Sparkles}
+                        label="Regenerar imagem com IA"
+                        onPress={() => void regenerateImage(draft)}
+                        loading={regenerating === draft.key}
+                        disabled={busy}
+                      />
+                      {draft.errors.image ? <Text className="text-xs text-danger">{draft.errors.image}</Text> : null}
+                    </View>
+                  ) : null}
                   {draft.content.type === "multiple_choice" && (
                     <OptionsEditor
                       labelId={`${draft.key}-alternativas`}
                       options={draft.content.options}
                       onChange={(options) => updateDraft(draft.key, { content: { ...draft.content, options } })}
                       error={draft.errors.options}
+                      disabled={busy}
                     />
                   )}
                   <RichTextInput
@@ -332,6 +429,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                     value={draft.content.explanation}
                     onChange={(v) => updateDraft(draft.key, { content: { ...draft.content, explanation: v } })}
                     minHeight={72}
+                    disabled={busy}
                   />
                   <FormSelect
                     dense

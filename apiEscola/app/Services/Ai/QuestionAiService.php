@@ -11,6 +11,7 @@ use App\Models\Subject;
 use App\Models\SubjectTopic;
 use App\Models\User;
 use App\Support\AiPromptGuard;
+use App\Support\QuestionImageSpec;
 use App\Support\QuestionRichText;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +22,8 @@ use Illuminate\Support\Facades\Log;
  * - similar: gera questões parecidas com uma existente, já classificadas.
  *
  * A IA só pode escolher ids dos catálogos do tenant enviados no prompt; o que vier fora disso
- * é descartado aqui (nada é gravado — o painel confirma e salva pelo fluxo normal).
+ * é descartado aqui (questões só são gravadas após confirmação pelo painel).
+ * O pipeline com imagem persiste rascunhos e arquivos para revisão e auditoria.
  * Prompt injection: todo texto de usuário/banco vai delimitado como dado (AiPromptGuard).
  */
 class QuestionAiService
@@ -36,11 +38,12 @@ class QuestionAiService
     public function __construct(
         private readonly AiCredentialResolver $resolver,
         private readonly AiChatClient $client,
+        private readonly QuestionImageService $images,
     ) {}
 
     /**
      * @param  array{question_text: string, type?: string|null, options?: array<int, array{option_text?: string}>}  $input
-     * @return array<string, mixed>  sugestão no formato do payload de criação + "notes"
+     * @return array<string, mixed> sugestão no formato do payload de criação + "notes"
      */
     public function autofill(?User $user, int $tenantId, array $input): array
     {
@@ -58,7 +61,7 @@ class QuestionAiService
             .'Responda somente com um objeto JSON válido. '.self::FORMAT_RULES."\n\n".AiPromptGuard::SYSTEM_RULES;
 
         $user = implode("\n\n", array_filter([
-            "Analise o enunciado abaixo e preencha os campos da questão.",
+            'Analise o enunciado abaixo e preencha os campos da questão.',
             "ENUNCIADO:\n".AiPromptGuard::wrap('enunciado', $input['question_text']),
             $filledOptions ? "ALTERNATIVAS JÁ INFORMADAS (mantenha o texto e só indique a correta):\n".AiPromptGuard::wrap('alternativas', implode("\n", $filledOptions)) : null,
             ! empty($input['type']) ? 'TIPO ESCOLHIDO: '.($input['type'] === 'essay' ? 'dissertativa' : 'objetiva') : null,
@@ -69,20 +72,20 @@ class QuestionAiService
             ."- \"explanation\": resolva a questão passo a passo ANTES de definir o gabarito; a alternativa correta tem de bater com essa resolução (confira os cálculos).\n"
             ."- Classificação: use apenas ids das listas abaixo; se nenhum servir, use null (ou lista vazia).\n"
             ."- \"board_id\" e \"year\" só se a banca/ano estiverem explícitos no enunciado (ex.: \"(ENEM 2019)\").\n"
-            ."- \"tags\": até 3 palavras-chave curtas.",
+            .'- "tags": até 3 palavras-chave curtas.',
             $this->catalogsPrompt($catalogs),
             "Formato da resposta:\n".json_encode([
                 'question_text' => 'string',
-                'type'          => 'multiple_choice | essay',
-                'explanation'   => 'string',
-                'options'       => [['option_text' => 'string', 'is_correct' => true]],
-                'subject_id'    => 'int|null',
-                'topic_ids'     => ['int'],
+                'type' => 'multiple_choice | essay',
+                'explanation' => 'string',
+                'options' => [['option_text' => 'string', 'is_correct' => true]],
+                'subject_id' => 'int|null',
+                'topic_ids' => ['int'],
                 'difficulty_id' => 'int|null',
-                'board_id'      => 'int|null',
-                'year'          => 'int|null',
-                'exam_type_id'  => 'int|null',
-                'tags'          => ['string'],
+                'board_id' => 'int|null',
+                'year' => 'int|null',
+                'exam_type_id' => 'int|null',
+                'tags' => ['string'],
             ], JSON_UNESCAPED_UNICODE),
         ]));
 
@@ -101,13 +104,17 @@ class QuestionAiService
 
     /**
      * @param  array{quantity: int, difficulty_id?: int|null, options_count?: int|null, instructions?: string|null}  $params
-     * @return array<int, array<string, mixed>>  questões no formato do payload de criação
+     * @return array<int, array<string, mixed>> questões no formato do payload de criação
      */
     public function similar(?User $user, int $tenantId, ExamQuestion $source, array $params): array
     {
+        $actor = $user;
         $credential = $this->credential($user, $tenantId);
         $catalogs = $this->catalogs($tenantId);
         $source->loadMissing(['options', 'subject:id,name', 'topics:id,name', 'difficulty:id,name', 'tags:id,name']);
+        $imageContext = trim((string) $source->image_url) !== ''
+            ? $this->images->prepare($user, $tenantId, $source)
+            : null;
 
         $quantity = max(1, min(10, (int) $params['quantity']));
         $type = $source->type === 'essay' ? 'essay' : 'multiple_choice';
@@ -147,20 +154,30 @@ class QuestionAiService
             "Formato da resposta:\n".json_encode([
                 'questions' => [[
                     'question_text' => 'string',
-                    'explanation'   => 'string',
-                    'options'       => [['option_text' => 'string', 'is_correct' => true]],
+                    'explanation' => 'string',
+                    'options' => [['option_text' => 'string', 'is_correct' => true]],
                 ]],
             ], JSON_UNESCAPED_UNICODE),
         ]));
 
-        $raw = $this->client->json($credential, $system, $user, 0.8);
+        if ($imageContext !== null) {
+            $user .= "\n\nANÁLISE VISUAL DA REFERÊNCIA:\n"
+                .AiPromptGuard::wrap('analise_visual', json_encode($imageContext['analysis'], JSON_UNESCAPED_UNICODE))
+                ."\nPara cada questão, acrescente \"possui_imagem\" (boolean). Se a nova questão dispensar imagem, use false e não invente uma.\n"
+                ."Se precisar, use true e acrescente \"image_spec\" no formato abaixo. TODOS os dados visuais e labels devem ser da NOVA questão.\n"
+                ."Não preserve números da referência que mudaram. Não coloque a resposta no spec.\n"
+                .json_encode(QuestionImageSpec::specFormat(), JSON_UNESCAPED_UNICODE);
+        }
+        $raw = $imageContext === null
+            ? $this->client->json($credential, $system, $user, 0.8)
+            : $this->images->recreate($imageContext, $system, $user);
 
         $classification = [
-            'subject_id'    => $source->subject_id,
-            'topic_ids'     => $source->topics->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+            'subject_id' => $source->subject_id,
+            'topic_ids' => $source->topics->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             'difficulty_id' => $difficulty ? (int) $difficulty['id'] : null,
-            'exam_type_id'  => $source->exam_type_id,
-            'tags'          => array_values(array_unique([...$source->tags->pluck('name')->all(), self::AI_TAG])),
+            'exam_type_id' => $source->exam_type_id,
+            'tags' => array_values(array_unique([...$source->tags->pluck('name')->all(), self::AI_TAG])),
         ];
 
         $questions = [];
@@ -172,7 +189,10 @@ class QuestionAiService
             if ($content === null || trim(QuestionRichText::plain($content['question_text'])) === '') {
                 continue;
             }
-            $questions[] = $this->shuffleOptions($content) + $classification;
+            $suggestion = $this->shuffleOptions($content) + $classification;
+            $questions[] = $imageContext === null
+                ? $suggestion
+                : $this->images->create($actor, $tenantId, $source, $suggestion, $item, $imageContext);
         }
 
         if ($questions === []) {
@@ -203,9 +223,9 @@ class QuestionAiService
             if (AiPromptGuard::looksLikeInjection(QuestionRichText::plain($text))) {
                 Log::warning('IA: possível prompt injection no conteúdo', [
                     'tenant_id' => $tenantId,
-                    'action'    => $action,
-                    'user_id'   => auth()->id(),
-                    'excerpt'   => mb_substr(QuestionRichText::plain($text), 0, 200),
+                    'action' => $action,
+                    'user_id' => auth()->id(),
+                    'excerpt' => mb_substr(QuestionRichText::plain($text), 0, 200),
                 ]);
 
                 return;
@@ -230,9 +250,9 @@ class QuestionAiService
             : (($raw['type'] ?? null) === 'essay' ? 'essay' : 'multiple_choice');
 
         $content = [
-            'type'          => $type,
+            'type' => $type,
             'question_text' => $this->text($raw['question_text'] ?? '', 20000),
-            'explanation'   => $this->text($raw['explanation'] ?? '', 20000),
+            'explanation' => $this->text($raw['explanation'] ?? '', 20000),
         ];
 
         if ($type === 'essay') {
@@ -249,7 +269,7 @@ class QuestionAiService
             }
             $options[] = [
                 'option_text' => $text,
-                'is_correct'  => is_array($option) && filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'is_correct' => is_array($option) && filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
         }
         $options = array_slice($options, 0, $expectedOptions ?? 10);
@@ -292,13 +312,13 @@ class QuestionAiService
             ->unique()->take(5)->values()->all();
 
         return array_filter([
-            'subject_id'    => $subjectId,
-            'topic_ids'     => $topicIds,
+            'subject_id' => $subjectId,
+            'topic_ids' => $topicIds,
             'difficulty_id' => $pick($catalogs['difficulties'], $raw['difficulty_id'] ?? null),
-            'board_id'      => $pick($catalogs['boards'], $raw['board_id'] ?? null),
-            'year'          => $year !== null && $year >= 1900 && $year <= 2100 ? $year : null,
-            'exam_type_id'  => $pick($catalogs['exam_types'], $raw['exam_type_id'] ?? null),
-            'tags'          => $tags,
+            'board_id' => $pick($catalogs['boards'], $raw['board_id'] ?? null),
+            'year' => $year !== null && $year >= 1900 && $year <= 2100 ? $year : null,
+            'exam_type_id' => $pick($catalogs['exam_types'], $raw['exam_type_id'] ?? null),
+            'tags' => $tags,
         ], fn ($v) => $v !== null && $v !== []);
     }
 
@@ -315,11 +335,11 @@ class QuestionAiService
         $plain = fn ($models) => $models->map(fn ($m) => $m->toArray())->values();
 
         return [
-            'subjects'     => $plain(Subject::query()->where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name'])),
-            'topics'       => $plain(SubjectTopic::query()->where('tenant_id', $tenantId)->orderBy('name')->limit(self::MAX_TOPICS_IN_PROMPT)->get(['id', 'subject_id', 'name'])),
+            'subjects' => $plain(Subject::query()->where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name'])),
+            'topics' => $plain(SubjectTopic::query()->where('tenant_id', $tenantId)->orderBy('name')->limit(self::MAX_TOPICS_IN_PROMPT)->get(['id', 'subject_id', 'name'])),
             'difficulties' => $plain(QuestionDifficulty::query()->orderBy('sort_order')->get(['id', 'name'])),
-            'boards'       => $plain(QuestionBoard::query()->where('tenant_id', $tenantId)->orderBy('name')->limit(300)->get(['id', 'name'])),
-            'exam_types'   => $plain(ExamType::query()->active()->get(['id', 'label'])),
+            'boards' => $plain(QuestionBoard::query()->where('tenant_id', $tenantId)->orderBy('name')->limit(300)->get(['id', 'name'])),
+            'exam_types' => $plain(ExamType::query()->active()->get(['id', 'label'])),
         ];
     }
 

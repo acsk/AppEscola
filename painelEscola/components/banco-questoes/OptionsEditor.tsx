@@ -15,10 +15,11 @@ type Props = {
   error?: string;
   /** Id único do rótulo (vários editores na mesma tela, ex.: modal de semelhantes). */
   labelId?: string;
+  disabled?: boolean;
 };
 
 /** Alternativas de questão objetiva: texto com formatação, gabarito (rádio), adicionar/remover. */
-export default function OptionsEditor({ options, onChange, error, labelId = "alternativas-label" }: Props) {
+export default function OptionsEditor({ options, onChange, error, labelId = "alternativas-label", disabled = false }: Props) {
   const setText = (key: string, text: string) =>
     onChange(options.map((o) => (o.key === key ? { ...o, option_text: text } : o)));
 
@@ -42,6 +43,7 @@ export default function OptionsEditor({ options, onChange, error, labelId = "alt
               aria-checked={option.is_correct}
               aria-label={`Alternativa ${LETTERS[i]} é a correta`}
               onPress={() => onChange(markCorrect(options, option.key))}
+              disabled={disabled}
               className="items-center justify-center"
               style={{ width: 28, height: 36 }}
             >
@@ -68,6 +70,7 @@ export default function OptionsEditor({ options, onChange, error, labelId = "alt
               onChange={(v) => setText(option.key, v)}
               placeholder={`Texto da alternativa ${LETTERS[i]}`}
               aria-label={`Texto da alternativa ${LETTERS[i]}`}
+              disabled={disabled}
             />
             {option.is_correct && (
               <Text className="text-xs font-medium text-success" style={{ marginRight: 4, lineHeight: 36 }}>
@@ -79,6 +82,7 @@ export default function OptionsEditor({ options, onChange, error, labelId = "alt
                 <DeleteIconButton
                   label={`Remover alternativa ${LETTERS[i]}`}
                   onPress={() => onChange(options.filter((o) => o.key !== option.key))}
+                  disabled={disabled}
                 />
               </View>
             )}
@@ -94,6 +98,7 @@ export default function OptionsEditor({ options, onChange, error, labelId = "alt
             icon={Plus}
             label="Adicionar alternativa"
             onPress={() => onChange([...options, { key: newOptionKey(), option_text: "", is_correct: false }])}
+            disabled={disabled}
           />
         </View>
       )}

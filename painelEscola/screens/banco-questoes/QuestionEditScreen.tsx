@@ -76,16 +76,30 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [aiAvailable, setAiAvailable] = useState(false);
+  const [aiStatusLoading, setAiStatusLoading] = useState(true);
+  const [aiStatusError, setAiStatusError] = useState<string | null>(null);
   const [aiFilling, setAiFilling] = useState(false);
   const [aiHintDismissed, setAiHintDismissed] = useState(false);
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
   const [sourceDifficultyId, setSourceDifficultyId] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetchAiStatus()
-      .then((status) => setAiAvailable(status.available))
-      .catch(() => setAiAvailable(false));
+  const loadAiStatus = useCallback(async () => {
+    setAiStatusLoading(true);
+    setAiStatusError(null);
+    try {
+      const status = await fetchAiStatus();
+      setAiAvailable(status.available);
+    } catch (error) {
+      setAiAvailable(false);
+      setAiStatusError(getApiErrorMessage(error, "Não foi possível verificar a configuração de IA."));
+    } finally {
+      setAiStatusLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadAiStatus();
+  }, [loadAiStatus]);
 
   const load = useCallback(async () => {
     if (!isEdit) return;
@@ -134,6 +148,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const leave = (action: () => void) => (dirty ? setPendingLeave(() => action) : action());
 
   const setField = <K extends keyof ContentForm>(key: K, value: ContentForm[K]) => {
+    if (aiFilling) return;
     setContent((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => {
       const next = { ...prev };
@@ -150,6 +165,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
   /** Preenche alternativas, gabarito, explicação e (na criação) a classificação, sem apagar o que já foi digitado. */
   const autofill = async () => {
+    if (aiFilling || saving !== null || uploading || !aiAvailable) return;
     if (statementChars < AI_MIN_CHARS) {
       setErrors((prev) => ({ ...prev, question_text: `Escreva um enunciado com pelo menos ${AI_MIN_CHARS} caracteres para usar a IA.` }));
       return;
@@ -164,23 +180,15 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       });
       const merged = mergeContentSuggestion(content, response.body);
       setContent(merged.form);
-      const filled = [...merged.filled];
       if (!isEdit) {
         const classified = mergeClassificationSuggestion(classification, response.body);
         if (classified.changed) {
           setClassification(classified.form);
-          filled.push("classificação");
         }
       }
       setErrors({});
       setAiHintDismissed(true);
-      setToast({
-        visible: true,
-        type: "success",
-        message: filled.length
-          ? `IA preencheu: ${filled.join(", ")}. Revise antes de salvar.`
-          : "A IA não encontrou campos vazios para preencher.",
-      });
+      showApiToast(setToast, response, "Campos sugeridos pela IA. Revise antes de salvar.");
     } catch (error) {
       setErrors((prev) => ({ ...prev, ...getApiValidationErrors(error) }));
       showApiErrorToast(setToast, error, "Não foi possível preencher com IA.");
@@ -190,7 +198,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   };
 
   const onPickImage = async (file: File | undefined) => {
-    if (!file) return;
+    if (!file || aiFilling || saving !== null) return;
     if (file.size > MAX_IMAGE_BYTES) {
       setErrors((prev) => ({ ...prev, image_url: "A imagem deve ter no máximo 5MB." }));
       return;
@@ -211,6 +219,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   };
 
   const save = async (mode: "save" | "another") => {
+    if (aiFilling || uploading || saving !== null) return;
     const clientErrors = validateContent(content);
     if (Object.keys(clientErrors).length) {
       setErrors(clientErrors);
@@ -253,7 +262,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       title="Conteúdo"
       description="Enunciado, alternativas e gabarito da questão avulsa."
       actions={
-        aiAvailable ? (
+        isEdit && aiAvailable ? (
           <Button
             size="sm"
             icon={Sparkles}
@@ -282,8 +291,24 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         onChange={(v) => setField("question_text", v)}
         error={errors.question_text}
         minHeight={140}
+        disabled={aiFilling}
         placeholder="Texto do enunciado (opcional se houver imagem). Pode colar a questão inteira, com as alternativas."
       />
+
+      {!isEdit && (
+        <View style={{ gap: 8, marginBottom: 16 }}>
+          <Text className={`text-xs ${aiStatusError ? "text-danger" : "text-ink-muted"}`} aria-live="polite">
+            {aiStatusLoading
+              ? "Verificando configuração de IA…"
+              : aiStatusError
+                ? aiStatusError
+                : !aiAvailable
+                  ? "Para autocompletar, cadastre uma chave em Configurações → Integração com IA."
+                  : "Escreva ao menos 15 caracteres no enunciado e use “Autocompletar com IA” para sugerir alternativas, gabarito, explicação e classificação. Revise antes de salvar."}
+          </Text>
+          {aiStatusError ? <Button size="sm" label="Verificar IA novamente" onPress={() => void loadAiStatus()} /> : null}
+        </View>
+      )}
 
       {showAiHint && (
         <View
@@ -296,7 +321,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           </Text>
           <View className="flex-row" style={{ gap: 8 }}>
             <Button size="sm" variant="ghost" label="Agora não" onPress={() => setAiHintDismissed(true)} />
-            <Button size="sm" variant="primary" icon={Sparkles} label="Preencher com IA" onPress={() => void autofill()} />
+            <Button size="sm" variant="primary" icon={Sparkles} label="Autocompletar com IA" onPress={() => void autofill()} disabled={saving !== null || uploading} />
           </View>
         </View>
       )}
@@ -315,12 +340,12 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
               resizeMode="contain"
             />
             <View className="flex-row" style={{ gap: 8 }}>
-              <Button size="sm" icon={ImagePlus} label="Trocar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} />
-              <Button size="sm" variant="danger" icon={Trash2} label="Remover imagem" onPress={() => setField("image_url", "")} />
+              <Button size="sm" icon={ImagePlus} label="Trocar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
+              <Button size="sm" variant="danger" icon={Trash2} label="Remover imagem" onPress={() => setField("image_url", "")} disabled={aiFilling || saving !== null} />
             </View>
           </View>
         ) : (
-          <Button icon={ImagePlus} label="Enviar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} />
+          <Button icon={ImagePlus} label="Enviar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
         )}
         <Text className="text-xs text-ink-subtle" style={{ marginTop: 6 }}>
           JPG, PNG, WEBP ou GIF, até 5MB.
@@ -338,7 +363,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
       {/* Alternativas */}
       {content.type === "multiple_choice" && (
-        <OptionsEditor options={content.options} onChange={(options) => setField("options", options)} error={errors.options} />
+        <OptionsEditor options={content.options} onChange={(options) => setField("options", options)} error={errors.options} disabled={aiFilling} />
       )}
 
       <RichTextInput
@@ -347,6 +372,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         onChange={(v) => setField("explanation", v)}
         error={errors.explanation}
         minHeight={96}
+        disabled={aiFilling}
         placeholder="Comentário da resposta (opcional)"
       />
     </Panel>
@@ -361,7 +387,15 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             title={title}
             description={isEdit ? "Conteúdo da questão avulsa. A classificação fica na tela da questão." : "Questão avulsa, sem vínculo com simulado."}
             actions={
-              isEdit && aiAvailable && !loading && !loadError ? (
+              !isEdit ? (
+                <Button
+                  icon={Sparkles}
+                  label="Autocompletar com IA"
+                  onPress={() => void autofill()}
+                  loading={aiFilling}
+                  disabled={aiStatusLoading || !aiAvailable || statementChars < AI_MIN_CHARS || saving !== null || uploading}
+                />
+              ) : aiAvailable && !loading && !loadError ? (
                 <Button
                   icon={Sparkles}
                   label="Criar semelhantes com IA"
@@ -371,6 +405,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
                       type: initialContent.type,
                       optionsCount: initialContent.options.filter((o) => plainRichText(o.option_text).trim()).length,
                       difficultyId: sourceDifficultyId,
+                      imageUrl: initialContent.image_url,
                     })
                   }
                 />
@@ -405,16 +440,16 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
                   </Panel>
                 ) : (
                   <Panel title="Classificação" description="Opcional; pode ser feita depois.">
-                    <ClassificationFields form={classification} onChange={setClassification} catalogs={catalogs} />
+                    <ClassificationFields form={classification} onChange={(form) => !aiFilling && setClassification(form)} catalogs={catalogs} />
                   </Panel>
                 )}
               </View>
             </View>
 
             <View className="flex-row flex-wrap justify-end" style={{ gap: 8, marginTop: 24 }}>
-              <Button label="Cancelar" onPress={() => leave(goToList)} disabled={saving !== null} />
+              <Button label="Cancelar" onPress={() => leave(goToList)} disabled={saving !== null || aiFilling} />
               {!isEdit && (
-                <Button label="Salvar e criar outra" onPress={() => void save("another")} loading={saving === "another"} disabled={saving !== null} />
+                <Button label="Salvar e criar outra" onPress={() => void save("another")} loading={saving === "another"} disabled={saving !== null || aiFilling || uploading} />
               )}
               <Button variant="primary" label={isEdit ? "Salvar alterações" : "Salvar questão"} onPress={() => void save("save")} loading={saving === "save"} disabled={saving !== null} />
             </View>

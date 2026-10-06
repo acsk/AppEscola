@@ -16,7 +16,44 @@ class AiChatClient
      * @param  array{provider: string, api_key: string, base_url: string, model: string}  $credential
      * @return array<string, mixed>
      */
-    public function json(array $credential, string $system, string $user, float $temperature = 0.4): array
+    public function json(array $credential, string $system, string $user, float $temperature = 0.4, array $images = []): array
+    {
+        return $this->jsonWithMetadata($credential, $system, $user, $temperature, $images)['data'];
+    }
+
+    public function jsonWithMetadata(array $credential, string $system, string $user, float $temperature = 0.4, array $images = []): array
+    {
+        $content = $user;
+        if ($images !== []) {
+            $content = [
+                ['type' => 'text', 'text' => $user],
+                ...array_map(fn (string $url) => ['type' => 'image_url', 'image_url' => ['url' => $url]], $images),
+            ];
+        }
+        $payload = [
+            'model' => $credential['model'],
+            'temperature' => $temperature,
+            'response_format' => ['type' => 'json_object'],
+            'messages' => [
+                ['role' => 'system', 'content' => $system],
+                ['role' => 'user', 'content' => $content],
+            ],
+        ];
+        if (isset($credential['provider_routing'])) {
+            $payload['provider'] = $credential['provider_routing'];
+        }
+        $response = $this->request($credential, 'chat/completions', $payload);
+
+        return [
+            'data' => $this->decode((string) data_get($response, 'choices.0.message.content', '')),
+            'usage' => $response['usage'] ?? [],
+            'id' => $response['id'] ?? null,
+            'model' => $response['model'] ?? $credential['model'],
+        ];
+    }
+
+    /** Shared transport: credentials and provider error bodies never enter logs. */
+    public function request(array $credential, string $endpoint, ?array $payload = null): array
     {
         $headers = [];
         if ($credential['provider'] === 'openrouter') {
@@ -25,21 +62,16 @@ class AiChatClient
         }
 
         try {
-            $response = Http::withToken($credential['api_key'])
+            $request = Http::withToken($credential['api_key'])
                 ->withHeaders($headers)
                 ->acceptJson()
-                ->timeout((int) config('services.ai.timeout', 90))
-                ->post($credential['base_url'].'/chat/completions', [
-                    'model'           => $credential['model'],
-                    'temperature'     => $temperature,
-                    'response_format' => ['type' => 'json_object'],
-                    'messages'        => [
-                        ['role' => 'system', 'content' => $system],
-                        ['role' => 'user', 'content' => $user],
-                    ],
-                ]);
+                ->timeout($endpoint === 'images'
+                    ? (int) config('services.ai.images.timeout', 120)
+                    : (int) config('services.ai.timeout', 90));
+            $url = $credential['base_url'].'/'.$endpoint;
+            $response = $payload === null ? $request->get($url) : $request->post($url, $payload);
         } catch (ConnectionException $e) {
-            Log::warning('IA: falha de conexão', ['provider' => $credential['provider'], 'error' => $e->getMessage()]);
+            Log::warning('IA: falha de conexão', ['provider' => $credential['provider']]);
             throw AiException::provider();
         }
 
@@ -53,15 +85,17 @@ class AiChatClient
         if ($response->failed()) {
             Log::warning('IA: erro do provedor', [
                 'provider' => $credential['provider'],
-                'status'   => $response->status(),
-                'body'     => mb_substr($response->body(), 0, 500),
+                'status' => $response->status(),
             ]);
             throw AiException::provider();
         }
 
-        $content = (string) data_get($response->json(), 'choices.0.message.content', '');
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw AiException::invalidResponse();
+        }
 
-        return $this->decode($content);
+        return $data;
     }
 
     /** Aceita JSON puro ou dentro de bloco ```json```. */
@@ -74,7 +108,7 @@ class AiChatClient
 
         $decoded = json_decode($content, true);
         if (! is_array($decoded)) {
-            Log::warning('IA: resposta não é JSON', ['content' => mb_substr($content, 0, 500)]);
+            Log::warning('IA: resposta não é JSON');
             throw AiException::invalidResponse();
         }
 

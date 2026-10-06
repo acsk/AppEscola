@@ -2,20 +2,25 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\AiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\QuestionAiAutofillRequest;
 use App\Http\Requests\QuestionAiSimilarRequest;
+use App\Http\Requests\RegenerateQuestionImageRequest;
 use App\Models\ExamQuestion;
+use App\Models\QuestionImageGeneration;
 use App\Services\Ai\AiCredentialResolver;
 use App\Services\Ai\QuestionAiService;
+use App\Services\Ai\QuestionImageService;
 use App\Services\ExamAccessService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
- * IA no banco de questões. Só sugere conteúdo — nada é gravado aqui;
- * o painel confirma e salva pelos endpoints normais de questão avulsa.
+ * IA no banco de questões. Conteúdo só é salvo após confirmação pelo painel;
+ * rascunhos e arquivos de imagem são persistidos para revisão e auditoria.
  */
 class QuestionAiController extends Controller
 {
@@ -25,6 +30,7 @@ class QuestionAiController extends Controller
         private readonly ExamAccessService $examAccess,
         private readonly AiCredentialResolver $resolver,
         private readonly QuestionAiService $ai,
+        private readonly QuestionImageService $images,
     ) {}
 
     /** GET /question-bank/ai/status — se há chave disponível para o usuário (sem expor a chave). */
@@ -56,6 +62,31 @@ class QuestionAiController extends Controller
             ['questions' => $questions],
             count($questions).' questão(ões) gerada(s). Revise antes de incluir.'
         );
+    }
+
+    public function regenerateImage(RegenerateQuestionImageRequest $request, string $generation): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $draft = QuestionImageGeneration::query()->where('tenant_id', $tenantId)->findOrFail($generation);
+        if ($draft->image_spec === null || $draft->content === null) {
+            throw new AiException('Esta geração não possui um rascunho de imagem para regenerar.');
+        }
+        $lock = Cache::lock('question-image:'.$draft->id, 1800);
+        if (! $lock->get()) {
+            throw new AiException('Esta imagem já está sendo regenerada. Aguarde a conclusão.', 409, 'image_busy');
+        }
+        try {
+            $payload = $this->images->regenerate(
+                $request->user(), $draft, $request->validated('content'),
+                (string) $request->validated('instructions', '')
+            );
+        } finally {
+            $lock->release();
+        }
+
+        return $this->success($payload, $payload['image_generation']['status'] === 'READY'
+            ? 'Imagem regenerada. Revise antes de aprovar.'
+            : 'A imagem precisa de revisão. Confira o motivo antes de tentar novamente.');
     }
 
     private function authorizeStaff(Request $request): int

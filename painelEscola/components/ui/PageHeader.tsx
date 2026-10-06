@@ -7,12 +7,14 @@ type Props = {
   title: string;
   description?: string;
   breadcrumb?: BreadcrumbItem[];
+  /** Linha de identificação abaixo do título (código, status, datas). */
+  meta?: React.ReactNode;
   /** Ações principais da página, à direita (no máximo um `primary`). */
   actions?: React.ReactNode;
 };
 
 /** Cabeçalho de página: trilha, título (estilo `display`), descrição e ações. Fica sobre `bg`. */
-export default function PageHeader({ title, description, breadcrumb, actions }: Props) {
+export default function PageHeader({ title, description, breadcrumb, meta, actions }: Props) {
   const { isMobile } = useResponsiveLayout();
   return (
     <View
@@ -33,6 +35,7 @@ export default function PageHeader({ title, description, breadcrumb, actions }: 
         >
           {title}
         </Text>
+        {meta ? <View style={{ marginTop: 4 }}>{meta}</View> : null}
         {!!description && (
           <Text className="text-sm text-ink-muted" style={{ marginTop: 2, lineHeight: 22 }}>
             {description}

@@ -214,6 +214,7 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
                 type: question.type,
                 optionsCount: question.options?.length ?? 0,
                 difficultyId: question.difficulty_id,
+                imageUrl: question.image_url,
               })
             }
           />

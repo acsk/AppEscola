@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\ExamQuestion;
 use App\Support\QuestionRichText;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -12,7 +13,10 @@ use Illuminate\Validation\Validator;
  */
 class SaveStandaloneQuestionRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     public function rules(): array
     {
@@ -20,37 +24,38 @@ class SaveStandaloneQuestionRequest extends FormRequest
         $req = $creating ? 'required' : 'sometimes';
 
         return [
-            'type'              => [$req, 'in:multiple_choice,essay'],
-            'question_text'     => ['sometimes', 'nullable', 'string', 'max:20000'],
-            'image_url'         => ['sometimes', 'nullable', 'url', 'max:500'],
-            'video_url'         => ['sometimes', 'nullable', 'url', 'max:500'],
-            'explanation'       => ['sometimes', 'nullable', 'string', 'max:20000'],
+            'type' => [$req, 'in:multiple_choice,essay'],
+            'question_text' => ['sometimes', 'nullable', 'string', 'max:20000'],
+            'image_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+            'video_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+            'explanation' => ['sometimes', 'nullable', 'string', 'max:20000'],
             'allow_text_answer' => ['sometimes', 'boolean'],
+            'generation_id' => $creating ? ['sometimes', 'nullable', 'uuid'] : ['prohibited'],
 
-            'options'                       => ['sometimes', 'nullable', 'array', 'max:10'],
-            'options.*.option_text'         => ['required', 'string', 'max:5000'],
-            'options.*.is_correct'          => ['required', 'boolean'],
+            'options' => ['sometimes', 'nullable', 'array', 'max:10'],
+            'options.*.option_text' => ['required', 'string', 'max:5000'],
+            'options.*.is_correct' => ['required', 'boolean'],
             'options.*.triggers_text_input' => ['nullable', 'boolean'],
-            'options.*.order'               => ['nullable', 'integer', 'min:1'],
+            'options.*.order' => ['nullable', 'integer', 'min:1'],
         ] + UpdateQuestionClassificationRequest::classificationRules();
     }
 
     public function attributes(): array
     {
         return [
-            'type'                  => 'tipo',
-            'question_text'         => 'enunciado',
-            'image_url'             => 'imagem',
-            'explanation'           => 'explicação',
-            'options'               => 'alternativas',
+            'type' => 'tipo',
+            'question_text' => 'enunciado',
+            'image_url' => 'imagem',
+            'explanation' => 'explicação',
+            'options' => 'alternativas',
             'options.*.option_text' => 'texto da alternativa',
-        ] + (new UpdateQuestionClassificationRequest())->attributes();
+        ] + (new UpdateQuestionClassificationRequest)->attributes();
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            $current = $this->route('question') ? \App\Models\ExamQuestion::find((int) $this->route('question')) : null;
+            $current = $this->route('question') ? ExamQuestion::find((int) $this->route('question')) : null;
 
             $type = $this->input('type', $current?->type);
             $text = $this->has('question_text') ? $this->input('question_text') : $current?->question_text;

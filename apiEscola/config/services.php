@@ -66,6 +66,18 @@ return [
     'ai' => [
         'preferred_provider' => env('AI_PREFERRED_PROVIDER', 'openrouter'),
         'timeout' => (int) env('AI_TIMEOUT', 90),
+        'images' => [
+            'vision_model' => env('OPENROUTER_VISION_MODEL', 'openai/gpt-4o-mini'),
+            'model' => env('OPENROUTER_IMAGE_MODEL', 'google/gemini-3.1-flash-image-preview'),
+            'allow_paid_primary' => filter_var(env('IMAGE_ALLOW_PAID_PRIMARY', true), FILTER_VALIDATE_BOOLEAN),
+            'vision_free_fallbacks' => array_filter(explode(',', (string) env('OPENROUTER_VISION_FREE_FALLBACKS', ''))),
+            'free_fallbacks' => array_filter(explode(',', (string) env('OPENROUTER_IMAGE_FREE_FALLBACKS', ''))),
+            'validate' => filter_var(env('IMAGE_MULTIMODAL_VALIDATION', true), FILTER_VALIDATE_BOOLEAN),
+            'max_retries' => max(0, min(3, (int) env('IMAGE_GENERATION_MAX_RETRIES', 2))),
+            'timeout' => max(30, min(180, (int) env('IMAGE_GENERATION_TIMEOUT', 120))),
+            'max_bytes' => 5 * 1024 * 1024,
+            'max_dimension' => 4096,
+        ],
         'openrouter' => [
             'api_key' => env('OPENROUTER_API_KEY'),
             'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),

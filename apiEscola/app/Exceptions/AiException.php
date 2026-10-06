@@ -39,9 +39,10 @@ class AiException extends RuntimeException
     public function render(): JsonResponse
     {
         return response()->json([
-            'type'    => 'error',
+            'type' => 'error',
             'message' => $this->getMessage(),
-            'body'    => $this->errorCode ? ['code' => $this->errorCode] : null,
+            'body' => $this->errorCode ? ['code' => $this->errorCode]
+                + ($this->errorCode === 'image_needs_review' ? ['status' => 'NEEDS_REVIEW', 'motivo' => $this->getMessage()] : []) : null,
         ], $this->status);
     }
 }

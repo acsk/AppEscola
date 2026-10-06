@@ -347,11 +347,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::get('questions/{question}',               [QuestionBankController::class, 'show'])->whereNumber('question');
         Route::patch('questions/{question}/classification', [QuestionBankController::class, 'updateClassification'])->whereNumber('question');
 
-        // IA: sugestões (nada é gravado; o painel confirma e salva pelos endpoints acima)
+        // IA: sugestões; rascunhos de imagens ficam auditados até a aprovação.
         Route::get('ai/status', [QuestionAiController::class, 'status']);
         Route::middleware('throttle:30,1')->group(function () {
             Route::post('ai/autofill',                       [QuestionAiController::class, 'autofill']);
             Route::post('questions/{question}/ai/similar',   [QuestionAiController::class, 'similar'])->whereNumber('question');
+            Route::post('ai/image-generations/{generation}/regenerate', [QuestionAiController::class, 'regenerateImage'])->whereUuid('generation');
         });
 
         Route::get('subjects',          [SubjectTopicController::class, 'subjects']);

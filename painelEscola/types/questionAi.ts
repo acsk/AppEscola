@@ -15,6 +15,24 @@ export type AiQuestionSuggestion = {
   year?: number;
   exam_type_id?: number | null;
   tags?: string[];
+  possui_imagem?: boolean;
+  image_url?: string | null;
+  generation_id?: string;
+  image_generation?: AiImageGeneration;
+};
+
+export type AiImageGeneration = {
+  status: "PENDING" | "GENERATING" | "READY" | "NEEDS_REVIEW" | "APPROVED";
+  model: string | null;
+  attempts: number;
+  validation: { valida: boolean; confidence: number; problemas: string[]; recomendacao: string | null } | null;
+  reason: string | null;
+};
+
+export type AiImageReview = {
+  generation_id: string;
+  image_url: string | null;
+  image_generation: AiImageGeneration;
 };
 
 export type AiStatus = { available: boolean; source: "env" | "tenant" | null; provider: AiProvider | null };

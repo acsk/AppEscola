@@ -6,8 +6,11 @@ use App\Exceptions\QuestionBankException;
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
 use App\Models\ExamType;
+use App\Models\QuestionImageGeneration;
+use App\Services\Ai\QuestionImageService;
 use App\Support\QuestionRichText;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Conteúdo de questões (enunciado, alternativas, gabarito, explicação).
@@ -19,26 +22,42 @@ class QuestionContentService
     /** Campos de conteúdo gravados direto em exam_questions. */
     private const CONTENT_FIELDS = ['type', 'question_text', 'image_url', 'video_url', 'explanation', 'allow_text_answer'];
 
-    public function __construct(private readonly QuestionClassificationService $classification)
-    {
-    }
+    public function __construct(
+        private readonly QuestionClassificationService $classification,
+        private readonly QuestionImageService $images,
+    ) {}
 
     public function createStandalone(int $tenantId, array $data): ExamQuestion
     {
         return DB::transaction(function () use ($tenantId, $data) {
+            $generation = null;
+            if (! empty($data['generation_id'])) {
+                $generation = QuestionImageGeneration::query()->where('tenant_id', $tenantId)
+                    ->lockForUpdate()->find($data['generation_id']);
+                if ($generation === null) {
+                    throw ValidationException::withMessages(['generation_id' => 'Geração de imagem não encontrada para esta escola.']);
+                }
+                $this->images->assertApproval($generation, $tenantId, $data);
+            } elseif (! empty($data['image_url']) && QuestionImageGeneration::query()
+                ->whereNull('question_id')->where('image_url', $data['image_url'])->exists()) {
+                throw ValidationException::withMessages(['generation_id' => 'Informe a geração da imagem para aprovar esta questão.']);
+            }
             $question = ExamQuestion::create(array_merge(
                 $this->contentAttributes($data),
                 [
-                    'tenant_id'    => $tenantId,
-                    'exam_id'      => null,
+                    'tenant_id' => $tenantId,
+                    'exam_id' => null,
                     'exam_type_id' => $this->defaultExamTypeId(),
-                    'points'       => 1,
-                    'order'        => 1,
+                    'points' => 1,
+                    'order' => 1,
                 ]
             ));
 
             if ($question->type === 'multiple_choice') {
                 $this->syncOptions($question, $data['options'] ?? []);
+            }
+            if ($generation !== null) {
+                $generation->update(['question_id' => $question->id, 'status' => 'APPROVED']);
             }
 
             return $this->applyClassification($question, $data, $tenantId);
@@ -78,10 +97,10 @@ class QuestionContentService
         $question->options()->delete();
         foreach (array_values($options) as $i => $option) {
             ExamQuestionOption::create([
-                'question_id'         => $question->id,
-                'option_text'         => QuestionRichText::normalize($option['option_text']),
-                'is_correct'          => (bool) $option['is_correct'],
-                'order'               => $option['order'] ?? ($i + 1),
+                'question_id' => $question->id,
+                'option_text' => QuestionRichText::normalize($option['option_text']),
+                'is_correct' => (bool) $option['is_correct'],
+                'order' => $option['order'] ?? ($i + 1),
                 'triggers_text_input' => $option['triggers_text_input'] ?? false,
             ]);
         }

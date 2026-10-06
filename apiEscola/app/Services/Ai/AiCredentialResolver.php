@@ -16,13 +16,13 @@ class AiCredentialResolver
     /**
      * @return array{provider: string, api_key: string, base_url: string, model: string, source: string}|null
      */
-    public function resolve(?User $user, ?int $tenantId): ?array
+    public function resolve(?User $user, ?int $tenantId, ?string $requiredProvider = null): ?array
     {
         if ($user?->isSuperAdmin()) {
-            return $this->fromEnv();
+            return $this->fromEnv($requiredProvider);
         }
 
-        return $tenantId ? $this->fromTenant($tenantId) : null;
+        return $tenantId ? $this->fromTenant($tenantId, $requiredProvider) : null;
     }
 
     /** Resumo seguro (sem chave) para o painel saber se pode exibir os botões de IA. */
@@ -32,14 +32,14 @@ class AiCredentialResolver
 
         return [
             'available' => $credential !== null,
-            'source'    => $credential['source'] ?? null,
-            'provider'  => $credential['provider'] ?? null,
+            'source' => $credential['source'] ?? null,
+            'provider' => $credential['provider'] ?? null,
         ];
     }
 
-    private function fromEnv(): ?array
+    private function fromEnv(?string $requiredProvider = null): ?array
     {
-        foreach ($this->providerOrder() as $provider) {
+        foreach ($requiredProvider ? [$requiredProvider] : $this->providerOrder() as $provider) {
             $key = trim((string) config("services.ai.{$provider}.api_key"));
             if ($key !== '') {
                 return $this->credential($provider, $key, null, 'env');
@@ -49,7 +49,7 @@ class AiCredentialResolver
         return null;
     }
 
-    private function fromTenant(int $tenantId): ?array
+    private function fromTenant(int $tenantId, ?string $requiredProvider = null): ?array
     {
         $credentials = TenantAiCredential::query()
             ->where('tenant_id', $tenantId)
@@ -57,7 +57,7 @@ class AiCredentialResolver
             ->get()
             ->keyBy('provider');
 
-        foreach ($this->providerOrder() as $provider) {
+        foreach ($requiredProvider ? [$requiredProvider] : $this->providerOrder() as $provider) {
             $credential = $credentials->get($provider);
             $key = $credential ? trim((string) $credential->api_key) : '';
             if ($key !== '') {
@@ -72,10 +72,10 @@ class AiCredentialResolver
     {
         return [
             'provider' => $provider,
-            'api_key'  => $key,
+            'api_key' => $key,
             'base_url' => rtrim((string) config("services.ai.{$provider}.base_url"), '/'),
-            'model'    => $model ?: (string) config("services.ai.{$provider}.model"),
-            'source'   => $source,
+            'model' => $model ?: (string) config("services.ai.{$provider}.model"),
+            'source' => $source,
         ];
     }
 

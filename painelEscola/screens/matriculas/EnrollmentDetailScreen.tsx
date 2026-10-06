@@ -29,6 +29,16 @@ import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import DatePickerInput from "../../components/ui/DatePickerInput";
 import Badge from "../../components/ui/Badge";
+import Button from "../../components/ui/Button";
+import Panel from "../../components/ui/Panel";
+import PageHeader from "../../components/ui/PageHeader";
+import ActionsMenu from "../../components/ui/ActionsMenu";
+import EnrollmentFacts from "../../components/matriculas/EnrollmentFacts";
+import EnrollmentInvoicesPanel from "../../components/matriculas/EnrollmentInvoicesPanel";
+import DefinitionRows from "../../components/matriculas/DefinitionRows";
+import { FileText, Pencil, Receipt, Trash2, UserRound } from "lucide-react-native";
+import { color, type Tone } from "../../constants/theme";
+import { INVOICE_DISPLAY, invoiceDisplayStatus, monthsBetween, nextDueDate } from "../../utils/enrollmentInvoices";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import MessageModal from "../../components/ui/MessageModal";
 import {
@@ -141,6 +151,27 @@ const ENROLLMENT_STATUS_LABELS: Record<string, string> = {
   pending: "Pendente",
   cancelled: "Cancelado",
   concluded: "Concluído",
+};
+
+/** Status da matrícula no cabeçalho (feminino: "a matrícula"). */
+const ENROLLMENT_STATUS_META: Record<string, { label: string; tone: Tone }> = {
+  active: { label: "Ativa", tone: "success" },
+  pending: { label: "Pendente", tone: "warning" },
+  cancelled: { label: "Cancelada", tone: "danger" },
+  concluded: { label: "Concluída", tone: "brand" },
+};
+
+const PERIOD_LABELS: Record<string, string> = {
+  morning: "Manhã",
+  afternoon: "Tarde",
+  night: "Noite",
+  full_time: "Integral",
+};
+
+/** CPF parcialmente oculto: •••.482.•••-17 */
+const maskCpfPartial = (document?: string | null) => {
+  const d = (document ?? "").replace(/\D/g, "");
+  return d.length === 11 ? `•••.${d.slice(3, 6)}.•••-${d.slice(9)}` : document || null;
 };
 
 const INVOICE_STATUS_LABELS: Record<string, string> = {
@@ -1174,6 +1205,29 @@ export default function EnrollmentDetailScreen({
     }
   };
 
+  // ── Dados do cabeçalho, da faixa de resumo e dos painéis laterais ─────────
+  const statusMeta = ENROLLMENT_STATUS_META[enrollment.status] ?? { label: enrollment.status, tone: "neutral" as const };
+  const twoColumns = width >= 1100;
+  const vigencyMonths = monthsBetween(enrollment.start_date, enrollment.end_date ?? null);
+  const activeInvoices = invoices.filter((i) => i.status !== "cancelled").length;
+  const upcomingDue = nextDueDate(invoices);
+  const enrolledClasses = enrollment.school_classes?.length
+    ? enrollment.school_classes
+    : enrollment.school_class
+      ? [enrollment.school_class]
+      : [];
+  const classNames = enrolledClasses.map((c) => c.name);
+  const classPeriod = enrolledClasses[0]?.period ? PERIOD_LABELS[enrolledClasses[0].period] ?? enrolledClasses[0].period : null;
+  const hasDiscount = !!enrollment.discount_amount && parseFloat(enrollment.discount_amount) > 0;
+  const enrollmentFee = enrollment.course_plan?.enrollment_fee_amount && parseFloat(String(enrollment.course_plan.enrollment_fee_amount)) > 0
+    ? enrollment.course_plan.enrollment_fee_amount
+    : null;
+  const netMonthly = enrollment.net_monthly_amount
+    ? money(enrollment.net_monthly_amount)
+    : enrollment.monthly_amount
+      ? money(String(Math.max(0, parseFloat(enrollment.monthly_amount) - (parseFloat(enrollment.discount_amount ?? "0") || 0))))
+      : "—";
+
   const renderInvoiceActions = (item: Invoice) => (
     <View className="flex-row justify-end gap-1">
       <TouchableOpacity
@@ -1248,7 +1302,7 @@ export default function EnrollmentDetailScreen({
             </Text>
           ) : null}
         </View>
-        <Badge slug={item.status} label={INVOICE_STATUS_LABELS[item.status] ?? item.status} />
+        <Badge tone={INVOICE_DISPLAY[invoiceDisplayStatus(item)].tone} dot label={INVOICE_DISPLAY[invoiceDisplayStatus(item)].label} />
       </View>
       <View>{renderTypeBadge(item.type)}</View>
       <View className="flex-row items-end justify-between gap-3">
@@ -1288,39 +1342,6 @@ export default function EnrollmentDetailScreen({
       )}
       {renderInvoiceActions(item)}
     </TouchableOpacity>
-  );
-
-  const renderInfoBlock = (
-    label: string,
-    value: string,
-    detail?: string | null,
-    flex = 1
-  ) => (
-    <View
-      className="bg-surface-sunken border border-border rounded-ds-md px-3 py-2"
-      style={{ flex, minHeight: 70 }}
-    >
-      <Text className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wide mb-1">
-        {label}
-      </Text>
-      <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
-        {value || "—"}
-      </Text>
-      {!!detail && (
-        <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
-          {detail}
-        </Text>
-      )}
-    </View>
-  );
-
-  const renderFinanceBlock = (label: string, value: string) => (
-    <View className="flex-1 bg-surface-sunken border border-border rounded-ds-md px-3 py-2">
-      <Text className="text-[11px] text-ink-subtle uppercase font-semibold mb-1">{label}</Text>
-      <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
   );
 
   const renderChargeOption = ({
@@ -1402,288 +1423,155 @@ export default function EnrollmentDetailScreen({
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Enrollment summary */}
-      <View
-        className="bg-surface rounded-ds-md mb-5 border border-border"
-        style={{
-          padding: isMobile ? 12 : 16,
-          gap: 12,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <View className="flex-row items-center gap-3" style={{ flex: 1, minWidth: 0 }}>
-            <TouchableOpacity
-              onPress={() => navigate("matriculas")}
-              className="w-9 h-9 bg-brand-tint border border-border rounded-full items-center justify-center"
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back-outline" size={18} color="var(--ds-brand)" />
-            </TouchableOpacity>
-            <View className="flex-1" style={{ minWidth: 0 }}>
-              <View className="flex-row items-center gap-2" style={{ flexWrap: "wrap" }}>
-                <Text
-                  className={`${isMobile ? "text-lg" : "text-xl"} font-semibold text-ink`}
-                  numberOfLines={1}
-                >
-                  Matrícula {enrollment.enrollment_number ?? `#${enrollment.id}`}
-                </Text>
-                <Badge
-                  slug={enrollment.status}
-                  label={ENROLLMENT_STATUS_LABELS[enrollment.status] ?? enrollment.status}
+      {/* Cabeçalho: trilha, aluno, identificação e ações */}
+      <View style={{ marginBottom: 20 }}>
+        <PageHeader
+          breadcrumb={[
+            { label: "Matrículas", onPress: () => navigate("matriculas") },
+            { label: enrollment.enrollment_number ?? `#${enrollment.id}` },
+          ]}
+          title={enrollment.student?.name ?? `Matrícula ${enrollment.enrollment_number ?? `#${enrollment.id}`}`}
+          meta={
+            <View className="flex-row flex-wrap items-center" style={{ gap: 12 }}>
+              <Text className="text-sm font-mono font-medium text-ink-muted">
+                Matrícula {enrollment.enrollment_number ?? `#${enrollment.id}`}
+              </Text>
+              <View style={{ width: 1, height: 14, backgroundColor: color.border }} />
+              <Badge tone={statusMeta.tone} dot label={statusMeta.label} />
+              {enrollment.created_at ? (
+                <>
+                  <View style={{ width: 1, height: 14, backgroundColor: color.border }} />
+                  <Text className="text-sm text-ink-muted">Criada em {fmt(enrollment.created_at.slice(0, 10))}</Text>
+                </>
+              ) : null}
+            </View>
+          }
+          actions={
+            <>
+              {enrollment.student?.id ? (
+                <Button
+                  icon={FileText}
+                  label="Boletim"
+                  onPress={() =>
+                    navigate("alunos-boletim", { studentId: enrollment.student!.id, studentName: enrollment.student?.name })
+                  }
                 />
-              </View>
-              <Text className="text-sm text-ink-muted" numberOfLines={1}>
-                {enrollment.student?.name ?? "—"}
-              </Text>
-            </View>
-          </View>
-          <View className="flex-row gap-2" style={{ alignSelf: isMobile ? "stretch" : "auto" }}>
-            {enrollment.student?.id ? (
-              <TouchableOpacity
-                onPress={() =>
-                  navigate("alunos-boletim", {
-                    studentId: enrollment.student!.id,
-                    studentName: enrollment.student?.name,
-                  })
-                }
-                className="flex-row items-center justify-center bg-surface border border-border-strong px-3.5 py-2 rounded-ds-md"
-                style={{ flex: isMobile ? 1 : undefined, minHeight: 38 }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="ribbon-outline" size={15} color="var(--ds-ink)" />
-                <Text className="text-ink font-medium text-sm ml-1.5">Boletim</Text>
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity
-              onPress={openEdit}
-              className="flex-row items-center justify-center bg-brand px-3.5 py-2 rounded-ds-md"
-              style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="pencil-outline" size={15} color="var(--ds-on-brand)" />
-              <Text className="text-on-brand font-medium text-sm ml-1.5">Editar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setDeleteEnrollmentVisible(true)}
-              className="flex-row items-center justify-center bg-danger border border-danger px-3.5 py-2 rounded-ds-md"
-              style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
-              <Text className="text-on-danger font-semibold text-sm ml-1.5">Excluir</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View className="h-px bg-surface-sunken" />
-
-        <View style={{ gap: 10 }}>
-          <View style={{ flexDirection: isMobile ? "column" : "row", gap: 10 }}>
-            {renderInfoBlock(
-              enrollmentProductKind(enrollment) === "bundle" ? "Pacote" : "Curso / Plano",
-              enrollmentProductTitle(enrollment),
-              enrollmentProductSubtitle(enrollment) ??
-                (enrollment.course_plan
-                  ? `Plano ${enrollment.course_plan.name} · ${enrollment.course_plan.cycle_label}`
-                  : null),
-              1.8
-            )}
-            {renderInfoBlock("Início", fmt(enrollment.start_date), null, 0.7)}
-            {renderInfoBlock("Término", fmt(enrollment.end_date ?? null), null, 0.7)}
-            {renderInfoBlock(
-              "Vencimento",
-              enrollment.payment_due_day ? `Dia ${enrollment.payment_due_day}` : "—",
-              null,
-              0.7
-            )}
-          </View>
-
-          <View style={{ flexDirection: isMobile ? "column" : "row", gap: 10 }}>
-            {renderFinanceBlock("Mensalidade (base)", money(enrollment.monthly_amount))}
-            {renderFinanceBlock(
-              "Desconto",
-              enrollment.discount_amount && parseFloat(enrollment.discount_amount) > 0
-                ? money(enrollment.discount_amount)
-                : "—"
-            )}
-            {renderFinanceBlock(
-              "Mensalidade líquida",
-              enrollment.net_monthly_amount
-                ? money(enrollment.net_monthly_amount)
-                : enrollment.monthly_amount
-                  ? money(
-                      String(
-                        Math.max(
-                          0,
-                          parseFloat(enrollment.monthly_amount) -
-                            (parseFloat(enrollment.discount_amount ?? "0") || 0)
-                        )
-                      )
-                    )
-                  : "—"
-            )}
-            {renderFinanceBlock(
-              "Taxa de matrícula",
-              enrollment.course_plan?.enrollment_fee_amount
-                ? money(String(enrollment.course_plan.enrollment_fee_amount))
-                : "—"
-            )}
-            {enrollment.created_at &&
-              renderFinanceBlock("Criado em", fmt(enrollment.created_at.slice(0, 10)))}
-          </View>
-        </View>
+              ) : null}
+              <Button variant="primary" icon={Pencil} label="Editar matrícula" onPress={openEdit} />
+              <ActionsMenu
+                items={[
+                  ...(enrollment.student?.id
+                    ? [{ key: "ficha", label: "Ficha do aluno", icon: UserRound, onPress: () => navigate("alunos-form", { studentId: enrollment.student!.id }) }]
+                    : []),
+                  { key: "contrato", label: "Cobranças do contrato", icon: FileText, onPress: () => setContractModalVisible(true) },
+                  { key: "boletos", label: "Todos os boletos", icon: Receipt, onPress: () => setCarneModalVisible(true) },
+                  { key: "excluir", label: "Excluir matrícula…", icon: Trash2, danger: true, separatorBefore: true, onPress: () => setDeleteEnrollmentVisible(true) },
+                ]}
+              />
+            </>
+          }
+        />
       </View>
 
-      {/* Cobranças */}
+      {/* Faixa de resumo */}
+      <EnrollmentFacts
+        width={width}
+        facts={[
+          {
+            label: enrollmentProductKind(enrollment) === "bundle" ? "Pacote" : "Curso e plano",
+            value: enrollmentProductTitle(enrollment),
+            detail:
+              enrollmentProductSubtitle(enrollment) ??
+              (enrollment.course_plan ? `${enrollment.course_plan.name} · ${enrollment.course_plan.cycle_label}` : null),
+          },
+          {
+            label: "Vigência",
+            value: `${fmt(enrollment.start_date)} → ${enrollment.end_date ? fmt(enrollment.end_date) : "sem término"}`,
+            detail: [
+              vigencyMonths ? `${vigencyMonths} ${vigencyMonths === 1 ? "mês" : "meses"}` : null,
+              activeInvoices ? `${activeInvoices} cobrança${activeInvoices === 1 ? "" : "s"}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || null,
+            mono: true,
+          },
+          {
+            label: "Vencimento",
+            value: enrollment.payment_due_day ? `Todo dia ${enrollment.payment_due_day}` : "—",
+            detail: upcomingDue ? `Próximo: ${fmt(upcomingDue)}` : null,
+          },
+          {
+            label: classNames.length > 1 ? "Turmas" : "Turma",
+            value: classNames.join(", ") || "Sem turma",
+            detail: classPeriod,
+          },
+        ]}
+      />
+
       <View
-        className="mb-3"
         style={{
-          flexDirection: isMobile ? "column" : "row",
-          alignItems: isMobile ? "stretch" : "center",
-          justifyContent: "space-between",
-          gap: 10,
+          flexDirection: twoColumns ? "row" : "column",
+          alignItems: twoColumns ? "flex-start" : "stretch",
+          gap: 20,
+          marginTop: 20,
         }}
       >
-        <View>
-          <Text className="text-lg font-semibold text-ink">Cobranças</Text>
-          <Text className="text-sm text-ink-muted">
-            {invoices.length} cobrança{invoices.length !== 1 ? "s" : ""}
-          </Text>
-          {enrollment.charges_batch_generated && (
-            <View className="mt-1 self-start rounded-full bg-success-tint border border-success px-2 py-0.5">
-              <Text className="text-[11px] font-semibold text-success">
-                Lote gerado em {fmtDateTime(enrollment.charges_generated_at ?? null)}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => setContractModalVisible(true)}
-            className="flex-row items-center justify-center px-4 py-2 rounded-ds-md border bg-surface border-border-strong min-h-control-md"
-            activeOpacity={0.85}
-            style={{ minHeight: 44 }}
-          >
-            <Ionicons name="document-text-outline" size={16} color="var(--ds-ink)" />
-            <Text className="font-semibold text-sm ml-1 text-ink">
-              Cobranças do contrato
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setCarneModalVisible(true)}
-            className="flex-row items-center justify-center px-4 py-2 rounded-ds-md border bg-surface border-border-strong min-h-control-md"
-            activeOpacity={0.85}
-            style={{ minHeight: 44 }}
-          >
-            <Ionicons name="newspaper-outline" size={16} color="var(--ds-ink)" />
-            <Text className="font-semibold text-sm ml-1 text-ink">
-              Todos os boletos
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={openCreateInvoice}
-            className="flex-row items-center justify-center bg-brand px-4 rounded-ds-md py-2 min-h-control-md"
-            activeOpacity={0.85}
-            style={{
-              minHeight: 44,
+        <View style={{ flex: twoColumns ? 1 : undefined, minWidth: 0 }}>
+          <EnrollmentInvoicesPanel
+            invoices={invoices}
+            compact={showInvoiceCards}
+            typeLabels={TYPE_LABELS}
+            money={money}
+            formatDate={fmt}
+            batchGeneratedLabel={
+              enrollment.charges_batch_generated
+                ? `Lote de cobranças gerado em ${fmtDateTime(enrollment.charges_generated_at ?? null)}.`
+                : null
+            }
+            onNewInvoice={openCreateInvoice}
+            onContract={() => setContractModalVisible(true)}
+            onAllSlips={() => setCarneModalVisible(true)}
+            onOpenActions={(item) => setActionsInvoice(item)}
+            onPay={(item) => openChargeModal(item)}
+            onReceipt={(item) => openReceiptModal(item)}
+            onAudit={(item) => {
+              setAuditInvoice(item);
+              setAuditVisible(true);
             }}
-          >
-            <Ionicons name="add" size={16} color="var(--ds-on-brand)" />
-            <Text className="text-on-brand font-medium text-sm ml-1">Nova cobrança</Text>
-          </TouchableOpacity>
+            renderCard={renderInvoiceCard}
+          />
+        </View>
+
+        <View style={{ width: twoColumns ? 300 : "100%", gap: 20 }}>
+          <Panel title="Valores">
+            <DefinitionRows
+              rows={[
+                { label: "Mensalidade base", value: money(enrollment.monthly_amount) },
+                hasDiscount
+                  ? { label: "Desconto", value: `− ${money(enrollment.discount_amount)}` }
+                  : { label: "Desconto", value: "Sem desconto", muted: true },
+                enrollmentFee
+                  ? { label: "Taxa de matrícula", value: money(String(enrollmentFee)) }
+                  : { label: "Taxa de matrícula", value: "Sem taxa", muted: true },
+              ]}
+              total={{ label: "Mensalidade líquida", value: netMonthly }}
+            />
+          </Panel>
+          <Panel title="Aluno">
+            <DefinitionRows
+              rows={[
+                { label: "CPF", value: maskCpfPartial(enrollment.student?.document) ?? "Não informado", muted: !enrollment.student?.document },
+                ...(enrollment.student?.email ? [{ label: "E-mail", value: enrollment.student.email, text: true }] : []),
+                ...(enrollment.student?.phone ? [{ label: "Telefone", value: enrollment.student.phone }] : []),
+                { label: "Pagador", value: enrollment.guardian?.name ?? "O próprio aluno", text: true },
+                ...(enrollment.student?.id
+                  ? [{ label: "Cadastro", value: "Ver ficha", onPress: () => navigate("alunos-form", { studentId: enrollment.student!.id }) }]
+                  : []),
+              ]}
+            />
+          </Panel>
         </View>
       </View>
-
-      {invoices.length === 0 ? (
-        <View
-          className="bg-surface rounded-ds-md items-center justify-center py-12 border border-border"
-          style={{
-          }}
-        >
-          <Ionicons name="cash-outline" size={36} color="var(--ds-border)" />
-          <Text className="text-ink-subtle mt-3 text-sm">Nenhuma cobrança vinculada</Text>
-        </View>
-      ) : showInvoiceCards ? (
-        <View className="gap-3">{invoices.map(renderInvoiceCard)}</View>
-      ) : (
-        <View className={TABLE_CONTAINER} style={{ width: "100%" }}>
-          <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
-            <Text
-              className={TABLE_HEADER_CELL}
-              style={{ width: 88, minWidth: 88 }}
-            >
-              ID
-            </Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 2.2 }}>
-              Descrição
-            </Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.85 }}>
-              Tipo
-            </Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.75, textAlign: "right", paddingRight: 16 }}>
-              Valor
-            </Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.85 }}>
-              Vencimento
-            </Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.7 }}>
-              Forma
-            </Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.7 }}>
-              Status
-            </Text>
-            <View style={{ width: 132 }} />
-          </View>
-
-          {invoices.map((item, i) => (
-            <DataTableRow key={item.id} index={i} onPress={() => setActionsInvoice(item)}>
-              <View style={{ width: 88, minWidth: 88, paddingRight: 8 }}>
-                <Text className={TABLE_CELL_MONO} numberOfLines={1}>
-                  #{item.id}
-                </Text>
-                {item.cora?.charge_id ? (
-                  <Text className={`${TABLE_CELL_SUBLINE} font-mono`} numberOfLines={1}>
-                    {item.cora.charge_id}
-                  </Text>
-                ) : null}
-              </View>
-              <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 2.2, paddingRight: 8 }} numberOfLines={1}>
-                {item.description}
-              </Text>
-              <View style={{ flex: 0.85 }}>{renderTypeBadge(item.type)}</View>
-              <Text className={TABLE_CELL_MONO} style={{ flex: 0.75, textAlign: "right", paddingRight: 16 }}>
-                {money(item.amount)}
-              </Text>
-              <Text className={`${TABLE_CELL_MONO} text-ink-muted`} style={{ flex: 0.85 }}>
-                {fmt(item.due_date)}
-              </Text>
-              <Text className={TABLE_CELL_MUTED} style={{ flex: 0.7 }} numberOfLines={1}>
-                {item.payment_method
-                  ? (METHOD_LABELS[item.payment_method] ?? item.payment_method)
-                  : "—"}
-              </Text>
-              <View style={{ flex: 0.7 }}>
-                <Badge slug={item.status} label={INVOICE_STATUS_LABELS[item.status] ?? item.status} />
-              </View>
-              <View style={{ width: 132 }}>{renderInvoiceActions(item)}</View>
-            </DataTableRow>
-          ))}
-        </View>
-      )}
 
       <EnrollmentEditModal
         visible={editVisible}
