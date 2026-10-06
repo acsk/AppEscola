@@ -18,6 +18,7 @@ import { createStandaloneQuestion } from "../../services/questionBank";
 import { getApiErrorMessage, getApiValidationErrors } from "../../utils/apiErrors";
 import { describeAiError } from "../../utils/aiErrors";
 import MessageModal from "../ui/MessageModal";
+import ProgressDialog from "../ui/ProgressDialog";
 import {
   type ContentForm,
   contentFromSuggestion,
@@ -304,11 +305,6 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
           <Text className="text-xs text-ink-subtle" style={{ marginBottom: 12 }}>
             Só ajusta o conteúdo das questões (tema, contexto, estilo, foco). {instructions.length}/{MAX_INSTRUCTIONS}
           </Text>
-          {generating && (
-            <Text className="text-xs text-ink-muted" aria-live="polite">
-              Gerando questões… isso pode levar até um minuto.
-            </Text>
-          )}
         </View>
       ) : (
         <View style={{ gap: 16 }}>
@@ -472,6 +468,38 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         </View>
       )}
     </Modal>
+
+    <ProgressDialog
+      visible={generating}
+      title={quantity === 1 ? "Gerando 1 questão semelhante" : `Gerando ${quantity} questões semelhantes`}
+      message="A IA está criando enunciado, alternativas, gabarito, explicação e classificação."
+      expectedSeconds={source?.imageUrl ? 180 : 60}
+      stages={
+        source?.imageUrl
+          ? [
+              { after: 0, label: "Analisando a imagem da questão…" },
+              { after: 20, label: "Criando as questões…" },
+              { after: 60, label: "Gerando as novas imagens…" },
+              { after: 150, label: "Conferindo as imagens geradas…" },
+            ]
+          : [
+              { after: 0, label: "Lendo a questão de referência…" },
+              { after: 5, label: "Criando as questões…" },
+              { after: 30, label: "Conferindo gabaritos e classificação…" },
+            ]
+      }
+    />
+
+    <ProgressDialog
+      visible={regenerating !== null}
+      title="Regenerando a imagem"
+      message="A IA está desenhando uma nova imagem para esta questão."
+      expectedSeconds={90}
+      stages={[
+        { after: 0, label: "Gerando a imagem…" },
+        { after: 45, label: "Conferindo a imagem gerada…" },
+      ]}
+    />
 
     <MessageModal
       visible={error !== null}

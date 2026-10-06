@@ -19,10 +19,20 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
   const [query, setQuery] = useState("");
   const selected = new Set(value);
 
+  // Selecionados primeiro na lista (sem busca), para o usuário não precisar rolar até eles.
   const visible = useMemo(() => {
     const q = foldText(query);
-    return q ? topics.filter((t) => foldText(t.name).includes(q) || foldText(t.subject_name ?? "").includes(q)) : topics;
-  }, [query, topics]);
+    const matches = q ? topics.filter((t) => foldText(t.name).includes(q) || foldText(t.subject_name ?? "").includes(q)) : topics;
+    if (q) return matches;
+    const chosen = new Set(value);
+    return [...matches.filter((t) => chosen.has(t.id)), ...matches.filter((t) => !chosen.has(t.id))];
+  }, [query, topics, value]);
+
+  /** Assuntos marcados, na ordem em que foram escolhidos (chips acima da lista). */
+  const selectedTopics = useMemo(() => {
+    const byId = new Map(topics.map((t) => [t.id, t]));
+    return value.map((id) => byId.get(id)).filter((t): t is TopicOption => !!t);
+  }, [topics, value]);
 
   const toggle = (id: number) =>
     onChange(selected.has(id) ? value.filter((v) => v !== id) : [...value, id]);
@@ -32,6 +42,26 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
       <Text className="text-xs font-medium text-ink-muted mb-1" nativeID="topics-label">
         Assuntos {value.length > 0 ? `(${value.length})` : ""}
       </Text>
+      {!disabled && selectedTopics.length > 0 && (
+        <View className="flex-row flex-wrap items-center gap-1.5 mb-1.5" aria-label="Assuntos selecionados">
+          {selectedTopics.map((topic) => (
+            <View key={topic.id} className="flex-row items-center rounded-full bg-brand-tint border border-border pl-2 pr-1 py-0.5">
+              <Text className="text-xs text-brand">
+                {topic.name}
+                {topic.subject_name ? <Text className="text-ink-subtle"> · {topic.subject_name}</Text> : null}
+              </Text>
+              <TouchableOpacity onPress={() => toggle(topic.id)} aria-label={`Remover assunto ${topic.name}`} className="ml-1">
+                <Ionicons name="close" size={12} color="var(--ds-brand-hover)" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {selectedTopics.length > 1 && (
+            <TouchableOpacity onPress={() => onChange([])} aria-label="Remover todos os assuntos" className="px-1 py-0.5">
+              <Text className="text-xs text-ink-muted underline">Limpar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
       {disabled ? (
         <View className="rounded-ds-md border border-dashed border-border-strong px-3 py-2 min-h-control-md justify-center">
           <Text className="text-xs text-ink-subtle">{disabledHint ?? "Escolha a disciplina primeiro."}</Text>
