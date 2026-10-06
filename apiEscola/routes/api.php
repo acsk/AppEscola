@@ -38,6 +38,8 @@ use App\Http\Controllers\Api\ReceiptController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\NotificationBroadcastController;
 use App\Http\Controllers\Api\TenantMobileThemeController;
+use App\Http\Controllers\Api\TenantAiSettingsController;
+use App\Http\Controllers\Api\QuestionAiController;
 use App\Http\Controllers\Api\TenantNotificationSettingsController;
 use App\Http\Controllers\Api\StudentNotificationController;
 use App\Http\Controllers\Api\CalendarEventController;
@@ -160,6 +162,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('tenant-mobile-theme',        [TenantMobileThemeController::class, 'show']);
     Route::put('tenant-mobile-theme',        [TenantMobileThemeController::class, 'update']);
     Route::post('tenant-mobile-theme/reset', [TenantMobileThemeController::class, 'reset']);
+
+    // Chaves de IA do tenant (criptografadas). Super admin usa as chaves do .env.
+    Route::get('ai-settings',               [TenantAiSettingsController::class, 'index']);
+    Route::put('ai-settings/{provider}',    [TenantAiSettingsController::class, 'update']);
+    Route::delete('ai-settings/{provider}', [TenantAiSettingsController::class, 'destroy']);
 
     // Administração de usuários (super_admin e admin)
     Route::apiResource('users', UserManagementController::class);
@@ -339,6 +346,13 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::patch('questions/classification',         [QuestionBankController::class, 'batchClassification']);
         Route::get('questions/{question}',               [QuestionBankController::class, 'show'])->whereNumber('question');
         Route::patch('questions/{question}/classification', [QuestionBankController::class, 'updateClassification'])->whereNumber('question');
+
+        // IA: sugestões (nada é gravado; o painel confirma e salva pelos endpoints acima)
+        Route::get('ai/status', [QuestionAiController::class, 'status']);
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('ai/autofill',                       [QuestionAiController::class, 'autofill']);
+            Route::post('questions/{question}/ai/similar',   [QuestionAiController::class, 'similar'])->whereNumber('question');
+        });
 
         Route::get('subjects',          [SubjectTopicController::class, 'subjects']);
         Route::get('topics',            [SubjectTopicController::class, 'index']);

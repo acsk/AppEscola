@@ -70,7 +70,7 @@ const ICON_LABELS: Record<string, string> = {
   atom: "Atomo",
   music: "Musica",
   palette: "Paleta",
-  code2: "Codigo",
+  code2: "Código",
   brain: "Cerebro",
   "book-marked": "Livro marcado",
   "graduation-cap": "Capelo",
@@ -161,7 +161,7 @@ function DropdownTrigger({
       <Ionicons
         name={open ? "chevron-up" : "chevron-down"}
         size={18}
-        color="#4B5463"
+        color="var(--ds-ink-muted)"
       />
     </TouchableOpacity>
   );
@@ -232,9 +232,9 @@ function IconDropdownPicker({
                 left,
                 width: Math.max(260, anchor.w),
                 zIndex: 9999,
-                backgroundColor: "white",
+                backgroundColor: "var(--ds-surface)",
                 borderWidth: 1,
-                borderColor: "#D9DDE3",
+                borderColor: "var(--ds-border)",
                 borderRadius: 4,
                 overflow: "hidden",
               }}
@@ -248,10 +248,10 @@ function IconDropdownPicker({
                   onPress={() => handleSelect("")}
                   activeOpacity={0.7}
                   className="flex-row items-center gap-3 px-4 py-3 border-b border-border"
-                  style={{ backgroundColor: !value ? "#E9EFF6" : "white" }}
+                  style={{ backgroundColor: !value ? "var(--ds-brand-tint)" : "white" }}
                 >
                   <View className="w-9 h-9 rounded-ds-md items-center justify-center bg-surface-sunken">
-                    <Ionicons name="close-outline" size={18} color="#5F6878" />
+                    <Ionicons name="close-outline" size={18} color="var(--ds-ink-subtle)" />
                   </View>
                   <Text className="text-sm font-medium text-ink">Sem ícone</Text>
                 </TouchableOpacity>
@@ -263,12 +263,12 @@ function IconDropdownPicker({
                       onPress={() => handleSelect(key)}
                       activeOpacity={0.7}
                       className="flex-row items-center gap-3 px-4 py-3 border-b border-border"
-                      style={{ backgroundColor: selected ? "#E9EFF6" : "white" }}
+                      style={{ backgroundColor: selected ? "var(--ds-brand-tint)" : "white" }}
                     >
                       <SubjectIcon icon={key} color={color} size={18} />
                       <Text
                         className="text-sm"
-                        style={{ color: selected ? "#132C4A" : "#111722", fontWeight: selected ? "600" : "500" }}
+                        style={{ color: selected ? "var(--ds-brand-hover)" : "var(--ds-ink)", fontWeight: selected ? "600" : "500" }}
                       >
                         {ICON_LABELS[key] ?? key}
                       </Text>
@@ -330,7 +330,7 @@ function ColorDropdownPicker({
               borderRadius: 4,
               backgroundColor: value || "#8B5CF6",  // ds-keep
               borderWidth: 1,
-              borderColor: "#D9DDE3",
+              borderColor: "var(--ds-border)",
             }}
           />
           <View>
@@ -354,9 +354,9 @@ function ColorDropdownPicker({
                 left,
                 width: Math.max(260, anchor.w),
                 zIndex: 9999,
-                backgroundColor: "white",
+                backgroundColor: "var(--ds-surface)",
                 borderWidth: 1,
-                borderColor: "#D9DDE3",
+                borderColor: "var(--ds-border)",
                 borderRadius: 4,
                 overflow: "hidden",
               }}
@@ -374,7 +374,7 @@ function ColorDropdownPicker({
                       onPress={() => handleSelect(colorOption)}
                       activeOpacity={0.7}
                       className="flex-row items-center gap-3 px-4 py-3 border-b border-border"
-                      style={{ backgroundColor: selected ? "#E9EFF6" : "white" }}
+                      style={{ backgroundColor: selected ? "var(--ds-brand-tint)" : "white" }}
                     >
                       <View
                         style={{
@@ -383,12 +383,12 @@ function ColorDropdownPicker({
                           borderRadius: 4,
                           backgroundColor: colorOption,
                           borderWidth: 2,
-                          borderColor: selected ? "#111722" : "#D9DDE3",
+                          borderColor: selected ? "var(--ds-ink)" : "var(--ds-border)",
                         }}
                       />
                       <Text
                         className="text-sm"
-                        style={{ color: selected ? "#132C4A" : "#111722", fontWeight: selected ? "600" : "500" }}
+                        style={{ color: selected ? "var(--ds-brand-hover)" : "var(--ds-ink)", fontWeight: selected ? "600" : "500" }}
                       >
                         {colorOption}
                       </Text>
@@ -499,19 +499,19 @@ export default function SubjectsScreen() {
           <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Disciplinas</Text>
           <Text className="text-sm text-ink-muted">Matérias lecionadas no cursinho</Text>
         </View>
-        <TouchableOpacity onPress={openCreate} className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md" activeOpacity={0.85}>
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Nova disciplina</Text>
+        <TouchableOpacity onPress={openCreate} className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center" activeOpacity={0.85}>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Nova disciplina</Text>
         </TouchableOpacity>
       </View>
 
       <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
         <View className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}>
-          <Ionicons name="search-outline" size={16} color="#5F6878" />
-          <TextInput value={search} onChangeText={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar disciplina..." placeholderTextColor="#5F6878" className="flex-1 ml-2 text-sm text-ink" />
-          {!!search && <TouchableOpacity onPress={() => setSearch("")}><Ionicons name="close-circle" size={16} color="#5F6878" /></TouchableOpacity>}
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
+          <TextInput value={search} onChangeText={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar disciplina..." placeholderTextColor="var(--ds-ink-subtle)" className="flex-1 ml-2 text-sm text-ink" />
+          {!!search && <TouchableOpacity onPress={() => setSearch("")}><Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" /></TouchableOpacity>}
         </View>
-        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #D9DDE3", borderRadius: 4, padding: "0 14px", fontSize: 14, color: "#111722", backgroundColor: "white", height: 44, minWidth: isMobile ? "100%" : 160 }}>
+        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #D9DDE3", borderRadius: 4, padding: "0 14px", fontSize: 14, color: "var(--ds-ink)", backgroundColor: "var(--ds-surface)", height: 44, minWidth: isMobile ? "100%" : 160 }}>
           <option value="">Todos</option>
           <option value="active">Ativo</option>
           <option value="inactive">Inativo</option>
@@ -533,10 +533,10 @@ export default function SubjectsScreen() {
         </View>
 
         {loading ? (
-          <View className="items-center justify-center py-20"><ActivityIndicator size="large" color="#1C3D63" /></View>
+          <View className="items-center justify-center py-20"><ActivityIndicator size="large" color="var(--ds-brand)" /></View>
         ) : rows.length === 0 ? (
           <View className="items-center justify-center py-16">
-            <Ionicons name="library-outline" size={40} color="#D9DDE3" />
+            <Ionicons name="library-outline" size={40} color="var(--ds-border)" />
             <Text className="text-ink-subtle mt-3 text-sm">Nenhuma disciplina encontrada</Text>
           </View>
         ) : (
@@ -552,10 +552,10 @@ export default function SubjectsScreen() {
               </View>
               <View style={{ width: 72 }} className="flex-row justify-end gap-2">
                 <TouchableOpacity onPress={() => openEdit(item)} className="p-1.5 bg-brand-tint rounded-ds-md">
-                  <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
+                  <Ionicons name="pencil-outline" size={15} color="var(--ds-brand)" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-danger-tint rounded-ds-md">
-                  <Ionicons name="trash-outline" size={15} color="#B0261B" />
+                <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-danger rounded-ds-md">
+                  <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
                 </TouchableOpacity>
               </View>
             </DataTableRow>
@@ -573,11 +573,11 @@ export default function SubjectsScreen() {
       <Modal visible={modalVisible} title={editId ? "Editar disciplina" : "Nova disciplina"} onClose={() => setModalVisible(false)} size="lg"
         footer={
           <>
-            <TouchableOpacity onPress={() => setModalVisible(false)} className="px-5 py-2.5 rounded-ds-md border border-border">
+            <TouchableOpacity onPress={() => setModalVisible(false)} className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center">
               <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={save} disabled={saving} className="px-5 py-2.5 rounded-ds-md bg-brand">
-              {saving ? <ActivityIndicator color="white" size="small" /> : <Text className="text-sm font-semibold text-white">Salvar</Text>}
+            <TouchableOpacity onPress={save} disabled={saving} className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center">
+              {saving ? <ActivityIndicator color="var(--ds-on-brand)" size="small" /> : <Text className="text-sm font-medium text-on-brand">Salvar</Text>}
             </TouchableOpacity>
           </>
         }

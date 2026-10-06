@@ -173,8 +173,8 @@ export default function StudentAcademicHistoryScreen({
         }}
       >
         <View style={{ flex: 1 }}>
-          <Text className="text-2xl font-bold text-gray-800">Histórico acadêmico</Text>
-          <Text className="text-sm text-gray-500 mt-0.5">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Histórico acadêmico</Text>
+          <Text className="text-sm text-ink-muted mt-0.5">
             Cursos, turmas e resultados completos dos simulados online
           </Text>
         </View>
@@ -186,66 +186,66 @@ export default function StudentAcademicHistoryScreen({
         >
           <TouchableOpacity
             onPress={load}
-            className="flex-row items-center justify-center bg-white border border-gray-200 px-4 py-2.5 rounded-xl"
+            className="flex-row items-center justify-center bg-surface border border-border-strong px-4 rounded-ds-md py-2 min-h-control-md"
             activeOpacity={0.85}
           >
-            <Ionicons name="refresh-outline" size={16} color="#4B5563" />
-            <Text className="text-sm font-semibold text-gray-700 ml-1.5">Atualizar</Text>
+            <Ionicons name="refresh-outline" size={16} color="var(--ds-ink-muted)" />
+            <Text className="text-sm font-semibold text-ink ml-1.5">Atualizar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleExportPdf}
             disabled={!history || exporting}
-            className="flex-row items-center justify-center bg-violet-600 px-4 py-2.5 rounded-xl"
+            className="flex-row items-center justify-center bg-brand px-4 rounded-ds-md py-2 min-h-control-md"
             style={{ opacity: !history || exporting ? 0.6 : 1 }}
             activeOpacity={0.85}
           >
             {exporting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="var(--ds-on-brand)" />
             ) : (
-              <Ionicons name="download-outline" size={16} color="#fff" />
+              <Ionicons name="download-outline" size={16} color="var(--ds-on-brand)" />
             )}
-            <Text className="text-sm font-semibold text-white ml-1.5">Gerar PDF</Text>
+            <Text className="text-sm font-medium text-on-brand ml-1.5">Gerar PDF</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {loading ? (
-        <View className="items-center justify-center py-20 bg-white rounded-2xl border border-gray-200">
-          <ActivityIndicator size="large" color="#7C3AED" />
+        <View className="items-center justify-center py-20 bg-surface rounded-ds-md border border-border">
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
         </View>
       ) : error ? (
-        <View className="bg-red-50 border border-red-200 rounded-2xl px-4 py-5">
-          <Text className="text-sm text-red-700">{error}</Text>
+        <View className="bg-danger-tint border border-danger rounded-ds-md px-4 py-5">
+          <Text className="text-sm text-danger">{error}</Text>
           <TouchableOpacity
             onPress={load}
-            className="mt-3 self-start px-3 py-2 rounded-lg bg-red-600"
+            className="mt-3 self-start px-3 py-2 min-h-control-md justify-center rounded-ds-md bg-surface border border-border-strong"
           >
-            <Text className="text-white text-sm font-semibold">Tentar novamente</Text>
+            <Text className="text-ink text-sm font-medium">Tentar novamente</Text>
           </TouchableOpacity>
         </View>
       ) : history ? (
         <View className="gap-4">
-          <View className="bg-white border border-gray-200 rounded-2xl p-4">
+          <View className="bg-surface border border-border rounded-ds-md p-4">
             <View className="flex-row items-start justify-between gap-3">
               <View style={{ flex: 1 }}>
-                <Text className="text-lg font-bold text-gray-900">{history.student.name}</Text>
+                <Text className="text-lg font-semibold text-ink">{history.student.name}</Text>
                 {history.student.enrollment_number ? (
-                  <Text className="text-xs font-mono font-semibold text-violet-600 mt-0.5">
+                  <Text className="text-xs font-mono font-semibold text-brand mt-0.5">
                     Matrícula {history.student.enrollment_number}
                   </Text>
                 ) : null}
                 <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
-                  <Text className="text-xs text-gray-500">
+                  <Text className="text-xs text-ink-muted">
                     Documento:{" "}
                     {history.student.document ? maskCPF(history.student.document) : "—"}
                   </Text>
-                  <Text className="text-xs text-gray-500">
+                  <Text className="text-xs text-ink-muted">
                     Nascimento: {fmtDate(history.student.birth_date)}
                   </Text>
-                  <Text className="text-xs text-gray-500">
+                  <Text className="text-xs text-ink-muted">
                     E-mail: {history.student.email || "—"}
                   </Text>
-                  <Text className="text-xs text-gray-500">
+                  <Text className="text-xs text-ink-muted">
                     Telefone:{" "}
                     {history.student.phone ? maskPhone(history.student.phone) : "—"}
                   </Text>
@@ -290,28 +290,28 @@ export default function StudentAcademicHistoryScreen({
               ].map((card) => (
                 <View
                   key={card.label}
-                  className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5"
+                  className="flex-1 bg-surface-sunken border border-border rounded-ds-md px-3 py-2.5"
                 >
-                  <Text className="text-[11px] uppercase font-bold text-gray-500 tracking-wide">
+                  <Text className="text-[11px] uppercase font-semibold text-ink-muted tracking-wide">
                     {card.label}
                   </Text>
-                  <Text className="text-base font-bold text-gray-900 mt-0.5">{card.value}</Text>
+                  <Text className="text-base font-semibold text-ink mt-0.5">{card.value}</Text>
                 </View>
               ))}
             </View>
           </View>
 
-          <View className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-            <View className="px-4 py-3 border-b border-gray-100">
-              <Text className="text-sm font-bold text-gray-900">Cursos e turmas</Text>
-              <Text className="text-xs text-gray-500 mt-0.5">
+          <View className="bg-surface border border-border rounded-ds-md overflow-hidden">
+            <View className="px-4 py-3 border-b border-border">
+              <Text className="text-sm font-semibold text-ink">Cursos e turmas</Text>
+              <Text className="text-xs text-ink-muted mt-0.5">
                 Histórico de matrículas do aluno
               </Text>
             </View>
             {history.enrollments.length === 0 ? (
               <View className="items-center py-10 px-4">
-                <Ionicons name="school-outline" size={32} color="#E5E7EB" />
-                <Text className="text-sm text-gray-400 mt-2">Nenhuma matrícula encontrada</Text>
+                <Ionicons name="school-outline" size={32} color="var(--ds-border)" />
+                <Text className="text-sm text-ink-subtle mt-2">Nenhuma matrícula encontrada</Text>
               </View>
             ) : (
               <>
@@ -366,17 +366,17 @@ export default function StudentAcademicHistoryScreen({
             )}
           </View>
 
-          <View className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-            <View className="px-4 py-3 border-b border-gray-100">
-              <Text className="text-sm font-bold text-gray-900">Simulados online</Text>
-              <Text className="text-xs text-gray-500 mt-0.5">
+          <View className="bg-surface border border-border rounded-ds-md overflow-hidden">
+            <View className="px-4 py-3 border-b border-border">
+              <Text className="text-sm font-semibold text-ink">Simulados online</Text>
+              <Text className="text-xs text-ink-muted mt-0.5">
                 Clique para abrir a correção completa · PDF com dados do aluno e horário de entrega
               </Text>
             </View>
             {history.exam_attempts.length === 0 ? (
               <View className="items-center py-10 px-4">
-                <Ionicons name="document-text-outline" size={32} color="#E5E7EB" />
-                <Text className="text-sm text-gray-400 mt-2">Nenhum simulado encontrado</Text>
+                <Ionicons name="document-text-outline" size={32} color="var(--ds-border)" />
+                <Text className="text-sm text-ink-subtle mt-2">Nenhum simulado encontrado</Text>
               </View>
             ) : (
               history.exam_attempts.map((attempt, index) => (
@@ -424,14 +424,14 @@ export default function StudentAcademicHistoryScreen({
                         event?.stopPropagation?.();
                         handleExportAttemptPdf(attempt);
                       }}
-                      className="p-1.5 bg-violet-50 rounded-lg border border-violet-200"
+                      className="p-1.5 bg-brand-tint rounded-ds-md border border-border"
                       activeOpacity={0.85}
                       accessibilityLabel="Gerar PDF do simulado"
                     >
                       {exportingAttemptId === attempt.id ? (
-                        <ActivityIndicator size="small" color="#7C3AED" />
+                        <ActivityIndicator size="small" color="var(--ds-brand)" />
                       ) : (
-                        <Ionicons name="download-outline" size={15} color="#7C3AED" />
+                        <Ionicons name="download-outline" size={15} color="var(--ds-brand)" />
                       )}
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -439,11 +439,11 @@ export default function StudentAcademicHistoryScreen({
                         event?.stopPropagation?.();
                         setReviewAttempt(attempt);
                       }}
-                      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+                      className="p-1.5 bg-surface-sunken rounded-ds-md border border-border"
                       activeOpacity={0.85}
                       accessibilityLabel="Ver correção"
                     >
-                      <Ionicons name="eye-outline" size={15} color="#4B5563" />
+                      <Ionicons name="eye-outline" size={15} color="var(--ds-ink-muted)" />
                     </TouchableOpacity>
                   </View>
                 </DataTableRow>

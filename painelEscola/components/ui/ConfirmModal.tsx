@@ -6,7 +6,7 @@ import DialogPanel from "./DialogPanel";
 import Button from "./Button";
 
 /**
- * Confirmação antes de uma ação. `tone="danger"` usa o botão destrutivo contornado (nunca cheio).
+ * Confirmação antes de uma ação. `tone="danger"` usa o botão destrutivo vermelho cheio.
  * `iconName` é mantido por compatibilidade, mas o design system não usa ícone decorativo no diálogo.
  */
 export default function ConfirmModal({

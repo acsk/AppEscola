@@ -354,42 +354,42 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Relatórios</Text>
-          <Text className="text-sm text-gray-500">Relação de alunos por turma</Text>
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Relatórios</Text>
+          <Text className="text-sm text-ink-muted">Relação de alunos por turma</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" as any }}>
           <GridPdfExportButton
             filename="relatorio-turmas-alunos"
-            title="Relatório de Turmas"
+            title="Relatório de turmas"
             subtitle="Relação de alunos por turma"
             groups={buildPdfGroups(rows)}
             onBeforeExport={handleExportPdf}
           />
           <TouchableOpacity
             onPress={() => navigate("turmas")}
-            className="flex-row items-center bg-violet-600 px-4 py-2.5 rounded-xl"
+            className="flex-row items-center bg-brand px-4 rounded-ds-md py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="grid-outline" size={16} color="#fff" />
-            <Text className="text-white font-semibold text-sm ml-2">Ir para turmas</Text>
+            <Ionicons name="grid-outline" size={16} color="var(--ds-on-brand)" />
+            <Text className="text-on-brand font-medium text-sm ml-2">Ir para turmas</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <View className="bg-white border border-gray-200 rounded-2xl p-3 mb-4">
+      <View className="bg-surface border border-border rounded-ds-md p-3 mb-4">
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">Filtros</Text>
-          <TouchableOpacity onPress={clearFilters} className="px-2 py-1 rounded-lg bg-gray-100" activeOpacity={0.8}>
-            <Text className="text-xs font-semibold text-gray-600">Limpar</Text>
+          <Text className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Filtros</Text>
+          <TouchableOpacity onPress={clearFilters} className="px-2 py-1 rounded-ds-md bg-surface-sunken" activeOpacity={0.8}>
+            <Text className="text-xs font-semibold text-ink-muted">Limpar</Text>
           </TouchableOpacity>
         </View>
 
         <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
           <View
-            className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3"
+            className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
             style={{ height: 44, minWidth: isMobile ? "100%" : 280, flexGrow: 1 }}
           >
-            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
             <input
               placeholder="Buscar aluno, matrícula ou turma"
               value={search}
@@ -402,7 +402,7 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#374151",
+                color: "var(--ds-ink)",
                 marginLeft: 8,
                 backgroundColor: "transparent",
               }}
@@ -418,12 +418,12 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 220,
             }}
@@ -443,12 +443,12 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 260,
             }}
@@ -468,12 +468,12 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 180,
             }}
@@ -493,12 +493,12 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 180,
             }}
@@ -513,16 +513,16 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
         </View>
       </View>
 
-      <View className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <View className="bg-surface border border-border rounded-ds-md overflow-hidden">
         {loading ? (
           <View className="py-14 items-center">
-            <ActivityIndicator color="#7C3AED" />
-            <Text className="text-xs text-gray-500 mt-2">Carregando relatório...</Text>
+            <ActivityIndicator color="var(--ds-brand)" />
+            <Text className="text-xs text-ink-muted mt-2">Carregando relatório...</Text>
           </View>
         ) : rows.length === 0 ? (
           <View className="py-14 items-center">
-            <Ionicons name="document-text-outline" size={26} color="#9CA3AF" />
-            <Text className="text-sm font-semibold text-gray-600 mt-2">Nenhum registro encontrado</Text>
+            <Ionicons name="document-text-outline" size={26} color="var(--ds-ink-subtle)" />
+            <Text className="text-sm font-semibold text-ink-muted mt-2">Nenhum registro encontrado</Text>
           </View>
         ) : (
           <ScrollView

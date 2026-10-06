@@ -135,7 +135,7 @@ export default function SearchableSelect({
     }
   }, [value, selectedOption]);
 
-  const borderColor = error ? "#B0261B" : "#7A8393"; // `border-strong` em controles (≥3:1)
+  const borderColor = error ? "var(--ds-danger)" : "var(--ds-border-strong)"; // `border-strong` em controles (≥3:1)
 
   const closePicker = () => {
     setOpen(false);
@@ -149,7 +149,7 @@ export default function SearchableSelect({
           width: MODAL_WIDTH,
           height: MODAL_HEIGHT,
           maxWidth: "92vw" as unknown as number,
-          backgroundColor: "white",
+          backgroundColor: "var(--ds-surface)",
           borderRadius: 6,
           overflow: "hidden",
           flexDirection: "column",
@@ -164,21 +164,21 @@ export default function SearchableSelect({
             paddingHorizontal: 20,
             paddingVertical: 16,
             borderBottomWidth: 1,
-            borderBottomColor: "#F7F8FA",
+            borderBottomColor: "var(--ds-surface-sunken)",
           }}
         >
-          <Text style={{ fontSize: 16, fontWeight: "600", color: "#111722" }}>
+          <Text style={{ fontSize: 16, fontWeight: "600", color: "var(--ds-ink)" }}>
             {modalTitle}
           </Text>
           <TouchableOpacity
             onPress={closePicker}
             style={{
               padding: 4,
-              backgroundColor: "#F7F8FA",
+              backgroundColor: "var(--ds-surface-sunken)",
               borderRadius: 4,
             }}
           >
-            <Ionicons name="close" size={18} color="#4B5463" />
+            <Ionicons name="close" size={18} color="var(--ds-ink-muted)" />
           </TouchableOpacity>
         </View>
 
@@ -190,11 +190,11 @@ export default function SearchableSelect({
             paddingHorizontal: 16,
             paddingVertical: 10,
             borderBottomWidth: 1,
-            borderBottomColor: "#F7F8FA",
+            borderBottomColor: "var(--ds-surface-sunken)",
             gap: 8,
           }}
         >
-          <Ionicons name="search-outline" size={16} color="#5F6878" />
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           {Platform.OS === "web" ? (
             <input
               autoFocus
@@ -206,7 +206,7 @@ export default function SearchableSelect({
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#111722",
+                color: "var(--ds-ink)",
                 backgroundColor: "transparent",
               }}
             />
@@ -219,15 +219,15 @@ export default function SearchableSelect({
               style={{
                 flex: 1,
                 fontSize: 14,
-                color: "#111722",
+                color: "var(--ds-ink)",
                 padding: 0,
               }}
-              placeholderTextColor="#5F6878"
+              placeholderTextColor="var(--ds-ink-subtle)"
             />
           )}
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery("")}>
-              <Ionicons name="close-circle" size={16} color="#5F6878" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -237,12 +237,12 @@ export default function SearchableSelect({
           style={{
             paddingHorizontal: 16,
             paddingVertical: 6,
-            backgroundColor: "#F7F8FA",
+            backgroundColor: "var(--ds-surface-sunken)",
             borderBottomWidth: 1,
-            borderBottomColor: "#F7F8FA",
+            borderBottomColor: "var(--ds-surface-sunken)",
           }}
         >
-          <Text style={{ fontSize: 11, color: "#5F6878" }}>
+          <Text style={{ fontSize: 11, color: "var(--ds-ink-subtle)" }}>
             {searching
               ? "Buscando..."
               : `${filtered.length} opção${filtered.length !== 1 ? "ões" : ""} encontrada${filtered.length !== 1 ? "s" : ""}`}
@@ -264,9 +264,9 @@ export default function SearchableSelect({
                 paddingVertical: 40,
               }}
             >
-              <ActivityIndicator size="small" color="#1C3D63" />
+              <ActivityIndicator size="small" color="var(--ds-brand)" />
               <Text
-                style={{ fontSize: 13, color: "#5F6878", marginTop: 8 }}
+                style={{ fontSize: 13, color: "var(--ds-ink-subtle)", marginTop: 8 }}
               >
                 Buscando...
               </Text>
@@ -279,9 +279,9 @@ export default function SearchableSelect({
                 paddingVertical: 40,
               }}
             >
-              <Ionicons name="search-outline" size={28} color="#D9DDE3" />
+              <Ionicons name="search-outline" size={28} color="var(--ds-border)" />
               <Text
-                style={{ fontSize: 13, color: "#5F6878", marginTop: 8 }}
+                style={{ fontSize: 13, color: "var(--ds-ink-subtle)", marginTop: 8 }}
               >
                 Nenhuma opção encontrada
               </Text>
@@ -299,11 +299,11 @@ export default function SearchableSelect({
                     alignItems: "center",
                     paddingHorizontal: 16,
                     paddingVertical: 12,
-                    backgroundColor: isSelected ? "#E9EFF6" : "transparent",
+                    backgroundColor: isSelected ? "var(--ds-brand-tint)" : "transparent",
                     borderBottomWidth: 1,
-                    borderBottomColor: "#F7F8FA",
+                    borderBottomColor: "var(--ds-surface-sunken)",
                     borderLeftWidth: 3,
-                    borderLeftColor: isSelected ? "#1C3D63" : "transparent",
+                    borderLeftColor: isSelected ? "var(--ds-brand)" : "transparent",
                   }}
                 >
                   <View style={{ flex: 1 }}>
@@ -311,7 +311,7 @@ export default function SearchableSelect({
                       style={{
                         fontSize: 15,
                         fontWeight: isSelected ? "600" : "400",
-                        color: isSelected ? "#132C4A" : "#111722",
+                        color: isSelected ? "var(--ds-brand-hover)" : "var(--ds-ink)",
                       }}
                     >
                       {opt.label}
@@ -320,7 +320,7 @@ export default function SearchableSelect({
                       <Text
                         style={{
                           fontSize: 13,
-                          color: isSelected ? "#1C3D63" : "#5F6878",
+                          color: isSelected ? "var(--ds-brand)" : "var(--ds-ink-subtle)",
                           marginTop: 2,
                         }}
                       >
@@ -332,7 +332,7 @@ export default function SearchableSelect({
                     <Ionicons
                       name="checkmark-circle"
                       size={18}
-                      color="#1C3D63"
+                      color="var(--ds-brand)"
                     />
                   )}
                 </TouchableOpacity>
@@ -349,7 +349,7 @@ export default function SearchableSelect({
             paddingHorizontal: 16,
             paddingVertical: 12,
             borderTopWidth: 1,
-            borderTopColor: "#F7F8FA",
+            borderTopColor: "var(--ds-surface-sunken)",
           }}
         >
           <TouchableOpacity
@@ -358,10 +358,10 @@ export default function SearchableSelect({
               paddingHorizontal: 20,
               paddingVertical: 8,
               borderRadius: 4,
-              backgroundColor: "#F7F8FA",
+              backgroundColor: "var(--ds-surface-sunken)",
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: "600", color: "#111722" }}>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: "var(--ds-ink)" }}>
               Fechar
             </Text>
           </TouchableOpacity>
@@ -378,12 +378,12 @@ export default function SearchableSelect({
             fontSize: 13,
             lineHeight: 18,
             fontWeight: "500",
-            color: "#111722",
+            color: "var(--ds-ink)",
             marginBottom: 6,
           }}
         >
           {label}
-          {required && <Text style={{ color: "#B0261B" }}> *</Text>}
+          {required && <Text style={{ color: "var(--ds-danger)" }}> *</Text>}
         </Text>
       )}
 
@@ -403,7 +403,7 @@ export default function SearchableSelect({
           borderColor,
           borderRadius: 4,
           paddingHorizontal: 12,
-          backgroundColor: disabled ? "#F7F8FA" : "#FFFFFF",
+          backgroundColor: disabled ? "var(--ds-surface-sunken)" : "var(--ds-surface)",
           opacity: disabled ? 0.45 : 1,
           height: dense ? 32 : 38,
         }}
@@ -412,7 +412,7 @@ export default function SearchableSelect({
           style={{
             flex: 1,
             fontSize: 14,
-            color: selected ? "#111722" : "#5F6878",
+            color: selected ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
           }}
           numberOfLines={1}
         >
@@ -424,21 +424,21 @@ export default function SearchableSelect({
               onPress={handleClear}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="close-circle" size={16} color="#5F6878" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
-          <Ionicons name="search-outline" size={16} color="#1C3D63" />
+          <Ionicons name="search-outline" size={16} color="var(--ds-brand)" />
         </View>
       </TouchableOpacity>
 
       {/* Linha secundária da opção selecionada (ex.: matrícula do aluno), como texto de ajuda */}
       {showSelectedPreview && selected?.sublabel ? (
-        <Text style={{ fontSize: 12, lineHeight: 16, color: "#5F6878", marginTop: 6 }}>{selected.sublabel}</Text>
+        <Text style={{ fontSize: 12, lineHeight: 16, color: "var(--ds-ink-subtle)", marginTop: 6 }}>{selected.sublabel}</Text>
       ) : null}
 
       {/* Erro */}
       {error && (
-        <Text style={{ fontSize: 12, fontWeight: "500", color: "#B0261B", marginTop: 6 }}>
+        <Text style={{ fontSize: 12, fontWeight: "500", color: "var(--ds-danger)", marginTop: 6 }}>
           {error}
         </Text>
       )}

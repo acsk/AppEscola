@@ -25,7 +25,18 @@ module.exports = {
         accent: { DEFAULT: ds.color.accent, tint: ds.color["accent-tint"] },
         success: { DEFAULT: ds.color.success, tint: ds.color["success-tint"] },
         warning: { DEFAULT: ds.color.warning, tint: ds.color["warning-tint"] },
-        danger: { DEFAULT: ds.color.danger, tint: ds.color["danger-tint"] },
+        danger: { DEFAULT: ds.color.danger, tint: ds.color["danger-tint"], hover: ds.color["danger-hover"] },
+        "on-danger": ds.color["on-danger"],
+        nav: {
+          bg: ds.color["nav-bg"],
+          hover: ds.color["nav-hover"],
+          active: ds.color["nav-active"],
+          divider: ds.color["nav-divider"],
+          accent: ds.color["nav-accent"],
+          ink: ds.color["nav-ink"],
+          "ink-muted": ds.color["nav-ink-muted"],
+          label: ds.color["nav-label"],
+        },
       },
       borderRadius: {
         "ds-sm": ds.radius.sm,
@@ -37,6 +48,10 @@ module.exports = {
         mono: [ds.font.mono],
       },
       height: {
+        "control-sm": `${ds.size["control-sm"]}px`,
+        "control-md": `${ds.size["control-md"]}px`,
+      },
+      minHeight: {
         "control-sm": `${ds.size["control-sm"]}px`,
         "control-md": `${ds.size["control-md"]}px`,
       },

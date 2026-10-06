@@ -76,7 +76,7 @@ export default function DateTimePickerInput({
           value={value}
           onChangeText={(v) => onChangeText(maskDateTime(v))}
           placeholder="DD/MM/AAAA HH:MM"
-          placeholderTextColor="#5F6878"
+          placeholderTextColor="var(--ds-ink-subtle)"
           className={`flex-1 text-sm ${disabled ? "text-ink-subtle" : "text-ink"}`}
           style={{ minWidth: 0 }}
           maxLength={16}
@@ -94,7 +94,7 @@ export default function DateTimePickerInput({
           activeOpacity={disabled ? 1 : 0.7}
           disabled={disabled}
         >
-          <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "var(--ds-border-strong)" : "var(--ds-brand)"} />
         </TouchableOpacity>
 
         {Platform.OS === "web" && (

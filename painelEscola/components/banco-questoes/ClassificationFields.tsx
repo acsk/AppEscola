@@ -96,6 +96,7 @@ export default function ClassificationFields({ form, onChange, catalogs }: Props
           dense
           label="Modalidade (tipo de prova)"
           value={form.exam_type_id ?? ""}
+          placeholder="Padrão (Personalizado)"
           options={catalogs.examTypes.map((t) => ({ value: t.id, label: t.label }))}
           onChange={(v) => v && set("exam_type_id", Number(v))}
         />
@@ -122,7 +123,7 @@ function SwitchRow({ label, value, onChange }: { label: string; value: boolean; 
         value={value}
         onValueChange={onChange}
         aria-label={label}
-        trackColor={{ true: "#1C3D63", false: "#7A8393" }}
+        trackColor={{ true: "var(--ds-brand)", false: "var(--ds-border-strong)" }}
         thumbColor="#FFFFFF"
       />
       <Text className="text-xs text-ink">{label}</Text>

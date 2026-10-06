@@ -4,7 +4,7 @@
 
 /*
  * Design system "Cursinho Hub" — base do web.
- * Cores e medidas espelham constants/designTokens.js.
+ * Cores: variáveis `--ds-*` geradas de constants/designTokens.js (constants/themeCss.ts), por tema.
  */
 
 /* Fonte da interface: IBM Plex Sans (carregada do Google Fonts em App.tsx).
@@ -12,8 +12,8 @@
    Fontes de ícones (Ionicons/Feather) usam font-family inline e não são afetadas. */
 html,
 body {
-  background: #f3f4f6;
-  color: #111722;
+  background: var(--ds-bg);
+  color: var(--ds-ink);
 }
 
 body:not(#_),
@@ -49,7 +49,7 @@ body:not(#_) [role="checkbox"]:focus-visible,
 body:not(#_) [role="radio"]:focus-visible,
 body:not(#_) a:focus-visible,
 body:not(#_) button:focus-visible {
-  outline: 2px solid #1c3d63;
+  outline: 2px solid var(--ds-focus);
   outline-offset: 2px;
 }
 
@@ -58,17 +58,22 @@ body:not(#_) input:focus-visible,
 body:not(#_) textarea:focus-visible,
 body:not(#_) select:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px #1c3d63;
+  box-shadow: 0 0 0 1px var(--ds-brand);
+}
+
+/* Campo composto (ícone + input num contêiner com borda): o anel fica no contêiner. */
+body:not(#_) [data-field-shell] input:focus-visible {
+  box-shadow: none;
 }
 
 /* Barras de rolagem discretas, na cor de borda forte. */
 * {
-  scrollbar-color: #7a8393 transparent;
+  scrollbar-color: var(--ds-border-strong) transparent;
   scrollbar-width: thin;
 }
 
 .app-scrollbar {
-  scrollbar-color: #7a8393 #f7f8fa;
+  scrollbar-color: var(--ds-border-strong) var(--ds-surface-sunken);
   scrollbar-width: thin;
 }
 
@@ -80,16 +85,29 @@ body:not(#_) select:focus-visible {
 
 .app-scrollbar::-webkit-scrollbar-track,
 .app-scrollbar *::-webkit-scrollbar-track {
-  background: #f7f8fa;
+  background: var(--ds-surface-sunken);
 }
 
 .app-scrollbar::-webkit-scrollbar-thumb,
 .app-scrollbar *::-webkit-scrollbar-thumb {
-  background: #7a8393;
-  border: 2px solid #f7f8fa;
+  background: var(--ds-border-strong);
+  border: 2px solid var(--ds-surface-sunken);
 }
 
 .app-scrollbar::-webkit-scrollbar-thumb:hover,
 .app-scrollbar *::-webkit-scrollbar-thumb:hover {
-  background: #4b5463;
+  background: var(--ds-ink-muted);
 }
+
+/* Sidebar invertida: foco em `nav-accent` (legível no fundo escuro). */
+body:not(#_) [data-nav] [role="link"]:focus-visible {
+  outline-color: var(--ds-nav-accent);
+}
+
+/* Editor de texto com formatação (components/ui/RichTextInput.tsx). */
+.ds-rich-text-input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ds-ink-subtle);
+  pointer-events: none;
+}
+.ds-rich-text-input b { font-weight: 600; }

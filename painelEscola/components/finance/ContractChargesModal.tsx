@@ -183,7 +183,7 @@ function RowCheckbox({
       <Ionicons
         name={checked ? "checkbox" : "square-outline"}
         size={18}
-        color={disabled ? "#D1D5DB" : checked ? "#7C3AED" : "#9CA3AF"}
+        color={disabled ? "var(--ds-border-strong)" : checked ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
       />
     </View>
   );
@@ -199,12 +199,12 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <View className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-3 items-center">
-      <View className="w-8 h-8 rounded-full bg-white border border-gray-100 items-center justify-center mb-1.5">
-        <Ionicons name={icon} size={16} color="#9CA3AF" />
+    <View className="rounded-ds-md border border-dashed border-border bg-surface-sunken px-3 py-3 items-center">
+      <View className="w-8 h-8 rounded-full bg-surface border border-border items-center justify-center mb-1.5">
+        <Ionicons name={icon} size={16} color="var(--ds-ink-subtle)" />
       </View>
-      <Text className="text-sm font-semibold text-gray-700">{title}</Text>
-      <Text className="text-xs text-gray-500 text-center mt-1">{description}</Text>
+      <Text className="text-sm font-semibold text-ink">{title}</Text>
+      <Text className="text-xs text-ink-muted text-center mt-1">{description}</Text>
     </View>
   );
 }
@@ -221,8 +221,8 @@ function SectionHeader({
   return (
     <View className="flex-row items-start justify-between gap-3 mb-1.5">
       <View className="flex-1">
-        <Text className="text-sm font-bold text-gray-900">{title}</Text>
-        {subtitle ? <Text className="text-xs text-gray-500 mt-0.5">{subtitle}</Text> : null}
+        <Text className="text-sm font-semibold text-ink">{title}</Text>
+        {subtitle ? <Text className="text-xs text-ink-muted mt-0.5">{subtitle}</Text> : null}
       </View>
       {action}
     </View>
@@ -237,13 +237,13 @@ function SectionPanel({
   accent?: "gray" | "violet" | "emerald";
 }) {
   const accentStyles = {
-    gray: "border-gray-200 bg-gray-50",
-    violet: "border-violet-200 bg-violet-50/50",
-    emerald: "border-emerald-200 bg-emerald-50/50",
+    gray: "border-border bg-surface-sunken",
+    violet: "border-border bg-brand-tint",
+    emerald: "border-success bg-success-tint/50",
   };
 
   return (
-    <View className={`rounded-xl border ${accentStyles[accent]} p-3`}>
+    <View className={`rounded-ds-md border ${accentStyles[accent]} p-3`}>
       {children}
     </View>
   );
@@ -257,14 +257,14 @@ function Pill({
   tone?: PillTone;
 }) {
   const styles = {
-    gray: { bg: "bg-gray-100", text: "text-gray-700" },
-    slate: { bg: "bg-slate-100", text: "text-slate-700" },
-    emerald: { bg: "bg-emerald-50", text: "text-emerald-700" },
-    violet: { bg: "bg-violet-50", text: "text-violet-700" },
-    amber: { bg: "bg-amber-50", text: "text-amber-800" },
-    orange: { bg: "bg-orange-50", text: "text-orange-700" },
-    red: { bg: "bg-red-50", text: "text-red-700" },
-    blue: { bg: "bg-sky-50", text: "text-sky-700" },
+    gray: { bg: "bg-surface-sunken", text: "text-ink" },
+    slate: { bg: "bg-surface-sunken", text: "text-ink" },
+    emerald: { bg: "bg-success-tint", text: "text-success" },
+    violet: { bg: "bg-brand-tint", text: "text-brand" },
+    amber: { bg: "bg-warning-tint", text: "text-warning" },
+    orange: { bg: "bg-warning-tint", text: "text-warning" },
+    red: { bg: "bg-danger-tint", text: "text-danger" },
+    blue: { bg: "bg-brand-tint", text: "text-brand" },
   };
 
   return (
@@ -295,9 +295,9 @@ function CardBadges({ children }: { children: React.ReactNode }) {
 
 function DueDateBadge({ date }: { date: string | null | undefined }) {
   return (
-    <View className="flex-row items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5">
-      <Ionicons name="calendar-outline" size={11} color="#6B7280" />
-      <Text className="text-[10px] font-semibold text-gray-600">{fmtDate(date)}</Text>
+    <View className="flex-row items-center gap-1 rounded-ds-md bg-surface-sunken px-1.5 py-0.5">
+      <Ionicons name="calendar-outline" size={11} color="var(--ds-ink-muted)" />
+      <Text className="text-[10px] font-semibold text-ink-muted">{fmtDate(date)}</Text>
     </View>
   );
 }
@@ -307,7 +307,7 @@ function AccordionChevron({ expanded }: { expanded: boolean }) {
     <Ionicons
       name={expanded ? "chevron-up" : "chevron-down"}
       size={16}
-      color="#6B7280"
+      color="var(--ds-ink-muted)"
     />
   );
 }
@@ -322,12 +322,12 @@ function DetailBlock({
   value: string;
 }) {
   return (
-    <View className="min-w-[150px] flex-1 rounded-lg bg-white border border-gray-100 px-2.5 py-2">
+    <View className="min-w-[150px] flex-1 rounded-ds-md bg-surface border border-border px-2.5 py-2">
       <View className="flex-row items-center gap-1.5 mb-0.5">
-        <Ionicons name={icon} size={13} color="#6B7280" />
-        <Text className="text-[10px] font-bold uppercase text-gray-500">{label}</Text>
+        <Ionicons name={icon} size={13} color="var(--ds-ink-muted)" />
+        <Text className="text-[10px] font-semibold uppercase text-ink-muted">{label}</Text>
       </View>
-      <Text className="text-xs font-semibold text-gray-900" numberOfLines={2}>
+      <Text className="text-xs font-semibold text-ink" numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -350,12 +350,12 @@ function LocalInvoiceCard({
 
   return (
     <View
-      className={`w-full rounded-lg border px-2.5 py-2 ${
+      className={`w-full rounded-ds-md border px-2.5 py-2 ${
         hint
-          ? "border-amber-200 bg-amber-50/40"
+          ? "border-warning bg-warning-tint/40"
           : compact
-            ? "border-gray-100 bg-gray-50/60"
-            : "border-gray-100 bg-white"
+            ? "border-border bg-surface-sunken"
+            : "border-border bg-surface"
       }`}
     >
       <TouchableOpacity
@@ -363,20 +363,20 @@ function LocalInvoiceCard({
         activeOpacity={0.75}
         className="flex-row items-center gap-2"
       >
-        <View className="w-7 h-7 rounded-md bg-white border border-gray-100 items-center justify-center">
-          <Ionicons name="document-text-outline" size={14} color="#6B7280" />
+        <View className="w-7 h-7 rounded-ds-md bg-surface border border-border items-center justify-center">
+          <Ionicons name="document-text-outline" size={14} color="var(--ds-ink-muted)" />
         </View>
         <View className="flex-1">
           <View className="flex-row items-center gap-1.5">
-            <Text className="text-[10px] font-mono font-semibold text-violet-600" numberOfLines={1}>
+            <Text className="text-[10px] font-mono font-semibold text-brand" numberOfLines={1}>
               ID #{row.invoice_id}
             </Text>
             <DueDateBadge date={row.due_date} />
           </View>
-          <Text className="text-xs font-bold text-gray-900 mt-0.5" numberOfLines={1}>
+          <Text className="text-xs font-semibold text-ink mt-0.5" numberOfLines={1}>
             {row.description}
           </Text>
-          <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
+          <Text className="text-[11px] text-ink-muted mt-0.5" numberOfLines={1}>
             {fmtMoney(row.amount)}
             {providerVisible && row.cora_charge_id ? ` · Cora ${row.cora_charge_id}` : ""}
           </Text>
@@ -399,7 +399,7 @@ function LocalInvoiceCard({
       </TouchableOpacity>
 
       {expanded ? (
-        <View className="mt-2 pt-2 border-t border-gray-100">
+        <View className="mt-2 pt-2 border-t border-border">
           <View className="flex-row flex-wrap gap-1.5">
             <DetailBlock icon="pricetag-outline" label="ID" value={`#${row.invoice_id}`} />
             <DetailBlock icon="calendar-outline" label="Vencimento" value={fmtDate(row.due_date)} />
@@ -416,8 +416,8 @@ function LocalInvoiceCard({
           </View>
 
           {hint ? (
-            <View className="flex-row items-start gap-1.5 mt-1.5 rounded-md bg-amber-50 border border-amber-100 px-2 py-1.5">
-              <Ionicons name="information-circle-outline" size={13} color="#B45309" />
+            <View className="flex-row items-start gap-1.5 mt-1.5 rounded-ds-md bg-warning-tint border border-warning px-2 py-1.5">
+              <Ionicons name="information-circle-outline" size={13} color="var(--ds-warning)" />
               <Text className="flex-1 text-[10px] leading-4 text-amber-900">{hint}</Text>
             </View>
           ) : null}
@@ -433,12 +433,12 @@ function CompactTableHeader({
   columns: { label: string; width?: number; flex?: number; align?: "left" | "right" }[];
 }) {
   return (
-    <View className="flex-row items-center px-2 py-1.5 bg-gray-50 border-b border-gray-100">
+    <View className="flex-row items-center px-2 py-1.5 bg-surface-sunken border-b border-border">
       <View style={{ width: 28 }} />
       {columns.map((col) => (
         <Text
           key={col.label}
-          className={`text-[9px] font-bold uppercase text-gray-500 ${
+          className={`text-[9px] font-semibold uppercase text-ink-muted ${
             col.align === "right" ? "text-right" : ""
           }`}
           style={col.width ? { width: col.width } : col.flex ? { flex: col.flex } : undefined}
@@ -479,16 +479,16 @@ function ExecutionPreviewSummary({
   }
 
   return (
-    <View className="rounded-lg border border-violet-200 bg-violet-50/70 px-3 py-2.5 gap-1.5">
+    <View className="rounded-ds-md border border-border bg-brand-tint px-3 py-2.5 gap-1.5">
       <View className="flex-row items-center gap-2">
-        <Ionicons name="play-circle-outline" size={16} color="#6D28D9" />
-        <Text className="text-xs font-bold text-violet-900">
+        <Ionicons name="play-circle-outline" size={16} color="var(--ds-brand-hover)" />
+        <Text className="text-xs font-semibold text-brand">
           Ao executar ({lines.length} {lines.length === 1 ? "ação" : "ações"})
         </Text>
       </View>
       {lines.map((line, i) => (
         <View key={i} className="flex-row items-start gap-2 pl-0.5">
-          <Ionicons name={line.icon} size={13} color="#7C3AED" style={{ marginTop: 1 }} />
+          <Ionicons name={line.icon} size={13} color="var(--ds-brand)" style={{ marginTop: 1 }} />
           <Text className="flex-1 text-[11px] leading-4 text-violet-950">{line.text}</Text>
         </View>
       ))}
@@ -518,14 +518,14 @@ function ContractChargesStepIndicator({ current }: { current: ContractChargesSte
               <View className="flex-1 items-center min-w-0">
                 <View
                   className={`h-7 w-7 rounded-full items-center justify-center ${
-                    active ? "bg-violet-600" : done ? "bg-violet-200" : "bg-gray-200"
+                    active ? "bg-brand" : done ? "bg-brand-tint" : "bg-border"
                   }`}
                 >
                   {done ? (
-                    <Ionicons name="checkmark" size={14} color="#5B21B6" />
+                    <Ionicons name="checkmark" size={14} color="var(--ds-brand-hover)" />
                   ) : (
                     <Text
-                      className={`text-xs font-bold ${active ? "text-white" : "text-gray-500"}`}
+                      className={`text-xs font-semibold ${active ? "text-on-brand" : "text-ink-muted"}`}
                     >
                       {i + 1}
                     </Text>
@@ -533,7 +533,7 @@ function ContractChargesStepIndicator({ current }: { current: ContractChargesSte
                 </View>
                 <Text
                   className={`text-[9px] font-semibold mt-1 text-center ${
-                    active ? "text-violet-800" : done ? "text-violet-600" : "text-gray-400"
+                    active ? "text-brand" : done ? "text-brand" : "text-ink-subtle"
                   }`}
                   numberOfLines={1}
                 >
@@ -542,7 +542,7 @@ function ContractChargesStepIndicator({ current }: { current: ContractChargesSte
               </View>
               {i < WIZARD_STEPS.length - 1 ? (
                 <View
-                  className={`h-0.5 flex-1 mb-4 max-w-[12px] ${done ? "bg-violet-300" : "bg-gray-200"}`}
+                  className={`h-0.5 flex-1 mb-4 max-w-[12px] ${done ? "bg-brand-tint" : "bg-border"}`}
                 />
               ) : null}
             </View>
@@ -576,13 +576,13 @@ function OverviewSummaryCards({
       {cards.map((card) => (
         <View
           key={card.label}
-          className="flex-1 min-w-[100px] rounded-lg border border-gray-100 bg-white px-2.5 py-2"
+          className="flex-1 min-w-[100px] rounded-ds-md border border-border bg-surface px-2.5 py-2"
         >
           <View className="flex-row items-center gap-1 mb-0.5">
-            <Ionicons name={card.icon} size={12} color="#6B7280" />
-            <Text className="text-[9px] font-bold uppercase text-gray-500">{card.label}</Text>
+            <Ionicons name={card.icon} size={12} color="var(--ds-ink-muted)" />
+            <Text className="text-[9px] font-semibold uppercase text-ink-muted">{card.label}</Text>
           </View>
-          <Text className="text-lg font-bold text-gray-900">{card.value}</Text>
+          <Text className="text-lg font-semibold text-ink">{card.value}</Text>
         </View>
       ))}
     </View>
@@ -615,10 +615,10 @@ function ContractChargesDebugPanel({ debug }: { debug: Record<string, unknown> }
   const hydrateSamples = (cora.hydrate_samples ?? []) as Array<Record<string, unknown>>;
 
   return (
-    <View className="rounded-lg border border-amber-300 bg-amber-50/90 overflow-hidden">
-      <View className="px-3 py-2 border-b border-amber-200">
-        <Text className="text-xs font-bold text-amber-950">Debug cobranças (prod)</Text>
-        <Text className="text-[10px] text-amber-800 mt-0.5">
+    <View className="rounded-ds-md border border-warning bg-warning-tint/90 overflow-hidden">
+      <View className="px-3 py-2 border-b border-warning">
+        <Text className="text-xs font-semibold text-amber-950">Debug cobranças (prod)</Text>
+        <Text className="text-[10px] text-warning mt-0.5">
           {String(debug.hint ?? "")}
         </Text>
       </View>
@@ -639,14 +639,14 @@ function ContractChargesDebugPanel({ debug }: { debug: Record<string, unknown> }
         {Platform.OS === "web" ? (
           <TouchableOpacity
             onPress={() => copyJson().catch(() => undefined)}
-            className="px-2 py-1 rounded-md bg-amber-100 border border-amber-200"
+            className="px-2 py-1 rounded-ds-md bg-warning-tint border border-warning"
           >
             <Text className="text-[10px] font-semibold text-amber-900">Copiar JSON</Text>
           </TouchableOpacity>
         ) : null}
       </View>
       <ScrollView
-        className="max-h-48 bg-gray-900 mx-2 mb-2 rounded-md"
+        className="max-h-48 bg-gray-900 mx-2 mb-2 rounded-ds-md"
         horizontal={false}
         nestedScrollEnabled
       >
@@ -674,10 +674,10 @@ function PreviewAlerts({
       {items.map((text, i) => (
         <View
           key={`${i}-${text.slice(0, 24)}`}
-          className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2"
+          className="flex-row items-start gap-2 rounded-ds-md bg-warning-tint border border-warning px-3 py-2"
         >
-          <Ionicons name="warning-outline" size={15} color="#B45309" />
-          <Text className="flex-1 text-xs text-amber-800">{text}</Text>
+          <Ionicons name="warning-outline" size={15} color="var(--ds-warning)" />
+          <Text className="flex-1 text-xs text-warning">{text}</Text>
         </View>
       ))}
     </View>
@@ -708,7 +708,7 @@ function CompactGenerateList({
   }
 
   return (
-    <View className="rounded-lg border border-violet-200 bg-white overflow-hidden">
+    <View className="rounded-ds-md border border-border bg-surface overflow-hidden">
       <CompactTableHeader
         columns={[
           { label: "Venc.", width: 68 },
@@ -731,8 +731,8 @@ function CompactGenerateList({
           <View
             key={row.key}
             className={`flex-row items-center px-1 py-1.5 ${
-              index < rows.length - 1 ? "border-b border-gray-50" : ""
-            } ${selected ? "bg-violet-50/80" : disabled ? "opacity-60" : ""}`}
+              index < rows.length - 1 ? "border-b border-border" : ""
+            } ${selected ? "bg-brand-tint" : disabled ? "opacity-60" : ""}`}
           >
             <TouchableOpacity
               onPress={() => onToggle(row.key)}
@@ -742,13 +742,13 @@ function CompactGenerateList({
             >
               <RowCheckbox checked={selected} disabled={disabled} />
             </TouchableOpacity>
-            <Text className="text-[11px] text-gray-700" style={{ width: 68 }}>
+            <Text className="text-[11px] text-ink" style={{ width: 68 }}>
               {fmtDate(row.due_date)}
             </Text>
-            <Text className="text-[11px] font-semibold text-gray-900" style={{ width: 82 }}>
+            <Text className="text-[11px] font-semibold text-ink" style={{ width: 82 }}>
               {fmtMoney(row.amount)}
             </Text>
-            <Text className="flex-1 text-[10px] text-gray-600" numberOfLines={1}>
+            <Text className="flex-1 text-[10px] text-ink-muted" numberOfLines={1}>
               {row.description ?? typeLabel}
             </Text>
             <View style={{ width: 56 }} className="items-end">
@@ -762,7 +762,7 @@ function CompactGenerateList({
         );
       })}
       {selectable.length === 0 && rows.length > 0 ? (
-        <Text className="text-[10px] text-gray-500 px-2 py-2">Todas as parcelas já existem ou estão bloqueadas.</Text>
+        <Text className="text-[10px] text-ink-muted px-2 py-2">Todas as parcelas já existem ou estão bloqueadas.</Text>
       ) : null}
     </View>
   );
@@ -949,7 +949,7 @@ export default function ContractChargesModal({
       case "overview":
         return (
           <View className="gap-3">
-            <Text className="text-xs text-gray-600 leading-5">
+            <Text className="text-xs text-ink-muted leading-5">
               Gere as parcelas no sistema conforme o contrato. Depois, emita boleto/PIX na Cora pela
               ação “gerar cobrança” de cada fatura. Importação de boletos da Cora não é mais usada.
             </Text>
@@ -959,7 +959,7 @@ export default function ContractChargesModal({
               providerError={preview.summary.provider_fetch_error}
             />
             {importedInvoices.length > 0 ? (
-              <View className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 gap-2">
+              <View className="rounded-ds-md border border-warning bg-warning-tint px-3 py-2.5 gap-2">
                 <Text className="text-xs font-semibold text-amber-950">
                   {importedInvoices.length} cobrança(s) importada(s) da Cora nesta matrícula
                 </Text>
@@ -969,21 +969,21 @@ export default function ContractChargesModal({
                 <TouchableOpacity
                   onPress={purgeImported}
                   disabled={loading || applying || purgingImported}
-                  className={`self-start flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg ${
-                    purgingImported ? "bg-amber-200" : "bg-amber-600"
+                  className={`self-start flex-row items-center gap-1.5 px-3 py-1.5 rounded-ds-md ${
+                    purgingImported ? "bg-danger opacity-60" : "bg-danger"
                   }`}
                 >
                   {purgingImported ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <ActivityIndicator color="var(--ds-on-danger)" size="small" />
                   ) : (
-                    <Ionicons name="trash-outline" size={14} color="white" />
+                    <Ionicons name="trash-outline" size={14} color="var(--ds-on-danger)" />
                   )}
-                  <Text className="text-xs font-semibold text-white">Remover importadas</Text>
+                  <Text className="text-xs font-medium text-on-danger">Remover importadas</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
-            <View className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
-              <Text className="text-xs font-bold text-gray-800 mb-2">Tipos de cobrança na análise</Text>
+            <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-2.5">
+              <Text className="text-xs font-semibold text-ink mb-2">Tipos de cobrança na análise</Text>
               <View className="flex-row flex-wrap gap-1.5">
                 {(["monthly", "enrollment_fee"] as const).map((type) => {
                   const active = invoiceTypes.includes(type);
@@ -998,18 +998,18 @@ export default function ContractChargesModal({
                         });
                       }}
                       disabled={loading || applying || preview.charges_batch_generated}
-                      className={`flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-md border ${
-                        active ? "bg-white border-violet-300" : "bg-transparent border-gray-200"
+                      className={`flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-ds-md border ${
+                        active ? "bg-surface border-border" : "bg-transparent border-border"
                       }`}
                     >
                       <Ionicons
                         name={active ? "checkmark-circle" : "ellipse-outline"}
                         size={14}
-                        color={active ? "#7C3AED" : "#9CA3AF"}
+                        color={active ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                       />
                       <Text
                         className={`text-[11px] font-semibold ${
-                          active ? "text-violet-800" : "text-gray-600"
+                          active ? "text-brand" : "text-ink-muted"
                         }`}
                       >
                         {label}
@@ -1018,14 +1018,14 @@ export default function ContractChargesModal({
                   );
                 })}
               </View>
-              <Text className="text-[10px] text-gray-500 mt-2">
+              <Text className="text-[10px] text-ink-muted mt-2">
                 Alterar os tipos recarrega a análise ao avançar ou usar Atualizar.
               </Text>
             </View>
             {preview.charges_batch_generated ? (
-              <View className="flex-row items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-                <Ionicons name="lock-closed-outline" size={16} color="#B45309" />
-                <Text className="flex-1 text-xs text-amber-800">
+              <View className="flex-row items-start gap-2 rounded-ds-md bg-warning-tint border border-warning px-3 py-2">
+                <Ionicons name="lock-closed-outline" size={16} color="var(--ds-warning)" />
+                <Text className="flex-1 text-xs text-warning">
                   O lote do contrato já foi gerado. Novas parcelas locais estão bloqueadas; use cobranças
                   avulsas se precisar de parcelas extras.
                 </Text>
@@ -1035,14 +1035,14 @@ export default function ContractChargesModal({
               <TouchableOpacity
                 onPress={loadDebugPreview}
                 disabled={loading || debugLoading || applying}
-                className={`self-start flex-row items-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 ${
+                className={`self-start flex-row items-center gap-1 px-2.5 py-1.5 rounded-ds-md border border-warning bg-warning-tint ${
                   loading || debugLoading || applying ? "opacity-60" : ""
                 }`}
               >
                 {debugLoading ? (
-                  <ActivityIndicator size="small" color="#B45309" />
+                  <ActivityIndicator size="small" color="var(--ds-warning)" />
                 ) : (
-                  <Ionicons name="bug-outline" size={14} color="#B45309" />
+                  <Ionicons name="bug-outline" size={14} color="var(--ds-warning)" />
                 )}
                 <Text className="text-[11px] font-semibold text-amber-900">Carregar debug técnico</Text>
               </TouchableOpacity>
@@ -1054,7 +1054,7 @@ export default function ContractChargesModal({
       case "generate":
         return (
           <View className="gap-2">
-            <Text className="text-xs text-gray-600 leading-5">
+            <Text className="text-xs text-ink-muted leading-5">
               Crie parcelas no sistema conforme o contrato. Em seguida, emita o boleto na Cora pela
               fatura (gerar cobrança).
             </Text>
@@ -1064,7 +1064,7 @@ export default function ContractChargesModal({
                 action={
                   canGenerate && selectableGenerate.length > 0 ? (
                     <TouchableOpacity
-                      className="px-2 py-1 rounded-lg bg-violet-50"
+                      className="px-2 py-1 rounded-ds-md bg-brand-tint"
                       onPress={() =>
                         toggleAll(
                           selectableGenerate.map((r) => r.key),
@@ -1072,7 +1072,7 @@ export default function ContractChargesModal({
                         )
                       }
                     >
-                      <Text className="text-xs font-semibold text-violet-700">
+                      <Text className="text-xs font-semibold text-brand">
                         {selectedGenerateKeys.length === selectableGenerate.length
                           ? "Desmarcar"
                           : "Marcar todas"}
@@ -1088,7 +1088,7 @@ export default function ContractChargesModal({
                 onToggle={toggleKey}
               />
             </SectionPanel>
-            <Text className="text-[10px] text-gray-500 text-center">
+            <Text className="text-[10px] text-ink-muted text-center">
               {selectedGenerateKeys.length} parcela(s) marcada(s) para gerar
             </Text>
           </View>
@@ -1097,7 +1097,7 @@ export default function ContractChargesModal({
       case "review":
         return (
           <View className="gap-3">
-            <Text className="text-xs text-gray-600 leading-5">
+            <Text className="text-xs text-ink-muted leading-5">
               Confira o que será executado. Você pode voltar às etapas anteriores para ajustar a seleção.
             </Text>
             <ExecutionPreviewSummary preview={preview} selectedKeys={selectedKeys} />
@@ -1108,9 +1108,9 @@ export default function ContractChargesModal({
                 description="Volte e marque parcelas para gerar no sistema."
               />
             ) : (
-              <View className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 flex-row items-center gap-2">
-                <Ionicons name="checkmark-done-outline" size={18} color="#6D28D9" />
-                <Text className="text-sm font-semibold text-violet-900">
+              <View className="rounded-ds-md border border-border bg-brand-tint px-3 py-2 flex-row items-center gap-2">
+                <Ionicons name="checkmark-done-outline" size={18} color="var(--ds-brand-hover)" />
+                <Text className="text-sm font-semibold text-brand">
                   {selectedActionCount} ação(ões) pronta(s) para executar
                 </Text>
               </View>
@@ -1122,10 +1122,10 @@ export default function ContractChargesModal({
                   subtitle="Somente consulta — não entra na execução."
                   action={
                     <TouchableOpacity
-                      className="px-2 py-1 rounded-lg bg-gray-100"
+                      className="px-2 py-1 rounded-ds-md bg-surface-sunken"
                       onPress={() => setShowLocalInvoices((v) => !v)}
                     >
-                      <Text className="text-xs font-semibold text-gray-700">
+                      <Text className="text-xs font-semibold text-ink">
                         {showLocalInvoices ? "Ocultar" : "Ver"}
                       </Text>
                     </TouchableOpacity>
@@ -1163,46 +1163,46 @@ export default function ContractChargesModal({
             <TouchableOpacity
               onPress={onClose}
               disabled={applying}
-              className="px-4 py-2.5 rounded-lg border border-gray-200 bg-white"
+              className="px-4 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
             >
-              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+              <Text className="text-sm font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               onPress={goBack}
               disabled={applying || loading}
-              className="flex-row items-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-200 bg-white"
+              className="flex-row items-center gap-1.5 px-4 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
             >
-              <Ionicons name="arrow-back" size={16} color="#374151" />
-              <Text className="text-sm font-semibold text-gray-700">Voltar</Text>
+              <Ionicons name="arrow-back" size={16} color="var(--ds-ink)" />
+              <Text className="text-sm font-semibold text-ink">Voltar</Text>
             </TouchableOpacity>
           )}
           {step === "overview" ? (
             <TouchableOpacity
               onPress={loadPreview}
               disabled={loading || applying}
-              className={`flex-row items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-violet-200 ${
-                loading || applying ? "opacity-60" : "bg-white"
+              className={`flex-row items-center justify-center gap-2 px-4 py-2.5 rounded-ds-md border border-border ${
+                loading || applying ? "opacity-60" : "bg-surface"
               }`}
             >
-              <Ionicons name="refresh-outline" size={16} color="#6D28D9" />
-              <Text className="text-sm font-semibold text-violet-700">Atualizar</Text>
+              <Ionicons name="refresh-outline" size={16} color="var(--ds-brand-hover)" />
+              <Text className="text-sm font-semibold text-brand">Atualizar</Text>
             </TouchableOpacity>
           ) : null}
           {isLastStep ? (
             <TouchableOpacity
               onPress={submit}
               disabled={applying || loading || selectedActionCount === 0}
-              className={`flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-lg ${
-                applying || loading || selectedActionCount === 0 ? "bg-violet-300" : "bg-violet-600"
+              className={`flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-ds-md ${
+                applying || loading || selectedActionCount === 0 ? "bg-brand-tint" : "bg-brand"
               }`}
             >
               {applying ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle-outline" size={16} color="white" />
-                  <Text className="text-sm font-bold text-white">
+                  <Ionicons name="checkmark-circle-outline" size={16} color="var(--ds-on-brand)" />
+                  <Text className="text-sm font-medium text-on-brand">
                     Executar ({selectedActionCount})
                   </Text>
                 </>
@@ -1212,12 +1212,12 @@ export default function ContractChargesModal({
             <TouchableOpacity
               onPress={goNext}
               disabled={loading || applying || !preview}
-              className={`flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-lg ${
-                loading || applying || !preview ? "bg-violet-300" : "bg-violet-600"
+              className={`flex-row items-center justify-center gap-2 px-5 py-2.5 rounded-ds-md ${
+                loading || applying || !preview ? "bg-brand-tint" : "bg-brand"
               }`}
             >
-              <Text className="text-sm font-bold text-white">Próximo</Text>
-              <Ionicons name="arrow-forward" size={16} color="white" />
+              <Text className="text-sm font-medium text-on-brand">Próximo</Text>
+              <Ionicons name="arrow-forward" size={16} color="var(--ds-on-brand)" />
             </TouchableOpacity>
           )}
         </>
@@ -1237,14 +1237,14 @@ export default function ContractChargesModal({
 
         {loading ? (
           <View className="items-center py-10">
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text className="text-xs text-gray-500 mt-2">Consultando sistema e provedor...</Text>
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
+            <Text className="text-xs text-ink-muted mt-2">Consultando sistema e provedor...</Text>
           </View>
         ) : null}
 
         {!!error && (
-          <View className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-            <Text className="text-sm text-red-700">{error}</Text>
+          <View className="rounded-ds-md border border-danger bg-danger-tint px-3 py-2">
+            <Text className="text-sm text-danger">{error}</Text>
           </View>
         )}
 

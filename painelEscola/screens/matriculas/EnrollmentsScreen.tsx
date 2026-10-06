@@ -187,8 +187,8 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#111722",
-    backgroundColor: "white",
+    color: "var(--ds-ink)",
+    backgroundColor: "var(--ds-surface)",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
     flexGrow: isMobile ? 1 : 0,
@@ -402,7 +402,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             className="h-9 px-3 rounded-ds-md bg-brand-tint border border-border flex-row items-center justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="eye-outline" size={15} color="#1C3D63" />
+            <Ionicons name="eye-outline" size={15} color="var(--ds-brand)" />
             <Text className="text-xs font-semibold text-brand ml-1.5">Detalhes</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -413,7 +413,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             className="w-9 h-9 rounded-ds-md bg-surface-sunken border border-border items-center justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="ellipsis-horizontal" size={17} color="#4B5463" />
+            <Ionicons name="ellipsis-horizontal" size={17} color="var(--ds-ink-muted)" />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -438,12 +438,12 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         </View>
         <TouchableOpacity
           onPress={() => navigate("matriculas-form")}
-          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           style={{ justifyContent: "center", width: isMobile ? "100%" : undefined }}
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">
             Nova matrícula
           </Text>
         </TouchableOpacity>
@@ -471,7 +471,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
             style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
-            <Ionicons name="search-outline" size={16} color="#5F6878" />
+            <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
             <input
               placeholder="Aluno ou matrícula..."
               value={search}
@@ -484,14 +484,14 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#111722",
+                color: "var(--ds-ink)",
                 marginLeft: 8,
                 backgroundColor: "transparent",
               }}
             />
             {!!search.trim() ? (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#5F6878" />
+                <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -553,11 +553,11 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         <View className="gap-3">
           {loading ? (
             <View className="items-center justify-center py-16 bg-surface rounded-ds-md border border-border">
-              <ActivityIndicator size="large" color="#1C3D63" />
+              <ActivityIndicator size="large" color="var(--ds-brand)" />
             </View>
           ) : rows.length === 0 ? (
             <View className="items-center justify-center py-14 bg-surface rounded-ds-md border border-border">
-              <Ionicons name="clipboard-outline" size={40} color="#D9DDE3" />
+              <Ionicons name="clipboard-outline" size={40} color="var(--ds-border)" />
               <Text className="text-ink-subtle mt-3 text-sm">
                 Nenhuma matrícula encontrada
               </Text>
@@ -616,11 +616,11 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
 
           {loading ? (
             <View className="items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#1C3D63" />
+              <ActivityIndicator size="large" color="var(--ds-brand)" />
             </View>
           ) : rows.length === 0 ? (
             <View className="items-center justify-center py-16">
-              <Ionicons name="clipboard-outline" size={40} color="#D9DDE3" />
+              <Ionicons name="clipboard-outline" size={40} color="var(--ds-border)" />
               <Text className="text-ink-subtle mt-3 text-sm">
                 Nenhuma matrícula encontrada
               </Text>
@@ -664,7 +664,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                     className="p-1.5 bg-surface-sunken rounded-ds-md border border-border"
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="ellipsis-horizontal" size={16} color="#4B5463" />
+                    <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
                   </TouchableOpacity>
                 </View>
               </DataTableRow>
@@ -696,17 +696,17 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           <>
             <TouchableOpacity
               onPress={() => setViewVisible(false)}
-              className="px-5 py-2.5 rounded-ds-md border border-border"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             >
               <Text className="text-sm font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
             {viewData && (
               <TouchableOpacity
                 onPress={() => { setViewVisible(false); openEdit(viewData); }}
-                className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
+                className="px-5 rounded-ds-md bg-brand flex-row items-center gap-2 py-2 min-h-control-md justify-center"
               >
-                <Ionicons name="pencil-outline" size={14} color="white" />
-                <Text className="text-sm font-semibold text-white">Editar</Text>
+                <Ionicons name="pencil-outline" size={14} color="var(--ds-on-brand)" />
+                <Text className="text-sm font-medium text-on-brand">Editar</Text>
               </TouchableOpacity>
             )}
           </>
@@ -714,7 +714,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
       >
         {loadingView ? (
           <View className="items-center py-10">
-            <ActivityIndicator size="large" color="#1C3D63" />
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
           </View>
         ) : viewData ? (
           <View className="gap-5">

@@ -54,7 +54,7 @@ const ICON_LABELS: Record<string, string> = {
   atom: "Atomo",
   music: "Musica",
   palette: "Paleta",
-  code2: "Codigo",
+  code2: "Código",
   brain: "Cerebro",
   "book-marked": "Livro marcado",
   "graduation-cap": "Capelo",
@@ -74,7 +74,7 @@ function SubjectIcon({
   color?: string | null;
   size?: number;
 }) {
-  const bg = color ?? "#7C3AED";
+  const bg = color ?? "var(--ds-brand)";
   const IconComp = icon ? ICON_MAP[icon] : null;
 
   return (
@@ -82,7 +82,7 @@ function SubjectIcon({
       style={{
         width: size + 16,
         height: size + 16,
-        borderRadius: 10,
+        borderRadius: 4,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: bg + "22",
@@ -196,7 +196,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       }
     }
 
-    return responseData?.message || "Nao foi possivel salvar este usuario.";
+    return responseData?.message || "Não foi possível salvar este usuário.";
   };
 
   useEffect(() => {
@@ -320,7 +320,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     loadSubjects();
   }, [canTeach]);
 
-  const title = useMemo(() => (isEdit ? "Editar Usuario" : "Novo Usuario"), [isEdit]);
+  const title = useMemo(() => (isEdit ? "Editar usuário" : "Novo usuário"), [isEdit]);
 
   const showTenantField = isGlobalSuperAdmin && form.role !== "super_admin";
   const isRoleLocked = isEdit && (isTenantOwner || isEditingOwnUser);
@@ -374,7 +374,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
 
     if (form.password || form.password_confirmation) {
       if (form.password !== form.password_confirmation) {
-        localErrors.password_confirmation = "A confirmacao de senha nao confere.";
+        localErrors.password_confirmation = "A confirmacao de senha não confere.";
       }
     }
 
@@ -417,10 +417,10 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     try {
       if (isEdit && userId) {
         await api.put(`/users/${userId}`, payload);
-        navigate("users", { success: "Usuario atualizado com sucesso." });
+        navigate("users", { success: "Usuário atualizado com sucesso." });
       } else {
         await api.post("/users", payload);
-        navigate("users", { success: "Usuario criado com sucesso." });
+        navigate("users", { success: "Usuário criado com sucesso." });
       }
     } catch (e: any) {
       if (e.response?.status === 422) {
@@ -441,10 +441,10 @@ export default function UserFormScreen({ navigate, userId }: Props) {
         setToast({
           visible: true,
           type: "error",
-          message: e.response?.data?.message || "Seu perfil nao possui permissao para esta operacao.",
+          message: e.response?.data?.message || "Seu perfil não possui permissão para esta operacao.",
         });
       } else {
-        const fallbackMessage = e.response?.data?.message || "Nao foi possivel salvar este usuario.";
+        const fallbackMessage = e.response?.data?.message || "Não foi possível salvar este usuário.";
         setErrors({ general: fallbackMessage });
         setToast({ visible: true, type: "error", message: fallbackMessage });
       }
@@ -458,34 +458,34 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}>
       <View className="flex-row items-center gap-2 mb-6">
         <TouchableOpacity onPress={() => navigate("users")} className="flex-row items-center gap-1.5" activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-          <Text className="text-sm font-medium text-violet-600">Usuarios</Text>
+          <Ionicons name="chevron-back" size={18} color="var(--ds-brand)" />
+          <Text className="text-sm font-medium text-brand">Usuários</Text>
         </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        <Text className="text-sm text-gray-500">{title}</Text>
+        <Ionicons name="chevron-forward" size={14} color="var(--ds-border-strong)" />
+        <Text className="text-sm text-ink-muted">{title}</Text>
       </View>
 
       <View className="mb-6">
-        <Text className="text-2xl font-bold text-gray-800">{title}</Text>
-        <Text className="text-sm text-gray-500">Defina acesso, perfil e status do usuario</Text>
+        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">{title}</Text>
+        <Text className="text-sm text-ink-muted">Defina acesso, perfil e status do usuário</Text>
       </View>
 
       {forbidden && (
-        <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex-row items-center gap-2">
-          <Ionicons name="shield-outline" size={16} color="#B45309" />
-          <Text className="text-sm text-amber-700">Seu perfil nao possui permissao para esta operacao.</Text>
+        <View className="mb-4 rounded-ds-md border border-warning bg-warning-tint px-4 py-3 flex-row items-center gap-2">
+          <Ionicons name="shield-outline" size={16} color="var(--ds-warning)" />
+          <Text className="text-sm text-warning">Seu perfil não possui permissão para esta operacao.</Text>
         </View>
       )}
 
       {!!errors.general && (
-        <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex-row items-center gap-2">
-          <Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
-          <Text className="text-sm text-red-700" style={{ flex: 1 }}>{errors.general}</Text>
+        <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3 flex-row items-center gap-2">
+          <Ionicons name="alert-circle-outline" size={16} color="var(--ds-danger)" />
+          <Text className="text-sm text-danger" style={{ flex: 1 }}>{errors.general}</Text>
         </View>
       )}
 
-      <View className="bg-white rounded-2xl p-5 mb-5" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
-        <Text className="text-base font-semibold text-gray-800 mb-3">Dados do usuario</Text>
+      <View className="bg-surface rounded-ds-md p-5 mb-5 border border-border" style={{ }}>
+        <Text className="text-base font-semibold text-ink mb-3">Dados do usuário</Text>
 
         {showTenantField && (
           <FormSelect
@@ -540,12 +540,12 @@ export default function UserFormScreen({ navigate, userId }: Props) {
               disabled={isRoleLocked}
             />
             {isEdit && isTenantOwner && (
-              <Text className="text-xs text-amber-600 mt-1">
+              <Text className="text-xs text-warning mt-1">
                 O usuario administrador inicial do tenant nao pode ter o perfil alterado.
               </Text>
             )}
             {isEditingOwnUser && (
-              <Text className="text-xs text-amber-600 mt-1">
+              <Text className="text-xs text-warning mt-1">
                 Voce nao pode alterar o seu proprio perfil de acesso.
               </Text>
             )}
@@ -565,11 +565,11 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       </View>
 
       {canTeach && (
-        <View className="bg-white rounded-2xl p-5 mb-5" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
-          <Text className="text-base font-semibold text-gray-800 mb-1">Disciplinas</Text>
-          <Text className="text-xs text-gray-400 mb-3">Selecione as disciplinas que este usuario leciona</Text>
+        <View className="bg-surface rounded-ds-md p-5 mb-5 border border-border" style={{ }}>
+          <Text className="text-base font-semibold text-ink mb-1">Disciplinas</Text>
+          <Text className="text-xs text-ink-subtle mb-3">Selecione as disciplinas que este usuário leciona</Text>
           {subjects.length === 0 ? (
-            <Text className="text-sm text-gray-400">Nenhuma disciplina disponivel.</Text>
+            <Text className="text-sm text-ink-subtle">Nenhuma disciplina disponivel.</Text>
           ) : (
             subjects.map((s) => {
               const selected = form.subject_ids.includes(s.id);
@@ -583,11 +583,11 @@ export default function UserFormScreen({ navigate, userId }: Props) {
                   <Ionicons
                     name={selected ? "checkbox" : "square-outline"}
                     size={20}
-                    color={selected ? "#7C3AED" : "#9CA3AF"}
+                    color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                   />
                   <View className="flex-row items-center gap-2 ml-2" style={{ flex: 1 }}>
                     <SubjectIcon icon={s.icon} color={s.color} size={16} />
-                    <Text className="text-sm text-gray-700" style={{ flex: 1 }}>
+                    <Text className="text-sm text-ink" style={{ flex: 1 }}>
                       {s.name}
                     </Text>
                   </View>
@@ -598,8 +598,8 @@ export default function UserFormScreen({ navigate, userId }: Props) {
         </View>
       )}
 
-      <View className="bg-white rounded-2xl p-5 mb-5" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 }}>
-        <Text className="text-base font-semibold text-gray-800 mb-3">Senha</Text>
+      <View className="bg-surface rounded-ds-md p-5 mb-5 border border-border" style={{ }}>
+        <Text className="text-base font-semibold text-ink mb-3">Senha</Text>
 
         <FormInput
           label={isEdit ? "Nova senha (opcional)" : "Senha"}
@@ -633,41 +633,41 @@ export default function UserFormScreen({ navigate, userId }: Props) {
           <Ionicons
             name={form.password_change_required ? "checkbox" : "square-outline"}
             size={20}
-            color={form.password_change_required ? "#7C3AED" : "#9CA3AF"}
+            color={form.password_change_required ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
           />
-          <Text className="text-sm text-gray-700 ml-2">Exigir troca de senha no primeiro acesso</Text>
+          <Text className="text-sm text-ink ml-2">Exigir troca de senha no primeiro acesso</Text>
         </TouchableOpacity>
       </View>
 
       <View className="flex-row items-center justify-end gap-3">
         <TouchableOpacity
           onPress={() => navigate("users")}
-          className="px-5 py-3 rounded-xl border border-gray-200"
+          className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
           activeOpacity={0.75}
           disabled={saving}
         >
-          <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+          <Text className="text-sm font-semibold text-ink">Cancelar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={save}
-          className="px-6 py-3 rounded-xl bg-violet-600"
+          className="px-6 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
           disabled={saving || loading}
           style={{ opacity: saving || loading ? 0.75 : 1 }}
         >
           {saving ? (
-            <ActivityIndicator size="small" color="white" />
+            <ActivityIndicator size="small" color="var(--ds-on-brand)" />
           ) : (
-            <Text className="text-sm font-semibold text-white">Salvar</Text>
+            <Text className="text-sm font-medium text-on-brand">Salvar</Text>
           )}
         </TouchableOpacity>
       </View>
 
       {loading && (
         <View className="mt-6 items-center">
-          <ActivityIndicator size="small" color="#7C3AED" />
-          <Text className="text-xs text-gray-500 mt-2">Carregando dados do usuario...</Text>
+          <ActivityIndicator size="small" color="var(--ds-brand)" />
+          <Text className="text-xs text-ink-muted mt-2">Carregando dados do usuário...</Text>
         </View>
       )}
     </ScrollView>

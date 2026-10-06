@@ -27,8 +27,8 @@ type Props = {
 };
 
 const toneStyles: Record<ActionDef["tone"], { bg: string; icon: string }> = {
-  violet: { bg: "bg-brand-tint", icon: "#1C3D63" },
-  red: { bg: "bg-danger-tint", icon: "#B0261B" },
+  violet: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  red: { bg: "bg-danger", icon: "var(--ds-on-danger)" },
 };
 
 export default function OfficialAssessmentActionsModal({
@@ -107,7 +107,7 @@ export default function OfficialAssessmentActionsModal({
                     disabled={disabled}
                     className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       action.group === "danger"
-                        ? "border-danger bg-surface"
+                        ? "border-danger bg-danger-tint"
                         : "border-border bg-surface"
                     }`}
                     style={{ opacity: disabled ? 0.45 : 1 }}
@@ -117,13 +117,13 @@ export default function OfficialAssessmentActionsModal({
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-semibold text-ink">{action.label}</Text>
+                      <Text className={`text-sm font-semibold ${action.group === "danger" ? "text-danger" : "text-ink"}`}>{action.label}</Text>
                       {action.description ? (
                         <Text className="text-xs text-ink-muted mt-0.5">{action.description}</Text>
                       ) : null}
                     </View>
                     {!disabled ? (
-                      <Ionicons name="chevron-forward-outline" size={16} color="#5F6878" />
+                      <Ionicons name="chevron-forward-outline" size={16} color="var(--ds-ink-subtle)" />
                     ) : null}
                   </TouchableOpacity>
                 );

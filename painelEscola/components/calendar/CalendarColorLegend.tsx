@@ -25,8 +25,8 @@ export default function CalendarColorLegend({ typesMeta }: Props) {
   if (items.length === 0) return null;
 
   return (
-    <View className="mt-3 pt-3 border-t border-gray-100">
-      <Text className="text-xs font-semibold text-gray-500 mb-2">Legenda</Text>
+    <View className="mt-3 pt-3 border-t border-border">
+      <Text className="text-xs font-semibold text-ink-muted mb-2">Legenda</Text>
       <View className="flex-row flex-wrap gap-x-4 gap-y-2">
         {items.map((item) => (
           <View key={item.key} className="flex-row items-center gap-1.5">
@@ -38,7 +38,7 @@ export default function CalendarColorLegend({ typesMeta }: Props) {
                 backgroundColor: item.color,
               }}
             />
-            <Text className="text-xs text-gray-600">{item.label}</Text>
+            <Text className="text-xs text-ink-muted">{item.label}</Text>
           </View>
         ))}
       </View>

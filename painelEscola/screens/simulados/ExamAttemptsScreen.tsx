@@ -10,6 +10,15 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import Badge from "../../components/ui/Badge";
+import DataTableRow from "../../components/ui/DataTableRow";
+import {
+  TABLE_CELL,
+  TABLE_CELL_MONO,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_CELL_SUBLINE,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../../components/ui/dataTableStyles";
 import Pagination from "../../components/ui/Pagination";
 import Modal from "../../components/ui/Modal";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
@@ -189,8 +198,8 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#111722",
-    backgroundColor: "white",
+    color: "var(--ds-ink)",
+    backgroundColor: "var(--ds-surface)",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
   };
@@ -223,12 +232,13 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
     flexShrink: 0,
     paddingLeft: 8,
   };
+  // Cabeçalho do DataTable do design system: 12px/500, sem caixa alta.
   const headerTextStyle = {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: '#4B5463',
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.2,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500' as const,
+    color: 'var(--ds-ink-muted)',
+    letterSpacing: 0.24,
   };
 
   const getAnswerQuestionLabel = (answer: ExamAttemptDetail["answers"][number]) => {
@@ -290,10 +300,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
   );
 
   const getStatusPillColors = (status: string) => {
-    if (status === "completed") return { bg: "#E5F1EA", color: "#1C6A45" };
-    if (status === "pending_review" || status === "in_progress") return { bg: "#F7F8FA", color: "#111722" };
-    if (status === "awaiting_release") return { bg: "#E9EFF6", color: "#1C3D63" };
-    return { bg: "#F7F8FA", color: "#111722" };
+    if (status === "completed") return { bg: "var(--ds-success-tint)", color: "var(--ds-success)" };
+    if (status === "pending_review" || status === "in_progress") return { bg: "var(--ds-surface-sunken)", color: "var(--ds-ink)" };
+    if (status === "awaiting_release") return { bg: "var(--ds-brand-tint)", color: "var(--ds-brand)" };
+    return { bg: "var(--ds-surface-sunken)", color: "var(--ds-ink)" };
   };
 
   return (
@@ -310,7 +320,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
             className="p-2 rounded-ds-md bg-surface border border-border"
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={18} color="#111722" />
+            <Ionicons name="arrow-back" size={18} color="var(--ds-ink)" />
           </TouchableOpacity>
           <View>
             <View className="flex-row items-center gap-2">
@@ -320,20 +330,20 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                   className="px-2 py-0.5 rounded-ds-md"
                   style={{
                     backgroundColor:
-                      statusFilter === "pending_review" ? "#FBEFDC" :
-                      statusFilter === "awaiting_release" ? "#E9EFF6" :
-                      statusFilter === "in_progress" ? "#FBEFDC" :
-                      "#E5F1EA",
+                      statusFilter === "pending_review" ? "var(--ds-warning-tint)" :
+                      statusFilter === "awaiting_release" ? "var(--ds-brand-tint)" :
+                      statusFilter === "in_progress" ? "var(--ds-warning-tint)" :
+                      "var(--ds-success-tint)",
                   }}
                 >
                   <Text
                     className="text-xs font-semibold"
                     style={{
                       color:
-                        statusFilter === "pending_review" ? "#8A5200" :
-                        statusFilter === "awaiting_release" ? "#1C3D63" :
-                        statusFilter === "in_progress" ? "#8A5200" :
-                        "#1C6A45",
+                        statusFilter === "pending_review" ? "var(--ds-warning)" :
+                        statusFilter === "awaiting_release" ? "var(--ds-brand)" :
+                        statusFilter === "in_progress" ? "var(--ds-warning)" :
+                        "var(--ds-success)",
                     }}
                   >
                     {STATUS_LABEL[statusFilter] ?? statusFilter}
@@ -357,10 +367,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
         {statusFilter && (
           <TouchableOpacity
             onPress={() => { setStatusFilter(""); setPage(1); }}
-            className="flex-row items-center px-3 py-2 rounded-ds-md bg-surface border border-border"
+            className="flex-row items-center px-3 rounded-ds-md bg-surface border border-border-strong py-2 min-h-control-md justify-center"
             activeOpacity={0.7}
           >
-            <Ionicons name="close-outline" size={16} color="#4B5463" />
+            <Ionicons name="close-outline" size={16} color="var(--ds-ink-muted)" />
             <Text className="text-sm text-ink-muted ml-1">Limpar filtro</Text>
           </TouchableOpacity>
         )}
@@ -393,11 +403,9 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
         style={{
           width: "100%",
           minWidth: Math.max(tableMinWidth ?? 0, attemptsTableMinWidth),
-          borderWidth: 1,
-          borderColor: '#F7F8FA',
         }}
       >
-        <View className="flex-row bg-surface-sunken border-b border-border px-4 py-3">
+        <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
           <Text style={[headerTextStyle, studentColumnStyle]}>
             Aluno
           </Text>
@@ -421,55 +429,43 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
 
         {loading ? (
           <View className="py-16 items-center">
-            <ActivityIndicator color="#1C3D63" />
+            <ActivityIndicator color="var(--ds-brand)" />
           </View>
         ) : rows.length === 0 ? (
           <View className="py-16 items-center gap-2">
-            <Ionicons name="time-outline" size={32} color="#7A8393" />
+            <Ionicons name="time-outline" size={32} color="var(--ds-border-strong)" />
             <Text className="text-sm text-ink-subtle">Nenhuma tentativa encontrada</Text>
           </View>
         ) : (
           rows.map((a, i) => (
-            <View
-              key={a.id}
-              className={`flex-row items-center px-4 py-2.5 ${i < rows.length - 1 ? "border-b border-border" : ""}`}
-              style={{ minHeight: 58 }}
-            >
+            <DataTableRow key={a.id} index={i} style={{ minHeight: 58 }}>
               <View style={studentColumnStyle}>
-                <Text
-                  className="font-semibold text-ink"
-                  style={{ fontSize: 13, lineHeight: 17 }}
-                  numberOfLines={1}
-                >
+                <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>
                   {a.student?.name ?? "—"}
                 </Text>
-                <Text className="text-ink-subtle" style={{ fontSize: 11, lineHeight: 15 }}>
+                <Text className={`${TABLE_CELL_SUBLINE} font-mono`}>
                   {a.student?.enrollment_number ?? "—"}
                 </Text>
               </View>
               <View style={examColumnStyle}>
-                <Text
-                  className="text-ink"
-                  style={{ fontSize: 13, lineHeight: 17 }}
-                  numberOfLines={1}
-                >
+                <Text className={TABLE_CELL} numberOfLines={1}>
                   {a.exam?.title ?? "Simulado removido"}
                 </Text>
               </View>
               <View style={{ width: attemptColumns.score, alignItems: "center" }}>
                 {a.status === "completed" ? (
                   <>
-                    <Text className="font-semibold text-ink" style={{ fontSize: 13, lineHeight: 16 }}>
+                    <Text className={TABLE_CELL_MONO}>
                       {a.score?.toFixed(1) ?? "—"} / {a.max_score.toFixed(1)}
                     </Text>
-                    <Text className="text-ink-subtle" style={{ fontSize: 11, lineHeight: 15 }}>{fmtPct(a.percentage)}</Text>
+                    <Text className={`${TABLE_CELL_SUBLINE} font-mono`}>{fmtPct(a.percentage)}</Text>
                   </>
                 ) : a.status === "pending_review" ? (
                   <Text className="text-amber-500 text-center" style={{ fontSize: 11, lineHeight: 15 }}>
                     {a.pending_answers_count ? `${a.pending_answers_count} pendente${a.pending_answers_count !== 1 ? "s" : ""}` : "Pendente"}
                   </Text>
                 ) : a.status === "awaiting_release" ? (
-                  <Text className="text-center" style={{ color: '#1C3D63', fontSize: 11, lineHeight: 15 }}>
+                  <Text className="text-center" style={{ color: 'var(--ds-brand)', fontSize: 11, lineHeight: 15 }}>
                     Aguardando liberação
                   </Text>
                 ) : (
@@ -480,8 +476,8 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                 {a.status === "completed" && typeof a.passed === "boolean" ? (
                   renderTablePill(
                     a.passed ? "Aprovado" : "Reprovado",
-                    a.passed ? "#E5F1EA" : "#FBE9E7",
-                    a.passed ? "#1C6A45" : "#B0261B",
+                    a.passed ? "var(--ds-success-tint)" : "var(--ds-danger-tint)",
+                    a.passed ? "var(--ds-success)" : "var(--ds-danger)",
                   )
                 ) : (
                   <Text className="text-ink-subtle" style={{ fontSize: 13 }}>—</Text>
@@ -494,7 +490,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                 })()}
               </View>
               <View style={startedColumnStyle}>
-                <Text className="text-ink-muted" style={{ fontSize: 12, lineHeight: 16 }}>
+                <Text className={`${TABLE_CELL_MONO} text-ink-muted`}>
                   {fmtDate(a.started_at)}
                 </Text>
               </View>
@@ -509,9 +505,9 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                   justifyContent: "center",
                 }}
               >
-                <Ionicons name="eye-outline" size={15} color="#1C3D63" />
+                <Ionicons name="eye-outline" size={15} color="var(--ds-brand)" />
               </TouchableOpacity>
-            </View>
+            </DataTableRow>
           ))
         )}
       </View>
@@ -545,7 +541,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       >
         {loadingDetail ? (
           <View className="py-12 items-center">
-            <ActivityIndicator color="#1C3D63" />
+            <ActivityIndicator color="var(--ds-brand)" />
           </View>
         ) : detail ? (() => {
           const allCorrected = detail.answers.every(a => a.is_correct !== null);
@@ -555,23 +551,23 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
               <View
                 style={{
                   marginBottom: 20,
-                  backgroundColor: '#F7F8FA',
+                  backgroundColor: 'var(--ds-surface-sunken)',
                   borderRadius: 4,
                   padding: 16,
                   borderWidth: 1,
-                  borderColor: '#D9DDE3',
+                  borderColor: 'var(--ds-border)',
                 }}
               >
                 {/* Título */}
-                <Text style={{ fontSize: 16, fontWeight: '600', color: '#111722', marginBottom: 4 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: 'var(--ds-ink)', marginBottom: 4 }}>
                   {detail.exam?.title ?? "Simulado removido"}
                 </Text>
 
                 {/* Aluno */}
-                <Text style={{ fontSize: 13, color: '#4B5463', marginBottom: 12 }}>
+                <Text style={{ fontSize: 13, color: 'var(--ds-ink-muted)', marginBottom: 12 }}>
                   {detail.student?.name ?? "—"}
                   {detail.student?.enrollment_number ? (
-                    <Text style={{ color: '#5F6878' }}>{` · ${detail.student.enrollment_number}`}</Text>
+                    <Text style={{ color: 'var(--ds-ink-subtle)' }}>{` · ${detail.student.enrollment_number}`}</Text>
                   ) : null}
                 </Text>
 
@@ -590,17 +586,17 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                         paddingHorizontal: 12,
                         paddingVertical: 5,
                         borderRadius: 999,
-                        backgroundColor: detail.passed ? '#E5F1EA' : '#FBE9E7',
+                        backgroundColor: detail.passed ? 'var(--ds-success-tint)' : 'var(--ds-danger-tint)',
                         borderWidth: 1,
-                        borderColor: detail.passed ? '#1C6A45' : '#B0261B',
+                        borderColor: detail.passed ? 'var(--ds-success)' : 'var(--ds-danger)',
                       }}
                     >
                       <Ionicons
                         name={detail.passed ? "checkmark-circle" : "close-circle"}
                         size={14}
-                        color={detail.passed ? "#1C6A45" : "#B0261B"}
+                        color={detail.passed ? "var(--ds-success)" : "var(--ds-danger)"}
                       />
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: detail.passed ? '#1C6A45' : '#B0261B' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: detail.passed ? 'var(--ds-success)' : 'var(--ds-danger)' }}>
                         {detail.passed ? "Aprovado" : "Reprovado"}
                       </Text>
                     </View>
@@ -611,12 +607,12 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                         paddingHorizontal: 10,
                         paddingVertical: 4,
                         borderRadius: 999,
-                        backgroundColor: '#FBEFDC',
+                        backgroundColor: 'var(--ds-warning-tint)',
                         borderWidth: 1,
-                        borderColor: '#8A5200',
+                        borderColor: 'var(--ds-warning)',
                       }}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#8A5200' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: 'var(--ds-warning)' }}>
                         {detail.pending_answers_count ?? detail.answers.filter(a => a.is_correct === null).length} pendente
                         {(detail.pending_answers_count ?? 1) !== 1 ? "s" : ""}
                       </Text>
@@ -636,16 +632,16 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                       paddingHorizontal: 12,
                       paddingVertical: 8,
                       borderWidth: 1,
-                      borderColor: '#D9DDE3',
+                      borderColor: 'var(--ds-border)',
                       marginBottom: 12,
                     }}
                   >
-                    <Ionicons name="star-outline" size={15} color="#1C3D63" />
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#111722' }}>
+                    <Ionicons name="star-outline" size={15} color="var(--ds-brand)" />
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: 'var(--ds-ink)' }}>
                       {detail.score?.toFixed(1)} / {detail.max_score.toFixed(1)} pts
                     </Text>
-                    <Text style={{ fontSize: 13, color: '#4B5463' }}>·</Text>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#1C3D63' }}>
+                    <Text style={{ fontSize: 13, color: 'var(--ds-ink-muted)' }}>·</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: 'var(--ds-brand)' }}>
                       {fmtPct(detail.percentage)}
                     </Text>
                   </View>
@@ -654,16 +650,16 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                 {/* Datas */}
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Ionicons name="play-circle-outline" size={14} color="#5F6878" />
-                    <Text style={{ fontSize: 12, color: '#4B5463' }}>
-                      Início: <Text style={{ color: '#111722', fontWeight: '500' }}>{fmtDate(detail.started_at)}</Text>
+                    <Ionicons name="play-circle-outline" size={14} color="var(--ds-ink-subtle)" />
+                    <Text style={{ fontSize: 12, color: 'var(--ds-ink-muted)' }}>
+                      Início: <Text style={{ color: 'var(--ds-ink)', fontWeight: '500' }}>{fmtDate(detail.started_at)}</Text>
                     </Text>
                   </View>
                   {detail.finished_at && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Ionicons name="flag-outline" size={14} color="#5F6878" />
-                      <Text style={{ fontSize: 12, color: '#4B5463' }}>
-                        Término: <Text style={{ color: '#111722', fontWeight: '500' }}>{fmtDate(detail.finished_at)}</Text>
+                      <Ionicons name="flag-outline" size={14} color="var(--ds-ink-subtle)" />
+                      <Text style={{ fontSize: 12, color: 'var(--ds-ink-muted)' }}>
+                        Término: <Text style={{ color: 'var(--ds-ink)', fontWeight: '500' }}>{fmtDate(detail.finished_at)}</Text>
                       </Text>
                     </View>
                   )}
@@ -701,7 +697,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                       : null;
                     const selectedDisplay = getOptionDisplay(selectedLabel);
                     const correctDisplay = getOptionDisplay(correctLabel);
-                    const statusColor = isCorreta ? '#1C6A45' : isErrada ? '#B0261B' : '#8A5200';
+                    const statusColor = isCorreta ? 'var(--ds-success)' : isErrada ? 'var(--ds-danger)' : 'var(--ds-warning)';
                     return (
                       <View
                         key={ans.question_id}
@@ -710,9 +706,9 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                           borderRadius: 4,
                           borderWidth: 1,
                           borderLeftWidth: 4,
-                          borderColor: '#D9DDE3',
+                          borderColor: 'var(--ds-border)',
                           borderLeftColor: statusColor,
-                          backgroundColor: '#FFFFFF',
+                          backgroundColor: 'var(--ds-surface)',
                           overflow: 'hidden',
                         }}
                       >
@@ -743,7 +739,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                 fontSize: 14,
                                 fontWeight: '600',
                                 lineHeight: 20,
-                                color: '#111722',
+                                color: 'var(--ds-ink)',
                               }}
                             >
                               {getAnswerQuestionLabel(ans)}
@@ -752,15 +748,15 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                               <View
                                 style={{
                                   borderWidth: 1,
-                                  borderColor: '#D9DDE3',
+                                  borderColor: 'var(--ds-border)',
                                   borderRadius: 4,
                                   overflow: 'hidden',
-                                  backgroundColor: '#F7F8FA',
+                                  backgroundColor: 'var(--ds-surface-sunken)',
                                 }}
                               >
                                 <Image
                                   source={{ uri: imageUrl }}
-                                  style={{ width: '100%', height: 180, backgroundColor: '#F7F8FA' }}
+                                  style={{ width: '100%', height: 180, backgroundColor: 'var(--ds-surface-sunken)' }}
                                   resizeMode="contain"
                                 />
                               </View>
@@ -770,7 +766,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                             <Ionicons
                               name={isCorreta ? "checkmark-circle" : "close-circle"}
                               size={22}
-                              color={isCorreta ? "#1C6A45" : "#B0261B"}
+                              color={isCorreta ? "var(--ds-success)" : "var(--ds-danger)"}
                             />
                           )}
                         </View>
@@ -782,7 +778,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                             marginBottom: 12,
                             marginLeft: 42,
                             borderTopWidth: 1,
-                            borderTopColor: '#F7F8FA',
+                            borderTopColor: 'var(--ds-surface-sunken)',
                             paddingTop: 12,
                           }}
                         >
@@ -793,8 +789,8 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                 minWidth: 0,
                                 borderRadius: 4,
                                 borderWidth: 1,
-                                borderColor: isErrada ? '#B0261B' : isCorreta ? '#1C6A45' : '#E9EFF6',
-                                backgroundColor: isErrada ? '#FBE9E7' : isCorreta ? '#E5F1EA' : '#F7F8FA',
+                                borderColor: isErrada ? 'var(--ds-danger)' : isCorreta ? 'var(--ds-success)' : 'var(--ds-brand-tint)',
+                                backgroundColor: isErrada ? 'var(--ds-danger-tint)' : isCorreta ? 'var(--ds-success-tint)' : 'var(--ds-surface-sunken)',
                                 padding: 12,
                               }}
                             >
@@ -806,16 +802,16 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                     borderRadius: 999,
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    backgroundColor: isErrada ? '#FBE9E7' : isCorreta ? '#E5F1EA' : '#E9EFF6',
+                                    backgroundColor: isErrada ? 'var(--ds-danger-tint)' : isCorreta ? 'var(--ds-success-tint)' : 'var(--ds-brand-tint)',
                                   }}
                                 >
                                   <Ionicons
                                     name={isErrada ? "close" : isCorreta ? "checkmark" : "ellipse-outline"}
                                     size={14}
-                                    color={isErrada ? "#B0261B" : isCorreta ? "#1C6A45" : "#1C3D63"}
+                                    color={isErrada ? "var(--ds-danger)" : isCorreta ? "var(--ds-success)" : "var(--ds-brand)"}
                                   />
                                 </View>
-                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#4B5463', textTransform: 'uppercase' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '600', color: 'var(--ds-ink-muted)', textTransform: 'uppercase' }}>
                                   Opção marcada
                                 </Text>
                               </View>
@@ -828,15 +824,15 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                       borderRadius: 4,
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      backgroundColor: isErrada ? '#B0261B' : isCorreta ? '#1C6A45' : '#6366F1',
+                                      backgroundColor: isErrada ? 'var(--ds-danger)' : isCorreta ? 'var(--ds-success)' : '#6366F1',
                                     }}
                                   >
-                                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
+                                    <Text style={{ fontSize: 15, fontWeight: '600', color: 'var(--ds-on-brand)' }}>
                                       {selectedDisplay.letter}
                                     </Text>
                                   </View>
                                 )}
-                                <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: '#111722' }}>
+                                <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: 'var(--ds-ink)' }}>
                                   {selectedDisplay.text
                                     ?? (ans.option_id == null && ans.text_answer == null
                                       ? "O aluno não assinalou a opção."
@@ -851,8 +847,8 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                 minWidth: 0,
                                 borderRadius: 4,
                                 borderWidth: 1,
-                                borderColor: '#D9DDE3',
-                                backgroundColor: '#E9EFF6',
+                                borderColor: 'var(--ds-border)',
+                                backgroundColor: 'var(--ds-brand-tint)',
                                 padding: 12,
                               }}
                             >
@@ -864,12 +860,12 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                     borderRadius: 999,
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    backgroundColor: '#E9EFF6',
+                                    backgroundColor: 'var(--ds-brand-tint)',
                                   }}
                                 >
-                                  <Ionicons name="ribbon-outline" size={14} color="#1C3D63" />
+                                  <Ionicons name="ribbon-outline" size={14} color="var(--ds-brand)" />
                                 </View>
-                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#132C4A', textTransform: 'uppercase' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '600', color: 'var(--ds-brand-hover)', textTransform: 'uppercase' }}>
                                   Gabarito
                                 </Text>
                               </View>
@@ -882,15 +878,15 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                       borderRadius: 4,
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      backgroundColor: '#1C3D63',
+                                      backgroundColor: 'var(--ds-brand)',
                                     }}
                                   >
-                                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#FFFFFF' }}>
+                                    <Text style={{ fontSize: 15, fontWeight: '600', color: 'var(--ds-on-brand)' }}>
                                       {correctDisplay.letter}
                                     </Text>
                                   </View>
                                 )}
-                                <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: '#132C4A' }}>
+                                <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600', color: 'var(--ds-brand-hover)' }}>
                                   {correctDisplay.text ?? "Resposta correta"}
                                 </Text>
                               </View>
@@ -901,16 +897,16 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                               style={{
                                 borderRadius: 4,
                                 borderWidth: 1,
-                                borderColor: '#D9DDE3',
-                                backgroundColor: '#F7F8FA',
+                                borderColor: 'var(--ds-border)',
+                                backgroundColor: 'var(--ds-surface-sunken)',
                                 padding: 10,
                                 marginBottom: 8,
                               }}
                             >
-                              <Text style={{ fontSize: 11, fontWeight: '600', color: '#4B5463', marginBottom: 4 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: 'var(--ds-ink-muted)', marginBottom: 4 }}>
                                 Resposta discursiva
                               </Text>
-                              <Text style={{ fontSize: 13, lineHeight: 18, color: '#111722', fontStyle: 'italic' }}>
+                              <Text style={{ fontSize: 13, lineHeight: 18, color: 'var(--ds-ink)', fontStyle: 'italic' }}>
                                 "{ans.text_answer}"
                               </Text>
                             </View>
@@ -920,12 +916,12 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                               style={{
                                 borderRadius: 4,
                                 borderWidth: 1,
-                                borderColor: '#D9DDE3',
-                                backgroundColor: '#F7F8FA',
+                                borderColor: 'var(--ds-border)',
+                                backgroundColor: 'var(--ds-surface-sunken)',
                                 padding: 10,
                               }}
                             >
-                              <Text style={{ fontSize: 13, color: '#5F6878', fontWeight: '600' }}>
+                              <Text style={{ fontSize: 13, color: 'var(--ds-ink-subtle)', fontWeight: '600' }}>
                                 O aluno não assinalou a opção.
                               </Text>
                             </View>
@@ -937,10 +933,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                   paddingHorizontal: 10,
                                   paddingVertical: 5,
                                   borderRadius: 999,
-                                  backgroundColor: isCorreta ? '#E5F1EA' : '#FBE9E7',
+                                  backgroundColor: isCorreta ? 'var(--ds-success-tint)' : 'var(--ds-danger-tint)',
                                 }}
                               >
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: isCorreta ? '#1C6A45' : '#B0261B' }}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: isCorreta ? 'var(--ds-success)' : 'var(--ds-danger)' }}>
                                   +{ans.points_earned.toFixed(1)} pts
                                 </Text>
                               </View>
@@ -954,27 +950,27 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
                                 onPress={() => correctAnswer(ans.id, true)}
                                 disabled={correctingId === ans.id}
                                 className="flex-row items-center gap-1 px-3 py-1.5 rounded-ds-md"
-                                style={{ backgroundColor: '#E5F1EA', borderWidth: 1, borderColor: '#1C6A45' }}
+                                style={{ backgroundColor: 'var(--ds-success-tint)', borderWidth: 1, borderColor: 'var(--ds-success)' }}
                                 activeOpacity={0.7}
                               >
                                 {correctingId === ans.id
-                                  ? <ActivityIndicator size="small" color="#1C6A45" />
-                                  : <Ionicons name="checkmark" size={14} color="#1C6A45" />
+                                  ? <ActivityIndicator size="small" color="var(--ds-success)" />
+                                  : <Ionicons name="checkmark" size={14} color="var(--ds-success)" />
                                 }
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#1C6A45', marginLeft: 4 }}>Correto</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: 'var(--ds-success)', marginLeft: 4 }}>Correto</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
                                 onPress={() => correctAnswer(ans.id, false)}
                                 disabled={correctingId === ans.id}
                                 className="flex-row items-center gap-1 px-3 py-1.5 rounded-ds-md"
-                                style={{ backgroundColor: '#FBE9E7', borderWidth: 1, borderColor: '#B0261B' }}
+                                style={{ backgroundColor: 'var(--ds-danger-tint)', borderWidth: 1, borderColor: 'var(--ds-danger)' }}
                                 activeOpacity={0.7}
                               >
                                 {correctingId === ans.id
-                                  ? <ActivityIndicator size="small" color="#B0261B" />
-                                  : <Ionicons name="close" size={14} color="#B0261B" />
+                                  ? <ActivityIndicator size="small" color="var(--ds-danger)" />
+                                  : <Ionicons name="close" size={14} color="var(--ds-danger)" />
                                 }
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#B0261B', marginLeft: 4 }}>Incorreto</Text>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: 'var(--ds-danger)', marginLeft: 4 }}>Incorreto</Text>
                               </TouchableOpacity>
                             </View>
                           )}
@@ -989,10 +985,10 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
               {detailNeedsCorrection && allCorrected && (
                 <TouchableOpacity
                   onPress={() => { setDetailId(null); fetchAttempts(); }}
-                  style={{ marginTop: 8, backgroundColor: '#1C3D63', borderRadius: 4, paddingVertical: 12, alignItems: 'center' }}
+                  style={{ marginTop: 8, backgroundColor: 'var(--ds-brand)', borderRadius: 4, paddingVertical: 12, alignItems: 'center' }}
                   activeOpacity={0.8}
                 >
-                  <Text style={{ color: 'white', fontSize: 14, fontWeight: '600' }}>Finalizar correção</Text>
+                  <Text style={{ color: 'var(--ds-on-brand)', fontSize: 14, fontWeight: '600' }}>Finalizar correção</Text>
                 </TouchableOpacity>
               )}
             </View>

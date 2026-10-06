@@ -16,6 +16,13 @@ import Modal from "../../components/ui/Modal";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import Badge from "../../components/ui/Badge";
+import DataTableRow from "../../components/ui/DataTableRow";
+import {
+  TABLE_CONTAINER,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../../components/ui/dataTableStyles";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -152,86 +159,86 @@ export default function ExamTypesScreen() {
   if (!isSuperAdmin) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-sm text-amber-700">Acesso permitido apenas para super admin.</Text>
+        <Text className="text-sm text-warning">Acesso permitido apenas para super admin.</Text>
       </View>
     );
   }
 
   const fieldStyle = {
-    border: "1px solid #E5E7EB",
-    borderRadius: 10,
+    border: "1px solid #D9DDE3",
+    borderRadius: 4,
     padding: "8px 10px",
     fontSize: 13,
-    color: "#1F2937",
-    backgroundColor: "#F9FAFB",
+    color: "var(--ds-ink)",
+    backgroundColor: "var(--ds-surface-sunken)",
     outline: "none",
     width: "100%",
     minHeight: 38,
   } as const;
 
   return (
-    <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
+    <ScrollView className="flex-1 bg-surface-sunken" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
       <View
         className="mb-6"
         style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-900">Tipos de prova</Text>
-          <Text className="text-sm text-gray-500 mt-1">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Tipos de prova</Text>
+          <Text className="text-sm text-ink-muted mt-1">
             Classificações (ENEM, Vestibular, etc.) usadas em simulados, questões e provas/exercícios
           </Text>
         </View>
         <TouchableOpacity
           onPress={openCreate}
-          className="flex-row items-center gap-2 bg-violet-600 px-4 py-3 rounded-xl self-start"
+          className="flex-row items-center gap-2 bg-brand px-4 rounded-ds-md self-start py-2 min-h-control-md justify-center"
         >
-          <Ionicons name="add" size={18} color="#fff" />
-          <Text className="text-white font-semibold">Nova classificação</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium">Nova classificação</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <ActivityIndicator size="large" color="var(--ds-brand)" />
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={isMobile}>
           <View
-            className="bg-white rounded-2xl border border-gray-100 overflow-hidden"
+            className={TABLE_CONTAINER}
             style={{ minWidth: tableMinWidth, width: "100%" }}
           >
-            <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-              <Text className="text-xs font-semibold text-gray-500 uppercase flex-[2]">Nome</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase flex-1">Identificador</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase w-16 text-center">Ordem</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase w-24 text-center">Status</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase w-28 text-center">Uso</Text>
-              <Text className="text-xs font-semibold text-gray-500 uppercase w-20 text-right">Ações</Text>
+            <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+              <Text className={`${TABLE_HEADER_CELL} flex-[2]`}>Nome</Text>
+              <Text className={`${TABLE_HEADER_CELL} flex-1`}>Identificador</Text>
+              <Text className={`${TABLE_HEADER_CELL} w-16 text-right`}>Ordem</Text>
+              <Text className={`${TABLE_HEADER_CELL} w-24 text-center`}>Status</Text>
+              <Text className={`${TABLE_HEADER_CELL} w-28 text-center`}>Uso</Text>
+              <Text className={`${TABLE_HEADER_CELL} w-20 text-right`}>Ações</Text>
             </View>
             {rows.length === 0 ? (
-              <Text className="text-gray-400 p-6">Nenhuma classificação cadastrada.</Text>
+              <Text className="text-ink-subtle p-6">Nenhuma classificação cadastrada.</Text>
             ) : (
-              rows.map((row) => (
-                <View key={row.id} className="flex-row items-center px-4 py-3 border-b border-gray-50">
-                  <Text className="text-sm font-medium text-gray-800 flex-[2]">{row.label}</Text>
-                  <Text className="text-xs text-gray-500 flex-1">{row.slug}</Text>
-                  <Text className="text-xs text-gray-600 w-16 text-center">{row.sort_order}</Text>
+              rows.map((row, i) => (
+                <DataTableRow key={row.id} index={i}>
+                  <Text className="text-sm font-medium text-ink flex-[2]">{row.label}</Text>
+                  <Text className="text-sm font-mono text-ink-muted flex-1">{row.slug}</Text>
+                  <Text className="text-sm font-mono text-ink w-16 text-right">{row.sort_order}</Text>
                   <View className="w-24 items-center">
                     <Badge
                       label={row.is_active ? "Ativo" : "Inativo"}
                       tone={row.is_active ? "success" : "neutral"}
                     />
                   </View>
-                  <Text className="text-[10px] text-gray-400 w-28 text-center">
+                  <Text className="text-xs font-mono text-ink-muted w-28 text-center">
                     S:{row.exams_count ?? 0} · P:{row.past_exams_count ?? 0} · Q:{row.questions_count ?? 0}
                   </Text>
                   <View className="flex-row gap-2 w-20 justify-end">
                     <TouchableOpacity onPress={() => openEdit(row)}>
-                      <Ionicons name="pencil-outline" size={18} color="#7C3AED" />
+                      <Ionicons name="pencil-outline" size={18} color="var(--ds-brand)" />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setDeleteId(row.id)}>
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    <TouchableOpacity className="p-1.5 bg-danger rounded-ds-md" onPress={() => setDeleteId(row.id)}>
+                      <Ionicons name="trash-outline" size={18} color="var(--ds-on-danger)" />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </DataTableRow>
               ))
             )}
           </View>
@@ -247,42 +254,42 @@ export default function ExamTypesScreen() {
           <TouchableOpacity
             onPress={save}
             disabled={saving}
-            className="bg-violet-600 px-5 py-2.5 rounded-xl items-center"
+            className="bg-brand px-5 rounded-ds-md items-center py-2 min-h-control-md justify-center"
           >
             {saving ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color="var(--ds-on-brand)" size="small" />
             ) : (
-              <Text className="text-white text-sm font-semibold">Salvar</Text>
+              <Text className="text-on-brand text-sm font-medium">Salvar</Text>
             )}
           </TouchableOpacity>
         }
       >
         <View className="gap-3">
           <View>
-            <Text className="text-xs font-semibold text-gray-600 mb-1">
-              Nome <Text className="text-red-500">*</Text>
+            <Text className="text-xs font-semibold text-ink-muted mb-1">
+              Nome <Text className="text-danger">*</Text>
             </Text>
             <input
               value={form.label}
               onChange={(e: any) => setForm((p) => ({ ...p, label: e.target.value }))}
               placeholder="Ex.: ENEM"
-              style={{ ...fieldStyle, borderColor: errors.label ? "#FCA5A5" : "#E5E7EB" }}
+              style={{ ...fieldStyle, borderColor: errors.label ? "var(--ds-danger)" : "var(--ds-border)" }}
             />
-            {errors.label ? <Text className="text-xs text-red-500 mt-1">{errors.label}</Text> : null}
+            {errors.label ? <Text className="text-xs text-danger mt-1">{errors.label}</Text> : null}
           </View>
           <View>
-            <Text className="text-xs font-semibold text-gray-600 mb-1">Identificador (slug)</Text>
-            <Text className="text-[10px] text-gray-400 mb-1">Opcional no cadastro; gerado automaticamente a partir do nome.</Text>
+            <Text className="text-xs font-semibold text-ink-muted mb-1">Identificador (slug)</Text>
+            <Text className="text-[10px] text-ink-subtle mb-1">Opcional no cadastro; gerado automaticamente a partir do nome.</Text>
             <input
               value={form.slug}
               onChange={(e: any) => setForm((p) => ({ ...p, slug: e.target.value }))}
               placeholder="ex.: enem"
               style={fieldStyle}
             />
-            {errors.slug ? <Text className="text-xs text-red-500 mt-1">{errors.slug}</Text> : null}
+            {errors.slug ? <Text className="text-xs text-danger mt-1">{errors.slug}</Text> : null}
           </View>
           <View>
-            <Text className="text-xs font-semibold text-gray-600 mb-1">Ordem de exibição</Text>
+            <Text className="text-xs font-semibold text-ink-muted mb-1">Ordem de exibição</Text>
             <input
               value={form.sort_order}
               inputMode="numeric"
@@ -293,7 +300,7 @@ export default function ExamTypesScreen() {
             />
           </View>
           <View className="flex-row items-center justify-between py-1">
-            <Text className="text-sm text-gray-700">Ativo nos formulários</Text>
+            <Text className="text-sm text-ink">Ativo nos formulários</Text>
             <Switch value={form.is_active} onValueChange={(v) => setForm((p) => ({ ...p, is_active: v }))} />
           </View>
         </View>

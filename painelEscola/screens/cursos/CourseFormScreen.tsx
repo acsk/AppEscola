@@ -204,7 +204,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           visible: true,
           type: "error",
           message:
-            e?.response?.data?.message || "Nao foi possivel salvar o curso.",
+            e?.response?.data?.message || "Não foi possível salvar o curso.",
         });
       }
     }
@@ -290,7 +290,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           visible: true,
           type: "error",
           message:
-            e?.response?.data?.message || "Nao foi possivel salvar o plano.",
+            e?.response?.data?.message || "Não foi possível salvar o plano.",
         });
       }
     }
@@ -337,7 +337,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#1C3D63" />
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
           <Text className="text-ink-muted text-sm mt-3">Carregando...</Text>
         </View>
       ) : (
@@ -381,12 +381,12 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                 onChange={(e: any) => setForm({ ...form, status: e.target.value })}
                 style={{
                   width: "100%",
-                  border: `1px solid ${errors.status ? "#B0261B" : "#D9DDE3"}`,
+                  border: `1px solid ${errors.status ? "var(--ds-danger)" : "var(--ds-border)"}`,
                   borderRadius: 4,
                   padding: "9px 12px",
                   fontSize: 14,
-                  color: "#111722",
-                  backgroundColor: "white",
+                  color: "var(--ds-ink)",
+                  backgroundColor: "var(--ds-surface)",
                 }}
               >
                 {STATUS_OPTIONS.map((o) => (
@@ -412,11 +412,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                 </View>
                 <TouchableOpacity
                   onPress={openCreatePlan}
-                  className="flex-row items-center bg-brand px-4 py-2 rounded-ds-md"
+                  className="flex-row items-center bg-brand px-4 rounded-ds-md py-2 min-h-control-md justify-center"
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="add" size={16} color="white" />
-                  <Text className="text-white font-semibold text-xs ml-1">
+                  <Ionicons name="add" size={16} color="var(--ds-on-brand)" />
+                  <Text className="text-on-brand font-medium text-xs ml-1">
                     Adicionar plano
                   </Text>
                 </TouchableOpacity>
@@ -424,11 +424,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
 
               {loadingPlans ? (
                 <View className="items-center py-10">
-                  <ActivityIndicator color="#1C3D63" />
+                  <ActivityIndicator color="var(--ds-brand)" />
                 </View>
               ) : plans.length === 0 ? (
                 <View className="items-center py-10">
-                  <Ionicons name="wallet-outline" size={32} color="#D9DDE3" />
+                  <Ionicons name="wallet-outline" size={32} color="var(--ds-border)" />
                   <Text className="text-ink-subtle text-sm mt-2">
                     Nenhum plano cadastrado
                   </Text>
@@ -473,13 +473,13 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                             onPress={() => openEditPlan(plan)}
                             className="p-1.5 bg-brand-tint rounded-ds-md"
                           >
-                            <Ionicons name="pencil-outline" size={14} color="#1C3D63" />
+                            <Ionicons name="pencil-outline" size={14} color="var(--ds-brand)" />
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => setDeletePlanId(plan.id)}
-                            className="p-1.5 bg-danger-tint rounded-ds-md"
+                            className="p-1.5 bg-danger rounded-ds-md"
                           >
-                            <Ionicons name="trash-outline" size={14} color="#B0261B" />
+                            <Ionicons name="trash-outline" size={14} color="var(--ds-on-danger)" />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -492,7 +492,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
 
           {!isEdit && (
             <View className="flex-row items-center gap-2 bg-brand-tint border border-border rounded-ds-md px-4 py-3 mb-5">
-              <Ionicons name="information-circle-outline" size={18} color="#1C3D63" />
+              <Ionicons name="information-circle-outline" size={18} color="var(--ds-brand)" />
               <Text className="text-sm text-brand flex-1">
                 Após salvar o curso, você poderá adicionar os planos de cobrança.
               </Text>
@@ -503,7 +503,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           <View className="flex-row justify-end gap-3 mt-2">
             <TouchableOpacity
               onPress={() => navigate("cursos")}
-              className="px-6 py-3 rounded-ds-md border border-border bg-surface"
+              className="px-6 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
               activeOpacity={0.8}
             >
               <Text className="text-sm font-semibold text-ink">
@@ -517,11 +517,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
               activeOpacity={0.85}
             >
               {saving ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
                 <>
-                  <Ionicons name="checkmark" size={16} color="white" />
-                  <Text className="text-sm font-semibold text-white">
+                  <Ionicons name="checkmark" size={16} color="var(--ds-on-brand)" />
+                  <Text className="text-sm font-medium text-on-brand">
                     {isEdit ? "Salvar alterações" : "Cadastrar curso"}
                   </Text>
                 </>
@@ -541,7 +541,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           <>
             <TouchableOpacity
               onPress={() => setPlanModal(false)}
-              className="px-5 py-2.5 rounded-ds-md border border-border"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             >
               <Text className="text-sm font-semibold text-ink">
                 Cancelar
@@ -550,12 +550,12 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             <TouchableOpacity
               onPress={savePlan}
               disabled={savingPlan}
-              className="px-5 py-2.5 rounded-ds-md bg-brand"
+              className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
             >
               {savingPlan ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
-                <Text className="text-sm font-semibold text-white">Salvar</Text>
+                <Text className="text-sm font-medium text-on-brand">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -585,8 +585,8 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
               borderRadius: 4,
               padding: "9px 12px",
               fontSize: 14,
-              color: "#111722",
-              backgroundColor: "white",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface)",
             }}
           >
             {BILLING_CYCLES.map((c) => (
@@ -625,7 +625,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
 
         {cycleMonthly !== null && (
           <View className="flex-row items-center gap-2 bg-brand-tint rounded-ds-md px-3 py-2 mt-1">
-            <Ionicons name="trending-down-outline" size={14} color="#1C3D63" />
+            <Ionicons name="trending-down-outline" size={14} color="var(--ds-brand)" />
             <Text className="text-xs text-brand">
               Equivalente a{" "}
               <Text className="font-semibold">{fmtBRL(cycleMonthly)}/mês</Text>
@@ -648,8 +648,8 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
               borderRadius: 4,
               padding: "9px 12px",
               fontSize: 14,
-              color: "#111722",
-              backgroundColor: "white",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface)",
             }}
           >
             {STATUS_OPTIONS.map((o) => (

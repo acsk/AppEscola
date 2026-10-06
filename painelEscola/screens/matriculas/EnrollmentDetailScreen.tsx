@@ -14,6 +14,17 @@ import { PixLogoIcon } from "phosphor-react-native";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
 import Modal from "../../components/ui/Modal";
+import DataTableRow from "../../components/ui/DataTableRow";
+import {
+  TABLE_CELL_MONO,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_CELL_SUBLINE,
+  TABLE_CONTAINER,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../../components/ui/dataTableStyles";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import DatePickerInput from "../../components/ui/DatePickerInput";
@@ -955,7 +966,7 @@ export default function EnrollmentDetailScreen({
     const normalized = message.toLowerCase();
     return (
       normalized.includes("cobrança está travada") ||
-      normalized.includes("nao é permitido trocar o método") ||
+      normalized.includes("não é permitido trocar o método") ||
       normalized.includes("não é permitido trocar o método")
     );
   };
@@ -1016,7 +1027,7 @@ export default function EnrollmentDetailScreen({
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#1C3D63" />
+        <ActivityIndicator size="large" color="var(--ds-brand)" />
       </View>
     );
   }
@@ -1027,9 +1038,9 @@ export default function EnrollmentDetailScreen({
         <Text className="text-ink-muted">Matrícula não encontrada.</Text>
         <TouchableOpacity
           onPress={() => navigate("matriculas")}
-          className="mt-4 px-4 py-2 bg-brand rounded-ds-md"
+          className="mt-4 px-4 bg-brand rounded-ds-md py-2 min-h-control-md justify-center"
         >
-          <Text className="text-white text-sm font-semibold">Voltar</Text>
+          <Text className="text-on-brand text-sm font-medium">Voltar</Text>
         </TouchableOpacity>
       </View>
     );
@@ -1174,7 +1185,7 @@ export default function EnrollmentDetailScreen({
         style={{ width: 30, height: 30 }}
         activeOpacity={0.8}
       >
-        <Ionicons name="information-circle-outline" size={15} color="#1C3D63" />
+        <Ionicons name="information-circle-outline" size={15} color="var(--ds-brand)" />
       </TouchableOpacity>
       {item.status === "paid" ? (
         <TouchableOpacity
@@ -1183,7 +1194,7 @@ export default function EnrollmentDetailScreen({
           style={{ width: 30, height: 30 }}
           activeOpacity={0.8}
         >
-          <Ionicons name="receipt-outline" size={15} color="#1C6A45" />
+          <Ionicons name="receipt-outline" size={15} color="var(--ds-success)" />
         </TouchableOpacity>
       ) : null}
       <TouchableOpacity
@@ -1192,7 +1203,7 @@ export default function EnrollmentDetailScreen({
         style={{ width: 30, height: 30 }}
         activeOpacity={0.8}
       >
-        <Ionicons name="ellipsis-horizontal" size={16} color="#4B5463" />
+        <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
       </TouchableOpacity>
     </View>
   );
@@ -1220,7 +1231,7 @@ export default function EnrollmentDetailScreen({
   };
 
   const renderInvoiceCard = (item: Invoice) => (
-    <View key={item.id} className="bg-surface rounded-ds-md border border-border p-3 gap-3">
+    <TouchableOpacity key={item.id} onPress={() => setActionsInvoice(item)} activeOpacity={0.86} className="bg-surface rounded-ds-md border border-border p-3 gap-3">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
           <Text className="text-xs font-mono font-semibold text-brand" numberOfLines={1}>
@@ -1260,23 +1271,23 @@ export default function EnrollmentDetailScreen({
       {!!item.cora?.charge_id && (
         <TouchableOpacity
           onPress={() => openChargeModal(item)}
-          className="flex-row items-center gap-2 bg-brand-tint border border-border rounded-ds-md px-3 py-2"
+          className="flex-row items-center gap-2 bg-surface border border-border-strong rounded-ds-md px-3 py-2 min-h-control-md"
           activeOpacity={0.8}
         >
           <Ionicons
             name={item.payment_method === "bank_slip" ? "barcode-outline" : "qr-code-outline"}
             size={14}
-            color="#1C3D63"
+            color="var(--ds-ink)"
           />
-          <Text className="text-xs font-semibold text-brand flex-1" numberOfLines={1}>
+          <Text className="text-xs font-semibold text-ink flex-1" numberOfLines={1}>
             Cobrança Cora · {item.cora.charge_id}
           </Text>
-          <Text className="text-xs text-brand">{item.cora.status ?? "—"}</Text>
-          <Ionicons name="chevron-forward-outline" size={13} color="#1C3D63" />
+          <Text className="text-xs text-ink">{item.cora.status ?? "—"}</Text>
+          <Ionicons name="chevron-forward-outline" size={13} color="var(--ds-ink)" />
         </TouchableOpacity>
       )}
       {renderInvoiceActions(item)}
-    </View>
+    </TouchableOpacity>
   );
 
   const renderInfoBlock = (
@@ -1330,11 +1341,11 @@ export default function EnrollmentDetailScreen({
     onPress: () => void;
   }) => {
     const colors = {
-      violet: { border: "#1C3D63", bg: "#E9EFF6", text: "#132C4A", soft: "#E9EFF6" },
-      amber: { border: "#8A5200", bg: "#FBEFDC", text: "#8A5200", soft: "#FBEFDC" },
-      blue: { border: "#1C3D63", bg: "#E9EFF6", text: "#132C4A", soft: "#E9EFF6" },
+      violet: { border: "var(--ds-brand)", bg: "var(--ds-brand-tint)", text: "var(--ds-brand-hover)", soft: "var(--ds-brand-tint)" },
+      amber: { border: "var(--ds-warning)", bg: "var(--ds-warning-tint)", text: "var(--ds-warning)", soft: "var(--ds-warning-tint)" },
+      blue: { border: "var(--ds-brand)", bg: "var(--ds-brand-tint)", text: "var(--ds-brand-hover)", soft: "var(--ds-brand-tint)" },
     }[tone];
-    const inactive = "#5F6878";
+    const inactive = "var(--ds-ink-subtle)";
 
     return (
       <TouchableOpacity
@@ -1346,8 +1357,8 @@ export default function EnrollmentDetailScreen({
           minHeight: 50,
           paddingHorizontal: 12,
           paddingVertical: 9,
-          borderColor: active ? colors.border : "#D9DDE3",
-          backgroundColor: active ? colors.bg : disabled ? "#F7F8FA" : "#FFFFFF",
+          borderColor: active ? colors.border : "var(--ds-border)",
+          backgroundColor: active ? colors.bg : disabled ? "var(--ds-surface-sunken)" : "var(--ds-surface)",
           opacity: disabled ? 0.65 : 1,
           gap: 10,
         }}
@@ -1357,7 +1368,7 @@ export default function EnrollmentDetailScreen({
           style={{
             width: 32,
             height: 32,
-            backgroundColor: active ? colors.soft : "#F7F8FA",
+            backgroundColor: active ? colors.soft : "var(--ds-surface-sunken)",
           }}
         >
           <Ionicons name={icon} size={17} color={active ? colors.text : inactive} />
@@ -1373,7 +1384,7 @@ export default function EnrollmentDetailScreen({
           {!!detail && (
             <Text
               className="text-xs"
-              style={{ color: active ? colors.text : "#D9DDE3" }}
+              style={{ color: active ? colors.text : "var(--ds-border)" }}
               numberOfLines={1}
             >
               {detail}
@@ -1413,7 +1424,7 @@ export default function EnrollmentDetailScreen({
               className="w-9 h-9 bg-brand-tint border border-border rounded-full items-center justify-center"
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back-outline" size={18} color="#1C3D63" />
+              <Ionicons name="arrow-back-outline" size={18} color="var(--ds-brand)" />
             </TouchableOpacity>
             <View className="flex-1" style={{ minWidth: 0 }}>
               <View className="flex-row items-center gap-2" style={{ flexWrap: "wrap" }}>
@@ -1442,12 +1453,12 @@ export default function EnrollmentDetailScreen({
                     studentName: enrollment.student?.name,
                   })
                 }
-                className="flex-row items-center justify-center bg-brand-tint border border-border px-3.5 py-2 rounded-ds-md"
-                style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
+                className="flex-row items-center justify-center bg-surface border border-border-strong px-3.5 py-2 rounded-ds-md"
+                style={{ flex: isMobile ? 1 : undefined, minHeight: 38 }}
                 activeOpacity={0.85}
               >
-                <Ionicons name="ribbon-outline" size={15} color="#1C3D63" />
-                <Text className="text-brand font-semibold text-sm ml-1.5">Boletim</Text>
+                <Ionicons name="ribbon-outline" size={15} color="var(--ds-ink)" />
+                <Text className="text-ink font-medium text-sm ml-1.5">Boletim</Text>
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
@@ -1456,17 +1467,17 @@ export default function EnrollmentDetailScreen({
               style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
               activeOpacity={0.85}
             >
-              <Ionicons name="pencil-outline" size={15} color="white" />
-              <Text className="text-white font-semibold text-sm ml-1.5">Editar</Text>
+              <Ionicons name="pencil-outline" size={15} color="var(--ds-on-brand)" />
+              <Text className="text-on-brand font-medium text-sm ml-1.5">Editar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setDeleteEnrollmentVisible(true)}
-              className="flex-row items-center justify-center bg-danger-tint border border-danger px-3.5 py-2 rounded-ds-md"
+              className="flex-row items-center justify-center bg-danger border border-danger px-3.5 py-2 rounded-ds-md"
               style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
               activeOpacity={0.85}
             >
-              <Ionicons name="trash-outline" size={15} color="#B0261B" />
-              <Text className="text-danger font-semibold text-sm ml-1.5">Excluir</Text>
+              <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
+              <Text className="text-on-danger font-semibold text-sm ml-1.5">Excluir</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1563,36 +1574,36 @@ export default function EnrollmentDetailScreen({
         >
           <TouchableOpacity
             onPress={() => setContractModalVisible(true)}
-            className="flex-row items-center justify-center px-4 py-2.5 rounded-ds-md border bg-brand-tint border-border"
+            className="flex-row items-center justify-center px-4 py-2 rounded-ds-md border bg-surface border-border-strong min-h-control-md"
             activeOpacity={0.85}
             style={{ minHeight: 44 }}
           >
-            <Ionicons name="document-text-outline" size={16} color="#1C3D63" />
-            <Text className="font-semibold text-sm ml-1 text-brand">
+            <Ionicons name="document-text-outline" size={16} color="var(--ds-ink)" />
+            <Text className="font-semibold text-sm ml-1 text-ink">
               Cobranças do contrato
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setCarneModalVisible(true)}
-            className="flex-row items-center justify-center px-4 py-2.5 rounded-ds-md border bg-success-tint border-success"
+            className="flex-row items-center justify-center px-4 py-2 rounded-ds-md border bg-surface border-border-strong min-h-control-md"
             activeOpacity={0.85}
             style={{ minHeight: 44 }}
           >
-            <Ionicons name="newspaper-outline" size={16} color="#1C6A45" />
-            <Text className="font-semibold text-sm ml-1 text-success">
+            <Ionicons name="newspaper-outline" size={16} color="var(--ds-ink)" />
+            <Text className="font-semibold text-sm ml-1 text-ink">
               Todos os boletos
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={openCreateInvoice}
-            className="flex-row items-center justify-center bg-brand px-4 py-2.5 rounded-ds-md"
+            className="flex-row items-center justify-center bg-brand px-4 rounded-ds-md py-2 min-h-control-md"
             activeOpacity={0.85}
             style={{
               minHeight: 44,
             }}
           >
-            <Ionicons name="add" size={16} color="white" />
-            <Text className="text-white font-semibold text-sm ml-1">Nova cobrança</Text>
+            <Ionicons name="add" size={16} color="var(--ds-on-brand)" />
+            <Text className="text-on-brand font-medium text-sm ml-1">Nova cobrança</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1603,74 +1614,64 @@ export default function EnrollmentDetailScreen({
           style={{
           }}
         >
-          <Ionicons name="cash-outline" size={36} color="#D9DDE3" />
+          <Ionicons name="cash-outline" size={36} color="var(--ds-border)" />
           <Text className="text-ink-subtle mt-3 text-sm">Nenhuma cobrança vinculada</Text>
         </View>
       ) : showInvoiceCards ? (
         <View className="gap-3">{invoices.map(renderInvoiceCard)}</View>
       ) : (
-        <View
-          className="bg-surface rounded-ds-md overflow-hidden border border-border"
-          style={{
-            width: "100%",
-          }}
-        >
-          <View className="flex-row bg-surface-sunken border-b border-border px-4 py-2.5">
+        <View className={TABLE_CONTAINER} style={{ width: "100%" }}>
+          <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
             <Text
-              className="text-xs font-semibold text-ink-muted uppercase tracking-wide"
+              className={TABLE_HEADER_CELL}
               style={{ width: 88, minWidth: 88 }}
             >
               ID
             </Text>
-            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 2.2 }}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 2.2 }}>
               Descrição
             </Text>
-            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.85 }}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.85 }}>
               Tipo
             </Text>
-            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.75 }}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.75, textAlign: "right", paddingRight: 16 }}>
               Valor
             </Text>
-            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.85 }}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.85 }}>
               Vencimento
             </Text>
-            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.7 }}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.7 }}>
               Forma
             </Text>
-            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.7 }}>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.7 }}>
               Status
             </Text>
             <View style={{ width: 132 }} />
           </View>
 
           {invoices.map((item, i) => (
-            <View
-              key={item.id}
-              className={`flex-row items-center px-4 py-2 border-b border-border ${
-                i % 2 === 1 ? "bg-surface-sunken" : ""
-              }`}
-            >
+            <DataTableRow key={item.id} index={i} onPress={() => setActionsInvoice(item)}>
               <View style={{ width: 88, minWidth: 88, paddingRight: 8 }}>
-                <Text className="text-xs font-mono font-semibold text-brand" numberOfLines={1}>
+                <Text className={TABLE_CELL_MONO} numberOfLines={1}>
                   #{item.id}
                 </Text>
                 {item.cora?.charge_id ? (
-                  <Text className="text-[10px] text-ink-subtle mt-0.5" numberOfLines={1}>
+                  <Text className={`${TABLE_CELL_SUBLINE} font-mono`} numberOfLines={1}>
                     {item.cora.charge_id}
                   </Text>
                 ) : null}
               </View>
-              <Text className="text-xs font-semibold text-ink" style={{ flex: 2.2 }} numberOfLines={1}>
+              <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 2.2, paddingRight: 8 }} numberOfLines={1}>
                 {item.description}
               </Text>
               <View style={{ flex: 0.85 }}>{renderTypeBadge(item.type)}</View>
-              <Text className="text-xs font-semibold text-ink" style={{ flex: 0.75 }}>
+              <Text className={TABLE_CELL_MONO} style={{ flex: 0.75, textAlign: "right", paddingRight: 16 }}>
                 {money(item.amount)}
               </Text>
-              <Text className="text-xs text-ink-muted" style={{ flex: 0.85 }}>
+              <Text className={`${TABLE_CELL_MONO} text-ink-muted`} style={{ flex: 0.85 }}>
                 {fmt(item.due_date)}
               </Text>
-              <Text className="text-xs text-ink-muted" style={{ flex: 0.7 }} numberOfLines={1}>
+              <Text className={TABLE_CELL_MUTED} style={{ flex: 0.7 }} numberOfLines={1}>
                 {item.payment_method
                   ? (METHOD_LABELS[item.payment_method] ?? item.payment_method)
                   : "—"}
@@ -1679,7 +1680,7 @@ export default function EnrollmentDetailScreen({
                 <Badge slug={item.status} label={INVOICE_STATUS_LABELS[item.status] ?? item.status} />
               </View>
               <View style={{ width: 132 }}>{renderInvoiceActions(item)}</View>
-            </View>
+            </DataTableRow>
           ))}
         </View>
       )}
@@ -1708,19 +1709,19 @@ export default function EnrollmentDetailScreen({
           <>
             <TouchableOpacity
               onPress={() => setInvoiceModalVisible(false)}
-              className="px-5 py-2.5 rounded-ds-md border border-border"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             >
               <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={saveInvoice}
               disabled={savingInvoice}
-              className="px-5 py-2.5 rounded-ds-md bg-brand"
+              className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
             >
               {savingInvoice ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
-                <Text className="text-sm font-semibold text-white">Salvar</Text>
+                <Text className="text-sm font-medium text-on-brand">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -1832,9 +1833,9 @@ export default function EnrollmentDetailScreen({
                       }`}
                     >
                       {chargeMethod === "pix" ? (
-                        <PixLogoIcon size={25} color="#1C6A45" weight="fill" />
+                        <PixLogoIcon size={25} color="var(--ds-success)" weight="fill" />
                       ) : (
-                        <Ionicons name="barcode-outline" size={20} color="#1C3D63" />
+                        <Ionicons name="barcode-outline" size={20} color="var(--ds-brand)" />
                       )}
                     </View>
                   )}
@@ -1849,7 +1850,7 @@ export default function EnrollmentDetailScreen({
                         </Text>
                       ) : null}
                       <View className="rounded-full border border-border bg-brand-tint px-2.5 py-1 flex-row items-center gap-1.5">
-                        <Ionicons name="calendar-outline" size={12} color="#1C3D63" />
+                        <Ionicons name="calendar-outline" size={12} color="var(--ds-brand)" />
                         <Text className="text-xs font-semibold text-brand">
                           Vencimento {fmt(chargeInvoice.due_date)}
                         </Text>
@@ -1871,7 +1872,7 @@ export default function EnrollmentDetailScreen({
           ) : undefined
         }
         footerStyle={{
-          backgroundColor: "#F7F8FA",
+          backgroundColor: "var(--ds-surface-sunken)",
           flexWrap: "wrap",
           alignItems: "stretch",
           paddingHorizontal: isMobile ? 16 : 24,
@@ -1884,14 +1885,14 @@ export default function EnrollmentDetailScreen({
                 onPress={onCheckChargeStatus}
                 disabled={checkingStatus || !chargeInvoice}
                 activeOpacity={0.8}
-                className="px-3 py-2 rounded-ds-md border border-border bg-surface items-center flex-row justify-center gap-2"
+                className="px-3 rounded-ds-md border border-border-strong bg-surface items-center flex-row justify-center gap-2 py-2 min-h-control-md"
                 style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
               >
                 {checkingStatus ? (
-                  <ActivityIndicator size="small" color="#1C3D63" />
+                  <ActivityIndicator size="small" color="var(--ds-brand)" />
                 ) : (
                   <>
-                    <Ionicons name="refresh-outline" size={15} color="#1C3D63" />
+                    <Ionicons name="refresh-outline" size={15} color="var(--ds-brand)" />
                     <Text className="text-xs font-semibold text-brand">Consultar status</Text>
                   </>
                 )}
@@ -1900,11 +1901,11 @@ export default function EnrollmentDetailScreen({
                 <TouchableOpacity
                   onPress={() => openPreviewModal(boletoPaymentUrl)}
                   activeOpacity={0.85}
-                  className="px-3 py-2 rounded-ds-md border border-brand bg-brand items-center flex-row justify-center gap-2"
+                  className="px-3 rounded-ds-md border border-brand bg-brand items-center flex-row justify-center gap-2 py-2 min-h-control-md"
                   style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
                 >
-                  <Ionicons name="document-text-outline" size={15} color="white" />
-                  <Text className="text-xs font-semibold text-white">Ver boleto</Text>
+                  <Ionicons name="document-text-outline" size={15} color="var(--ds-on-brand)" />
+                  <Text className="text-xs font-medium text-on-brand">Ver boleto</Text>
                 </TouchableOpacity>
               )}
               {typeof window !== "undefined" && window.location.hostname === "localhost" && (
@@ -1916,10 +1917,10 @@ export default function EnrollmentDetailScreen({
                   style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
                 >
                   {payingCharge ? (
-                    <ActivityIndicator size="small" color="#1C6A45" />
+                    <ActivityIndicator size="small" color="var(--ds-success)" />
                   ) : (
                     <>
-                      <Ionicons name="checkmark-circle-outline" size={15} color="#1C6A45" />
+                      <Ionicons name="checkmark-circle-outline" size={15} color="var(--ds-success)" />
                       <Text className="text-xs font-semibold text-success">Simular pagamento</Text>
                     </>
                   )}
@@ -1930,10 +1931,10 @@ export default function EnrollmentDetailScreen({
             <TouchableOpacity
               onPress={closeChargeModal}
               activeOpacity={0.85}
-              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface items-center flex-row justify-center gap-2"
+              className="px-4 rounded-ds-md border border-border-strong bg-surface items-center flex-row justify-center gap-2 py-2 min-h-control-md"
               style={{ minWidth: isMobile ? undefined : 140 }}
             >
-              <Ionicons name="arrow-back-outline" size={15} color="#111722" />
+              <Ionicons name="arrow-back-outline" size={15} color="var(--ds-ink)" />
               <Text className="text-xs font-semibold text-ink">Voltar</Text>
             </TouchableOpacity>
           )
@@ -1960,7 +1961,7 @@ export default function EnrollmentDetailScreen({
               </Text>
               {loadingChargeOptions && (
                 <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-2.5 mb-2 flex-row items-center gap-2">
-                  <ActivityIndicator size="small" color="#4B5463" />
+                  <ActivityIndicator size="small" color="var(--ds-ink-muted)" />
                   <Text className="text-xs text-ink-muted">Carregando opções de pagamento...</Text>
                 </View>
               )}
@@ -2005,8 +2006,8 @@ export default function EnrollmentDetailScreen({
                       subtitle: hasBoletoAssets ? "Cobrança disponível" : "Boleto bancário com linha digitável",
                       actionLabel: hasBoletoAssets ? "Usar boleto" : canUseHybrid ? "Gerar boleto + PIX" : "Gerar boleto",
                       icon: "barcode-outline",
-                      iconColor: "#1C3D63",
-                      iconBg: "#E9EFF6",
+                      iconColor: "var(--ds-brand)",
+                      iconBg: "var(--ds-brand-tint)",
                       enabled: canGenerateBoleto,
                       hasAssets: hasBoletoAssets,
                       generateMethod: canUseHybrid ? "hybrid" : "boleto",
@@ -2017,8 +2018,8 @@ export default function EnrollmentDetailScreen({
                       subtitle: hasPixAssets ? "Cobrança disponível" : "QR Code e código copia e cola",
                       actionLabel: hasPixAssets ? "Usar PIX" : "Gerar PIX",
                       icon: "qr-code-outline",
-                      iconColor: "#1C3D63",
-                      iconBg: "#E5F1EA",
+                      iconColor: "var(--ds-brand)",
+                      iconBg: "var(--ds-success-tint)",
                       enabled: canUsePix,
                       hasAssets: hasPixAssets,
                     },
@@ -2063,19 +2064,19 @@ export default function EnrollmentDetailScreen({
                         <View className="flex-row items-start justify-between gap-3">
                           <View
                             className="w-12 h-12 rounded-ds-md items-center justify-center"
-                            style={{ backgroundColor: disabled ? "#F7F8FA" : m.iconBg }}
+                            style={{ backgroundColor: disabled ? "var(--ds-surface-sunken)" : m.iconBg }}
                           >
                             {m.key === "pix" ? (
                               <PixLogoIcon
                                 size={25}
-                                color={disabled ? "#5F6878" : m.iconColor}
+                                color={disabled ? "var(--ds-ink-subtle)" : m.iconColor}
                                 weight="fill"
                               />
                             ) : (
                               <Ionicons
                                 name={m.icon}
                                 size={24}
-                                color={disabled ? "#5F6878" : m.iconColor}
+                                color={disabled ? "var(--ds-ink-subtle)" : m.iconColor}
                               />
                             )}
                           </View>
@@ -2115,12 +2116,12 @@ export default function EnrollmentDetailScreen({
                             {m.actionLabel}
                           </Text>
                           {generatingCharge && chargeMethod === m.key ? (
-                            <ActivityIndicator size="small" color="#4B5463" />
+                            <ActivityIndicator size="small" color="var(--ds-ink-muted)" />
                           ) : (
                             <Ionicons
                               name="chevron-forward-outline"
                               size={18}
-                              color={disabled ? "#7A8393" : "#5F6878"}
+                              color={disabled ? "var(--ds-border-strong)" : "var(--ds-ink-subtle)"}
                             />
                           )}
                         </View>
@@ -2153,24 +2154,24 @@ export default function EnrollmentDetailScreen({
                       onPress={() => setChargeMethod(tab)}
                       activeOpacity={0.85}
                       className={`flex-1 rounded-ds-md py-2.5 flex-row items-center justify-center gap-1.5 ${
-                        activeChargeMethod === tab ? "bg-brand" : "bg-surface"
+                        activeChargeMethod === tab ? "bg-surface border border-border-strong" : "bg-transparent"
                       }`}
                       style={activeChargeMethod === tab ? { } : undefined}
                     >
                       {tab === "pix" ? (
                         <PixLogoIcon
                           size={17}
-                          color={activeChargeMethod === tab ? "white" : "#4B5463"}
+                          color={activeChargeMethod === tab ? "var(--ds-ink)" : "var(--ds-ink-muted)"}
                           weight="fill"
                         />
                       ) : (
                         <Ionicons
                           name="barcode-outline"
                           size={16}
-                          color={activeChargeMethod === tab ? "white" : "#4B5463"}
+                          color={activeChargeMethod === tab ? "var(--ds-ink)" : "var(--ds-ink-muted)"}
                         />
                       )}
-                      <Text className={`text-xs font-semibold ${activeChargeMethod === tab ? "text-white" : "text-ink-muted"}`}>
+                      <Text className={`text-xs font-semibold ${activeChargeMethod === tab ? "text-ink" : "text-ink-muted"}`}>
                         {tab === "boleto" ? "Boleto" : "PIX"}
                       </Text>
                     </TouchableOpacity>
@@ -2201,12 +2202,12 @@ export default function EnrollmentDetailScreen({
                         <QRCode
                           value={pixCopyPaste}
                           size={checkoutQrSize}
-                          color="#000000"
-                          backgroundColor="#FFFFFF"
+                          color="#000000" // ds-keep: QR code precisa de preto sobre branco
+                          backgroundColor="#FFFFFF" // ds-keep
                         />
                       ) : (
                         <View className="items-center justify-center" style={{ width: checkoutQrSize, height: checkoutQrSize }}>
-                          <ActivityIndicator size="small" color="#4B5463" />
+                          <ActivityIndicator size="small" color="var(--ds-ink-muted)" />
                           <Text className="text-xs text-ink-muted mt-2">Gerando QR Code...</Text>
                         </View>
                       )}
@@ -2219,8 +2220,8 @@ export default function EnrollmentDetailScreen({
                       </Text>
                       <View className="bg-surface-sunken rounded-ds-md border border-border px-3 py-2.5">
                         <View className="flex-row items-center gap-2">
-                          <View className="w-8 h-8 rounded-ds-md items-center justify-center" style={{ backgroundColor: "#E5F1EA" }}>
-                            <PixLogoIcon size={19} color="#1C6A45" weight="fill" />
+                          <View className="w-8 h-8 rounded-ds-md items-center justify-center" style={{ backgroundColor: "var(--ds-success-tint)" }}>
+                            <PixLogoIcon size={19} color="var(--ds-success)" weight="fill" />
                           </View>
                           <View className="flex-1 min-w-0">
                             <Text
@@ -2235,10 +2236,10 @@ export default function EnrollmentDetailScreen({
                           <TouchableOpacity
                             onPress={copyPixCode}
                             activeOpacity={0.8}
-                            className="rounded-ds-md bg-brand px-3 py-2 flex-row items-center gap-1"
+                            className="rounded-ds-md bg-brand px-3 flex-row items-center gap-1 py-2 min-h-control-md justify-center"
                           >
-                            <Ionicons name="copy-outline" size={14} color="white" />
-                            <Text className="text-xs font-semibold text-white">Copiar</Text>
+                            <Ionicons name="copy-outline" size={14} color="var(--ds-on-brand)" />
+                            <Text className="text-xs font-medium text-on-brand">Copiar</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -2253,7 +2254,7 @@ export default function EnrollmentDetailScreen({
                   {!!boletoDigitable && (
                     <View className="bg-surface-sunken rounded-ds-md border border-border px-3 py-2.5 flex-row items-center gap-3">
                       <View className="w-8 h-8 rounded-ds-md items-center justify-center bg-brand-tint">
-                        <Ionicons name="barcode-outline" size={19} color="#1C3D63" />
+                        <Ionicons name="barcode-outline" size={19} color="var(--ds-brand)" />
                       </View>
                       <View className="flex-1 min-w-0">
                         <Text className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wide mb-1">Linha digitável</Text>
@@ -2272,10 +2273,10 @@ export default function EnrollmentDetailScreen({
                           }
                         }}
                         activeOpacity={0.8}
-                        className="bg-brand rounded-ds-md px-3 py-2 flex-row items-center gap-1"
+                        className="bg-brand rounded-ds-md px-3 flex-row items-center gap-1 py-2 min-h-control-md justify-center"
                       >
-                        <Ionicons name="copy-outline" size={14} color="white" />
-                        <Text className="text-xs font-semibold text-white">Copiar</Text>
+                        <Ionicons name="copy-outline" size={14} color="var(--ds-on-brand)" />
+                        <Text className="text-xs font-medium text-on-brand">Copiar</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2311,7 +2312,7 @@ export default function EnrollmentDetailScreen({
             <TouchableOpacity
               onPress={closePreviewModal}
               activeOpacity={0.85}
-              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface"
+              className="px-4 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
             >
               <Text className="text-xs font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
@@ -2321,11 +2322,11 @@ export default function EnrollmentDetailScreen({
                   if (typeof window !== "undefined") window.open(previewUrl, "_blank");
                 }}
                 activeOpacity={0.85}
-                className="px-4 py-2.5 rounded-ds-md bg-brand"
+                className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
               >
                 <View className="flex-row items-center gap-2">
-                  <Ionicons name="download-outline" size={15} color="white" />
-                  <Text className="text-xs font-semibold text-white">Baixar boleto</Text>
+                  <Ionicons name="download-outline" size={15} color="var(--ds-on-brand)" />
+                  <Text className="text-xs font-medium text-on-brand">Baixar boleto</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -2345,11 +2346,11 @@ export default function EnrollmentDetailScreen({
           <View>
             <Image
               source={{ uri: previewUrl }}
-              style={{ width: "100%", height: 640, borderRadius: 4, resizeMode: "contain", backgroundColor: "#F7F8FA" }}
+              style={{ width: "100%", height: 640, borderRadius: 4, resizeMode: "contain", backgroundColor: "var(--ds-surface-sunken)" }}
             />
           </View>
         ) : isPdfPreviewUrl(previewUrl) && PdfDocument && PdfPage ? (
-          <View style={{ width: "100%", maxHeight: 680, borderRadius: 4, overflow: "hidden", borderWidth: 1, borderColor: "#D9DDE3", backgroundColor: "#F7F8FA" }}>
+          <View style={{ width: "100%", maxHeight: 680, borderRadius: 4, overflow: "hidden", borderWidth: 1, borderColor: "var(--ds-border)", backgroundColor: "var(--ds-surface-sunken)" }}>
             <ScrollView contentContainerStyle={{ padding: 16, alignItems: "center", gap: 16 }}>
               <PdfDocument
                 file={previewUrl}
@@ -2384,11 +2385,11 @@ export default function EnrollmentDetailScreen({
             </ScrollView>
           </View>
         ) : (
-          <View style={{ width: "100%", height: 680, borderRadius: 4, overflow: "hidden", borderWidth: 1, borderColor: "#D9DDE3", backgroundColor: "#F7F8FA" }}>
+          <View style={{ width: "100%", height: 680, borderRadius: 4, overflow: "hidden", borderWidth: 1, borderColor: "var(--ds-border)", backgroundColor: "var(--ds-surface-sunken)" }}>
             {React.createElement("iframe", {
               src: previewUrl,
               title: "Boleto",
-              style: { width: "100%", height: "100%", border: 0, backgroundColor: "white" },
+              style: { width: "100%", height: "100%", border: 0, backgroundColor: "var(--ds-surface)" },
             })}
           </View>
         )}
@@ -2403,9 +2404,9 @@ export default function EnrollmentDetailScreen({
         footer={
           <TouchableOpacity
             onPress={() => setAuditVisible(false)}
-            className="px-5 py-2.5 rounded-ds-md bg-brand"
+            className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
           >
-            <Text className="text-sm font-semibold text-white">Fechar</Text>
+            <Text className="text-sm font-medium text-on-brand">Fechar</Text>
           </TouchableOpacity>
         }
       >
@@ -2597,10 +2598,10 @@ export default function EnrollmentDetailScreen({
                 <TouchableOpacity
                   onPress={() => printReceipt(receiptData)}
                   activeOpacity={0.85}
-                  className="px-4 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
+                  className="px-4 rounded-ds-md bg-brand flex-row items-center gap-2 py-2 min-h-control-md justify-center"
                 >
-                  <Ionicons name="print-outline" size={15} color="white" />
-                  <Text className="text-xs font-semibold text-white">Imprimir</Text>
+                  <Ionicons name="print-outline" size={15} color="var(--ds-on-brand)" />
+                  <Text className="text-xs font-medium text-on-brand">Imprimir</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -2609,7 +2610,7 @@ export default function EnrollmentDetailScreen({
       >
         {loadingReceipt && (
           <View className="items-center py-8">
-            <ActivityIndicator size="small" color="#1C3D63" />
+            <ActivityIndicator size="small" color="var(--ds-brand)" />
             <Text className="text-xs text-ink-muted mt-2">Carregando recibo...</Text>
           </View>
         )}
@@ -2630,7 +2631,7 @@ export default function EnrollmentDetailScreen({
                 />
               ) : (
                 <View className="w-16 h-16 rounded-ds-md bg-brand-tint items-center justify-center mb-2">
-                  <Ionicons name="school-outline" size={28} color="#1C3D63" />
+                  <Ionicons name="school-outline" size={28} color="var(--ds-brand)" />
                 </View>
               )}
               <Text className="text-sm font-semibold text-ink text-center">

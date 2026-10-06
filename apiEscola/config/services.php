@@ -27,7 +27,7 @@ return [
     ],
 
     'resend_marketing' => [
-        'key' => env('RESEND_MARKETING_API_KEY', 're_LY9qrsRb_Lf4XLHAwTi1pkG7FGwCaMUJA'),
+        'key' => env('RESEND_MARKETING_API_KEY'),
         'base_url' => env('RESEND_MARKETING_BASE_URL', 'https://api.resend.com'),
         'timeout' => (int) env('RESEND_MARKETING_TIMEOUT', 15),
     ],
@@ -57,6 +57,25 @@ return [
         'verify_ssl' => (bool) env('CORA_VERIFY_SSL', true),
         /** GET contract-charges/preview?debug=1 — super_admin sempre; demais usuários se true */
         'contract_charges_debug' => filter_var(env('CORA_CONTRACT_CHARGES_DEBUG', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    /**
+     * IA (banco de questões). As chaves do .env são usadas só pelo super admin;
+     * tenants usam as próprias chaves em tenant_ai_credentials.
+     */
+    'ai' => [
+        'preferred_provider' => env('AI_PREFERRED_PROVIDER', 'openrouter'),
+        'timeout' => (int) env('AI_TIMEOUT', 90),
+        'openrouter' => [
+            'api_key' => env('OPENROUTER_API_KEY'),
+            'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+            'model' => env('OPENROUTER_MODEL', 'openai/gpt-4o-mini'),
+        ],
+        'openai' => [
+            'api_key' => env('OPENAI_API_KEY'),
+            'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+            'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+        ],
     ],
 
 ];

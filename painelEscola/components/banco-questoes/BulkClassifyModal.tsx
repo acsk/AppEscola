@@ -126,7 +126,7 @@ export default function BulkClassifyModal({
       <TouchableOpacity
         onPress={step === "confirm" && !applying ? () => setStep("form") : onClose}
         disabled={applying}
-        className="px-4 py-2.5 rounded-ds-md border border-border"
+        className="px-4 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
       >
         <Text className="text-sm font-semibold text-ink-muted">{step === "confirm" ? "Voltar" : "Cancelar"}</Text>
       </TouchableOpacity>
@@ -135,8 +135,8 @@ export default function BulkClassifyModal({
         disabled={!built || applying}
         className={`px-4 py-2.5 rounded-ds-md flex-row items-center gap-2 ${!built || applying ? "bg-brand-tint" : "bg-brand"}`}
       >
-        {applying && <ActivityIndicator size="small" color="#FFFFFF" />}
-        <Text className="text-sm font-semibold text-white">
+        {applying && <ActivityIndicator size="small" color="var(--ds-on-brand)" />}
+        <Text className="text-sm font-medium text-on-brand">
           {step === "form" ? "Continuar" : `Alterar ${countLabel}`}
         </Text>
       </TouchableOpacity>

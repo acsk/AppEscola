@@ -203,7 +203,7 @@ export default function OfficialAssessmentGradesTable({
         className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3 mb-3"
         style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
       >
-        <Ionicons name="search-outline" size={16} color="#5F6878" />
+        <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
         <input
           placeholder="Filtrar por aluno ou matrícula..."
           value={search}
@@ -213,14 +213,14 @@ export default function OfficialAssessmentGradesTable({
             border: "none",
             outline: "none",
             fontSize: 14,
-            color: "#111722",
+            color: "var(--ds-ink)",
             marginLeft: 8,
             backgroundColor: "transparent",
           }}
         />
         {search.trim() ? (
           <TouchableOpacity onPress={() => setSearch("")} activeOpacity={0.8}>
-            <Ionicons name="close-circle" size={16} color="#5F6878" />
+            <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -290,10 +290,10 @@ export default function OfficialAssessmentGradesTable({
                   const cell = formatGradeCell(gradeMap.get(`${student.student_id}-${s.id}`));
                   const color =
                     cell.tone === "absent"
-                      ? "#B0261B"
+                      ? "var(--ds-danger)"
                       : cell.tone === "ok"
-                        ? "#111722"
-                        : "#5F6878";
+                        ? "var(--ds-ink)"
+                        : "var(--ds-ink-subtle)";
                   return renderCell(COL_SUBJECT.flex, COL_SUBJECT.minWidth, cell.text, {
                     center: true,
                     color,
@@ -305,12 +305,12 @@ export default function OfficialAssessmentGradesTable({
                     maxScoreNum != null && total.sum != null && total.sum > maxScoreNum;
                   const totalColor =
                     total.tone === "absent"
-                      ? "#B0261B"
+                      ? "var(--ds-danger)"
                       : overMax
-                        ? "#B0261B"
+                        ? "var(--ds-danger)"
                         : total.tone === "ok"
-                          ? "#1C3D63"
-                          : "#5F6878";
+                          ? "var(--ds-brand)"
+                          : "var(--ds-ink-subtle)";
                   return renderCell(COL_TOTAL.flex, COL_TOTAL.minWidth, total.text, {
                     center: true,
                     color: totalColor,
@@ -331,7 +331,7 @@ export default function OfficialAssessmentGradesTable({
                       activeOpacity={0.85}
                       accessibilityLabel={`Lançar notas de ${student.student_name}`}
                     >
-                      <Ionicons name="create-outline" size={16} color="#1C3D63" />
+                      <Ionicons name="create-outline" size={16} color="var(--ds-brand)" />
                     </TouchableOpacity>
                   </View>
                 ) : null}

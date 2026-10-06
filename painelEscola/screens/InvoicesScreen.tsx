@@ -78,6 +78,7 @@ if (Platform.OS === "web" && pdfjs) {
 
 import type { GuardianRef, StudentRef } from "../types/entities";
 import type { Invoice, InvoiceFormValues, InvoicesScreenProps } from "../types/invoices";
+import Tabs from "../components/ui/Tabs";
 
 const canGenerateChargeForInvoice = (invoice: Invoice | null) => {
   if (!invoice) return false;
@@ -114,9 +115,9 @@ const limitText = (value: string | undefined | null, max: number) => {
 };
 
 const SUMMARY_TONES: Record<string, { bg: string; border: string; text: string }> = {
-  amber: { bg: "#FFFBEB", border: "#FDE68A", text: "#92400E" },
-  red: { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B" },
-  emerald: { bg: "#ECFDF5", border: "#A7F3D0", text: "#065F46" },
+  amber: { bg: "var(--ds-warning-tint)", border: "var(--ds-warning)", text: "var(--ds-warning)" },
+  red: { bg: "var(--ds-danger-tint)", border: "var(--ds-danger)", text: "var(--ds-danger)" },
+  emerald: { bg: "var(--ds-success-tint)", border: "var(--ds-success)", text: "var(--ds-success)" },
 };
 
 type ListView = "open" | "paid" | "all";
@@ -673,7 +674,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     if (loading) {
       return (
         <View className="items-center justify-center py-20">
-          <ActivityIndicator size="large" color="#7C3AED" />
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
         </View>
       );
     }
@@ -681,8 +682,8 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     if (rows.length === 0) {
       return (
         <View className="items-center justify-center py-16">
-          <Ionicons name="cash-outline" size={40} color="#E5E7EB" />
-          <Text className="text-gray-400 mt-3 text-sm">Nenhuma cobrança encontrada</Text>
+          <Ionicons name="cash-outline" size={40} color="var(--ds-border)" />
+          <Text className="text-ink-subtle mt-3 text-sm">Nenhuma cobrança encontrada</Text>
         </View>
       );
     }
@@ -715,80 +716,67 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         }}
       >
         <View>
-          <Text className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-gray-800`}>
-            \-Pagamentos
-          </Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Gestão de pagamentos</Text>
+          <Text className="text-sm text-ink-muted">
             Cobranças em aberto, baixas manuais e resumo financeiro
           </Text>
         </View>
         <TouchableOpacity
           onPress={openCreate}
-          className="flex-row items-center justify-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center justify-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md"
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Nova Cobrança</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Nova cobrança</Text>
         </TouchableOpacity>
       </View>
 
-      <View className="mb-4 flex-row flex-wrap gap-2">
-        {(["open", "paid", "all"] as ListView[]).map((tab) => {
-          const active = listView === tab;
-          const labels: Record<ListView, string> = {
-            open: "Em aberto",
-            paid: "Baixadas",
-            all: "Todas",
-          };
-          return (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => {
-                setListView(tab);
-                setStatusFilter("");
-                setPage(1);
-              }}
-              className={`px-4 py-2 rounded-xl border ${active ? "bg-violet-600 border-violet-600" : "bg-white border-gray-200"}`}
-              style={isMobile ? { flex: 1, alignItems: "center" } : undefined}
-              activeOpacity={0.85}
-            >
-              <Text className={`text-sm font-semibold ${active ? "text-white" : "text-gray-700"}`}>
-                {labels[tab]}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      <View className="mb-4">
+        <Tabs
+          accessibilityLabel="Situação das cobranças"
+          items={[
+            { id: "open" as ListView, label: "Em aberto" },
+            { id: "paid" as ListView, label: "Baixadas" },
+            { id: "all" as ListView, label: "Todas" },
+          ]}
+          value={listView}
+          onChange={(tab) => {
+            setListView(tab);
+            setStatusFilter("");
+            setPage(1);
+          }}
+        />
       </View>
 
       <View className="mb-4 flex-row flex-wrap gap-3">
         {summaryLoading ? (
           <View className="w-full items-center py-4">
-            <ActivityIndicator color="#7C3AED" />
+            <ActivityIndicator color="var(--ds-brand)" />
           </View>
         ) : (
           summaryCards.map((card) => (
             <View
               key={card.label}
-              className="bg-white rounded-xl border px-4 py-3 flex-1"
+              className="bg-surface rounded-ds-md border px-4 py-3 flex-1"
               style={{
                 minWidth: isMobile ? "100%" : 200,
                 maxWidth: isMobile ? "100%" : 280,
-                borderColor: SUMMARY_TONES[card.tone]?.border ?? "#E5E7EB",
+                borderColor: SUMMARY_TONES[card.tone]?.border ?? "var(--ds-border)",
               }}
             >
               <View className="flex-row items-center justify-between">
-                <Text className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                <Text className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide">
                   {card.label}
                 </Text>
                 <View
                   className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: SUMMARY_TONES[card.tone]?.text ?? "#6B7280" }}
+                  style={{ backgroundColor: SUMMARY_TONES[card.tone]?.text ?? "var(--ds-ink-muted)" }}
                 />
               </View>
-              <Text className="text-2xl font-bold text-gray-900 mt-1">{card.value}</Text>
+              <Text className="text-2xl font-semibold text-ink mt-1">{card.value}</Text>
               <Text
                 className="text-sm font-semibold mt-0.5"
-                style={{ color: SUMMARY_TONES[card.tone]?.text ?? "#4B5563" }}
+                style={{ color: SUMMARY_TONES[card.tone]?.text ?? "var(--ds-ink-muted)" }}
               >
                 {fmtMoney(card.amount)}
               </Text>
@@ -798,20 +786,20 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
       </View>
 
       {summary?.by_payment_method && summary.by_payment_method.length > 0 && listView === "paid" ? (
-        <View className="mb-4 bg-white rounded-2xl border border-gray-100 px-4 py-3">
-          <Text className="text-xs font-semibold text-gray-500 uppercase mb-2">
+        <View className="mb-4 bg-surface rounded-ds-md border border-border-strong px-4 py-2 min-h-control-md justify-center">
+          <Text className="text-xs font-semibold text-ink-muted uppercase mb-2">
             Baixas por forma de pagamento (período)
           </Text>
           <View className="flex-row flex-wrap gap-2">
             {summary.by_payment_method.map((row) => (
               <View
                 key={row.payment_method}
-                className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-100"
+                className="px-3 py-2 rounded-ds-md bg-surface-sunken border border-border"
               >
-                <Text className="text-xs font-semibold text-gray-700">
+                <Text className="text-xs font-semibold text-ink">
                   {paymentMethodLabel(row.payment_method)}
                 </Text>
-                <Text className="text-xs text-gray-500">
+                <Text className="text-xs text-ink-muted">
                   {row.count} · {fmtMoney(row.amount)}
                 </Text>
               </View>
@@ -883,14 +871,14 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
       </View>
 
       {filterPeriodError ? (
-        <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-          <Text className="text-sm text-red-700">{filterPeriodError}</Text>
+        <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+          <Text className="text-sm text-danger">{filterPeriodError}</Text>
         </View>
       ) : null}
 
       {saveSuccess ? (
-        <View className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <Text className="text-sm text-emerald-700">{saveSuccess}</Text>
+        <View className="mb-4 rounded-ds-md border border-success bg-success-tint px-4 py-3">
+          <Text className="text-sm text-success">{saveSuccess}</Text>
         </View>
       ) : null}
 
@@ -903,19 +891,19 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                 key={item.id}
                 onPress={() => setActionsInvoice(item)}
                 activeOpacity={0.85}
-                className="bg-white rounded-xl border border-gray-200 px-3 py-3"
-                style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
+                className="bg-surface rounded-ds-md border border-border-strong px-3 py-2 min-h-control-md justify-center"
+                style={{ }}
               >
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1" style={{ minWidth: 0 }}>
-                    <Text className="text-xs font-mono font-semibold text-violet-600">
+                    <Text className="text-xs font-mono font-semibold text-brand">
                       #{item.id}
                       {item.cora?.charge_id ? ` · ${item.cora.charge_id}` : ""}
                     </Text>
-                    <Text className="text-sm font-bold text-gray-900 mt-0.5" numberOfLines={1}>
+                    <Text className="text-sm font-semibold text-ink mt-0.5" numberOfLines={1}>
                       {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
                     </Text>
-                    <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
+                    <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={2}>
                       {limitText(item.description, DESCRIPTION_LIMIT)}
                     </Text>
                   </View>
@@ -924,39 +912,39 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                       event?.stopPropagation?.();
                       setActionsInvoice(item);
                     }}
-                    className="w-8 h-8 items-center justify-center bg-gray-100 rounded-lg border border-gray-200"
+                    className="w-8 h-8 items-center justify-center bg-surface-sunken rounded-ds-md border border-border"
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+                    <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
                   </TouchableOpacity>
                 </View>
 
                 <View className="flex-row items-center justify-between mt-3">
-                  <Text className="text-base font-bold text-gray-900">{fmtMoney(item.amount)}</Text>
+                  <Text className="text-base font-semibold text-ink">{fmtMoney(item.amount)}</Text>
                   <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
                 </View>
 
                 <View className="flex-row flex-wrap gap-2 mt-3">
-                  <View className="rounded-lg bg-gray-50 px-2.5 py-1.5">
-                    <Text className="text-xs uppercase font-semibold text-gray-500">
+                  <View className="rounded-ds-md bg-surface-sunken px-2.5 py-1.5">
+                    <Text className="text-xs uppercase font-semibold text-ink-muted">
                       {listView === "paid" ? "Pago em" : "Vencimento"}
                     </Text>
-                    <Text className="text-xs font-semibold text-gray-700 mt-0.5">
+                    <Text className="text-xs font-semibold text-ink mt-0.5">
                       {listView === "paid" ? fmtDateTime(item.paid_at) : fmt(item.due_date)}
                     </Text>
                   </View>
-                  <View className="rounded-lg bg-gray-50 px-2.5 py-1.5">
-                    <Text className="text-xs uppercase font-semibold text-gray-500">Forma</Text>
-                    <Text className="text-xs font-semibold text-gray-700 mt-0.5">
+                  <View className="rounded-ds-md bg-surface-sunken px-2.5 py-1.5">
+                    <Text className="text-xs uppercase font-semibold text-ink-muted">Forma</Text>
+                    <Text className="text-xs font-semibold text-ink mt-0.5">
                       {paymentMethodLabel(item.payment_method)}
                     </Text>
                   </View>
                   {listView === "paid" ? (
-                    <View className="rounded-lg bg-gray-50 px-2.5 py-1.5 flex-1 min-w-[140px]">
-                      <Text className="text-xs uppercase font-semibold text-gray-500">
+                    <View className="rounded-ds-md bg-surface-sunken px-2.5 py-1.5 flex-1 min-w-[140px]">
+                      <Text className="text-xs uppercase font-semibold text-ink-muted">
                         Identificador
                       </Text>
-                      <Text className="text-xs font-semibold text-gray-700 mt-0.5" numberOfLines={1}>
+                      <Text className="text-xs font-semibold text-ink mt-0.5" numberOfLines={1}>
                         {item.payment_reference ?? "—"}
                       </Text>
                     </View>
@@ -966,7 +954,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             ))}
 
           {meta.total > 0 && (
-            <View className="bg-white rounded-2xl border border-gray-100 px-3">
+            <View className="bg-surface rounded-ds-md border border-border px-3">
               <Pagination
                 currentPage={meta.current_page}
                 lastPage={meta.last_page}
@@ -985,14 +973,10 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
           contentContainerStyle={{ width: "100%" }}
         >
           <View
-            className="bg-white rounded-2xl overflow-hidden border border-gray-200"
+            className="bg-surface rounded-ds-md overflow-hidden border border-border"
             style={{
               width: "100%",
               minWidth: tableMinWidth ?? (listView === "paid" ? 1260 : 1140),
-              shadowColor: "#000",
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              elevation: 2,
             }}
           >
             <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
@@ -1033,7 +1017,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                   onPress={() => setActionsInvoice(item)}
                 >
                   <View style={{ width: 88, minWidth: 88, paddingRight: 8 }}>
-                    <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+                    <Text className="text-xs font-mono font-semibold text-brand" numberOfLines={1}>
                       #{item.id}
                     </Text>
                     {item.cora?.charge_id ? (
@@ -1087,17 +1071,17 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                         event?.stopPropagation?.();
                         setActionsInvoice(item);
                       }}
-                      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+                      className="p-1.5 bg-surface-sunken rounded-ds-md border border-border"
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+                      <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
                     </TouchableOpacity>
                   </View>
                 </DataTableRow>
               ))}
 
             {meta.total > 0 && (
-              <View className="px-4 border-t border-gray-100">
+              <View className="px-4 border-t border-border">
                 <Pagination currentPage={meta.current_page} lastPage={meta.last_page} total={meta.total} perPage={meta.per_page} onPageChange={setPage} />
               </View>
             )}
@@ -1105,14 +1089,14 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         </ScrollView>
       )}
 
-      <Modal visible={modalVisible} title={editId ? "Editar Cobrança" : "Nova Cobrança"} onClose={() => setModalVisible(false)} size="lg"
+      <Modal visible={modalVisible} title={editId ? "Editar cobrança" : "Nova cobrança"} onClose={() => setModalVisible(false)} size="lg"
         footer={
           <>
-            <TouchableOpacity onPress={() => setModalVisible(false)} className="px-5 py-2.5 rounded-xl border border-gray-200">
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)} className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center">
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={save} disabled={saving} className="px-5 py-2.5 rounded-xl bg-violet-600">
-              {saving ? <ActivityIndicator color="white" size="small" /> : <Text className="text-sm font-bold text-white">Salvar</Text>}
+            <TouchableOpacity onPress={save} disabled={saving} className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center">
+              {saving ? <ActivityIndicator color="var(--ds-on-brand)" size="small" /> : <Text className="text-sm font-medium text-on-brand">Salvar</Text>}
             </TouchableOpacity>
           </>
         }
@@ -1148,7 +1132,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
           value={form.description}
           onChangeText={(v) => setForm({ ...form, description: v })}
           error={errors.description}
-          placeholder="Ex: Mensalidade Março/2026"
+          placeholder="Ex: Mensalidade março/2026"
         />
         <View className="flex-row gap-4 flex-wrap">
           <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
@@ -1177,7 +1161,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             <FormSelect label="Status" value={form.status} options={statusOptions} onChange={(v) => setForm({ ...form, status: v })} error={errors.status} />
           </View>
           <View style={{ flex: 1, minWidth: isMobile ? "100%" : 220 }}>
-            <FormSelect label="Forma de Pagamento" value={form.payment_method} options={methodOptions} onChange={(v) => setForm({ ...form, payment_method: v })} error={errors.payment_method} />
+            <FormSelect label="Forma de pagamento" value={form.payment_method} options={methodOptions} onChange={(v) => setForm({ ...form, payment_method: v })} error={errors.payment_method} />
           </View>
         </View>
         <FormInput
@@ -1199,30 +1183,30 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         size="lg"
         footer={
           <>
-            <TouchableOpacity onPress={closeChargeModal} className="px-5 py-2.5 rounded-xl border border-gray-200">
-              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            <TouchableOpacity onPress={closeChargeModal} className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center">
+              <Text className="text-sm font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onCheckChargeStatus}
               disabled={checkingStatus || !chargeInvoice || !chargeInvoice.cora?.charge_id}
-              className="px-5 py-2.5 rounded-xl border border-violet-200"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             >
               {checkingStatus ? (
-                <ActivityIndicator size="small" color="#7C3AED" />
+                <ActivityIndicator size="small" color="var(--ds-brand)" />
               ) : (
-                <Text className="text-sm font-semibold text-violet-700">Consultar status</Text>
+                <Text className="text-sm font-semibold text-brand">Consultar status</Text>
               )}
             </TouchableOpacity>
             {chargeEnvironment === "stage" ? (
               <TouchableOpacity
                 onPress={onPayCharge}
                 disabled={payingCharge || !chargeInvoice || !chargeInvoice.cora?.charge_id}
-                className="px-5 py-2.5 rounded-xl border border-emerald-300"
+                className="px-5 py-2.5 rounded-ds-md border border-success"
               >
                 {payingCharge ? (
-                  <ActivityIndicator size="small" color="#059669" />
+                  <ActivityIndicator size="small" color="var(--ds-success)" />
                 ) : (
-                  <Text className="text-sm font-semibold text-emerald-700">Simular pagamento</Text>
+                  <Text className="text-sm font-semibold text-success">Simular pagamento</Text>
                 )}
               </TouchableOpacity>
             ) : null}
@@ -1235,14 +1219,14 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                   !chargeProvider ||
                   !canGenerateChargeForInvoice(chargeInvoice)
                 }
-                className={`px-5 py-2.5 rounded-xl ${
-                  canGenerateChargeForInvoice(chargeInvoice) ? "bg-violet-600" : "bg-gray-300"
+                className={`px-5 py-2.5 rounded-ds-md ${
+                  canGenerateChargeForInvoice(chargeInvoice) ? "bg-brand" : "bg-border"
                 }`}
               >
                 {generatingCharge ? (
-                  <ActivityIndicator color="white" size="small" />
+                  <ActivityIndicator color="var(--ds-on-brand)" size="small" />
                 ) : (
-                  <Text className="text-sm font-bold text-white">Gerar cobrança</Text>
+                  <Text className="text-sm font-medium text-on-brand">Gerar cobrança</Text>
                 )}
               </TouchableOpacity>
             ) : null}
@@ -1250,20 +1234,20 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         }
       >
         {chargeInvoice ? (
-          <View className="mb-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+          <View className="mb-3 rounded-ds-md border border-border bg-surface-sunken px-4 py-3">
+            <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
               {chargeInvoice.description}
             </Text>
-            <Text className="text-xs text-gray-500 mt-1" numberOfLines={1}>
+            <Text className="text-xs text-ink-muted mt-1" numberOfLines={1}>
               {chargeInvoice.student?.name ?? "—"} ·{" "}
               {fmtMoney(chargeInvoice.amount)} · venc. {fmt(chargeInvoice.due_date)}
             </Text>
             {chargeInvoice.cora?.charge_id ? (
-              <Text className="text-xs font-mono font-semibold text-violet-600 mt-1.5" numberOfLines={1}>
+              <Text className="text-xs font-mono font-semibold text-brand mt-1.5" numberOfLines={1}>
                 Cora {chargeInvoice.cora.charge_id}
               </Text>
             ) : (
-              <Text className="text-xs text-amber-700 mt-1.5">
+              <Text className="text-xs text-warning mt-1.5">
                 Ainda sem cobrança no provedor. Confirme e gere abaixo.
               </Text>
             )}
@@ -1296,14 +1280,14 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                 </View>
               </View>
             ) : (
-              <View className="rounded-xl border border-gray-200 bg-white px-4 py-3 mb-3">
-                <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <View className="rounded-ds-md border border-border-strong bg-surface px-4 mb-3 py-2 min-h-control-md justify-center">
+                <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
                   Configuração automática
                 </Text>
-                <Text className="text-sm text-gray-800 mt-1">
+                <Text className="text-sm text-ink mt-1">
                   {chargeProvider || "Cora"} · {paymentMethodLabel(chargeMethod)} · produção
                 </Text>
-                <Text className="text-xs text-gray-500 mt-1">
+                <Text className="text-xs text-ink-muted mt-1">
                   Usa a credencial Cora já cadastrada no tenant.
                 </Text>
               </View>
@@ -1323,8 +1307,8 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             ) : null}
 
             {!!chargeInvoice && !canGenerateChargeForInvoice(chargeInvoice) ? (
-              <View className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 mb-3">
-                <Text className="text-xs text-red-700">
+              <View className="rounded-ds-md border border-danger bg-danger-tint px-4 py-3 mb-3">
+                <Text className="text-xs text-danger">
                   Esta fatura está {STATUS_LABELS[chargeInvoice.status] ?? chargeInvoice.status} e não
                   permite nova geração de cobrança.
                 </Text>
@@ -1332,8 +1316,8 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             ) : null}
           </>
         ) : (
-          <View className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 mb-3">
-            <Text className="text-xs text-violet-800">
+          <View className="rounded-ds-md border border-border bg-brand-tint px-4 py-3 mb-3">
+            <Text className="text-xs text-brand">
               Consulta direta na Cora ({chargeEnvironment === "prod" ? "produção" : "teste"}) com as
               credenciais do tenant — sem selecionar provedor ou ambiente.
             </Text>
@@ -1341,15 +1325,15 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         )}
 
         {!!chargeResult && (
-          <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 mb-3">
-            <Text className="text-sm font-semibold text-emerald-700">Cobrança no provedor</Text>
-            <Text className="text-xs text-emerald-700 mt-1">
+          <View className="rounded-ds-md border border-success bg-success-tint px-4 py-3 mb-3">
+            <Text className="text-sm font-semibold text-success">Cobrança no provedor</Text>
+            <Text className="text-xs text-success mt-1">
               ID: {chargeResult.charge_id || chargeInvoice?.cora?.charge_id || "—"}
             </Text>
-            <Text className="text-xs text-emerald-700 mt-1">
+            <Text className="text-xs text-success mt-1">
               Ambiente: {chargeResult.environment || chargeEnvironment}
             </Text>
-            <Text className="text-xs text-emerald-700 mt-1">
+            <Text className="text-xs text-success mt-1">
               Status: {chargeResult.status || chargeInvoice?.cora?.status || "—"}
             </Text>
             {!!(chargeResult.payment_url || chargeInvoice?.cora?.payment_url) && (
@@ -1358,50 +1342,50 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                   onPress={() =>
                     openPreviewModal(chargeResult.payment_url || chargeInvoice?.cora?.payment_url || null)
                   }
-                  className="px-3 py-2 rounded-lg bg-emerald-600 self-start"
+                  className="px-3 py-2 rounded-ds-md bg-emerald-600 self-start"
                 >
-                  <Text className="text-xs font-semibold text-white">Visualizar documento</Text>
+                  <Text className="text-xs font-medium text-on-brand">Visualizar documento</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => {
                     const url = chargeResult.payment_url || chargeInvoice?.cora?.payment_url || "";
                     if (typeof window !== "undefined") window.open(url, "_blank");
                   }}
-                  className="px-3 py-2 rounded-lg border border-emerald-300 self-start"
+                  className="px-3 py-2 rounded-ds-md border border-success self-start"
                 >
-                  <Text className="text-xs font-semibold text-emerald-700">Abrir em nova aba</Text>
+                  <Text className="text-xs font-semibold text-success">Abrir em nova aba</Text>
                 </TouchableOpacity>
               </View>
             )}
             {!!(chargeResult.pix_copy_paste || chargeInvoice?.cora?.pix_copy_paste) && (
-              <TouchableOpacity onPress={copyPixCode} className="mt-2 px-3 py-2 rounded-lg border border-emerald-300 self-start">
-                <Text className="text-xs font-semibold text-emerald-700">Copiar Pix copia e cola</Text>
+              <TouchableOpacity onPress={copyPixCode} className="mt-2 px-3 py-2 rounded-ds-md border border-success self-start">
+                <Text className="text-xs font-semibold text-success">Copiar pix copia e cola</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
         {!!chargeStatusResult && (
-          <View className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-            <Text className="text-sm font-semibold text-blue-700">Status atualizado</Text>
-            <Text className="text-xs text-blue-700 mt-1">Provider: {chargeStatusResult.provider || "—"}</Text>
-            <Text className="text-xs text-blue-700 mt-1">Status: {chargeStatusResult.status || "—"}</Text>
-            <Text className="text-xs text-blue-700 mt-1">Pago em: {chargeStatusResult.paid_at || "—"}</Text>
+          <View className="rounded-ds-md border border-border bg-brand-tint px-4 py-3">
+            <Text className="text-sm font-semibold text-brand">Status atualizado</Text>
+            <Text className="text-xs text-brand mt-1">Provider: {chargeStatusResult.provider || "—"}</Text>
+            <Text className="text-xs text-brand mt-1">Status: {chargeStatusResult.status || "—"}</Text>
+            <Text className="text-xs text-brand mt-1">Pago em: {chargeStatusResult.paid_at || "—"}</Text>
           </View>
         )}
 
         {!!paidChargeResult && (
-          <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 mt-3">
-            <Text className="text-sm font-semibold text-emerald-700">Pagamento simulado</Text>
-            <Text className="text-xs text-emerald-700 mt-1">Status: {paidChargeResult.status || "—"}</Text>
-            <Text className="text-xs text-emerald-700 mt-1">Pago em: {paidChargeResult.paid_at || "—"}</Text>
+          <View className="rounded-ds-md border border-success bg-success-tint px-4 py-3 mt-3">
+            <Text className="text-sm font-semibold text-success">Pagamento simulado</Text>
+            <Text className="text-xs text-success mt-1">Status: {paidChargeResult.status || "—"}</Text>
+            <Text className="text-xs text-success mt-1">Pago em: {paidChargeResult.paid_at || "—"}</Text>
           </View>
         )}
 
         {!!chargeActionError && (
-          <View className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 mt-3">
-            <Text className="text-sm font-semibold text-red-700">Atenção</Text>
-            <Text className="text-xs text-red-700 mt-1">{chargeActionError}</Text>
+          <View className="rounded-ds-md border border-danger bg-danger-tint px-4 py-3 mt-3">
+            <Text className="text-sm font-semibold text-danger">Atenção</Text>
+            <Text className="text-xs text-danger mt-1">{chargeActionError}</Text>
           </View>
         )}
       </Modal>
@@ -1413,30 +1397,30 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         size="lg"
         footer={
           <>
-            <TouchableOpacity onPress={closePreviewModal} className="px-5 py-2.5 rounded-xl border border-gray-200">
-              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            <TouchableOpacity onPress={closePreviewModal} className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center">
+              <Text className="text-sm font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
             {!!previewUrl && (
               <TouchableOpacity
                 onPress={() => {
                   if (typeof window !== "undefined") window.open(previewUrl, "_blank");
                 }}
-                className="px-5 py-2.5 rounded-xl bg-violet-600"
+                className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
               >
-                <Text className="text-sm font-bold text-white">Abrir em nova aba</Text>
+                <Text className="text-sm font-medium text-on-brand">Abrir em nova aba</Text>
               </TouchableOpacity>
             )}
           </>
         }
       >
         {!previewUrl ? (
-          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <Text className="text-sm text-gray-600">Nenhum documento disponível para visualização.</Text>
+          <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-4">
+            <Text className="text-sm text-ink-muted">Nenhum documento disponível para visualização.</Text>
           </View>
         ) : Platform.OS !== "web" ? (
-          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <Text className="text-sm text-gray-700">A visualização embutida está disponível no web.</Text>
-            <Text className="text-xs text-gray-500 mt-2">Use "Abrir em nova aba" para ver o documento.</Text>
+          <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-4">
+            <Text className="text-sm text-ink">A visualização embutida está disponível no web.</Text>
+            <Text className="text-xs text-ink-muted mt-2">Use "Abrir em nova aba" para ver o documento.</Text>
           </View>
         ) : isImagePreviewUrl(previewUrl) ? (
           <View>
@@ -1445,18 +1429,18 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
               style={{
                 width: "100%",
                 height: isMobile ? 420 : 640,
-                borderRadius: 16,
+                borderRadius: 4,
                 resizeMode: "contain",
-                backgroundColor: "#F9FAFB",
+                backgroundColor: "var(--ds-surface-sunken)",
               }}
             />
           </View>
         ) : isPdfPreviewUrl(previewUrl) && PdfDocument && PdfPage ? (
-          <View style={{ width: "100%", maxHeight: 680, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" }}>
+          <View style={{ width: "100%", maxHeight: 680, borderRadius: 4, overflow: "hidden", borderWidth: 1, borderColor: "var(--ds-border)", backgroundColor: "var(--ds-surface-sunken)" }}>
             <ScrollView contentContainerStyle={{ padding: 16, alignItems: "center", gap: 16 }}>
               <PdfDocument
                 file={previewUrl}
-                loading={<Text className="text-sm text-gray-600">Carregando PDF...</Text>}
+                loading={<Text className="text-sm text-ink-muted">Carregando PDF...</Text>}
                 onLoadSuccess={({ numPages }: { numPages: number }) => {
                   setPdfPageCount(numPages);
                   setPdfPreviewError(null);
@@ -1479,29 +1463,29 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
               </PdfDocument>
 
               {!!pdfPreviewError && (
-                <View className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                  <Text className="text-sm font-semibold text-red-700">Falha ao renderizar PDF</Text>
-                  <Text className="text-xs text-red-700 mt-1">{pdfPreviewError}</Text>
+                <View className="w-full rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+                  <Text className="text-sm font-semibold text-danger">Falha ao renderizar PDF</Text>
+                  <Text className="text-xs text-danger mt-1">{pdfPreviewError}</Text>
                 </View>
               )}
             </ScrollView>
           </View>
         ) : (
-          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <Text className="text-sm text-gray-700">Esse tipo de documento não suporta preview embutido.</Text>
-            <Text className="text-xs text-gray-500 mt-2">Use "Abrir em nova aba" para visualizar o arquivo.</Text>
+          <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-4">
+            <Text className="text-sm text-ink">Esse tipo de documento não suporta preview embutido.</Text>
+            <Text className="text-xs text-ink-muted mt-2">Use "Abrir em nova aba" para visualizar o arquivo.</Text>
           </View>
         )}
       </Modal>
 
       {!!actionError && (
-        <View className="mx-4 mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-          <Text className="text-sm font-semibold text-red-700">{actionError}</Text>
+        <View className="mx-4 mb-3 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+          <Text className="text-sm font-semibold text-danger">{actionError}</Text>
         </View>
       )}
       <ConfirmModal
         visible={!!cancelId}
-        title="Cancelar Cobrança"
+        title="Cancelar cobrança"
         message={
           rows.find((i) => i.id === cancelId)?.lifecycle_hint ??
           (rows.find((i) => i.id === cancelId)?.requires_cora_cancel_before_delete

@@ -120,13 +120,13 @@ const validateDraftFields = (
       const hasNewFile = !!draft.files[field.name];
 
       if (!hasUploadedFile && !hasNewFile) {
-        nextErrors[field.name] = "Este campo e obrigatorio.";
+        nextErrors[field.name] = "Este campo e obrigatório.";
       }
       return;
     }
 
     if (!String(draft.values[field.name] ?? "").trim()) {
-      nextErrors[field.name] = "Este campo e obrigatorio.";
+      nextErrors[field.name] = "Este campo e obrigatório.";
     }
   });
 
@@ -443,7 +443,7 @@ export default function PaymentProvidersScreen() {
     try {
       const payload = buildPayload(draft);
       await savePaymentProviderSettings(Number(tenantId), provider, payload);
-      showToast("success", "Configuracao salva com sucesso.");
+      showToast("success", "Configuração salva com sucesso.");
       await loadSchema();
     } catch (e: any) {
       if (e?.response?.status === 422) {
@@ -459,7 +459,7 @@ export default function PaymentProvidersScreen() {
           return next;
         });
       }
-      showToast("error", e?.response?.data?.message || "Falha ao salvar configuracao.");
+      showToast("error", e?.response?.data?.message || "Falha ao salvar configuração.");
     } finally {
       setSaving(false);
     }
@@ -494,8 +494,8 @@ export default function PaymentProvidersScreen() {
 
   const renderProviderPicker = () => (
     <View className="mb-4">
-      <Text className="text-sm font-semibold text-gray-700 mb-2">
-        Provedor <Text className="text-red-500">*</Text>
+      <Text className="text-sm font-semibold text-ink mb-2">
+        Provedor <Text className="text-danger">*</Text>
       </Text>
       <View className="flex-row flex-wrap" style={{ gap: 10 }}>
         {providers.map((item) => {
@@ -505,8 +505,8 @@ export default function PaymentProvidersScreen() {
               key={item.slug}
               onPress={() => setProvider(item.slug)}
               activeOpacity={0.85}
-              className={`rounded-2xl border px-3 py-3 ${
-                selected ? "border-violet-400 bg-violet-50" : "border-gray-200 bg-white"
+              className={`rounded-ds-md border px-3 py-3 ${
+                selected ? "border-brand bg-brand-tint" : "border-border bg-surface"
               }`}
               style={{
                 minWidth: isMobile ? "100%" : 200,
@@ -515,30 +515,30 @@ export default function PaymentProvidersScreen() {
               }}
             >
               <View className="flex-row items-center gap-3">
-                <PaymentProviderLogo uri={item.logo_url ?? null} size={52} rounded={14} />
+                <PaymentProviderLogo uri={item.logo_url ?? null} size={52} rounded={4} />
                 <View className="flex-1 min-w-0">
                   <Text
-                    className={`text-sm font-bold ${selected ? "text-violet-700" : "text-gray-800"}`}
+                    className={`text-sm font-semibold ${selected ? "text-brand" : "text-ink"}`}
                     numberOfLines={1}
                   >
                     {item.name}
                   </Text>
-                  <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+                  <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
                     {item.slug}
                   </Text>
                   <View className="flex-row flex-wrap mt-1.5" style={{ gap: 4 }}>
                     {(item.capabilities ?? []).slice(0, 3).map((cap) => (
                       <View
                         key={`${item.slug}-${cap}`}
-                        className="rounded-full bg-gray-100 px-2 py-0.5"
+                        className="rounded-full bg-surface-sunken px-2 py-0.5"
                       >
-                        <Text className="text-[10px] font-semibold text-gray-600">{cap}</Text>
+                        <Text className="text-[10px] font-semibold text-ink-muted">{cap}</Text>
                       </View>
                     ))}
                   </View>
                 </View>
                 {selected ? (
-                  <Ionicons name="checkmark-circle" size={20} color="#7C3AED" />
+                  <Ionicons name="checkmark-circle" size={20} color="var(--ds-brand)" />
                 ) : null}
               </View>
             </TouchableOpacity>
@@ -559,18 +559,18 @@ export default function PaymentProvidersScreen() {
 
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Configuração de Provedores</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Configuração de provedores</Text>
+          <Text className="text-sm text-ink-muted">
             Configure as credenciais de cada provedor por tenant e ambiente (teste/produção).
           </Text>
         </View>
       </View>
 
-      <View className="bg-white rounded-2xl border border-gray-100 p-5" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}>
+      <View className="bg-surface rounded-ds-md border border-border p-5" style={{ }}>
         {(loadingProviders || loadingTenants) ? (
           <View className="py-10 items-center">
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text className="text-sm text-gray-500 mt-3">Carregando provedores...</Text>
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
+            <Text className="text-sm text-ink-muted mt-3">Carregando provedores...</Text>
           </View>
         ) : (
           <>
@@ -589,22 +589,22 @@ export default function PaymentProvidersScreen() {
             </View>
 
             {providers.length > 0 ? renderProviderPicker() : (
-              <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <Text className="text-sm text-amber-800">
-                  Nenhum provedor ativo. Cadastre bancos em Cadastro de Bancos.
+              <View className="mb-4 rounded-ds-md border border-warning bg-warning-tint px-4 py-3">
+                <Text className="text-sm text-warning">
+                  Nenhum provedor ativo. Cadastre bancos em Cadastro de bancos.
                 </Text>
               </View>
             )}
 
             {!!selectedProviderInfo && (
-              <View className="rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 mb-4">
+              <View className="rounded-ds-md border border-border bg-brand-tint px-4 py-3 mb-4">
                 <View className="flex-row items-center gap-3">
-                  <PaymentProviderLogo uri={selectedProviderInfo.logo_url ?? null} size={44} rounded={12} />
+                  <PaymentProviderLogo uri={selectedProviderInfo.logo_url ?? null} size={44} rounded={4} />
                   <View className="flex-1">
-                    <Text className="text-sm font-semibold text-violet-700">
+                    <Text className="text-sm font-semibold text-brand">
                       {selectedProviderInfo.name}
                     </Text>
-                    <Text className="text-xs text-violet-600 mt-1">
+                    <Text className="text-xs text-brand mt-1">
                       Capacidades: {selectedProviderInfo.capabilities.join(", ") || "Nenhuma informada"}
                     </Text>
                   </View>
@@ -619,16 +619,16 @@ export default function PaymentProvidersScreen() {
                   <TouchableOpacity
                     key={environment}
                     onPress={() => setSelectedEnvironment(environment)}
-                    className={`flex-1 rounded-2xl border px-4 py-3 ${active ? "border-violet-300 bg-violet-50" : "border-gray-200 bg-white"}`}
+                    className={`flex-1 rounded-ds-md border px-4 py-3 ${active ? "border-border bg-brand-tint" : "border-border bg-surface"}`}
                   >
-                    <Text className={`text-sm font-semibold ${active ? "text-violet-700" : "text-gray-700"}`}>
+                    <Text className={`text-sm font-semibold ${active ? "text-brand" : "text-ink"}`}>
                       {environmentLabels[environment].title}
                     </Text>
-                    <Text className={`text-xs mt-1 ${active ? "text-violet-600" : "text-gray-500"}`}>
+                    <Text className={`text-xs mt-1 ${active ? "text-brand" : "text-ink-muted"}`}>
                       {environmentLabels[environment].subtitle}
                     </Text>
                     {!!schemaFields.length && (
-                      <Text className="text-xs text-gray-500 mt-2">
+                      <Text className="text-xs text-ink-muted mt-2">
                         {drafts[environment].values.client_id
                           ? (drafts[environment].connectionStatus?.ok ? "Conectado" : "Configurado")
                           : "Não configurado"}
@@ -639,19 +639,19 @@ export default function PaymentProvidersScreen() {
               })}
             </View>
 
-            <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 mb-4">
-              <Text className="text-sm font-semibold text-gray-700">Ambiente ativo: {environmentLabels[selectedEnvironment].title}</Text>
-              <Text className="text-xs text-gray-500 mt-1">Cada ambiente grava credenciais separadas no backend.</Text>
+            <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-3 mb-4">
+              <Text className="text-sm font-semibold text-ink">Ambiente ativo: {environmentLabels[selectedEnvironment].title}</Text>
+              <Text className="text-xs text-ink-muted mt-1">Cada ambiente grava credenciais separadas no backend.</Text>
             </View>
 
             {loadingSchema ? (
               <View className="py-8 items-center">
-                <ActivityIndicator size="small" color="#7C3AED" />
-                <Text className="text-xs text-gray-500 mt-2">Carregando campos de configuracao...</Text>
+                <ActivityIndicator size="small" color="var(--ds-brand)" />
+                <Text className="text-xs text-ink-muted mt-2">Carregando campos de configuração...</Text>
               </View>
             ) : schemaFields.length === 0 ? (
-              <View className="py-6 rounded-xl border border-amber-200 bg-amber-50 px-4">
-                <Text className="text-sm text-amber-700">Schema nao disponivel para esse provedor/tenant.</Text>
+              <View className="py-6 rounded-ds-md border border-warning bg-warning-tint px-4">
+                <Text className="text-sm text-warning">Schema não disponivel para esse provedor/tenant.</Text>
               </View>
             ) : (
               <>
@@ -663,19 +663,19 @@ export default function PaymentProvidersScreen() {
                     if (field.name === 'test_account_main_cpf') {
                       return (
                         <View key="test-accounts-section" className="mt-6 mb-4">
-                          <View className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 mb-4">
+                          <View className="rounded-ds-md border border-border bg-brand-tint px-4 py-3 mb-4">
                             <View className="flex-row items-center gap-2">
-                              <Ionicons name="information-circle" size={16} color="#1E40AF" />
-                              <Text className="text-sm font-semibold text-blue-900">Dados de Teste Cora</Text>
+                              <Ionicons name="information-circle" size={16} color="var(--ds-brand)" />
+                              <Text className="text-sm font-semibold text-brand">Dados de teste cora</Text>
                             </View>
-                            <Text className="text-xs text-blue-700 mt-1">
+                            <Text className="text-xs text-brand mt-1">
                               Use essas credenciais para testar transações no ambiente de homologação.
                             </Text>
                           </View>
                           
-                          <Text className="text-xs font-semibold text-gray-600 mb-2 uppercase">Conta Principal (Empresa)</Text>
+                          <Text className="text-xs font-semibold text-ink-muted mb-2 uppercase">Conta principal (Empresa)</Text>
                           <FormInput
-                            label="CPF - Conta Principal"
+                            label="CPF - Conta principal"
                             required={field.required}
                             value={activeDraft.values[field.name] ?? ""}
                             onChangeText={(value) => onChangeText(field.name, value)}
@@ -684,7 +684,7 @@ export default function PaymentProvidersScreen() {
                           />
                           
                           <FormInput
-                            label="Senha - Conta Principal"
+                            label="Senha - Conta principal"
                             required={false}
                             value={activeDraft.values['test_account_main_password'] ?? ""}
                             onChangeText={(value) => onChangeText('test_account_main_password', value)}
@@ -693,11 +693,11 @@ export default function PaymentProvidersScreen() {
                             secureTextEntry
                           />
                           
-                          <View className="h-px bg-gray-200 my-4" />
+                          <View className="h-px bg-border my-4" />
                           
-                          <Text className="text-xs font-semibold text-gray-600 mb-2 uppercase">Conta Secundária (Cliente)</Text>
+                          <Text className="text-xs font-semibold text-ink-muted mb-2 uppercase">Conta secundária (Cliente)</Text>
                           <FormInput
-                            label="CPF - Conta Secundária"
+                            label="CPF - Conta secundária"
                             required={false}
                             value={activeDraft.values['test_account_secondary_cpf'] ?? ""}
                             onChangeText={(value) => onChangeText('test_account_secondary_cpf', value)}
@@ -706,7 +706,7 @@ export default function PaymentProvidersScreen() {
                           />
                           
                           <FormInput
-                            label="Senha - Conta Secundária"
+                            label="Senha - Conta secundária"
                             required={false}
                             value={activeDraft.values['test_account_secondary_password'] ?? ""}
                             onChangeText={(value) => onChangeText('test_account_secondary_password', value)}
@@ -742,9 +742,9 @@ export default function PaymentProvidersScreen() {
                   if (field.type === "file") {
                     return (
                       <View key={field.name} className="mb-4">
-                        <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+                        <Text className="text-sm font-semibold text-ink mb-1.5">
                           {label}
-                          {field.required && <Text className="text-red-500"> *</Text>}
+                          {field.required && <Text className="text-danger"> *</Text>}
                         </Text>
                         <input
                           key={`${selectedEnvironment}-${field.name}`}
@@ -755,11 +755,11 @@ export default function PaymentProvidersScreen() {
                             onChangeFile(field.name, file);
                           }}
                           style={{
-                            border: `1px solid ${activeDraft.errors[field.name] ? "#FCA5A5" : "#E5E7EB"}`,
-                            borderRadius: 12,
+                            border: `1px solid ${activeDraft.errors[field.name] ? "var(--ds-danger)" : "var(--ds-border)"}`,
+                            borderRadius: 4,
                             padding: "10px 14px",
                             fontSize: 14,
-                            backgroundColor: "#F9FAFB",
+                            backgroundColor: "var(--ds-surface-sunken)",
                             width: "100%",
                             height: 42,
                             fontFamily: "system-ui, -apple-system",
@@ -768,17 +768,17 @@ export default function PaymentProvidersScreen() {
                           } as any}
                         />
                         {!!activeDraft.files[field.name] && (
-                          <Text className="text-xs text-gray-500 mt-1">
+                          <Text className="text-xs text-ink-muted mt-1">
                             Arquivo selecionado: {activeDraft.files[field.name]?.name}
                           </Text>
                         )}
                         {!activeDraft.files[field.name] && activeDraft.uploadedFiles[field.name] && (
-                          <Text className="text-xs text-emerald-600 mt-1">
+                          <Text className="text-xs text-success mt-1">
                             Arquivo já enviado para este ambiente.
                           </Text>
                         )}
                         {!!activeDraft.errors[field.name] && (
-                          <Text className="text-xs text-red-500 mt-1">{activeDraft.errors[field.name]}</Text>
+                          <Text className="text-xs text-danger mt-1">{activeDraft.errors[field.name]}</Text>
                         )}
                       </View>
                     );
@@ -801,28 +801,28 @@ export default function PaymentProvidersScreen() {
                   <TouchableOpacity
                     onPress={onSave}
                     disabled={saving || testing}
-                    className="px-5 py-2.5 rounded-xl bg-violet-600"
+                    className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
                     style={{ opacity: saving || testing ? 0.75 : 1 }}
                   >
                     {saving ? (
-                      <ActivityIndicator size="small" color="white" />
+                      <ActivityIndicator size="small" color="var(--ds-on-brand)" />
                     ) : (
-                      <Text className="text-sm font-bold text-white">Salvar configuracao</Text>
+                      <Text className="text-sm font-medium text-on-brand">Salvar configuração</Text>
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     onPress={onTestConnection}
                     disabled={saving || testing || !canTestConnection}
-                    className="px-5 py-2.5 rounded-xl border border-violet-200"
+                    className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
                     style={{ opacity: saving || testing || !canTestConnection ? 0.45 : 1 }}
                   >
                     {testing ? (
-                      <ActivityIndicator size="small" color="#7C3AED" />
+                      <ActivityIndicator size="small" color="var(--ds-brand)" />
                     ) : (
                       <Text
                         className={`text-sm font-semibold ${
-                          canTestConnection ? "text-violet-700" : "text-gray-400"
+                          canTestConnection ? "text-brand" : "text-ink-subtle"
                         }`}
                       >
                         Testar conexao
@@ -832,7 +832,7 @@ export default function PaymentProvidersScreen() {
                 </View>
 
                 {!canTestConnection && (
-                  <Text className="text-xs text-gray-500 mt-2">
+                  <Text className="text-xs text-ink-muted mt-2">
                     {hasPendingCredentialFiles(activeDraft)
                       ? "Salve os novos arquivos antes de testar a conexao."
                       : "Salve as credenciais deste ambiente para habilitar o teste de conexao."}
@@ -841,27 +841,27 @@ export default function PaymentProvidersScreen() {
 
                 {!!activeDraft.connectionStatus && (
                   <View
-                    className={`mt-4 rounded-xl border px-4 py-3 ${
+                    className={`mt-4 rounded-ds-md border px-4 py-3 ${
                       activeDraft.connectionStatus.ok
-                        ? "border-emerald-200 bg-emerald-50"
-                        : "border-red-200 bg-red-50"
+                        ? "border-success bg-success-tint"
+                        : "border-danger bg-danger-tint"
                     }`}
                   >
                     <View className="flex-row items-center gap-2">
                       <Ionicons
                         name={activeDraft.connectionStatus.ok ? "checkmark-circle" : "alert-circle"}
                         size={16}
-                        color={activeDraft.connectionStatus.ok ? "#047857" : "#B91C1C"}
+                        color={activeDraft.connectionStatus.ok ? "var(--ds-success)" : "var(--ds-danger)"}
                       />
                       <Text
                         className={`text-sm font-semibold ${
-                          activeDraft.connectionStatus.ok ? "text-emerald-700" : "text-red-700"
+                          activeDraft.connectionStatus.ok ? "text-success" : "text-danger"
                         }`}
                       >
-                        {activeDraft.connectionStatus.ok ? "Conectado" : "Nao conectado"}
+                        {activeDraft.connectionStatus.ok ? "Conectado" : "Não conectado"}
                       </Text>
                     </View>
-                    <Text className={`text-xs mt-1 ${activeDraft.connectionStatus.ok ? "text-emerald-700" : "text-red-700"}`}>
+                    <Text className={`text-xs mt-1 ${activeDraft.connectionStatus.ok ? "text-success" : "text-danger"}`}>
                       provider_status: {activeDraft.connectionStatus.providerStatus} | expires_in: {activeDraft.connectionStatus.expiresIn}
                     </Text>
                   </View>
@@ -869,12 +869,12 @@ export default function PaymentProvidersScreen() {
               </>
             )}
 
-            <View className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4">
-              <Text className="text-sm font-semibold text-gray-700 mb-2">Uso na cobranca</Text>
-              <Text className="text-xs text-gray-600 mb-2">
+            <View className="mt-8 rounded-ds-md border border-border bg-surface-sunken px-4 py-4">
+              <Text className="text-sm font-semibold text-ink mb-2">Uso na cobranca</Text>
+              <Text className="text-xs text-ink-muted mb-2">
                 A tela de cobrancas usa contrato unificado para gerar charge com provider + method.
               </Text>
-              <Text className="text-xs text-gray-600">
+              <Text className="text-xs text-ink-muted">
                 Metodos sugeridos: {PAYMENT_METHOD_OPTIONS.map((item) => item.value).join(", ")}.
               </Text>
             </View>

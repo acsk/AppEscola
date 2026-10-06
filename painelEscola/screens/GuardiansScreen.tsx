@@ -26,6 +26,18 @@ import {
 } from "../hooks/useDomains";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { maskCPF, maskPhone } from "../utils/masks";
+import DataTableRow from "../components/ui/DataTableRow";
+import {
+  TABLE_CELL,
+  TABLE_CELL_MONO,
+  TABLE_CELL_MUTED,
+  TABLE_CELL_SEMIBOLD,
+  TABLE_CELL_SUBLINE,
+  TABLE_CONTAINER,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../components/ui/dataTableStyles";
 import type { GuardianDetail, GuardianListItem } from "../types/guardians";
 
 type Form = {
@@ -248,32 +260,28 @@ export default function GuardiansScreen() {
   const renderMenuButton = (item: GuardianListItem) => (
     <TouchableOpacity
       onPress={() => setMenuGuardian(item)}
-      className="p-1.5 rounded-lg bg-gray-50 border border-gray-100"
+      className="p-1.5 rounded-ds-md bg-surface-sunken border border-border"
       accessibilityLabel="Abrir opções"
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Ionicons name="ellipsis-horizontal" size={18} color="#6B7280" />
+      <Ionicons name="ellipsis-horizontal" size={18} color="var(--ds-ink-muted)" />
     </TouchableOpacity>
   );
 
   const renderRow = (item: GuardianListItem, i: number) => {
     if (isMobile) {
       return (
-        <View
+        <TouchableOpacity
           key={item.id}
-          className="bg-white border border-gray-200 rounded-xl p-3"
-          style={{
-            shadowColor: "#000",
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
+          onPress={() => setMenuGuardian(item)}
+          activeOpacity={0.86}
+          className="bg-surface border border-border rounded-ds-md p-3"
         >
           <View className="flex-row items-start justify-between gap-3">
             <View style={{ flex: 1 }}>
-              <Text className="text-sm font-semibold text-gray-800">{item.name}</Text>
+              <Text className="text-sm font-semibold text-ink">{item.name}</Text>
               {item.document ? (
-                <Text className="text-xs text-gray-400 mt-0.5">
+                <Text className="text-xs text-ink-subtle mt-0.5">
                   {maskCPF(item.document)}
                 </Text>
               ) : null}
@@ -281,53 +289,45 @@ export default function GuardiansScreen() {
             {renderMenuButton(item)}
           </View>
           <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
-            <Text className="text-xs text-gray-500">E-mail: {item.email ?? "—"}</Text>
-            <Text className="text-xs text-gray-500">
+            <Text className="text-xs text-ink-muted">E-mail: {item.email ?? "—"}</Text>
+            <Text className="text-xs text-ink-muted">
               Telefone: {item.phone ? maskPhone(item.phone) : "—"}
             </Text>
-            <Text className="text-xs text-gray-500">
+            <Text className="text-xs text-ink-muted">
               Parentesco: {relationshipLabel(item.relationship)}
             </Text>
-            <Text className="text-xs text-gray-500">
+            <Text className="text-xs text-ink-muted">
               Alunos: {item.students_count ?? 0}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
     return (
-      <View
-        key={item.id}
-        className={`flex-row items-center px-3 py-2 border-b border-gray-50 ${
-          i % 2 === 1 ? "bg-gray-50/40" : ""
-        }`}
-      >
-        <View style={{ flex: 2 }}>
-          <Text className="text-xs font-medium text-gray-800">{item.name}</Text>
+      <DataTableRow key={item.id} index={i} onPress={() => setMenuGuardian(item)}>
+        <View style={{ flex: 2, minWidth: 0, paddingRight: 8 }}>
+          <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>{item.name}</Text>
           {item.document ? (
-            <Text className="text-[11px] text-gray-400">{maskCPF(item.document)}</Text>
+            <Text className={`${TABLE_CELL_SUBLINE} font-mono`}>{maskCPF(item.document)}</Text>
           ) : null}
         </View>
-        <Text className="text-xs text-gray-600" style={{ flex: 2 }}>
+        <Text className={TABLE_CELL_MUTED} style={{ flex: 2, paddingRight: 8 }} numberOfLines={1}>
           {item.email ?? "—"}
         </Text>
-        <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
+        <Text className={item.phone ? TABLE_CELL_MONO : TABLE_CELL_MUTED} style={{ flex: 1 }}>
           {item.phone ? maskPhone(item.phone) : "—"}
         </Text>
-        <Text className="text-xs text-gray-600" style={{ flex: 1 }}>
+        <Text className={TABLE_CELL} style={{ flex: 1 }}>
           {relationshipLabel(item.relationship)}
         </Text>
-        <Text
-          className="text-xs font-medium text-violet-700 text-center"
-          style={{ width: 48 }}
-        >
+        <Text className={TABLE_CELL_MONO} style={{ width: 64, textAlign: "right" }}>
           {item.students_count ?? 0}
         </Text>
         <View style={{ width: 44 }} className="items-end">
           {renderMenuButton(item)}
         </View>
-      </View>
+      </DataTableRow>
     );
   };
 
@@ -346,29 +346,29 @@ export default function GuardiansScreen() {
         }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Responsáveis</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Responsáveis</Text>
+          <Text className="text-sm text-ink-muted">
             Pais e responsáveis pelos alunos
           </Text>
         </View>
         <TouchableOpacity
           onPress={openCreate}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">
-            Novo Responsável
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">
+            Novo responsável
           </Text>
         </TouchableOpacity>
       </View>
 
       <View className="mb-4">
         <View
-          className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
+          className="flex-row items-center bg-surface border border-border rounded-ds-md px-4"
           style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={search}
             onChangeText={(v) => {
@@ -376,12 +376,12 @@ export default function GuardiansScreen() {
               setPage(1);
             }}
             placeholder="Buscar por nome..."
-            placeholderTextColor="#9CA3AF"
-            className="flex-1 ml-2 text-sm text-gray-800"
+            placeholderTextColor="var(--ds-ink-subtle)"
+            className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -394,60 +394,31 @@ export default function GuardiansScreen() {
         contentContainerStyle={{ width: "100%" }}
       >
         <View
-          className={isMobile ? "gap-3" : "bg-white rounded-2xl overflow-hidden"}
+          className={isMobile ? "gap-3" : TABLE_CONTAINER}
           style={{
             width: "100%",
             minWidth: isMobile ? undefined : tableMinWidth,
-            shadowColor: isMobile ? undefined : "#000",
-            shadowOpacity: isMobile ? undefined : 0.05,
-            shadowRadius: isMobile ? undefined : 10,
-            elevation: isMobile ? undefined : 2,
           }}
         >
           {!isMobile && (
-            <View className="flex-row bg-gray-50 border-b border-gray-100 px-3 py-2">
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ flex: 2 }}
-              >
-                Nome
-              </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ flex: 2 }}
-              >
-                E-mail
-              </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ flex: 1 }}
-              >
-                Telefone
-              </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                style={{ flex: 1 }}
-              >
-                Parentesco
-              </Text>
-              <Text
-                className="text-xs font-semibold text-gray-500 uppercase tracking-wide text-center"
-                style={{ width: 48 }}
-              >
-                Alunos
-              </Text>
+            <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>Nome</Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>E-mail</Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Telefone</Text>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Parentesco</Text>
+              <Text className={TABLE_HEADER_CELL} style={{ width: 64, textAlign: "right" }}>Alunos</Text>
               <View style={{ width: 44 }} />
             </View>
           )}
 
           {loading ? (
             <View className="items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#7C3AED" />
+              <ActivityIndicator size="large" color="var(--ds-brand)" />
             </View>
           ) : rows.length === 0 ? (
             <View className="items-center justify-center py-16">
-              <Ionicons name="person-outline" size={40} color="#E5E7EB" />
-              <Text className="text-gray-400 mt-3 text-sm">
+              <Ionicons name="person-outline" size={40} color="var(--ds-border)" />
+              <Text className="text-ink-subtle mt-3 text-sm">
                 Nenhum responsável encontrado
               </Text>
             </View>
@@ -456,7 +427,7 @@ export default function GuardiansScreen() {
           )}
 
           {meta.total > 0 && (
-            <View className="px-4 border-t border-gray-100">
+            <View className="px-4 border-t border-border">
               <Pagination
                 currentPage={meta.current_page}
                 lastPage={meta.last_page}
@@ -488,25 +459,25 @@ export default function GuardiansScreen() {
 
       <Modal
         visible={modalVisible}
-        title={editId ? "Editar Responsável" : "Novo Responsável"}
+        title={editId ? "Editar responsável" : "Novo responsável"}
         onClose={() => setModalVisible(false)}
         footer={
           <>
             <TouchableOpacity
               onPress={() => setModalVisible(false)}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             >
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={save}
               disabled={saving}
-              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
             >
               {saving ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
-                <Text className="text-sm font-bold text-white">Salvar</Text>
+                <Text className="text-sm font-medium text-on-brand">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -570,7 +541,7 @@ export default function GuardiansScreen() {
 
       <ConfirmModal
         visible={!!deleteId}
-        title="Excluir Responsável"
+        title="Excluir responsável"
         message="Esta ação não pode ser desfeita."
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}

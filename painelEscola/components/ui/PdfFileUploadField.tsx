@@ -3,16 +3,17 @@ import { View, Text, TouchableOpacity, Platform, StyleSheet } from "react-native
 import { Ionicons } from "@expo/vector-icons";
 
 const THEME = {
-  primary: "#1C3D63",
-  primaryDark: "#132C4A",
-  soft: "#E9EFF6",
-  border: "#D9DDE3",
-  ink: "#111722",
-  muted: "#4B5463",
-  surface: "#FFFFFF",
-  error: "#B0261B",
-  errorBg: "#FBE9E7",
-  errorBorder: "#B0261B",
+  primary: "var(--ds-brand)",
+  primaryDark: "var(--ds-brand-hover)",
+  soft: "var(--ds-brand-tint)",
+  border: "var(--ds-border)",
+  ink: "var(--ds-ink)",
+  muted: "var(--ds-ink-muted)",
+  surface: "var(--ds-on-brand)",
+  error: "var(--ds-danger)",
+  errorBg: "var(--ds-danger-tint)",
+  errorBorder: "var(--ds-danger)",
+  onDanger: "var(--ds-on-danger)",
 } as const;
 
 type Props = {
@@ -127,10 +128,12 @@ export default function PdfFileUploadField({
                 <TouchableOpacity
                   onPress={clearSelection}
                   disabled={disabled}
-                  style={styles.btnGhost}
+                  style={[styles.btnDanger, disabled && { opacity: 0.5 }]}
                   activeOpacity={0.85}
+                  aria-label="Remover arquivo"
                 >
-                  <Text style={styles.btnGhostText}>Remover</Text>
+                  <Ionicons name="trash-outline" size={13} color={THEME.onDanger} />
+                  <Text style={styles.btnDangerText}>Remover</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -318,14 +321,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: THEME.primary,
   },
-  btnGhost: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  btnDanger: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    backgroundColor: THEME.error,
   },
-  btnGhostText: {
+  btnDangerText: {
     fontSize: 12,
     fontWeight: "600",
-    color: THEME.muted,
+    color: THEME.onDanger,
   },
   errorText: {
     fontSize: 12,

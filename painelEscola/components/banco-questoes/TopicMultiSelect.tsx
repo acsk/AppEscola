@@ -32,25 +32,25 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
         Assuntos {value.length > 0 ? `(${value.length})` : ""}
       </Text>
       {disabled ? (
-        <View className="rounded-ds-md border border-dashed border-border px-3 py-3">
+        <View className="rounded-ds-md border border-dashed border-border-strong px-3 py-2 min-h-control-md justify-center">
           <Text className="text-xs text-ink-subtle">{disabledHint ?? "Escolha a disciplina primeiro."}</Text>
         </View>
       ) : (
         <View className="rounded-ds-md border border-border bg-surface" aria-labelledby="topics-label">
           <View className="flex-row items-center px-3 border-b border-border" style={{ height: 38 }}>
-            <Ionicons name="search-outline" size={14} color="#5F6878" />
+            <Ionicons name="search-outline" size={14} color="var(--ds-ink-subtle)" />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Filtrar assuntos..."
-              placeholderTextColor="#5F6878"
+              placeholderTextColor="var(--ds-ink-subtle)"
               aria-label="Filtrar assuntos"
               className="flex-1 ml-2 text-xs text-ink"
             />
           </View>
           {loading ? (
             <View className="py-4 items-center">
-              <ActivityIndicator color="#1C3D63" />
+              <ActivityIndicator color="var(--ds-brand)" />
             </View>
           ) : (
             <ScrollView style={{ maxHeight: 180 }}>
@@ -73,7 +73,7 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
                       <Ionicons
                         name={checked ? "checkbox" : "square-outline"}
                         size={16}
-                        color={checked ? "#1C3D63" : "#5F6878"}
+                        color={checked ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                       />
                       <Text className="text-xs text-ink ml-2 flex-1">{topic.name}</Text>
                     </TouchableOpacity>

@@ -25,7 +25,7 @@ function StudentFlags({ student }: { student: GuardianStudentLink }) {
   if (student.pivot?.can_access_portal) flags.push("Portal");
   if (flags.length === 0) return null;
   return (
-    <Text className="text-[10px] text-gray-500 mt-0.5">{flags.join(" · ")}</Text>
+    <Text className="text-[10px] text-ink-muted mt-0.5">{flags.join(" · ")}</Text>
   );
 }
 
@@ -45,7 +45,7 @@ export default function GuardianStudentsModal({
       size="md"
       headerContent={
         guardian ? (
-          <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+          <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
             {guardian.name}
           </Text>
         ) : null
@@ -53,12 +53,12 @@ export default function GuardianStudentsModal({
     >
       {loading ? (
         <View className="items-center justify-center py-16">
-          <ActivityIndicator size="large" color="#7C3AED" />
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
         </View>
       ) : students.length === 0 ? (
         <View className="items-center py-12 px-4">
-          <Ionicons name="school-outline" size={40} color="#E5E7EB" />
-          <Text className="text-gray-400 text-sm mt-3 text-center">
+          <Ionicons name="school-outline" size={40} color="var(--ds-border)" />
+          <Text className="text-ink-subtle text-sm mt-3 text-center">
             Nenhum aluno vinculado a este responsável
           </Text>
         </View>
@@ -68,11 +68,11 @@ export default function GuardianStudentsModal({
             <View
               key={student.id}
               className={`px-1 py-3 ${
-                index < students.length - 1 ? "border-b border-gray-100" : ""
+                index < students.length - 1 ? "border-b border-border" : ""
               }`}
             >
               <View className="flex-row items-center justify-between gap-2">
-                <Text className="text-sm font-semibold text-gray-800 flex-1">
+                <Text className="text-sm font-semibold text-ink flex-1">
                   {student.name}
                 </Text>
                 {student.status ? (
@@ -85,7 +85,7 @@ export default function GuardianStudentsModal({
                 ) : null}
               </View>
               {student.enrollment_number ? (
-                <Text className="text-xs text-gray-500 mt-0.5">
+                <Text className="text-xs text-ink-muted mt-0.5">
                   Matrícula: {student.enrollment_number}
                 </Text>
               ) : null}

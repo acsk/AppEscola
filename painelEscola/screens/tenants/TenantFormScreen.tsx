@@ -144,7 +144,7 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
     load();
   }, [isEdit, tenantId]);
 
-  const title = useMemo(() => (isEdit ? "Editar Tenant" : "Novo Tenant"), [isEdit]);
+  const title = useMemo(() => (isEdit ? "Editar tenant" : "Novo tenant"), [isEdit]);
 
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
@@ -325,16 +325,16 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
           className="flex-row items-center gap-1.5"
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-          <Text className="text-sm font-medium text-violet-600">Tenants</Text>
+          <Ionicons name="chevron-back" size={18} color="var(--ds-brand)" />
+          <Text className="text-sm font-medium text-brand">Tenants</Text>
         </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        <Text className="text-sm text-gray-500">{title}</Text>
+        <Ionicons name="chevron-forward" size={14} color="var(--ds-border-strong)" />
+        <Text className="text-sm text-ink-muted">{title}</Text>
       </View>
 
       <View className="mb-6">
-        <Text className="text-2xl font-bold text-gray-800">{title}</Text>
-        <Text className="text-sm text-gray-500">
+        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">{title}</Text>
+        <Text className="text-sm text-ink-muted">
           {isEdit
             ? "Atualize os dados institucionais do tenant"
             : "Cadastre o tenant e o usuário administrador inicial"}
@@ -342,30 +342,30 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
       </View>
 
       {forbidden && (
-        <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex-row items-center gap-2">
-          <Ionicons name="shield-outline" size={16} color="#B45309" />
-          <Text className="text-sm text-amber-700">Acesso permitido apenas para super admin.</Text>
+        <View className="mb-4 rounded-ds-md border border-warning bg-warning-tint px-4 py-3 flex-row items-center gap-2">
+          <Ionicons name="shield-outline" size={16} color="var(--ds-warning)" />
+          <Text className="text-sm text-warning">Acesso permitido apenas para super admin.</Text>
         </View>
       )}
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#7C3AED" />
-          <Text className="text-gray-500 text-sm mt-3">Carregando tenant...</Text>
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
+          <Text className="text-ink-muted text-sm mt-3">Carregando tenant...</Text>
         </View>
       ) : (
         <>
-          <View className="bg-white rounded-2xl border border-gray-100 p-5 mb-4" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}>
+          <View className="bg-surface rounded-ds-md border border-border p-5 mb-4" style={{ }}>
             <View className="flex-row items-center gap-2 mb-3">
-              <Ionicons name="business-outline" size={16} color="#7C3AED" />
-              <Text className="text-sm font-bold text-gray-800">Dados do tenant</Text>
+              <Ionicons name="business-outline" size={16} color="var(--ds-brand)" />
+              <Text className="text-sm font-semibold text-ink">Dados do tenant</Text>
             </View>
 
             <View className="flex-row items-start gap-5 mb-4">
               <View className="items-center gap-2">
                 <View
-                  className="rounded-2xl overflow-hidden border-2 border-violet-100"
-                  style={{ width: 112, height: 112, backgroundColor: "#F5F3FF" }}
+                  className="rounded-ds-md overflow-hidden border-2 border-border"
+                  style={{ width: 112, height: 112, backgroundColor: "var(--ds-brand-tint)" }}
                 >
                   {pendingLogoPreview || tenantPhotoUrl ? (
                     <Image
@@ -375,7 +375,7 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                     />
                   ) : (
                     <View className="flex-1 items-center justify-center">
-                      <Ionicons name="school-outline" size={42} color="#C4B5FD" />
+                      <Ionicons name="school-outline" size={42} color="var(--ds-border)" />
                     </View>
                   )}
                   {uploadingLogo && (
@@ -388,7 +388,7 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                         justifyContent: "center",
                       }}
                     >
-                      <ActivityIndicator color="white" size="small" />
+                      <ActivityIndicator color="var(--ds-on-brand)" size="small" />
                     </View>
                   )}
                 </View>
@@ -400,16 +400,16 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 4,
-                      border: "1px solid #DDD6FE",
-                      borderRadius: 8,
+                      border: "1px solid #D9DDE3",
+                      borderRadius: 4,
                       padding: "4px 10px",
                       fontSize: 12,
                       fontWeight: 600,
-                      color: "#7C3AED",
+                      color: "var(--ds-brand)",
                       opacity: uploadingLogo ? 0.5 : 1,
                     }}
                   >
-                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
+                    <Ionicons name="camera-outline" size={13} color="var(--ds-brand)" />
                     <span style={{ marginLeft: 2 }}>
                       {tenantPhotoUrl || pendingLogoPreview ? "Alterar logo" : "Adicionar logo"}
                     </span>
@@ -425,28 +425,28 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                 ) : (
                   <TouchableOpacity
                     disabled
-                    className="flex-row items-center gap-1 border border-violet-200 rounded-lg px-2.5 py-1"
+                    className="flex-row items-center gap-1 border border-border rounded-ds-md px-2.5 py-1"
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
-                    <Text className="text-xs font-semibold text-violet-700">Adicionar logo</Text>
+                    <Ionicons name="camera-outline" size={13} color="var(--ds-brand)" />
+                    <Text className="text-xs font-semibold text-brand">Adicionar logo</Text>
                   </TouchableOpacity>
                 )}
 
                 {pendingLogoPreview && !isEdit && (
-                  <Text className="text-xs text-amber-600 text-center" style={{ maxWidth: 112 }}>
+                  <Text className="text-xs text-warning text-center" style={{ maxWidth: 112 }}>
                     A logo será enviada ao criar
                   </Text>
                 )}
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text className="text-xs text-gray-400 leading-relaxed">
+                <Text className="text-xs text-ink-subtle leading-relaxed">
                   Logo da escola (opcional).{"\n"}
                   Formatos: JPG, PNG, WEBP. Tamanho máximo: 5 MB.
                 </Text>
                 {errors.photo ? (
-                  <Text className="text-xs text-red-500 mt-2">{errors.photo}</Text>
+                  <Text className="text-xs text-danger mt-2">{errors.photo}</Text>
                 ) : null}
               </View>
             </View>
@@ -567,8 +567,8 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                   <Text
                     className={`text-xs mt-1 ${
                       cepLookupMessage.includes("localizado")
-                        ? "text-emerald-600"
-                        : "text-amber-600"
+                        ? "text-success"
+                        : "text-warning"
                     }`}
                   >
                     {isLookingUpCEP ? "Buscando CEP..." : cepLookupMessage}
@@ -633,15 +633,15 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
             />
           </View>
 
-          <View className="bg-white rounded-2xl border border-gray-100 p-5 mb-6" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}>
+          <View className="bg-surface rounded-ds-md border border-border p-5 mb-6" style={{ }}>
             <View className="flex-row items-center gap-2 mb-3">
-              <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
-              <Text className="text-sm font-bold text-gray-800">Usuário administrador inicial</Text>
+              <Ionicons name="person-circle-outline" size={16} color="var(--ds-brand)" />
+              <Text className="text-sm font-semibold text-ink">Usuário administrador inicial</Text>
             </View>
 
             {isEdit ? (
-              <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <Text className="text-sm text-gray-600">
+              <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-3">
+                <Text className="text-sm text-ink-muted">
                   Campos de admin não são atualizados por esta rota. Para criar admin inicial, use a criação de tenant.
                 </Text>
               </View>
@@ -694,24 +694,24 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
           <View className="flex-row justify-end gap-3">
             <TouchableOpacity
               onPress={() => navigate("tenants")}
-              className="px-5 py-3 rounded-xl border border-gray-200"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
               activeOpacity={0.7}
               disabled={saving}
             >
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={save}
-              className="px-5 py-3 rounded-xl bg-violet-600"
+              className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
               activeOpacity={0.85}
               disabled={saving}
               style={{ opacity: saving ? 0.75 : 1 }}
             >
               {saving ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
-                <Text className="text-sm font-semibold text-white">
+                <Text className="text-sm font-medium text-on-brand">
                   {isEdit ? "Salvar alterações" : "Criar tenant"}
                 </Text>
               )}

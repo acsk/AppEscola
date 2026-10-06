@@ -22,6 +22,11 @@ import {
   formFromQuestion,
 } from "../../utils/questionClassification";
 import type { QuestionBankQuestion } from "../../types/questionBank";
+import { Pencil, Sparkles } from "lucide-react-native";
+import Button from "../../components/ui/Button";
+import RichText from "../../components/ui/RichText";
+import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
+import { fetchAiStatus } from "../../services/questionAi";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -48,6 +53,15 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
     type: "success",
     message: "",
   });
+
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
+
+  useEffect(() => {
+    fetchAiStatus()
+      .then((status) => setAiAvailable(status.available))
+      .catch(() => setAiAvailable(false));
+  }, []);
 
   const patch = useMemo(() => diffClassification(initial, form), [initial, form]);
   const dirty = Object.keys(patch).length > 0;
@@ -139,9 +153,7 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
         <QuestionStatusBadge isAnnulled={question.is_annulled} isOutdated={question.is_outdated} />
       </View>
       {!!question.question_text?.trim() && (
-        <Text className="text-sm text-ink leading-6" selectable>
-          {question.question_text}
-        </Text>
+        <RichText className="text-sm text-ink leading-6" selectable value={question.question_text} />
       )}
       {!!question.image_url && (
         <Image
@@ -164,12 +176,10 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
               <Text className={`text-sm font-semibold ${option.is_correct ? "text-success" : "text-ink-muted"}`}>
                 {OPTION_LETTERS[i] ?? i + 1})
               </Text>
-              <Text className="text-sm text-ink flex-1" selectable>
-                {option.option_text}
-              </Text>
+              <RichText className="text-sm text-ink flex-1" selectable value={option.option_text} />
               {option.is_correct && (
                 <View className="flex-row items-center gap-1">
-                  <Ionicons name="checkmark-circle" size={16} color="#1C6A45" />
+                  <Ionicons name="checkmark-circle" size={16} color="var(--ds-success)" />
                   <Text className="text-xs font-semibold text-success">Gabarito</Text>
                 </View>
               )}
@@ -180,14 +190,35 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
       {!!question.explanation?.trim() && (
         <View className="rounded-ds-md bg-surface-sunken border border-border p-3">
           <Text className="text-xs font-semibold text-ink-muted mb-1">Explicação</Text>
-          <Text className="text-xs text-ink" selectable>
-            {question.explanation}
-          </Text>
+          <RichText className="text-xs text-ink" selectable value={question.explanation} />
         </View>
       )}
-      <Text className="text-xs text-ink-subtle">
-        O conteúdo da questão é somente leitura aqui{question.exam ? "; edite pelo simulado." : "."}
-      </Text>
+      {question.exam && <Text className="text-xs text-ink-subtle">O conteúdo desta questão é editado pelo simulado.</Text>}
+      <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+        {!question.exam && (
+          <Button
+            size="sm"
+            icon={Pencil}
+            label="Editar conteúdo"
+            onPress={() => leave(() => navigate("questoes-editar", { questionId, query: listQuery }))}
+          />
+        )}
+        {aiAvailable && (
+          <Button
+            size="sm"
+            icon={Sparkles}
+            label="Criar semelhantes com IA"
+            onPress={() =>
+              setSimilarSource({
+                id: question.id,
+                type: question.type,
+                optionsCount: question.options?.length ?? 0,
+                difficultyId: question.difficulty_id,
+              })
+            }
+          />
+        )}
+      </View>
     </View>
   );
 
@@ -203,17 +234,17 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
 
         {loading ? (
           <View className="py-20 items-center">
-            <ActivityIndicator color="#1C3D63" />
+            <ActivityIndicator color="var(--ds-brand)" />
           </View>
         ) : loadError || !question ? (
           <View className="py-16 items-center gap-3">
-            <Ionicons name="alert-circle-outline" size={32} color="#B0261B" />
+            <Ionicons name="alert-circle-outline" size={32} color="var(--ds-danger)" />
             <Text className="text-sm text-ink-muted text-center">{loadError ?? "Questão não encontrada."}</Text>
             <View className="flex-row gap-2">
-              <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-ds-md bg-brand">
-                <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
+              <TouchableOpacity onPress={() => void load()} className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center">
+                <Text className="text-sm font-medium text-on-brand">Tentar novamente</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={goToList} className="px-4 py-2 rounded-ds-md border border-border">
+              <TouchableOpacity onPress={goToList} className="px-4 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center">
                 <Text className="text-sm font-semibold text-ink-muted">Voltar à lista</Text>
               </TouchableOpacity>
             </View>
@@ -240,20 +271,20 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
                     disabled={!dirty || saving !== null}
                     className={`flex-row items-center gap-2 px-4 py-2.5 rounded-ds-md ${!dirty || saving ? "bg-brand-tint" : "bg-brand"}`}
                   >
-                    {saving === "save" && <ActivityIndicator size="small" color="#FFFFFF" />}
-                    <Text className="text-sm font-semibold text-white">Salvar</Text>
+                    {saving === "save" && <ActivityIndicator size="small" color="var(--ds-on-brand)" />}
+                    <Text className="text-sm font-medium text-on-brand">Salvar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={onSaveAndNext}
                     disabled={saving !== null}
-                    className="flex-row items-center gap-2 px-4 py-2.5 rounded-ds-md border border-border bg-brand-tint"
+                    className="flex-row items-center gap-2 px-4 py-2 rounded-ds-md border border-border-strong bg-surface min-h-control-md"
                   >
-                    {saving === "next" && <ActivityIndicator size="small" color="#1C3D63" />}
-                    <Text className="text-sm font-semibold text-brand">{dirty ? "Salvar e próxima" : "Próxima"}</Text>
-                    <Ionicons name="arrow-forward" size={14} color="#1C3D63" />
+                    {saving === "next" && <ActivityIndicator size="small" color="var(--ds-ink)" />}
+                    <Text className="text-sm font-semibold text-ink">{dirty ? "Salvar e próxima" : "Próxima"}</Text>
+                    <Ionicons name="arrow-forward" size={14} color="var(--ds-ink)" />
                   </TouchableOpacity>
                   {dirty && (
-                    <TouchableOpacity onPress={() => setForm(initial)} disabled={saving !== null} className="px-4 py-2.5 rounded-ds-md border border-border">
+                    <TouchableOpacity onPress={() => setForm(initial)} disabled={saving !== null} className="px-4 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center">
                       <Text className="text-sm font-semibold text-ink-muted">Descartar</Text>
                     </TouchableOpacity>
                   )}
@@ -263,6 +294,17 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
           </View>
         )}
       </ScrollView>
+
+      <SimilarQuestionsModal
+        visible={similarSource !== null}
+        source={similarSource}
+        catalogs={catalogs}
+        onClose={() => setSimilarSource(null)}
+        onCreated={(count) =>
+          setToast({ visible: true, type: "success", message: `${count} questão(ões) semelhante(s) incluída(s) no banco.` })
+        }
+        setToast={setToast}
+      />
 
       <ConfirmModal
         visible={pendingLeave !== null}

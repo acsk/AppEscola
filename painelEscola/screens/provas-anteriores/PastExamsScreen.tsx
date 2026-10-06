@@ -366,8 +366,8 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
     borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#111722",
-    backgroundColor: "white",
+    color: "var(--ds-ink)",
+    backgroundColor: "var(--ds-surface)",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
   } as const;
@@ -433,7 +433,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                   className="p-2 rounded-ds-md bg-brand-tint"
                   accessibilityLabel="Abrir PDF"
                 >
-                  <Ionicons name="open-outline" size={15} color="#1C3D63" />
+                  <Ionicons name="open-outline" size={15} color="var(--ds-brand)" />
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity
@@ -441,14 +441,14 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 className="p-2 rounded-ds-md bg-brand-tint"
                 accessibilityLabel="Editar prova"
               >
-                <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
+                <Ionicons name="pencil-outline" size={15} color="var(--ds-brand)" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setDeleteId(row.id)}
-                className="p-2 rounded-ds-md bg-danger-tint"
+                className="p-2 rounded-ds-md bg-danger"
                 accessibilityLabel="Remover prova"
               >
-                <Ionicons name="trash-outline" size={15} color="#B0261B" />
+                <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
               </TouchableOpacity>
             </View>
           </View>
@@ -494,7 +494,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
               className="p-2 rounded-ds-md bg-brand-tint"
               accessibilityLabel="Abrir PDF"
             >
-              <Ionicons name="open-outline" size={15} color="#1C3D63" />
+              <Ionicons name="open-outline" size={15} color="var(--ds-brand)" />
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
@@ -502,14 +502,14 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             className="p-2 rounded-ds-md bg-brand-tint"
             accessibilityLabel="Editar prova"
           >
-            <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
+            <Ionicons name="pencil-outline" size={15} color="var(--ds-brand)" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setDeleteId(row.id)}
-            className="p-2 rounded-ds-md bg-danger-tint"
+            className="p-2 rounded-ds-md bg-danger"
             accessibilityLabel="Remover prova"
           >
-            <Ionicons name="trash-outline" size={15} color="#B0261B" />
+            <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
           </TouchableOpacity>
         </View>
       </DataTableRow>
@@ -673,11 +673,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         </View>
         <TouchableOpacity
           onPress={openCreate}
-          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Novo material</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Novo material</Text>
         </TouchableOpacity>
       </View>
 
@@ -686,7 +686,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           <Text className="text-sm font-semibold text-ink">Filtros</Text>
           {hasActiveFilters ? (
             <TouchableOpacity onPress={clearFilters} className="flex-row items-center gap-1">
-              <Ionicons name="close-circle-outline" size={16} color="#1C3D63" />
+              <Ionicons name="close-circle-outline" size={16} color="var(--ds-brand)" />
               <Text className="text-xs font-semibold text-brand">Limpar filtros</Text>
             </TouchableOpacity>
           ) : null}
@@ -703,7 +703,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             className="flex-row items-center bg-surface border border-border rounded-ds-md px-4"
             style={{ height: 44, minWidth: isMobile ? "100%" : 260, flex: isMobile ? undefined : 2 }}
           >
-            <Ionicons name="search-outline" size={16} color="#5F6878" />
+            <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
             <TextInput
               value={search}
               onChangeText={(v) => {
@@ -711,12 +711,12 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 setPage(1);
               }}
               placeholder="Buscar por título ou descrição..."
-              placeholderTextColor="#5F6878"
+              placeholderTextColor="var(--ds-ink-subtle)"
               className="flex-1 ml-2 text-sm text-ink"
             />
             {!!search && (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#5F6878" />
+                <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
               </TouchableOpacity>
             )}
           </View>
@@ -855,11 +855,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
 
           {loading ? (
             <View className="py-16 items-center">
-              <ActivityIndicator color="#1C3D63" />
+              <ActivityIndicator color="var(--ds-brand)" />
             </View>
           ) : rows.length === 0 ? (
             <View className="py-16 items-center gap-2 px-4">
-              <Ionicons name="document-text-outline" size={32} color="#7A8393" />
+              <Ionicons name="document-text-outline" size={32} color="var(--ds-border-strong)" />
               <Text className="text-sm text-ink-subtle text-center">
                 {hasActiveFilters
                   ? "Nenhuma prova encontrada com os filtros selecionados."
@@ -899,7 +899,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             <TouchableOpacity
               onPress={closeModal}
               disabled={saving}
-              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface items-center"
+              className="px-4 rounded-ds-md border border-border-strong bg-surface items-center py-2 min-h-control-md justify-center"
               style={{ flex: 1 }}
             >
               <Text className="text-sm font-semibold text-ink">Cancelar</Text>
@@ -907,14 +907,14 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             <TouchableOpacity
               onPress={save}
               disabled={saving}
-              className="bg-brand px-5 py-2.5 rounded-ds-md items-center"
+              className="bg-brand px-5 rounded-ds-md items-center py-2 min-h-control-md justify-center"
               style={{ flex: 1, zIndex: 2 }}
               accessibilityRole="button"
             >
               {saving ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
-                <Text className="text-white text-sm font-semibold">Salvar</Text>
+                <Text className="text-on-brand text-sm font-medium">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -923,7 +923,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         <View style={{ gap: 12 }}>
           {hasFormErrors ? (
             <View className="rounded-ds-md border border-danger bg-danger-tint px-3 py-2 flex-row items-start gap-2">
-              <Ionicons name="alert-circle-outline" size={16} color="#B0261B" />
+              <Ionicons name="alert-circle-outline" size={16} color="var(--ds-danger)" />
               <Text className="flex-1 text-xs text-danger">
                 {Object.values(errors).join(" ")}
               </Text>
@@ -1145,7 +1145,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                           accessibilityLabel={`Remover ${course?.name ?? "curso"}`}
                         >
-                          <Ionicons name="close-circle" size={16} color="#1C3D63" />
+                          <Ionicons name="close-circle" size={16} color="var(--ds-brand)" />
                         </TouchableOpacity>
                       </View>
                     );

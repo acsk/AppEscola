@@ -72,12 +72,16 @@ export default function Modal({
   const bodyPaddingY = compact ? 10 : 16;
 
   const closeRef = useRef<View>(null);
+  // onClose costuma ser uma função inline (nova a cada render): via ref, o efeito abaixo
+  // não roda de novo ao digitar — senão o foco voltava para o "X" a cada tecla.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // Web: Esc fecha; o foco vai para o botão de fechar ao abrir.
+  // Web: Esc fecha; o foco vai para o botão de fechar só ao abrir.
   useEffect(() => {
     if (!isWeb || !visible || typeof document === "undefined") return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKeyDown);
     const focusTimer = setTimeout(() => (closeRef.current as unknown as HTMLElement | null)?.focus?.(), 0);
@@ -85,7 +89,7 @@ export default function Modal({
       document.removeEventListener("keydown", onKeyDown);
       clearTimeout(focusTimer);
     };
-  }, [isWeb, visible, onClose]);
+  }, [isWeb, visible]);
 
   // Evita scroll do body/layout enquanto o modal cobre a tela no web.
   useEffect(() => {

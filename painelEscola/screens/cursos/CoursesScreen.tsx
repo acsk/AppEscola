@@ -98,21 +98,21 @@ export default function CoursesScreen({ navigate }: Props) {
         <View style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
           <TouchableOpacity
             onPress={() => navigate("pacotes")}
-            className="flex-row items-center bg-surface border border-border px-4 py-2.5 rounded-ds-md"
+            className="flex-row items-center bg-surface border border-border-strong px-4 rounded-ds-md py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="albums-outline" size={16} color="#1C3D63" />
+            <Ionicons name="albums-outline" size={16} color="var(--ds-brand)" />
             <Text className="text-brand font-semibold text-sm ml-1.5">
               Pacotes
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigate("cursos-form")}
-            className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
+            className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="add" size={18} color="white" />
-            <Text className="text-white font-semibold text-sm ml-1.5">
+            <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+            <Text className="text-on-brand font-medium text-sm ml-1.5">
               Novo curso
             </Text>
           </TouchableOpacity>
@@ -125,7 +125,7 @@ export default function CoursesScreen({ navigate }: Props) {
           className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4"
           style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
-          <Ionicons name="search-outline" size={16} color="#5F6878" />
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={search}
             onChangeText={(v) => {
@@ -133,12 +133,12 @@ export default function CoursesScreen({ navigate }: Props) {
               setPage(1);
             }}
             placeholder="Buscar curso..."
-            placeholderTextColor="#5F6878"
+            placeholderTextColor="var(--ds-ink-subtle)"
             className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#5F6878" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -153,8 +153,8 @@ export default function CoursesScreen({ navigate }: Props) {
             borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#111722",
-            backgroundColor: "white",
+            color: "var(--ds-ink)",
+            backgroundColor: "var(--ds-surface)",
             height: 44,
             minWidth: isMobile ? "100%" : 160,
           }}
@@ -194,11 +194,11 @@ export default function CoursesScreen({ navigate }: Props) {
 
         {loading ? (
           <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color="#1C3D63" />
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
           </View>
         ) : rows.length === 0 ? (
           <View className="items-center justify-center py-16">
-            <Ionicons name="book-outline" size={40} color="#D9DDE3" />
+            <Ionicons name="book-outline" size={40} color="var(--ds-border)" />
             <Text className="text-ink-subtle mt-3 text-sm">
               Nenhum curso encontrado
             </Text>
@@ -228,13 +228,13 @@ export default function CoursesScreen({ navigate }: Props) {
                   }
                   className="p-1.5 bg-brand-tint rounded-ds-md"
                 >
-                  <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
+                  <Ionicons name="pencil-outline" size={15} color="var(--ds-brand)" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setDeleteId(item.id)}
-                  className="p-1.5 bg-danger-tint rounded-ds-md"
+                  className="p-1.5 bg-danger rounded-ds-md"
                 >
-                  <Ionicons name="trash-outline" size={15} color="#B0261B" />
+                  <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
                 </TouchableOpacity>
               </View>
             </DataTableRow>

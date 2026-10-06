@@ -62,38 +62,38 @@ function QuestionBlock({
   );
 
   const borderTone = isCorrect
-    ? "border-emerald-200 bg-emerald-50/40"
+    ? "border-success bg-success-tint/40"
     : isWrong
-      ? "border-red-200 bg-red-50/40"
+      ? "border-danger bg-danger-tint/40"
       : pending
-        ? "border-amber-200 bg-amber-50/40"
-        : "border-gray-200 bg-white";
+        ? "border-warning bg-warning-tint/40"
+        : "border-border bg-surface";
 
   return (
-    <View className={`rounded-xl border px-3 py-3 ${borderTone}`}>
+    <View className={`rounded-ds-md border px-3 py-3 ${borderTone}`}>
       <View className="flex-row items-start gap-2 mb-2">
-        <Text className="text-sm font-bold text-gray-900">{index + 1}.</Text>
-        <Text className="flex-1 text-sm text-gray-800">{question.question_text || "—"}</Text>
+        <Text className="text-sm font-semibold text-ink">{index + 1}.</Text>
+        <Text className="flex-1 text-sm text-ink">{question.question_text || "—"}</Text>
         <View
           className={`px-2 py-0.5 rounded-full ${
             isCorrect
-              ? "bg-emerald-100"
+              ? "bg-success-tint"
               : isWrong
-                ? "bg-red-100"
+                ? "bg-danger-tint"
                 : pending
-                  ? "bg-amber-100"
-                  : "bg-gray-100"
+                  ? "bg-warning-tint"
+                  : "bg-surface-sunken"
           }`}
         >
           <Text
-            className={`text-[11px] font-bold ${
+            className={`text-[11px] font-semibold ${
               isCorrect
-                ? "text-emerald-700"
+                ? "text-success"
                 : isWrong
-                  ? "text-red-700"
+                  ? "text-danger"
                   : pending
-                    ? "text-amber-700"
-                    : "text-gray-600"
+                    ? "text-warning"
+                    : "text-ink-muted"
             }`}
           >
             {isCorrect
@@ -114,55 +114,55 @@ function QuestionBlock({
             const correct = op.is_correct === true;
             const wrongSelected = selected && op.is_correct === false;
             const tone = correct
-              ? "border-emerald-300 bg-emerald-50"
+              ? "border-success bg-success-tint"
               : wrongSelected
-                ? "border-red-300 bg-red-50"
+                ? "border-danger bg-danger-tint"
                 : selected
-                  ? "border-blue-300 bg-blue-50"
-                  : "border-gray-200 bg-white";
+                  ? "border-border bg-brand-tint"
+                  : "border-border bg-surface";
 
             return (
               <View
                 key={op.id}
-                className={`flex-row items-start gap-2 rounded-lg border px-2.5 py-2 ${tone}`}
+                className={`flex-row items-start gap-2 rounded-ds-md border px-2.5 py-2 ${tone}`}
               >
                 <View
                   className={`w-5 h-5 rounded-full items-center justify-center mt-0.5 ${
                     correct
                       ? "bg-emerald-600"
                       : wrongSelected
-                        ? "bg-red-600"
+                        ? "bg-danger"
                         : selected
-                          ? "bg-blue-600"
-                          : "bg-gray-200"
+                          ? "bg-brand"
+                          : "bg-border"
                   }`}
                 >
                   {correct || wrongSelected ? (
                     <Ionicons
                       name={correct ? "checkmark" : "close"}
                       size={12}
-                      color="#fff"
+                      color="var(--ds-on-brand)"
                     />
                   ) : selected ? (
-                    <View className="w-2 h-2 rounded-full bg-white" />
+                    <View className="w-2 h-2 rounded-full bg-surface" />
                   ) : null}
                 </View>
                 <View className="flex-1">
                   <Text
                     className={`text-sm ${
                       correct
-                        ? "text-emerald-800 font-semibold"
+                        ? "text-success font-semibold"
                         : wrongSelected
-                          ? "text-red-800 font-semibold"
+                          ? "text-danger font-semibold"
                           : selected
-                            ? "text-blue-800 font-semibold"
-                            : "text-gray-700"
+                            ? "text-brand font-semibold"
+                            : "text-ink"
                     }`}
                   >
                     {optionLetter(opIdx)}) {op.option_text}
                   </Text>
                   {correct || selected ? (
-                    <Text className="text-[11px] text-gray-500 mt-0.5">
+                    <Text className="text-[11px] text-ink-muted mt-0.5">
                       {[
                         selected ? "Marcada pelo aluno" : null,
                         correct ? "Resposta correta" : null,
@@ -179,20 +179,20 @@ function QuestionBlock({
       ) : null}
 
       {question.student_answer?.text_answer ? (
-        <View className="mt-2 rounded-lg border border-gray-200 bg-white px-2.5 py-2">
-          <Text className="text-[11px] font-bold text-gray-500 uppercase">Texto enviado</Text>
-          <Text className="text-sm text-gray-800 mt-0.5">
+        <View className="mt-2 rounded-ds-md border border-border bg-surface px-2.5 py-2">
+          <Text className="text-[11px] font-semibold text-ink-muted uppercase">Texto enviado</Text>
+          <Text className="text-sm text-ink mt-0.5">
             {question.student_answer.text_answer}
           </Text>
         </View>
       ) : null}
 
       {!question.student_answer?.option_id && !question.student_answer?.text_answer ? (
-        <Text className="text-xs text-gray-500 mt-2">Sem resposta do aluno.</Text>
+        <Text className="text-xs text-ink-muted mt-2">Sem resposta do aluno.</Text>
       ) : null}
 
       {question.correction?.points_earned != null || question.points != null ? (
-        <Text className="text-[11px] text-gray-500 mt-2">
+        <Text className="text-[11px] text-ink-muted mt-2">
           Pontuação:{" "}
           {question.correction?.points_earned != null &&
           question.correction?.max_points != null
@@ -229,33 +229,33 @@ export default function StudentAttemptReviewModal({
         <View className="flex-row justify-end gap-2">
           <TouchableOpacity
             onPress={onClose}
-            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+            className="px-4 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
-            <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+            <Text className="text-sm font-semibold text-ink">Fechar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={onExportPdf}
             disabled={exporting}
-            className="flex-row items-center px-4 py-2.5 rounded-xl bg-violet-600"
+            className="flex-row items-center px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
             style={{ opacity: exporting ? 0.65 : 1 }}
             activeOpacity={0.85}
           >
             {exporting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="var(--ds-on-brand)" />
             ) : (
-              <Ionicons name="download-outline" size={16} color="#fff" />
+              <Ionicons name="download-outline" size={16} color="var(--ds-on-brand)" />
             )}
-            <Text className="text-sm font-semibold text-white ml-1.5">Gerar PDF</Text>
+            <Text className="text-sm font-medium text-on-brand ml-1.5">Gerar PDF</Text>
           </TouchableOpacity>
         </View>
       }
     >
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3 gap-1">
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3 gap-1">
         <View className="flex-row flex-wrap items-center gap-2">
-          <Text className="text-sm font-bold text-gray-900">{student.name}</Text>
+          <Text className="text-sm font-semibold text-ink">{student.name}</Text>
           {student.enrollment_number ? (
-            <Text className="text-xs font-mono font-semibold text-violet-600">
+            <Text className="text-xs font-mono font-semibold text-brand">
               Matrícula {student.enrollment_number}
             </Text>
           ) : null}
@@ -266,11 +266,11 @@ export default function StudentAttemptReviewModal({
             }
           />
         </View>
-        <Text className="text-xs text-gray-500">
+        <Text className="text-xs text-ink-muted">
           {attempt.exam?.subject?.name ?? "Sem disciplina"}
           {attempt.exam?.exam_type_label ? ` · ${attempt.exam.exam_type_label}` : ""}
         </Text>
-        <Text className="text-xs text-gray-600">
+        <Text className="text-xs text-ink-muted">
           Entrega: {fmtDateTime(attempt.finished_at ?? attempt.started_at)}
           {attempt.score_display ? ` · Nota ${attempt.score_display}` : ""}
           {attempt.percentage != null ? ` · ${fmtPct(attempt.percentage)}` : ""}
@@ -284,8 +284,8 @@ export default function StudentAttemptReviewModal({
 
       {questions.length === 0 ? (
         <View className="items-center py-10">
-          <Ionicons name="document-text-outline" size={36} color="#E5E7EB" />
-          <Text className="text-sm text-gray-400 mt-2">
+          <Ionicons name="document-text-outline" size={36} color="var(--ds-border)" />
+          <Text className="text-sm text-ink-subtle mt-2">
             Sem detalhamento de questões nesta tentativa.
           </Text>
         </View>

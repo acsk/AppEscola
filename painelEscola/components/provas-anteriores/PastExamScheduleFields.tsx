@@ -86,7 +86,7 @@ export default function PastExamScheduleFields({
             >
               <Text
                 className={`text-xs font-semibold ${
-                  active ? "text-white" : "text-ink-muted"
+                  active ? "text-on-brand" : "text-ink-muted"
                 }`}
               >
                 {opt.label}

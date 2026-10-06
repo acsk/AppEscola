@@ -75,7 +75,7 @@ export default function FirstAccessPasswordScreen() {
 
         {!!errors.general && (
           <View className="bg-danger-tint border border-danger rounded-ds-md px-4 py-3 mb-4 flex-row items-center">
-            <Ionicons name="alert-circle-outline" size={16} color="#B0261B" />
+            <Ionicons name="alert-circle-outline" size={16} color="var(--ds-danger)" />
             <Text className="text-sm text-danger ml-2 flex-1">{errors.general}</Text>
           </View>
         )}
@@ -121,7 +121,7 @@ export default function FirstAccessPasswordScreen() {
           activeOpacity={0.85}
         >
           {loading ? (
-            <ActivityIndicator color="white" size="small" />
+            <ActivityIndicator color="var(--ds-on-brand)" size="small" />
           ) : (
             <Text className="text-on-brand font-medium text-sm">Atualizar senha</Text>
           )}

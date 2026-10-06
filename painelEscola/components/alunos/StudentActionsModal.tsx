@@ -42,10 +42,10 @@ type Props = {
 };
 
 const toneStyles: Record<ActionDef["tone"], { bg: string; icon: string }> = {
-  blue: { bg: "bg-blue-50", icon: "#2563EB" },
-  violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-  emerald: { bg: "bg-emerald-50", icon: "#059669" },
-  red: { bg: "bg-red-50", icon: "#EF4444" },
+  blue: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  violet: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  emerald: { bg: "bg-success-tint", icon: "var(--ds-success)" },
+  red: { bg: "bg-danger", icon: "var(--ds-on-danger)" },
 };
 
 export default function StudentActionsModal({
@@ -124,20 +124,20 @@ export default function StudentActionsModal({
 
   return (
     <Modal visible={visible} title="Ações do aluno" onClose={onClose} size="md">
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
-        <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3">
+        <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
           {student.name}
         </Text>
         {student.enrollment_number ? (
-          <Text className="text-xs font-mono font-semibold text-violet-600 mt-0.5">
+          <Text className="text-xs font-mono font-semibold text-brand mt-0.5">
             Matrícula {student.enrollment_number}
           </Text>
         ) : null}
         {student.document ? (
-          <Text className="text-xs text-gray-500 mt-0.5">{maskCPF(student.document)}</Text>
+          <Text className="text-xs text-ink-muted mt-0.5">{maskCPF(student.document)}</Text>
         ) : null}
         {student.email ? (
-          <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+          <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
             {student.email}
           </Text>
         ) : null}
@@ -149,7 +149,7 @@ export default function StudentActionsModal({
       <View className="gap-2">
         {groups.map((group) => (
           <View key={group.key}>
-            <Text className="text-xs uppercase font-bold text-gray-500 tracking-wide mb-1">
+            <Text className="text-xs uppercase font-semibold text-ink-muted tracking-wide mb-1">
               {group.title}
             </Text>
             <View className="gap-1.5">
@@ -162,23 +162,23 @@ export default function StudentActionsModal({
                       onSelect(action.key);
                       onClose();
                     }}
-                    className={`flex-row items-center gap-2.5 rounded-xl border px-3 py-2 ${
+                    className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       action.group === "danger"
-                        ? "border-red-100 bg-white"
-                        : "border-gray-100 bg-white"
+                        ? "border-danger bg-danger-tint"
+                        : "border-border bg-surface"
                     }`}
                     activeOpacity={0.85}
                   >
-                    <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
+                    <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${style.bg}`}>
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900">{action.label}</Text>
+                      <Text className={`text-sm font-semibold ${action.group === "danger" ? "text-danger" : "text-ink"}`}>{action.label}</Text>
                       {action.description ? (
-                        <Text className="text-xs text-gray-500 mt-0.5">{action.description}</Text>
+                        <Text className="text-xs text-ink-muted mt-0.5">{action.description}</Text>
                       ) : null}
                     </View>
-                    <Ionicons name="chevron-forward-outline" size={16} color="#9CA3AF" />
+                    <Ionicons name="chevron-forward-outline" size={16} color="var(--ds-ink-subtle)" />
                   </TouchableOpacity>
                 );
               })}

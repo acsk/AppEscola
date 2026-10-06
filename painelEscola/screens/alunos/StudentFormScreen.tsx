@@ -122,9 +122,9 @@ function CheckToggle({
       <Ionicons
         name={value ? "checkbox" : "square-outline"}
         size={20}
-        color={value ? "#7C3AED" : "#9CA3AF"}
+        color={value ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
       />
-      <Text className="text-sm text-gray-700">{label}</Text>
+      <Text className="text-sm text-ink">{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -636,7 +636,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
           visible: true,
           type: "error",
           message:
-            e?.response?.data?.message || "Nao foi possivel salvar o aluno.",
+            e?.response?.data?.message || "Não foi possível salvar o aluno.",
         });
       }
     }
@@ -670,10 +670,10 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
         }}
       >
         <View className="flex-1">
-          <Text className="text-2xl font-bold text-gray-800">
-            {isEdit ? "Editar Aluno" : "Novo Aluno"}
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">
+            {isEdit ? "Editar aluno" : "Novo aluno"}
           </Text>
-          <Text className="text-sm text-gray-500 mt-1">
+          <Text className="text-sm text-ink-muted mt-1">
             {isEdit
               ? "Atualize os dados do aluno e seus responsáveis"
               : "Preencha os dados para cadastrar um novo aluno"}
@@ -682,63 +682,59 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
         {isEdit && studentId ? (
           <TouchableOpacity
             onPress={() => setStudentActionsOpen(true)}
-            className="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200 items-center justify-center"
+            className="w-10 h-10 rounded-ds-md bg-surface-sunken border border-border items-center justify-center"
             activeOpacity={0.85}
             accessibilityLabel="Ações do aluno"
           >
-            <Ionicons name="ellipsis-horizontal" size={20} color="#4B5563" />
+            <Ionicons name="ellipsis-horizontal" size={20} color="var(--ds-ink-muted)" />
           </TouchableOpacity>
         ) : null}
       </View>
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#7C3AED" />
-          <Text className="text-gray-500 text-sm mt-3">Carregando dados...</Text>
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
+          <Text className="text-ink-muted text-sm mt-3">Carregando dados...</Text>
         </View>
       ) : (
         <View className="gap-0">
           {isEdit ? (
             <View
-              className="bg-white rounded-2xl border border-gray-200 p-4 mb-5"
+              className="bg-surface rounded-ds-md border border-border p-4 mb-5"
               style={{
-                shadowColor: "#000",
-                shadowOpacity: 0.04,
-                shadowRadius: 8,
-                elevation: 1,
               }}
             >
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-1" style={{ minWidth: 0 }}>
-                  <Text className="text-lg font-bold text-gray-900" numberOfLines={2}>
+                  <Text className="text-lg font-semibold text-ink" numberOfLines={2}>
                     {form.name || "—"}
                   </Text>
                   {enrollmentNumber ? (
-                    <Text className="text-xs font-mono font-semibold text-violet-600 mt-1">
+                    <Text className="text-xs font-mono font-semibold text-brand mt-1">
                       Matrícula {enrollmentNumber}
                     </Text>
                   ) : null}
                   <View className="flex-row flex-wrap items-center gap-2 mt-2">
                     <Badge slug={form.status} label={statusLabel} />
                     {hasAppAccess ? (
-                      <View className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5">
-                        <Text className="text-xs font-semibold text-blue-700">App ativo</Text>
+                      <View className="rounded-full bg-brand-tint border border-border px-2 py-0.5">
+                        <Text className="text-xs font-semibold text-brand">App ativo</Text>
                       </View>
                     ) : null}
                   </View>
                 </View>
               </View>
-              <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-gray-100">
-                <Text className="text-xs text-gray-500">
+              <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-3 pt-3 border-t border-border">
+                <Text className="text-xs text-ink-muted">
                   CPF: {form.document.trim() ? form.document : "—"}
                 </Text>
-                <Text className="text-xs text-gray-500">
+                <Text className="text-xs text-ink-muted">
                   E-mail: {form.email.trim() ? form.email : "—"}
                 </Text>
-                <Text className="text-xs text-gray-500">
+                <Text className="text-xs text-ink-muted">
                   Telefone: {form.phone.trim() ? form.phone : "—"}
                 </Text>
-                <Text className="text-xs text-gray-500">
+                <Text className="text-xs text-ink-muted">
                   Nascimento: {form.birth_date.trim() ? form.birth_date : "—"}
                 </Text>
               </View>
@@ -747,9 +743,9 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                   {desiredCourses.map((course) => (
                     <View
                       key={course.id}
-                      className="rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1"
+                      className="rounded-full bg-brand-tint border border-border px-2.5 py-1"
                     >
-                      <Text className="text-xs font-semibold text-violet-700">{course.name}</Text>
+                      <Text className="text-xs font-semibold text-brand">{course.name}</Text>
                     </View>
                   ))}
                 </View>
@@ -759,20 +755,16 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
           {/* ── Card: Dados pessoais ── */}
           <View
-            className="bg-white rounded-2xl p-6 mb-5"
+            className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
             style={{
-              shadowColor: "#000",
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
             }}
           >
             <View className="flex-row items-center gap-2 mb-5">
-              <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-                <Ionicons name="person-outline" size={16} color="#7C3AED" />
+              <View className="w-8 h-8 bg-brand-tint rounded-ds-md items-center justify-center">
+                <Ionicons name="person-outline" size={16} color="var(--ds-brand)" />
               </View>
-              <Text className="text-base font-semibold text-gray-800">
-                Dados Pessoais
+              <Text className="text-base font-semibold text-ink">
+                Dados pessoais
               </Text>
             </View>
 
@@ -780,8 +772,8 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
             <View className="flex-row items-start gap-5 mb-5">
               <View className="items-center gap-2">
                 <View
-                  className="rounded-2xl overflow-hidden border-2 border-violet-100"
-                  style={{ width: 128, height: 128, backgroundColor: "#F5F3FF" }}
+                  className="rounded-ds-md overflow-hidden border-2 border-border"
+                  style={{ width: 128, height: 128, backgroundColor: "var(--ds-brand-tint)" }}
                 >
                   {pendingPhotoPreview || photoUrl ? (
                     <Image
@@ -791,7 +783,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                     />
                   ) : (
                     <View className="flex-1 items-center justify-center">
-                      <Ionicons name="person" size={52} color="#C4B5FD" />
+                      <Ionicons name="person" size={52} color="var(--ds-border)" />
                     </View>
                   )}
                   {photoUploading && (
@@ -804,7 +796,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                         justifyContent: "center",
                       }}
                     >
-                      <ActivityIndicator color="white" size="small" />
+                      <ActivityIndicator color="var(--ds-on-brand)" size="small" />
                     </View>
                   )}
                 </View>
@@ -817,16 +809,16 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                       alignItems: "center",
                       gap: 4,
                       background: "transparent",
-                      border: "1px solid #DDD6FE",
-                      borderRadius: 8,
+                      border: "1px solid #D9DDE3",
+                      borderRadius: 4,
                       padding: "4px 10px",
                       fontSize: 12,
                       fontWeight: 600,
-                      color: "#7C3AED",
+                      color: "var(--ds-brand)",
                       opacity: photoUploading ? 0.5 : 1,
                     }}
                   >
-                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
+                    <Ionicons name="camera-outline" size={13} color="var(--ds-brand)" />
                     <span style={{ marginLeft: 2 }}>
                       {photoUrl || pendingPhotoPreview ? "Alterar" : "Adicionar foto"}
                     </span>
@@ -842,18 +834,18 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                 ) : (
                   <TouchableOpacity
                     disabled={photoUploading}
-                    className="flex-row items-center gap-1 border border-violet-200 rounded-lg px-2.5 py-1"
+                    className="flex-row items-center gap-1 border border-border rounded-ds-md px-2.5 py-1"
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="camera-outline" size={13} color="#7C3AED" />
-                    <Text className="text-xs font-semibold text-violet-700">
+                    <Ionicons name="camera-outline" size={13} color="var(--ds-brand)" />
+                    <Text className="text-xs font-semibold text-brand">
                       {photoUrl || pendingPhotoPreview ? "Alterar" : "Adicionar foto"}
                     </Text>
                   </TouchableOpacity>
                 )}
 
                 {pendingPhotoPreview && !isEdit && (
-                  <Text className="text-xs text-amber-600 text-center" style={{ maxWidth: 128 }}>
+                  <Text className="text-xs text-warning text-center" style={{ maxWidth: 128 }}>
                     Será enviada ao salvar
                   </Text>
                 )}
@@ -861,11 +853,11 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
               <View className="flex-1">
                 {enrollmentNumber && (
-                  <View className="flex-row items-center gap-3 bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 mb-3">
-                    <Ionicons name="id-card-outline" size={18} color="#7C3AED" />
+                  <View className="flex-row items-center gap-3 bg-brand-tint border border-border rounded-ds-md px-4 py-3 mb-3">
+                    <Ionicons name="id-card-outline" size={18} color="var(--ds-brand)" />
                     <View className="flex-1">
-                      <Text className="text-xs text-violet-500 font-medium">Número de Matrícula (login)</Text>
-                      <Text className="text-base font-bold text-violet-700 font-mono tracking-widest">
+                      <Text className="text-xs text-brand font-medium">Número de matrícula (login)</Text>
+                      <Text className="text-base font-semibold text-brand font-mono tracking-widest">
                         {enrollmentNumber}
                       </Text>
                     </View>
@@ -876,39 +868,39 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                   <TouchableOpacity
                     onPress={() => setProvisionModalVisible(true)}
                     disabled={provisioningAccess}
-                    className="flex-row items-center justify-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3"
+                    className="flex-row items-center justify-center gap-2 bg-surface border border-border-strong rounded-ds-md px-4 py-2 mb-3 min-h-control-md"
                     activeOpacity={0.85}
                   >
                     {provisioningAccess ? (
-                      <ActivityIndicator size="small" color="#D97706" />
+                      <ActivityIndicator size="small" color="var(--ds-ink)" />
                     ) : (
-                      <Ionicons name="phone-portrait-outline" size={18} color="#D97706" />
+                      <Ionicons name="phone-portrait-outline" size={18} color="var(--ds-ink)" />
                     )}
-                    <Text className="text-sm font-semibold text-amber-800">
+                    <Text className="text-sm font-semibold text-ink">
                       Gerar acesso ao app
                     </Text>
                   </TouchableOpacity>
                 )}
 
                 {provisionCredentials && (
-                  <View className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-3">
-                    <Text className="text-xs text-emerald-700 font-medium mb-1">
+                  <View className="bg-success-tint border border-success rounded-ds-md px-4 py-3 mb-3">
+                    <Text className="text-xs text-success font-medium mb-1">
                       Credenciais geradas (informe ao aluno)
                     </Text>
                     <Text className="text-sm text-emerald-900">
                       Login:{" "}
-                      <Text className="font-mono font-bold">{provisionCredentials.login}</Text>
+                      <Text className="font-mono font-semibold">{provisionCredentials.login}</Text>
                     </Text>
                     <Text className="text-sm text-emerald-900 mt-0.5">
                       Senha inicial:{" "}
-                      <Text className="font-mono font-bold">{provisionCredentials.password}</Text>
+                      <Text className="font-mono font-semibold">{provisionCredentials.password}</Text>
                     </Text>
-                    <Text className="text-xs text-emerald-600 mt-2">
+                    <Text className="text-xs text-success mt-2">
                       A senha é a data de nascimento (DDMMAAAA) ou código padrão do sistema.
                     </Text>
                   </View>
                 )}
-                <Text className="text-xs text-gray-400 leading-relaxed">
+                <Text className="text-xs text-ink-subtle leading-relaxed">
                   Formatos aceitos: JPG, PNG, WEBP.{"\n"}Tamanho máximo: 5 MB (será comprimida automaticamente).
                 </Text>
               </View>
@@ -962,7 +954,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
               </View>
               <View className="flex-1">
                 <DatePickerInput
-                  label="Data de Nascimento"
+                  label="Data de nascimento"
                   value={form.birth_date}
                   onChangeText={(v) => setForm({ ...form, birth_date: v })}
                   error={errors.birth_date}
@@ -972,10 +964,10 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
             <View className="flex-row gap-4 mt-1">
               <View className="flex-1">
-                <Text className="text-sm font-medium text-gray-700 mb-1">
-                  Menor de Idade?
+                <Text className="text-sm font-medium text-ink mb-1">
+                  Menor de idade?
                 </Text>
-                <View className="border border-gray-200 rounded-lg px-3 py-3 bg-gray-50 flex-row items-center gap-2">
+                <View className="border border-border rounded-ds-md px-3 py-3 bg-surface-sunken flex-row items-center gap-2">
                   <Ionicons
                     name={
                       form.is_minor === "true"
@@ -983,18 +975,18 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                         : "close-circle"
                     }
                     size={18}
-                    color={form.is_minor === "true" ? "#7C3AED" : "#6B7280"}
+                    color={form.is_minor === "true" ? "var(--ds-brand)" : "var(--ds-ink-muted)"}
                   />
                   <Text
                     className={
                       form.is_minor === "true"
-                        ? "text-violet-700 font-medium"
-                        : "text-gray-500"
+                        ? "text-brand font-medium"
+                        : "text-ink-muted"
                     }
                   >
                     {form.is_minor === "true" ? "Sim" : "Não"}
                   </Text>
-                  <Text className="text-xs text-gray-400 ml-1">
+                  <Text className="text-xs text-ink-subtle ml-1">
                     (calculado pela data de nascimento)
                   </Text>
                 </View>
@@ -1014,50 +1006,46 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
           {(isEdit || desiredCourses.length > 0) && (
             <View
-              className="bg-white rounded-2xl p-6 mb-5"
+              className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
               style={{
-                shadowColor: "#000",
-                shadowOpacity: 0.04,
-                shadowRadius: 8,
-                elevation: 1,
               }}
             >
               <View className="flex-row items-center gap-2 mb-2">
-                <View className="w-8 h-8 bg-amber-100 rounded-lg items-center justify-center">
-                  <Ionicons name="school-outline" size={16} color="#B45309" />
+                <View className="w-8 h-8 bg-warning-tint rounded-ds-md items-center justify-center">
+                  <Ionicons name="school-outline" size={16} color="var(--ds-warning)" />
                 </View>
-                <Text className="text-base font-semibold text-gray-800">Pré-cadastro</Text>
+                <Text className="text-base font-semibold text-ink">Pré-cadastro</Text>
               </View>
 
-              <Text className="text-xs text-gray-500 mb-3">
+              <Text className="text-xs text-ink-muted mb-3">
                 Cursos de interesse informados no cadastro público do app mobile.
               </Text>
 
               {desiredCourses.length > 0 ? (
                 <View className="flex-row flex-wrap gap-2 mb-3">
                   {desiredCourses.map((course) => (
-                    <View key={course.id} className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1">
-                      <Text className="text-xs font-semibold text-amber-700">{course.name}</Text>
+                    <View key={course.id} className="rounded-full bg-warning-tint border border-warning px-3 py-1">
+                      <Text className="text-xs font-semibold text-warning">{course.name}</Text>
                     </View>
                   ))}
                 </View>
               ) : (
-                <Text className="text-xs text-gray-400 mb-3">Nenhum curso de interesse informado.</Text>
+                <Text className="text-xs text-ink-subtle mb-3">Nenhum curso de interesse informado.</Text>
               )}
 
               {isEdit && form.status === "inactive" && (
                 <TouchableOpacity
                   onPress={approveRegistration}
                   disabled={approving}
-                  className="flex-row items-center gap-2 self-start rounded-xl bg-emerald-600 px-4 py-2"
+                  className="flex-row items-center gap-2 self-start rounded-ds-md bg-emerald-600 px-4 py-2"
                   activeOpacity={0.85}
                 >
                   {approving ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <ActivityIndicator color="var(--ds-on-brand)" size="small" />
                   ) : (
-                    <Ionicons name="checkmark-circle-outline" size={16} color="white" />
+                    <Ionicons name="checkmark-circle-outline" size={16} color="var(--ds-on-brand)" />
                   )}
-                  <Text className="text-sm font-semibold text-white">Aprovar cadastro (ativar aluno)</Text>
+                  <Text className="text-sm font-medium text-on-brand">Aprovar cadastro (ativar aluno)</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1065,25 +1053,21 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
           {/* ── Card: Responsáveis ── */}
           <View
-            className="bg-white rounded-2xl p-6 mb-5"
+            className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
             style={{
-              shadowColor: "#000",
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
             }}
           >
             <View className="flex-row items-center justify-between mb-5">
               <View className="flex-row items-center gap-2">
-                <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-                  <Ionicons name="people-outline" size={16} color="#7C3AED" />
+                <View className="w-8 h-8 bg-brand-tint rounded-ds-md items-center justify-center">
+                  <Ionicons name="people-outline" size={16} color="var(--ds-brand)" />
                 </View>
-                <Text className="text-base font-semibold text-gray-800">
+                <Text className="text-base font-semibold text-ink">
                   Responsáveis
                 </Text>
                 {guardians.length > 0 && (
-                  <View className="bg-violet-100 rounded-full px-2.5 py-0.5 ml-1">
-                    <Text className="text-xs font-semibold text-violet-700">
+                  <View className="bg-brand-tint rounded-full px-2.5 py-0.5 ml-1">
+                    <Text className="text-xs font-semibold text-brand">
                       {guardians.length}
                     </Text>
                   </View>
@@ -1093,30 +1077,30 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                 onPress={() =>
                   setGuardians((prev) => [...prev, { ...EMPTY_GUARDIAN }])
                 }
-                className="flex-row items-center gap-1.5 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl"
+                className="flex-row items-center gap-1.5 bg-surface border border-border-strong px-4 py-2 rounded-ds-md min-h-control-md"
                 activeOpacity={0.8}
               >
-                <Ionicons name="add" size={16} color="#7C3AED" />
-                <Text className="text-sm font-semibold text-violet-700">
-                  Adicionar Responsável
+                <Ionicons name="add" size={16} color="var(--ds-ink)" />
+                <Text className="text-sm font-semibold text-ink">
+                  Adicionar responsável
                 </Text>
               </TouchableOpacity>
             </View>
 
             {errors.guardians && (
-              <View className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
-                <Text className="text-sm text-red-600">{errors.guardians}</Text>
+              <View className="bg-danger-tint border border-danger rounded-ds-md px-4 py-3 mb-4">
+                <Text className="text-sm text-danger">{errors.guardians}</Text>
               </View>
             )}
 
             {guardians.length === 0 ? (
-              <View className="border-2 border-dashed border-gray-200 rounded-xl py-10 items-center">
-                <Ionicons name="people-outline" size={36} color="#D1D5DB" />
-                <Text className="text-sm font-medium text-gray-400 mt-3">
+              <View className="border-2 border-dashed border-border rounded-ds-md py-10 items-center">
+                <Ionicons name="people-outline" size={36} color="var(--ds-border-strong)" />
+                <Text className="text-sm font-medium text-ink-subtle mt-3">
                   Nenhum responsável vinculado
                 </Text>
-                <Text className="text-xs text-gray-400 mt-1">
-                  Clique em "Adicionar Responsável" para vincular
+                <Text className="text-xs text-ink-subtle mt-1">
+                  Clique em "Adicionar responsável" para vincular
                 </Text>
               </View>
             ) : (
@@ -1124,38 +1108,38 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                 {guardians.map((g, idx) => (
                   <View
                     key={idx}
-                    className="border border-gray-200 rounded-xl overflow-hidden"
+                    className="border border-border rounded-ds-md overflow-hidden"
                   >
                     {/* Card top bar */}
-                    <View className="flex-row items-center justify-between bg-gray-50 px-4 py-3 border-b border-gray-200">
+                    <View className="flex-row items-center justify-between bg-surface-sunken px-4 py-3 border-b border-border">
                       <View className="flex-row items-center gap-2">
-                        <View className="w-6 h-6 bg-violet-600 rounded-full items-center justify-center">
-                          <Text className="text-white text-xs font-bold">
+                        <View className="w-6 h-6 bg-brand rounded-full items-center justify-center">
+                          <Text className="text-on-brand text-xs font-medium">
                             {idx + 1}
                           </Text>
                         </View>
-                        <Text className="text-sm font-semibold text-gray-700">
+                        <Text className="text-sm font-semibold text-ink">
                           {g.mode === "existing" && g.guardian_id
                             ? guardianOptions.find(
                                 (o) => o.value === String(g.guardian_id)
                               )?.label ?? "Responsável"
-                            : g.name || "Novo Responsável"}
+                            : g.name || "Novo responsável"}
                         </Text>
                       </View>
                       <View className="flex-row items-center gap-2">
                         {/* Mode toggle */}
-                        <View className="flex-row border border-gray-200 rounded-lg overflow-hidden">
+                        <View className="flex-row border border-border rounded-ds-md overflow-hidden">
                           <TouchableOpacity
                             onPress={() => switchGuardianMode(idx, "new")}
                             className={`px-3 py-1 ${
-                              g.mode === "new" ? "bg-violet-600" : "bg-white"
+                              g.mode === "new" ? "bg-surface-sunken" : "bg-surface"
                             }`}
                           >
                             <Text
                               className={`text-xs font-semibold ${
                                 g.mode === "new"
-                                  ? "text-white"
-                                  : "text-gray-500"
+                                  ? "text-ink"
+                                  : "text-ink-muted"
                               }`}
                             >
                               Novo
@@ -1165,15 +1149,15 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                             onPress={() => switchGuardianMode(idx, "existing")}
                             className={`px-3 py-1 ${
                               g.mode === "existing"
-                                ? "bg-violet-600"
-                                : "bg-white"
+                                ? "bg-brand"
+                                : "bg-surface"
                             }`}
                           >
                             <Text
                               className={`text-xs font-semibold ${
                                 g.mode === "existing"
-                                  ? "text-white"
-                                  : "text-gray-500"
+                                  ? "text-ink"
+                                  : "text-ink-muted"
                               }`}
                             >
                               Já cadastrado
@@ -1182,12 +1166,12 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                         </View>
                         <TouchableOpacity
                           onPress={() => setDeleteGuardianIndex(idx)}
-                          className="p-1.5 bg-red-50 rounded-lg"
+                          className="p-1.5 bg-danger rounded-ds-md"
                         >
                           <Ionicons
                             name="trash-outline"
                             size={15}
-                            color="#EF4444"
+                            color="var(--ds-on-danger)"
                           />
                         </TouchableOpacity>
                       </View>
@@ -1201,7 +1185,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                             label="Responsável"
                             required
                             placeholder="Selecione um responsável..."
-                            modalTitle="Selecionar Responsável"
+                            modalTitle="Selecionar responsável"
                             options={guardianOptions}
                             value={g.guardian_id ? String(g.guardian_id) : ""}
                             onChange={(v) =>
@@ -1285,13 +1269,13 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                       )}
 
                       {/* Permissões */}
-                      <View className="mt-3 pt-3 border-t border-gray-100">
-                        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      <View className="mt-3 pt-3 border-t border-border">
+                        <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
                           Permissões
                         </Text>
                         <View className="flex-row gap-8">
                           <CheckToggle
-                            label="Responsável Financeiro"
+                            label="Responsável financeiro"
                             value={g.is_financial_responsible}
                             onChange={(v) =>
                               updateGuardian(idx, {
@@ -1300,7 +1284,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                             }
                           />
                           <CheckToggle
-                            label="Responsável Pedagógico"
+                            label="Responsável pedagógico"
                             value={g.is_pedagogical_responsible}
                             onChange={(v) =>
                               updateGuardian(idx, {
@@ -1309,7 +1293,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
                             }
                           />
                           <CheckToggle
-                            label="Acesso ao Portal"
+                            label="Acesso ao portal"
                             value={g.can_access_portal}
                             onChange={(v) =>
                               updateGuardian(idx, { can_access_portal: v })
@@ -1328,26 +1312,26 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
           <View className="flex-row justify-end gap-3 mt-2">
             <TouchableOpacity
               onPress={() => navigate("alunos")}
-              className="px-6 py-3 rounded-xl border border-gray-200 bg-white"
+              className="px-6 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
               activeOpacity={0.8}
             >
-              <Text className="text-sm font-semibold text-gray-700">
+              <Text className="text-sm font-semibold text-ink">
                 Cancelar
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={save}
               disabled={saving}
-              className="flex-row items-center gap-2 px-8 py-3 rounded-xl bg-violet-600"
+              className="flex-row items-center gap-2 px-8 py-3 rounded-ds-md bg-brand"
               activeOpacity={0.85}
             >
               {saving ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
                 <>
-                  <Ionicons name="checkmark" size={16} color="white" />
-                  <Text className="text-sm font-bold text-white">
-                    {isEdit ? "Salvar Alterações" : "Cadastrar Aluno"}
+                  <Ionicons name="checkmark" size={16} color="var(--ds-on-brand)" />
+                  <Text className="text-sm font-medium text-on-brand">
+                    {isEdit ? "Salvar alterações" : "Cadastrar aluno"}
                   </Text>
                 </>
               )}
@@ -1379,7 +1363,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
       <ConfirmModal
         visible={deleteStudentOpen}
-        title="Excluir Aluno"
+        title="Excluir aluno"
         message="Esta ação não pode ser desfeita. O aluno será removido permanentemente."
         onConfirm={deleteStudent}
         onCancel={() => setDeleteStudentOpen(false)}
@@ -1388,7 +1372,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
 
       <ConfirmModal
         visible={deleteGuardianIndex !== null}
-        title="Remover Responsável"
+        title="Remover responsável"
         message="Deseja remover este responsável da lista?"
         onConfirm={confirmDeleteGuardian}
         onCancel={() => setDeleteGuardianIndex(null)}

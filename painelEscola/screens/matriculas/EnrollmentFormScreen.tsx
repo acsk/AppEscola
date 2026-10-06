@@ -520,7 +520,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
       >
         <View className="items-center py-8">
           <View className="w-20 h-20 bg-success-tint rounded-full items-center justify-center mb-4">
-            <Ionicons name="checkmark-circle" size={48} color="#1C6A45" />
+            <Ionicons name="checkmark-circle" size={48} color="var(--ds-success)" />
           </View>
           <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight mb-1">
             Matrícula realizada!
@@ -617,21 +617,21 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
               setStartDate(""); setEndDate(""); setOverrideDates(false); setPayNotes("");
               setBusinessError(null);
             }}
-            className="flex-row items-center gap-2 px-6 py-3 rounded-ds-md border border-border bg-brand-tint"
+            className="flex-row items-center gap-2 px-6 py-2 rounded-ds-md border border-border-strong bg-surface min-h-control-md"
             activeOpacity={0.8}
           >
-            <Ionicons name="add" size={16} color="#1C3D63" />
-            <Text className="text-sm font-semibold text-brand">
+            <Ionicons name="add" size={16} color="var(--ds-ink)" />
+            <Text className="text-sm font-semibold text-ink">
               Nova matrícula
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigate("matriculas")}
-            className="flex-row items-center gap-2 px-6 py-3 rounded-ds-md bg-brand"
+            className="flex-row items-center gap-2 px-6 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="list-outline" size={16} color="white" />
-            <Text className="text-sm font-semibold text-white">Ver matrículas</Text>
+            <Ionicons name="list-outline" size={16} color="var(--ds-on-brand)" />
+            <Text className="text-sm font-medium text-on-brand">Ver matrículas</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -658,10 +658,10 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
       {businessError && (
         <View className="flex-row items-start gap-2 bg-danger-tint border border-danger rounded-ds-md px-4 py-3 mb-4">
-          <Ionicons name="alert-circle" size={18} color="#B0261B" />
+          <Ionicons name="alert-circle" size={18} color="var(--ds-danger)" />
           <Text className="flex-1 text-sm text-danger">{businessError}</Text>
           <TouchableOpacity onPress={() => setBusinessError(null)} activeOpacity={0.7}>
-            <Ionicons name="close" size={16} color="#B0261B" />
+            <Ionicons name="close" size={16} color="var(--ds-danger)" />
           </TouchableOpacity>
         </View>
       )}
@@ -682,11 +682,11 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
             <Ionicons
               name={m === "plan" ? "document-text-outline" : "albums-outline"}
               size={18}
-              color={mode === m ? "white" : "#4B5463"}
+              color={mode === m ? "white" : "var(--ds-ink-muted)"}
             />
             <Text
               className={`text-sm font-semibold ${
-                mode === m ? "text-white" : "text-ink-muted"
+                mode === m ? "text-on-brand" : "text-ink-muted"
               }`}
             >
               {m === "plan" ? "Plano individual" : "Pacote de cursos"}
@@ -743,8 +743,8 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                 borderRadius: 4,
                 padding: "9px 12px",
                 fontSize: 14,
-                color: "#111722",
-                backgroundColor: "white",
+                color: "var(--ds-ink)",
+                backgroundColor: "var(--ds-surface)",
               }}
             >
               <option value="">Nenhum (usar padrão)</option>
@@ -763,7 +763,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         {/* Aviso: menor de idade exige responsável (regra do backend) */}
         {studentId && requireGuardianForMinors && isMinor && !guardianId && (
           <View className="flex-row items-start gap-2 bg-warning-tint border border-warning rounded-ds-md px-3 py-2 mb-3">
-            <Ionicons name="warning-outline" size={14} color="#8A5200" />
+            <Ionicons name="warning-outline" size={14} color="var(--ds-warning)" />
             <Text className="flex-1 text-xs text-warning">
               Aluno menor de idade. Selecione um <Text className="font-semibold">responsável financeiro</Text> para concluir a matrícula.
             </Text>
@@ -773,7 +773,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         {/* Aviso: CPF obrigatório (regra do backend) */}
         {studentId && requireCpfToEnroll && !hasPayerCpf && (
           <View className="flex-row items-start gap-2 bg-warning-tint border border-warning rounded-ds-md px-3 py-2 mb-3">
-            <Ionicons name="warning-outline" size={14} color="#8A5200" />
+            <Ionicons name="warning-outline" size={14} color="var(--ds-warning)" />
             <Text className="flex-1 text-xs text-warning">
               {guardianId
                 ? "CPF do responsável financeiro é obrigatório para concluir a matrícula. Atualize o cadastro do responsável."
@@ -799,12 +799,12 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                   onChange={(e: any) => { setCourseId(e.target.value); setPlanId(""); }}
                   style={{
                     width: "100%",
-                    border: `1px solid ${errors.course_id ? "#B0261B" : "#D9DDE3"}`,
+                    border: `1px solid ${errors.course_id ? "var(--ds-danger)" : "var(--ds-border)"}`,
                     borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: courseId ? "#111722" : "#5F6878",
-                    backgroundColor: "white",
+                    color: courseId ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
+                    backgroundColor: "var(--ds-surface)",
                   }}
                 >
                   <option value="">Selecione o curso</option>
@@ -823,7 +823,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                 </Text>
                 {loadingPlans ? (
                   <View style={{ height: 40 }} className="items-center justify-center">
-                    <ActivityIndicator size="small" color="#1C3D63" />
+                    <ActivityIndicator size="small" color="var(--ds-brand)" />
                   </View>
                 ) : (
                   <select
@@ -832,12 +832,12 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                     disabled={!courseId || plans.length === 0}
                     style={{
                       width: "100%",
-                      border: `1px solid ${errors.course_plan_id ? "#B0261B" : "#D9DDE3"}`,
+                      border: `1px solid ${errors.course_plan_id ? "var(--ds-danger)" : "var(--ds-border)"}`,
                       borderRadius: 4,
                       padding: "9px 12px",
                       fontSize: 14,
-                      color: planId ? "#111722" : "#5F6878",
-                      backgroundColor: "white",
+                      color: planId ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
+                      backgroundColor: "var(--ds-surface)",
                       opacity: !courseId ? 0.6 : 1,
                     }}
                   >
@@ -864,14 +864,14 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
             {selectedPlan && (
               <View className="space-y-2 mb-3">
                 <View className="flex-row items-center gap-2 bg-brand-tint rounded-ds-md px-3 py-2">
-                  <Ionicons name="information-circle-outline" size={14} color="#1C3D63" />
+                  <Ionicons name="information-circle-outline" size={14} color="var(--ds-brand)" />
                   <Text className="text-xs text-brand">
                     {selectedPlan.cycle_label} · {fmtBRL(selectedPlan.price)} · equivalente a{" "}
                     <Text className="font-semibold">{fmtBRL(selectedPlan.monthly_equivalent)}/mês</Text>
                   </Text>
                 </View>
                 <View className="flex-row items-center gap-2 bg-warning-tint border border-warning rounded-ds-md px-3 py-2">
-                  <Ionicons name="pricetag-outline" size={14} color="#8A5200" />
+                  <Ionicons name="pricetag-outline" size={14} color="var(--ds-warning)" />
                   <Text className="text-xs text-warning">
                     Taxa de matrícula do plano: <Text className="font-semibold">
                       {selectedPlan.enrollment_fee_amount
@@ -911,7 +911,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
               </Text>
               {loadingBundles ? (
                 <View style={{ height: 40 }} className="items-center justify-center">
-                  <ActivityIndicator size="small" color="#1C3D63" />
+                  <ActivityIndicator size="small" color="var(--ds-brand)" />
                 </View>
               ) : (
                 <select
@@ -919,12 +919,12 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                   onChange={(e: any) => setBundleId(e.target.value)}
                   style={{
                     width: "100%",
-                    border: `1px solid ${errors.bundle_id ? "#B0261B" : "#D9DDE3"}`,
+                    border: `1px solid ${errors.bundle_id ? "var(--ds-danger)" : "var(--ds-border)"}`,
                     borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: bundleId ? "#111722" : "#5F6878",
-                    backgroundColor: "white",
+                    color: bundleId ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
+                    backgroundColor: "var(--ds-surface)",
                   }}
                 >
                   <option value="">Selecione o pacote</option>
@@ -943,7 +943,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
             {selectedBundle && (
               <>
                 <View className="flex-row items-center gap-2 bg-warning-tint rounded-ds-md px-3 py-2 mb-4">
-                  <Ionicons name="albums-outline" size={14} color="#8A5200" />
+                  <Ionicons name="albums-outline" size={14} color="var(--ds-warning)" />
                   <Text className="text-xs text-warning">
                     {selectedBundle.cycle_label} · {fmtBRL(selectedBundle.price)} ·{" "}
                     <Text className="font-semibold">
@@ -1000,7 +1000,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
               overrideDates ? "bg-brand border-brand" : "border-border-strong"
             }`}
           >
-            {overrideDates && <Ionicons name="checkmark" size={11} color="white" />}
+            {overrideDates && <Ionicons name="checkmark" size={11} color="var(--ds-on-brand)" />}
           </View>
           <Text className="text-xs font-medium text-ink-muted">
             Sobrescrever datas da turma (opcional)
@@ -1030,7 +1030,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
         {!overrideDates && (
           <View className="flex-row items-center gap-1.5 bg-brand-tint border border-border rounded-ds-md px-3 py-2 mb-3">
-            <Ionicons name="information-circle-outline" size={14} color="#1C3D63" />
+            <Ionicons name="information-circle-outline" size={14} color="var(--ds-brand)" />
             <Text className="text-xs text-brand">
               As datas serão herdadas automaticamente da turma selecionada.
             </Text>
@@ -1064,7 +1064,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
         {/* Price preview */}
         {showInitialPayment && discountedInitialCharge() !== null && (
           <View className="flex-row items-center gap-2 bg-success-tint border border-success rounded-ds-md px-3 py-2 mt-3">
-            <Ionicons name="cash-outline" size={14} color="#1C6A45" />
+            <Ionicons name="cash-outline" size={14} color="var(--ds-success)" />
             <Text className="text-xs text-success">
               {initialPaymentKind === "first_monthly"
                 ? "Primeira mensalidade estimada"
@@ -1082,7 +1082,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
         {showEnrollmentFeePayment && enrollmentFeeCoversFirstMonth && (
           <View className="flex-row items-center gap-2 bg-brand-tint border border-border rounded-ds-md px-3 py-2 mt-3">
-            <Ionicons name="information-circle-outline" size={14} color="#1C3D63" />
+            <Ionicons name="information-circle-outline" size={14} color="var(--ds-brand)" />
             <Text className="text-xs text-brand">
               A taxa de matrícula equivale ao primeiro mês. As mensalidades serão geradas <Text className="font-semibold">a partir do 2º mês</Text>.
             </Text>
@@ -1091,7 +1091,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
         {!chargesEnrollmentFee && (
           <View className="flex-row items-center gap-2 bg-surface-sunken border border-border rounded-ds-md px-3 py-2 mt-3">
-            <Ionicons name="information-circle-outline" size={14} color="#4B5463" />
+            <Ionicons name="information-circle-outline" size={14} color="var(--ds-ink-muted)" />
             <Text className="text-xs text-ink-muted">
               Este tenant não cobra taxa de matrícula. Apenas as mensalidades serão geradas conforme o plano.
             </Text>
@@ -1103,7 +1103,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           planEnrollmentFeeAmount === null &&
           chargeFirstMonthlyAtEnrollment && (
           <View className="flex-row items-center gap-2 bg-brand-tint border border-border rounded-ds-md px-3 py-2 mt-3">
-            <Ionicons name="information-circle-outline" size={14} color="#1C3D63" />
+            <Ionicons name="information-circle-outline" size={14} color="var(--ds-brand)" />
             <Text className="text-xs text-brand">
               Este plano não cobra taxa de matrícula. A{" "}
               <Text className="font-semibold">primeira mensalidade</Text> será gerada na matrícula
@@ -1117,7 +1117,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           planEnrollmentFeeAmount === null &&
           !chargeFirstMonthlyAtEnrollment && (
           <View className="flex-row items-center gap-2 bg-surface-sunken border border-border rounded-ds-md px-3 py-2 mt-3">
-            <Ionicons name="information-circle-outline" size={14} color="#4B5463" />
+            <Ionicons name="information-circle-outline" size={14} color="var(--ds-ink-muted)" />
             <Text className="text-xs text-ink-muted">
               Este plano não possui taxa de matrícula. Gere as mensalidades depois em Cobranças.
             </Text>
@@ -1126,7 +1126,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
         {!allowMonthliesBeforeFeePaid && showEnrollmentFeePayment && (
           <View className="flex-row items-start gap-2 bg-warning-tint border border-warning rounded-ds-md px-3 py-2 mt-3">
-            <Ionicons name="alert-circle-outline" size={14} color="#8A5200" />
+            <Ionicons name="alert-circle-outline" size={14} color="var(--ds-warning)" />
             <Text className="flex-1 text-xs text-warning">
               Mensalidades só serão geradas após a quitação da taxa de matrícula.
             </Text>
@@ -1162,7 +1162,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
             <Switch
               value={payNow}
               onValueChange={setPayNow}
-              trackColor={{ false: "#D9DDE3", true: "#1C3D63" }}
+              trackColor={{ false: "var(--ds-border)", true: "var(--ds-brand)" }}
               thumbColor="white"
             />
           </View>
@@ -1170,7 +1170,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
 
         {!payNow && (
           <View className="flex-row items-center gap-2 bg-warning-tint rounded-ds-md px-3 py-2">
-            <Ionicons name="time-outline" size={14} color="#8A5200" />
+            <Ionicons name="time-outline" size={14} color="var(--ds-warning)" />
             <Text className="text-xs text-warning">
               A invoice será criada como <Text className="font-semibold">pendente</Text> e poderá ser paga depois.
             </Text>
@@ -1188,12 +1188,12 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
                 onChange={(e: any) => setPayMethod(e.target.value)}
                 style={{
                   width: "100%",
-                  border: `1px solid ${errors.payment_method ? "#B0261B" : "#D9DDE3"}`,
+                  border: `1px solid ${errors.payment_method ? "var(--ds-danger)" : "var(--ds-border)"}`,
                   borderRadius: 4,
                   padding: "9px 12px",
                   fontSize: 14,
-                  color: payMethod ? "#111722" : "#5F6878",
-                  backgroundColor: "white",
+                  color: payMethod ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
+                  backgroundColor: "var(--ds-surface)",
                 }}
               >
                 <option value="">Selecione o método</option>
@@ -1232,7 +1232,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
             />
 
             <View className="flex-row items-center gap-2 bg-success-tint border border-success rounded-ds-md px-3 py-2">
-              <Ionicons name="checkmark-circle-outline" size={14} color="#1C6A45" />
+              <Ionicons name="checkmark-circle-outline" size={14} color="var(--ds-success)" />
               <Text className="text-xs text-success">
                 A invoice será marcada como <Text className="font-semibold">paga</Text>.
               </Text>
@@ -1246,7 +1246,7 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
       <View className="flex-row justify-end gap-3">
         <TouchableOpacity
           onPress={() => navigate("matriculas")}
-          className="px-6 py-3 rounded-ds-md border border-border bg-surface"
+          className="px-6 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
           activeOpacity={0.8}
         >
           <Text className="text-sm font-semibold text-ink">Cancelar</Text>
@@ -1258,11 +1258,11 @@ export default function EnrollmentFormScreen({ navigate }: EnrollmentFormScreenP
           activeOpacity={0.85}
         >
           {saving ? (
-            <ActivityIndicator color="white" size="small" />
+            <ActivityIndicator color="var(--ds-on-brand)" size="small" />
           ) : (
             <>
-              <Ionicons name="checkmark" size={16} color="white" />
-              <Text className="text-sm font-semibold text-white">Matricular</Text>
+              <Ionicons name="checkmark" size={16} color="var(--ds-on-brand)" />
+              <Text className="text-sm font-medium text-on-brand">Matricular</Text>
             </>
           )}
         </TouchableOpacity>

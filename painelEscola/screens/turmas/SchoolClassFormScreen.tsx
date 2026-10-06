@@ -409,11 +409,11 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         setToast({
           visible: true,
           type: "error",
-          message: e.response?.data?.message || "Nao foi possivel salvar a turma.",
+          message: e.response?.data?.message || "Não foi possível salvar a turma.",
         });
         scrollRef.current?.scrollTo({ y: 0, animated: true });
       } else {
-        const errorMessage = e.response?.data?.message || "Nao foi possivel salvar a turma.";
+        const errorMessage = e.response?.data?.message || "Não foi possível salvar a turma.";
         setToast({
           visible: true,
           type: "error",
@@ -565,7 +565,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#1C3D63" />
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
         </View>
       ) : (
         <View>
@@ -654,8 +654,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                     borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: form.period ? "#111722" : "#5F6878",
-                    backgroundColor: "white",
+                    color: form.period ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
+                    backgroundColor: "var(--ds-surface)",
                   }}
                 >
                   <option value="">Selecione o período</option>
@@ -694,8 +694,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                     borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: "#111722",
-                    backgroundColor: "white",
+                    color: "var(--ds-ink)",
+                    backgroundColor: "var(--ds-surface)",
                   }}
                 >
                   {STATUS_OPTIONS.map((o) => (
@@ -711,7 +711,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             <View className="flex-row justify-end gap-3 mt-4">
               <TouchableOpacity
                 onPress={() => navigate("turmas")}
-                className="px-5 py-2.5 rounded-ds-md border border-border bg-surface"
+                className="px-5 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
                 activeOpacity={0.8}
               >
                 <Text className="text-sm font-semibold text-ink">
@@ -721,15 +721,15 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
               <TouchableOpacity
                 onPress={saveClass}
                 disabled={saving}
-                className="flex-row items-center gap-2 px-6 py-2.5 rounded-ds-md bg-brand"
+                className="flex-row items-center gap-2 px-6 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
                 activeOpacity={0.85}
               >
                 {saving ? (
-                  <ActivityIndicator color="white" size="small" />
+                  <ActivityIndicator color="var(--ds-on-brand)" size="small" />
                 ) : (
                   <>
-                    <Ionicons name="checkmark" size={16} color="white" />
-                    <Text className="text-sm font-semibold text-white">
+                    <Ionicons name="checkmark" size={16} color="var(--ds-on-brand)" />
+                    <Text className="text-sm font-medium text-on-brand">
                       {isEdit ? "Salvar alterações" : "Criar turma"}
                     </Text>
                   </>
@@ -764,7 +764,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                   className="flex-row items-center gap-1.5 bg-surface border border-border-strong px-3 py-1.5 rounded-ds-md"
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="add" size={16} color="#111722" />
+                  <Ionicons name="add" size={16} color="var(--ds-ink)" />
                   <Text className="text-sm font-medium text-ink">
                     Adicionar horário
                   </Text>
@@ -773,7 +773,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
               {schedules.length === 0 ? (
                 <View className="items-center py-8">
-                  <Ionicons name="time-outline" size={32} color="#D9DDE3" />
+                  <Ionicons name="time-outline" size={32} color="var(--ds-border)" />
                   <Text className="text-ink-subtle text-sm mt-2">
                     Nenhum horário cadastrado
                   </Text>
@@ -797,7 +797,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                         <Ionicons
                           name="time-outline"
                           size={14}
-                          color="#4B5463"
+                          color="var(--ds-ink-muted)"
                         />
                         <Text className="text-sm text-ink">
                           {fmtTime(s.start_time)} – {fmtTime(s.end_time)}
@@ -818,7 +818,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                           <Ionicons
                             name="location-outline"
                             size={13}
-                            color="#5F6878"
+                            color="var(--ds-ink-subtle)"
                           />
                           <Text className="text-xs text-ink-muted">{s.room}</Text>
                         </View>
@@ -831,17 +831,17 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                           <Ionicons
                             name="pencil-outline"
                             size={14}
-                            color="#1C3D63"
+                            color="var(--ds-brand)"
                           />
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => setDeleteScheduleId(s.id)}
-                          className="p-1.5 bg-danger-tint rounded-ds-md"
+                          className="p-1.5 bg-danger rounded-ds-md"
                         >
                           <Ionicons
                             name="trash-outline"
                             size={14}
-                            color="#B0261B"
+                            color="var(--ds-on-danger)"
                           />
                         </TouchableOpacity>
                       </View>
@@ -854,7 +854,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             </>
           ) : (
             <View className="bg-brand-tint border border-border rounded-ds-md px-5 py-4 flex-row items-center gap-3">
-              <Ionicons name="information-circle-outline" size={20} color="#1C3D63" />
+              <Ionicons name="information-circle-outline" size={20} color="var(--ds-brand)" />
               <Text className="text-sm text-brand flex-1">
                 Após criar a turma, você poderá adicionar os horários de aula.
               </Text>
@@ -873,7 +873,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           <>
             <TouchableOpacity
               onPress={() => setScheduleModal(false)}
-              className="px-5 py-2.5 rounded-ds-md border border-border"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             >
               <Text className="text-sm font-semibold text-ink">
                 Cancelar
@@ -882,12 +882,12 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             <TouchableOpacity
               onPress={saveSchedule}
               disabled={savingSchedule}
-              className="px-5 py-2.5 rounded-ds-md bg-brand"
+              className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
             >
               {savingSchedule ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
-                <Text className="text-sm font-semibold text-white">Salvar</Text>
+                <Text className="text-sm font-medium text-on-brand">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -921,11 +921,11 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           <View
             style={{
               borderWidth: 1,
-              borderColor: scheduleErrors.teacher_ids ? "#B0261B" : "#D9DDE3",
+              borderColor: scheduleErrors.teacher_ids ? "var(--ds-danger)" : "var(--ds-border)",
               borderRadius: 4,
               padding: 10,
               maxHeight: 180,
-              backgroundColor: "white",
+              backgroundColor: "var(--ds-surface)",
             }}
           >
             <ScrollView>
@@ -943,7 +943,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                     <Ionicons
                       name={selected ? "radio-button-on" : "radio-button-off"}
                       size={18}
-                      color={selected ? "#1C3D63" : "#5F6878"}
+                      color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                     />
                     <Text className="text-sm text-ink ml-2">{t.name.toUpperCase()}</Text>
                   </TouchableOpacity>
@@ -980,8 +980,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
               borderRadius: 4,
               padding: "9px 12px",
               fontSize: 14,
-              color: "#111722",
-              backgroundColor: "white",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface)",
             }}
           >
             {WEEKDAY_ORDER.map((w) => (

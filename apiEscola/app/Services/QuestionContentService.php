@@ -6,6 +6,7 @@ use App\Exceptions\QuestionBankException;
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
 use App\Models\ExamType;
+use App\Support\QuestionRichText;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -26,7 +27,7 @@ class QuestionContentService
     {
         return DB::transaction(function () use ($tenantId, $data) {
             $question = ExamQuestion::create(array_merge(
-                array_intersect_key($data, array_flip(self::CONTENT_FIELDS)),
+                $this->contentAttributes($data),
                 [
                     'tenant_id'    => $tenantId,
                     'exam_id'      => null,
@@ -49,7 +50,7 @@ class QuestionContentService
         $this->assertStandalone($question);
 
         return DB::transaction(function () use ($question, $data) {
-            $question->fill(array_intersect_key($data, array_flip(self::CONTENT_FIELDS)))->save();
+            $question->fill($this->contentAttributes($data))->save();
 
             if ($question->type === 'essay') {
                 $question->options()->delete();
@@ -78,12 +79,25 @@ class QuestionContentService
         foreach (array_values($options) as $i => $option) {
             ExamQuestionOption::create([
                 'question_id'         => $question->id,
-                'option_text'         => $option['option_text'],
+                'option_text'         => QuestionRichText::normalize($option['option_text']),
                 'is_correct'          => (bool) $option['is_correct'],
                 'order'               => $option['order'] ?? ($i + 1),
                 'triggers_text_input' => $option['triggers_text_input'] ?? false,
             ]);
         }
+    }
+
+    /** Campos de conteúdo, com enunciado e explicação no formato canônico de formatação. */
+    private function contentAttributes(array $data): array
+    {
+        $attributes = array_intersect_key($data, array_flip(self::CONTENT_FIELDS));
+        foreach (['question_text', 'explanation'] as $field) {
+            if (array_key_exists($field, $attributes)) {
+                $attributes[$field] = QuestionRichText::normalize($attributes[$field]);
+            }
+        }
+
+        return $attributes;
     }
 
     private function applyClassification(ExamQuestion $question, array $data, int $tenantId): ExamQuestion

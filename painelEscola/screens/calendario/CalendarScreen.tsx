@@ -263,45 +263,45 @@ export default function CalendarScreen({ navigate: _navigate }: WithNavigate) {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: "#EEEEFF" }}
+      style={{ flex: 1, backgroundColor: "var(--ds-bg)" }}
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
     >
       <View className="flex-row items-center justify-between mb-4">
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Calendário</Text>
-          <Text className="text-sm text-gray-500 mt-1">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Calendário</Text>
+          <Text className="text-sm text-ink-muted mt-1">
             Eventos, simulados e vencimentos (sincronizados automaticamente)
           </Text>
         </View>
         <TouchableOpacity
           onPress={openCreate}
-          className="flex-row items-center gap-2 bg-violet-600 px-4 py-2.5 rounded-xl"
+          className="flex-row items-center gap-2 bg-brand px-4 rounded-ds-md py-2 min-h-control-md justify-center"
         >
-          <Ionicons name="add" size={18} color="#fff" />
-          <Text className="text-sm font-semibold text-white">Novo evento</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-sm font-medium text-on-brand">Novo evento</Text>
         </TouchableOpacity>
       </View>
 
-      <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
+      <View className="bg-surface rounded-ds-md border border-border p-4 mb-4">
         <View className="flex-row items-center justify-between mb-3">
           <TouchableOpacity
             onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
           >
-            <Ionicons name="chevron-back" size={22} color="#7C3AED" />
+            <Ionicons name="chevron-back" size={22} color="var(--ds-brand)" />
           </TouchableOpacity>
-          <Text className="text-lg font-bold text-gray-800 capitalize">
+          <Text className="text-lg font-semibold text-ink capitalize">
             {month.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
           </Text>
           <TouchableOpacity
             onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
           >
-            <Ionicons name="chevron-forward" size={22} color="#7C3AED" />
+            <Ionicons name="chevron-forward" size={22} color="var(--ds-brand)" />
           </TouchableOpacity>
         </View>
 
         <View className="flex-row mb-2">
           {WEEKDAYS.map((w) => (
-            <Text key={w} className="flex-1 text-center text-xs font-bold text-gray-400">
+            <Text key={w} className="flex-1 text-center text-xs font-semibold text-ink-subtle">
               {w}
             </Text>
           ))}
@@ -320,10 +320,10 @@ export default function CalendarScreen({ navigate: _navigate }: WithNavigate) {
               return (
                 <TouchableOpacity
                   key={toKey(day)}
-                  className={`flex-1 items-center py-1 rounded-lg ${selected ? "bg-violet-100" : ""}`}
+                  className={`flex-1 items-center py-1 rounded-ds-md ${selected ? "bg-brand-tint" : ""}`}
                   onPress={() => setSelectedDay(day)}
                 >
-                  <Text className={`text-sm font-bold ${selected ? "text-violet-700" : "text-gray-700"}`}>
+                  <Text className={`text-sm font-semibold ${selected ? "text-brand" : "text-ink"}`}>
                     {day.getDate()}
                   </Text>
                   {dayItems.length > 0 ? (
@@ -334,7 +334,7 @@ export default function CalendarScreen({ navigate: _navigate }: WithNavigate) {
                           className="w-1.5 h-1.5 rounded-full"
                           style={{
                             backgroundColor:
-                              ev.type_color ?? typesMeta[ev.type]?.color ?? "#7C3AED",
+                              ev.type_color ?? typesMeta[ev.type]?.color ?? "var(--ds-brand)",
                           }}
                         />
                       ))}
@@ -351,33 +351,33 @@ export default function CalendarScreen({ navigate: _navigate }: WithNavigate) {
         <CalendarColorLegend typesMeta={typesMeta} />
       </View>
 
-      <Text className="text-base font-bold text-gray-800 mb-2 capitalize">
+      <Text className="text-base font-semibold text-ink mb-2 capitalize">
         {selectedDay.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
       </Text>
 
       {loading ? (
-        <ActivityIndicator color="#7C3AED" />
+        <ActivityIndicator color="var(--ds-brand)" />
       ) : dayEvents.length === 0 ? (
-        <Text className="text-sm text-gray-500">Nenhum evento neste dia.</Text>
+        <Text className="text-sm text-ink-muted">Nenhum evento neste dia.</Text>
       ) : (
         dayEvents.map((ev) => (
           <TouchableOpacity
             key={ev.id}
             onPress={() => openEdit(ev)}
-            className="bg-white border border-gray-100 rounded-xl p-4 mb-2 flex-row items-start gap-3"
+            className="bg-surface border border-border rounded-ds-md p-4 mb-2 flex-row items-start gap-3"
           >
             <View
               style={{
                 width: 4,
                 alignSelf: "stretch",
                 borderRadius: 2,
-                backgroundColor: ev.type_color ?? typesMeta[ev.type]?.color ?? "#7C3AED",
+                backgroundColor: ev.type_color ?? typesMeta[ev.type]?.color ?? "var(--ds-brand)",
               }}
             />
             <View className="flex-1">
-              <Text className="text-xs font-bold text-gray-400">{ev.type_label}</Text>
-              <Text className="text-base font-bold text-gray-800">{ev.title}</Text>
-              <Text className="text-xs text-gray-500 mt-1">
+              <Text className="text-xs font-semibold text-ink-subtle">{ev.type_label}</Text>
+              <Text className="text-base font-semibold text-ink">{ev.title}</Text>
+              <Text className="text-xs text-ink-muted mt-1">
                 {new Date(ev.starts_at).toLocaleString("pt-BR")}
                 {ev.source_type === "exam"
                   ? " · Sincronizado do simulado"
@@ -387,8 +387,8 @@ export default function CalendarScreen({ navigate: _navigate }: WithNavigate) {
               </Text>
             </View>
             {ev.is_editable ? (
-              <TouchableOpacity onPress={() => setDeleteTarget(ev)}>
-                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              <TouchableOpacity className="p-1.5 bg-danger rounded-ds-md" onPress={() => setDeleteTarget(ev)}>
+                <Ionicons name="trash-outline" size={18} color="var(--ds-on-danger)" />
               </TouchableOpacity>
             ) : null}
           </TouchableOpacity>
@@ -473,12 +473,12 @@ export default function CalendarScreen({ navigate: _navigate }: WithNavigate) {
         <TouchableOpacity
           onPress={save}
           disabled={saving}
-          className="mt-2 bg-violet-600 rounded-xl py-3 items-center"
+          className="mt-2 bg-brand rounded-ds-md py-3 items-center"
         >
           {saving ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="var(--ds-on-brand)" />
           ) : (
-            <Text className="text-white font-semibold">Salvar</Text>
+            <Text className="text-on-brand font-medium">Salvar</Text>
           )}
         </TouchableOpacity>
       </Modal>

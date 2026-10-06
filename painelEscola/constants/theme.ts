@@ -1,4 +1,7 @@
-/** Tokens do design system para estilos inline (style={...}). Para classes, use os nomes no Tailwind. */
+/**
+ * Tokens do design system para estilos inline (style={...}). Para classes, use os nomes no Tailwind.
+ * Cada cor é uma variável CSS (`var(--ds-ink)`) que acompanha o tema claro/escuro.
+ */
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const tokens = require("./designTokens") as {
   color: Record<
@@ -22,7 +25,18 @@ const tokens = require("./designTokens") as {
     | "warning-tint"
     | "danger"
     | "danger-tint"
-    | "focus",
+    | "on-danger"
+    | "danger-hover"
+    | "focus"
+    | "nav-bg"
+    | "nav-hover"
+    | "nav-active"
+    | "nav-divider"
+    | "nav-accent"
+    | "nav-ink"
+    | "nav-ink-muted"
+    | "nav-label"
+    | "overlay",
     string
   >;
   radius: Record<"0" | "sm" | "md" | "lg", string>;

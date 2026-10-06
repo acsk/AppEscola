@@ -10,7 +10,7 @@ type Props = {
   /** Rótulo em caixa de frase: "Salvar alterações", "Nova turma". */
   label?: string;
   onPress?: () => void;
-  /** Um `primary` por área (painel ou página); `danger` é contornado, nunca cheio. */
+  /** Um `primary` por área (painel ou página); `danger` (excluir/remover) é vermelho cheio para chamar atenção. */
   variant?: ButtonVariant;
   size?: "md" | "sm";
   icon?: LucideIcon;
@@ -27,7 +27,7 @@ const VARIANTS: Record<ButtonVariant, { bg: string; fg: string; border: string }
   primary: { bg: color.brand, fg: color["on-brand"], border: color.brand },
   secondary: { bg: color.surface, fg: color.ink, border: color["border-strong"] },
   ghost: { bg: "transparent", fg: color["ink-muted"], border: "transparent" },
-  danger: { bg: color.surface, fg: color.danger, border: color.danger },
+  danger: { bg: color.danger, fg: color["on-danger"], border: color.danger },
 };
 
 /** Botão do design system: retangular (raio 4px); só o primário tem cor cheia. */

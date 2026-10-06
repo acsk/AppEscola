@@ -24,9 +24,9 @@ type Props = {
 };
 
 const toneStyles: Record<ActionItem["tone"], { bg: string; icon: string }> = {
-  blue: { bg: "bg-blue-50", icon: "#2563EB" },
-  violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-  red: { bg: "bg-red-50", icon: "#EF4444" },
+  blue: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  violet: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  red: { bg: "bg-danger", icon: "var(--ds-on-danger)" },
 };
 
 export default function GuardianActionsModal({
@@ -79,17 +79,17 @@ export default function GuardianActionsModal({
 
   return (
     <Modal visible={visible} title="Ações" onClose={onClose} size="sm">
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
-        <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3">
+        <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
           {guardian.name}
         </Text>
         {guardian.document ? (
-          <Text className="text-xs text-gray-500 mt-0.5">
+          <Text className="text-xs text-ink-muted mt-0.5">
             {maskCPF(guardian.document)}
           </Text>
         ) : null}
         {guardian.email ? (
-          <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+          <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
             {guardian.email}
           </Text>
         ) : null}
@@ -98,7 +98,7 @@ export default function GuardianActionsModal({
       <View className="gap-2">
         {groups.map((group) => (
           <View key={group.key}>
-            <Text className="text-[10px] uppercase font-bold text-gray-500 tracking-wide mb-1">
+            <Text className="text-[10px] uppercase font-semibold text-ink-muted tracking-wide mb-1">
               {group.title}
             </Text>
             <View className="gap-1.5">
@@ -111,29 +111,29 @@ export default function GuardianActionsModal({
                       onSelect(action.key);
                       onClose();
                     }}
-                    className={`flex-row items-center gap-2.5 rounded-xl border px-3 py-2 ${
+                    className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       action.group === "danger"
-                        ? "border-red-100 bg-white"
-                        : "border-gray-100 bg-white"
+                        ? "border-danger bg-danger-tint"
+                        : "border-border bg-surface"
                     }`}
                     activeOpacity={0.85}
                   >
                     <View
-                      className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}
+                      className={`w-9 h-9 rounded-ds-md items-center justify-center ${style.bg}`}
                     >
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+                      <Text className={`text-sm font-semibold ${action.group === "danger" ? "text-danger" : "text-ink"}`} numberOfLines={1}>
                         {action.label}
                       </Text>
                       {action.description ? (
-                        <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={2}>
+                        <Text className="text-[11px] text-ink-muted mt-0.5" numberOfLines={2}>
                           {action.description}
                         </Text>
                       ) : null}
                     </View>
-                    <Ionicons name="chevron-forward-outline" size={16} color="#9CA3AF" />
+                    <Ionicons name="chevron-forward-outline" size={16} color="var(--ds-ink-subtle)" />
                   </TouchableOpacity>
                 );
               })}

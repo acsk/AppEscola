@@ -45,9 +45,9 @@ function formatGrade(value: number | null | undefined): string {
 }
 
 function gradeCellText(row: ReportCardGradeRow): { text: string; color: string } {
-  if (row.is_absent) return { text: "Faltou", color: "#DC2626" };
-  if (row.grade != null) return { text: formatGrade(row.grade), color: "#111827" };
-  return { text: "—", color: "#9CA3AF" };
+  if (row.is_absent) return { text: "Faltou", color: "var(--ds-danger)" };
+  if (row.grade != null) return { text: formatGrade(row.grade), color: "var(--ds-ink)" };
+  return { text: "—", color: "var(--ds-ink-subtle)" };
 }
 
 function StatCard({
@@ -62,20 +62,20 @@ function StatCard({
   tone: "violet" | "emerald" | "amber" | "blue";
 }) {
   const styles = {
-    violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-    emerald: { bg: "bg-emerald-50", icon: "#16A34A" },
-    amber: { bg: "bg-amber-50", icon: "#D97706" },
-    blue: { bg: "bg-blue-50", icon: "#2563EB" },
+    violet: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+    emerald: { bg: "bg-success-tint", icon: "var(--ds-success)" },
+    amber: { bg: "bg-warning-tint", icon: "var(--ds-warning)" },
+    blue: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
   };
 
   return (
-    <View className="bg-white rounded-2xl border border-gray-200 p-4 min-w-[140px] flex-1">
+    <View className="bg-surface rounded-ds-md border border-border p-4 min-w-[140px] flex-1">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-xs font-semibold text-gray-500">{label}</Text>
-          <Text className="text-2xl font-extrabold text-gray-900 mt-1">{value}</Text>
+          <Text className="text-xs font-semibold text-ink-muted">{label}</Text>
+          <Text className="text-2xl font-semibold text-ink mt-1">{value}</Text>
         </View>
-        <View className={`w-9 h-9 rounded-xl items-center justify-center ${styles[tone].bg}`}>
+        <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${styles[tone].bg}`}>
           <Ionicons name={icon} size={18} color={styles[tone].icon} />
         </View>
       </View>
@@ -84,10 +84,6 @@ function StatCard({
 }
 
 const cardShadow = {
-  shadowColor: "#000",
-  shadowOpacity: 0.05,
-  shadowRadius: 10,
-  elevation: 2,
 } as const;
 
 export default function StudentReportCardScreen({
@@ -154,13 +150,13 @@ export default function StudentReportCardScreen({
         }}
       >
         <View className="flex-1">
-          <Text className="text-2xl font-bold text-gray-800">Boletim</Text>
-          <Text className="text-sm text-gray-500 mt-1">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Boletim</Text>
+          <Text className="text-sm text-ink-muted mt-1">
             Avaliações presenciais publicadas que contam no boletim
             {displayName ? ` · ${displayName}` : ""}
           </Text>
           {enrollmentNumber ? (
-            <Text className="text-xs font-mono font-semibold text-violet-600 mt-2">
+            <Text className="text-xs font-mono font-semibold text-brand mt-2">
               Matrícula {enrollmentNumber}
             </Text>
           ) : null}
@@ -168,27 +164,27 @@ export default function StudentReportCardScreen({
         <TouchableOpacity
           onPress={load}
           disabled={loading}
-          className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 items-center justify-center self-end"
+          className="w-10 h-10 rounded-ds-md bg-brand-tint border border-border items-center justify-center self-end"
           accessibilityLabel="Atualizar boletim"
         >
-          <Ionicons name="refresh" size={18} color="#7C3AED" />
+          <Ionicons name="refresh" size={18} color="var(--ds-brand)" />
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View className="py-16 items-center">
-          <ActivityIndicator size="large" color="#7C3AED" />
-          <Text className="text-sm text-gray-500 mt-3">Carregando boletim...</Text>
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
+          <Text className="text-sm text-ink-muted mt-3">Carregando boletim...</Text>
         </View>
       ) : error ? (
-        <View className="bg-red-50 border border-red-200 rounded-2xl p-4">
-          <Text className="text-sm text-red-700">{error}</Text>
+        <View className="bg-danger-tint border border-danger rounded-ds-md p-4">
+          <Text className="text-sm text-danger">{error}</Text>
           <TouchableOpacity
             onPress={load}
-            className="mt-3 self-start px-4 py-2 rounded-xl bg-white border border-red-200"
+            className="mt-3 self-start px-4 py-2 rounded-ds-md bg-surface border border-danger"
             activeOpacity={0.85}
           >
-            <Text className="text-sm font-semibold text-red-700">Tentar novamente</Text>
+            <Text className="text-sm font-semibold text-danger">Tentar novamente</Text>
           </TouchableOpacity>
         </View>
       ) : data ? (
@@ -220,21 +216,21 @@ export default function StudentReportCardScreen({
             />
           </View>
 
-          <Text className="text-base font-bold text-gray-900 mb-2">Média por disciplina</Text>
-          <Text className="text-xs text-gray-500 mb-3">
+          <Text className="text-base font-semibold text-ink mb-2">Média por disciplina</Text>
+          <Text className="text-xs text-ink-muted mb-3">
             Média ponderada das avaliações publicadas em cada matéria.
           </Text>
 
           {data.summary.by_subject.length === 0 ? (
-            <View className="bg-white rounded-2xl border border-gray-200 p-6 mb-5 items-center" style={cardShadow}>
-              <Ionicons name="school-outline" size={36} color="#E5E7EB" />
-              <Text className="text-sm text-gray-500 mt-3 text-center">
+            <View className="bg-surface rounded-ds-md border border-border p-6 mb-5 items-center" style={cardShadow}>
+              <Ionicons name="school-outline" size={36} color="var(--ds-border)" />
+              <Text className="text-sm text-ink-muted mt-3 text-center">
                 Nenhuma nota de avaliação presencial publicada para este aluno.
               </Text>
             </View>
           ) : (
             <View
-              className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-5"
+              className="bg-surface rounded-ds-md border border-border overflow-hidden mb-5"
               style={cardShadow}
             >
               <ScrollView
@@ -262,12 +258,12 @@ export default function StudentReportCardScreen({
                     </Text>
                   </View>
                   {data.summary.by_subject.map((row, idx) => {
-                    const color = row.subject?.color ?? "#7C3AED";
+                    const color = row.subject?.color ?? "var(--ds-brand)";
                     return (
                       <DataTableRow key={String(row.subject_id)} index={idx}>
                         <View className="flex-row items-center gap-2" style={{ flex: 2, paddingRight: 8 }}>
                           <View
-                            className="w-7 h-7 rounded-lg items-center justify-center"
+                            className="w-7 h-7 rounded-ds-md items-center justify-center"
                             style={{ backgroundColor: `${color}22` }}
                           >
                             <Ionicons
@@ -288,7 +284,7 @@ export default function StudentReportCardScreen({
                         </Text>
                         <Text
                           className={TABLE_CELL_SEMIBOLD}
-                          style={{ flex: 0.85, textAlign: "right", color: "#7C3AED" }}
+                          style={{ flex: 0.85, textAlign: "right", color: "var(--ds-brand)" }}
                         >
                           {formatGrade(row.weighted_average)}
                         </Text>
@@ -300,18 +296,18 @@ export default function StudentReportCardScreen({
             </View>
           )}
 
-          <Text className="text-base font-bold text-gray-900 mb-2">Histórico de lançamentos</Text>
-          <Text className="text-xs text-gray-500 mb-3">
+          <Text className="text-base font-semibold text-ink mb-2">Histórico de lançamentos</Text>
+          <Text className="text-xs text-ink-muted mb-3">
             Todas as notas publicadas que entram no boletim, por avaliação e disciplina.
           </Text>
 
           {sortedGrades.length === 0 ? (
-            <View className="bg-white rounded-2xl border border-gray-200 p-6 items-center" style={cardShadow}>
-              <Text className="text-sm text-gray-500 text-center">Nenhum lançamento para exibir.</Text>
+            <View className="bg-surface rounded-ds-md border border-border p-6 items-center" style={cardShadow}>
+              <Text className="text-sm text-ink-muted text-center">Nenhum lançamento para exibir.</Text>
             </View>
           ) : (
             <View
-              className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
+              className="bg-surface rounded-ds-md border border-border overflow-hidden"
               style={cardShadow}
             >
               <ScrollView

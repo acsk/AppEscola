@@ -463,19 +463,19 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
   return (
     <ScrollView
       className="flex-1"
-      style={{ backgroundColor: "#EEEEFF" }}
+      style={{ backgroundColor: "var(--ds-bg)" }}
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}
     >
       <View className="flex-row items-center justify-between mb-4">
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Notificações</Text>
-          <Text className="text-sm text-gray-500 mt-1">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Notificações</Text>
+          <Text className="text-sm text-ink-muted mt-1">
             Envie avisos para o app mobile dos alunos
           </Text>
         </View>
       </View>
 
-      <View className="flex-row bg-white rounded-xl p-1 mb-4 border border-gray-100 self-start">
+      <View className="flex-row bg-surface rounded-ds-md p-1 mb-4 border border-border self-start">
         {(
           [
             { id: "send" as TabId, label: "Nova mensagem" },
@@ -486,11 +486,11 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
           <TouchableOpacity
             key={t.id}
             onPress={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg ${tab === t.id ? "bg-violet-600" : ""}`}
+            className={`px-4 py-2 rounded-ds-md ${tab === t.id ? "bg-brand" : ""}`}
           >
             <Text
               className={`text-sm font-semibold ${
-                tab === t.id ? "text-white" : "text-gray-500"
+                tab === t.id ? "text-on-brand" : "text-ink-muted"
               }`}
             >
               {t.label}
@@ -500,17 +500,17 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
       </View>
 
       {tab === "settings" ? (
-        <View className="bg-white rounded-2xl border border-gray-100 p-5">
-          <Text className="text-base font-bold text-gray-800 mb-1">
+        <View className="bg-surface rounded-ds-md border border-border p-5">
+          <Text className="text-base font-semibold text-ink mb-1">
             Notificações no calendário
           </Text>
-          <Text className="text-sm text-gray-500 mb-4">
+          <Text className="text-sm text-ink-muted mb-4">
             Escolha quais tipos de notificação podem ser enviados também para a agenda
             do aluno (com data de início e fim).
           </Text>
 
           {settingsLoading ? (
-            <ActivityIndicator color="#7C3AED" />
+            <ActivityIndicator color="var(--ds-brand)" />
           ) : (
             <>
               {Object.entries(typesMeta).map(([typeKey, meta]) => {
@@ -521,19 +521,19 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
                 return (
                   <TouchableOpacity
                     key={typeKey}
-                    className="flex-row items-start gap-3 py-3 border-b border-gray-100"
+                    className="flex-row items-start gap-3 py-3 border-b border-border"
                     onPress={() => toggleCalendarTypeSetting(key)}
                     activeOpacity={0.8}
                   >
                     <Ionicons
                       name={selected ? "checkbox" : "square-outline"}
                       size={22}
-                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                      color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                     />
                     <View className="flex-1">
-                      <Text className="text-sm font-semibold text-gray-800">{meta.label}</Text>
+                      <Text className="text-sm font-semibold text-ink">{meta.label}</Text>
                       {calendarLabel ? (
-                        <Text className="text-xs text-gray-500 mt-0.5">
+                        <Text className="text-xs text-ink-muted mt-0.5">
                           No calendário: {calendarLabel}
                         </Text>
                       ) : null}
@@ -545,14 +545,14 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
               <TouchableOpacity
                 onPress={handleSaveSettings}
                 disabled={settingsSaving}
-                className="mt-4 flex-row items-center justify-center gap-2 bg-violet-600 py-3 rounded-xl"
+                className="mt-4 flex-row items-center justify-center gap-2 bg-brand py-3 rounded-ds-md"
               >
                 {settingsSaving ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="var(--ds-on-brand)" />
                 ) : (
                   <>
-                    <Ionicons name="save-outline" size={18} color="#fff" />
-                    <Text className="text-sm font-semibold text-white">Salvar configurações</Text>
+                    <Ionicons name="save-outline" size={18} color="var(--ds-on-brand)" />
+                    <Text className="text-sm font-medium text-on-brand">Salvar configurações</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -562,9 +562,9 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
       ) : null}
 
       {tab === "send" ? (
-        <View className="bg-white rounded-2xl border border-gray-100 p-5">
+        <View className="bg-surface rounded-ds-md border border-border p-5">
           {canShowCalendarForType ? (
-            <View className="mb-4 p-4 rounded-xl border border-violet-100 bg-violet-50">
+            <View className="mb-4 p-4 rounded-ds-md border border-border bg-brand-tint">
               <TouchableOpacity
                 className="flex-row items-center gap-2"
                 onPress={() =>
@@ -578,13 +578,13 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
                 <Ionicons
                   name={form.show_on_calendar ? "checkbox" : "square-outline"}
                   size={22}
-                  color="#7C3AED"
+                  color="var(--ds-brand)"
                 />
                 <View className="flex-1">
-                  <Text className="text-sm font-bold text-violet-900">
+                  <Text className="text-sm font-semibold text-brand">
                     Exibir também no calendário
                   </Text>
-                  <Text className="text-xs text-violet-700 mt-0.5">
+                  <Text className="text-xs text-brand mt-0.5">
                     O aluno verá no sino e na agenda (com data início e fim).
                   </Text>
                 </View>
@@ -610,8 +610,8 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
               ) : null}
             </View>
           ) : (
-            <View className="mb-4 p-3 rounded-xl bg-gray-50 border border-gray-100">
-              <Text className="text-xs text-gray-600">
+            <View className="mb-4 p-3 rounded-ds-md bg-surface-sunken border border-border">
+              <Text className="text-xs text-ink-muted">
                 O tipo &quot;{typesMeta[form.type]?.label ?? form.type}&quot; não está
                 habilitado para o calendário. Ajuste em Configurações.
               </Text>
@@ -634,8 +634,8 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
             placeholder="Ex.: Aula cancelada amanhã"
           />
           <View className="mb-4">
-            <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-              Mensagem <Text className="text-red-500">*</Text>
+            <Text className="text-sm font-semibold text-ink mb-1.5">
+              Mensagem <Text className="text-danger">*</Text>
             </Text>
             <TextInput
               value={form.body}
@@ -645,17 +645,17 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
               placeholder="Texto exibido no app do aluno..."
               style={{
                 borderWidth: 1,
-                borderColor: fieldErrors.body ? "#FCA5A5" : "#E5E7EB",
-                borderRadius: 12,
+                borderColor: fieldErrors.body ? "var(--ds-danger)" : "var(--ds-border)",
+                borderRadius: 4,
                 padding: 12,
                 minHeight: 120,
                 textAlignVertical: "top",
                 fontSize: 14,
-                color: "#111827",
+                color: "var(--ds-ink)",
               }}
             />
             {fieldErrors.body ? (
-              <Text className="text-xs text-red-500 mt-1">{fieldErrors.body}</Text>
+              <Text className="text-xs text-danger mt-1">{fieldErrors.body}</Text>
             ) : null}
           </View>
 
@@ -711,7 +711,7 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
 
           {form.audience_type === "students" ? (
             <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+              <Text className="text-sm font-semibold text-ink mb-1.5">
                 Alunos selecionados ({form.student_ids.length})
               </Text>
               <TextInput
@@ -720,8 +720,8 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
                 placeholder="Buscar por nome ou matrícula..."
                 style={{
                   borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  borderRadius: 12,
+                  borderColor: "var(--ds-border)",
+                  borderRadius: 4,
                   padding: 12,
                   marginBottom: 8,
                   fontSize: 14,
@@ -731,8 +731,8 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
                 style={{
                   maxHeight: 220,
                   borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  borderRadius: 12,
+                  borderColor: "var(--ds-border)",
+                  borderRadius: 4,
                   overflow: "hidden",
                 }}
               >
@@ -743,28 +743,28 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
                       <TouchableOpacity
                         key={s.id}
                         onPress={() => toggleStudentSelection(s.id)}
-                        className={`flex-row items-center px-3 py-2.5 border-b border-gray-50 ${
-                          selected ? "bg-violet-50" : ""
+                        className={`flex-row items-center px-3 py-2.5 border-b border-border ${
+                          selected ? "bg-brand-tint" : ""
                         }`}
                       >
                         <Ionicons
                           name={selected ? "checkbox" : "square-outline"}
                           size={20}
-                          color={selected ? "#7C3AED" : "#9CA3AF"}
+                          color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                         />
-                        <Text className="ml-2 text-sm text-gray-700 flex-1">{s.name}</Text>
+                        <Text className="ml-2 text-sm text-ink flex-1">{s.name}</Text>
                       </TouchableOpacity>
                     );
                   })}
                 </ScrollView>
               </View>
               {fieldErrors.student_ids ? (
-                <Text className="text-xs text-red-500 mt-1">{fieldErrors.student_ids}</Text>
+                <Text className="text-xs text-danger mt-1">{fieldErrors.student_ids}</Text>
               ) : null}
             </View>
           ) : null}
 
-          <Text className="text-sm font-bold text-gray-700 mb-2 mt-2">
+          <Text className="text-sm font-semibold text-ink mb-2 mt-2">
             Ação no app (opcional)
           </Text>
           <FormSelect
@@ -795,9 +795,9 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
           ) : null}
 
           {previewCount !== null ? (
-            <View className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 mb-4">
-              <Text className="text-sm text-violet-800">
-                <Text className="font-bold">{previewCount}</Text> aluno(s) receberão esta
+            <View className="bg-brand-tint border border-border rounded-ds-md px-4 py-3 mb-4">
+              <Text className="text-sm text-brand">
+                <Text className="font-semibold">{previewCount}</Text> aluno(s) receberão esta
                 notificação.
               </Text>
             </View>
@@ -807,12 +807,12 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
             <TouchableOpacity
               onPress={handlePreview}
               disabled={previewLoading}
-              className="flex-1 rounded-xl border border-violet-200 bg-violet-50 py-3 items-center"
+              className="flex-1 rounded-ds-md border border-border bg-brand-tint py-3 items-center"
             >
               {previewLoading ? (
-                <ActivityIndicator color="#7C3AED" />
+                <ActivityIndicator color="var(--ds-brand)" />
               ) : (
-                <Text className="text-sm font-semibold text-violet-700">
+                <Text className="text-sm font-semibold text-brand">
                   Pré-visualizar destinatários
                 </Text>
               )}
@@ -820,12 +820,12 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
             <TouchableOpacity
               onPress={handleSend}
               disabled={sending}
-              className="flex-1 rounded-xl bg-violet-600 py-3 items-center"
+              className="flex-1 rounded-ds-md bg-brand py-3 items-center"
             >
               {sending ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="var(--ds-on-brand)" />
               ) : (
-                <Text className="text-sm font-semibold text-white">Enviar notificação</Text>
+                <Text className="text-sm font-medium text-on-brand">Enviar notificação</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -833,15 +833,15 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
       ) : null}
 
       {tab === "history" ? (
-        <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <View className="bg-surface rounded-ds-md border border-border overflow-hidden">
           {historyLoading ? (
             <View className="py-16 items-center">
-              <ActivityIndicator color="#7C3AED" />
+              <ActivityIndicator color="var(--ds-brand)" />
             </View>
           ) : broadcasts.length === 0 ? (
             <View className="py-16 items-center px-6">
-              <Ionicons name="notifications-off-outline" size={40} color="#9CA3AF" />
-              <Text className="text-gray-500 mt-3 text-center">
+              <Ionicons name="notifications-off-outline" size={40} color="var(--ds-ink-subtle)" />
+              <Text className="text-ink-muted mt-3 text-center">
                 Nenhum envio registrado ainda.
               </Text>
             </View>
@@ -849,12 +849,12 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
             broadcasts.map((b) => (
               <View
                 key={b.id}
-                className="px-4 py-4 border-b border-gray-50"
+                className="px-4 py-4 border-b border-border"
               >
                 <View className="flex-row items-start justify-between gap-2">
                   <View className="flex-1">
-                    <Text className="text-base font-bold text-gray-800">{b.title}</Text>
-                    <Text className="text-sm text-gray-500 mt-1" numberOfLines={2}>
+                    <Text className="text-base font-semibold text-ink">{b.title}</Text>
+                    <Text className="text-sm text-ink-muted mt-1" numberOfLines={2}>
                       {b.body}
                     </Text>
                   </View>
@@ -870,7 +870,7 @@ export default function NotificationsScreen({ navigate: _navigate }: WithNavigat
                     <Badge label="No calendário" variant="info" />
                   ) : null}
                 </View>
-                <Text className="text-xs text-gray-400 mt-2">
+                <Text className="text-xs text-ink-subtle mt-2">
                   {b.sent_by?.name ? `${b.sent_by.name} · ` : ""}
                   {b.created_at
                     ? new Date(b.created_at).toLocaleString("pt-BR")

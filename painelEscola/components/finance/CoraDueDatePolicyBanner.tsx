@@ -15,19 +15,19 @@ export default function CoraDueDatePolicyBanner({ message, emphasized = false }:
 
   return (
     <View
-      className={`rounded-xl border px-3 py-2.5 flex-row gap-2 ${
-        emphasized ? "bg-amber-50 border-amber-200" : "bg-sky-50 border-sky-200"
+      className={`rounded-ds-md border px-3 py-2.5 flex-row gap-2 ${
+        emphasized ? "bg-warning-tint border-warning" : "bg-brand-tint border-border"
       }`}
     >
       <Ionicons
         name="information-circle-outline"
         size={18}
-        color={emphasized ? "#B45309" : "#0369A1"}
+        color={emphasized ? "var(--ds-warning)" : "var(--ds-brand)"}
         style={{ marginTop: 1 }}
       />
       <Text
         className={`text-xs flex-1 leading-relaxed ${
-          emphasized ? "text-amber-900" : "text-sky-900"
+          emphasized ? "text-amber-900" : "text-brand"
         }`}
       >
         {text}

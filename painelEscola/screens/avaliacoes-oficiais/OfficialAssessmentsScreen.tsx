@@ -79,8 +79,8 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
     borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#111722",
-    backgroundColor: "white",
+    color: "var(--ds-ink)",
+    backgroundColor: "var(--ds-surface)",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
     flexGrow: isMobile ? 1 : 0,
@@ -215,7 +215,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
       activeOpacity={0.85}
       accessibilityLabel="Ações da avaliação"
     >
-      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5463" />
+      <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
     </TouchableOpacity>
   );
 
@@ -228,7 +228,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
   const renderAssessmentCard = (row: OfficialAssessmentListItem) => (
     <TouchableOpacity
       key={row.id}
-      onPress={() => openForm(row.id)}
+      onPress={() => setMenuAssessment(row)}
       activeOpacity={0.86}
       className="bg-surface rounded-ds-md border border-border p-4"
       style={{
@@ -299,12 +299,12 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
         </View>
         <TouchableOpacity
           onPress={() => openForm(null)}
-          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           style={{ justifyContent: "center", width: isMobile ? "100%" : undefined }}
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Nova avaliação</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Nova avaliação</Text>
         </TouchableOpacity>
       </View>
 
@@ -327,7 +327,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
             className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
             style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
-            <Ionicons name="search-outline" size={16} color="#5F6878" />
+            <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
             <input
               placeholder="Título da avaliação..."
               value={search}
@@ -340,14 +340,14 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#111722",
+                color: "var(--ds-ink)",
                 marginLeft: 8,
                 backgroundColor: "transparent",
               }}
             />
             {!!search.trim() ? (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#5F6878" />
+                <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -434,11 +434,11 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
         <View className="gap-3">
           {loading ? (
             <View className="items-center justify-center py-16 bg-surface rounded-ds-md border border-border">
-              <ActivityIndicator size="large" color="#1C3D63" />
+              <ActivityIndicator size="large" color="var(--ds-brand)" />
             </View>
           ) : rows.length === 0 ? (
             <View className="items-center justify-center py-14 bg-surface rounded-ds-md border border-border">
-              <Ionicons name="school-outline" size={40} color="#D9DDE3" />
+              <Ionicons name="school-outline" size={40} color="var(--ds-border)" />
               <Text className="text-ink-subtle mt-3 text-sm text-center px-6">
                 Nenhuma avaliação encontrada
               </Text>
@@ -497,16 +497,16 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
 
             {loading ? (
               <View className="items-center justify-center py-20">
-                <ActivityIndicator size="large" color="#1C3D63" />
+                <ActivityIndicator size="large" color="var(--ds-brand)" />
               </View>
             ) : rows.length === 0 ? (
               <View className="items-center justify-center py-16">
-                <Ionicons name="school-outline" size={40} color="#D9DDE3" />
+                <Ionicons name="school-outline" size={40} color="var(--ds-border)" />
                 <Text className="text-ink-subtle mt-3 text-sm">Nenhuma avaliação encontrada</Text>
               </View>
             ) : (
               rows.map((row, i) => (
-                <DataTableRow key={row.id} index={i} onPress={() => openForm(row.id)}>
+                <DataTableRow key={row.id} index={i} onPress={() => setMenuAssessment(row)}>
                   <View style={{ flex: 1.75, paddingRight: 10, minWidth: 0 }}>
                     <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>
                       {row.title}

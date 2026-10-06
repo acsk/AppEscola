@@ -525,7 +525,7 @@ export default function OfficialAssessmentFormScreen({
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#1C3D63" />
+        <ActivityIndicator size="large" color="var(--ds-brand)" />
       </View>
     );
   }
@@ -546,7 +546,7 @@ export default function OfficialAssessmentFormScreen({
           className="bg-surface rounded-ds-md p-6 items-center border border-border"
           style={cardShadow}
         >
-          <Ionicons name="alert-circle-outline" size={40} color="#D9DDE3" />
+          <Ionicons name="alert-circle-outline" size={40} color="var(--ds-border)" />
           <Text className="text-base font-semibold text-ink text-center mt-3">
             Não foi possível carregar esta avaliação.
           </Text>
@@ -555,7 +555,7 @@ export default function OfficialAssessmentFormScreen({
           </Text>
           <TouchableOpacity
             onPress={() => navigate("avaliacoes-oficiais")}
-            className="mt-5 px-5 py-2.5 rounded-ds-md border border-border"
+            className="mt-5 px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             activeOpacity={0.8}
           >
             <Text className="text-sm font-semibold text-ink">Voltar para lista</Text>
@@ -643,7 +643,7 @@ export default function OfficialAssessmentFormScreen({
                     <Ionicons
                       name={selected ? "checkbox" : "square-outline"}
                       size={20}
-                      color={selected ? "#1C3D63" : "#5F6878"}
+                      color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                     />
                     <Text
                       className={`text-sm font-medium ${
@@ -741,7 +741,7 @@ export default function OfficialAssessmentFormScreen({
         >
           <TouchableOpacity
             onPress={() => navigate("avaliacoes-oficiais")}
-            className="px-5 py-2.5 rounded-ds-md border border-border bg-surface"
+            className="px-5 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
             <Text className="text-sm font-semibold text-ink">Cancelar</Text>
@@ -750,22 +750,22 @@ export default function OfficialAssessmentFormScreen({
             <TouchableOpacity
               onPress={() => setDeleteModalVisible(true)}
               disabled={deleting}
-              className="px-5 py-2.5 rounded-ds-md border border-danger bg-danger-tint flex-row items-center gap-2"
+              className="px-5 py-2 rounded-ds-md border border-danger bg-danger flex-row items-center gap-2 min-h-control-md"
               activeOpacity={0.85}
             >
-              <Ionicons name="trash-outline" size={16} color="#B0261B" />
-              <Text className="text-sm font-semibold text-danger">Excluir</Text>
+              <Ionicons name="trash-outline" size={16} color="var(--ds-on-danger)" />
+              <Text className="text-sm font-semibold text-on-danger">Excluir</Text>
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
             onPress={save}
             disabled={saving || status === "published"}
-            className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
+            className="px-5 rounded-ds-md bg-brand flex-row items-center gap-2 py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
             style={{ opacity: saving || status === "published" ? 0.6 : 1 }}
           >
-            {saving ? <ActivityIndicator size="small" color="white" /> : null}
-            <Text className="text-sm font-semibold text-white">
+            {saving ? <ActivityIndicator size="small" color="var(--ds-on-brand)" /> : null}
+            <Text className="text-sm font-medium text-on-brand">
               {saving ? "Salvando..." : "Salvar avaliação"}
             </Text>
           </TouchableOpacity>
@@ -781,9 +781,9 @@ export default function OfficialAssessmentFormScreen({
             <Ionicons
               name={status === "published" ? "checkmark-circle" : "megaphone-outline"}
               size={16}
-              color="white"
+              color="var(--ds-on-brand)"
             />
-            <Text className="text-sm font-semibold text-white">
+            <Text className="text-sm font-medium text-on-brand">
               {status === "published" ? "Publicada" : "Publicar"}
             </Text>
           </TouchableOpacity>
@@ -811,12 +811,12 @@ export default function OfficialAssessmentFormScreen({
           <TouchableOpacity
             onPress={() => openGradesModal()}
             disabled={status === "published"}
-            className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center justify-center gap-2"
+            className="px-5 rounded-ds-md bg-brand flex-row items-center justify-center gap-2 py-2 min-h-control-md"
             activeOpacity={0.85}
             style={{ opacity: status === "published" ? 0.6 : 1 }}
           >
-            <Ionicons name="create-outline" size={16} color="white" />
-            <Text className="text-sm font-semibold text-white">Lançar notas</Text>
+            <Ionicons name="create-outline" size={16} color="var(--ds-on-brand)" />
+            <Text className="text-sm font-medium text-on-brand">Lançar notas</Text>
           </TouchableOpacity>
         </View>
 
@@ -847,7 +847,7 @@ export default function OfficialAssessmentFormScreen({
           >
             <TouchableOpacity
               onPress={closeGradesModal}
-              className="px-5 py-2.5 rounded-ds-md border border-border bg-surface"
+              className="px-5 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
               activeOpacity={0.85}
             >
               <Text className="text-sm font-semibold text-ink">Fechar</Text>
@@ -855,15 +855,15 @@ export default function OfficialAssessmentFormScreen({
             <TouchableOpacity
               onPress={saveGrades}
               disabled={!assessmentBackendId || savingGrades || status === "published"}
-              className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
+              className="px-5 rounded-ds-md bg-brand flex-row items-center gap-2 py-2 min-h-control-md justify-center"
               activeOpacity={0.85}
               style={{
                 opacity: !assessmentBackendId || savingGrades || status === "published" ? 0.6 : 1,
               }}
             >
-              {savingGrades ? <ActivityIndicator size="small" color="white" /> : null}
-              <Ionicons name="save-outline" size={16} color="white" />
-              <Text className="text-sm font-semibold text-white">
+              {savingGrades ? <ActivityIndicator size="small" color="var(--ds-on-brand)" /> : null}
+              <Ionicons name="save-outline" size={16} color="var(--ds-on-brand)" />
+              <Text className="text-sm font-medium text-on-brand">
                 {savingGrades
                   ? "Salvando..."
                   : gradesModalStudentId != null

@@ -202,7 +202,7 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
           visible: true,
           type: "error",
           message:
-            e?.response?.data?.message || "Nao foi possivel salvar o pacote.",
+            e?.response?.data?.message || "Não foi possível salvar o pacote.",
         });
       }
     }
@@ -234,7 +234,7 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#1C3D63" />
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
         </View>
       ) : (
         <View>
@@ -284,8 +284,8 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
                     borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: "#111722",
-                    backgroundColor: "white",
+                    color: "var(--ds-ink)",
+                    backgroundColor: "var(--ds-surface)",
                   }}
                 >
                   {BILLING_CYCLES.map((c) => (
@@ -310,7 +310,7 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
 
             {monthly !== null && (
               <View className="flex-row items-center gap-2 bg-brand-tint rounded-ds-md px-3 py-2 mt-2">
-                <Ionicons name="trending-down-outline" size={14} color="#1C3D63" />
+                <Ionicons name="trending-down-outline" size={14} color="var(--ds-brand)" />
                 <Text className="text-xs text-brand">
                   Equivalente a{" "}
                   <Text className="font-semibold">{fmtBRL(monthly)}/mês</Text> por
@@ -334,8 +334,8 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
                   borderRadius: 4,
                   padding: "9px 12px",
                   fontSize: 14,
-                  color: "#111722",
-                  backgroundColor: "white",
+                  color: "var(--ds-ink)",
+                  backgroundColor: "var(--ds-surface)",
                 }}
               >
                 {STATUS_OPTIONS.map((o) => (
@@ -363,14 +363,14 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
 
             {errors.course_ids && (
               <View className="flex-row items-center gap-2 bg-danger-tint border border-danger rounded-ds-md px-3 py-2 mb-3">
-                <Ionicons name="alert-circle-outline" size={14} color="#B0261B" />
+                <Ionicons name="alert-circle-outline" size={14} color="var(--ds-danger)" />
                 <Text className="text-xs text-danger">{errors.course_ids}</Text>
               </View>
             )}
 
             {courseOptions.length === 0 ? (
               <View className="items-center py-8">
-                <Ionicons name="book-outline" size={32} color="#D9DDE3" />
+                <Ionicons name="book-outline" size={32} color="var(--ds-border)" />
                 <Text className="text-ink-subtle text-sm mt-2">
                   Nenhum curso ativo disponível
                 </Text>
@@ -393,7 +393,7 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
                       <Ionicons
                         name={selected ? "checkbox" : "square-outline"}
                         size={20}
-                        color={selected ? "#1C3D63" : "#5F6878"}
+                        color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                       />
                       <Text
                         className={`text-sm font-medium ${
@@ -410,7 +410,7 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
 
             {form.course_ids.length > 0 && (
               <View className="flex-row items-center gap-2 bg-success-tint border border-success rounded-ds-md px-3 py-2 mt-3">
-                <Ionicons name="checkmark-circle-outline" size={14} color="#1C6A45" />
+                <Ionicons name="checkmark-circle-outline" size={14} color="var(--ds-success)" />
                 <Text className="text-xs text-success">
                   {form.course_ids.length} curso
                   {form.course_ids.length !== 1 ? "s" : ""} selecionado
@@ -425,7 +425,7 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
           <View className="flex-row justify-end gap-3 mt-2">
             <TouchableOpacity
               onPress={() => navigate("pacotes")}
-              className="px-6 py-3 rounded-ds-md border border-border bg-surface"
+              className="px-6 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
               activeOpacity={0.8}
             >
               <Text className="text-sm font-semibold text-ink">
@@ -439,11 +439,11 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
               activeOpacity={0.85}
             >
               {saving ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
                 <>
-                  <Ionicons name="checkmark" size={16} color="white" />
-                  <Text className="text-sm font-semibold text-white">
+                  <Ionicons name="checkmark" size={16} color="var(--ds-on-brand)" />
+                  <Text className="text-sm font-medium text-on-brand">
                     {isEdit ? "Salvar alterações" : "Cadastrar pacote"}
                   </Text>
                 </>

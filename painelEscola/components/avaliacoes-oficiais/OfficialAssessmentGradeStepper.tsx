@@ -90,7 +90,7 @@ function PresenceButtons({
         }`}
         style={{ opacity: disabled ? 0.6 : 1 }}
       >
-        <Ionicons name="checkmark-circle" size={iconSize} color={!isAbsent ? "#1C6A45" : "#5F6878"} />
+        <Ionicons name="checkmark-circle" size={iconSize} color={!isAbsent ? "var(--ds-success)" : "var(--ds-ink-subtle)"} />
         <Text className={`text-xs font-semibold ${!isAbsent ? "text-success" : "text-ink-muted"}`}>
           Presente
         </Text>
@@ -104,7 +104,7 @@ function PresenceButtons({
         }`}
         style={{ opacity: disabled ? 0.6 : 1 }}
       >
-        <Ionicons name="close-circle" size={iconSize} color={isAbsent ? "#B0261B" : "#5F6878"} />
+        <Ionicons name="close-circle" size={iconSize} color={isAbsent ? "var(--ds-danger)" : "var(--ds-ink-subtle)"} />
         <Text className={`text-xs font-semibold ${isAbsent ? "text-danger" : "text-ink-muted"}`}>Faltou</Text>
       </TouchableOpacity>
     </View>
@@ -133,7 +133,7 @@ function SubjectGradeField({
         editable={editable}
         keyboardType="decimal-pad"
         placeholder="0"
-        placeholderTextColor="#5F6878"
+        placeholderTextColor="var(--ds-ink-subtle)"
         className="bg-surface border border-border rounded-ds-md px-3 text-sm font-semibold text-ink"
         style={{
           height: 40,
@@ -262,8 +262,8 @@ export default function OfficialAssessmentGradeStepper({
 
       {current ? (
         <>
-          <View className="rounded-ds-md border-2 border-border bg-brand px-4 py-3 mb-3">
-            <Text className="text-lg font-semibold text-white leading-tight" numberOfLines={2}>
+          <View className="rounded-ds-md border-2 border-border bg-brand px-4 mb-3 py-2 min-h-control-md justify-center">
+            <Text className="text-lg font-medium text-on-brand leading-tight" numberOfLines={2}>
               {current.student_name}
             </Text>
             {current.enrollment_number ? (
@@ -273,7 +273,7 @@ export default function OfficialAssessmentGradeStepper({
             ) : null}
             {currentComplete ? (
               <View className="flex-row items-center gap-1 mt-1.5">
-                <Ionicons name="checkmark-circle" size={14} color="#1C6A45" />
+                <Ionicons name="checkmark-circle" size={14} color="var(--ds-success)" />
                 <Text className="text-[11px] font-semibold text-emerald-100">
                   Lançamento completo
                 </Text>
@@ -336,22 +336,22 @@ export default function OfficialAssessmentGradeStepper({
           <TouchableOpacity
             onPress={() => setStepIndex((i) => Math.max(0, i - 1))}
             disabled={stepIndex === 0}
-            className="flex-1 flex-row items-center justify-center gap-1 px-3 py-2 rounded-ds-md border border-border bg-surface"
+            className="flex-1 flex-row items-center justify-center gap-1 px-3 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md"
             activeOpacity={0.85}
             style={{ opacity: stepIndex === 0 ? 0.45 : 1 }}
           >
-            <Ionicons name="chevron-back" size={16} color="#4B5463" />
+            <Ionicons name="chevron-back" size={16} color="var(--ds-ink-muted)" />
             <Text className="text-xs font-semibold text-ink">Anterior</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setStepIndex((i) => Math.min(totalSteps - 1, i + 1))}
             disabled={stepIndex >= totalSteps - 1}
-            className="flex-1 flex-row items-center justify-center gap-1 px-3 py-2 rounded-ds-md bg-brand"
+            className="flex-1 flex-row items-center justify-center gap-1 px-3 rounded-ds-md bg-brand py-2 min-h-control-md"
             activeOpacity={0.85}
             style={{ opacity: stepIndex >= totalSteps - 1 ? 0.45 : 1 }}
           >
-            <Text className="text-xs font-semibold text-white">Próximo</Text>
-            <Ionicons name="chevron-forward" size={16} color="white" />
+            <Text className="text-xs font-medium text-on-brand">Próximo</Text>
+            <Ionicons name="chevron-forward" size={16} color="var(--ds-on-brand)" />
           </TouchableOpacity>
         </View>
       ) : null}
@@ -360,13 +360,13 @@ export default function OfficialAssessmentGradeStepper({
         <TouchableOpacity
           onPress={onSaveGrades}
           disabled={!canSaveGrades || savingGrades || readOnly}
-          className="self-start mt-3 px-4 py-2 rounded-ds-md bg-brand flex-row items-center gap-2"
+          className="self-start mt-3 px-4 rounded-ds-md bg-brand flex-row items-center gap-2 py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
           style={{ opacity: !canSaveGrades || savingGrades || readOnly ? 0.6 : 1 }}
         >
-          {savingGrades ? <ActivityIndicator size="small" color="white" /> : null}
-          <Ionicons name="save-outline" size={14} color="white" />
-          <Text className="text-xs font-semibold text-white">
+          {savingGrades ? <ActivityIndicator size="small" color="var(--ds-on-brand)" /> : null}
+          <Ionicons name="save-outline" size={14} color="var(--ds-on-brand)" />
+          <Text className="text-xs font-medium text-on-brand">
             {savingGrades ? "Salvando..." : "Salvar todas as notas"}
           </Text>
         </TouchableOpacity>

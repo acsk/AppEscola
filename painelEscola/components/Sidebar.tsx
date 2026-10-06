@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, TouchableOpacity, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import {
   Archive,
   Bell,
@@ -21,6 +21,7 @@ import {
   Library,
   Link2,
   Palette,
+  Sparkles,
   Tags,
   UserCog,
   UserRound,
@@ -57,6 +58,7 @@ export default function Sidebar({
   onSelectItem,
   canManageTenants = false,
   canManageUsers = false,
+  canManageAi = false,
   canManageExams = false,
   canSendNotifications = false,
   isMobile = false,
@@ -120,6 +122,7 @@ export default function Sidebar({
       items: [
         { id: "configuracoes-cobranca", label: "Regras de cobrança", icon: Calculator },
         { id: "configuracoes-tema-mobile", label: "Tema do app mobile", icon: Palette },
+        ...(canManageAi ? [{ id: "configuracoes-ia", label: "Integração com IA", icon: Sparkles }] : []),
       ],
     },
     ...(canManageTenants
@@ -157,49 +160,52 @@ export default function Sidebar({
   const renderItem = (item: SidebarItem) => {
     const isActive = activeItem === item.id;
     return (
-      <TouchableOpacity
+      <Pressable
         key={item.id}
         onPress={() => handlePress(item.id)}
         role="link"
         aria-current={isActive ? "page" : undefined}
-        className={`flex-row items-center rounded-ds-md px-3 ${isActive ? "bg-brand-tint" : ""}`}
-        style={{ height: 34, gap: 12 }}
-        activeOpacity={0.7}
+        style={(state) => ({
+          // Layout todo em style: com style em função, o NativeWind descarta o className do Pressable.
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 12,
+          borderRadius: 4,
+          height: 34,
+          gap: 12,
+          // `hovered` existe no RN Web (não está nos tipos do RN).
+          backgroundColor: isActive
+            ? color["nav-active"]
+            : (state as { hovered?: boolean }).hovered
+              ? color["nav-hover"]
+              : "transparent",
+        })}
       >
-        {/* Barra de acento do item ativo: o único uso de `accent` na navegação. */}
+        {/* Barra de acento do item ativo: o único uso de acento na navegação. */}
         {isActive && (
-          <View style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, backgroundColor: color.accent }} />
+          <View style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, backgroundColor: color["nav-accent"] }} />
         )}
-        <Icon icon={item.icon} color={isActive ? color.brand : color["ink-muted"]} />
-        <Text
-          className={`text-sm flex-1 ${isActive ? "font-medium text-brand" : "text-ink-muted"}`}
-          numberOfLines={1}
-        >
+        <Icon icon={item.icon} color={isActive ? color["nav-ink"] : color["nav-ink-muted"]} />
+        <Text className={`text-sm flex-1 ${isActive ? "font-medium text-nav-ink" : "text-nav-ink-muted"}`} numberOfLines={1}>
           {item.label}
         </Text>
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
   return (
     <View
-      className="bg-surface border-r border-border"
+      data-nav
+      className="bg-nav-bg"
       style={{
         width: isMobile ? Math.min(304, width * 0.86) : size["sidebar-width"],
         height: "100%",
       }}
     >
       {/* Marca + versão */}
-      <View
-        className="flex-row items-center border-b border-border px-4"
-        style={{ height: size["topbar-height"], gap: 12 }}
-      >
-        <View
-          className="bg-brand rounded-ds-sm items-center justify-center"
-          style={{ width: 28, height: 28 }}
-          aria-hidden
-        >
-          <Text className="text-xs font-semibold text-on-brand" style={{ letterSpacing: 0.3 }}>
+      <View className="flex-row items-center border-b border-nav-divider px-4" style={{ height: size["topbar-height"], gap: 12 }}>
+        <View className="bg-nav-ink rounded-ds-sm items-center justify-center" style={{ width: 28, height: 28 }} aria-hidden>
+          <Text className="text-xs font-semibold text-nav-bg" style={{ letterSpacing: 0.3 }}>
             CH
           </Text>
         </View>
@@ -209,14 +215,14 @@ export default function Sidebar({
           className="flex-1"
           aria-label={`Cursinho Hub. Versão: API ${apiVersion}, app ${appVersion}. Copiar informações de versão`}
         >
-          <Text className="font-semibold text-ink" style={{ fontSize: 15, lineHeight: 18 }}>
+          <Text className="font-semibold text-nav-ink" style={{ fontSize: 15, lineHeight: 18 }}>
             Cursinho Hub
           </Text>
           <View className="flex-row items-center" style={{ gap: 4 }}>
-            <Text className="font-mono text-ink-subtle" style={{ fontSize: 11, lineHeight: 14 }} numberOfLines={1}>
+            <Text className="font-mono text-nav-label" style={{ fontSize: 11, lineHeight: 14 }} numberOfLines={1}>
               {appVersion} · API {apiVersion}
             </Text>
-            <Icon icon={versionCopied ? Check : Copy} size={16} color={versionCopied ? color.success : color["ink-subtle"]} />
+            <Icon icon={versionCopied ? Check : Copy} size={16} color={versionCopied ? color["nav-accent"] : color["nav-label"]} />
           </View>
         </TouchableOpacity>
         {isMobile && (
@@ -227,26 +233,32 @@ export default function Sidebar({
             aria-label="Fechar menu"
             activeOpacity={0.8}
           >
-            <Icon icon={X} />
+            <Icon icon={X} color={color["nav-ink-muted"]} />
           </TouchableOpacity>
         )}
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 12 }} aria-label="Navegação principal">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }} aria-label="Navegação principal">
         {sections.map((section, index) => (
-          <View key={section.label ?? `secao-${index}`} style={{ marginTop: index === 0 ? 0 : 12 }}>
+          <View
+            key={section.label ?? `secao-${index}`}
+            className={index === 0 ? "" : "border-t border-nav-divider"}
+            style={{ paddingVertical: 12 }}
+          >
             {section.label && (
               <Text
-                className="font-semibold text-ink-subtle uppercase px-4 py-2"
-                style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.9 }}
+                className="font-semibold text-nav-label uppercase px-4"
+                style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.9, paddingTop: 4, paddingBottom: 8 }}
               >
                 {section.label}
               </Text>
             )}
-            <View className="px-2">{section.items.map(renderItem)}</View>
+            <View className="px-2" style={{ gap: 2 }}>
+              {section.items.map(renderItem)}
+            </View>
           </View>
         ))}
-        <Text className="font-mono text-ink-subtle px-4 mt-4" style={{ fontSize: 11, lineHeight: 14 }}>
+        <Text className="font-mono text-nav-label px-4" style={{ fontSize: 11, lineHeight: 14 }}>
           Build {buildDate}
         </Text>
       </ScrollView>

@@ -8,6 +8,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Modal from "../ui/Modal";
+import DataTableRow from "../ui/DataTableRow";
+import { TABLE_CONTAINER, TABLE_HEADER_CELL, TABLE_HEADER_ROW, TABLE_HEADER_ROW_STYLE } from "../ui/dataTableStyles";
 import {
   fetchExamQuestionErrorsReport,
   type ExamQuestionErrorsReport,
@@ -131,12 +133,12 @@ export default function ExamQuestionErrorsReportModal({
 
       {loading ? (
         <View className="py-10 items-center">
-          <ActivityIndicator size="large" color="#1C3D63" />
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
           <Text className="text-sm text-ink-muted mt-3">Carregando relatório…</Text>
         </View>
       ) : error ? (
         <View className="py-8 items-center px-4">
-          <Ionicons name="alert-circle-outline" size={28} color="#8A5200" />
+          <Ionicons name="alert-circle-outline" size={28} color="var(--ds-warning)" />
           <Text className="text-sm text-warning text-center mt-2">{error}</Text>
         </View>
       ) : report ? (
@@ -145,28 +147,28 @@ export default function ExamQuestionErrorsReportModal({
             <TouchableOpacity
               onPress={handleExport}
               disabled={exporting}
-              className="flex-row items-center bg-brand px-4 py-2 rounded-ds-md"
+              className="flex-row items-center bg-brand px-4 rounded-ds-md py-2 min-h-control-md justify-center"
               activeOpacity={0.85}
             >
               {exporting ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color="var(--ds-on-brand)" />
               ) : (
-                <Ionicons name="download-outline" size={16} color="#fff" />
+                <Ionicons name="download-outline" size={16} color="var(--ds-on-brand)" />
               )}
-              <Text className="text-white font-semibold text-sm ml-1.5">
+              <Text className="text-on-brand font-medium text-sm ml-1.5">
                 Exportar PDF
               </Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator>
-            <View className="border border-border rounded-ds-md overflow-hidden bg-surface">
-              <View className="flex-row bg-surface-sunken border-b border-border px-3 py-2">
-                <Text className="w-10 text-[11px] font-semibold text-ink-muted">#</Text>
-                <Text className="flex-1 text-[11px] font-semibold text-ink-muted">Questão</Text>
-                <Text className="w-14 text-[11px] font-semibold text-ink-muted text-right">Erros</Text>
-                <Text className="w-16 text-[11px] font-semibold text-ink-muted text-right">% Erro</Text>
-                <Text className="w-16 text-[11px] font-semibold text-ink-muted text-right">% Acer.</Text>
+            <View className={TABLE_CONTAINER}>
+              <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+                <Text className={`w-10 ${TABLE_HEADER_CELL}`}>#</Text>
+                <Text className={`flex-1 ${TABLE_HEADER_CELL}`}>Questão</Text>
+                <Text className={`w-14 text-right ${TABLE_HEADER_CELL}`}>Erros</Text>
+                <Text className={`w-16 text-right ${TABLE_HEADER_CELL}`}>% Erro</Text>
+                <Text className={`w-16 text-right ${TABLE_HEADER_CELL}`}>% Acer.</Text>
               </View>
 
               {report.questions.length === 0 ? (
@@ -175,38 +177,35 @@ export default function ExamQuestionErrorsReportModal({
                 </View>
               ) : (
                 report.questions.map((q, idx) => (
-                  <View
-                    key={q.question_id}
-                    className="flex-row items-start px-3 py-2.5 border-b border-border"
-                  >
-                    <Text className="w-10 text-xs font-semibold text-ink pt-0.5">
+                  <DataTableRow key={q.question_id} index={idx} style={{ alignItems: "flex-start" }}>
+                    <Text className="w-10 text-sm font-mono text-ink">
                       {idx + 1}
                     </Text>
                     <View className="flex-1 pr-2">
-                      <Text className="text-xs text-ink" numberOfLines={3}>
-                        <Text className="font-semibold text-ink-muted">#{q.order} · </Text>
+                      <Text className="text-sm text-ink" numberOfLines={3}>
+                        <Text className="font-mono text-ink-muted">#{q.order} · </Text>
                         {q.question_text_preview}
                       </Text>
                       {(q.subject || q.total_answers === 0) && (
-                        <Text className="text-[11px] text-ink-subtle mt-0.5">
+                        <Text className="text-xs text-ink-subtle mt-0.5">
                           {q.subject ? q.subject : ""}
                           {q.subject && q.total_answers === 0 ? " · " : ""}
                           {q.total_answers === 0 ? "sem respostas corrigidas" : ""}
                         </Text>
                       )}
                     </View>
-                    <Text className="w-14 text-xs text-ink text-right font-semibold pt-0.5">
+                    <Text className="w-14 text-sm font-mono text-ink text-right">
                       {q.wrong_count}/{q.total_answers}
                     </Text>
                     <Text
-                      className={`w-16 text-xs text-right font-semibold pt-0.5 ${errorTone(q.error_rate)}`}
+                      className={`w-16 text-sm font-mono text-right ${errorTone(q.error_rate)}`}
                     >
                       {fmtPct(q.error_rate)}
                     </Text>
-                    <Text className="w-16 text-xs text-ink-muted text-right pt-0.5">
+                    <Text className="w-16 text-sm font-mono text-ink-muted text-right">
                       {fmtPct(q.hit_rate)}
                     </Text>
-                  </View>
+                  </DataTableRow>
                 ))
               )}
             </View>

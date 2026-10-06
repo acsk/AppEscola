@@ -71,7 +71,7 @@ function getPickerValue(value: string, fallback: string): string {
   const normalizedFallback = normalizeHexInput(fallback);
   if (isFullHex(normalizedFallback)) return normalizedFallback;
   if (isFullHex(normalizeHexInput(fallback))) return normalizeHexInput(fallback);
-  return "#4F46E5";
+  return "#4F46E5"; // ds-keep (cor padrão do app mobile: dado, não estilo)
 }
 
 type ColorFieldProps = {
@@ -120,13 +120,13 @@ function ColorField({
 
   return (
     <View
-      className="flex-row items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2"
+      className="flex-row items-center gap-3 rounded-ds-md border border-border-strong bg-surface px-3 py-2 min-h-control-md justify-center"
       style={{ minWidth: 300, flexBasis: 360, flexGrow: 1 }}
     >
       <TouchableOpacity
         onPress={openColorPicker}
         disabled={!editable}
-        className="h-9 w-9 rounded-lg border border-gray-200"
+        className="h-9 w-9 rounded-ds-md border border-border"
         style={{ backgroundColor: previewColor }}
         activeOpacity={0.8}
       >
@@ -151,11 +151,11 @@ function ColorField({
       </TouchableOpacity>
 
       <View className="min-w-0 flex-1">
-        <Text className="text-sm font-semibold text-gray-700" numberOfLines={1}>
+        <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
           {label}
         </Text>
         {description ? (
-          <Text className="mt-0.5 text-xs text-gray-500" numberOfLines={1}>
+          <Text className="mt-0.5 text-xs text-ink-muted" numberOfLines={1}>
             {description}
           </Text>
         ) : null}
@@ -169,13 +169,13 @@ function ColorField({
           if (value.trim()) onChange(normalizeHexInput(value));
         }}
         placeholder={normalizeHexInput(defaultValue)}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor="var(--ds-ink-subtle)"
         editable={editable}
         autoCapitalize="characters"
         autoCorrect={false}
         spellCheck={false}
-        className={`h-9 w-28 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-800 ${
-          editable ? "" : "text-gray-400"
+        className={`h-9 w-28 rounded-ds-md border border-border bg-surface-sunken px-3 text-sm font-semibold text-ink ${
+          editable ? "" : "text-ink-subtle"
         }`}
       />
     </View>
@@ -387,12 +387,9 @@ export default function MobileThemeSettingsScreen() {
       />
 
       <View className="mb-4 flex-row items-start">
-        <View className="w-10 h-10 rounded-xl bg-violet-100 items-center justify-center mr-3">
-          <Ionicons name="color-palette-outline" size={20} color="#7C3AED" />
-        </View>
         <View className="flex-1">
-          <Text className="text-xl font-bold text-gray-900">Tema do app mobile</Text>
-          <Text className="text-sm text-gray-500 mt-0.5">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Tema do app mobile</Text>
+          <Text className="text-sm text-ink-muted mt-0.5">
             Personalize as cores que os alunos veem no mobileEscola. A logo é configurada no
             cadastro do tenant.
           </Text>
@@ -412,37 +409,37 @@ export default function MobileThemeSettingsScreen() {
       )}
 
       {logoUrl ? (
-        <View className="mb-3 flex-row items-center gap-3 bg-white rounded-xl border border-gray-100 px-3 py-2">
+        <View className="mb-3 flex-row items-center gap-3 bg-surface rounded-ds-md border border-border-strong px-3 py-2 min-h-control-md justify-center">
           <Image
             source={{ uri: logoUrl }}
-            style={{ width: 44, height: 44, borderRadius: 10 }}
+            style={{ width: 44, height: 44, borderRadius: 4 }}
             resizeMode="contain"
           />
           <View className="flex-1">
-            <Text className="text-sm font-semibold text-gray-800">Logo atual</Text>
-            <Text className="text-xs text-gray-500 mt-0.5">
-              Altere em Tenants → foto da escola.
+            <Text className="text-sm font-semibold text-ink">Logo atual</Text>
+            <Text className="text-xs text-ink-muted mt-0.5">
+              Altere em tenants → foto da escola.
             </Text>
           </View>
         </View>
       ) : null}
 
-      <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <View className="bg-surface rounded-ds-md border border-border overflow-hidden">
         {loading ? (
           <View className="p-10 items-center">
-            <ActivityIndicator size="large" color="#7C3AED" />
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
           </View>
         ) : !draft ? (
           <View className="p-6">
-            <Text className="text-sm text-gray-600">Selecione um tenant para editar o tema.</Text>
+            <Text className="text-sm text-ink-muted">Selecione um tenant para editar o tema.</Text>
           </View>
         ) : (
           <View className="p-4 gap-5">
             <View>
-              <Text className="text-xs font-bold text-violet-700 uppercase mb-2">
+              <Text className="text-xs font-semibold text-brand uppercase mb-2">
                 Templates prontos
               </Text>
-              <Text className="text-xs text-gray-500 mb-3">
+              <Text className="text-xs text-ink-muted mb-3">
                 Escolha um ponto de partida e ajuste as cores abaixo se precisar.
               </Text>
               <View className="flex-row flex-wrap gap-3">
@@ -456,10 +453,10 @@ export default function MobileThemeSettingsScreen() {
                       key={tpl.id}
                       onPress={() => canEdit && applyTemplateLocally(tpl.id)}
                       disabled={!canEdit}
-                      className={`min-w-[150px] flex-1 rounded-xl border px-3 py-2.5 ${
+                      className={`min-w-[150px] flex-1 rounded-ds-md border px-3 py-2.5 ${
                         selected
-                          ? "border-violet-500 bg-violet-50"
-                          : "border-gray-200 bg-white"
+                          ? "border-brand bg-brand-tint"
+                          : "border-border bg-surface"
                       }`}
                       activeOpacity={0.85}
                     >
@@ -467,19 +464,19 @@ export default function MobileThemeSettingsScreen() {
                         {swatches.slice(0, 3).map((hex, idx) => (
                           <View
                             key={`${tpl.id}-${idx}`}
-                            className="h-5 flex-1 rounded-md border border-gray-200"
+                            className="h-5 flex-1 rounded-ds-md border border-border"
                             style={{ backgroundColor: hex }}
                           />
                         ))}
                       </View>
                       <Text
-                        className={`text-sm font-bold ${
-                          selected ? "text-violet-800" : "text-gray-800"
+                        className={`text-sm font-semibold ${
+                          selected ? "text-brand" : "text-ink"
                         }`}
                       >
                         {tpl.name}
                       </Text>
-                      <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
+                      <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={2}>
                         {tpl.description}
                       </Text>
                     </TouchableOpacity>
@@ -490,7 +487,7 @@ export default function MobileThemeSettingsScreen() {
 
             {groupedFields.map((group) => (
               <View key={group.id}>
-                <Text className="text-xs font-bold text-violet-700 uppercase mb-2">
+                <Text className="text-xs font-semibold text-brand uppercase mb-2">
                   {group.label}
                 </Text>
                 <View className="flex-row flex-wrap gap-3">
@@ -521,26 +518,26 @@ export default function MobileThemeSettingsScreen() {
                 <TouchableOpacity
                   onPress={() => void handleSave()}
                   disabled={saving || !isDirty}
-                  className={`px-5 py-2.5 rounded-xl ${
-                    saving || !isDirty ? "bg-violet-300" : "bg-violet-600"
+                  className={`px-5 py-2.5 rounded-ds-md ${
+                    saving || !isDirty ? "bg-brand-tint" : "bg-brand"
                   }`}
                   activeOpacity={0.85}
                 >
-                  <Text className="text-white font-semibold">
+                  <Text className="text-on-brand font-medium">
                     {saving ? "Salvando…" : "Salvar alterações"}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setConfirmReset(true)}
                   disabled={resetting}
-                  className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white"
+                  className="px-5 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
                   activeOpacity={0.85}
                 >
-                  <Text className="text-gray-700 font-semibold">Restaurar padrão</Text>
+                  <Text className="text-ink font-semibold">Restaurar padrão</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text className="text-sm text-amber-700">
+              <Text className="text-sm text-warning">
                 Seu perfil pode visualizar, mas não alterar estas cores.
               </Text>
             )}

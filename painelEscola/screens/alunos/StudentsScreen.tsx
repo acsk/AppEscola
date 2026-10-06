@@ -261,11 +261,11 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         event?.stopPropagation?.();
         setMenuStudent(toActionItem(item));
       }}
-      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+      className="p-1.5 bg-surface-sunken rounded-ds-md border border-border"
       activeOpacity={0.85}
       accessibilityLabel="Ações do aluno"
     >
-      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+      <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
     </TouchableOpacity>
   );
 
@@ -278,34 +278,30 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
       key={item.id}
       onPress={() => openStudentMenu(item)}
       activeOpacity={0.9}
-      className="bg-white border border-gray-200 rounded-xl p-3"
+      className="bg-surface border border-border rounded-ds-md p-3"
       style={{
-        shadowColor: "#000",
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 1,
       }}
     >
       <View className="flex-row items-start justify-between gap-3">
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text className="text-sm font-semibold text-gray-800" numberOfLines={2}>
+          <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
             {item.name}
           </Text>
-          <Text className="text-xs font-mono text-violet-600 font-semibold mt-0.5">
+          <Text className="text-xs font-mono text-brand font-semibold mt-0.5">
             {item.enrollment_number ?? "Sem matrícula"}
           </Text>
         </View>
         {renderActionsButton(item)}
       </View>
       <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
-        <Text className="text-xs text-gray-500">Documento: {fmtDocument(item.document) ?? "—"}</Text>
-        <Text className="text-xs text-gray-500">
+        <Text className="text-xs text-ink-muted">Documento: {fmtDocument(item.document) ?? "—"}</Text>
+        <Text className="text-xs text-ink-muted">
           Telefone: {item.phone ? maskPhone(item.phone) : "—"}
         </Text>
-        <Text className="text-xs text-gray-500">Nascimento: {fmtDate(item.birth_date)}</Text>
-        <Text className="text-xs text-gray-500">E-mail: {fmtEmail(item.email)}</Text>
-        <Text className="text-xs text-gray-500">Cursos: {studentCourseLabel(item)}</Text>
-        <Text className="text-xs text-gray-500">Responsáveis: {fmtNames(item.guardians)}</Text>
+        <Text className="text-xs text-ink-muted">Nascimento: {fmtDate(item.birth_date)}</Text>
+        <Text className="text-xs text-ink-muted">E-mail: {fmtEmail(item.email)}</Text>
+        <Text className="text-xs text-ink-muted">Cursos: {studentCourseLabel(item)}</Text>
+        <Text className="text-xs text-ink-muted">Responsáveis: {fmtNames(item.guardians)}</Text>
       </View>
       <View className="mt-2 self-start">
         <Badge slug={item.status} label={statusLabel(item.status)} />
@@ -371,16 +367,16 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Alunos</Text>
-          <Text className="text-sm text-gray-500">Gerencie os alunos do cursinho</Text>
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Alunos</Text>
+          <Text className="text-sm text-ink-muted">Gerencie os alunos do cursinho</Text>
         </View>
         <TouchableOpacity
           onPress={() => navigate("alunos-form")}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Novo Aluno</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Novo aluno</Text>
         </TouchableOpacity>
       </View>
 
@@ -389,10 +385,10 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}
       >
         <View
-          className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
+          className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4"
           style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={search}
             onChangeText={(v) => {
@@ -400,12 +396,12 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
               setPage(1);
             }}
             placeholder="Buscar por nome..."
-            placeholderTextColor="#9CA3AF"
-            className="flex-1 ml-2 text-sm text-gray-800"
+            placeholderTextColor="var(--ds-ink-subtle)"
+            className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -416,12 +412,12 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
+            color: "var(--ds-ink)",
+            backgroundColor: "var(--ds-surface)",
             height: 44,
             minWidth: isMobile ? "100%" : 160,
           }}
@@ -440,12 +436,12 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
+            color: "var(--ds-ink)",
+            backgroundColor: "var(--ds-surface)",
             height: 44,
             minWidth: isMobile ? "100%" : 220,
           }}
@@ -464,12 +460,12 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
+            color: "var(--ds-ink)",
+            backgroundColor: "var(--ds-surface)",
             height: 44,
             minWidth: isMobile ? "100%" : 180,
           }}
@@ -483,19 +479,19 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
       {isMobile ? (
         <View className="gap-3">
           {loading ? (
-            <View className="items-center justify-center py-16 bg-white rounded-2xl border border-gray-200">
-              <ActivityIndicator size="large" color="#7C3AED" />
+            <View className="items-center justify-center py-16 bg-surface rounded-ds-md border border-border">
+              <ActivityIndicator size="large" color="var(--ds-brand)" />
             </View>
           ) : rows.length === 0 ? (
-            <View className="items-center justify-center py-14 bg-white rounded-2xl border border-gray-200">
-              <Ionicons name="people-outline" size={40} color="#E5E7EB" />
-              <Text className="text-gray-400 mt-3 text-sm">Nenhum aluno encontrado</Text>
+            <View className="items-center justify-center py-14 bg-surface rounded-ds-md border border-border">
+              <Ionicons name="people-outline" size={40} color="var(--ds-border)" />
+              <Text className="text-ink-subtle mt-3 text-sm">Nenhum aluno encontrado</Text>
             </View>
           ) : (
             rows.map(renderMobileCard)
           )}
           {meta.total > 0 && (
-            <View className="bg-white rounded-2xl border border-gray-200 px-4">
+            <View className="bg-surface rounded-ds-md border border-border px-4">
               <Pagination
                 currentPage={meta.current_page}
                 lastPage={meta.last_page}
@@ -514,14 +510,10 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
           contentContainerStyle={{ width: "100%" }}
         >
           <View
-            className="bg-white rounded-2xl overflow-hidden border border-gray-200"
+            className="bg-surface rounded-ds-md overflow-hidden border border-border"
             style={{
               width: "100%",
               minWidth: TABLE_MIN_WIDTH,
-              shadowColor: "#000",
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              elevation: 2,
             }}
           >
             <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
@@ -535,19 +527,19 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
 
             {loading ? (
               <View className="items-center justify-center py-20">
-                <ActivityIndicator size="large" color="#7C3AED" />
+                <ActivityIndicator size="large" color="var(--ds-brand)" />
               </View>
             ) : rows.length === 0 ? (
               <View className="items-center justify-center py-16">
-                <Ionicons name="people-outline" size={40} color="#E5E7EB" />
-                <Text className="text-gray-400 mt-3 text-sm">Nenhum aluno encontrado</Text>
+                <Ionicons name="people-outline" size={40} color="var(--ds-border)" />
+                <Text className="text-ink-subtle mt-3 text-sm">Nenhum aluno encontrado</Text>
               </View>
             ) : (
               rows.map(renderDesktopRow)
             )}
 
             {meta.total > 0 && (
-              <View className="px-4 border-t border-gray-100">
+              <View className="px-4 border-t border-border">
                 <Pagination
                   currentPage={meta.current_page}
                   lastPage={meta.last_page}
@@ -571,7 +563,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
 
       <ConfirmModal
         visible={!!deleteId}
-        title="Excluir Aluno"
+        title="Excluir aluno"
         message="Esta ação não pode ser desfeita. O aluno será removido permanentemente."
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}

@@ -321,7 +321,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
       setStudents(nextStudents);
       setRows(nextRows);
     } catch (e: any) {
-      setNotice(e?.response?.data?.message || "Nao foi possivel carregar a frequencia.");
+      setNotice(e?.response?.data?.message || "Não foi possível carregar a frequencia.");
       setStudents([]);
       setRows({});
     }
@@ -355,7 +355,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
 
   const saveAttendance = async () => {
     if (!classId || students.length === 0) {
-      setNotice("Nao ha alunos matriculados nesta turma.");
+      setNotice("Não ha alunos matriculados nesta turma.");
       return;
     }
 
@@ -380,7 +380,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
       const successMessage = data?.message || "Frequencia lancada com sucesso.";
       setToast({ visible: true, type: "success", message: successMessage });
     } catch (e: any) {
-      const errorMessage = e?.response?.data?.message || "Nao foi possivel salvar a frequencia.";
+      const errorMessage = e?.response?.data?.message || "Não foi possível salvar a frequencia.";
       setNotice(errorMessage);
       setToast({ visible: true, type: "error", message: errorMessage });
     }
@@ -391,7 +391,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
   if (!classId) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-sm text-ink-muted">Turma invalida.</Text>
+        <Text className="text-sm text-ink-muted">Turma inválida.</Text>
       </View>
     );
   }
@@ -458,11 +458,11 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
               accessibilityLabel="Salvar frequência"
             >
               {saving ? (
-                <ActivityIndicator size="small" color="white" />
+                <ActivityIndicator size="small" color="var(--ds-on-brand)" />
               ) : (
                 <>
-                  <Ionicons name="save-outline" size={18} color="white" />
-                  <Text className="text-sm font-semibold text-white">Salvar</Text>
+                  <Ionicons name="save-outline" size={18} color="var(--ds-on-brand)" />
+                  <Text className="text-sm font-medium text-on-brand">Salvar</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -477,11 +477,11 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
 
         {loading ? (
           <View className="items-center py-16">
-            <ActivityIndicator size="large" color="#1C3D63" />
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
           </View>
         ) : students.length === 0 ? (
           <View className="items-center py-16">
-            <Ionicons name="people-outline" size={32} color="#7A8393" />
+            <Ionicons name="people-outline" size={32} color="var(--ds-border-strong)" />
             <Text className="text-sm text-ink-subtle mt-2">Nenhum aluno matriculado nesta turma.</Text>
           </View>
         ) : (
@@ -516,7 +516,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
                           <Ionicons
                             name={option.icon}
                             size={15}
-                            color={selected ? "#111722" : "#5F6878"}
+                            color={selected ? "var(--ds-ink)" : "var(--ds-ink-subtle)"}
                           />
                           <Text className={`text-sm font-semibold ${selected ? option.activeTextClass : "text-ink-muted"}`}>
                             {option.label}

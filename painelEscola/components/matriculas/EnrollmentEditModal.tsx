@@ -95,19 +95,19 @@ export default function EnrollmentEditModal({
           <>
             <TouchableOpacity
               onPress={onClose}
-              className="px-5 py-2.5 rounded-ds-md border border-border"
+              className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
             >
               <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSavePress}
               disabled={saving}
-              className="px-5 py-2.5 rounded-ds-md bg-brand"
+              className="px-5 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
             >
               {saving ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color="var(--ds-on-brand)" size="small" />
               ) : (
-                <Text className="text-sm font-semibold text-white">Salvar</Text>
+                <Text className="text-sm font-medium text-on-brand">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -115,7 +115,7 @@ export default function EnrollmentEditModal({
       >
         {financialFieldsLocked && (
           <View className="flex-row items-center gap-1.5 bg-warning-tint border border-warning rounded-ds-md px-3 py-2.5 mb-4">
-            <Ionicons name="lock-closed-outline" size={14} color="#8A5200" />
+            <Ionicons name="lock-closed-outline" size={14} color="var(--ds-warning)" />
             <Text className="text-xs text-warning flex-1">
               Datas, mensalidade e desconto estão bloqueados porque já existem cobranças baixadas nesta matrícula.
             </Text>
@@ -207,7 +207,7 @@ export default function EnrollmentEditModal({
         {!financialFieldsLocked &&
         (form.monthly_amount.trim() || form.discount_amount.trim()) ? (
           <View className="flex-row items-center gap-2 bg-success-tint border border-success rounded-ds-md px-3 py-2 -mt-1 mb-2">
-            <Ionicons name="calculator-outline" size={14} color="#1C6A45" />
+            <Ionicons name="calculator-outline" size={14} color="var(--ds-success)" />
             <Text className="text-xs text-success">
               Mensalidade líquida:{" "}
               <Text className="font-semibold">

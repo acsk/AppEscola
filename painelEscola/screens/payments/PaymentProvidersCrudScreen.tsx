@@ -232,43 +232,43 @@ export default function PaymentProvidersCrudScreen() {
       />
 
       <View className="mb-4">
-        <Text className="text-xl font-bold text-gray-800">Cadastro de Bancos</Text>
-        <Text className="text-xs text-gray-500 mt-1">
+        <Text className="text-xl font-semibold text-ink">Cadastro de bancos</Text>
+        <Text className="text-xs text-ink-muted mt-1">
           Crie e gerencie os provedores de pagamento disponíveis para cobranças.
         </Text>
       </View>
 
       {/* Form Card */}
-      <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}>
+      <View className="bg-surface rounded-ds-md border border-border p-4 mb-4" style={{ }}>
         <View className="flex-row items-center gap-2 mb-3">
-          <Ionicons name={editingId ? "pencil" : "add-circle"} size={18} color="#7C3AED" />
-          <Text className="text-base font-bold text-gray-800">
-            {editingId ? "Editar Provedor" : "Novo Provedor"}
+          <Ionicons name={editingId ? "pencil" : "add-circle"} size={18} color="var(--ds-brand)" />
+          <Text className="text-base font-semibold text-ink">
+            {editingId ? "Editar provedor" : "Novo provedor"}
           </Text>
         </View>
 
         {!!editingId && (
-          <View className="mb-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5">
+          <View className="mb-3 rounded-ds-md border border-border bg-brand-tint px-3 py-2.5">
             <View className="flex-row items-center gap-2">
-              <Ionicons name="create-outline" size={16} color="#7C3AED" />
-              <Text className="text-xs font-bold text-violet-700">
+              <Ionicons name="create-outline" size={16} color="var(--ds-brand)" />
+              <Text className="text-xs font-semibold text-brand">
                 Modo de edição ativo
               </Text>
             </View>
-            <Text className="text-xs text-violet-600 mt-1">
+            <Text className="text-xs text-brand mt-1">
               Altere os dados abaixo e clique em salvar alterações para atualizar o banco.
             </Text>
             {loadingEditDetails && (
-              <Text className="text-xs text-violet-600 mt-2">Carregando detalhes completos do provedor...</Text>
+              <Text className="text-xs text-brand mt-2">Carregando detalhes completos do provedor...</Text>
             )}
           </View>
         )}
 
         {!!editingId && !!editingDetails?.cora_credentials && (
-          <View className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
+          <View className="mb-3 rounded-ds-md border border-border bg-brand-tint px-3 py-2.5">
             <View className="flex-row items-center gap-2">
-              <Ionicons name="shield-checkmark-outline" size={16} color="#1D4ED8" />
-              <Text className="text-xs font-bold text-blue-800">Credenciais Cora</Text>
+              <Ionicons name="shield-checkmark-outline" size={16} color="var(--ds-brand-hover)" />
+              <Text className="text-xs font-semibold text-brand">Credenciais cora</Text>
             </View>
             <View className="flex-row flex-wrap gap-2 mt-2">
               {[
@@ -276,8 +276,8 @@ export default function PaymentProvidersCrudScreen() {
                 `Teste: ${editingDetails.cora_credentials.environments?.stage ? "Ativo" : "Inativo"}`,
                 `Produção: ${editingDetails.cora_credentials.environments?.prod ? "Ativo" : "Inativo"}`,
               ].map((label) => (
-                <View key={label} className="rounded-full bg-white border border-blue-100 px-2 py-0.5">
-                  <Text className="text-[11px] font-semibold text-blue-700">{label}</Text>
+                <View key={label} className="rounded-full bg-surface border border-border px-2 py-0.5">
+                  <Text className="text-[11px] font-semibold text-brand">{label}</Text>
                 </View>
               ))}
             </View>
@@ -287,7 +287,7 @@ export default function PaymentProvidersCrudScreen() {
         <View style={{ flexDirection: isMobile ? "column" : "row", gap: 14 }}>
           <View style={{ flex: 1 }}>
             <FormInput
-              label="Nome do Provedor"
+              label="Nome do provedor"
               required
               value={String(form.name ?? "")}
               onChangeText={(v) => onChangeText("name", v)}
@@ -354,18 +354,18 @@ export default function PaymentProvidersCrudScreen() {
           </View>
         </View>
 
-        <View className="mb-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3">
+        <View className="mb-3 rounded-ds-md border border-border bg-surface-sunken px-3 py-3">
           <View className="flex-row items-center gap-3">
-            <PaymentProviderLogo uri={form.logo_url || null} size={64} rounded={18} />
+            <PaymentProviderLogo uri={form.logo_url || null} size={64} rounded={4} />
             <View style={{ flex: 1 }}>
-              <Text className="text-sm font-bold text-gray-700">Pré-visualização do logo</Text>
-              <Text className="text-xs text-gray-500 mt-1">
+              <Text className="text-sm font-semibold text-ink">Pré-visualização do logo</Text>
+              <Text className="text-xs text-ink-muted mt-1">
                 {form.logo_url?.trim()
                   ? "A imagem será exibida na listagem usando a URL informada."
                   : "Informe uma URL válida para visualizar o logo do banco."}
               </Text>
               {!!form.logo_url?.trim() && (
-                <Text className="text-[11px] text-gray-400 mt-2" numberOfLines={1}>
+                <Text className="text-[11px] text-ink-subtle mt-2" numberOfLines={1}>
                   {form.logo_url}
                 </Text>
               )}
@@ -377,15 +377,15 @@ export default function PaymentProvidersCrudScreen() {
           <TouchableOpacity
             onPress={onSubmit}
             disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center justify-center gap-2"
+            className="px-5 rounded-ds-md bg-brand flex-row items-center justify-center gap-2 py-2 min-h-control-md"
             style={{ opacity: saving ? 0.75 : 1 }}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="white" />
+              <ActivityIndicator size="small" color="var(--ds-on-brand)" />
             ) : (
               <>
-                <Ionicons name={editingId ? "checkmark" : "add"} size={16} color="white" />
-                <Text className="text-sm font-bold text-white">
+                <Ionicons name={editingId ? "checkmark" : "add"} size={16} color="var(--ds-on-brand)" />
+                <Text className="text-sm font-medium text-on-brand">
                   {editingId ? "Salvar alterações" : "Criar banco"}
                 </Text>
               </>
@@ -396,33 +396,33 @@ export default function PaymentProvidersCrudScreen() {
             <TouchableOpacity
               onPress={resetForm}
               disabled={saving}
-              className="px-5 py-2.5 rounded-xl border border-gray-300 flex-row items-center justify-center gap-2"
+              className="px-5 rounded-ds-md border border-border-strong flex-row items-center justify-center gap-2 py-2 min-h-control-md"
             >
-              <Ionicons name="close" size={16} color="#6B7280" />
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+              <Ionicons name="close" size={16} color="var(--ds-ink-muted)" />
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {/* Providers List */}
-      <View className="bg-white rounded-2xl border border-gray-100 p-4" style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}>
+      <View className="bg-surface rounded-ds-md border border-border p-4" style={{ }}>
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-row items-center gap-2">
-            <Ionicons name="list" size={18} color="#7C3AED" />
-            <Text className="text-base font-bold text-gray-800">Provedores ({providers.length})</Text>
+            <Ionicons name="list" size={18} color="var(--ds-brand)" />
+            <Text className="text-base font-semibold text-ink">Provedores ({providers.length})</Text>
           </View>
         </View>
 
         {loading ? (
           <View className="py-10 items-center">
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text className="text-sm text-gray-500 mt-3">Carregando...</Text>
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
+            <Text className="text-sm text-ink-muted mt-3">Carregando...</Text>
           </View>
         ) : providers.length === 0 ? (
           <View className="py-8 items-center">
-            <Ionicons name="archive-outline" size={32} color="#D1D5DB" />
-            <Text className="text-sm text-gray-500 mt-2">Nenhum provedor cadastrado.</Text>
+            <Ionicons name="archive-outline" size={32} color="var(--ds-border-strong)" />
+            <Text className="text-sm text-ink-muted mt-2">Nenhum provedor cadastrado.</Text>
           </View>
         ) : (
           <View className="flex-row flex-wrap" style={{ gap: 12 }}>
@@ -434,61 +434,57 @@ export default function PaymentProvidersCrudScreen() {
               return (
                 <View
                   key={item.id}
-                  className={`rounded-2xl border p-3 ${
-                    isEditingThisProvider ? "border-violet-500 bg-violet-50" : "border-gray-100 bg-white"
+                  className={`rounded-ds-md border p-3 ${
+                    isEditingThisProvider ? "border-brand bg-brand-tint" : "border-border bg-surface"
                   }`}
                   style={{
                     flexBasis: providerCardBasis,
                     flexGrow: 1,
                     minWidth: isMobile ? "100%" : 260,
-                    shadowColor: "#111827",
-                    shadowOpacity: isEditingThisProvider ? 0.16 : 0.08,
-                    shadowRadius: isEditingThisProvider ? 16 : 12,
-                    shadowOffset: { width: 0, height: isEditingThisProvider ? 7 : 5 },
                     elevation: isEditingThisProvider ? 4 : 2,
                   }}
                 >
                   {isEditingThisProvider && (
-                    <View className="mb-2 flex-row items-center justify-between rounded-xl bg-violet-600 px-3 py-1.5">
+                    <View className="mb-2 flex-row items-center justify-between rounded-ds-md bg-brand px-3 py-1.5">
                       <View className="flex-row items-center gap-1.5">
-                        <Ionicons name="create-outline" size={13} color="white" />
-                        <Text className="text-[11px] font-bold text-white">Selecionado para edição</Text>
+                        <Ionicons name="create-outline" size={13} color="var(--ds-on-brand)" />
+                        <Text className="text-[11px] font-medium text-on-brand">Selecionado para edição</Text>
                       </View>
-                      {saving && <ActivityIndicator size="small" color="white" />}
+                      {saving && <ActivityIndicator size="small" color="var(--ds-on-brand)" />}
                     </View>
                   )}
                   <View className="flex-row items-start gap-3">
-                    <PaymentProviderLogo uri={item.logo_url || null} size={92} rounded={20} />
+                    <PaymentProviderLogo uri={item.logo_url || null} size={92} rounded={4} />
                     <View className="flex-1 min-w-0">
                       <View className="flex-row items-start justify-between gap-2">
                         <View className="flex-1 min-w-0">
-                          <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+                          <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
                             {item.name}
                           </Text>
-                          <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+                          <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
                             {item.slug}
                           </Text>
                         </View>
-                        <View className={`px-2 py-0.5 rounded-full ${item.is_active ? "bg-emerald-100" : "bg-gray-200"}`}>
-                          <Text className={`text-[11px] font-bold ${item.is_active ? "text-emerald-700" : "text-gray-600"}`}>
+                        <View className={`px-2 py-0.5 rounded-full ${item.is_active ? "bg-success-tint" : "bg-border"}`}>
+                          <Text className={`text-[11px] font-semibold ${item.is_active ? "text-success" : "text-ink-muted"}`}>
                             {item.is_active ? "Ativo" : "Inativo"}
                           </Text>
                         </View>
                       </View>
 
-                      <Text className="text-xs text-gray-600 mt-2" numberOfLines={2}>
+                      <Text className="text-xs text-ink-muted mt-2" numberOfLines={2}>
                         {item.description || "Sem descrição cadastrada."}
                       </Text>
 
                       <View className="flex-row items-center justify-between mt-3">
                         <View className="flex-row items-center gap-1.5">
-                          <View className="rounded-full bg-white border border-gray-200 px-2 py-0.5">
-                            <Text className="text-[11px] font-semibold text-gray-500">Ordem {item.order}</Text>
+                          <View className="rounded-full bg-surface border border-border px-2 py-0.5">
+                            <Text className="text-[11px] font-semibold text-ink-muted">Ordem {item.order}</Text>
                           </View>
                           {isEditingThisProvider && (
-                            <View className="rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 flex-row items-center gap-1">
-                              {saving && <ActivityIndicator size="small" color="#7C3AED" />}
-                              <Text className="text-[11px] font-bold text-violet-700">{cardStatusLabel}</Text>
+                            <View className="rounded-full bg-brand-tint border border-border px-2 py-0.5 flex-row items-center gap-1">
+                              {saving && <ActivityIndicator size="small" color="var(--ds-brand)" />}
+                              <Text className="text-[11px] font-semibold text-brand">{cardStatusLabel}</Text>
                             </View>
                           )}
                         </View>
@@ -497,13 +493,13 @@ export default function PaymentProvidersCrudScreen() {
                           <TouchableOpacity
                             onPress={() => fillFormForEdit(item)}
                             disabled={isCardLocked}
-                            className={`h-8 w-8 rounded-lg border items-center justify-center ${
-                              isCardLocked ? "border-gray-200 bg-gray-100" : "border-violet-200 bg-white"
+                            className={`h-8 w-8 rounded-ds-md border items-center justify-center ${
+                              isCardLocked ? "border-border bg-surface-sunken" : "border-border bg-surface"
                             }`}
                             activeOpacity={0.85}
                             style={{ opacity: isCardLocked ? 0.55 : 1 }}
                           >
-                            <Ionicons name={isEditingThisProvider ? "lock-closed-outline" : "pencil"} size={14} color={isCardLocked ? "#9CA3AF" : "#7C3AED"} />
+                            <Ionicons name={isEditingThisProvider ? "lock-closed-outline" : "pencil"} size={14} color={isCardLocked ? "var(--ds-ink-subtle)" : "var(--ds-brand)"} />
                           </TouchableOpacity>
 
                           <TouchableOpacity
@@ -512,13 +508,13 @@ export default function PaymentProvidersCrudScreen() {
                               setConfirmDeleteVisible(true);
                             }}
                             disabled={isCardLocked}
-                            className={`h-8 w-8 rounded-lg border items-center justify-center ${
-                              isCardLocked ? "border-gray-200 bg-gray-100" : "border-red-200 bg-white"
+                            className={`h-8 w-8 rounded-ds-md border items-center justify-center ${
+                              isCardLocked ? "border-border bg-surface-sunken" : "border-danger bg-danger"
                             }`}
                             activeOpacity={0.85}
                             style={{ opacity: isCardLocked ? 0.55 : 1 }}
                           >
-                            <Ionicons name="trash" size={14} color={isCardLocked ? "#9CA3AF" : "#DC2626"} />
+                            <Ionicons name="trash" size={14} color={isCardLocked ? "var(--ds-ink-subtle)" : "var(--ds-on-danger)"} />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -533,7 +529,7 @@ export default function PaymentProvidersCrudScreen() {
 
       <ConfirmModal
         visible={confirmDeleteVisible}
-        title="Remover Provedor"
+        title="Remover provedor"
         message={`Tem certeza que deseja remover este provedor? Esta ação não pode ser desfeita.`}
         onConfirm={onConfirmDeleteProvider}
         onCancel={() => {

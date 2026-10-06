@@ -12,6 +12,13 @@ import api from "../../services/api";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import Pagination from "../../components/ui/Pagination";
 import Badge from "../../components/ui/Badge";
+import DataTableRow from "../../components/ui/DataTableRow";
+import {
+  TABLE_CONTAINER,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../../components/ui/dataTableStyles";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 
 type Tenant = {
@@ -125,43 +132,43 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Tenants</Text>
-          <Text className="text-sm text-gray-500">Gestão de clientes e dados institucionais</Text>
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Tenants</Text>
+          <Text className="text-sm text-ink-muted">Gestão de clientes e dados institucionais</Text>
         </View>
         <TouchableOpacity
           onPress={() => navigate("tenants-form", { tenantId: null })}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Novo Tenant</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Novo tenant</Text>
         </TouchableOpacity>
       </View>
 
       {!!successMessage && (
-        <View className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex-row items-start gap-2">
-          <Ionicons name="checkmark-circle-outline" size={16} color="#047857" style={{ marginTop: 1 }} />
+        <View className="mb-4 rounded-ds-md border border-success bg-success-tint px-4 py-3 flex-row items-start gap-2">
+          <Ionicons name="checkmark-circle-outline" size={16} color="var(--ds-success)" style={{ marginTop: 1 }} />
           <View style={{ flex: 1 }}>
-            <Text className="text-sm text-emerald-700">{successMessage}</Text>
+            <Text className="text-sm text-success">{successMessage}</Text>
           </View>
           <TouchableOpacity onPress={() => setSuccessMessage("")}>
-            <Ionicons name="close" size={16} color="#047857" />
+            <Ionicons name="close" size={16} color="var(--ds-success)" />
           </TouchableOpacity>
         </View>
       )}
 
       {forbidden && (
-        <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex-row items-center gap-2">
-          <Ionicons name="shield-outline" size={16} color="#B45309" />
-          <Text className="text-sm text-amber-700">
+        <View className="mb-4 rounded-ds-md border border-warning bg-warning-tint px-4 py-3 flex-row items-center gap-2">
+          <Ionicons name="shield-outline" size={16} color="var(--ds-warning)" />
+          <Text className="text-sm text-warning">
             Acesso permitido apenas para super admin.
           </Text>
         </View>
       )}
 
       <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
-        <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 380 }}>
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+        <View className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 380 }}>
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={search}
             onChangeText={(v) => {
@@ -169,12 +176,12 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
               setPage(1);
             }}
             placeholder="Buscar por nome, slug ou CNPJ..."
-            placeholderTextColor="#9CA3AF"
-            className="flex-1 ml-2 text-sm text-gray-800"
+            placeholderTextColor="var(--ds-ink-subtle)"
+            className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -186,12 +193,12 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
+            color: "var(--ds-ink)",
+            backgroundColor: "var(--ds-surface)",
             height: 44,
             minWidth: isMobile ? "100%" : 160,
           }}
@@ -208,45 +215,45 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
         style={{ width: "100%" }}
         contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
       >
-      <View className="bg-white rounded-2xl overflow-hidden" style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2.2 }}>Tenant</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1.5 }}>Slug</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1.5 }}>Contato</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Status</Text>
+      <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: tableMinWidth, }}>
+        <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 2.2 }}>Tenant</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.5 }}>Slug</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.5 }}>Contato</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Status</Text>
           <View style={{ width: 90 }} />
         </View>
 
         {loading ? (
           <View className="py-16 items-center">
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text className="text-sm text-gray-500 mt-3">Carregando tenants...</Text>
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
+            <Text className="text-sm text-ink-muted mt-3">Carregando tenants...</Text>
           </View>
         ) : rows.length === 0 ? (
           <View className="py-16 items-center">
-            <Ionicons name="business-outline" size={28} color="#9CA3AF" />
-            <Text className="text-sm text-gray-500 mt-2">Nenhum tenant encontrado.</Text>
+            <Ionicons name="business-outline" size={28} color="var(--ds-ink-subtle)" />
+            <Text className="text-sm text-ink-muted mt-2">Nenhum tenant encontrado.</Text>
           </View>
         ) : (
-          rows.map((row) => (
-            <View key={row.id} className="flex-row items-center border-b border-gray-100 px-4 py-3">
+          rows.map((row, i) => (
+            <DataTableRow key={row.id} index={i}>
               <View style={{ flex: 2.2 }}>
-                <Text className="text-sm font-semibold text-gray-800">{row.name}</Text>
+                <Text className="text-sm font-semibold text-ink">{row.name}</Text>
                 {!!row.corporate_name && (
-                  <Text className="text-xs text-gray-500">{row.corporate_name}</Text>
+                  <Text className="text-xs text-ink-muted">{row.corporate_name}</Text>
                 )}
                 {!!row.cnpj && (
-                  <Text className="text-xs text-gray-400 mt-0.5">CNPJ: {row.cnpj}</Text>
+                  <Text className="text-xs text-ink-subtle mt-0.5">CNPJ: {row.cnpj}</Text>
                 )}
               </View>
 
               <View style={{ flex: 1.5 }}>
-                <Text className="text-sm text-gray-700">{row.slug}</Text>
+                <Text className="text-sm text-ink">{row.slug}</Text>
               </View>
 
               <View style={{ flex: 1.5 }}>
-                <Text className="text-sm text-gray-700">{row.email || "—"}</Text>
-                <Text className="text-xs text-gray-500">{row.phone || row.whatsapp || "Sem telefone"}</Text>
+                <Text className="text-sm text-ink">{row.email || "—"}</Text>
+                <Text className="text-xs text-ink-muted">{row.phone || row.whatsapp || "Sem telefone"}</Text>
               </View>
 
               <View style={{ flex: 1 }}>
@@ -258,13 +265,13 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
 
               <View className="flex-row items-center justify-end" style={{ width: 90 }}>
                 <TouchableOpacity onPress={() => navigate("tenants-form", { tenantId: row.id })} className="p-2" activeOpacity={0.7}>
-                  <Ionicons name="create-outline" size={18} color="#6366F1" />
+                  <Ionicons name="create-outline" size={18} color="var(--ds-brand)" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setDeleteId(row.id)} className="p-2" activeOpacity={0.7}>
-                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                <TouchableOpacity onPress={() => setDeleteId(row.id)} className="p-2 bg-danger rounded-ds-md" activeOpacity={0.7}>
+                  <Ionicons name="trash-outline" size={18} color="var(--ds-on-danger)" />
                 </TouchableOpacity>
               </View>
-            </View>
+            </DataTableRow>
           ))
         )}
       </View>

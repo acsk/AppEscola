@@ -479,22 +479,22 @@ export default function BillingSettingsScreen() {
     if (field.type === "bool") {
       const checked = !!value;
       return (
-        <View key={key} className="mb-4 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+        <View key={key} className="mb-4 bg-surface-sunken border border-border rounded-ds-md px-4 py-3">
           <View className="flex-row items-center justify-between">
             <View className="flex-1 pr-3">
-              <Text className="text-sm font-semibold text-gray-800">{label}</Text>
+              <Text className="text-sm font-semibold text-ink">{label}</Text>
               {description ? (
-                <Text className="text-xs text-gray-500 mt-1">{description}</Text>
+                <Text className="text-xs text-ink-muted mt-1">{description}</Text>
               ) : null}
             </View>
             <Switch
               value={checked}
               onValueChange={(v) => updateField(scope, key, v)}
-              trackColor={{ false: "#E5E7EB", true: "#C4B5FD" }}
-              thumbColor={checked ? "#7C3AED" : "#F9FAFB"}
+              trackColor={{ false: "var(--ds-border)", true: "var(--ds-border)" }}
+              thumbColor={checked ? "var(--ds-brand)" : "var(--ds-surface-sunken)"}
             />
           </View>
-          {error ? <Text className="text-xs text-red-500 mt-2">{error}</Text> : null}
+          {error ? <Text className="text-xs text-danger mt-2">{error}</Text> : null}
         </View>
       );
     }
@@ -520,7 +520,7 @@ export default function BillingSettingsScreen() {
             error={error}
           />
           {description ? (
-            <Text className="-mt-3 mb-4 text-xs text-gray-500">{description}</Text>
+            <Text className="-mt-3 mb-4 text-xs text-ink-muted">{description}</Text>
           ) : null}
         </View>
       );
@@ -568,7 +568,7 @@ export default function BillingSettingsScreen() {
               error={error}
             />
             {description ? (
-              <Text className="-mt-3 mb-4 text-xs text-gray-500">{description}</Text>
+              <Text className="-mt-3 mb-4 text-xs text-ink-muted">{description}</Text>
             ) : null}
           </View>
         );
@@ -582,7 +582,7 @@ export default function BillingSettingsScreen() {
             error={error}
           />
           {description ? (
-            <Text className="-mt-3 mb-4 text-xs text-gray-500">{description}</Text>
+            <Text className="-mt-3 mb-4 text-xs text-ink-muted">{description}</Text>
           ) : null}
         </View>
       );
@@ -597,13 +597,13 @@ export default function BillingSettingsScreen() {
       const arr: string[] = Array.isArray(value) ? value : [];
       return (
         <View key={key} className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">{label}</Text>
+          <Text className="text-sm font-semibold text-ink mb-1.5">{label}</Text>
           {description ? (
-            <Text className="text-xs text-gray-500 mb-2">{description}</Text>
+            <Text className="text-xs text-ink-muted mb-2">{description}</Text>
           ) : null}
           <View className="flex-row flex-wrap" style={{ gap: 8 }}>
             {options.length === 0 ? (
-              <Text className="text-xs text-gray-400">Nenhuma opção disponível.</Text>
+              <Text className="text-xs text-ink-subtle">Nenhuma opção disponível.</Text>
             ) : (
               options.map((opt) => {
                 const selected = arr.includes(opt);
@@ -612,20 +612,20 @@ export default function BillingSettingsScreen() {
                     key={opt}
                     onPress={() => toggleArrayValue(scope, key, opt)}
                     activeOpacity={0.8}
-                    className={`flex-row items-center px-3 py-2 rounded-xl border ${
+                    className={`flex-row items-center px-3 py-2 rounded-ds-md border ${
                       selected
-                        ? "bg-violet-50 border-violet-300"
-                        : "bg-gray-50 border-gray-200"
+                        ? "bg-brand-tint border-border"
+                        : "bg-surface-sunken border-border"
                     }`}
                   >
                     <Ionicons
                       name={selected ? "checkbox" : "square-outline"}
                       size={16}
-                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                      color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                     />
                     <Text
                       className={`ml-2 text-xs font-semibold ${
-                        selected ? "text-violet-700" : "text-gray-600"
+                        selected ? "text-brand" : "text-ink-muted"
                       }`}
                     >
                       {optionLabel(opt)}
@@ -635,7 +635,7 @@ export default function BillingSettingsScreen() {
               })
             )}
           </View>
-          {error ? <Text className="text-xs text-red-500 mt-2">{error}</Text> : null}
+          {error ? <Text className="text-xs text-danger mt-2">{error}</Text> : null}
         </View>
       );
     }
@@ -660,14 +660,14 @@ export default function BillingSettingsScreen() {
 
     return (
       <View>
-        <Text className="text-xs text-gray-500 mb-4">
+        <Text className="text-xs text-ink-muted mb-4">
           {scopeDescriptions[activeScope] ?? SCOPE_FALLBACK_DESCRIPTIONS[activeScope]}
         </Text>
 
         {entries.length === 0 ? (
           <View className="py-12 items-center">
-            <Ionicons name="folder-open-outline" size={28} color="#9CA3AF" />
-            <Text className="mt-2 text-sm text-gray-500">
+            <Ionicons name="folder-open-outline" size={28} color="var(--ds-ink-subtle)" />
+            <Text className="mt-2 text-sm text-ink-muted">
               Nenhuma configuração disponível para este escopo.
             </Text>
           </View>
@@ -676,7 +676,7 @@ export default function BillingSettingsScreen() {
         )}
 
         <View
-          className="mt-2 pt-4 border-t border-gray-100"
+          className="mt-2 pt-4 border-t border-border"
           style={{
             flexDirection: isMobile ? "column" : "row",
             gap: 12,
@@ -686,25 +686,25 @@ export default function BillingSettingsScreen() {
           <TouchableOpacity
             onPress={() => setResetTarget(activeScope)}
             disabled={saving || resetting}
-            className="px-4 py-3 rounded-xl border border-gray-200 items-center"
+            className="px-4 rounded-ds-md border border-border-strong items-center py-2 min-h-control-md justify-center"
             activeOpacity={0.8}
           >
-            <Text className="text-sm font-semibold text-gray-700">
+            <Text className="text-sm font-semibold text-ink">
               Restaurar padrões
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => handleSave(activeScope)}
             disabled={saving || !hasChanges(activeScope)}
-            className={`px-5 py-3 rounded-xl items-center ${
-              !hasChanges(activeScope) || saving ? "bg-violet-300" : "bg-violet-600"
+            className={`px-5 py-3 rounded-ds-md items-center ${
+              !hasChanges(activeScope) || saving ? "bg-brand-tint" : "bg-brand"
             }`}
             activeOpacity={0.85}
           >
             {saving ? (
-              <ActivityIndicator color="white" size="small" />
+              <ActivityIndicator color="var(--ds-on-brand)" size="small" />
             ) : (
-              <Text className="text-sm font-bold text-white">Salvar alterações</Text>
+              <Text className="text-sm font-medium text-on-brand">Salvar alterações</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -728,14 +728,11 @@ export default function BillingSettingsScreen() {
 
       <View className="mb-5">
         <View className="flex-row items-center" style={{ gap: 10 }}>
-          <View className="w-10 h-10 rounded-xl bg-violet-100 items-center justify-center">
-            <Ionicons name="settings-outline" size={20} color="#7C3AED" />
-          </View>
           <View className="flex-1">
-            <Text className="text-xl font-bold text-gray-800">
+            <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">
               Configurações de cobrança
             </Text>
-            <Text className="text-xs text-gray-500 mt-0.5">
+            <Text className="text-xs text-ink-muted mt-0.5">
               Personalize matrículas, geração de invoices e métodos de pagamento aceitos pelo tenant.
             </Text>
           </View>
@@ -743,13 +740,13 @@ export default function BillingSettingsScreen() {
       </View>
 
       {isSuperAdmin && (
-        <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">
+        <View className="bg-surface rounded-ds-md border border-border p-4 mb-4">
+          <Text className="text-sm font-semibold text-ink mb-2">
             Tenant
           </Text>
           {loadingTenants ? (
             <View className="py-3 items-start">
-              <ActivityIndicator size="small" color="#7C3AED" />
+              <ActivityIndicator size="small" color="var(--ds-brand)" />
             </View>
           ) : (
             <FormSelect
@@ -763,9 +760,9 @@ export default function BillingSettingsScreen() {
         </View>
       )}
 
-      <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <View className="bg-surface rounded-ds-md border border-border overflow-hidden">
         <View
-          className="border-b border-gray-100"
+          className="border-b border-border"
           style={{
             flexDirection: isMobile ? "column" : "row",
           }}
@@ -778,21 +775,21 @@ export default function BillingSettingsScreen() {
                 onPress={() => setActiveScope(tab.key)}
                 activeOpacity={0.8}
                 className={`flex-row items-center px-4 py-3 ${
-                  isActive ? "bg-violet-50" : "bg-white"
+                  "bg-surface"
                 } ${isMobile ? "" : "flex-1 justify-center"}`}
                 style={{
                   borderBottomWidth: isActive && !isMobile ? 2 : 0,
-                  borderBottomColor: "#7C3AED",
+                  borderBottomColor: "var(--ds-brand)",
                 }}
               >
                 <Ionicons
                   name={tab.icon}
                   size={16}
-                  color={isActive ? "#7C3AED" : "#6B7280"}
+                  color={isActive ? "var(--ds-brand)" : "var(--ds-ink-muted)"}
                 />
                 <Text
                   className={`ml-2 text-sm font-semibold ${
-                    isActive ? "text-violet-700" : "text-gray-600"
+                    isActive ? "text-brand" : "text-ink-muted"
                   }`}
                 >
                   {tab.label}
@@ -805,15 +802,15 @@ export default function BillingSettingsScreen() {
         <View className="p-5">
           {tenantNotChosen ? (
             <View className="py-12 items-center">
-              <Ionicons name="business-outline" size={28} color="#9CA3AF" />
-              <Text className="mt-2 text-sm text-gray-500 text-center">
+              <Ionicons name="business-outline" size={28} color="var(--ds-ink-subtle)" />
+              <Text className="mt-2 text-sm text-ink-muted text-center">
                 Selecione um tenant para visualizar as configurações.
               </Text>
             </View>
           ) : loadingSchema || !schema || !drafts ? (
             <View className="py-12 items-center">
-              <ActivityIndicator size="large" color="#7C3AED" />
-              <Text className="mt-3 text-sm text-gray-500">
+              <ActivityIndicator size="large" color="var(--ds-brand)" />
+              <Text className="mt-3 text-sm text-ink-muted">
                 Carregando configurações...
               </Text>
             </View>

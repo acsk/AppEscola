@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\QuestionRichText;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -55,7 +56,7 @@ class SaveStandaloneQuestionRequest extends FormRequest
             $text = $this->has('question_text') ? $this->input('question_text') : $current?->question_text;
             $image = $this->has('image_url') ? $this->input('image_url') : $current?->image_url;
 
-            if (trim((string) $text) === '' && trim((string) $image) === '') {
+            if (trim(QuestionRichText::plain($text)) === '' && trim((string) $image) === '') {
                 $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
             }
 
@@ -68,7 +69,7 @@ class SaveStandaloneQuestionRequest extends FormRequest
 
             $options = array_values(array_filter(
                 (array) $this->input('options', []),
-                fn ($o) => trim((string) ($o['option_text'] ?? '')) !== ''
+                fn ($o) => trim(QuestionRichText::plain($o['option_text'] ?? '')) !== ''
             ));
             if (count($options) < 2) {
                 $validator->errors()->add('options', 'Informe pelo menos 2 alternativas preenchidas.');

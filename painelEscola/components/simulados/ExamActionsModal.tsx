@@ -32,10 +32,10 @@ type Props = {
 };
 
 const toneStyles: Record<ActionDef["tone"], { bg: string; icon: string }> = {
-  blue: { bg: "bg-brand-tint", icon: "#1C3D63" },
-  violet: { bg: "bg-brand-tint", icon: "#1C3D63" },
-  emerald: { bg: "bg-success-tint", icon: "#1C6A45" },
-  red: { bg: "bg-danger-tint", icon: "#B0261B" },
+  blue: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  violet: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  emerald: { bg: "bg-success-tint", icon: "var(--ds-success)" },
+  red: { bg: "bg-danger", icon: "var(--ds-on-danger)" },
 };
 
 function fmtRespondedPct(value: number | null | undefined) {
@@ -151,7 +151,7 @@ export default function ExamActionsModal({
                     }}
                     className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       action.group === "danger"
-                        ? "border-danger bg-surface"
+                        ? "border-danger bg-danger-tint"
                         : "border-border bg-surface"
                     }`}
                     activeOpacity={0.85}
@@ -160,12 +160,12 @@ export default function ExamActionsModal({
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-semibold text-ink">{action.label}</Text>
+                      <Text className={`text-sm font-semibold ${action.group === "danger" ? "text-danger" : "text-ink"}`}>{action.label}</Text>
                       {action.description ? (
                         <Text className="text-xs text-ink-muted mt-0.5">{action.description}</Text>
                       ) : null}
                     </View>
-                    <Ionicons name="chevron-forward-outline" size={16} color="#5F6878" />
+                    <Ionicons name="chevron-forward-outline" size={16} color="var(--ds-ink-subtle)" />
                   </TouchableOpacity>
                 );
               })}
@@ -254,8 +254,8 @@ export function ExamDeliveryReportsModal({
 
   const exportingAny = exportingPdfKind != null;
   const reportToneStyles = {
-    emerald: { bg: "bg-success-tint", icon: "#1C6A45" },
-    amber: { bg: "bg-warning-tint", icon: "#8A5200" },
+    emerald: { bg: "bg-success-tint", icon: "var(--ds-success)" },
+    amber: { bg: "bg-warning-tint", icon: "var(--ds-warning)" },
   };
 
   return (
@@ -282,7 +282,7 @@ export function ExamDeliveryReportsModal({
           className="flex-row items-center gap-1.5 mb-3 self-start"
           activeOpacity={0.85}
         >
-          <Ionicons name="arrow-back-outline" size={16} color="#4B5463" />
+          <Ionicons name="arrow-back-outline" size={16} color="var(--ds-ink-muted)" />
           <Text className="text-xs font-semibold text-ink-muted">Voltar às ações</Text>
         </TouchableOpacity>
       ) : null}
@@ -306,7 +306,7 @@ export function ExamDeliveryReportsModal({
                       onSelect(item.kind);
                     }}
                     disabled={disabled}
-                    className="flex-row items-center gap-2.5 rounded-ds-md border border-border bg-surface px-3 py-2.5"
+                    className="flex-row items-center gap-2.5 rounded-ds-md border border-border-strong bg-surface px-3 py-2 min-h-control-md justify-center"
                     style={{ opacity: disabled && !exporting ? 0.55 : 1 }}
                     activeOpacity={0.85}
                   >
@@ -324,7 +324,7 @@ export function ExamDeliveryReportsModal({
                       <Text className="text-xs text-ink-muted mt-0.5">{item.description}</Text>
                     </View>
                     {!disabled ? (
-                      <Ionicons name="download-outline" size={16} color="#5F6878" />
+                      <Ionicons name="download-outline" size={16} color="var(--ds-ink-subtle)" />
                     ) : null}
                   </TouchableOpacity>
                 );

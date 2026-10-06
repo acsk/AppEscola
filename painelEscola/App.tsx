@@ -41,10 +41,10 @@ import {
 import { PastExamsScreen } from "./screens/provas-anteriores";
 import TenantsScreen from "./screens/tenants/TenantsScreen";
 import ExamTypesScreen from "./screens/admin/ExamTypesScreen";
-import { QuestionBankScreen, QuestionClassifyScreen, QuestionTaxonomyScreen } from "./screens/banco-questoes";
+import { QuestionBankScreen, QuestionClassifyScreen, QuestionEditScreen, QuestionTaxonomyScreen } from "./screens/banco-questoes";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
-import { BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/configuracoes";
+import { AiSettingsScreen, BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/configuracoes";
 import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
@@ -119,6 +119,7 @@ const SCREEN_SLUGS = [
   "matriculas-detail",
   "configuracoes-cobranca",
   "configuracoes-tema-mobile",
+  "configuracoes-ia",
   "notificacoes",
   "calendario",
   "relatorios-turmas",
@@ -130,7 +131,10 @@ function hashToNav(hash: string): NavState {
 
   // Banco de questões: o estado da listagem (filtros, aba, ordem, página) fica na query do hash.
   if (seg0 === "questoes") {
+    if (seg1 === "nova") return { screen: "questoes-nova", params: { query } };
     const id = seg1 ? parseInt(seg1, 10) : NaN;
+    const seg2 = path.split("/").filter(Boolean)[2];
+    if (!isNaN(id) && id > 0 && seg2 === "editar") return { screen: "questoes-editar", params: { questionId: id, query } };
     if (!isNaN(id) && id > 0) return { screen: "questoes-classificar", params: { questionId: id, query } };
     return { screen: "questoes", params: { query } };
   }
@@ -250,6 +254,7 @@ function hashToNav(hash: string): NavState {
 
   if (seg0 === "configuracoes") {
     if (seg1 === "tema-mobile") return { screen: "configuracoes-tema-mobile" };
+    if (seg1 === "ia") return { screen: "configuracoes-ia" };
     if (seg1 === "cobranca") return { screen: "configuracoes-cobranca" };
     return { screen: "configuracoes-cobranca" };
   }
@@ -267,6 +272,11 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "questoes") {
     const query = nav.params?.query;
     return query ? `#/questoes?${query}` : "#/questoes";
+  }
+  if (nav.screen === "questoes-nova" || nav.screen === "questoes-editar") {
+    const query = nav.params?.query;
+    const base = nav.screen === "questoes-nova" ? "#/questoes/nova" : `#/questoes/${nav.params?.questionId}/editar`;
+    return `${base}${query ? `?${query}` : ""}`;
   }
   if (nav.screen === "questoes-classificar") {
     const query = nav.params?.query;
@@ -332,6 +342,7 @@ function navToHash(nav: NavState): string {
     return id != null ? `#/users/${id}` : "#/users/novo";
   }
   if (nav.screen === "configuracoes-tema-mobile") return "#/configuracoes/tema-mobile";
+  if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
   return `#/${nav.screen}`;
@@ -584,7 +595,7 @@ function AppContent() {
         >
           <View className="w-full max-w-md rounded-2xl bg-white px-6 py-5 border border-gray-100">
             <View className="flex-row items-center gap-2 mb-3">
-              <Ionicons name="warning-outline" size={18} color="#B45309" />
+              <Ionicons name="warning-outline" size={18} color="var(--ds-warning)" />
               <Text className="text-base font-bold text-gray-800">Hora de entrar de novo</Text>
             </View>
             <Text className="text-sm text-gray-600 mb-2">{sessionExpiredDialog.message}</Text>
@@ -597,7 +608,7 @@ function AppContent() {
               activeOpacity={0.85}
               accessibilityRole="button"
             >
-              <Text className="text-sm font-semibold text-white">Entrar com minha conta</Text>
+              <Text className="text-sm font-medium text-on-brand">Entrar com minha conta</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -612,7 +623,7 @@ function AppContent() {
         >
           <View className="w-full max-w-md rounded-2xl bg-white px-6 py-5 border border-gray-100">
             <View className="flex-row items-center gap-2 mb-3">
-              <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
+              <Ionicons name="cloud-offline-outline" size={18} color="var(--ds-warning)" />
               <Text className="text-base font-bold text-gray-800">Falha de comunicação</Text>
             </View>
             <Text className="text-sm text-gray-600 mb-5">{networkIssueDialog.message}</Text>
@@ -629,7 +640,7 @@ function AppContent() {
                 className="flex-1 rounded-xl bg-violet-600 py-3 items-center"
                 activeOpacity={0.85}
               >
-                <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
+                <Text className="text-sm font-medium text-on-brand">Tentar novamente</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -645,7 +656,7 @@ function AppContent() {
         >
           <View className="w-full max-w-md rounded-2xl bg-white px-6 py-5 border border-gray-100">
             <View className="flex-row items-center gap-2 mb-3">
-              <Ionicons name="refresh-outline" size={18} color="#7C3AED" />
+              <Ionicons name="refresh-outline" size={18} color="var(--ds-brand)" />
               <Text className="text-base font-bold text-gray-800">Atualização disponível</Text>
             </View>
             <Text className="text-sm text-gray-600 mb-5">{reloadRequiredDialog.message}</Text>
@@ -662,7 +673,7 @@ function AppContent() {
                 className="flex-1 rounded-xl bg-violet-600 py-3 items-center"
                 activeOpacity={0.85}
               >
-                <Text className="text-sm font-semibold text-white">Recarregar</Text>
+                <Text className="text-sm font-medium text-on-brand">Recarregar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -691,7 +702,7 @@ function AppContent() {
     : nav.screen.startsWith("turmas")
     ? "turmas"
     : nav.screen.startsWith("configuracoes")
-    ? "configuracoes-cobranca"
+    ? nav.screen
     : nav.screen.startsWith("notificacoes")
     ? "notificacoes"
     : nav.screen.startsWith("calendario")
@@ -715,7 +726,7 @@ function AppContent() {
   if (isLoading || !fontsReady) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: color.bg }}>
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <ActivityIndicator size="large" color="var(--ds-brand)" />
       </View>
     );
   }
@@ -747,7 +758,7 @@ function AppContent() {
         <View className="flex-1 items-center justify-center px-6">
           <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
             <View className="flex-row items-center mb-2">
-              <Ionicons name="shield-outline" size={18} color="#B45309" />
+              <Ionicons name="shield-outline" size={18} color="var(--ds-warning)" />
               <View style={{ width: 8 }} />
               <Text className="text-base font-semibold text-amber-800">Acesso negado</Text>
             </View>
@@ -761,7 +772,7 @@ function AppContent() {
               className="self-start px-4 py-2 rounded-xl bg-amber-600"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-white">Voltar ao dashboard</Text>
+              <Text className="text-sm font-medium text-on-brand">Voltar ao dashboard</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -773,7 +784,7 @@ function AppContent() {
         <View className="flex-1 items-center justify-center px-6">
           <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
             <View className="flex-row items-center mb-2">
-              <Ionicons name="shield-outline" size={18} color="#B45309" />
+              <Ionicons name="shield-outline" size={18} color="var(--ds-warning)" />
               <View style={{ width: 8 }} />
               <Text className="text-base font-semibold text-amber-800">Acesso negado</Text>
             </View>
@@ -785,7 +796,7 @@ function AppContent() {
               className="self-start px-4 py-2 rounded-xl bg-amber-600"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-white">Voltar ao dashboard</Text>
+              <Text className="text-sm font-medium text-on-brand">Voltar ao dashboard</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -803,7 +814,7 @@ function AppContent() {
         <View className="flex-1 items-center justify-center px-6">
           <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
             <View className="flex-row items-center mb-2">
-              <Ionicons name="shield-outline" size={18} color="#B45309" />
+              <Ionicons name="shield-outline" size={18} color="var(--ds-warning)" />
               <View style={{ width: 8 }} />
               <Text className="text-base font-semibold text-amber-800">Acesso negado</Text>
             </View>
@@ -815,7 +826,7 @@ function AppContent() {
               className="self-start px-4 py-2 rounded-xl bg-amber-600"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-white">Voltar ao dashboard</Text>
+              <Text className="text-sm font-medium text-on-brand">Voltar ao dashboard</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -835,7 +846,7 @@ function AppContent() {
                 onPress={() => navigate("alunos")}
                 className="px-4 py-2 rounded-xl bg-violet-600"
               >
-                <Text className="text-sm font-semibold text-white">Voltar à lista</Text>
+                <Text className="text-sm font-medium text-on-brand">Voltar à lista</Text>
               </TouchableOpacity>
             </View>
           );
@@ -862,7 +873,7 @@ function AppContent() {
                 onPress={() => navigate("alunos")}
                 className="px-4 py-2 rounded-xl bg-violet-600"
               >
-                <Text className="text-sm font-semibold text-white">Voltar à lista</Text>
+                <Text className="text-sm font-medium text-on-brand">Voltar à lista</Text>
               </TouchableOpacity>
             </View>
           );
@@ -889,7 +900,7 @@ function AppContent() {
                 onPress={() => navigate("alunos")}
                 className="px-4 py-2 rounded-xl bg-violet-600"
               >
-                <Text className="text-sm font-semibold text-white">Voltar à lista</Text>
+                <Text className="text-sm font-medium text-on-brand">Voltar à lista</Text>
               </TouchableOpacity>
             </View>
           );
@@ -926,6 +937,7 @@ function AppContent() {
       case "provas-anteriores": return <PastExamsScreen navigate={navigate} />;
       case "configuracoes-cobranca": return <BillingSettingsScreen />;
       case "configuracoes-tema-mobile": return <MobileThemeSettingsScreen />;
+      case "configuracoes-ia": return <AiSettingsScreen />;
       case "notificacoes":
         if (!canSendNotifications) {
           return (
@@ -965,12 +977,22 @@ function AppContent() {
           />
         );
       case "questoes-taxonomia": return <QuestionTaxonomyScreen navigate={navigate} />;
+      case "questoes-nova":
+      case "questoes-editar":
+        return (
+          <QuestionEditScreen
+            key={nav.screen === "questoes-nova" ? "nova" : String(nav.params?.questionId)}
+            navigate={navigate}
+            questionId={nav.screen === "questoes-nova" ? null : Number(nav.params?.questionId)}
+            listQuery={String(nav.params?.query ?? "")}
+          />
+        );
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       case "relatorios-turmas": return <ClassStudentsReportScreen navigate={navigate} />;
-      default: return <DashboardScreen />;
+      default: return <DashboardScreen navigate={navigate} />;
     }
   };
 
@@ -983,6 +1005,7 @@ function AppContent() {
             onSelectItem={(s) => navigate(s)}
             canManageTenants={canManageTenants}
             canManageUsers={canManageUsers}
+            canManageAi={canManageUsers}
             canManageExams={canManageExams}
             canSendNotifications={canSendNotifications}
             apiVersion={apiVersion}
@@ -1003,6 +1026,7 @@ function AppContent() {
               onSelectItem={(s) => navigate(s)}
               canManageTenants={canManageTenants}
               canManageUsers={canManageUsers}
+              canManageAi={canManageUsers}
               canManageExams={canManageExams}
               canSendNotifications={canSendNotifications}
               apiVersion={apiVersion}

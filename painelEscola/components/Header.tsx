@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity } from "react-native";
 import { Bell, LogOut, Menu, Search, Settings } from "lucide-react-native";
 import { useAuth } from "../contexts/AuthContext";
 import Icon from "./ui/Icon";
+import ThemeToggle from "./ui/ThemeToggle";
 import { color, size } from "../constants/theme";
 import { roleLabel } from "../utils/permissions";
 
@@ -63,6 +64,7 @@ export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
       <View className="flex-1" />
 
       <View className="flex-row items-center" style={{ gap: 8 }}>
+        <ThemeToggle compact={isMobile} />
         <IconButton icon={Settings} label="Configurações" />
         <IconButton icon={Bell} label="Notificações" />
 

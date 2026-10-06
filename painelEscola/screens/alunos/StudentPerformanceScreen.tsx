@@ -39,8 +39,8 @@ function formatPct(value: number | null | undefined, fractionDigits = 1): string
 }
 
 function trendColor(change: number | null | undefined): string {
-  if (change == null || change === 0) return "#6B7280";
-  return change > 0 ? "#16A34A" : "#DC2626";
+  if (change == null || change === 0) return "var(--ds-ink-muted)";
+  return change > 0 ? "var(--ds-success)" : "var(--ds-danger)";
 }
 
 function subjectFilterKey(subjectId: number | null | undefined): string {
@@ -66,22 +66,22 @@ function BarChart({
         const hasValue = value != null;
         return (
           <View key={`${labels[index]}-${index}`} className="flex-1 items-center min-w-[40px]">
-            <Text className="text-xs font-bold text-gray-500 mb-1.5">
+            <Text className="text-xs font-semibold text-ink-muted mb-1.5">
               {hasValue ? formatPct(value, 0) : "—"}
             </Text>
             <View
-              className="w-[72%] justify-end bg-gray-100 rounded-lg overflow-hidden"
+              className="w-[72%] justify-end bg-surface-sunken rounded-ds-md overflow-hidden"
               style={{ height: maxHeight }}
             >
               <View
-                className="w-full rounded-lg"
+                className="w-full rounded-ds-md"
                 style={{
                   height,
-                  backgroundColor: hasValue ? "#7C3AED" : "#F3F4F6",
+                  backgroundColor: hasValue ? "var(--ds-brand)" : "var(--ds-surface-sunken)",
                 }}
               />
             </View>
-            <Text className="text-xs text-gray-500 mt-1.5 text-center" numberOfLines={1}>
+            <Text className="text-xs text-ink-muted mt-1.5 text-center" numberOfLines={1}>
               {labels[index]}
             </Text>
           </View>
@@ -103,8 +103,8 @@ function SectionHeader({
   return (
     <View className="flex-row items-end justify-between gap-3 mb-2">
       <View className="flex-1">
-        <Text className="text-base font-bold text-gray-900">{title}</Text>
-        {subtitle ? <Text className="text-xs text-gray-500 mt-0.5">{subtitle}</Text> : null}
+        <Text className="text-base font-semibold text-ink">{title}</Text>
+        {subtitle ? <Text className="text-xs text-ink-muted mt-0.5">{subtitle}</Text> : null}
       </View>
       {action}
     </View>
@@ -125,20 +125,20 @@ function StatCard({
   helper?: React.ReactNode;
 }) {
   const styles = {
-    violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-    emerald: { bg: "bg-emerald-50", icon: "#16A34A" },
-    amber: { bg: "bg-amber-50", icon: "#D97706" },
-    blue: { bg: "bg-blue-50", icon: "#2563EB" },
+    violet: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+    emerald: { bg: "bg-success-tint", icon: "var(--ds-success)" },
+    amber: { bg: "bg-warning-tint", icon: "var(--ds-warning)" },
+    blue: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
   };
 
   return (
-    <View className="bg-white rounded-2xl border border-gray-100 p-4 min-w-[150px] flex-1">
+    <View className="bg-surface rounded-ds-md border border-border p-4 min-w-[150px] flex-1">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-xs font-semibold text-gray-500">{label}</Text>
-          <Text className="text-2xl font-extrabold text-gray-900 mt-1">{value}</Text>
+          <Text className="text-xs font-semibold text-ink-muted">{label}</Text>
+          <Text className="text-2xl font-semibold text-ink mt-1">{value}</Text>
         </View>
-        <View className={`w-9 h-9 rounded-xl items-center justify-center ${styles[tone].bg}`}>
+        <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${styles[tone].bg}`}>
           <Ionicons name={icon} size={18} color={styles[tone].icon} />
         </View>
       </View>
@@ -148,17 +148,17 @@ function StatCard({
 }
 
 function SubjectCard({ item, compact = false }: { item: PerformanceBySubject; compact?: boolean }) {
-  const color = item.subject.color || "#7C3AED";
+  const color = item.subject.color || "var(--ds-brand)";
   const approved =
     item.avg_percentage != null && item.passing_score_avg != null
       ? item.avg_percentage >= item.passing_score_avg
       : null;
 
   return (
-    <View className={`bg-white rounded-2xl border border-gray-100 ${compact ? "p-3 mb-2" : "p-4 mb-3"}`}>
+    <View className={`bg-surface rounded-ds-md border border-border ${compact ? "p-3 mb-2" : "p-4 mb-3"}`}>
       <View className="flex-row items-center gap-3">
         <View
-          className={`${compact ? "w-9 h-9" : "w-10 h-10"} rounded-xl items-center justify-center`}
+          className={`${compact ? "w-9 h-9" : "w-10 h-10"} rounded-ds-md items-center justify-center`}
           style={{ backgroundColor: `${color}22` }}
         >
           <Ionicons
@@ -168,20 +168,20 @@ function SubjectCard({ item, compact = false }: { item: PerformanceBySubject; co
           />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-gray-800">{item.subject.name}</Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
+          <Text className="text-sm font-semibold text-ink">{item.subject.name}</Text>
+          <Text className="text-xs text-ink-muted mt-0.5">
             {item.attempts_count} simulado{item.attempts_count !== 1 ? "s" : ""}
             {item.passing_score_avg != null ? ` · mín. ${formatPct(item.passing_score_avg, 0)}` : ""}
           </Text>
         </View>
         <Text
-          className={`${compact ? "text-base" : "text-lg"} font-extrabold`}
-          style={{ color: approved === false ? "#DC2626" : approved === true ? "#16A34A" : "#111827" }}
+          className={`${compact ? "text-base" : "text-lg"} font-semibold`}
+          style={{ color: approved === false ? "var(--ds-danger)" : approved === true ? "var(--ds-success)" : "var(--ds-ink)" }}
         >
           {formatPct(item.avg_percentage)}
         </Text>
       </View>
-      <View className={`${compact ? "h-1.5 mt-2.5" : "h-2 mt-3"} bg-gray-100 rounded-full overflow-hidden`}>
+      <View className={`${compact ? "h-1.5 mt-2.5" : "h-2 mt-3"} bg-surface-sunken rounded-full overflow-hidden`}>
         <View
           className="h-full rounded-full"
           style={{
@@ -191,7 +191,7 @@ function SubjectCard({ item, compact = false }: { item: PerformanceBySubject; co
         />
       </View>
       <View className="flex-row justify-between items-center mt-2 flex-wrap gap-2">
-        <Text className="text-xs text-gray-500">Último: {formatPct(item.latest_percentage)}</Text>
+        <Text className="text-xs text-ink-muted">Último: {formatPct(item.latest_percentage)}</Text>
         {item.month_change != null && (
           <View className="flex-row items-center gap-1">
             <Ionicons
@@ -213,29 +213,25 @@ function SubjectCard({ item, compact = false }: { item: PerformanceBySubject; co
 function MonthDetailCard({ month }: { month: PerformanceMonthlyEvolution }) {
   return (
     <View
-      className="bg-white rounded-2xl border border-gray-200 p-4 mb-2"
+      className="bg-surface rounded-ds-md border border-border p-4 mb-2"
       style={{
-        shadowColor: "#000",
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 1,
       }}
     >
       <View className="flex-row justify-between mb-3">
         <View>
-          <Text className="text-sm font-bold text-gray-900">{month.label}</Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
+          <Text className="text-sm font-semibold text-ink">{month.label}</Text>
+          <Text className="text-xs text-ink-muted mt-0.5">
             {month.attempts_count} simulado{month.attempts_count !== 1 ? "s" : ""}
           </Text>
         </View>
-        <Text className="text-base font-extrabold text-violet-700">
+        <Text className="text-base font-semibold text-brand">
           {formatPct(month.avg_percentage)}
         </Text>
       </View>
       {month.by_subject.length === 0 ? (
-        <Text className="text-xs text-gray-500 pt-2">Nenhum simulado neste mês.</Text>
+        <Text className="text-xs text-ink-muted pt-2">Nenhum simulado neste mês.</Text>
       ) : (
-        <View className="rounded-xl overflow-hidden border border-gray-200">
+        <View className="rounded-ds-md overflow-hidden border border-border">
           <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
             <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>
               Disciplina
@@ -322,7 +318,7 @@ export default function StudentPerformanceScreen({
     data?.by_subject.map((item) => ({
       key: subjectFilterKey(item.subject_id),
       label: item.subject.name,
-      color: item.subject.color || "#7C3AED",
+      color: item.subject.color || "var(--ds-brand)",
       attempts: item.attempts_count,
     })) ?? [];
   const selectedSubject = data?.by_subject.find(
@@ -391,23 +387,23 @@ export default function StudentPerformanceScreen({
         }}
       >
         <View className="flex-1">
-          <Text className="text-2xl font-bold text-gray-800">Aproveitamento</Text>
-          <Text className="text-sm text-gray-500 mt-1">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Aproveitamento</Text>
+          <Text className="text-sm text-ink-muted mt-1">
             Desempenho em simulados concluídos
             {displayName ? ` · ${displayName}` : ""}
           </Text>
           {(enrollmentNumber || courseLabel) && (
             <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1 mt-2">
               {enrollmentNumber ? (
-                <Text className="text-xs font-mono font-semibold text-violet-600">
+                <Text className="text-xs font-mono font-semibold text-brand">
                   Matrícula {enrollmentNumber}
                 </Text>
               ) : null}
               {enrollmentNumber && courseLabel ? (
-                <Text className="text-xs text-gray-400">·</Text>
+                <Text className="text-xs text-ink-subtle">·</Text>
               ) : null}
               {courseLabel ? (
-                <Text className="text-xs text-gray-500" numberOfLines={1}>
+                <Text className="text-xs text-ink-muted" numberOfLines={1}>
                   {courseLabel}
                 </Text>
               ) : null}
@@ -417,23 +413,19 @@ export default function StudentPerformanceScreen({
         <TouchableOpacity
           onPress={load}
           disabled={loading}
-          className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 items-center justify-center self-end"
+          className="w-10 h-10 rounded-ds-md bg-brand-tint border border-border items-center justify-center self-end"
           accessibilityLabel="Atualizar dados"
         >
-          <Ionicons name="refresh" size={18} color="#7C3AED" />
+          <Ionicons name="refresh" size={18} color="var(--ds-brand)" />
         </TouchableOpacity>
       </View>
 
       <View
-        className="bg-white rounded-2xl border border-gray-200 p-4 mb-4"
+        className="bg-surface rounded-ds-md border border-border p-4 mb-4"
         style={{
-          shadowColor: "#000",
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 2,
         }}
       >
-        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
           Período
         </Text>
         <View className="flex-row gap-2">
@@ -441,13 +433,15 @@ export default function StudentPerformanceScreen({
             <TouchableOpacity
               key={option}
               onPress={() => setMonths(option)}
-              className={`px-4 py-2 rounded-full border ${
-                months === option ? "bg-violet-600 border-violet-600" : "bg-gray-50 border-gray-200"
+              className={`px-4 py-2 min-h-control-sm justify-center rounded-ds-md border ${
+                months === option ? "bg-surface-sunken border-border-strong" : "bg-surface border-border"
               }`}
+              role="radio"
+              aria-checked={months === option}
             >
               <Text
                 className={`text-sm font-semibold ${
-                  months === option ? "text-white" : "text-gray-600"
+                  months === option ? "text-ink" : "text-ink-muted"
                 }`}
               >
                 {option} meses
@@ -459,36 +453,32 @@ export default function StudentPerformanceScreen({
 
       {loading ? (
         <View className="py-16 items-center">
-          <ActivityIndicator size="large" color="#7C3AED" />
+          <ActivityIndicator size="large" color="var(--ds-brand)" />
         </View>
       ) : error ? (
-        <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
-          <Text className="text-sm text-red-700">{error}</Text>
+        <View className="bg-danger-tint border border-danger rounded-ds-md p-4 mb-4">
+          <Text className="text-sm text-danger">{error}</Text>
           <TouchableOpacity
             onPress={load}
-            className="mt-3 self-start px-4 py-2 rounded-xl bg-white border border-red-200"
+            className="mt-3 self-start px-4 py-2 rounded-ds-md bg-surface border border-danger"
             activeOpacity={0.85}
           >
-            <Text className="text-sm font-semibold text-red-700">Tentar novamente</Text>
+            <Text className="text-sm font-semibold text-danger">Tentar novamente</Text>
           </TouchableOpacity>
         </View>
       ) : data ? (
         <>
           <View
-            className="bg-white rounded-2xl border border-gray-200 p-3 mb-4"
+            className="bg-surface rounded-ds-md border border-border p-3 mb-4"
             style={{
-              shadowColor: "#000",
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              elevation: 2,
             }}
           >
             <View className="flex-row items-center justify-between gap-3 mb-3">
               <View className="flex-1">
-                <Text className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
                   Filtros
                 </Text>
-                <Text className="text-sm font-semibold text-gray-900 mt-0.5">
+                <Text className="text-sm font-semibold text-ink mt-0.5">
                   {selectedSubject ? selectedSubject.subject.name : "Todas as disciplinas"}
                 </Text>
               </View>
@@ -498,10 +488,10 @@ export default function StudentPerformanceScreen({
                     setSelectedSubjectKey(ALL_SUBJECTS);
                     setShowEmptyMonths(false);
                   }}
-                  className="px-3 py-1.5 rounded-full bg-gray-100"
+                  className="px-3 py-1.5 rounded-full bg-surface-sunken"
                   activeOpacity={0.8}
                 >
-                  <Text className="text-xs font-semibold text-gray-600">Limpar</Text>
+                  <Text className="text-xs font-semibold text-ink-muted">Limpar</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -512,19 +502,19 @@ export default function StudentPerformanceScreen({
                   onPress={() => setSelectedSubjectKey(ALL_SUBJECTS)}
                   className={`flex-row items-center gap-1.5 px-3 py-2 rounded-full border ${
                     selectedSubjectKey === ALL_SUBJECTS
-                      ? "bg-violet-600 border-violet-600"
-                      : "bg-gray-50 border-gray-200"
+                      ? "bg-brand border-brand"
+                      : "bg-surface-sunken border-border"
                   }`}
                   activeOpacity={0.85}
                 >
                   <Ionicons
                     name="layers-outline"
                     size={14}
-                    color={selectedSubjectKey === ALL_SUBJECTS ? "white" : "#6B7280"}
+                    color={selectedSubjectKey === ALL_SUBJECTS ? "white" : "var(--ds-ink-muted)"}
                   />
                   <Text
-                    className={`text-xs font-bold ${
-                      selectedSubjectKey === ALL_SUBJECTS ? "text-white" : "text-gray-600"
+                    className={`text-xs font-semibold ${
+                      selectedSubjectKey === ALL_SUBJECTS ? "text-on-brand" : "text-ink-muted"
                     }`}
                   >
                     Todas
@@ -538,7 +528,7 @@ export default function StudentPerformanceScreen({
                       key={subject.key}
                       onPress={() => setSelectedSubjectKey(subject.key)}
                       className={`flex-row items-center gap-1.5 px-3 py-2 rounded-full border ${
-                        active ? "bg-white border-violet-300" : "bg-gray-50 border-gray-200"
+                        active ? "bg-surface border-border" : "bg-surface-sunken border-border"
                       }`}
                       activeOpacity={0.85}
                     >
@@ -547,11 +537,11 @@ export default function StudentPerformanceScreen({
                         style={{ backgroundColor: subject.color }}
                       />
                       <Text
-                        className={`text-xs font-bold ${active ? "text-violet-700" : "text-gray-600"}`}
+                        className={`text-xs font-semibold ${active ? "text-brand" : "text-ink-muted"}`}
                       >
                         {subject.label}
                       </Text>
-                      <Text className="text-xs text-gray-400">{subject.attempts}</Text>
+                      <Text className="text-xs text-ink-subtle">{subject.attempts}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -560,20 +550,20 @@ export default function StudentPerformanceScreen({
 
             <TouchableOpacity
               onPress={() => setShowEmptyMonths((prev) => !prev)}
-              className="flex-row items-center justify-between mt-3 rounded-xl bg-gray-50 px-3 py-2"
+              className="flex-row items-center justify-between mt-3 rounded-ds-md bg-surface-sunken px-3 py-2"
               activeOpacity={0.85}
             >
               <View className="flex-row items-center gap-2">
                 <Ionicons
                   name={showEmptyMonths ? "checkbox" : "square-outline"}
                   size={18}
-                  color={showEmptyMonths ? "#7C3AED" : "#94A3B8"}
+                  color={showEmptyMonths ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                 />
-                <Text className="text-xs font-semibold text-gray-700">
+                <Text className="text-xs font-semibold text-ink">
                   Mostrar meses sem simulados
                 </Text>
               </View>
-              <Text className="text-xs font-semibold text-gray-400">
+              <Text className="text-xs font-semibold text-ink-subtle">
                 {emptyMonths.length} mês{emptyMonths.length !== 1 ? "es" : ""}
               </Text>
             </TouchableOpacity>
@@ -618,14 +608,14 @@ export default function StudentPerformanceScreen({
           </View>
 
           {overview?.best_subject && (
-            <View className="bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-4 flex-row items-center gap-3">
-              <View className="w-9 h-9 rounded-xl bg-white items-center justify-center">
-                <Ionicons name="trophy-outline" size={18} color="#B45309" />
+            <View className="bg-warning-tint border border-warning rounded-ds-md p-3 mb-4 flex-row items-center gap-3">
+              <View className="w-9 h-9 rounded-ds-md bg-surface items-center justify-center border border-border">
+                <Ionicons name="trophy-outline" size={18} color="var(--ds-warning)" />
               </View>
               <View className="flex-1">
-                <Text className="text-xs font-semibold text-amber-800">Melhor média</Text>
+                <Text className="text-xs font-semibold text-warning">Melhor média</Text>
                 <Text className="text-sm text-amber-950 mt-0.5">
-                  <Text className="font-bold">{overview.best_subject.name}</Text> ·{" "}
+                  <Text className="font-semibold">{overview.best_subject.name}</Text> ·{" "}
                   {formatPct(overview.best_subject.avg_percentage)}
                 </Text>
               </View>
@@ -637,12 +627,8 @@ export default function StudentPerformanceScreen({
             subtitle="Média de aproveitamento por mês no período selecionado."
           />
           <View
-            className="bg-white rounded-2xl border border-gray-200 p-4 mb-5"
+            className="bg-surface rounded-ds-md border border-border p-4 mb-5"
             style={{
-              shadowColor: "#000",
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              elevation: 2,
             }}
           >
             {filteredMonthlyEvolution.some((m) => m.avg_percentage != null) ? (
@@ -652,7 +638,7 @@ export default function StudentPerformanceScreen({
                 compact={isMobile}
               />
             ) : (
-              <Text className="text-sm text-gray-500 text-center py-4">
+              <Text className="text-sm text-ink-muted text-center py-4">
                 Sem simulados concluídos no período.
               </Text>
             )}
@@ -663,14 +649,14 @@ export default function StudentPerformanceScreen({
             subtitle="Comparação por matéria, com mínimo esperado quando disponível."
           />
           {data.by_subject.length === 0 ? (
-            <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
-              <Text className="text-sm text-gray-500 text-center">
+            <View className="bg-surface rounded-ds-md border border-border p-4 mb-5">
+              <Text className="text-sm text-ink-muted text-center">
                 Nenhum simulado concluído com nota registrada.
               </Text>
             </View>
           ) : filteredSubjects.length === 0 ? (
-            <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
-              <Text className="text-sm text-gray-500 text-center">
+            <View className="bg-surface rounded-ds-md border border-border p-4 mb-5">
+              <Text className="text-sm text-ink-muted text-center">
                 Nenhum resultado para o filtro selecionado.
               </Text>
             </View>
@@ -689,8 +675,8 @@ export default function StudentPerformanceScreen({
             }
             action={
               emptyMonths.length > 0 ? (
-                <View className="rounded-full bg-gray-100 px-2 py-1">
-                  <Text className="text-xs font-semibold text-gray-500">
+                <View className="rounded-full bg-surface-sunken px-2 py-1">
+                  <Text className="text-xs font-semibold text-ink-muted">
                     {emptyMonths.length} sem dados
                   </Text>
                 </View>
@@ -698,8 +684,8 @@ export default function StudentPerformanceScreen({
             }
           />
           {visibleMonthDetails.length === 0 ? (
-            <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-2">
-              <Text className="text-sm text-gray-500 text-center">
+            <View className="bg-surface rounded-ds-md border border-border p-4 mb-2">
+              <Text className="text-sm text-ink-muted text-center">
                 Nenhum simulado concluído no período.
               </Text>
             </View>
@@ -710,8 +696,8 @@ export default function StudentPerformanceScreen({
           {!showEmptyMonths && emptyMonths.length > 0 ? (
             <View className="flex-row flex-wrap gap-2 mt-2">
               {emptyMonths.map((month) => (
-                <View key={month.month} className="rounded-full bg-gray-100 px-3 py-1.5">
-                  <Text className="text-xs font-semibold text-gray-500">
+                <View key={month.month} className="rounded-full bg-surface-sunken px-3 py-1.5">
+                  <Text className="text-xs font-semibold text-ink-muted">
                     {month.label}: sem simulado
                   </Text>
                 </View>

@@ -62,21 +62,21 @@ function StepIndicator({ current }: { current: Step }) {
           <View key={step.id} className="flex-row items-center flex-1 max-w-[72px]">
             <View
               className={`h-7 w-7 rounded-full items-center justify-center ${
-                active ? "bg-violet-600" : done ? "bg-violet-200" : "bg-gray-200"
+                active ? "bg-brand" : done ? "bg-brand-tint" : "bg-border"
               }`}
             >
               {done ? (
-                <Ionicons name="checkmark" size={14} color="#5B21B6" />
+                <Ionicons name="checkmark" size={14} color="var(--ds-brand-hover)" />
               ) : (
                 <Text
-                  className={`text-xs font-bold ${active ? "text-white" : "text-gray-500"}`}
+                  className={`text-xs font-semibold ${active ? "text-on-brand" : "text-ink-muted"}`}
                 >
                   {i + 1}
                 </Text>
               )}
             </View>
             {i < STEPS.length - 1 ? (
-              <View className={`flex-1 h-0.5 mx-0.5 ${done ? "bg-violet-300" : "bg-gray-200"}`} />
+              <View className={`flex-1 h-0.5 mx-0.5 ${done ? "bg-brand-tint" : "bg-border"}`} />
             ) : null}
           </View>
         );
@@ -303,7 +303,7 @@ export default function EnrollmentCarneModal({
         : issueMissing
           ? "Emitir no provedor"
           : "Sem boleto";
-    const statusColor = ready ? "#047857" : needsSync ? "#B45309" : "#DC2626";
+    const statusColor = ready ? "var(--ds-success)" : needsSync ? "var(--ds-warning)" : "var(--ds-danger)";
 
     const row = (
       <View className="flex-row items-center gap-2 min-w-0 flex-1">
@@ -311,16 +311,16 @@ export default function EnrollmentCarneModal({
           <Ionicons
             name={checked ? "checkbox" : "square-outline"}
             size={18}
-            color={checked ? "#7C3AED" : "#9CA3AF"}
+            color={checked ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
           />
         ) : (
-          <Ionicons name="checkmark-circle" size={18} color="#7C3AED" />
+          <Ionicons name="checkmark-circle" size={18} color="var(--ds-brand)" />
         )}
         <View className="flex-1 min-w-0">
-          <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
+          <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
             {inv.description}
           </Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
+          <Text className="text-xs text-ink-muted mt-0.5">
             {`Venc. ${inv.due_date ? isoToDisplay(inv.due_date) : "—"} · ${money(inv.amount)} · `}
             {inv.due_date_would_adjust && inv.provider_due_date_preview
               ? `Cora: ${isoToDisplay(inv.provider_due_date_preview)} · `
@@ -335,7 +335,7 @@ export default function EnrollmentCarneModal({
       return (
         <View
           key={inv.invoice_id}
-          className="px-3 py-2 border-b border-gray-100"
+          className="px-3 py-2 border-b border-border"
         >
           {row}
         </View>
@@ -347,7 +347,7 @@ export default function EnrollmentCarneModal({
         key={inv.invoice_id}
         onPress={() => toggle(inv.invoice_id)}
         activeOpacity={0.85}
-        className={`px-3 py-2 border-b border-gray-100 ${checked ? "bg-violet-50/50" : ""}`}
+        className={`px-3 py-2 border-b border-border ${checked ? "bg-brand-tint" : ""}`}
       >
         {row}
       </TouchableOpacity>
@@ -355,11 +355,11 @@ export default function EnrollmentCarneModal({
   };
 
   const renderExcludedRow = (inv: CarneExcludedInvoice) => (
-    <View key={inv.invoice_id} className="px-3 py-2 border-b border-amber-100">
-      <Text className="text-sm text-gray-800" numberOfLines={1}>
+    <View key={inv.invoice_id} className="px-3 py-2 border-b border-warning">
+      <Text className="text-sm text-ink" numberOfLines={1}>
         {inv.description}
       </Text>
-      <Text className="text-xs text-gray-500" numberOfLines={1}>
+      <Text className="text-xs text-ink-muted" numberOfLines={1}>
         {`${inv.reason_label} · ${money(inv.amount)}`}
       </Text>
     </View>
@@ -370,26 +370,26 @@ export default function EnrollmentCarneModal({
 
   const renderIntro = () => (
     <View>
-      <View className="rounded-xl bg-violet-50 border border-violet-100 p-4 mb-3">
-        <Text className="text-base font-bold text-violet-950">{studentLabel}</Text>
-        <Text className="text-xs text-violet-700 mt-1">
+      <View className="rounded-ds-md bg-brand-tint border border-border p-4 mb-3">
+        <Text className="text-base font-semibold text-violet-950">{studentLabel}</Text>
+        <Text className="text-xs text-brand mt-1">
           {preview?.enrollment_number ? `Matrícula ${preview.enrollment_number}` : ""}
         </Text>
       </View>
       <View className="flex-row flex-wrap gap-2 mb-3">
-        <View className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2 flex-1 min-w-[45%]">
-          <Text className="text-lg font-bold text-emerald-800">{preview?.eligible_count ?? 0}</Text>
-          <Text className="text-[10px] text-emerald-700">Aptas ao carnê</Text>
+        <View className="rounded-ds-md bg-success-tint border border-success px-3 py-2 flex-1 min-w-[45%]">
+          <Text className="text-lg font-semibold text-success">{preview?.eligible_count ?? 0}</Text>
+          <Text className="text-[10px] text-success">Aptas ao carnê</Text>
         </View>
-        <View className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 flex-1 min-w-[45%]">
-          <Text className="text-lg font-bold text-gray-800">{excluded.length}</Text>
-          <Text className="text-[10px] text-gray-600">Excluídas</Text>
+        <View className="rounded-ds-md bg-surface-sunken border border-border px-3 py-2 flex-1 min-w-[45%]">
+          <Text className="text-lg font-semibold text-ink">{excluded.length}</Text>
+          <Text className="text-[10px] text-ink-muted">Excluídas</Text>
         </View>
       </View>
-      <Text className="text-sm text-gray-700 mb-2">
+      <Text className="text-sm text-ink mb-2">
         Formato: <Text className="font-semibold">{archiveLabel}</Text>
       </Text>
-      <Text className="text-xs text-gray-500 leading-relaxed">
+      <Text className="text-xs text-ink-muted leading-relaxed">
         {preview?.archive_format_hint}
       </Text>
       {coraDueDateHint ? (
@@ -401,13 +401,13 @@ export default function EnrollmentCarneModal({
         </View>
       ) : null}
       {dueDateWouldAdjustCount > 0 ? (
-        <Text className="text-xs text-amber-800 mt-2 leading-relaxed">
+        <Text className="text-xs text-warning mt-2 leading-relaxed">
           {`${dueDateWouldAdjustCount} parcela(s) com vencimento no passado: na emissão, a Cora usará a data mínima permitida (geralmente o dia seguinte).`}
         </Text>
       ) : null}
       {needsPdfCount > 0 ? (
-        <View className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex-row gap-2">
-          <Ionicons name="warning-outline" size={18} color="#B45309" />
+        <View className="mt-3 rounded-ds-md bg-warning-tint border border-warning px-3 py-2 flex-row gap-2">
+          <Ionicons name="warning-outline" size={18} color="var(--ds-warning)" />
           <Text className="text-xs text-amber-900 flex-1 leading-relaxed">
             {`${needsPdfCount} parcela(s) têm boleto na Cora, mas o PDF ainda não está acessível. `}
             O passo seguinte mostra quais precisam de sincronização.
@@ -420,12 +420,12 @@ export default function EnrollmentCarneModal({
   const renderSelect = () => (
     <View className="flex-1">
       <View className="flex-row items-center justify-between mb-2 px-1">
-        <Text className="text-xs text-gray-600">
+        <Text className="text-xs text-ink-muted">
           {`${readyCount} pronta(s) · ${selectedIds.length} selecionada(s)`}
         </Text>
         {preview && preview.invoices.length > 0 ? (
           <TouchableOpacity onPress={() => toggleAll(selectedIds.length !== preview.invoices.length)}>
-            <Text className="text-xs font-bold text-violet-700">
+            <Text className="text-xs font-semibold text-brand">
               {selectedIds.length === preview.invoices.length ? "Desmarcar todas" : "Marcar todas"}
             </Text>
           </TouchableOpacity>
@@ -433,12 +433,12 @@ export default function EnrollmentCarneModal({
       </View>
       {!preview || preview.invoices.length === 0 ? (
         <View className="py-8 items-center">
-          <Text className="text-sm text-gray-500 text-center">
+          <Text className="text-sm text-ink-muted text-center">
             Não há cobranças aptas para o carnê.
           </Text>
         </View>
       ) : (
-        <View className="rounded-xl border border-gray-200 overflow-hidden max-h-[280px]">
+        <View className="rounded-ds-md border border-border overflow-hidden max-h-[280px]">
           <ScrollView nestedScrollEnabled>
             {preview.invoices.map((inv) => renderInvoiceRow(inv, true))}
           </ScrollView>
@@ -452,15 +452,15 @@ export default function EnrollmentCarneModal({
           <Ionicons
             name={showExcluded ? "chevron-up" : "chevron-down"}
             size={16}
-            color="#9CA3AF"
+            color="var(--ds-ink-subtle)"
           />
-          <Text className="text-xs text-gray-500">
+          <Text className="text-xs text-ink-muted">
             {`${excluded.length} cobrança(s) não entram no carnê`}
           </Text>
         </TouchableOpacity>
       ) : null}
       {showExcluded && excluded.length > 0 ? (
-        <View className="mt-1 rounded-xl border border-amber-100 bg-amber-50/30 overflow-hidden max-h-[120px]">
+        <View className="mt-1 rounded-ds-md border border-warning bg-warning-tint/30 overflow-hidden max-h-[120px]">
           <ScrollView nestedScrollEnabled>
             {excluded.map(renderExcludedRow)}
           </ScrollView>
@@ -471,7 +471,7 @@ export default function EnrollmentCarneModal({
 
   const renderOptions = () => (
     <View>
-      <Text className="text-sm text-gray-600 mb-3 px-1">
+      <Text className="text-sm text-ink-muted mb-3 px-1">
         Como o sistema deve tratar parcelas sem PDF ou com falha?
       </Text>
       {issueMissing && coraDueDateHint ? (
@@ -482,16 +482,16 @@ export default function EnrollmentCarneModal({
       <TouchableOpacity
         onPress={() => setRequireAll((v) => !v)}
         activeOpacity={0.85}
-        className="flex-row items-start gap-2.5 px-3 py-3 rounded-xl border border-gray-200 bg-white mb-2"
+        className="flex-row items-start gap-2.5 px-3 rounded-ds-md border border-border-strong bg-surface mb-2 py-2 min-h-control-md justify-center"
       >
         <Ionicons
           name={requireAll ? "checkbox" : "square-outline"}
           size={20}
-          color={requireAll ? "#7C3AED" : "#9CA3AF"}
+          color={requireAll ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
         />
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-gray-800">Exigir todas as parcelas</Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
+          <Text className="text-sm font-semibold text-ink">Exigir todas as parcelas</Text>
+          <Text className="text-xs text-ink-muted mt-0.5">
             Se uma falhar, o carnê inteiro não é baixado (recomendado).
           </Text>
         </View>
@@ -499,16 +499,16 @@ export default function EnrollmentCarneModal({
       <TouchableOpacity
         onPress={() => setIssueMissing((v) => !v)}
         activeOpacity={0.85}
-        className="flex-row items-start gap-2.5 px-3 py-3 rounded-xl border border-gray-200 bg-white"
+        className="flex-row items-start gap-2.5 px-3 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
       >
         <Ionicons
           name={issueMissing ? "checkbox" : "square-outline"}
           size={20}
-          color={issueMissing ? "#7C3AED" : "#9CA3AF"}
+          color={issueMissing ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
         />
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-gray-800">Emitir faltantes no provedor</Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
+          <Text className="text-sm font-semibold text-ink">Emitir faltantes no provedor</Text>
+          <Text className="text-xs text-ink-muted mt-0.5">
             Cria ou atualiza cobranças na Cora ao gerar (use se o PDF não existir).
           </Text>
         </View>
@@ -523,22 +523,22 @@ export default function EnrollmentCarneModal({
 
   const renderConfirm = () => (
     <View>
-      <View className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-3 mb-3">
+      <View className="rounded-ds-md bg-success-tint border border-success px-3 py-3 mb-3">
         <Text className="text-sm font-semibold text-emerald-900">Pronto para gerar</Text>
-        <Text className="text-xs text-emerald-800 mt-1">
+        <Text className="text-xs text-success mt-1">
           {`${selectedIds.length} parcela(s) · ${archiveLabel}`}
           {issueMissing ? " · com emissão na Cora" : " · só boletos existentes"}
         </Text>
         {expectedFilename ? (
           <View className="mt-2 flex-row items-start gap-1.5">
-            <Ionicons name="document-outline" size={14} color="#047857" style={{ marginTop: 1 }} />
+            <Ionicons name="document-outline" size={14} color="var(--ds-success)" style={{ marginTop: 1 }} />
             <Text className="text-[11px] text-emerald-900 flex-1" selectable>
               {`Será salvo como: ${expectedFilename}`}
             </Text>
           </View>
         ) : null}
       </View>
-      <View className="rounded-xl border border-gray-200 overflow-hidden max-h-[220px]">
+      <View className="rounded-ds-md border border-border overflow-hidden max-h-[220px]">
         <ScrollView nestedScrollEnabled>
           {selectedInvoices.map((inv) => renderInvoiceRow(inv, false))}
         </ScrollView>
@@ -558,32 +558,32 @@ export default function EnrollmentCarneModal({
       {step !== "intro" ? (
         <TouchableOpacity
           onPress={goBack}
-          className="px-5 py-2.5 rounded-xl border border-gray-200"
+          className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
           disabled={generating}
         >
-          <Text className="text-sm font-semibold text-gray-700">Voltar</Text>
+          <Text className="text-sm font-semibold text-ink">Voltar</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity
           onPress={onClose}
-          className="px-5 py-2.5 rounded-xl border border-gray-200"
+          className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
           disabled={generating}
         >
-          <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+          <Text className="text-sm font-semibold text-ink">Cancelar</Text>
         </TouchableOpacity>
       )}
       {step === "confirm" ? (
         <TouchableOpacity
           onPress={runGenerate}
           disabled={generating}
-          className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+          className="px-5 rounded-ds-md bg-brand flex-row items-center gap-2 py-2 min-h-control-md justify-center"
         >
           {generating ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color="var(--ds-on-brand)" size="small" />
           ) : (
-            <Ionicons name="download-outline" size={16} color="#fff" />
+            <Ionicons name="download-outline" size={16} color="var(--ds-on-brand)" />
           )}
-          <Text className="text-sm font-bold text-white">
+          <Text className="text-sm font-medium text-on-brand">
             {generating ? "Gerando..." : "Baixar arquivo"}
           </Text>
         </TouchableOpacity>
@@ -591,12 +591,12 @@ export default function EnrollmentCarneModal({
         <TouchableOpacity
           onPress={goNext}
           disabled={loading || (step === "select" && selectedIds.length === 0)}
-          className={`px-5 py-2.5 rounded-xl flex-row items-center gap-2 ${
-            step === "select" && selectedIds.length === 0 ? "bg-gray-300" : "bg-violet-600"
+          className={`px-5 py-2.5 rounded-ds-md flex-row items-center gap-2 ${
+            step === "select" && selectedIds.length === 0 ? "bg-border" : "bg-brand"
           }`}
         >
-          <Text className="text-sm font-bold text-white">Continuar</Text>
-          <Ionicons name="arrow-forward-outline" size={16} color="#fff" />
+          <Text className="text-sm font-medium text-on-brand">Continuar</Text>
+          <Ionicons name="arrow-forward-outline" size={16} color="var(--ds-on-brand)" />
         </TouchableOpacity>
       )}
     </View>
@@ -612,8 +612,8 @@ export default function EnrollmentCarneModal({
     >
       {loading ? (
         <View className="py-12 items-center">
-          <ActivityIndicator color="#7C3AED" size="large" />
-          <Text className="text-xs text-gray-500 mt-3">Consultando boletos na Cora…</Text>
+          <ActivityIndicator color="var(--ds-brand)" size="large" />
+          <Text className="text-xs text-ink-muted mt-3">Consultando boletos na Cora…</Text>
         </View>
       ) : (
         <>

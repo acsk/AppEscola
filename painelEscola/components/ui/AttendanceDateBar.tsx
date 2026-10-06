@@ -109,7 +109,7 @@ export default function AttendanceDateBar({
             className="h-11 w-11 rounded-ds-md items-center justify-center"
             accessibilityLabel="Dia anterior"
           >
-            <Ionicons name="chevron-back" size={20} color={disabled ? "#7A8393" : "#4B5463"} />
+            <Ionicons name="chevron-back" size={20} color={disabled ? "var(--ds-border-strong)" : "var(--ds-ink-muted)"} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -120,7 +120,7 @@ export default function AttendanceDateBar({
             accessibilityLabel="Selecionar data da frequência"
           >
             <View className="flex-row items-center gap-2.5">
-              <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
+              <Ionicons name="calendar-outline" size={18} color={disabled ? "var(--ds-border-strong)" : "var(--ds-brand)"} />
               <Text className={`text-xl font-semibold ${disabled ? "text-ink-subtle" : "text-ink"}`}>
                 {displayDate}
               </Text>
@@ -144,7 +144,7 @@ export default function AttendanceDateBar({
             className="h-11 w-11 rounded-ds-md items-center justify-center"
             accessibilityLabel="Próximo dia"
           >
-            <Ionicons name="chevron-forward" size={20} color={isNextDisabled ? "#7A8393" : "#4B5463"} />
+            <Ionicons name="chevron-forward" size={20} color={isNextDisabled ? "var(--ds-border-strong)" : "var(--ds-ink-muted)"} />
           </TouchableOpacity>
         </View>
       </View>
@@ -177,7 +177,7 @@ export default function AttendanceDateBar({
                 activeOpacity={0.75}
                 accessibilityLabel="Mês anterior"
               >
-                <Ionicons name="chevron-back" size={21} color="#111722" />
+                <Ionicons name="chevron-back" size={21} color="var(--ds-ink)" />
               </TouchableOpacity>
 
               <View className="items-center">
@@ -194,7 +194,7 @@ export default function AttendanceDateBar({
                 activeOpacity={0.75}
                 accessibilityLabel="Próximo mês"
               >
-                <Ionicons name="chevron-forward" size={21} color={canGoNextMonth ? "#111722" : "#7A8393"} />
+                <Ionicons name="chevron-forward" size={21} color={canGoNextMonth ? "var(--ds-ink)" : "var(--ds-border-strong)"} />
               </TouchableOpacity>
             </View>
 
@@ -236,7 +236,7 @@ export default function AttendanceDateBar({
                       <Text
                         className={`text-sm font-semibold ${
                           isSelected
-                            ? "text-white"
+                            ? "text-on-brand"
                             : isFuture
                               ? "text-ink-subtle"
                               : isMuted
@@ -266,7 +266,7 @@ export default function AttendanceDateBar({
                 className="h-11 px-4 rounded-ds-md items-center justify-center bg-brand"
                 activeOpacity={0.8}
               >
-                <Text className="text-sm font-semibold text-white">Hoje</Text>
+                <Text className="text-sm font-medium text-on-brand">Hoje</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -38,12 +38,12 @@ type Props = {
 };
 
 const toneStyles: Record<ActionItem["tone"], { bg: string; icon: string }> = {
-  emerald: { bg: "bg-emerald-50", icon: "#16A34A" },
-  blue: { bg: "bg-blue-50", icon: "#2563EB" },
-  violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-  orange: { bg: "bg-orange-50", icon: "#F97316" },
-  red: { bg: "bg-red-50", icon: "#EF4444" },
-  gray: { bg: "bg-gray-100", icon: "#9CA3AF" },
+  emerald: { bg: "bg-success-tint", icon: "var(--ds-success)" },
+  blue: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  violet: { bg: "bg-brand-tint", icon: "var(--ds-brand)" },
+  orange: { bg: "bg-warning-tint", icon: "#F97316" },
+  red: { bg: "bg-danger", icon: "var(--ds-on-danger)" },
+  gray: { bg: "bg-surface-sunken", icon: "var(--ds-ink-subtle)" },
 };
 
 const statusLabels: Record<string, string> = {
@@ -54,10 +54,10 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusStyles: Record<string, { bg: string; text: string }> = {
-  pending: { bg: "bg-amber-50", text: "text-amber-700" },
-  overdue: { bg: "bg-red-50", text: "text-red-700" },
-  paid: { bg: "bg-emerald-50", text: "text-emerald-700" },
-  cancelled: { bg: "bg-gray-100", text: "text-gray-700" },
+  pending: { bg: "bg-warning-tint", text: "text-warning" },
+  overdue: { bg: "bg-danger-tint", text: "text-danger" },
+  paid: { bg: "bg-success-tint", text: "text-success" },
+  cancelled: { bg: "bg-surface-sunken", text: "text-ink" },
 };
 
 function fmtMoney(v: string | number | null | undefined) {
@@ -82,24 +82,24 @@ function InfoPill({
   tone?: "gray" | "emerald" | "blue" | "amber" | "red";
 }) {
   const styles = {
-    gray: { bg: "bg-gray-100", text: "text-gray-700" },
-    emerald: { bg: "bg-emerald-50", text: "text-emerald-700" },
-    blue: { bg: "bg-blue-50", text: "text-blue-700" },
-    amber: { bg: "bg-amber-50", text: "text-amber-700" },
-    red: { bg: "bg-red-50", text: "text-red-700" },
+    gray: { bg: "bg-surface-sunken", text: "text-ink" },
+    emerald: { bg: "bg-success-tint", text: "text-success" },
+    blue: { bg: "bg-brand-tint", text: "text-brand" },
+    amber: { bg: "bg-warning-tint", text: "text-warning" },
+    red: { bg: "bg-danger-tint", text: "text-danger" },
   };
 
   return (
-    <View className={`rounded-md px-2 py-1 ${styles[tone].bg}`}>
+    <View className={`rounded-ds-md px-2 py-1 ${styles[tone].bg}`}>
       <Text className={`text-[10px] uppercase font-semibold ${styles[tone].text}`}>{label}</Text>
-      <Text className={`text-[11px] font-bold ${styles[tone].text}`}>{value}</Text>
+      <Text className={`text-[11px] font-semibold ${styles[tone].text}`}>{value}</Text>
     </View>
   );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Text className="text-[10px] uppercase font-bold text-gray-500 tracking-wide mt-0.5 mb-1">
+    <Text className="text-[10px] uppercase font-semibold text-ink-muted tracking-wide mt-0.5 mb-1">
       {children}
     </Text>
   );
@@ -264,27 +264,27 @@ export default function InvoiceActionsModal({
 
   return (
     <Modal visible={visible} title="Ações da cobrança" onClose={onClose} size="md">
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3">
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1">
-            <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+            <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
               {invoice.description}
             </Text>
-            <Text className="text-xs font-mono font-semibold text-violet-600 mt-0.5" numberOfLines={1}>
+            <Text className="text-xs font-mono font-semibold text-brand mt-0.5" numberOfLines={1}>
               ID #{invoice.id}
             </Text>
             {invoice.cora?.charge_id ? (
-              <Text className="text-[11px] font-mono text-blue-700 mt-0.5" numberOfLines={1}>
+              <Text className="text-[11px] font-mono text-brand mt-0.5" numberOfLines={1}>
                 Cora {invoice.cora.charge_id}
               </Text>
             ) : null}
-            <Text className="text-xs text-gray-500 mt-1" numberOfLines={1}>
+            <Text className="text-xs text-ink-muted mt-1" numberOfLines={1}>
               {fmtMoney(invoice.amount)} · {fmtDate(invoice.due_date)}
               {invoice.student?.name ? ` · ${invoice.student.name}` : ""}
             </Text>
           </View>
           <View className={`rounded-full px-2 py-0.5 ${statusStyle.bg}`}>
-            <Text className={`text-[11px] font-bold ${statusStyle.text}`}>
+            <Text className={`text-[11px] font-semibold ${statusStyle.text}`}>
               {statusLabels[invoice.status] ?? invoice.status}
             </Text>
           </View>
@@ -321,24 +321,24 @@ export default function InvoiceActionsModal({
                       onSelect(action.key);
                       onClose();
                     }}
-                    className={`flex-row items-center gap-2.5 rounded-xl border px-3 py-2 ${
+                    className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       disabled
-                        ? "border-gray-100 bg-gray-50 opacity-60"
+                        ? "border-border bg-surface-sunken opacity-60"
                         : action.group === "danger"
-                          ? "border-red-100 bg-white"
-                          : "border-gray-100 bg-white"
+                          ? "border-danger bg-danger-tint"
+                          : "border-border bg-surface"
                     }`}
                     activeOpacity={0.85}
                   >
-                    <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
+                    <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${style.bg}`}>
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+                      <Text className={`text-sm font-semibold ${action.group === "danger" ? "text-danger" : "text-ink"}`} numberOfLines={1}>
                         {action.label}
                       </Text>
                       {(action.description || action.disabledReason) && (
-                        <Text className="text-[11px] text-gray-500 mt-0.5" numberOfLines={1}>
+                        <Text className="text-[11px] text-ink-muted mt-0.5" numberOfLines={1}>
                           {action.disabledReason ?? action.description}
                         </Text>
                       )}
@@ -346,7 +346,7 @@ export default function InvoiceActionsModal({
                     <Ionicons
                       name={disabled ? "lock-closed-outline" : "chevron-forward-outline"}
                       size={16}
-                      color={disabled ? "#CBD5E1" : "#9CA3AF"}
+                      color={disabled ? "var(--ds-border-strong)" : "var(--ds-ink-subtle)"}
                     />
                   </TouchableOpacity>
                 );

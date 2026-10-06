@@ -27,6 +27,7 @@ import {
   fetchQuestionBankPage,
   fetchQuestionBankYears,
   patchClassificationBatch,
+  deleteStandaloneQuestion,
   patchQuestionClassification,
   type QuestionBankPage,
 } from "../../services/questionBank";
@@ -54,6 +55,12 @@ import {
 } from "../../utils/questionBankQuery";
 import type { BatchItem, ClassificationPatch, QuestionBankQuestion, QuestionBankSort } from "../../types/questionBank";
 import Tabs from "../../components/ui/Tabs";
+import { Plus } from "lucide-react-native";
+import Button from "../../components/ui/Button";
+import ConfirmModal from "../../components/ui/ConfirmModal";
+import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
+import { fetchAiStatus } from "../../services/questionAi";
+import { plainRichText } from "../../utils/richText";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -84,6 +91,14 @@ const filtersKey = (s: QuestionBankListState) =>
 export default function QuestionBankScreen({ navigate }: Props) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const catalogs = useQuestionBankCatalogs();
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
+
+  useEffect(() => {
+    fetchAiStatus()
+      .then((status) => setAiAvailable(status.available))
+      .catch(() => setAiAvailable(false));
+  }, []);
 
   // ── Estado na URL ──────────────────────────────────────────────────────────
   const [state, setState] = useState<QuestionBankListState>(readStateFromHash);
@@ -268,6 +283,27 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const openClassify = (id: number) =>
     navigate("questoes-classificar", { questionId: id, query: serializeListState(state) });
 
+  const [deleteRow, setDeleteRow] = useState<QuestionBankQuestion | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const confirmDelete = async () => {
+    if (!deleteRow) return;
+    setDeleting(true);
+    try {
+      showApiToast(setToast, await deleteStandaloneQuestion(deleteRow.id), "Questão removida com sucesso.");
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteRow.id);
+        return next;
+      });
+      void load();
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível excluir a questão.");
+    } finally {
+      setDeleting(false);
+      setDeleteRow(null);
+    }
+  };
+
   const quickPatch = async (row: QuestionBankQuestion, patch: ClassificationPatch) => {
     setMenuRow(null);
     try {
@@ -297,7 +333,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
         <Ionicons
           name={current === "ascending" ? "arrow-up" : current === "descending" ? "arrow-down" : "swap-vertical"}
           size={12}
-          color={current === "none" ? "#5F6878" : "#1C3D63"}
+          color={current === "none" ? "var(--ds-ink-subtle)" : "var(--ds-brand)"}
         />
       </TouchableOpacity>
     );
@@ -314,7 +350,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
       <Ionicons
         name={mixed ? "remove-circle" : checked ? "checkbox" : "square-outline"}
         size={18}
-        color={checked || mixed ? "#1C3D63" : "#5F6878"}
+        color={checked || mixed ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
       />
     </TouchableOpacity>
   );
@@ -333,19 +369,19 @@ export default function QuestionBankScreen({ navigate }: Props) {
           <View className="flex-row gap-2 items-start">
             <TouchableOpacity
               onPress={toggleDensity}
-              className="flex-row items-center gap-1.5 px-3 py-2 rounded-ds-md border border-border bg-surface"
+              className="flex-row items-center gap-1.5 px-3 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
               aria-label={`Densidade: ${density === "padrao" ? "Padrão" : "Compacta"}. Alternar`}
             >
-              <Ionicons name={density === "padrao" ? "reorder-four-outline" : "reorder-three-outline"} size={16} color="#4B5463" />
+              <Ionicons name={density === "padrao" ? "reorder-four-outline" : "reorder-three-outline"} size={16} color="var(--ds-ink-muted)" />
               <Text className="text-xs font-semibold text-ink-muted">{density === "padrao" ? "Padrão" : "Compacta"}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigate("questoes-taxonomia")}
-              className="flex-row items-center gap-1.5 px-3 py-2 rounded-ds-md bg-brand"
-            >
-              <Ionicons name="git-network-outline" size={16} color="#FFFFFF" />
-              <Text className="text-xs font-semibold text-white">Taxonomia</Text>
-            </TouchableOpacity>
+            <Button label="Taxonomia" onPress={() => navigate("questoes-taxonomia")} />
+            <Button
+              variant="primary"
+              icon={Plus}
+              label="Nova questão"
+              onPress={() => navigate("questoes-nova", { query: serializeListState(state) })}
+            />
           </View>
         </View>
 
@@ -364,18 +400,18 @@ export default function QuestionBankScreen({ navigate }: Props) {
           className="flex-row items-center bg-surface border border-border rounded-ds-md px-4 mb-3"
           style={{ height: 44 }}
         >
-          <Ionicons name="search-outline" size={16} color="#5F6878" />
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
             placeholder="Buscar por nº (#123), enunciado, simulado ou tag..."
-            placeholderTextColor="#5F6878"
+            placeholderTextColor="var(--ds-ink-subtle)"
             aria-label="Buscar questões"
             className="flex-1 ml-2 text-sm text-ink"
           />
           {!!searchText && (
             <TouchableOpacity onPress={() => setSearchText("")} aria-label="Limpar busca">
-              <Ionicons name="close-circle" size={16} color="#5F6878" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -449,7 +485,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
               className="flex-row items-center gap-1 px-3 rounded-ds-md border border-border bg-surface justify-center"
               style={{ height: 44 }}
             >
-              <Ionicons name="close-outline" size={16} color="#4B5463" />
+              <Ionicons name="close-outline" size={16} color="var(--ds-ink-muted)" />
               <Text className="text-xs font-semibold text-ink-muted">Limpar filtros</Text>
             </TouchableOpacity>
           )}
@@ -540,15 +576,15 @@ export default function QuestionBankScreen({ navigate }: Props) {
               ))
             ) : loadError ? (
               <View className="py-14 items-center gap-3 px-6">
-                <Ionicons name="cloud-offline-outline" size={32} color="#B0261B" />
+                <Ionicons name="cloud-offline-outline" size={32} color="var(--ds-danger)" />
                 <Text className="text-sm text-ink-muted text-center">{loadError}</Text>
-                <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-ds-md bg-brand">
-                  <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
+                <TouchableOpacity onPress={() => void load()} className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center">
+                  <Text className="text-sm font-medium text-on-brand">Tentar novamente</Text>
                 </TouchableOpacity>
               </View>
             ) : rows.length === 0 ? (
               <View className="py-14 items-center gap-2 px-6">
-                <Ionicons name="document-text-outline" size={32} color="#7A8393" />
+                <Ionicons name="document-text-outline" size={32} color="var(--ds-border-strong)" />
                 <Text className="text-sm text-ink-muted text-center">
                   {noQuestionsAtAll ? "Nenhuma questão cadastrada ainda." : "Nenhuma questão encontrada com esses filtros."}
                 </Text>
@@ -566,7 +602,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
             ) : (
               <View style={{ opacity: loading ? 0.6 : 1 }}>
                 {rows.map((row, i) => (
-                  <DataTableRow key={row.id} index={i} style={{ paddingVertical: rowPadding }}>
+                  <DataTableRow key={row.id} index={i} onPress={() => setMenuRow(row)} style={{ paddingVertical: rowPadding }}>
                     <Checkbox
                       checked={selected.has(row.id)}
                       onPress={() => {
@@ -585,7 +621,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     <View style={{ flex: 1, minWidth: 280, paddingRight: 12 }}>
                       <TouchableOpacity onPress={() => openClassify(row.id)} role="link" aria-label={`Classificar questão ${row.id}`}>
                         <Text className="text-xs text-brand font-medium" numberOfLines={density === "compacta" ? 1 : 2}>
-                          {row.question_text?.trim() || (row.image_url ? "[Enunciado em imagem]" : "[Sem enunciado]")}
+                          {plainRichText(row.question_text).trim() || (row.image_url ? "[Enunciado em imagem]" : "[Sem enunciado]")}
                         </Text>
                       </TouchableOpacity>
                       <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
@@ -607,7 +643,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     </View>
                     <View style={{ width: COL.actions, alignItems: "flex-end" }}>
                       <TouchableOpacity onPress={() => setMenuRow(row)} aria-label={`Ações da questão ${row.id}`} className="p-1.5 rounded-ds-md">
-                        <Ionicons name="ellipsis-vertical" size={16} color="#4B5463" />
+                        <Ionicons name="ellipsis-vertical" size={16} color="var(--ds-ink-muted)" />
                       </TouchableOpacity>
                     </View>
                   </DataTableRow>
@@ -647,7 +683,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
         )}
         {loading && result && (
           <View className="mt-3 items-center">
-            <ActivityIndicator color="#1C3D63" />
+            <ActivityIndicator color="var(--ds-brand)" />
           </View>
         )}
       </ScrollView>
@@ -658,6 +694,21 @@ export default function QuestionBankScreen({ navigate }: Props) {
             {(
               [
                 ["create-outline", "Classificar", () => openClassify(menuRow.id)],
+                ...(aiAvailable
+                  ? [[
+                      "sparkles-outline",
+                      "Criar semelhantes com IA",
+                      () => {
+                        setSimilarSource({
+                          id: menuRow.id,
+                          type: menuRow.type,
+                          optionsCount: menuRow.options?.length ?? 0,
+                          difficultyId: menuRow.difficulty_id,
+                        });
+                        setMenuRow(null);
+                      },
+                    ]]
+                  : []),
                 [
                   "ban-outline",
                   menuRow.is_annulled ? "Desmarcar anulada" : "Marcar como anulada",
@@ -670,17 +721,51 @@ export default function QuestionBankScreen({ navigate }: Props) {
                 ],
                 ...(menuRow.exam
                   ? [["document-text-outline", `Abrir simulado "${menuRow.exam.title}"`, () => navigate("simulados-form", { examId: menuRow.exam!.id })]]
-                  : []),
+                  : [
+                      ["pencil-outline", "Editar conteúdo", () => navigate("questoes-editar", { questionId: menuRow.id, query: serializeListState(state) })],
+                      ["trash-outline", "Excluir questão", () => { setDeleteRow(menuRow); setMenuRow(null); }],
+                    ]),
               ] as [keyof typeof Ionicons.glyphMap, string, () => void][]
-            ).map(([icon, label, action]) => (
-              <TouchableOpacity key={label} onPress={action} className="flex-row items-center gap-3 px-3 py-3 rounded-ds-md border border-border">
-                <Ionicons name={icon} size={18} color="#1C3D63" />
-                <Text className="text-sm text-ink">{label}</Text>
-              </TouchableOpacity>
-            ))}
+            ).map(([icon, label, action]) => {
+              const destructive = icon === "trash-outline";
+              return (
+                <TouchableOpacity
+                  key={label}
+                  onPress={action}
+                  className={`flex-row items-center gap-3 px-3 rounded-ds-md border py-2 min-h-control-md justify-center ${
+                    destructive ? "border-danger bg-danger" : "border-border-strong"
+                  }`}
+                >
+                  <Ionicons name={icon} size={18} color={destructive ? "var(--ds-on-danger)" : "var(--ds-brand)"} />
+                  <Text className={`text-sm ${destructive ? "font-semibold text-on-danger" : "text-ink"}`}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
       </Modal>
+
+      <SimilarQuestionsModal
+        visible={similarSource !== null}
+        source={similarSource}
+        catalogs={catalogs}
+        onClose={() => setSimilarSource(null)}
+        onCreated={(count) => {
+          setToast({ visible: true, type: "success", message: `${count} questão(ões) semelhante(s) incluída(s) no banco.` });
+          void load();
+        }}
+        setToast={setToast}
+      />
+
+      <ConfirmModal
+        visible={!!deleteRow}
+        title="Excluir questão"
+        message={`Excluir a questão #${deleteRow?.id ?? ""}? Ela deixa de aparecer no banco de questões.`}
+        confirmLabel="Excluir questão"
+        loading={deleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteRow(null)}
+      />
 
       <BulkClassifyModal
         visible={bulkAction !== null}

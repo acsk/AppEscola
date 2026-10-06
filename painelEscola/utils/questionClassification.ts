@@ -86,3 +86,30 @@ export function addTag(tags: string[], raw: string): string[] {
   if (!name || tags.some((t) => t.toLocaleLowerCase() === name.toLocaleLowerCase())) return tags;
   return [...tags, name];
 }
+
+/** Preenche só os campos de classificação vazios com a sugestão da IA (tags são somadas). */
+export function mergeClassificationSuggestion(
+  form: ClassificationForm,
+  s: Partial<Pick<ClassificationForm, "difficulty_id" | "subject_id" | "topic_ids" | "board_id" | "year" | "exam_type_id" | "tags">>
+): { form: ClassificationForm; changed: boolean } {
+  const next = { ...form };
+  if (next.subject_id === null && s.subject_id) {
+    next.subject_id = s.subject_id;
+    if (next.topic_ids.length === 0 && s.topic_ids?.length) next.topic_ids = [...s.topic_ids];
+  } else if (next.subject_id !== null && next.subject_id === s.subject_id && next.topic_ids.length === 0 && s.topic_ids?.length) {
+    next.topic_ids = [...s.topic_ids];
+  }
+  if (next.difficulty_id === null && s.difficulty_id) next.difficulty_id = s.difficulty_id;
+  if (next.board_id === null && s.board_id) next.board_id = s.board_id;
+  if (next.year === null && s.year) next.year = s.year;
+  if (next.exam_type_id === null && s.exam_type_id) next.exam_type_id = s.exam_type_id;
+  next.tags = (s.tags ?? []).reduce(addTag, next.tags);
+  return { form: next, changed: isDirty(form, next) };
+}
+
+/** Classificação completa a partir de uma sugestão da IA (questões semelhantes). */
+export function classificationFromSuggestion(
+  s: Partial<Pick<ClassificationForm, "difficulty_id" | "subject_id" | "topic_ids" | "board_id" | "year" | "exam_type_id" | "tags">>
+): ClassificationForm {
+  return mergeClassificationSuggestion(EMPTY_CLASSIFICATION_FORM, s).form;
+}

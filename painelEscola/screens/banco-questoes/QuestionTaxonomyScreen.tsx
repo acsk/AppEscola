@@ -155,8 +155,8 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   };
 
   const IconButton = ({ icon, label, onPress, danger }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean }) => (
-    <TouchableOpacity onPress={onPress} aria-label={label} className="p-1.5 rounded-ds-md">
-      <Ionicons name={icon} size={16} color={danger ? "#B0261B" : "#4B5463"} />
+    <TouchableOpacity onPress={onPress} aria-label={label} className={`p-1.5 rounded-ds-md ${danger ? "bg-danger" : ""}`}>
+      <Ionicons name={icon} size={16} color={danger ? "var(--ds-on-danger)" : "var(--ds-ink-muted)"} />
     </TouchableOpacity>
   );
 
@@ -180,13 +180,13 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
 
         {loading ? (
           <View className="py-16 items-center">
-            <ActivityIndicator color="#1C3D63" />
+            <ActivityIndicator color="var(--ds-brand)" />
           </View>
         ) : loadError ? (
           <View className="py-14 items-center gap-3">
             <Text className="text-sm text-ink-muted text-center">{loadError}</Text>
-            <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-ds-md bg-brand">
-              <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
+            <TouchableOpacity onPress={() => void load()} className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center">
+              <Text className="text-sm font-medium text-on-brand">Tentar novamente</Text>
             </TouchableOpacity>
           </View>
         ) : section === "tree" ? (
@@ -215,7 +215,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                       aria-expanded={open}
                       className="flex-row items-center px-4 py-3 gap-3"
                     >
-                      <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={16} color="#4B5463" />
+                      <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={16} color="var(--ds-ink-muted)" />
                       <Text className={`${TABLE_CELL_SEMIBOLD} flex-1`}>{subject.name}</Text>
                       <Text className={TABLE_CELL_MUTED}>
                         {subjectTopics.length} assunto(s) · {countLabel(subject.questions_count)}
@@ -249,7 +249,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                           className="flex-row items-center gap-2 px-4 py-3"
                           style={{ paddingLeft: 44 }}
                         >
-                          <Ionicons name="add-circle-outline" size={16} color="#1C3D63" />
+                          <Ionicons name="add-circle-outline" size={16} color="var(--ds-brand)" />
                           <Text className="text-xs font-semibold text-brand">Novo assunto em {subject.name}</Text>
                         </TouchableOpacity>
                       </View>
@@ -264,10 +264,10 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
             {currentDefinition?.editable ? (
               <TouchableOpacity
                 onPress={() => setEdit({ kind: "catalog", catalog: section, name: "", description: "" })}
-                className="self-start flex-row items-center gap-1.5 px-3 py-2 rounded-ds-md bg-brand"
+                className="self-start flex-row items-center gap-1.5 px-3 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
               >
-                <Ionicons name="add" size={16} color="#FFFFFF" />
-                <Text className="text-xs font-semibold text-white">Novo item</Text>
+                <Ionicons name="add" size={16} color="var(--ds-on-brand)" />
+                <Text className="text-xs font-medium text-on-brand">Novo item</Text>
               </TouchableOpacity>
             ) : (
               <Text className="text-xs text-ink-muted">Cadastro fixo do sistema (somente leitura).</Text>
@@ -318,12 +318,12 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
         compact
         footer={
           <View className="flex-row justify-end gap-3">
-            <TouchableOpacity onPress={() => setEdit(null)} disabled={saving} className="px-4 py-2.5 rounded-ds-md border border-border">
+            <TouchableOpacity onPress={() => setEdit(null)} disabled={saving} className="px-4 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center">
               <Text className="text-sm font-semibold text-ink-muted">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={submitEdit} disabled={saving} className={`px-4 py-2.5 rounded-ds-md flex-row items-center gap-2 ${saving ? "bg-brand-tint" : "bg-brand"}`}>
-              {saving && <ActivityIndicator size="small" color="#FFFFFF" />}
-              <Text className="text-sm font-semibold text-white">Salvar</Text>
+              {saving && <ActivityIndicator size="small" color="var(--ds-on-brand)" />}
+              <Text className="text-sm font-medium text-on-brand">Salvar</Text>
             </TouchableOpacity>
           </View>
         }

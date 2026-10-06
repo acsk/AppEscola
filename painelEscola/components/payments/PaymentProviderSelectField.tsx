@@ -111,7 +111,7 @@ export default function PaymentProviderSelectField({
     );
   }, [query, selectOptions]);
 
-  const borderColor = error ? "#FCA5A5" : "#E5E7EB";
+  const borderColor = error ? "var(--ds-danger)" : "var(--ds-border)";
 
   const handleSelect = (slug: string) => {
     onChange(slug);
@@ -121,13 +121,13 @@ export default function PaymentProviderSelectField({
 
   return (
     <View className="mb-4">
-      <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+      <Text className="text-sm font-semibold text-ink mb-1.5">
         {label}
-        {required ? <Text className="text-red-500"> *</Text> : null}
+        {required ? <Text className="text-danger"> *</Text> : null}
       </Text>
 
       {description ? (
-        <Text className="text-xs text-gray-500 mb-2">{description}</Text>
+        <Text className="text-xs text-ink-muted mb-2">{description}</Text>
       ) : null}
 
       <TouchableOpacity
@@ -141,33 +141,33 @@ export default function PaymentProviderSelectField({
           alignItems: "center",
           borderWidth: 1,
           borderColor,
-          borderRadius: 12,
+          borderRadius: 4,
           paddingHorizontal: 12,
           paddingVertical: 10,
-          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
+          backgroundColor: disabled ? "var(--ds-surface-sunken)" : "var(--ds-surface-sunken)",
           opacity: disabled ? 0.75 : 1,
           minHeight: 52,
           gap: 12,
         }}
       >
-        <PaymentProviderLogo uri={selected?.logo_url ?? null} size={40} rounded={10} />
+        <PaymentProviderLogo uri={selected?.logo_url ?? null} size={40} rounded={4} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
-            className="text-sm font-semibold text-gray-800"
+            className="text-sm font-semibold text-ink"
             numberOfLines={1}
           >
             {selected?.name ?? "Selecione o provedor"}
           </Text>
-          <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+          <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
             {selected
               ? selected.sublabel ?? selected.slug
               : "Toque para abrir a lista"}
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={18} color="#6B7280" />
+        <Ionicons name="chevron-down" size={18} color="var(--ds-ink-muted)" />
       </TouchableOpacity>
 
-      {error ? <Text className="text-xs text-red-500 mt-1.5">{error}</Text> : null}
+      {error ? <Text className="text-xs text-danger mt-1.5">{error}</Text> : null}
 
       <Modal
         visible={open}
@@ -192,13 +192,13 @@ export default function PaymentProviderSelectField({
               width: "100%",
               maxWidth: 520,
               maxHeight: "82%",
-              backgroundColor: "white",
-              borderRadius: 16,
+              backgroundColor: "var(--ds-surface)",
+              borderRadius: 4,
               overflow: "hidden",
             }}
           >
-            <View className="flex-row items-center justify-between px-5 py-4 border-b border-gray-100">
-              <Text className="text-base font-bold text-gray-900">
+            <View className="flex-row items-center justify-between px-5 py-4 border-b border-border">
+              <Text className="text-base font-semibold text-ink">
                 Provedor de pagamento
               </Text>
               <TouchableOpacity
@@ -206,37 +206,37 @@ export default function PaymentProviderSelectField({
                   setOpen(false);
                   setQuery("");
                 }}
-                className="p-1.5 rounded-lg bg-gray-100"
+                className="p-1.5 rounded-ds-md bg-surface-sunken"
               >
-                <Ionicons name="close" size={18} color="#6B7280" />
+                <Ionicons name="close" size={18} color="var(--ds-ink-muted)" />
               </TouchableOpacity>
             </View>
 
-            <View className="flex-row items-center px-4 py-3 border-b border-gray-100 gap-2">
-              <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <View className="flex-row items-center px-4 py-3 border-b border-border gap-2">
+              <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 placeholder="Buscar provedor..."
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="var(--ds-ink-subtle)"
                 style={{
                   flex: 1,
                   fontSize: 14,
-                  color: "#374151",
+                  color: "var(--ds-ink)",
                   paddingVertical: 4,
                 }}
               />
               {query.length > 0 ? (
                 <TouchableOpacity onPress={() => setQuery("")}>
-                  <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                  <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
                 </TouchableOpacity>
               ) : null}
             </View>
 
             {loading ? (
               <View className="py-12 items-center">
-                <ActivityIndicator size="small" color="#7C3AED" />
-                <Text className="text-xs text-gray-500 mt-2">Carregando provedores...</Text>
+                <ActivityIndicator size="small" color="var(--ds-brand)" />
+                <Text className="text-xs text-ink-muted mt-2">Carregando provedores...</Text>
               </View>
             ) : (
               <ScrollView
@@ -246,8 +246,8 @@ export default function PaymentProviderSelectField({
               >
                 {filtered.length === 0 ? (
                   <View className="py-10 items-center px-4">
-                    <Ionicons name="search-outline" size={28} color="#E5E7EB" />
-                    <Text className="text-sm text-gray-500 mt-2 text-center">
+                    <Ionicons name="search-outline" size={28} color="var(--ds-border)" />
+                    <Text className="text-sm text-ink-muted mt-2 text-center">
                       Nenhum provedor encontrado.
                     </Text>
                   </View>
@@ -259,30 +259,30 @@ export default function PaymentProviderSelectField({
                         key={item.slug}
                         onPress={() => handleSelect(item.slug)}
                         activeOpacity={0.8}
-                        className={`flex-row items-center px-4 py-3 border-b border-gray-50 ${
-                          isSelected ? "bg-violet-50" : "bg-white"
+                        className={`flex-row items-center px-4 py-3 border-b border-border ${
+                          isSelected ? "bg-brand-tint" : "bg-surface"
                         }`}
                         style={{
                           borderLeftWidth: 3,
-                          borderLeftColor: isSelected ? "#7C3AED" : "transparent",
+                          borderLeftColor: isSelected ? "var(--ds-brand)" : "transparent",
                         }}
                       >
-                        <PaymentProviderLogo uri={item.logo_url ?? null} size={48} rounded={12} />
+                        <PaymentProviderLogo uri={item.logo_url ?? null} size={48} rounded={4} />
                         <View className="flex-1 ml-3 min-w-0">
                           <Text
                             className={`text-sm ${
-                              isSelected ? "font-bold text-violet-800" : "font-semibold text-gray-800"
+                              isSelected ? "font-semibold text-brand" : "font-semibold text-ink"
                             }`}
                             numberOfLines={1}
                           >
                             {item.name}
                           </Text>
-                          <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
+                          <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={2}>
                             {item.sublabel ?? item.slug}
                           </Text>
                         </View>
                         {isSelected ? (
-                          <Ionicons name="checkmark-circle" size={20} color="#7C3AED" />
+                          <Ionicons name="checkmark-circle" size={20} color="var(--ds-brand)" />
                         ) : null}
                       </TouchableOpacity>
                     );
@@ -291,15 +291,15 @@ export default function PaymentProviderSelectField({
               </ScrollView>
             )}
 
-            <View className="flex-row justify-end px-4 py-3 border-t border-gray-100">
+            <View className="flex-row justify-end px-4 py-3 border-t border-border">
               <TouchableOpacity
                 onPress={() => {
                   setOpen(false);
                   setQuery("");
                 }}
-                className="px-5 py-2 rounded-lg bg-gray-100"
+                className="px-5 py-2 rounded-ds-md bg-surface-sunken"
               >
-                <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+                <Text className="text-sm font-semibold text-ink">Fechar</Text>
               </TouchableOpacity>
             </View>
           </View>

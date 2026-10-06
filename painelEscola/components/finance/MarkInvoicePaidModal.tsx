@@ -103,19 +103,19 @@ export default function MarkInvoicePaidModal({
         <>
           <TouchableOpacity
             onPress={onClose}
-            className="px-5 py-2.5 rounded-xl border border-gray-200"
+            className="px-5 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
           >
-            <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+            <Text className="text-sm font-semibold text-ink">Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={submit}
             disabled={saving || !invoice}
-            className="px-5 py-2.5 rounded-xl bg-emerald-600"
+            className="px-5 py-2.5 rounded-ds-md bg-emerald-600"
           >
             {saving ? (
-              <ActivityIndicator color="white" size="small" />
+              <ActivityIndicator color="var(--ds-on-brand)" size="small" />
             ) : (
-              <Text className="text-sm font-bold text-white">Confirmar baixa</Text>
+              <Text className="text-sm font-medium text-on-brand">Confirmar baixa</Text>
             )}
           </TouchableOpacity>
         </>
@@ -123,23 +123,23 @@ export default function MarkInvoicePaidModal({
     >
       {invoice ? (
         <View className="gap-3">
-          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+          <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-3">
+            <Text className="text-xs font-mono font-semibold text-brand" numberOfLines={1}>
               ID #{invoice.id}
               {invoice.cora?.charge_id ? ` · Cora ${invoice.cora.charge_id}` : ""}
             </Text>
-            <Text className="text-sm font-semibold text-gray-800 mt-0.5" numberOfLines={2}>
+            <Text className="text-sm font-semibold text-ink mt-0.5" numberOfLines={2}>
               {invoice.description}
             </Text>
-            <Text className="text-xs text-gray-500 mt-1">
+            <Text className="text-xs text-ink-muted mt-1">
               Valor: R$ {parseFloat(invoice.amount).toFixed(2)}
               {invoice.student?.name ? ` · ${invoice.student.name}` : ""}
             </Text>
           </View>
 
           {invoice.settlement_hint ? (
-            <View className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <Text className="text-xs text-amber-800">{invoice.settlement_hint}</Text>
+            <View className="rounded-ds-md border border-warning bg-warning-tint px-4 py-3">
+              <Text className="text-xs text-warning">{invoice.settlement_hint}</Text>
             </View>
           ) : null}
 
@@ -181,16 +181,16 @@ export default function MarkInvoicePaidModal({
           />
 
           {paymentMethod ? (
-            <View className="flex-row items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-              <Text className="text-xs text-emerald-800 flex-1">
+            <View className="flex-row items-center gap-2 bg-success-tint border border-success rounded-ds-md px-3 py-2">
+              <Text className="text-xs text-success flex-1">
                 A cobrança será marcada como paga via{" "}
-                <Text className="font-bold">{paymentMethodLabel(paymentMethod)}</Text>.
+                <Text className="font-semibold">{paymentMethodLabel(paymentMethod)}</Text>.
               </Text>
             </View>
           ) : null}
 
           {submitError ? (
-            <Text className="text-xs text-red-600">{submitError}</Text>
+            <Text className="text-xs text-danger">{submitError}</Text>
           ) : null}
         </View>
       ) : null}

@@ -12,6 +12,13 @@ import api from "../../services/api";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import Pagination from "../../components/ui/Pagination";
 import Badge from "../../components/ui/Badge";
+import DataTableRow from "../../components/ui/DataTableRow";
+import {
+  TABLE_CONTAINER,
+  TABLE_HEADER_CELL,
+  TABLE_HEADER_ROW,
+  TABLE_HEADER_ROW_STYLE,
+} from "../../components/ui/dataTableStyles";
 import { useAuth } from "../../contexts/AuthContext";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { roleLabel } from "../../utils/permissions";
@@ -128,7 +135,7 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
       if (e.response?.status === 403) {
         setForbidden(true);
       } else {
-        setErrorMessage(e.response?.data?.message || "Nao foi possivel carregar os usuarios.");
+        setErrorMessage(e.response?.data?.message || "Não foi possível carregar os usuários.");
       }
     }
 
@@ -203,9 +210,9 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
       if (e.response?.status === 403) {
         setForbidden(true);
       } else if (e.response?.status === 422) {
-        setErrorMessage(e.response?.data?.message || "Nao foi possivel remover este usuario.");
+        setErrorMessage(e.response?.data?.message || "Não foi possível remover este usuário.");
       } else {
-        setErrorMessage("Nao foi possivel remover este usuario.");
+        setErrorMessage("Não foi possível remover este usuário.");
       }
     }
 
@@ -216,51 +223,51 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Usuarios</Text>
-          <Text className="text-sm text-gray-500">Gestao de acesso e perfis da plataforma</Text>
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Usuários</Text>
+          <Text className="text-sm text-ink-muted">Gestão de acesso e perfis da plataforma</Text>
         </View>
         <TouchableOpacity
           onPress={() => navigate("users-form", { userId: null })}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Novo Usuario</Text>
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Novo usuário</Text>
         </TouchableOpacity>
       </View>
 
       {!!successMessage && (
-        <View className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex-row items-start gap-2">
-          <Ionicons name="checkmark-circle-outline" size={16} color="#047857" style={{ marginTop: 1 }} />
+        <View className="mb-4 rounded-ds-md border border-success bg-success-tint px-4 py-3 flex-row items-start gap-2">
+          <Ionicons name="checkmark-circle-outline" size={16} color="var(--ds-success)" style={{ marginTop: 1 }} />
           <View style={{ flex: 1 }}>
-            <Text className="text-sm text-emerald-700">{successMessage}</Text>
+            <Text className="text-sm text-success">{successMessage}</Text>
           </View>
           <TouchableOpacity onPress={() => setSuccessMessage("")}>
-            <Ionicons name="close" size={16} color="#047857" />
+            <Ionicons name="close" size={16} color="var(--ds-success)" />
           </TouchableOpacity>
         </View>
       )}
 
       {forbidden && (
-        <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex-row items-center gap-2">
-          <Ionicons name="shield-outline" size={16} color="#B45309" />
-          <Text className="text-sm text-amber-700">Seu perfil nao possui permissao para gerenciar usuarios.</Text>
+        <View className="mb-4 rounded-ds-md border border-warning bg-warning-tint px-4 py-3 flex-row items-center gap-2">
+          <Ionicons name="shield-outline" size={16} color="var(--ds-warning)" />
+          <Text className="text-sm text-warning">Seu perfil não possui permissão para gerenciar usuários.</Text>
         </View>
       )}
 
       {!!errorMessage && (
-        <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex-row items-center gap-2">
-          <Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
-          <Text className="text-sm text-red-700" style={{ flex: 1 }}>{errorMessage}</Text>
+        <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3 flex-row items-center gap-2">
+          <Ionicons name="alert-circle-outline" size={16} color="var(--ds-danger)" />
+          <Text className="text-sm text-danger" style={{ flex: 1 }}>{errorMessage}</Text>
           <TouchableOpacity onPress={() => setErrorMessage("")}>
-            <Ionicons name="close" size={16} color="#B91C1C" />
+            <Ionicons name="close" size={16} color="var(--ds-danger)" />
           </TouchableOpacity>
         </View>
       )}
 
       <View className="flex-row gap-3 mb-4" style={{ flexWrap: "wrap" as any }}>
-        <View className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4" style={{ height: 44, minWidth: isMobile ? "100%" : 280, flexGrow: 1 }}>
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+        <View className="flex-row items-center bg-surface border border-border rounded-ds-md px-4" style={{ height: 44, minWidth: isMobile ? "100%" : 280, flexGrow: 1 }}>
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={search}
             onChangeText={(v) => {
@@ -268,12 +275,12 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
               setPage(1);
             }}
             placeholder="Buscar por nome ou e-mail..."
-            placeholderTextColor="#9CA3AF"
-            className="flex-1 ml-2 text-sm text-gray-800"
+            placeholderTextColor="var(--ds-ink-subtle)"
+            className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -286,12 +293,12 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "white",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface)",
               height: 44,
               minWidth: isMobile ? "100%" : 200,
             }}
@@ -312,12 +319,12 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
+            color: "var(--ds-ink)",
+            backgroundColor: "var(--ds-surface)",
             height: 44,
             minWidth: isMobile ? "100%" : 170,
           }}
@@ -337,12 +344,12 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
-            backgroundColor: "white",
+            color: "var(--ds-ink)",
+            backgroundColor: "var(--ds-surface)",
             height: 44,
             minWidth: isMobile ? "100%" : 150,
           }}
@@ -359,36 +366,36 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
         style={{ width: "100%" }}
         contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
       >
-      <View className="bg-white rounded-2xl overflow-hidden" style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
-        <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-3">
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2 }}>Usuario</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1.6 }}>Tenant</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1.3 }}>Perfil</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1 }}>Status</Text>
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 1.4 }}>Primeiro acesso</Text>
+      <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: tableMinWidth, }}>
+        <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 2 }}>Usuário</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.6 }}>Tenant</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.3 }}>Perfil</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Status</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.4 }}>Primeiro acesso</Text>
           <View style={{ width: 90 }} />
         </View>
 
         {loading ? (
           <View className="py-16 items-center">
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text className="text-sm text-gray-500 mt-3">Carregando usuarios...</Text>
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
+            <Text className="text-sm text-ink-muted mt-3">Carregando usuários...</Text>
           </View>
         ) : rows.length === 0 ? (
           <View className="py-16 items-center">
-            <Ionicons name="people-outline" size={28} color="#9CA3AF" />
-            <Text className="text-sm text-gray-500 mt-2">Nenhum usuario encontrado.</Text>
+            <Ionicons name="people-outline" size={28} color="var(--ds-ink-subtle)" />
+            <Text className="text-sm text-ink-muted mt-2">Nenhum usuário encontrado.</Text>
           </View>
         ) : (
-          rows.map((row) => (
-            <View key={row.id} className="flex-row items-center border-b border-gray-100 px-4 py-3">
+          rows.map((row, i) => (
+            <DataTableRow key={row.id} index={i}>
               <View style={{ flex: 2 }}>
-                <Text className="text-sm font-semibold text-gray-800">{row.name}</Text>
-                <Text className="text-xs text-gray-500">{row.email}</Text>
+                <Text className="text-sm font-semibold text-ink">{row.name}</Text>
+                <Text className="text-xs text-ink-muted">{row.email}</Text>
               </View>
 
               <View style={{ flex: 1.6 }}>
-                <Text className="text-sm text-gray-700">
+                <Text className="text-sm text-ink">
                   {row.role === "super_admin"
                     ? "Global"
                     : row.tenant_id
@@ -398,7 +405,7 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
               </View>
 
               <View style={{ flex: 1.3 }}>
-                <Text className="text-sm text-gray-700">{roleLabel(row.role)}</Text>
+                <Text className="text-sm text-ink">{roleLabel(row.role)}</Text>
               </View>
 
               <View style={{ flex: 1 }}>
@@ -407,22 +414,22 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
 
               <View style={{ flex: 1.4 }}>
                 <Badge
-                  label={row.password_change_required ? "Obrigatoria" : "Nao"}
+                  label={row.password_change_required ? "Obrigatória" : "Não"}
                   variant={row.password_change_required ? "warning" : "default"}
                 />
               </View>
 
               <View className="flex-row items-center justify-end" style={{ width: 90 }}>
                 <TouchableOpacity onPress={() => navigate("users-form", { userId: row.id })} className="p-2" activeOpacity={0.7}>
-                  <Ionicons name="create-outline" size={18} color="#6366F1" />
+                  <Ionicons name="create-outline" size={18} color="var(--ds-brand)" />
                 </TouchableOpacity>
                 {!row.is_tenant_owner && (
-                  <TouchableOpacity onPress={() => setDeleteId(row.id)} className="p-2" activeOpacity={0.7}>
-                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  <TouchableOpacity onPress={() => setDeleteId(row.id)} className="p-2 bg-danger rounded-ds-md" activeOpacity={0.7}>
+                    <Ionicons name="trash-outline" size={18} color="var(--ds-on-danger)" />
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
+            </DataTableRow>
           ))
         )}
       </View>
@@ -440,8 +447,8 @@ export default function UsersScreen({ navigate, flashMessage }: Props) {
 
       <ConfirmModal
         visible={deleteId !== null}
-        title="Remover usuario"
-        message="Deseja realmente remover este usuario? Esta acao nao pode ser desfeita."
+        title="Remover usuário"
+        message="Deseja realmente remover este usuário? Esta acao não pode ser desfeita."
         onCancel={() => setDeleteId(null)}
         onConfirm={remove}
         loading={deleting}

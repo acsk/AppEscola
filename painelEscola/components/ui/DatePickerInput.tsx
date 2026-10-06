@@ -69,7 +69,7 @@ export default function DatePickerInput({
     setOpen(false);
   };
 
-  const borderColor = error ? "#B0261B" : "#7A8393"; // `border-strong` em controles
+  const borderColor = error ? "var(--ds-danger)" : "var(--ds-border-strong)"; // `border-strong` em controles
   const modalWidth = Math.min(width - 32, 340);
 
   return (
@@ -90,7 +90,7 @@ export default function DatePickerInput({
           borderRadius: 4,
           paddingHorizontal: 12,
           height: 38,
-          backgroundColor: disabled ? "#F7F8FA" : "#FFFFFF",
+          backgroundColor: disabled ? "var(--ds-surface-sunken)" : "var(--ds-surface)",
           opacity: disabled ? 0.7 : 1,
         }}
       >
@@ -98,7 +98,7 @@ export default function DatePickerInput({
           value={value}
           onChangeText={(v) => onChangeText(maskDate(v))}
           placeholder="DD/MM/AAAA"
-          placeholderTextColor="#5F6878"
+          placeholderTextColor="var(--ds-ink-subtle)"
           className={`flex-1 text-sm ${disabled ? "text-ink-subtle" : "text-ink"}`}
           style={{ minWidth: 0 }}
           maxLength={10}
@@ -112,12 +112,12 @@ export default function DatePickerInput({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ marginRight: 8 }}
           >
-            <Ionicons name="close-circle" size={16} color="#5F6878" />
+            <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
           </TouchableOpacity>
         ) : null}
 
         <TouchableOpacity onPress={openPicker} disabled={disabled} activeOpacity={0.85}>
-          <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "var(--ds-border-strong)" : "var(--ds-brand)"} />
         </TouchableOpacity>
       </View>
 
@@ -127,11 +127,11 @@ export default function DatePickerInput({
             <View
               style={{
                 width: modalWidth,
-                backgroundColor: "white",
+                backgroundColor: "var(--ds-surface)",
                 borderRadius: 4,
                 overflow: "hidden",
                 borderWidth: 1,
-                borderColor: "#D9DDE3",
+                borderColor: "var(--ds-border)",
               }}
             >
               <View
@@ -142,17 +142,17 @@ export default function DatePickerInput({
                   paddingHorizontal: 16,
                   paddingVertical: 14,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#F7F8FA",
+                  borderBottomColor: "var(--ds-surface-sunken)",
                 }}
               >
-                <Text style={{ fontSize: 16, fontWeight: "600", color: "#111722" }}>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "var(--ds-ink)" }}>
                   {modalTitle}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setOpen(false)}
-                  style={{ padding: 4, backgroundColor: "#F7F8FA", borderRadius: 4 }}
+                  style={{ padding: 4, backgroundColor: "var(--ds-surface-sunken)", borderRadius: 4 }}
                 >
-                  <Ionicons name="close" size={18} color="#4B5463" />
+                  <Ionicons name="close" size={18} color="var(--ds-ink-muted)" />
                 </TouchableOpacity>
               </View>
 

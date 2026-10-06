@@ -173,11 +173,11 @@ export default function SchoolClassesScreen({ navigate }: Props) {
         </View>
         <TouchableOpacity
           onPress={() => navigate("turmas-form")}
-          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
+          className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
           activeOpacity={0.85}
         >
-          <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">
+          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+          <Text className="text-on-brand font-medium text-sm ml-1.5">
             Nova turma
           </Text>
         </TouchableOpacity>
@@ -199,7 +199,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
             className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
             style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
-            <Ionicons name="search-outline" size={16} color="#5F6878" />
+            <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
             <input
               placeholder="Turma"
               value={search}
@@ -212,14 +212,14 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#111722",
+                color: "var(--ds-ink)",
                 marginLeft: 8,
                 backgroundColor: "transparent",
               }}
             />
             {!!search && (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#5F6878" />
+                <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
               </TouchableOpacity>
             )}
           </View>
@@ -235,8 +235,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#111722",
-              backgroundColor: "#F7F8FA",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 200,
             }}
@@ -260,8 +260,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#111722",
-              backgroundColor: "#F7F8FA",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 120,
             }}
@@ -285,8 +285,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#111722",
-              backgroundColor: "#F7F8FA",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 150,
             }}
@@ -310,8 +310,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#111722",
-              backgroundColor: "#F7F8FA",
+              color: "var(--ds-ink)",
+              backgroundColor: "var(--ds-surface-sunken)",
               height: 44,
               minWidth: isMobile ? "100%" : 140,
             }}
@@ -361,11 +361,11 @@ export default function SchoolClassesScreen({ navigate }: Props) {
 
         {loading ? (
           <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color="#1C3D63" />
+            <ActivityIndicator size="large" color="var(--ds-brand)" />
           </View>
         ) : rows.length === 0 ? (
           <View className="items-center justify-center py-16">
-            <Ionicons name="grid-outline" size={40} color="#D9DDE3" />
+            <Ionicons name="grid-outline" size={40} color="var(--ds-border)" />
             <Text className="text-ink-subtle mt-3 text-sm">
               Nenhuma turma encontrada
             </Text>
@@ -381,13 +381,13 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                     </View>
                     <View className="flex-row gap-2">
                       <TouchableOpacity onPress={() => navigate("turmas-frequencia", { classId: item.id })} className="p-1.5 bg-success-tint rounded-ds-md">
-                        <Ionicons name="checkmark-done-outline" size={15} color="#1C6A45" />
+                        <Ionicons name="checkmark-done-outline" size={15} color="var(--ds-success)" />
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => navigate("turmas-form", { classId: item.id })} className="p-1.5 bg-brand-tint rounded-ds-md">
-                        <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
+                        <Ionicons name="pencil-outline" size={15} color="var(--ds-brand)" />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-danger-tint rounded-ds-md">
-                        <Ionicons name="trash-outline" size={15} color="#B0261B" />
+                      <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-danger rounded-ds-md">
+                        <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -475,7 +475,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                   onPress={() => navigate("turmas-frequencia", { classId: item.id })}
                   className="flex-row items-center px-2.5 py-1.5 bg-success-tint rounded-ds-md gap-1"
                 >
-                  <Ionicons name="checkmark-done-outline" size={15} color="#1C6A45" />
+                  <Ionicons name="checkmark-done-outline" size={15} color="var(--ds-success)" />
                   <Text className="text-xs font-semibold text-success">
                     Frequência
                   </Text>
@@ -486,13 +486,13 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                   }
                   className="p-1.5 bg-brand-tint rounded-ds-md"
                 >
-                  <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
+                  <Ionicons name="pencil-outline" size={15} color="var(--ds-brand)" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setDeleteId(item.id)}
-                  className="p-1.5 bg-danger-tint rounded-ds-md"
+                  className="p-1.5 bg-danger rounded-ds-md"
                 >
-                  <Ionicons name="trash-outline" size={15} color="#B0261B" />
+                  <Ionicons name="trash-outline" size={15} color="var(--ds-on-danger)" />
                 </TouchableOpacity>
               </View>
                 </>

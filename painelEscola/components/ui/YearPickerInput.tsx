@@ -79,7 +79,7 @@ export default function YearPickerInput({
   const canGoPrevDecade = decadeStart - 10 >= minYear;
   const canGoNextDecade = decadeStart + 10 <= maxYear;
 
-  const borderColor = error ? "#B0261B" : "#7A8393"; // `border-strong` em controles
+  const borderColor = error ? "var(--ds-danger)" : "var(--ds-border-strong)"; // `border-strong` em controles
   const modalWidth = Math.min(width - 32, 360);
 
   return (
@@ -100,7 +100,7 @@ export default function YearPickerInput({
           borderRadius: 4,
           paddingHorizontal: 12,
           height: 38,
-          backgroundColor: disabled ? "#F7F8FA" : "#FFFFFF",
+          backgroundColor: disabled ? "var(--ds-surface-sunken)" : "var(--ds-surface)",
           width: "100%",
           opacity: disabled ? 0.7 : 1,
         }}
@@ -114,7 +114,7 @@ export default function YearPickerInput({
           <Text
             style={{
               fontSize: 14,
-              color: selectedYear ? "#111722" : "#5F6878",
+              color: selectedYear ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
             }}
             numberOfLines={1}
           >
@@ -127,11 +127,11 @@ export default function YearPickerInput({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ marginRight: 8 }}
           >
-            <Ionicons name="close-circle" size={16} color="#5F6878" />
+            <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity onPress={openPicker} disabled={disabled} activeOpacity={0.85}>
-          <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "var(--ds-border-strong)" : "var(--ds-brand)"} />
         </TouchableOpacity>
       </View>
 
@@ -141,7 +141,7 @@ export default function YearPickerInput({
           <View
             style={{
               width: modalWidth,
-              backgroundColor: "white",
+              backgroundColor: "var(--ds-surface)",
               borderRadius: 4,
               overflow: "hidden",
             }}
@@ -154,15 +154,15 @@ export default function YearPickerInput({
                 paddingHorizontal: 16,
                 paddingVertical: 14,
                 borderBottomWidth: 1,
-                borderBottomColor: "#F7F8FA",
+                borderBottomColor: "var(--ds-surface-sunken)",
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: "600", color: "#111722" }}>{modalTitle}</Text>
+              <Text style={{ fontSize: 16, fontWeight: "600", color: "var(--ds-ink)" }}>{modalTitle}</Text>
               <TouchableOpacity
                 onPress={() => setOpen(false)}
-                style={{ padding: 4, backgroundColor: "#F7F8FA", borderRadius: 4 }}
+                style={{ padding: 4, backgroundColor: "var(--ds-surface-sunken)", borderRadius: 4 }}
               >
-                <Ionicons name="close" size={18} color="#4B5463" />
+                <Ionicons name="close" size={18} color="var(--ds-ink-muted)" />
               </TouchableOpacity>
             </View>
 
@@ -173,9 +173,9 @@ export default function YearPickerInput({
                 justifyContent: "space-between",
                 paddingHorizontal: 12,
                 paddingVertical: 10,
-                backgroundColor: "#F7F8FA",
+                backgroundColor: "var(--ds-surface-sunken)",
                 borderBottomWidth: 1,
-                borderBottomColor: "#F7F8FA",
+                borderBottomColor: "var(--ds-surface-sunken)",
               }}
             >
               <TouchableOpacity
@@ -183,9 +183,9 @@ export default function YearPickerInput({
                 disabled={!canGoPrevDecade}
                 style={{ padding: 8, opacity: canGoPrevDecade ? 1 : 0.35 }}
               >
-                <Ionicons name="chevron-back" size={20} color="#4B5463" />
+                <Ionicons name="chevron-back" size={20} color="var(--ds-ink-muted)" />
               </TouchableOpacity>
-              <Text style={{ fontSize: 15, fontWeight: "600", color: "#111722" }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: "var(--ds-ink)" }}>
                 {decadeStart} – {Math.min(decadeStart + 11, maxYear)}
               </Text>
               <TouchableOpacity
@@ -193,7 +193,7 @@ export default function YearPickerInput({
                 disabled={!canGoNextDecade}
                 style={{ padding: 8, opacity: canGoNextDecade ? 1 : 0.35 }}
               >
-                <Ionicons name="chevron-forward" size={20} color="#4B5463" />
+                <Ionicons name="chevron-forward" size={20} color="var(--ds-ink-muted)" />
               </TouchableOpacity>
             </View>
 
@@ -219,9 +219,9 @@ export default function YearPickerInput({
                       paddingVertical: 12,
                       borderRadius: 4,
                       alignItems: "center",
-                      backgroundColor: active ? "#1C3D63" : "#F7F8FA",
+                      backgroundColor: active ? "var(--ds-brand)" : "var(--ds-surface-sunken)",
                       borderWidth: 1,
-                      borderColor: active ? "#1C3D63" : "#D9DDE3",
+                      borderColor: active ? "var(--ds-brand)" : "var(--ds-border)",
                     }}
                     activeOpacity={0.85}
                   >
@@ -229,7 +229,7 @@ export default function YearPickerInput({
                       style={{
                         fontSize: 14,
                         fontWeight: "600",
-                        color: active ? "#FFFFFF" : "#111722",
+                        color: active ? "var(--ds-on-brand)" : "var(--ds-ink)",
                       }}
                     >
                       {year}

@@ -23,7 +23,7 @@ export default function PaymentProviderLogo({
 
   return (
     <View
-      className="items-center justify-center overflow-hidden border border-gray-100 bg-white"
+      className="items-center justify-center overflow-hidden border border-border bg-surface"
       style={{
         width: size,
         height: size,
@@ -39,7 +39,7 @@ export default function PaymentProviderLogo({
         />
       ) : (
         <View className="items-center justify-center px-2">
-          <Ionicons name="business-outline" size={size > 56 ? 24 : 18} color="#7C3AED" />
+          <Ionicons name="business-outline" size={size > 56 ? 24 : 18} color="var(--ds-brand)" />
         </View>
       )}
     </View>

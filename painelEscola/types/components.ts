@@ -20,6 +20,8 @@ export type SidebarProps = {
   onSelectItem?: (id: string) => void;
   canManageTenants?: boolean;
   canManageUsers?: boolean;
+  /** Configurações → Integração com IA (admin e super admin). */
+  canManageAi?: boolean;
   canManageExams?: boolean;
   canSendNotifications?: boolean;
   isMobile?: boolean;

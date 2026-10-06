@@ -42,7 +42,7 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
               aria-label={`Remover tag ${tag}`}
               className="ml-1"
             >
-              <Ionicons name="close" size={12} color="#132C4A" />
+              <Ionicons name="close" size={12} color="var(--ds-brand-hover)" />
             </TouchableOpacity>
           </View>
         ))}
@@ -52,7 +52,7 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
           onSubmitEditing={() => commit(text)}
           blurOnSubmit={false}
           placeholder={value.length ? "" : "Digite e tecle Enter"}
-          placeholderTextColor="#5F6878"
+          placeholderTextColor="var(--ds-ink-subtle)"
           aria-labelledby={`tags-${label}`}
           className="text-xs text-ink"
           style={{ minWidth: 120, flexGrow: 1, height: 28 }}

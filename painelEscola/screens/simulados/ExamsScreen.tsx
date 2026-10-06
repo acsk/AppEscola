@@ -75,9 +75,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: stri
 function SubjectIcon({ icon, size = 16 }: { icon?: string | null; color?: string | null; size?: number }) {
   const IconComp = icon ? ICON_MAP[icon] : null;
   return IconComp ? (
-    <IconComp size={size} color="#4B5463" strokeWidth={1.5} />
+    <IconComp size={size} color="var(--ds-ink-muted)" strokeWidth={1.5} />
   ) : (
-    <Ionicons name="book-outline" size={size} color="#4B5463" />
+    <Ionicons name="book-outline" size={size} color="var(--ds-ink-muted)" />
   );
 }
 
@@ -240,7 +240,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       activeOpacity={0.85}
       accessibilityLabel="Ações do simulado"
     >
-      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5463" />
+      <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
     </TouchableOpacity>
   );
 
@@ -249,8 +249,8 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#111722",
-    backgroundColor: "white",
+    color: "var(--ds-ink)",
+    backgroundColor: "var(--ds-surface)",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
   };
@@ -281,11 +281,11 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         {allowManageExams && (
           <TouchableOpacity
             onPress={() => navigate("simulados-form", { examId: null })}
-            className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
+            className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="add" size={18} color="white" />
-            <Text className="text-white font-semibold text-sm ml-1.5">
+            <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
+            <Text className="text-on-brand font-medium text-sm ml-1.5">
               Novo simulado
             </Text>
           </TouchableOpacity>
@@ -302,7 +302,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             activeOpacity={0.85}
           >
             <View className="flex-row items-center gap-2 mb-2">
-              <Ionicons name="time-outline" size={15} color="#8A5200" />
+              <Ionicons name="time-outline" size={15} color="var(--ds-warning)" />
               <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide">Em andamento</Text>
             </View>
             <Text className="text-3xl font-semibold text-ink">{summary.in_progress}</Text>
@@ -313,21 +313,21 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             onPress={() => navigate("simulados-tentativas", { status: "pending_review" })}
             className="flex-1 rounded-ds-md p-4 border"
             style={{ minWidth: 140,
-              backgroundColor: summary.pending_review > 0 ? '#FBEFDC' : 'white',
-              borderColor: summary.pending_review > 0 ? '#8A5200' : '#FBEFDC',
+              backgroundColor: summary.pending_review > 0 ? 'var(--ds-warning-tint)' : 'white',
+              borderColor: summary.pending_review > 0 ? 'var(--ds-warning)' : 'var(--ds-warning-tint)',
             }}
             activeOpacity={0.85}
           >
             <View className="flex-row items-center gap-2 mb-2">
-              <Ionicons name="create-outline" size={15} color="#8A5200" />
+              <Ionicons name="create-outline" size={15} color="var(--ds-warning)" />
               <Text className="text-xs font-semibold text-warning uppercase tracking-wide">Corrigir</Text>
               {summary.pending_review > 0 && (
                 <View className="bg-warning rounded-ds-sm px-1.5" style={{ marginLeft: 'auto' }}>
-                  <Text className="text-white text-xs font-semibold">{summary.pending_review}</Text>
+                  <Text className="text-on-brand text-xs font-medium">{summary.pending_review}</Text>
                 </View>
               )}
             </View>
-            <Text className="text-3xl font-semibold" style={{ color: summary.pending_review > 0 ? '#8A5200' : '#111722' }}>
+            <Text className="text-3xl font-semibold" style={{ color: summary.pending_review > 0 ? 'var(--ds-warning)' : 'var(--ds-ink)' }}>
               {summary.pending_review}
             </Text>
             <Text className="text-xs text-amber-500 mt-1">aguardam correção</Text>
@@ -340,10 +340,10 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             activeOpacity={0.85}
           >
             <View className="flex-row items-center gap-2 mb-2">
-              <Ionicons name="lock-closed-outline" size={15} color="#1C3D63" />
+              <Ionicons name="lock-closed-outline" size={15} color="var(--ds-brand)" />
               <Text className="text-xs font-semibold text-brand uppercase tracking-wide">Aguardando</Text>
             </View>
-            <Text className="text-3xl font-semibold" style={{ color: summary.awaiting_release > 0 ? '#1C3D63' : '#111722' }}>
+            <Text className="text-3xl font-semibold" style={{ color: summary.awaiting_release > 0 ? 'var(--ds-brand)' : 'var(--ds-ink)' }}>
               {summary.awaiting_release}
             </Text>
             <Text className="text-xs text-ink-subtle mt-1">aguardam liberação</Text>
@@ -356,7 +356,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             activeOpacity={0.85}
           >
             <View className="flex-row items-center gap-2 mb-2">
-              <Ionicons name="checkmark-circle-outline" size={15} color="#1C6A45" />
+              <Ionicons name="checkmark-circle-outline" size={15} color="var(--ds-success)" />
               <Text className="text-xs font-semibold text-success uppercase tracking-wide">Concluídas</Text>
             </View>
             <Text className="text-3xl font-semibold text-ink">{summary.completed}</Text>
@@ -369,7 +369,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             style={{ minWidth: 140, alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={0.85}
           >
-            <Ionicons name="list-outline" size={20} color="#1C3D63" />
+            <Ionicons name="list-outline" size={20} color="var(--ds-brand)" />
             <Text className="text-xs font-semibold text-brand mt-1">Ver todas</Text>
             <Text className="text-xs text-ink-subtle">{summary.total} tentativas</Text>
           </TouchableOpacity>
@@ -382,17 +382,17 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           className="flex-row items-center bg-surface border border-border rounded-ds-md px-4"
           style={{ height: 44, minWidth: isMobile ? "100%" : 260, flex: 1 }}
         >
-          <Ionicons name="search-outline" size={16} color="#5F6878" />
+          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={search}
             onChangeText={(v) => { setSearch(v); setPage(1); }}
             placeholder="Buscar por título..."
-            placeholderTextColor="#5F6878"
+            placeholderTextColor="var(--ds-ink-subtle)"
             className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#5F6878" />
+              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
@@ -456,11 +456,11 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
 
         {loading ? (
           <View className="py-16 items-center">
-            <ActivityIndicator color="#1C3D63" />
+            <ActivityIndicator color="var(--ds-brand)" />
           </View>
         ) : rows.length === 0 ? (
           <View className="py-16 items-center gap-2">
-            <Ionicons name="document-text-outline" size={32} color="#7A8393" />
+            <Ionicons name="document-text-outline" size={32} color="var(--ds-border-strong)" />
             <Text className="text-sm text-ink-subtle">Nenhum simulado encontrado</Text>
           </View>
         ) : (
@@ -624,7 +624,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             header={
               <View
                 className="mb-2 p-5 rounded-ds-md border border-border"
-                style={{ backgroundColor: "#F7F8FA" }}
+                style={{ backgroundColor: "var(--ds-surface-sunken)" }}
               >
                 <View className="flex-row items-start justify-between gap-4 mb-3">
                   <Text className="text-xl font-semibold text-ink flex-1">
@@ -638,7 +638,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                 <View className="flex-row gap-4 flex-wrap">
                   {previewExam.duration_minutes != null && (
                     <View className="flex-row items-center gap-1.5">
-                      <Ionicons name="time-outline" size={14} color="#4B5463" />
+                      <Ionicons name="time-outline" size={14} color="var(--ds-ink-muted)" />
                       <Text className="text-sm text-ink-muted">
                         {previewExam.duration_minutes} min
                       </Text>
@@ -646,26 +646,26 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
                   )}
                   {previewExam.passing_score != null && (
                     <View className="flex-row items-center gap-1.5">
-                      <Ionicons name="ribbon-outline" size={14} color="#4B5463" />
+                      <Ionicons name="ribbon-outline" size={14} color="var(--ds-ink-muted)" />
                       <Text className="text-sm text-ink-muted">
                         Mínimo: {previewExam.passing_score}%
                       </Text>
                     </View>
                   )}
                   <View className="flex-row items-center gap-1.5">
-                    <Ionicons name="help-circle-outline" size={14} color="#4B5463" />
+                    <Ionicons name="help-circle-outline" size={14} color="var(--ds-ink-muted)" />
                     <Text className="text-sm text-ink-muted">
                       {previewExam.total_questions} questão
                       {previewExam.total_questions !== 1 ? "ões" : ""}
                     </Text>
                   </View>
                   <View className="flex-row items-center gap-1.5">
-                    <Ionicons name="star-outline" size={14} color="#4B5463" />
+                    <Ionicons name="star-outline" size={14} color="var(--ds-ink-muted)" />
                     <Text className="text-sm text-ink-muted">{previewExam.total_points} pontos</Text>
                   </View>
                   {(previewExam.courses?.length || previewExam.course) && (
                     <View className="flex-row items-center gap-1.5">
-                      <Ionicons name="book-outline" size={14} color="#4B5463" />
+                      <Ionicons name="book-outline" size={14} color="var(--ds-ink-muted)" />
                       <Text className="text-sm text-ink-muted">
                         {previewExam.courses?.length
                           ? previewExam.courses.map((c) => c.name).join(", ")

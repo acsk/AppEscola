@@ -141,11 +141,11 @@ export default function GridPdfExportButton<T extends Record<string, any>>({
       style={{ opacity: exporting ? 0.7 : 1 }}
     >
       {exporting ? (
-        <ActivityIndicator size="small" color="#fff" />
+        <ActivityIndicator size="small" color="var(--ds-on-brand)" />
       ) : (
-        <Ionicons name="document-attach-outline" size={16} color="#fff" />
+        <Ionicons name="document-attach-outline" size={16} color="var(--ds-on-brand)" />
       )}
-      <Text className="text-white font-semibold text-sm ml-2">
+      <Text className="text-on-brand font-medium text-sm ml-2">
         {exporting ? "Gerando PDF..." : "Exportar PDF"}
       </Text>
     </TouchableOpacity>
