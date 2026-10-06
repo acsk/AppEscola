@@ -36,6 +36,7 @@ import {
   type ClassificationForm,
   EMPTY_CLASSIFICATION_FORM,
   diffClassification,
+  formFromQuestion,
   mergeClassificationSuggestion,
 } from "../../utils/questionClassification";
 import { plainRichText } from "../../utils/richText";
@@ -64,6 +65,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [initialContent, setInitialContent] = useState<ContentForm>(EMPTY_CONTENT_FORM);
   const [content, setContent] = useState<ContentForm>(initialContent);
   const [classification, setClassification] = useState<ClassificationForm>(EMPTY_CLASSIFICATION_FORM);
+  const [initialClassification, setInitialClassification] = useState<ClassificationForm>(EMPTY_CLASSIFICATION_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(isEdit);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -99,6 +101,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setSourceDifficultyId(q.difficulty_id);
       setInitialContent(form);
       setContent(form);
+      const classified = formFromQuestion(q);
+      setInitialClassification(classified);
+      setClassification(classified);
     } catch (error) {
       setLoadError(getApiErrorMessage(error, "Não foi possível carregar a questão."));
     } finally {
@@ -113,8 +118,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const dirty = useMemo(
     () =>
       JSON.stringify(contentPayload(content)) !== JSON.stringify(contentPayload(initialContent)) ||
-      (!isEdit && Object.keys(diffClassification(EMPTY_CLASSIFICATION_FORM, classification)).length > 0),
-    [classification, content, initialContent, isEdit]
+      Object.keys(diffClassification(initialClassification, classification)).length > 0,
+    [classification, content, initialContent, initialClassification]
   );
 
   // Aviso ao fechar/recarregar a aba com alterações não salvas.
@@ -147,7 +152,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     content.options.every((o) => !plainRichText(o.option_text).trim()) && !plainRichText(content.explanation).trim();
   const showAiHint = aiAvailable && !aiHintDismissed && !aiFilling && statementChars >= AI_HINT_CHARS && contentIsBlank;
 
-  /** Preenche alternativas, gabarito, explicação e (na criação) a classificação, sem apagar o que já foi digitado. */
+  /** Preenche alternativas, gabarito, explicação e classificação, sem apagar o que já foi digitado. */
   const autofill = async () => {
     if (aiFilling || saving !== null || uploading) return;
     setAiFilling(true);
@@ -171,11 +176,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       });
       const merged = mergeContentSuggestion(content, response.body);
       setContent(merged.form);
-      if (!isEdit) {
-        const classified = mergeClassificationSuggestion(classification, response.body);
-        if (classified.changed) {
-          setClassification(classified.form);
-        }
+      const classified = mergeClassificationSuggestion(classification, response.body);
+      if (classified.changed) {
+        setClassification(classified.form);
       }
       setErrors({});
       setAiHintDismissed(true);
@@ -236,9 +239,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
     setSaving(mode);
     try {
-      const payload = isEdit
-        ? contentPayload(content)
-        : { ...contentPayload(content), ...diffClassification(EMPTY_CLASSIFICATION_FORM, classification) };
+      const payload = { ...contentPayload(content), ...diffClassification(initialClassification, classification) };
       const response = isEdit
         ? await updateStandaloneQuestion(questionId, payload)
         : await createStandaloneQuestion(payload);
@@ -253,6 +254,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         return;
       }
       setInitialContent(content);
+      setInitialClassification(classification);
       navigate("questoes-classificar", { questionId: response.body.id, query: listQuery });
     } catch (error) {
       setErrors(getApiValidationErrors(error));
@@ -268,18 +270,6 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     <Panel
       title="Conteúdo"
       description="Enunciado, alternativas e gabarito da questão avulsa."
-      actions={
-        isEdit ? (
-          <Button
-            size="sm"
-            icon={Sparkles}
-            label="Autocompletar com IA"
-            onPress={() => void autofill()}
-            loading={aiFilling}
-            disabled={saving !== null || uploading}
-          />
-        ) : undefined
-      }
     >
       <SegmentedControl<QuestionType>
         label="Tipo"
@@ -302,7 +292,6 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         placeholder="Texto do enunciado (opcional se houver imagem). Pode colar a questão inteira, com as alternativas."
       />
 
-      {!isEdit && (
         <View style={{ gap: 8, marginBottom: 16 }}>
           <Text className={`text-xs ${aiStatusError ? "text-danger" : "text-ink-muted"}`} aria-live="polite">
             {aiStatusLoading
@@ -315,7 +304,6 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           </Text>
           {aiStatusError ? <Button size="sm" label="Verificar IA novamente" onPress={() => void loadAiStatus()} /> : null}
         </View>
-      )}
 
       {showAiHint && (
         <View
@@ -324,11 +312,10 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           aria-live="polite"
         >
           <Text className="text-sm text-ink" style={{ flex: 1, minWidth: 220 }}>
-            Enunciado pronto. A IA pode preencher alternativas, gabarito, explicação{isEdit ? "" : " e classificação"} para você revisar.
+            Enunciado pronto. Use “Autocompletar com IA” no topo para preencher alternativas, gabarito, explicação e classificação.
           </Text>
           <View className="flex-row" style={{ gap: 8 }}>
             <Button size="sm" variant="ghost" label="Agora não" onPress={() => setAiHintDismissed(true)} />
-            <Button size="sm" variant="primary" icon={Sparkles} label="Autocompletar com IA" onPress={() => void autofill()} disabled={saving !== null || uploading} />
           </View>
         </View>
       )}
@@ -392,24 +379,25 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           <PageHeader
             breadcrumb={[{ label: "Banco de questões", onPress: () => leave(goToList) }, { label: isEdit ? `Questão #${questionId}` : "Nova questão" }]}
             title={title}
-            description={isEdit ? "Conteúdo da questão avulsa. A classificação fica na tela da questão." : "Questão avulsa, sem vínculo com simulado."}
+            description={isEdit ? "Conteúdo e classificação da questão avulsa." : "Questão avulsa, sem vínculo com simulado."}
             actions={
-              !isEdit ? (
+              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
                 <Button
                   icon={Sparkles}
                   label="Autocompletar com IA"
                   onPress={() => void autofill()}
                   loading={aiFilling}
-                  disabled={saving !== null || uploading}
+                  disabled={loading || !!loadError || saving !== null || uploading}
                 />
-              ) : (
-                <Button
-                  icon={Sparkles}
-                  label="Gerar similares com IA"
-                  onPress={() => void openSimilar()}
-                  disabled={loading || !!loadError || aiFilling || saving !== null || uploading}
-                />
-              )
+                {isEdit && (
+                  <Button
+                    icon={Sparkles}
+                    label="Gerar similares com IA"
+                    onPress={() => void openSimilar()}
+                    disabled={loading || !!loadError || aiFilling || saving !== null || uploading}
+                  />
+                )}
+              </View>
             }
           />
         </View>
@@ -428,21 +416,13 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             <View style={{ flexDirection: isMobile ? "column" : "row", gap: 24, alignItems: "flex-start" }}>
               <View style={{ flex: 3, width: isMobile ? "100%" : undefined }}>{contentPanel}</View>
               <View style={{ flex: 2, width: isMobile ? "100%" : undefined, minWidth: isMobile ? undefined : 320 }}>
-                {isEdit ? (
-                  <Panel title="Classificação">
-                    <Text className="text-sm text-ink-muted" style={{ marginBottom: 12 }}>
-                      Disciplina, assuntos, dificuldade, banca e tags ficam na tela da questão.
-                    </Text>
-                    <Button
-                      label="Abrir classificação"
-                      onPress={() => leave(() => navigate("questoes-classificar", { questionId, query: listQuery }))}
-                    />
-                  </Panel>
-                ) : (
-                  <Panel title="Classificação" description="Opcional; pode ser feita depois.">
-                    <ClassificationFields form={classification} onChange={(form) => !aiFilling && setClassification(form)} catalogs={catalogs} />
-                  </Panel>
-                )}
+                <Panel title="Classificação" description="Disciplina, assuntos, dificuldade, banca e tags.">
+                  <ClassificationFields
+                    form={classification}
+                    onChange={(form) => !aiFilling && saving === null && setClassification(form)}
+                    catalogs={catalogs}
+                  />
+                </Panel>
               </View>
             </View>
 

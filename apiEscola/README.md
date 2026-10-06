@@ -87,6 +87,11 @@ restantes, preserva textos de alternativas e explicacao ja preenchidos, e nunca
 salva automaticamente. Revise as sugestoes e confirme pelo botao de salvar.
 **Gerar similares com IA** tambem permanece visivel na edicao, classificacao e
 menu da listagem de questoes salvas, com a mesma orientacao de indisponibilidade.
+Na criacao e edicao, as acoes de IA ficam no cabecalho, sem botoes duplicados no
+conteudo. A edicao carrega e permite alterar a classificacao junto com o conteudo.
+O autocompletar preenche alternativas/gabarito e classificacao tambem na edicao,
+preservando textos e campos de classificacao ja preenchidos. Conteudo e alteracoes
+de classificacao sao salvos juntos pelo endpoint existente de questao avulsa.
 
 Testes visuais com servidor Expo web e API simulada, sem cobrancas:
 

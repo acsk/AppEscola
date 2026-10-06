@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
+import PageHeader from "../../components/ui/PageHeader";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import ClassificationFields from "../../components/banco-questoes/ClassificationFields";
@@ -213,12 +213,6 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
             onPress={() => leave(() => navigate("questoes-editar", { questionId, query: listQuery }))}
           />
         )}
-          <Button
-            size="sm"
-            icon={Sparkles}
-            label="Gerar similares com IA"
-            onPress={() => void openSimilar()}
-          />
       </View>
     </View>
   );
@@ -226,12 +220,23 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
   return (
     <View className="flex-1">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
-        <ScreenBreadcrumb
-          items={[
-            { label: "Banco de questões", onPress: () => leave(goToList) },
-            { label: `Questão #${questionId}` },
-          ]}
-        />
+        <View className="mb-6">
+          <PageHeader
+            title={`Questão #${questionId}`}
+            breadcrumb={[
+              { label: "Banco de questões", onPress: () => leave(goToList) },
+              { label: `Questão #${questionId}` },
+            ]}
+            actions={
+              <Button
+                icon={Sparkles}
+                label="Gerar similares com IA"
+                onPress={() => void openSimilar()}
+                disabled={loading || !!loadError || !question || saving !== null}
+              />
+            }
+          />
+        </View>
 
         {loading ? (
           <View className="py-20 items-center">

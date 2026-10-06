@@ -24,11 +24,18 @@ const sourceQuestion = {
   is_annulled: false, is_outdated: false, tags: [], topics: [], complete: false,
 };
 
-async function setup(page: Page, available = true, statusCode = 200) {
+async function setup(page: Page, available = true, statusCode = 200, questionOverrides: {
+  type?: "multiple_choice" | "essay";
+  image_url?: string;
+  subject_id?: number | null;
+  is_annulled?: boolean;
+} = {}) {
   let saved = 0;
   let aiRequests = 0;
   let currentStatusCode = statusCode;
   const regenerations: unknown[] = [];
+  const saves: Record<string, unknown>[] = [];
+  const question = { ...sourceQuestion, ...questionOverrides };
   await page.addInitScript(() => {
     localStorage.setItem("auth_token", "ui-test-token");
     localStorage.setItem("auth_user", JSON.stringify({ id: 1, name: "Equipe de teste", role: "admin", tenant_id: 1 }));
@@ -38,6 +45,13 @@ async function setup(page: Page, available = true, statusCode = 200) {
     const path = new URL(request.url()).pathname;
     let body: unknown = [];
     let status = 200;
+    if (path.endsWith("/subjects")) {
+      await route.fulfill({
+        headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+        json: { data: [{ id: 10, name: "Matemática" }, { id: 11, name: "Português" }] },
+      });
+      return;
+    }
     if (path.endsWith("/ai/status")) {
       body = { available, provider: "openrouter", source: "tenant" };
       status = currentStatusCode;
@@ -45,8 +59,18 @@ async function setup(page: Page, available = true, statusCode = 200) {
     else if (path.endsWith("/ai/autofill")) body = {
       type: "multiple_choice", question_text: "Quanto é a soma de dois e dois?", explanation: "Dois mais dois é quatro.",
       options: [{ option_text: "Quatro", is_correct: true }, { option_text: "Cinco", is_correct: false }],
+      subject_id: 10, topic_ids: [20], difficulty_id: 30, board_id: 40, year: 2020, tags: ["soma"],
     };
-    else if (path.endsWith("/questions/123")) body = sourceQuestion;
+    else if (path.endsWith("/difficulties")) body = [{ id: 30, name: "Fácil" }];
+    else if (path.endsWith("/boards")) body = [{ id: 40, name: "ENEM" }];
+    else if (path.endsWith("/topics")) body = [{ id: 20, subject_id: 10, name: "Aritmética" }];
+    else if (path.endsWith("/questions/123")) {
+      if (request.method() === "PUT") {
+        saved++;
+        saves.push(request.postDataJSON());
+        body = { ...question, ...request.postDataJSON() };
+      } else body = question;
+    }
     else if (path.endsWith("/ai/similar")) body = { questions: [generated] };
     else if (path.endsWith("/regenerate")) {
       regenerations.push(request.postDataJSON());
@@ -68,6 +92,7 @@ async function setup(page: Page, available = true, statusCode = 200) {
       return;
     } else if (path.endsWith("/question-bank/questions") && request.method() === "POST") {
       saved++;
+      saves.push(request.postDataJSON());
       status = 201;
       body = { id: 321 };
     }
@@ -90,7 +115,7 @@ async function setup(page: Page, available = true, statusCode = 200) {
     body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
   }));
 
-  return { saved: () => saved, aiRequests: () => aiRequests, recoverStatus: () => { currentStatusCode = 200; }, regenerations };
+  return { saved: () => saved, saves, aiRequests: () => aiRequests, recoverStatus: () => { currentStatusCode = 200; }, regenerations };
 }
 
 test("Nova questão mostra autocompletar, preenche e aguarda revisão sem salvar", async ({ page }) => {
@@ -109,9 +134,95 @@ test("Nova questão mostra autocompletar, preenche e aguarda revisão sem salvar
   await expect(page.getByRole("textbox", { name: "Texto da alternativa A" })).toHaveText("Quatro");
   await expect(page.getByRole("radio", { name: "Alternativa A é a correta" })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("textbox", { name: "Explicação", exact: true })).toHaveText("Dois mais dois é quatro.");
+  await expect(page.getByText("Matemática", { exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Aritmética" })).toHaveAttribute("aria-checked", "true");
   expect(state.saved()).toBe(0);
 });
 
+test("edição autocompleta respostas e classificação e salva juntas", async ({ page }) => {
+  const state = await setup(page, true, 200, { type: "multiple_choice", image_url: "" });
+  await page.goto(`${baseUrl}/#/questoes/123/editar`);
+  const autofill = page.getByRole("button", { name: "Autocompletar com IA", exact: true });
+  const similar = page.getByRole("button", { name: "Gerar similares com IA", exact: true });
+  await expect(autofill).toHaveCount(1);
+  await expect(similar).toHaveCount(1);
+  await expect(autofill).toBeEnabled();
+  await expect(page.getByText("Escolha a disciplina primeiro.", { exact: true })).toBeVisible();
+  await autofill.click();
+  await expect(page.getByRole("textbox", { name: "Texto da alternativa A" })).toHaveText("Quatro");
+  await expect(page.getByRole("radio", { name: "Alternativa A é a correta" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("Matemática", { exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Aritmética" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("ENEM", { exact: true })).toBeVisible();
+  expect(state.saved()).toBe(0);
+  await page.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+  await expect.poll(state.saved).toBe(1);
+  expect(state.saves[0]).toMatchObject({
+    type: "multiple_choice", subject_id: 10, topic_ids: [20], difficulty_id: 30,
+    board_id: 40, year: 2020, tags: ["soma"],
+    options: [{ option_text: "Quatro", is_correct: true }, { option_text: "Cinco", is_correct: false }],
+  });
+});
+
+test("edição carrega classificação existente e avisa ao sair com mudança somente nela", async ({ page }) => {
+  const state = await setup(page, true, 200, { subject_id: 11, is_annulled: true });
+  await page.goto(`${baseUrl}/#/questoes/123/editar`);
+  await expect(page.getByText("Português", { exact: true })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Anulada pela banca" })).toBeChecked();
+  await page.getByRole("switch", { name: "Anulada pela banca" }).click();
+  await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(page.getByText("Sair sem salvar?", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Continuar editando", exact: true }).click();
+  await page.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+  await expect.poll(state.saved).toBe(1);
+  expect(state.saves[0]).toMatchObject({ is_annulled: false });
+  expect(state.saves[0]).not.toHaveProperty("subject_id");
+});
+
+test("autocompletar na edição preserva disciplina já preenchida", async ({ page }) => {
+  const state = await setup(page, true, 200, { type: "multiple_choice", subject_id: 11, image_url: "" });
+  await page.goto(`${baseUrl}/#/questoes/123/editar`);
+  await expect(page.getByText("Português", { exact: true })).toBeVisible();
+  await expect(page.getByText("Escreva ao menos 15 caracteres", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Autocompletar com IA", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Texto da alternativa A" })).toHaveText("Quatro");
+  await expect(page.getByText("Português", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+  await expect.poll(state.saved).toBe(1);
+  expect(state.saves[0]).not.toHaveProperty("subject_id");
+  expect(state.saves[0]).not.toHaveProperty("topic_ids");
+  expect(state.saves[0]).toMatchObject({ difficulty_id: 30, board_id: 40, tags: ["soma"] });
+});
+
+test("similares fica acima do conteúdo na tela de classificação", async ({ page }) => {
+  await setup(page);
+  await page.goto(`${baseUrl}/#/questoes/123`);
+  const similar = page.getByRole("button", { name: "Gerar similares com IA", exact: true });
+  const statement = page.getByText(sourceQuestion.question_text, { exact: true });
+  await expect(similar).toHaveCount(1);
+  await expect(statement).toBeVisible();
+  expect((await similar.boundingBox())!.y).toBeLessThan((await statement.boundingBox())!.y);
+});
+
+test("ações de IA ficam somente no topo da edição nos dois temas e tamanhos", async ({ page }) => {
+  await setup(page);
+  for (const width of [360, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const scheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto(`${baseUrl}/#/questoes/123/editar`);
+      const statement = page.getByRole("textbox", { name: "Enunciado", exact: true });
+      await expect(statement).toBeVisible();
+      for (const name of ["Autocompletar com IA", "Gerar similares com IA"]) {
+        const button = page.getByRole("button", { name, exact: true });
+        await expect(button).toHaveCount(1);
+        await expect(button).toBeVisible();
+        expect((await button.boundingBox())!.y).toBeLessThan((await statement.boundingBox())!.y);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    }
+  }
+});
 test("Nova questão mantém botão visível e explica falta de credenciais", async ({ page }) => {
   const state = await setup(page, false);
   await page.goto(`${baseUrl}/#/questoes/nova`);
