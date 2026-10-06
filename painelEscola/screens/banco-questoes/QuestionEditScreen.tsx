@@ -19,7 +19,8 @@ import {
   updateStandaloneQuestion,
   uploadQuestionBankImage,
 } from "../../services/questionBank";
-import { aiAutofillQuestion, fetchAiStatus } from "../../services/questionAi";
+import { aiAutofillQuestion } from "../../services/questionAi";
+import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import {
@@ -75,31 +76,14 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     message: "",
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [aiAvailable, setAiAvailable] = useState(false);
-  const [aiStatusLoading, setAiStatusLoading] = useState(true);
-  const [aiStatusError, setAiStatusError] = useState<string | null>(null);
+  const {
+    available: aiAvailable, loading: aiStatusLoading, error: aiStatusError,
+    reload: loadAiStatus, ensureAvailable,
+  } = useQuestionAiStatus();
   const [aiFilling, setAiFilling] = useState(false);
   const [aiHintDismissed, setAiHintDismissed] = useState(false);
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
   const [sourceDifficultyId, setSourceDifficultyId] = useState<number | null>(null);
-
-  const loadAiStatus = useCallback(async () => {
-    setAiStatusLoading(true);
-    setAiStatusError(null);
-    try {
-      const status = await fetchAiStatus();
-      setAiAvailable(status.available);
-    } catch (error) {
-      setAiAvailable(false);
-      setAiStatusError(getApiErrorMessage(error, "Não foi possível verificar a configuração de IA."));
-    } finally {
-      setAiStatusLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadAiStatus();
-  }, [loadAiStatus]);
 
   const load = useCallback(async () => {
     if (!isEdit) return;
@@ -165,9 +149,15 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
   /** Preenche alternativas, gabarito, explicação e (na criação) a classificação, sem apagar o que já foi digitado. */
   const autofill = async () => {
-    if (aiFilling || saving !== null || uploading || !aiAvailable) return;
+    if (aiFilling || saving !== null || uploading) return;
+    const unavailable = await ensureAvailable();
+    if (unavailable) {
+      setToast({ visible: true, type: "error", message: unavailable });
+      return;
+    }
     if (statementChars < AI_MIN_CHARS) {
       setErrors((prev) => ({ ...prev, question_text: `Escreva um enunciado com pelo menos ${AI_MIN_CHARS} caracteres para usar a IA.` }));
+      setToast({ visible: true, type: "error", message: `Escreva um enunciado com pelo menos ${AI_MIN_CHARS} caracteres para usar a IA.` });
       return;
     }
     setAiFilling(true);
@@ -195,6 +185,22 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     } finally {
       setAiFilling(false);
     }
+  };
+
+  const openSimilar = async () => {
+    if (questionId === null || loading || loadError || aiFilling || saving !== null || uploading) return;
+    const unavailable = await ensureAvailable();
+    if (unavailable) {
+      setToast({ visible: true, type: "error", message: unavailable });
+      return;
+    }
+    setSimilarSource({
+      id: questionId,
+      type: initialContent.type,
+      optionsCount: initialContent.options.filter((o) => plainRichText(o.option_text).trim()).length,
+      difficultyId: sourceDifficultyId,
+      imageUrl: initialContent.image_url,
+    });
   };
 
   const onPickImage = async (file: File | undefined) => {
@@ -262,14 +268,14 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       title="Conteúdo"
       description="Enunciado, alternativas e gabarito da questão avulsa."
       actions={
-        isEdit && aiAvailable ? (
+        isEdit ? (
           <Button
             size="sm"
             icon={Sparkles}
-            label={aiFilling ? "Preenchendo…" : "Preencher com IA"}
+            label="Autocompletar com IA"
             onPress={() => void autofill()}
             loading={aiFilling}
-            disabled={statementChars < AI_MIN_CHARS || saving !== null}
+            disabled={saving !== null || uploading}
           />
         ) : undefined
       }
@@ -393,23 +399,16 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
                   label="Autocompletar com IA"
                   onPress={() => void autofill()}
                   loading={aiFilling}
-                  disabled={aiStatusLoading || !aiAvailable || statementChars < AI_MIN_CHARS || saving !== null || uploading}
+                  disabled={saving !== null || uploading}
                 />
-              ) : aiAvailable && !loading && !loadError ? (
+              ) : (
                 <Button
                   icon={Sparkles}
-                  label="Criar semelhantes com IA"
-                  onPress={() =>
-                    setSimilarSource({
-                      id: questionId,
-                      type: initialContent.type,
-                      optionsCount: initialContent.options.filter((o) => plainRichText(o.option_text).trim()).length,
-                      difficultyId: sourceDifficultyId,
-                      imageUrl: initialContent.image_url,
-                    })
-                  }
+                  label="Gerar similares com IA"
+                  onPress={() => void openSimilar()}
+                  disabled={loading || !!loadError || aiFilling || saving !== null || uploading}
                 />
-              ) : undefined
+              )
             }
           />
         </View>

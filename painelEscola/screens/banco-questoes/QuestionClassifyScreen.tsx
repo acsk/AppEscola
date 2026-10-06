@@ -26,7 +26,7 @@ import { Pencil, Sparkles } from "lucide-react-native";
 import Button from "../../components/ui/Button";
 import RichText from "../../components/ui/RichText";
 import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
-import { fetchAiStatus } from "../../services/questionAi";
+import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -54,14 +54,24 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
     message: "",
   });
 
-  const [aiAvailable, setAiAvailable] = useState(false);
+  const { ensureAvailable } = useQuestionAiStatus();
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
 
-  useEffect(() => {
-    fetchAiStatus()
-      .then((status) => setAiAvailable(status.available))
-      .catch(() => setAiAvailable(false));
-  }, []);
+  const openSimilar = async () => {
+    if (!question) return;
+    const unavailable = await ensureAvailable();
+    if (unavailable) {
+      setToast({ visible: true, type: "error", message: unavailable });
+      return;
+    }
+    setSimilarSource({
+      id: question.id,
+      type: question.type,
+      optionsCount: question.options?.length ?? 0,
+      difficultyId: question.difficulty_id,
+      imageUrl: question.image_url,
+    });
+  };
 
   const patch = useMemo(() => diffClassification(initial, form), [initial, form]);
   const dirty = Object.keys(patch).length > 0;
@@ -203,22 +213,12 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
             onPress={() => leave(() => navigate("questoes-editar", { questionId, query: listQuery }))}
           />
         )}
-        {aiAvailable && (
           <Button
             size="sm"
             icon={Sparkles}
-            label="Criar semelhantes com IA"
-            onPress={() =>
-              setSimilarSource({
-                id: question.id,
-                type: question.type,
-                optionsCount: question.options?.length ?? 0,
-                difficultyId: question.difficulty_id,
-                imageUrl: question.image_url,
-              })
-            }
+            label="Gerar similares com IA"
+            onPress={() => void openSimilar()}
           />
-        )}
       </View>
     </View>
   );

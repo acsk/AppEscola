@@ -59,7 +59,7 @@ import { Plus } from "lucide-react-native";
 import Button from "../../components/ui/Button";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
-import { fetchAiStatus } from "../../services/questionAi";
+import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import { plainRichText } from "../../utils/richText";
 
 type Props = {
@@ -91,14 +91,8 @@ const filtersKey = (s: QuestionBankListState) =>
 export default function QuestionBankScreen({ navigate }: Props) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const catalogs = useQuestionBankCatalogs();
-  const [aiAvailable, setAiAvailable] = useState(false);
+  const { ensureAvailable } = useQuestionAiStatus();
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
-
-  useEffect(() => {
-    fetchAiStatus()
-      .then((status) => setAiAvailable(status.available))
-      .catch(() => setAiAvailable(false));
-  }, []);
 
   // ── Estado na URL ──────────────────────────────────────────────────────────
   const [state, setState] = useState<QuestionBankListState>(readStateFromHash);
@@ -280,6 +274,21 @@ export default function QuestionBankScreen({ navigate }: Props) {
 
   // ── Ações por linha ────────────────────────────────────────────────────────
   const [menuRow, setMenuRow] = useState<QuestionBankQuestion | null>(null);
+  const openSimilar = async (row: QuestionBankQuestion) => {
+    setMenuRow(null);
+    const unavailable = await ensureAvailable();
+    if (unavailable) {
+      setToast({ visible: true, type: "error", message: unavailable });
+      return;
+    }
+    setSimilarSource({
+      id: row.id,
+      type: row.type,
+      optionsCount: row.options?.length ?? 0,
+      difficultyId: row.difficulty_id,
+      imageUrl: row.image_url,
+    });
+  };
   const openClassify = (id: number) =>
     navigate("questoes-classificar", { questionId: id, query: serializeListState(state) });
 
@@ -694,22 +703,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
             {(
               [
                 ["create-outline", "Classificar", () => openClassify(menuRow.id)],
-                ...(aiAvailable
-                  ? [[
-                      "sparkles-outline",
-                      "Criar semelhantes com IA",
-                      () => {
-                        setSimilarSource({
-                          id: menuRow.id,
-                          type: menuRow.type,
-                          optionsCount: menuRow.options?.length ?? 0,
-                          difficultyId: menuRow.difficulty_id,
-                          imageUrl: menuRow.image_url,
-                        });
-                        setMenuRow(null);
-                      },
-                    ]]
-                  : []),
+                ["sparkles-outline", "Gerar similares com IA", () => void openSimilar(menuRow)],
                 [
                   "ban-outline",
                   menuRow.is_annulled ? "Desmarcar anulada" : "Marcar como anulada",

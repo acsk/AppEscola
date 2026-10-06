@@ -79,9 +79,12 @@ A configuracao MySQL usa exclusivamente `appescola_test` e recria suas tabelas.
 Nao aponte testes `RefreshDatabase` para dados reais.
 
 No painel, a tela **Nova questao** oferece **Autocompletar com IA** no cabecalho:
-exige enunciado com pelo menos 15 caracteres e chave configurada. Sugere os campos
+o botao fica sempre visivel e orienta ao clicar quando faltar chave ou a consulta
+de status falhar. A geracao exige enunciado com pelo menos 15 caracteres e chave configurada. Sugere os campos
 restantes, preserva textos de alternativas e explicacao ja preenchidos, e nunca
 salva automaticamente. Revise as sugestoes e confirme pelo botao de salvar.
+**Gerar similares com IA** tambem permanece visivel na edicao, classificacao e
+menu da listagem de questoes salvas, com a mesma orientacao de indisponibilidade.
 
 Testes visuais com servidor Expo web e API simulada, sem cobrancas:
 
