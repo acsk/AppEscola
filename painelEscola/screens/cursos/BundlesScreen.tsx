@@ -13,6 +13,7 @@ import Badge from "../../components/ui/Badge";
 import Pagination from "../../components/ui/Pagination";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
 
 const fmtBRL = (v: string | number) =>
   Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -87,32 +88,24 @@ export default function BundlesScreen({ navigate }: Props) {
       keyboardShouldPersistTaps="handled"
     >
       {/* Cabeçalho */}
-      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
-        <View className="flex-row items-center gap-3" style={{ flex: 1 }}>
-          <TouchableOpacity
-            onPress={() => navigate("cursos")}
-            className="flex-row items-center gap-1.5"
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-            <Text className="text-sm font-medium text-violet-600">Cursos</Text>
-          </TouchableOpacity>
-          <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
+      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-end", justifyContent: "space-between", gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <ScreenBreadcrumb items={[{ label: "Cursos", onPress: () => navigate("cursos") }, { label: "Pacotes" }]} />
           <View>
-            <Text className="text-2xl font-bold text-gray-800">Pacotes</Text>
-            <Text className="text-sm text-gray-500">
+            <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Pacotes</Text>
+            <Text className="text-sm text-ink-muted">
               Pacotes de cursos com cobrança unificada
             </Text>
           </View>
         </View>
         <TouchableOpacity
           onPress={() => navigate("pacotes-form")}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="white" />
           <Text className="text-white font-semibold text-sm ml-1.5">
-            Novo Pacote
+            Novo pacote
           </Text>
         </TouchableOpacity>
       </View>
@@ -120,10 +113,10 @@ export default function BundlesScreen({ navigate }: Props) {
       {/* Filtros */}
       <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
         <View
-          className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
+          className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4"
           style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={16} color="#5F6878" />
           <TextInput
             value={search}
             onChangeText={(v) => {
@@ -131,12 +124,12 @@ export default function BundlesScreen({ navigate }: Props) {
               setPage(1);
             }}
             placeholder="Buscar pacote..."
-            placeholderTextColor="#9CA3AF"
-            className="flex-1 ml-2 text-sm text-gray-800"
+            placeholderTextColor="#5F6878"
+            className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="#5F6878" />
             </TouchableOpacity>
           )}
         </View>
@@ -147,11 +140,11 @@ export default function BundlesScreen({ navigate }: Props) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
+            color: "#111722",
             backgroundColor: "white",
             height: 44,
             minWidth: isMobile ? "100%" : 160,
@@ -166,15 +159,15 @@ export default function BundlesScreen({ navigate }: Props) {
       {/* Cards de bundles */}
       {loading ? (
         <View className="items-center justify-center py-20">
-          <ActivityIndicator size="large" color="#7C3AED" />
+          <ActivityIndicator size="large" color="#1C3D63" />
         </View>
       ) : rows.length === 0 ? (
         <View
-          className="bg-white rounded-2xl items-center justify-center py-16"
-          style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
+          className="bg-surface rounded-ds-md items-center justify-center py-16 border border-border"
+          style={{ }}
         >
-          <Ionicons name="albums-outline" size={40} color="#E5E7EB" />
-          <Text className="text-gray-400 mt-3 text-sm">
+          <Ionicons name="albums-outline" size={40} color="#D9DDE3" />
+          <Text className="text-ink-subtle mt-3 text-sm">
             Nenhum pacote encontrado
           </Text>
         </View>
@@ -183,18 +176,14 @@ export default function BundlesScreen({ navigate }: Props) {
           {rows.map((bundle) => (
             <View
               key={bundle.id}
-              className="bg-white rounded-2xl p-5"
+              className="bg-surface rounded-ds-md p-5 border border-border"
               style={{
-                shadowColor: "#000",
-                shadowOpacity: 0.05,
-                shadowRadius: 10,
-                elevation: 2,
               }}
             >
               <View style={{ flexDirection: isMobile ? "column" : "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
                 <View style={{ flex: 1, marginRight: isMobile ? 0 : 16, alignSelf: "stretch" }}>
                   <View className="flex-row items-center gap-2 mb-1">
-                    <Text className="text-base font-bold text-gray-800">
+                    <Text className="text-base font-semibold text-ink">
                       {bundle.name}
                     </Text>
                     <Badge
@@ -203,7 +192,7 @@ export default function BundlesScreen({ navigate }: Props) {
                     />
                   </View>
                   {bundle.description && (
-                    <Text className="text-sm text-gray-500 mb-2">
+                    <Text className="text-sm text-ink-muted mb-2">
                       {bundle.description}
                     </Text>
                   )}
@@ -213,9 +202,9 @@ export default function BundlesScreen({ navigate }: Props) {
                     {bundle.courses.map((c) => (
                       <View
                         key={c.id}
-                        className="bg-violet-50 border border-violet-100 rounded-full px-2.5 py-0.5"
+                        className="bg-brand-tint border border-border rounded-full px-2.5 py-0.5"
                       >
-                        <Text className="text-xs text-violet-600 font-medium">
+                        <Text className="text-xs text-brand font-medium">
                           {c.name}
                         </Text>
                       </View>
@@ -224,19 +213,19 @@ export default function BundlesScreen({ navigate }: Props) {
 
                   {/* Preço */}
                   <View className="flex-row items-center gap-3">
-                    <View className="bg-gray-50 rounded-lg px-3 py-1.5">
-                      <Text className="text-xs text-gray-500">
+                    <View className="bg-surface-sunken rounded-ds-md px-3 py-1.5">
+                      <Text className="text-xs text-ink-muted">
                         {bundle.cycle_label}
                       </Text>
-                      <Text className="text-sm font-bold text-gray-800">
+                      <Text className="text-sm font-semibold text-ink">
                         {fmtBRL(bundle.price)}
                       </Text>
                     </View>
-                    <View className="bg-violet-50 rounded-lg px-3 py-1.5">
-                      <Text className="text-xs text-violet-500">
+                    <View className="bg-brand-tint rounded-ds-md px-3 py-1.5">
+                      <Text className="text-xs text-brand">
                         Equivalente
                       </Text>
-                      <Text className="text-sm font-bold text-violet-700">
+                      <Text className="text-sm font-semibold text-brand">
                         {fmtBRL(bundle.monthly_equivalent)}/mês
                       </Text>
                     </View>
@@ -249,15 +238,15 @@ export default function BundlesScreen({ navigate }: Props) {
                     onPress={() =>
                       navigate("pacotes-form", { bundleId: bundle.id })
                     }
-                    className="p-2 bg-violet-50 rounded-lg"
+                    className="p-2 bg-brand-tint rounded-ds-md"
                   >
-                    <Ionicons name="pencil-outline" size={16} color="#7C3AED" />
+                    <Ionicons name="pencil-outline" size={16} color="#1C3D63" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setDeleteId(bundle.id)}
-                    className="p-2 bg-red-50 rounded-lg"
+                    className="p-2 bg-danger-tint rounded-ds-md"
                   >
-                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    <Ionicons name="trash-outline" size={16} color="#B0261B" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -267,7 +256,7 @@ export default function BundlesScreen({ navigate }: Props) {
       )}
 
       {meta.total > 0 && (
-        <View className="bg-white rounded-2xl mt-4 px-4 border border-gray-100">
+        <View className="bg-surface rounded-ds-md mt-4 px-4 border border-border">
           <Pagination
             currentPage={meta.current_page}
             lastPage={meta.last_page}
@@ -280,7 +269,7 @@ export default function BundlesScreen({ navigate }: Props) {
 
       <ConfirmModal
         visible={!!deleteId}
-        title="Excluir Pacote"
+        title="Excluir pacote"
         message="Este pacote será removido permanentemente."
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}

@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design system "Cursinho Hub" — base do web.
+ * Cores e medidas espelham constants/designTokens.js.
+ */
+
+/* Fonte da interface: IBM Plex Sans (carregada do Google Fonts em App.tsx).
+   `body:not(#_)` dá peso de id ao seletor (vence as classes do RN Web) e alcança modais em portal.
+   Fontes de ícones (Ionicons/Feather) usam font-family inline e não são afetadas. */
+html,
+body {
+  background: #f3f4f6;
+  color: #111722;
+}
+
+body:not(#_),
+body:not(#_) div,
+body:not(#_) span,
+body:not(#_) input,
+body:not(#_) textarea,
+body:not(#_) select,
+body:not(#_) button {
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Dados tabulares (datas, horários, matrículas, quantidades). */
+body:not(#_) .font-mono,
+body:not(#_) .font-mono * {
+  font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -9,8 +40,35 @@ textarea:focus {
   box-shadow: none;
 }
 
+/* Foco visível em tudo que é navegável pelo teclado: 2px em `focus` com 2px de afastamento. */
+body:not(#_) [tabindex]:focus-visible,
+body:not(#_) [role="button"]:focus-visible,
+body:not(#_) [role="link"]:focus-visible,
+body:not(#_) [role="tab"]:focus-visible,
+body:not(#_) [role="checkbox"]:focus-visible,
+body:not(#_) [role="radio"]:focus-visible,
+body:not(#_) a:focus-visible,
+body:not(#_) button:focus-visible {
+  outline: 2px solid #1c3d63;
+  outline-offset: 2px;
+}
+
+/* Campos: borda + anel de 1px em `brand`. */
+body:not(#_) input:focus-visible,
+body:not(#_) textarea:focus-visible,
+body:not(#_) select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px #1c3d63;
+}
+
+/* Barras de rolagem discretas, na cor de borda forte. */
+* {
+  scrollbar-color: #7a8393 transparent;
+  scrollbar-width: thin;
+}
+
 .app-scrollbar {
-  scrollbar-color: #7c3aed #ede9fe;
+  scrollbar-color: #7a8393 #f7f8fa;
   scrollbar-width: thin;
 }
 
@@ -22,18 +80,16 @@ textarea:focus {
 
 .app-scrollbar::-webkit-scrollbar-track,
 .app-scrollbar *::-webkit-scrollbar-track {
-  background: #ede9fe;
-  border-radius: 999px;
+  background: #f7f8fa;
 }
 
 .app-scrollbar::-webkit-scrollbar-thumb,
 .app-scrollbar *::-webkit-scrollbar-thumb {
-  background: #7c3aed;
-  border: 2px solid #ede9fe;
-  border-radius: 999px;
+  background: #7a8393;
+  border: 2px solid #f7f8fa;
 }
 
 .app-scrollbar::-webkit-scrollbar-thumb:hover,
 .app-scrollbar *::-webkit-scrollbar-thumb:hover {
-  background: #6d28d9;
+  background: #4b5463;
 }

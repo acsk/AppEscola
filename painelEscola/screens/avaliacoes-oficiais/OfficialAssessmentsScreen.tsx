@@ -75,11 +75,11 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
   });
 
   const filterSelectStyle = {
-    border: "1px solid #E5E7EB",
-    borderRadius: 12,
+    border: "1px solid #D9DDE3",
+    borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#374151",
+    color: "#111722",
     backgroundColor: "white",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
@@ -211,17 +211,17 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
         if (stopPropagation) event?.stopPropagation?.();
         setMenuAssessment(row);
       }}
-      className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+      className="p-1.5 bg-surface-sunken rounded-ds-md border border-border"
       activeOpacity={0.85}
       accessibilityLabel="Ações da avaliação"
     >
-      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+      <Ionicons name="ellipsis-horizontal" size={16} color="#4B5463" />
     </TouchableOpacity>
   );
 
   const renderKindBadge = (kind: string) => (
-    <View className="self-start rounded-md px-1.5 py-0.5 bg-violet-100">
-      <Text className="text-[10px] font-bold uppercase text-violet-700">{kindLabel(kind)}</Text>
+    <View className="self-start rounded-ds-md px-1.5 py-0.5 bg-brand-tint">
+      <Text className="text-[10px] font-semibold uppercase text-brand">{kindLabel(kind)}</Text>
     </View>
   );
 
@@ -230,45 +230,41 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
       key={row.id}
       onPress={() => openForm(row.id)}
       activeOpacity={0.86}
-      className="bg-white rounded-2xl border border-gray-200 p-4"
+      className="bg-surface rounded-ds-md border border-border p-4"
       style={{
-        shadowColor: "#000",
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 1,
       }}
     >
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1" style={{ minWidth: 0 }}>
-          <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+          <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
             {row.title}
           </Text>
-          <Text className="text-xs font-semibold text-gray-500 mt-1" numberOfLines={1}>
+          <Text className="text-xs font-semibold text-ink-muted mt-1" numberOfLines={1}>
             Turma: {row.school_class?.name ?? "—"} • {kindLabel(row.kind)}
           </Text>
         </View>
         <Badge slug={row.status} label={STATUS_LABELS[row.status] ?? row.status} />
       </View>
 
-      <View className="mt-3 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
+      <View className="mt-3 rounded-ds-md bg-surface-sunken border border-border px-3 py-2.5">
         {renderKindBadge(row.kind)}
         {row.counts_towards_report_card ? (
-          <Text className="text-[11px] text-emerald-600 font-semibold mt-1">
+          <Text className="text-[11px] text-success font-semibold mt-1">
             Conta no boletim
           </Text>
         ) : (
-          <Text className="text-[11px] text-gray-400 mt-1">Não conta no boletim</Text>
+          <Text className="text-[11px] text-ink-subtle mt-1">Não conta no boletim</Text>
         )}
       </View>
 
       <View className="flex-row gap-2 mt-3">
-        <View className="flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
-          <Text className="text-[11px] font-semibold uppercase text-gray-400">Data</Text>
-          <Text className="text-sm font-semibold text-gray-800 mt-0.5">{fmt(row.assessment_date)}</Text>
+        <View className="flex-1 rounded-ds-md bg-surface-sunken border border-border px-3 py-2">
+          <Text className="text-[11px] font-semibold uppercase text-ink-subtle">Data</Text>
+          <Text className="text-sm font-semibold text-ink mt-0.5">{fmt(row.assessment_date)}</Text>
         </View>
-        <View className="flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
-          <Text className="text-[11px] font-semibold uppercase text-gray-400">Notas</Text>
-          <Text className="text-sm font-semibold text-gray-800 mt-0.5">
+        <View className="flex-1 rounded-ds-md bg-surface-sunken border border-border px-3 py-2">
+          <Text className="text-[11px] font-semibold uppercase text-ink-subtle">Notas</Text>
+          <Text className="text-sm font-semibold text-ink mt-0.5">
             {row.grades_count ?? 0} lançada{(row.grades_count ?? 0) === 1 ? "" : "s"}
           </Text>
         </View>
@@ -296,14 +292,14 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
         }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Avaliações presenciais</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Avaliações presenciais</Text>
+          <Text className="text-sm text-ink-muted">
             Lançamento de notas oficiais para boletim
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => openForm(null)}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
           style={{ justifyContent: "center", width: isMobile ? "100%" : undefined }}
           activeOpacity={0.85}
         >
@@ -312,26 +308,26 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
         </TouchableOpacity>
       </View>
 
-      <View className="bg-white border border-gray-200 rounded-2xl p-3 mb-4">
+      <View className="bg-surface border border-border rounded-ds-md p-3 mb-4">
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">Filtros</Text>
+          <Text className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Filtros</Text>
           {hasActiveFilters ? (
             <TouchableOpacity
               onPress={clearFilters}
-              className="px-2 py-1 rounded-lg bg-gray-100"
+              className="px-2 py-1 rounded-ds-md bg-surface-sunken"
               activeOpacity={0.8}
             >
-              <Text className="text-xs font-semibold text-gray-600">Limpar</Text>
+              <Text className="text-xs font-semibold text-ink-muted">Limpar</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
         <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
           <View
-            className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3"
+            className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
             style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
-            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={16} color="#5F6878" />
             <input
               placeholder="Título da avaliação..."
               value={search}
@@ -344,14 +340,14 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#374151",
+                color: "#111722",
                 marginLeft: 8,
                 backgroundColor: "transparent",
               }}
             />
             {!!search.trim() ? (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={16} color="#5F6878" />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -429,21 +425,21 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
       </View>
 
       {error ? (
-        <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-          <Text className="text-sm text-red-700">{error}</Text>
+        <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+          <Text className="text-sm text-danger">{error}</Text>
         </View>
       ) : null}
 
       {isMobile ? (
         <View className="gap-3">
           {loading ? (
-            <View className="items-center justify-center py-16 bg-white rounded-2xl border border-gray-200">
-              <ActivityIndicator size="large" color="#7C3AED" />
+            <View className="items-center justify-center py-16 bg-surface rounded-ds-md border border-border">
+              <ActivityIndicator size="large" color="#1C3D63" />
             </View>
           ) : rows.length === 0 ? (
-            <View className="items-center justify-center py-14 bg-white rounded-2xl border border-gray-200">
-              <Ionicons name="school-outline" size={40} color="#E5E7EB" />
-              <Text className="text-gray-400 mt-3 text-sm text-center px-6">
+            <View className="items-center justify-center py-14 bg-surface rounded-ds-md border border-border">
+              <Ionicons name="school-outline" size={40} color="#D9DDE3" />
+              <Text className="text-ink-subtle mt-3 text-sm text-center px-6">
                 Nenhuma avaliação encontrada
               </Text>
             </View>
@@ -452,7 +448,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
           )}
 
           {meta.total > 0 && (
-            <View className="bg-white rounded-2xl border border-gray-200 px-4">
+            <View className="bg-surface rounded-ds-md border border-border px-4">
               <Pagination
                 currentPage={meta.current_page}
                 lastPage={meta.last_page}
@@ -471,14 +467,10 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
           contentContainerStyle={{ width: "100%" }}
         >
           <View
-            className="bg-white rounded-2xl overflow-hidden border border-gray-200"
+            className="bg-surface rounded-ds-md overflow-hidden border border-border"
             style={{
               width: "100%",
               minWidth: 920,
-              shadowColor: "#000",
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              elevation: 2,
             }}
           >
             <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
@@ -505,12 +497,12 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
 
             {loading ? (
               <View className="items-center justify-center py-20">
-                <ActivityIndicator size="large" color="#7C3AED" />
+                <ActivityIndicator size="large" color="#1C3D63" />
               </View>
             ) : rows.length === 0 ? (
               <View className="items-center justify-center py-16">
-                <Ionicons name="school-outline" size={40} color="#E5E7EB" />
-                <Text className="text-gray-400 mt-3 text-sm">Nenhuma avaliação encontrada</Text>
+                <Ionicons name="school-outline" size={40} color="#D9DDE3" />
+                <Text className="text-ink-subtle mt-3 text-sm">Nenhuma avaliação encontrada</Text>
               </View>
             ) : (
               rows.map((row, i) => (
@@ -551,7 +543,7 @@ export default function OfficialAssessmentsScreen({ navigate }: OfficialAssessme
             )}
 
             {meta.total > 0 && (
-              <View className="px-4 border-t border-gray-100">
+              <View className="px-4 border-t border-border">
                 <Pagination
                   currentPage={meta.current_page}
                   lastPage={meta.last_page}

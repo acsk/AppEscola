@@ -79,16 +79,16 @@ export default function YearPickerInput({
   const canGoPrevDecade = decadeStart - 10 >= minYear;
   const canGoNextDecade = decadeStart + 10 <= maxYear;
 
-  const borderColor = error ? "#EF4444" : "#E5E7EB";
+  const borderColor = error ? "#B0261B" : "#7A8393"; // `border-strong` em controles
   const modalWidth = Math.min(width - 32, 360);
 
   return (
     <View className={compact ? "mb-2" : "mb-4"}>
       <Text
-        className={`font-semibold text-gray-700 ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
+        className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}
       >
         {label}
-        {required ? <Text className="text-red-500"> *</Text> : null}
+        {required ? <Text className="text-danger"> *</Text> : null}
       </Text>
 
       <View
@@ -97,10 +97,10 @@ export default function YearPickerInput({
           alignItems: "center",
           borderWidth: 1,
           borderColor,
-          borderRadius: 12,
-          paddingHorizontal: 14,
-          height: 44,
-          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
+          borderRadius: 4,
+          paddingHorizontal: 12,
+          height: 38,
+          backgroundColor: disabled ? "#F7F8FA" : "#FFFFFF",
           width: "100%",
           opacity: disabled ? 0.7 : 1,
         }}
@@ -114,7 +114,7 @@ export default function YearPickerInput({
           <Text
             style={{
               fontSize: 14,
-              color: selectedYear ? "#374151" : "#9CA3AF",
+              color: selectedYear ? "#111722" : "#5F6878",
             }}
             numberOfLines={1}
           >
@@ -127,22 +127,22 @@ export default function YearPickerInput({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ marginRight: 8 }}
           >
-            <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+            <Ionicons name="close-circle" size={16} color="#5F6878" />
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity onPress={openPicker} disabled={disabled} activeOpacity={0.85}>
-          <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
         </TouchableOpacity>
       </View>
 
-      {error ? <Text className="text-xs text-red-500 mt-1">{error}</Text> : null}
+      {error ? <Text className="text-xs text-danger mt-1">{error}</Text> : null}
 
       <OverlayPortal open={open} onClose={() => setOpen(false)} contentPadding={16}>
           <View
             style={{
               width: modalWidth,
               backgroundColor: "white",
-              borderRadius: 16,
+              borderRadius: 4,
               overflow: "hidden",
             }}
           >
@@ -154,15 +154,15 @@ export default function YearPickerInput({
                 paddingHorizontal: 16,
                 paddingVertical: 14,
                 borderBottomWidth: 1,
-                borderBottomColor: "#F3F4F6",
+                borderBottomColor: "#F7F8FA",
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>{modalTitle}</Text>
+              <Text style={{ fontSize: 16, fontWeight: "600", color: "#111722" }}>{modalTitle}</Text>
               <TouchableOpacity
                 onPress={() => setOpen(false)}
-                style={{ padding: 4, backgroundColor: "#F3F4F6", borderRadius: 8 }}
+                style={{ padding: 4, backgroundColor: "#F7F8FA", borderRadius: 4 }}
               >
-                <Ionicons name="close" size={18} color="#6B7280" />
+                <Ionicons name="close" size={18} color="#4B5463" />
               </TouchableOpacity>
             </View>
 
@@ -173,9 +173,9 @@ export default function YearPickerInput({
                 justifyContent: "space-between",
                 paddingHorizontal: 12,
                 paddingVertical: 10,
-                backgroundColor: "#FAFAFA",
+                backgroundColor: "#F7F8FA",
                 borderBottomWidth: 1,
-                borderBottomColor: "#F3F4F6",
+                borderBottomColor: "#F7F8FA",
               }}
             >
               <TouchableOpacity
@@ -183,9 +183,9 @@ export default function YearPickerInput({
                 disabled={!canGoPrevDecade}
                 style={{ padding: 8, opacity: canGoPrevDecade ? 1 : 0.35 }}
               >
-                <Ionicons name="chevron-back" size={20} color="#6B7280" />
+                <Ionicons name="chevron-back" size={20} color="#4B5463" />
               </TouchableOpacity>
-              <Text style={{ fontSize: 15, fontWeight: "600", color: "#374151" }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: "#111722" }}>
                 {decadeStart} – {Math.min(decadeStart + 11, maxYear)}
               </Text>
               <TouchableOpacity
@@ -193,7 +193,7 @@ export default function YearPickerInput({
                 disabled={!canGoNextDecade}
                 style={{ padding: 8, opacity: canGoNextDecade ? 1 : 0.35 }}
               >
-                <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+                <Ionicons name="chevron-forward" size={20} color="#4B5463" />
               </TouchableOpacity>
             </View>
 
@@ -217,11 +217,11 @@ export default function YearPickerInput({
                       width: "22%",
                       minWidth: 68,
                       paddingVertical: 12,
-                      borderRadius: 10,
+                      borderRadius: 4,
                       alignItems: "center",
-                      backgroundColor: active ? "#7C3AED" : "#F9FAFB",
+                      backgroundColor: active ? "#1C3D63" : "#F7F8FA",
                       borderWidth: 1,
-                      borderColor: active ? "#7C3AED" : "#E5E7EB",
+                      borderColor: active ? "#1C3D63" : "#D9DDE3",
                     }}
                     activeOpacity={0.85}
                   >
@@ -229,7 +229,7 @@ export default function YearPickerInput({
                       style={{
                         fontSize: 14,
                         fontWeight: "600",
-                        color: active ? "#FFFFFF" : "#374151",
+                        color: active ? "#FFFFFF" : "#111722",
                       }}
                     >
                       {year}

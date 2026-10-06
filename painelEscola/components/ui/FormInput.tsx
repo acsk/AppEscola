@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import { View, Text, TextInput, TextInputProps, Platform } from "react-native";
+import { color, size } from "../../constants/theme";
 import { useRestrictTextInput, type TextInputRestriction } from "../../hooks/useRestrictTextInput";
 import {
   maskCurrency,
@@ -88,21 +89,21 @@ export default function FormInput({
 
   return (
     <View className={dense ? "mb-2" : "mb-4"}>
-      <Text
-        className={`font-medium text-gray-600 ${dense ? "text-xs mb-1" : "text-sm font-semibold text-gray-700 mb-1.5"}`}
-      >
+      <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
         {label}
-        {required && <Text className="text-red-500"> *</Text>}
+        {required && <Text className="text-danger"> *</Text>}
       </Text>
       <TextInput
         ref={inputRef}
         {...props}
         editable={editable}
-        className={`border rounded-xl px-4 text-sm text-gray-800 bg-gray-50 ${
-          error ? "border-red-400" : "border-gray-200"
-        } ${props.className ?? ""}`}
-        style={[{ height: 44 }, props.style]}
-        placeholderTextColor="#9CA3AF"
+        aria-invalid={!!error}
+        aria-label={props["aria-label"] ?? label}
+        className={`border rounded-ds-md px-3 text-sm text-ink ${
+          editable === false ? "bg-surface-sunken text-ink-muted" : "bg-surface"
+        } ${error ? "border-danger" : "border-border-strong"} ${props.className ?? ""}`}
+        style={[{ height: props.multiline ? undefined : size["control-md"], minHeight: size["control-md"] }, props.style]}
+        placeholderTextColor={color["ink-subtle"]}
         keyboardType={resolvedKeyboardType}
         onChangeText={handleChangeText}
         autoComplete={valueFormat ? "off" : props.autoComplete}
@@ -110,7 +111,11 @@ export default function FormInput({
         spellCheck={valueFormat ? false : props.spellCheck}
         {...(Platform.OS === "web" && webInputMode ? ({ inputMode: webInputMode } as object) : {})}
       />
-      {error && <Text className="text-xs text-red-500 mt-1">{error}</Text>}
+      {error && (
+        <Text className="text-xs font-medium text-danger" style={{ marginTop: 6 }}>
+          {error}
+        </Text>
+      )}
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import "./global.css";
+import { color } from "./constants/theme";
 import { useState, useEffect } from "react";
 import { loadAsync } from "expo-font";
 import { Ionicons } from "@expo/vector-icons";
@@ -713,7 +714,7 @@ function AppContent() {
 
   if (isLoading || !fontsReady) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEEFF" }}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: color.bg }}>
         <ActivityIndicator size="large" color="#7C3AED" />
       </View>
     );
@@ -975,7 +976,7 @@ function AppContent() {
 
   return (
     <SafeAreaProvider>
-      <View className="flex-1 flex-row" style={{ backgroundColor: "#EEEEFF" }}>
+      <View className="flex-1 flex-row" style={{ backgroundColor: color.bg }}>
         {!isMobile && (
           <Sidebar
             activeItem={activeItem}
@@ -1027,6 +1028,16 @@ export default function App() {
     // Página em pt-BR: evita Chrome Translate transformar "Sex" (sexta) em "Sexo".
     document.documentElement.lang = "pt-BR";
     document.documentElement.setAttribute("translate", "no");
+
+    // Fontes do design system (IBM Plex Sans e Mono).
+    if (!document.getElementById("ds-fonts")) {
+      const link = document.createElement("link");
+      link.id = "ds-fonts";
+      link.rel = "stylesheet";
+      link.href =
+        "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap";
+      document.head.appendChild(link);
+    }
   }, []);
 
   return (

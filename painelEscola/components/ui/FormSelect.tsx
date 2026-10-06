@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text } from "react-native";
+import { color, font, size } from "../../constants/theme";
 
 export type SelectOption = { value: string | number; label: string };
 
@@ -29,29 +30,28 @@ export default function FormSelect({
 }: Props) {
   return (
     <View className={dense ? "mb-2" : "mb-4"}>
-      <Text
-        className={`font-medium text-gray-600 ${dense ? "text-xs mb-1" : "text-sm font-semibold text-gray-700 mb-1.5"}`}
-      >
+      <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
         {label}
-        {required && <Text className="text-red-500"> *</Text>}
+        {required && <Text className="text-danger"> *</Text>}
       </Text>
       {/* Renderização nativa para web */}
       <select
         value={value as string}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        aria-label={label}
+        aria-invalid={!!error}
         style={{
-          border: `1px solid ${error ? "#FCA5A5" : "#E5E7EB"}`,
-          borderRadius: 12,
-          padding: "0 14px",
+          border: `1px solid ${error ? color.danger : color["border-strong"]}`,
+          borderRadius: 4,
+          padding: "0 12px",
           fontSize: 14,
-          color: disabled ? "#9CA3AF" : value ? "#1F2937" : "#9CA3AF",
-          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
-          outline: "none",
+          fontFamily: font.sans,
+          color: disabled ? color["ink-muted"] : value !== "" ? color.ink : color["ink-subtle"],
+          backgroundColor: disabled ? color["surface-sunken"] : color.surface,
           width: "100%",
-          height: 44,
+          height: dense ? size["control-sm"] : size["control-md"],
           cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.8 : 1,
         }}
       >
         {placeholder && (
@@ -66,7 +66,9 @@ export default function FormSelect({
         ))}
       </select>
       {error && (
-        <Text className="text-xs text-red-500 mt-1">{error}</Text>
+        <Text className="text-xs font-medium text-danger" style={{ marginTop: 6 }}>
+          {error}
+        </Text>
       )}
     </View>
   );

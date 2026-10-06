@@ -185,7 +185,7 @@ export default function OfficialAssessmentGradesTable({
 
   if (subjects.length === 0) {
     return (
-      <Text className="text-sm text-gray-500">
+      <Text className="text-sm text-ink-muted">
         Selecione ao menos uma disciplina para visualizar a grade de notas.
       </Text>
     );
@@ -193,17 +193,17 @@ export default function OfficialAssessmentGradesTable({
 
   if (students.length === 0) {
     return (
-      <Text className="text-sm text-gray-500">Selecione uma turma para carregar os alunos.</Text>
+      <Text className="text-sm text-ink-muted">Selecione uma turma para carregar os alunos.</Text>
     );
   }
 
   return (
     <View style={{ width: "100%" }}>
       <View
-        className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3 mb-3"
+        className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3 mb-3"
         style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
       >
-        <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+        <Ionicons name="search-outline" size={16} color="#5F6878" />
         <input
           placeholder="Filtrar por aluno ou matrícula..."
           value={search}
@@ -213,20 +213,20 @@ export default function OfficialAssessmentGradesTable({
             border: "none",
             outline: "none",
             fontSize: 14,
-            color: "#374151",
+            color: "#111722",
             marginLeft: 8,
             backgroundColor: "transparent",
           }}
         />
         {search.trim() ? (
           <TouchableOpacity onPress={() => setSearch("")} activeOpacity={0.8}>
-            <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+            <Ionicons name="close-circle" size={16} color="#5F6878" />
           </TouchableOpacity>
         ) : null}
       </View>
 
       {filteredStudents.length === 0 ? (
-        <Text className="text-sm text-gray-500 py-4 text-center">
+        <Text className="text-sm text-ink-muted py-4 text-center">
           Nenhum aluno encontrado para &quot;{search.trim()}&quot;.
         </Text>
       ) : (
@@ -240,7 +240,7 @@ export default function OfficialAssessmentGradesTable({
           }}
         >
           <View
-            className="border border-gray-200 rounded-xl overflow-hidden"
+            className="border border-border rounded-ds-md overflow-hidden"
             style={{ width: "100%", minWidth: isMobile ? tableScrollMinWidth : undefined }}
           >
             <View className={TABLE_HEADER_ROW} style={[{ width: "100%" }, TABLE_HEADER_ROW_STYLE]}>
@@ -290,10 +290,10 @@ export default function OfficialAssessmentGradesTable({
                   const cell = formatGradeCell(gradeMap.get(`${student.student_id}-${s.id}`));
                   const color =
                     cell.tone === "absent"
-                      ? "#DC2626"
+                      ? "#B0261B"
                       : cell.tone === "ok"
-                        ? "#111827"
-                        : "#9CA3AF";
+                        ? "#111722"
+                        : "#5F6878";
                   return renderCell(COL_SUBJECT.flex, COL_SUBJECT.minWidth, cell.text, {
                     center: true,
                     color,
@@ -305,12 +305,12 @@ export default function OfficialAssessmentGradesTable({
                     maxScoreNum != null && total.sum != null && total.sum > maxScoreNum;
                   const totalColor =
                     total.tone === "absent"
-                      ? "#DC2626"
+                      ? "#B0261B"
                       : overMax
-                        ? "#DC2626"
+                        ? "#B0261B"
                         : total.tone === "ok"
-                          ? "#7C3AED"
-                          : "#9CA3AF";
+                          ? "#1C3D63"
+                          : "#5F6878";
                   return renderCell(COL_TOTAL.flex, COL_TOTAL.minWidth, total.text, {
                     center: true,
                     color: totalColor,
@@ -327,11 +327,11 @@ export default function OfficialAssessmentGradesTable({
                   >
                     <TouchableOpacity
                       onPress={() => onLaunchIndividual!(student.student_id)}
-                      className="p-1.5 rounded-lg bg-violet-50 border border-violet-200"
+                      className="p-1.5 rounded-ds-md bg-brand-tint border border-border"
                       activeOpacity={0.85}
                       accessibilityLabel={`Lançar notas de ${student.student_name}`}
                     >
-                      <Ionicons name="create-outline" size={16} color="#7C3AED" />
+                      <Ionicons name="create-outline" size={16} color="#1C3D63" />
                     </TouchableOpacity>
                   </View>
                 ) : null}
@@ -342,7 +342,7 @@ export default function OfficialAssessmentGradesTable({
       )}
 
       {search.trim() && filteredStudents.length > 0 ? (
-        <Text className="text-xs text-gray-500 mt-2">
+        <Text className="text-xs text-ink-muted mt-2">
           Exibindo {filteredStudents.length} de {students.length} aluno
           {students.length !== 1 ? "s" : ""}
         </Text>

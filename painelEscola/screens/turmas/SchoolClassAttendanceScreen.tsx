@@ -12,6 +12,8 @@ import AttendanceDateBar from "../../components/ui/AttendanceDateBar";
 import FormInput from "../../components/ui/FormInput";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
+import Tabs from "../../components/ui/Tabs";
 
 type Props = {
   classId: number | null;
@@ -50,29 +52,29 @@ const STATUS_BUTTONS: Array<{
   {
     value: "present",
     label: "Presente",
-    activeClass: "bg-emerald-100 border-emerald-300",
-    activeTextClass: "text-emerald-700",
+    activeClass: "bg-success-tint border-success",
+    activeTextClass: "text-success",
     icon: "checkmark-circle",
   },
   {
     value: "absent",
     label: "Falta",
-    activeClass: "bg-red-100 border-red-300",
-    activeTextClass: "text-red-700",
+    activeClass: "bg-danger-tint border-danger",
+    activeTextClass: "text-danger",
     icon: "close-circle",
   },
   {
     value: "late",
     label: "Atraso",
-    activeClass: "bg-amber-100 border-amber-300",
-    activeTextClass: "text-amber-700",
+    activeClass: "bg-warning-tint border-warning",
+    activeTextClass: "text-warning",
     icon: "time",
   },
   {
     value: "excused",
     label: "Justificado",
-    activeClass: "bg-sky-100 border-sky-300",
-    activeTextClass: "text-sky-700",
+    activeClass: "bg-brand-tint border-border",
+    activeTextClass: "text-brand",
     icon: "document-text",
   },
 ];
@@ -389,7 +391,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
   if (!classId) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-sm text-gray-500">Turma invalida.</Text>
+        <Text className="text-sm text-ink-muted">Turma invalida.</Text>
       </View>
     );
   }
@@ -402,47 +404,35 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
         contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
       >
-      <View className="flex-row items-center gap-2 mb-6">
-        <TouchableOpacity
-          onPress={() => navigate("turmas")}
-          className="flex-row items-center gap-1.5"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-          <Text className="text-sm font-medium text-violet-600">Turmas</Text>
-        </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        <Text className="text-sm text-gray-500">Frequência</Text>
-      </View>
+      <ScreenBreadcrumb items={[{ label: "Turmas", onPress: () => navigate("turmas") }, { label: "Frequência" }]} />
 
       <View className="mb-6">
-        <Text className="text-2xl font-bold text-gray-800">Frequência da Turma</Text>
-        <Text className="text-sm text-gray-500">
+        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Frequência da turma</Text>
+        <Text className="text-sm text-ink-muted">
           {schoolClass ? `${schoolClass.name} • ${schoolClass.course?.name ?? "Sem curso"}` : "Lancamento diario rapido por aluno"}
         </Text>
       </View>
 
-      <View className="flex-row gap-3 mb-5">
-        <TouchableOpacity
-          onPress={() => navigate("turmas-form", { classId })}
-          className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
-          activeOpacity={0.8}
-        >
-          <Text className="text-sm font-semibold text-gray-700">Dados e Horários</Text>
-        </TouchableOpacity>
-        <View className="px-4 py-2.5 rounded-xl bg-violet-600">
-          <Text className="text-sm font-semibold text-white">Frequência</Text>
-        </View>
+      <View className="mb-6">
+        <Tabs
+          accessibilityLabel="Seções da turma"
+          items={[
+            { id: "dados", label: "Dados e horários" },
+            { id: "frequencia", label: "Frequência" },
+          ]}
+          value="frequencia"
+          onChange={(id) => id === "dados" && navigate("turmas-form", { classId })}
+        />
       </View>
 
       <View
-        className="bg-white rounded-2xl p-6"
-        style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
+        className="bg-surface rounded-ds-md p-6 border border-border"
+        style={{ }}
       >
         <View className="flex-row items-center justify-between gap-4 mb-4" style={{ flexWrap: "wrap" as any }}>
           <View style={{ minWidth: 190 }}>
-            <Text className="text-base font-semibold text-gray-800">Lançamento Diário</Text>
-            <Text className="text-xs text-gray-400">
+            <Text className="text-base font-semibold text-ink">Lançamento diário</Text>
+            <Text className="text-xs text-ink-subtle">
               {students.length} aluno{students.length !== 1 ? "s" : ""} • {presentCount} presente{presentCount !== 1 ? "s" : ""}
             </Text>
           </View>
@@ -461,7 +451,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
 
             <TouchableOpacity
               onPress={saveAttendance}
-              className="h-14 px-5 rounded-2xl bg-emerald-600 flex-row items-center justify-center gap-2"
+              className="h-14 px-5 rounded-ds-md bg-brand flex-row items-center justify-center gap-2"
               activeOpacity={0.85}
               disabled={saving || loading || !dateContext.canSaveNow}
               style={{ opacity: saving || loading || !dateContext.canSaveNow ? 0.7 : 1 }}
@@ -480,19 +470,19 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
         </View>
 
         {!dateContext.canSaveNow && !!dateContext.message && (
-          <Text className="text-xs text-amber-700 mb-3">{dateContext.message}</Text>
+          <Text className="text-xs text-warning mb-3">{dateContext.message}</Text>
         )}
 
-        {!!notice && <Text className="text-sm text-gray-600 mb-4">{notice}</Text>}
+        {!!notice && <Text className="text-sm text-ink-muted mb-4">{notice}</Text>}
 
         {loading ? (
           <View className="items-center py-16">
-            <ActivityIndicator size="large" color="#7C3AED" />
+            <ActivityIndicator size="large" color="#1C3D63" />
           </View>
         ) : students.length === 0 ? (
           <View className="items-center py-16">
-            <Ionicons name="people-outline" size={32} color="#D1D5DB" />
-            <Text className="text-sm text-gray-400 mt-2">Nenhum aluno matriculado nesta turma.</Text>
+            <Ionicons name="people-outline" size={32} color="#7A8393" />
+            <Text className="text-sm text-ink-subtle mt-2">Nenhum aluno matriculado nesta turma.</Text>
           </View>
         ) : (
           <View className="gap-4">
@@ -500,11 +490,11 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
               const row = rows[student.id] ?? { status: "present" as AttendanceStatus, notes: "" };
 
               return (
-                <View key={student.id} className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+                <View key={student.id} className="rounded-ds-md border border-border bg-surface-sunken p-4">
                   <View className="flex-row items-center justify-between mb-3">
                     <View>
-                      <Text className="text-base font-semibold text-gray-800">{student.name}</Text>
-                      <Text className="text-xs text-gray-400 mt-0.5">
+                      <Text className="text-base font-semibold text-ink">{student.name}</Text>
+                      <Text className="text-xs text-ink-subtle mt-0.5">
                         {student.enrollment_number || `ID ${student.id}`}
                       </Text>
                     </View>
@@ -518,17 +508,17 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
                         <TouchableOpacity
                           key={option.value}
                           onPress={() => setStudentStatus(student.id, option.value)}
-                          className={`px-3 py-2 rounded-xl border flex-row items-center gap-1.5 ${
-                            selected ? option.activeClass : "bg-white border-gray-200"
+                          className={`px-3 py-2 rounded-ds-md border flex-row items-center gap-1.5 ${
+                            selected ? option.activeClass : "bg-surface border-border"
                           }`}
                           activeOpacity={0.8}
                         >
                           <Ionicons
                             name={option.icon}
                             size={15}
-                            color={selected ? "#111827" : "#9CA3AF"}
+                            color={selected ? "#111722" : "#5F6878"}
                           />
-                          <Text className={`text-sm font-semibold ${selected ? option.activeTextClass : "text-gray-600"}`}>
+                          <Text className={`text-sm font-semibold ${selected ? option.activeTextClass : "text-ink-muted"}`}>
                             {option.label}
                           </Text>
                         </TouchableOpacity>

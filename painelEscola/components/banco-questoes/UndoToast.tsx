@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Platform, Text, TouchableOpacity, View } from "react-native";
+import { color, shadow } from "../../constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
@@ -33,24 +34,28 @@ export default function UndoToast({ visible, message, tone = "success", onUndo, 
       pointerEvents="box-none"
     >
       <View
-        className={`flex-row items-center rounded-2xl px-4 py-3 border ${isWarning ? "bg-amber-50 border-amber-200" : "bg-gray-900 border-gray-900"}`}
-        style={{ maxWidth: 640, width: "100%", gap: 12 }}
+        className="flex-row items-center bg-surface border border-border px-4 py-3"
+        style={{
+          maxWidth: 640,
+          width: "100%",
+          gap: 12,
+          borderRadius: 6,
+          ...(Platform.OS === "web" ? ({ boxShadow: shadow.overlay } as object) : { elevation: 8 }),
+        }}
       >
         <Ionicons
           name={isWarning ? "alert-circle-outline" : "checkmark-circle-outline"}
           size={18}
-          color={isWarning ? "#B45309" : "#A7F3D0"}
+          color={isWarning ? color.warning : color.success}
         />
-        <Text className={`flex-1 text-sm ${isWarning ? "text-amber-800" : "text-white"}`}>{message}</Text>
+        <Text className="flex-1 text-sm text-ink">{message}</Text>
         {onUndo && (
           <TouchableOpacity onPress={onUndo} disabled={undoing} className="px-2 py-1" aria-label="Desfazer alteração em massa">
-            <Text className={`text-sm font-bold ${isWarning ? "text-amber-700" : "text-violet-300"}`}>
-              {undoing ? "Desfazendo..." : "Desfazer"}
-            </Text>
+            <Text className="text-sm font-semibold text-brand">{undoing ? "Desfazendo..." : "Desfazer"}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity onPress={onClose} aria-label="Fechar aviso">
-          <Ionicons name="close" size={16} color={isWarning ? "#B45309" : "#D1D5DB"} />
+          <Ionicons name="close" size={16} color={color["ink-muted"]} />
         </TouchableOpacity>
       </View>
     </View>

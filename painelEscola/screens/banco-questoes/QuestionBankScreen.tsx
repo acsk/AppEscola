@@ -53,6 +53,7 @@ import {
   withSubjectFilter,
 } from "../../utils/questionBankQuery";
 import type { BatchItem, ClassificationPatch, QuestionBankQuestion, QuestionBankSort } from "../../types/questionBank";
+import Tabs from "../../components/ui/Tabs";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -296,7 +297,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
         <Ionicons
           name={current === "ascending" ? "arrow-up" : current === "descending" ? "arrow-down" : "swap-vertical"}
           size={12}
-          color={current === "none" ? "#9CA3AF" : "#7C3AED"}
+          color={current === "none" ? "#5F6878" : "#1C3D63"}
         />
       </TouchableOpacity>
     );
@@ -313,7 +314,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
       <Ionicons
         name={mixed ? "remove-circle" : checked ? "checkbox" : "square-outline"}
         size={18}
-        color={checked || mixed ? "#7C3AED" : "#9CA3AF"}
+        color={checked || mixed ? "#1C3D63" : "#5F6878"}
       />
     </TouchableOpacity>
   );
@@ -324,23 +325,23 @@ export default function QuestionBankScreen({ navigate }: Props) {
         {/* Cabeçalho */}
         <View className="mb-5" style={{ flexDirection: isMobile ? "column" : "row", gap: 12, justifyContent: "space-between" }}>
           <View>
-            <Text className="text-2xl font-bold text-gray-800">Banco de questões</Text>
-            <Text className="text-sm text-gray-500 mt-1">
+            <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Banco de questões</Text>
+            <Text className="text-sm text-ink-muted mt-1">
               Questões avulsas e de simulados. Classifique para facilitar a busca e a montagem de simulados.
             </Text>
           </View>
           <View className="flex-row gap-2 items-start">
             <TouchableOpacity
               onPress={toggleDensity}
-              className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white"
+              className="flex-row items-center gap-1.5 px-3 py-2 rounded-ds-md border border-border bg-surface"
               aria-label={`Densidade: ${density === "padrao" ? "Padrão" : "Compacta"}. Alternar`}
             >
-              <Ionicons name={density === "padrao" ? "reorder-four-outline" : "reorder-three-outline"} size={16} color="#4B5563" />
-              <Text className="text-xs font-semibold text-gray-600">{density === "padrao" ? "Padrão" : "Compacta"}</Text>
+              <Ionicons name={density === "padrao" ? "reorder-four-outline" : "reorder-three-outline"} size={16} color="#4B5463" />
+              <Text className="text-xs font-semibold text-ink-muted">{density === "padrao" ? "Padrão" : "Compacta"}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigate("questoes-taxonomia")}
-              className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600"
+              className="flex-row items-center gap-1.5 px-3 py-2 rounded-ds-md bg-brand"
             >
               <Ionicons name="git-network-outline" size={16} color="#FFFFFF" />
               <Text className="text-xs font-semibold text-white">Taxonomia</Text>
@@ -348,46 +349,33 @@ export default function QuestionBankScreen({ navigate }: Props) {
           </View>
         </View>
 
-        {/* Abas */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-          <View className="flex-row gap-2" role="tablist" aria-live="polite">
-            {tabs.map((tab) => {
-              const active = state.tab === tab.key;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  role="tab"
-                  aria-selected={active}
-                  onPress={() => updateState({ ...state, tab: tab.key, page: 1 })}
-                  className={`flex-row items-center gap-2 px-3 py-2 rounded-xl border ${active ? "bg-violet-600 border-violet-600" : "bg-white border-gray-200"}`}
-                >
-                  <Text className={`text-xs font-semibold ${active ? "text-white" : "text-gray-700"}`}>{tab.label}</Text>
-                  <View className={`rounded-full px-1.5 ${active ? "bg-white/20" : "bg-gray-100"}`} style={{ minWidth: 20, alignItems: "center" }}>
-                    <Text className={`text-xs font-bold ${active ? "text-white" : "text-gray-600"}`}>{tab.count ?? "…"}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+        {/* Abas (contagens atualizam sem trocar de aba: aria-live) */}
+        <View className="mb-4" aria-live="polite">
+          <Tabs
+            accessibilityLabel="Situação das questões"
+            items={tabs.map((tab) => ({ id: tab.key, label: tab.label, count: tab.count }))}
+            value={state.tab}
+            onChange={(tab) => updateState({ ...state, tab, page: 1 })}
+          />
+        </View>
 
         {/* Busca */}
         <View
-          className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 mb-3"
+          className="flex-row items-center bg-surface border border-border rounded-ds-md px-4 mb-3"
           style={{ height: 44 }}
         >
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={16} color="#5F6878" />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
             placeholder="Buscar por nº (#123), enunciado, simulado ou tag..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#5F6878"
             aria-label="Buscar questões"
-            className="flex-1 ml-2 text-sm text-gray-800"
+            className="flex-1 ml-2 text-sm text-ink"
           />
           {!!searchText && (
             <TouchableOpacity onPress={() => setSearchText("")} aria-label="Limpar busca">
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="#5F6878" />
             </TouchableOpacity>
           )}
         </View>
@@ -458,11 +446,11 @@ export default function QuestionBankScreen({ navigate }: Props) {
           {hasActiveFilters(state) && (
             <TouchableOpacity
               onPress={() => updateState(clearFilters(state))}
-              className="flex-row items-center gap-1 px-3 rounded-xl border border-gray-200 bg-white justify-center"
+              className="flex-row items-center gap-1 px-3 rounded-ds-md border border-border bg-surface justify-center"
               style={{ height: 44 }}
             >
-              <Ionicons name="close-outline" size={16} color="#6B7280" />
-              <Text className="text-xs font-semibold text-gray-600">Limpar filtros</Text>
+              <Ionicons name="close-outline" size={16} color="#4B5463" />
+              <Text className="text-xs font-semibold text-ink-muted">Limpar filtros</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -470,10 +458,10 @@ export default function QuestionBankScreen({ navigate }: Props) {
         {/* Barra de seleção / ações em massa */}
         {selected.size > 0 && (
           <View
-            className="mb-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3"
+            className="mb-3 rounded-ds-md border border-border bg-brand-tint px-4 py-3"
             style={{ flexDirection: isMobile ? "column" : "row", gap: 10, alignItems: isMobile ? "stretch" : "center" }}
           >
-            <Text className="text-sm font-semibold text-violet-800" aria-live="polite">
+            <Text className="text-sm font-semibold text-brand" aria-live="polite">
               {selected.size} {selected.size === 1 ? "selecionada" : "selecionadas"}
             </Text>
             <View className="flex-row flex-wrap gap-2" style={{ flex: 1 }}>
@@ -492,22 +480,22 @@ export default function QuestionBankScreen({ navigate }: Props) {
                   key={action}
                   onPress={() => setBulkAction(action)}
                   aria-label={`Em massa: ${label}`}
-                  className="px-3 py-1.5 rounded-lg bg-white border border-violet-200"
+                  className="px-3 py-1.5 rounded-ds-md bg-surface border border-border"
                 >
-                  <Text className="text-xs font-semibold text-violet-700">{label}</Text>
+                  <Text className="text-xs font-semibold text-brand">{label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
             <TouchableOpacity onPress={() => setSelected(new Set())}>
-              <Text className="text-xs font-semibold text-gray-500">Limpar seleção</Text>
+              <Text className="text-xs font-semibold text-ink-muted">Limpar seleção</Text>
             </TouchableOpacity>
           </View>
         )}
         {pageSelection === "all" && total > selected.size && (
           <View className="mb-3 flex-row items-center gap-2">
-            <Text className="text-xs text-gray-600">Todas as {pageIds.length} desta página estão selecionadas.</Text>
+            <Text className="text-xs text-ink-muted">Todas as {pageIds.length} desta página estão selecionadas.</Text>
             <TouchableOpacity onPress={selectAllMatching} disabled={selectingAll}>
-              <Text className="text-xs font-semibold text-violet-700">
+              <Text className="text-xs font-semibold text-brand">
                 {selectingAll ? "Selecionando..." : `Selecionar todas as ${total}`}
               </Text>
             </TouchableOpacity>
@@ -517,9 +505,9 @@ export default function QuestionBankScreen({ navigate }: Props) {
         {/* Tabela */}
         <ScrollView horizontal showsHorizontalScrollIndicator={isMobile} style={{ width: "100%" }} contentContainerStyle={{ width: isMobile ? undefined : "100%" }}>
           <View
-            className="bg-white rounded-2xl overflow-hidden"
+            className="bg-surface rounded-ds-md overflow-hidden border border-border"
             role="table"
-            style={{ width: "100%", minWidth: isMobile ? tableMinWidth : 980, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+            style={{ width: "100%", minWidth: isMobile ? tableMinWidth : 980, }}
           >
             <View className={TABLE_HEADER_ROW} style={[TABLE_HEADER_ROW_STYLE, { alignItems: "center" }]} role="row">
               <Checkbox
@@ -543,25 +531,25 @@ export default function QuestionBankScreen({ navigate }: Props) {
             {loading && !result ? (
               Array.from({ length: 6 }, (_, i) => (
                 <View key={i} className="flex-row items-center px-3 py-4 gap-4" aria-hidden>
-                  <View className="bg-gray-100 rounded" style={{ width: 18, height: 18 }} />
-                  <View className="bg-gray-100 rounded" style={{ width: 70, height: 12 }} />
-                  <View className="bg-gray-100 rounded flex-1" style={{ height: 12 }} />
-                  <View className="bg-gray-100 rounded" style={{ width: 100, height: 12 }} />
-                  <View className="bg-gray-100 rounded" style={{ width: 90, height: 12 }} />
+                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 18, height: 18 }} />
+                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 70, height: 12 }} />
+                  <View className="bg-surface-sunken rounded-ds-md flex-1" style={{ height: 12 }} />
+                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 100, height: 12 }} />
+                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 90, height: 12 }} />
                 </View>
               ))
             ) : loadError ? (
               <View className="py-14 items-center gap-3 px-6">
-                <Ionicons name="cloud-offline-outline" size={32} color="#F87171" />
-                <Text className="text-sm text-gray-600 text-center">{loadError}</Text>
-                <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-xl bg-violet-600">
+                <Ionicons name="cloud-offline-outline" size={32} color="#B0261B" />
+                <Text className="text-sm text-ink-muted text-center">{loadError}</Text>
+                <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-ds-md bg-brand">
                   <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
                 </TouchableOpacity>
               </View>
             ) : rows.length === 0 ? (
               <View className="py-14 items-center gap-2 px-6">
-                <Ionicons name="document-text-outline" size={32} color="#D1D5DB" />
-                <Text className="text-sm text-gray-500 text-center">
+                <Ionicons name="document-text-outline" size={32} color="#7A8393" />
+                <Text className="text-sm text-ink-muted text-center">
                   {noQuestionsAtAll ? "Nenhuma questão cadastrada ainda." : "Nenhuma questão encontrada com esses filtros."}
                 </Text>
                 {!noQuestionsAtAll && filtered && (
@@ -571,7 +559,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                       updateState({ ...clearFilters(state), search: "" });
                     }}
                   >
-                    <Text className="text-xs font-semibold text-violet-700">Limpar busca e filtros</Text>
+                    <Text className="text-xs font-semibold text-brand">Limpar busca e filtros</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -596,7 +584,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     </View>
                     <View style={{ flex: 1, minWidth: 280, paddingRight: 12 }}>
                       <TouchableOpacity onPress={() => openClassify(row.id)} role="link" aria-label={`Classificar questão ${row.id}`}>
-                        <Text className="text-xs text-violet-700 font-medium" numberOfLines={density === "compacta" ? 1 : 2}>
+                        <Text className="text-xs text-brand font-medium" numberOfLines={density === "compacta" ? 1 : 2}>
                           {row.question_text?.trim() || (row.image_url ? "[Enunciado em imagem]" : "[Sem enunciado]")}
                         </Text>
                       </TouchableOpacity>
@@ -618,8 +606,8 @@ export default function QuestionBankScreen({ navigate }: Props) {
                       <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
                     </View>
                     <View style={{ width: COL.actions, alignItems: "flex-end" }}>
-                      <TouchableOpacity onPress={() => setMenuRow(row)} aria-label={`Ações da questão ${row.id}`} className="p-1.5 rounded-lg">
-                        <Ionicons name="ellipsis-vertical" size={16} color="#6B7280" />
+                      <TouchableOpacity onPress={() => setMenuRow(row)} aria-label={`Ações da questão ${row.id}`} className="p-1.5 rounded-ds-md">
+                        <Ionicons name="ellipsis-vertical" size={16} color="#4B5463" />
                       </TouchableOpacity>
                     </View>
                   </DataTableRow>
@@ -659,7 +647,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
         )}
         {loading && result && (
           <View className="mt-3 items-center">
-            <ActivityIndicator color="#7C3AED" />
+            <ActivityIndicator color="#1C3D63" />
           </View>
         )}
       </ScrollView>
@@ -685,9 +673,9 @@ export default function QuestionBankScreen({ navigate }: Props) {
                   : []),
               ] as [keyof typeof Ionicons.glyphMap, string, () => void][]
             ).map(([icon, label, action]) => (
-              <TouchableOpacity key={label} onPress={action} className="flex-row items-center gap-3 px-3 py-3 rounded-xl border border-gray-100">
-                <Ionicons name={icon} size={18} color="#7C3AED" />
-                <Text className="text-sm text-gray-700">{label}</Text>
+              <TouchableOpacity key={label} onPress={action} className="flex-row items-center gap-3 px-3 py-3 rounded-ds-md border border-border">
+                <Ionicons name={icon} size={18} color="#1C3D63" />
+                <Text className="text-sm text-ink">{label}</Text>
               </TouchableOpacity>
             ))}
           </View>

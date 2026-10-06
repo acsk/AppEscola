@@ -43,11 +43,11 @@ const gradeRowKey = (studentId: number, subjectId: number) => `${studentId}-${su
 
 function PublishSummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="flex-row py-1.5 border-b border-gray-100">
-      <Text className="text-xs font-semibold text-gray-500" style={{ width: 118 }}>
+    <View className="flex-row py-1.5 border-b border-border">
+      <Text className="text-xs font-semibold text-ink-muted" style={{ width: 118 }}>
         {label}
       </Text>
-      <Text className="text-xs font-medium text-gray-800 flex-1">{value}</Text>
+      <Text className="text-xs font-medium text-ink flex-1">{value}</Text>
     </View>
   );
 }
@@ -520,16 +520,12 @@ export default function OfficialAssessmentFormScreen({
 
   const pageTitle = isEdit ? "Editar avaliação" : "Nova avaliação";
   const cardShadow = {
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
   } as const;
 
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <ActivityIndicator size="large" color="#1C3D63" />
       </View>
     );
   }
@@ -547,22 +543,22 @@ export default function OfficialAssessmentFormScreen({
           ]}
         />
         <View
-          className="bg-white rounded-2xl p-6 items-center"
+          className="bg-surface rounded-ds-md p-6 items-center border border-border"
           style={cardShadow}
         >
-          <Ionicons name="alert-circle-outline" size={40} color="#E5E7EB" />
-          <Text className="text-base font-semibold text-gray-900 text-center mt-3">
+          <Ionicons name="alert-circle-outline" size={40} color="#D9DDE3" />
+          <Text className="text-base font-semibold text-ink text-center mt-3">
             Não foi possível carregar esta avaliação.
           </Text>
-          <Text className="text-sm text-gray-500 text-center mt-2">
+          <Text className="text-sm text-ink-muted text-center mt-2">
             Verifique sua conexão e tente novamente para evitar sobrescrever dados existentes.
           </Text>
           <TouchableOpacity
             onPress={() => navigate("avaliacoes-oficiais")}
-            className="mt-5 px-5 py-2.5 rounded-xl border border-gray-200"
+            className="mt-5 px-5 py-2.5 rounded-ds-md border border-border"
             activeOpacity={0.8}
           >
-            <Text className="text-sm font-semibold text-gray-700">Voltar para lista</Text>
+            <Text className="text-sm font-semibold text-ink">Voltar para lista</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -592,8 +588,8 @@ export default function OfficialAssessmentFormScreen({
         }}
       >
         <View className="flex-1">
-          <Text className="text-2xl font-bold text-gray-800">{pageTitle}</Text>
-          <Text className="text-sm text-gray-500 mt-1">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">{pageTitle}</Text>
+          <Text className="text-sm text-ink-muted mt-1">
             Cadastro da avaliação e lançamento de notas para o boletim
           </Text>
         </View>
@@ -603,12 +599,9 @@ export default function OfficialAssessmentFormScreen({
         />
       </View>
 
-      <View className="bg-white rounded-2xl p-6 mb-5" style={cardShadow}>
+      <View className="bg-surface rounded-ds-md p-6 mb-5 border border-border" style={cardShadow}>
         <View className="flex-row items-center gap-2 mb-5">
-          <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-            <Ionicons name="clipboard-outline" size={16} color="#7C3AED" />
-          </View>
-          <Text className="text-base font-semibold text-gray-800">Dados da avaliação</Text>
+          <Text className="text-base font-semibold text-ink">Dados da avaliação</Text>
         </View>
 
         <SearchableSelect
@@ -623,14 +616,14 @@ export default function OfficialAssessmentFormScreen({
         />
 
         <View className="mb-4">
-          <Text className="text-sm font-medium text-gray-700 mb-1">
-            Disciplinas <Text className="text-red-500">*</Text>
+          <Text className="text-sm font-medium text-ink mb-1">
+            Disciplinas <Text className="text-danger">*</Text>
           </Text>
-          <Text className="text-xs text-gray-400 mb-3">
+          <Text className="text-xs text-ink-subtle mb-3">
             Selecione as disciplinas avaliadas. O lançamento de notas é feito por disciplina.
           </Text>
           {subjectOptions.length === 0 ? (
-            <Text className="text-sm text-gray-400">Nenhuma disciplina disponível</Text>
+            <Text className="text-sm text-ink-subtle">Nenhuma disciplina disponível</Text>
           ) : (
             <View className="gap-2">
               {subjectOptions.map((subject) => {
@@ -642,19 +635,19 @@ export default function OfficialAssessmentFormScreen({
                     onPress={() => !disabled && toggleSubject(subject.id)}
                     activeOpacity={0.7}
                     disabled={disabled}
-                    className={`flex-row items-center gap-3 px-4 py-3 rounded-xl border ${
-                      selected ? "bg-violet-50 border-violet-200" : "bg-gray-50 border-gray-100"
+                    className={`flex-row items-center gap-3 px-4 py-3 rounded-ds-md border ${
+                      selected ? "bg-brand-tint border-border" : "bg-surface-sunken border-border"
                     }`}
                     style={{ opacity: disabled ? 0.65 : 1 }}
                   >
                     <Ionicons
                       name={selected ? "checkbox" : "square-outline"}
                       size={20}
-                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                      color={selected ? "#1C3D63" : "#5F6878"}
                     />
                     <Text
                       className={`text-sm font-medium ${
-                        selected ? "text-violet-700" : "text-gray-700"
+                        selected ? "text-brand" : "text-ink"
                       }`}
                     >
                       {subject.name}
@@ -665,10 +658,10 @@ export default function OfficialAssessmentFormScreen({
             </View>
           )}
           {errors.subject_ids ? (
-            <Text className="text-xs text-red-500 mt-1">{errors.subject_ids}</Text>
+            <Text className="text-xs text-danger mt-1">{errors.subject_ids}</Text>
           ) : null}
           {form.subject_ids.length > 0 ? (
-            <Text className="text-xs text-green-600 mt-2">
+            <Text className="text-xs text-success mt-2">
               {form.subject_ids.length} disciplina{form.subject_ids.length !== 1 ? "s" : ""} selecionada
               {form.subject_ids.length !== 1 ? "s" : ""}
             </Text>
@@ -743,44 +736,44 @@ export default function OfficialAssessmentFormScreen({
         />
 
         <View
-          className="flex-row flex-wrap gap-3 pt-4 mt-2 border-t border-gray-100"
+          className="flex-row flex-wrap gap-3 pt-4 mt-2 border-t border-border"
           style={{ justifyContent: isMobile ? "center" : "flex-start" }}
         >
           <TouchableOpacity
             onPress={() => navigate("avaliacoes-oficiais")}
-            className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white"
+            className="px-5 py-2.5 rounded-ds-md border border-border bg-surface"
             activeOpacity={0.85}
           >
-            <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+            <Text className="text-sm font-semibold text-ink">Cancelar</Text>
           </TouchableOpacity>
           {assessmentBackendId && status === "draft" ? (
             <TouchableOpacity
               onPress={() => setDeleteModalVisible(true)}
               disabled={deleting}
-              className="px-5 py-2.5 rounded-xl border border-red-200 bg-red-50 flex-row items-center gap-2"
+              className="px-5 py-2.5 rounded-ds-md border border-danger bg-danger-tint flex-row items-center gap-2"
               activeOpacity={0.85}
             >
-              <Ionicons name="trash-outline" size={16} color="#EF4444" />
-              <Text className="text-sm font-semibold text-red-600">Excluir</Text>
+              <Ionicons name="trash-outline" size={16} color="#B0261B" />
+              <Text className="text-sm font-semibold text-danger">Excluir</Text>
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
             onPress={save}
             disabled={saving || status === "published"}
-            className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+            className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
             activeOpacity={0.85}
             style={{ opacity: saving || status === "published" ? 0.6 : 1 }}
           >
             {saving ? <ActivityIndicator size="small" color="white" /> : null}
-            <Text className="text-sm font-bold text-white">
+            <Text className="text-sm font-semibold text-white">
               {saving ? "Salvando..." : "Salvar avaliação"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setPublishModalVisible(true)}
             disabled={!assessmentBackendId || publishing || status === "published"}
-            className={`px-5 py-2.5 rounded-xl flex-row items-center gap-2 ${
-              status === "published" ? "bg-emerald-600" : "bg-amber-500"
+            className={`px-5 py-2.5 rounded-ds-md flex-row items-center gap-2 ${
+              status === "published" ? "bg-success" : "bg-brand"
             }`}
             activeOpacity={0.85}
             style={{ opacity: !assessmentBackendId || publishing || status === "published" ? 0.6 : 1 }}
@@ -790,14 +783,14 @@ export default function OfficialAssessmentFormScreen({
               size={16}
               color="white"
             />
-            <Text className="text-sm font-bold text-white">
+            <Text className="text-sm font-semibold text-white">
               {status === "published" ? "Publicada" : "Publicar"}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <View className="bg-white rounded-2xl p-6 mb-5" style={cardShadow}>
+      <View className="bg-surface rounded-ds-md p-6 mb-5 border border-border" style={cardShadow}>
         <View
           className="mb-5"
           style={{
@@ -808,12 +801,9 @@ export default function OfficialAssessmentFormScreen({
           }}
         >
           <View className="flex-row items-center gap-2 flex-1">
-            <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-              <Ionicons name="school-outline" size={16} color="#7C3AED" />
-            </View>
             <View className="flex-1">
-              <Text className="text-base font-semibold text-gray-800">Notas da turma</Text>
-              <Text className="text-xs text-gray-500 mt-0.5">
+              <Text className="text-base font-semibold text-ink">Notas da turma</Text>
+              <Text className="text-xs text-ink-muted mt-0.5">
                 Resumo por aluno e disciplina. Lançamento em lote ou pelo ícone em cada linha.
               </Text>
             </View>
@@ -821,12 +811,12 @@ export default function OfficialAssessmentFormScreen({
           <TouchableOpacity
             onPress={() => openGradesModal()}
             disabled={status === "published"}
-            className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center justify-center gap-2"
+            className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center justify-center gap-2"
             activeOpacity={0.85}
             style={{ opacity: status === "published" ? 0.6 : 1 }}
           >
             <Ionicons name="create-outline" size={16} color="white" />
-            <Text className="text-sm font-bold text-white">Lançar notas</Text>
+            <Text className="text-sm font-semibold text-white">Lançar notas</Text>
           </TouchableOpacity>
         </View>
 
@@ -857,15 +847,15 @@ export default function OfficialAssessmentFormScreen({
           >
             <TouchableOpacity
               onPress={closeGradesModal}
-              className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white"
+              className="px-5 py-2.5 rounded-ds-md border border-border bg-surface"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+              <Text className="text-sm font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={saveGrades}
               disabled={!assessmentBackendId || savingGrades || status === "published"}
-              className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+              className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
               activeOpacity={0.85}
               style={{
                 opacity: !assessmentBackendId || savingGrades || status === "published" ? 0.6 : 1,
@@ -873,7 +863,7 @@ export default function OfficialAssessmentFormScreen({
             >
               {savingGrades ? <ActivityIndicator size="small" color="white" /> : null}
               <Ionicons name="save-outline" size={16} color="white" />
-              <Text className="text-sm font-bold text-white">
+              <Text className="text-sm font-semibold text-white">
                 {savingGrades
                   ? "Salvando..."
                   : gradesModalStudentId != null
@@ -919,8 +909,8 @@ export default function OfficialAssessmentFormScreen({
         loading={publishing}
         confirmDisabled={publishSummary.launchedCount === 0}
       >
-        <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-          <Text className="text-xs font-bold text-gray-700 uppercase mb-1">Resumo da avaliação</Text>
+        <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-2">
+          <Text className="text-xs font-semibold text-ink uppercase mb-1">Resumo da avaliação</Text>
           <PublishSummaryRow label="Título" value={publishSummary.title} />
           <PublishSummaryRow label="Turma" value={publishSummary.classLabel} />
           <PublishSummaryRow label="Disciplinas" value={publishSummary.subjectNames} />
@@ -948,11 +938,11 @@ export default function OfficialAssessmentFormScreen({
           />
         </View>
         {publishSummary.launchedCount === 0 ? (
-          <Text className="text-xs text-amber-700 font-semibold text-center mt-2">
+          <Text className="text-xs text-warning font-semibold text-center mt-2">
             Lance ao menos uma nota antes de publicar.
           </Text>
         ) : publishSummary.pendingCount > 0 ? (
-          <Text className="text-xs text-amber-700 text-center mt-2">
+          <Text className="text-xs text-warning text-center mt-2">
             Ainda há {publishSummary.pendingCount} aluno
             {publishSummary.pendingCount !== 1 ? "s" : ""} com lançamento pendente. Você pode
             publicar mesmo assim.

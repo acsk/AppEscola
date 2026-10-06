@@ -28,34 +28,34 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
 
   return (
     <View className="mb-3">
-      <Text className="text-xs font-medium text-gray-600 mb-1" nativeID="topics-label">
+      <Text className="text-xs font-medium text-ink-muted mb-1" nativeID="topics-label">
         Assuntos {value.length > 0 ? `(${value.length})` : ""}
       </Text>
       {disabled ? (
-        <View className="rounded-xl border border-dashed border-gray-200 px-3 py-3">
-          <Text className="text-xs text-gray-400">{disabledHint ?? "Escolha a disciplina primeiro."}</Text>
+        <View className="rounded-ds-md border border-dashed border-border px-3 py-3">
+          <Text className="text-xs text-ink-subtle">{disabledHint ?? "Escolha a disciplina primeiro."}</Text>
         </View>
       ) : (
-        <View className="rounded-xl border border-gray-200 bg-white" aria-labelledby="topics-label">
-          <View className="flex-row items-center px-3 border-b border-gray-100" style={{ height: 38 }}>
-            <Ionicons name="search-outline" size={14} color="#9CA3AF" />
+        <View className="rounded-ds-md border border-border bg-surface" aria-labelledby="topics-label">
+          <View className="flex-row items-center px-3 border-b border-border" style={{ height: 38 }}>
+            <Ionicons name="search-outline" size={14} color="#5F6878" />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Filtrar assuntos..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#5F6878"
               aria-label="Filtrar assuntos"
-              className="flex-1 ml-2 text-xs text-gray-800"
+              className="flex-1 ml-2 text-xs text-ink"
             />
           </View>
           {loading ? (
             <View className="py-4 items-center">
-              <ActivityIndicator color="#7C3AED" />
+              <ActivityIndicator color="#1C3D63" />
             </View>
           ) : (
             <ScrollView style={{ maxHeight: 180 }}>
               {visible.length === 0 ? (
-                <Text className="text-xs text-gray-400 px-3 py-3">
+                <Text className="text-xs text-ink-subtle px-3 py-3">
                   {topics.length === 0 ? "Esta disciplina ainda não tem assuntos." : "Nenhum assunto encontrado."}
                 </Text>
               ) : (
@@ -73,9 +73,9 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
                       <Ionicons
                         name={checked ? "checkbox" : "square-outline"}
                         size={16}
-                        color={checked ? "#7C3AED" : "#9CA3AF"}
+                        color={checked ? "#1C3D63" : "#5F6878"}
                       />
-                      <Text className="text-xs text-gray-800 ml-2 flex-1">{topic.name}</Text>
+                      <Text className="text-xs text-ink ml-2 flex-1">{topic.name}</Text>
                     </TouchableOpacity>
                   );
                 })

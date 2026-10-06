@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import FormInput from "../components/ui/FormInput";
 import { parseApiErrors } from "../utils/apiErrors";
+import { color } from "../constants/theme";
 
 export default function FirstAccessPasswordScreen() {
   const { completeFirstAccess, logout } = useAuth();
@@ -60,32 +61,22 @@ export default function FirstAccessPasswordScreen() {
   return (
     <View
       className="flex-1 items-center justify-center"
-      style={{ backgroundColor: "#EEEEFF" }}
+      style={{ backgroundColor: color.bg }}
     >
-      <View
-        className="bg-white rounded-3xl p-10 w-full"
-        style={{
-          maxWidth: 460,
-          shadowColor: "#7C3AED",
-          shadowOpacity: 0.12,
-          shadowRadius: 24,
-          elevation: 10,
-        }}
-      >
-        <View className="items-center mb-6">
-          <View className="w-16 h-16 bg-violet-600 rounded-2xl items-center justify-center mb-4">
-            <Ionicons name="key-outline" size={30} color="white" />
-          </View>
-          <Text className="text-2xl font-bold text-gray-800">Primeiro acesso</Text>
-          <Text className="text-sm text-gray-500 mt-1 text-center">
+      <View className="bg-surface border border-border rounded-ds-md w-full" style={{ maxWidth: 460, padding: 32 }}>
+        <View className="mb-6">
+          <Text role="heading" aria-level={1} className="font-semibold text-ink" style={{ fontSize: 20, lineHeight: 28 }}>
+            Primeiro acesso
+          </Text>
+          <Text className="text-sm text-ink-muted" style={{ marginTop: 2 }}>
             Para continuar, altere sua senha de acesso.
           </Text>
         </View>
 
         {!!errors.general && (
-          <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
-            <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
-            <Text className="text-sm text-red-600 ml-2 flex-1">{errors.general}</Text>
+          <View className="bg-danger-tint border border-danger rounded-ds-md px-4 py-3 mb-4 flex-row items-center">
+            <Ionicons name="alert-circle-outline" size={16} color="#B0261B" />
+            <Text className="text-sm text-danger ml-2 flex-1">{errors.general}</Text>
           </View>
         )}
 
@@ -125,24 +116,25 @@ export default function FirstAccessPasswordScreen() {
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={loading}
-          className="bg-violet-600 rounded-xl py-3.5 items-center mt-2"
+          className="bg-brand rounded-ds-md items-center justify-center mt-2"
+          style={{ height: 38, opacity: loading ? 0.45 : 1 }}
           activeOpacity={0.85}
-          style={{ opacity: loading ? 0.75 : 1 }}
         >
           {loading ? (
             <ActivityIndicator color="white" size="small" />
           ) : (
-            <Text className="text-white font-bold text-sm">Atualizar senha</Text>
+            <Text className="text-on-brand font-medium text-sm">Atualizar senha</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={logout}
           disabled={loading}
-          className="rounded-xl py-3.5 items-center mt-2"
+          className="rounded-ds-md items-center justify-center mt-2"
+          style={{ height: 38 }}
           activeOpacity={0.75}
         >
-          <Text className="text-sm font-medium text-gray-500">Sair</Text>
+          <Text className="text-sm font-medium text-ink-muted">Sair</Text>
         </TouchableOpacity>
       </View>
     </View>

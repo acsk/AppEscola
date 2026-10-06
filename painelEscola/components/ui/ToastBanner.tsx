@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { CircleAlert, CircleCheck, X } from "lucide-react-native";
+import Icon from "./Icon";
+import { color, shadow } from "../../constants/theme";
 
 type ToastType = "success" | "error";
 
@@ -108,54 +110,37 @@ export default function ToastBanner({
 
   return (
     <Animated.View
+      role={type === "error" ? "alert" : "status"}
+      aria-live={type === "error" ? "assertive" : "polite"}
       style={{
         position: "absolute",
-        top: 18,
+        top: 16,
         left: 16,
         right: 16,
         alignSelf: "center",
         width: "100%",
         maxWidth: 560,
-        minHeight: 72,
-        paddingHorizontal: 18,
-        paddingVertical: 14,
-        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 6,
         borderWidth: 1,
-        borderColor: type === "success" ? "#A7F3D0" : "#FECACA",
-        backgroundColor: type === "success" ? "#ECFDF5" : "#FEF2F2",
+        borderColor: color.border,
+        backgroundColor: color.surface,
         flexDirection: "row",
         alignItems: "center",
-        gap: 10,
-        shadowColor: "#000",
-        shadowOpacity: 0.16,
-        shadowRadius: 14,
-        elevation: 8,
+        gap: 12,
+        ...(isWeb ? ({ boxShadow: shadow.overlay } as object) : { elevation: 8 }),
         zIndex: 999,
         opacity,
         transform: [{ translateY }, { scale }],
       }}
     >
-      <Ionicons
-        name={type === "success" ? "checkmark-circle" : "alert-circle"}
-        size={22}
-        color={type === "success" ? "#047857" : "#B91C1C"}
-      />
-      <Text
-        style={{
-          flex: 1,
-          fontSize: 15,
-          fontWeight: "600",
-          color: type === "success" ? "#065F46" : "#991B1B",
-        }}
-      >
+      <Icon icon={type === "success" ? CircleCheck : CircleAlert} size={20} color={type === "success" ? color.success : color.danger} />
+      <Text className="text-sm font-medium text-ink" style={{ flex: 1, lineHeight: 20 }}>
         {message}
       </Text>
-      <TouchableOpacity onPress={onClose}>
-        <Ionicons
-          name="close"
-          size={20}
-          color={type === "success" ? "#047857" : "#B91C1C"}
-        />
+      <TouchableOpacity onPress={onClose} aria-label="Fechar aviso" activeOpacity={0.7}>
+        <Icon icon={X} color={color["ink-muted"]} />
       </TouchableOpacity>
     </Animated.View>
   );

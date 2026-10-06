@@ -131,15 +131,15 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
   };
 
   const content = question && (
-    <View className="bg-white rounded-2xl border border-gray-200 p-5" style={{ gap: 14 }}>
+    <View className="bg-surface rounded-ds-md border border-border p-5" style={{ gap: 14 }}>
       <View className="flex-row items-center justify-between flex-wrap gap-2">
-        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
           Questão #{question.id} · {question.exam ? `Simulado: ${question.exam.title}` : "Avulsa"}
         </Text>
         <QuestionStatusBadge isAnnulled={question.is_annulled} isOutdated={question.is_outdated} />
       </View>
       {!!question.question_text?.trim() && (
-        <Text className="text-sm text-gray-800 leading-6" selectable>
+        <Text className="text-sm text-ink leading-6" selectable>
           {question.question_text}
         </Text>
       )}
@@ -152,25 +152,25 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
         />
       )}
       {question.type === "essay" ? (
-        <Text className="text-xs text-gray-500">Questão dissertativa (sem alternativas).</Text>
+        <Text className="text-xs text-ink-muted">Questão dissertativa (sem alternativas).</Text>
       ) : (
         <View style={{ gap: 8 }}>
           {(question.options ?? []).map((option, i) => (
             <View
               key={option.id}
-              className={`flex-row rounded-xl border px-3 py-2.5 ${option.is_correct ? "bg-green-50 border-green-300" : "bg-white border-gray-200"}`}
+              className={`flex-row rounded-ds-md border px-3 py-2.5 ${option.is_correct ? "bg-success-tint border-success" : "bg-surface border-border"}`}
               style={{ gap: 10 }}
             >
-              <Text className={`text-sm font-bold ${option.is_correct ? "text-green-700" : "text-gray-500"}`}>
+              <Text className={`text-sm font-semibold ${option.is_correct ? "text-success" : "text-ink-muted"}`}>
                 {OPTION_LETTERS[i] ?? i + 1})
               </Text>
-              <Text className="text-sm text-gray-800 flex-1" selectable>
+              <Text className="text-sm text-ink flex-1" selectable>
                 {option.option_text}
               </Text>
               {option.is_correct && (
                 <View className="flex-row items-center gap-1">
-                  <Ionicons name="checkmark-circle" size={16} color="#15803D" />
-                  <Text className="text-xs font-semibold text-green-700">Gabarito</Text>
+                  <Ionicons name="checkmark-circle" size={16} color="#1C6A45" />
+                  <Text className="text-xs font-semibold text-success">Gabarito</Text>
                 </View>
               )}
             </View>
@@ -178,14 +178,14 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
         </View>
       )}
       {!!question.explanation?.trim() && (
-        <View className="rounded-xl bg-gray-50 border border-gray-100 p-3">
-          <Text className="text-xs font-semibold text-gray-500 mb-1">Explicação</Text>
-          <Text className="text-xs text-gray-700" selectable>
+        <View className="rounded-ds-md bg-surface-sunken border border-border p-3">
+          <Text className="text-xs font-semibold text-ink-muted mb-1">Explicação</Text>
+          <Text className="text-xs text-ink" selectable>
             {question.explanation}
           </Text>
         </View>
       )}
-      <Text className="text-xs text-gray-400">
+      <Text className="text-xs text-ink-subtle">
         O conteúdo da questão é somente leitura aqui{question.exam ? "; edite pelo simulado." : "."}
       </Text>
     </View>
@@ -203,18 +203,18 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
 
         {loading ? (
           <View className="py-20 items-center">
-            <ActivityIndicator color="#7C3AED" />
+            <ActivityIndicator color="#1C3D63" />
           </View>
         ) : loadError || !question ? (
           <View className="py-16 items-center gap-3">
-            <Ionicons name="alert-circle-outline" size={32} color="#F87171" />
-            <Text className="text-sm text-gray-600 text-center">{loadError ?? "Questão não encontrada."}</Text>
+            <Ionicons name="alert-circle-outline" size={32} color="#B0261B" />
+            <Text className="text-sm text-ink-muted text-center">{loadError ?? "Questão não encontrada."}</Text>
             <View className="flex-row gap-2">
-              <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-xl bg-violet-600">
+              <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-ds-md bg-brand">
                 <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={goToList} className="px-4 py-2 rounded-xl border border-gray-200">
-                <Text className="text-sm font-semibold text-gray-600">Voltar à lista</Text>
+              <TouchableOpacity onPress={goToList} className="px-4 py-2 rounded-ds-md border border-border">
+                <Text className="text-sm font-semibold text-ink-muted">Voltar à lista</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -222,15 +222,15 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
           <View style={{ flexDirection: isMobile ? "column" : "row", gap: 16, alignItems: "flex-start" }}>
             <View style={{ flex: 3, width: isMobile ? "100%" : undefined }}>{content}</View>
             <View
-              className="bg-white rounded-2xl border border-gray-200 p-5"
+              className="bg-surface rounded-ds-md border border-border p-5"
               style={{ flex: 2, width: isMobile ? "100%" : undefined, minWidth: isMobile ? undefined : 320 }}
             >
-              <Text className="text-base font-bold text-gray-800 mb-3">Classificação</Text>
+              <Text className="text-base font-semibold text-ink mb-3">Classificação</Text>
               <ClassificationFields form={form} onChange={setForm} catalogs={catalogs} />
 
-              <View className="mt-4 pt-4 border-t border-gray-100" style={{ gap: 8 }}>
+              <View className="mt-4 pt-4 border-t border-border" style={{ gap: 8 }}>
                 {dirty && (
-                  <Text className="text-xs text-amber-700" aria-live="polite">
+                  <Text className="text-xs text-warning" aria-live="polite">
                     Alterações não salvas.
                   </Text>
                 )}
@@ -238,7 +238,7 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
                   <TouchableOpacity
                     onPress={onSave}
                     disabled={!dirty || saving !== null}
-                    className={`flex-row items-center gap-2 px-4 py-2.5 rounded-xl ${!dirty || saving ? "bg-violet-300" : "bg-violet-600"}`}
+                    className={`flex-row items-center gap-2 px-4 py-2.5 rounded-ds-md ${!dirty || saving ? "bg-brand-tint" : "bg-brand"}`}
                   >
                     {saving === "save" && <ActivityIndicator size="small" color="#FFFFFF" />}
                     <Text className="text-sm font-semibold text-white">Salvar</Text>
@@ -246,15 +246,15 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
                   <TouchableOpacity
                     onPress={onSaveAndNext}
                     disabled={saving !== null}
-                    className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl border border-violet-300 bg-violet-50"
+                    className="flex-row items-center gap-2 px-4 py-2.5 rounded-ds-md border border-border bg-brand-tint"
                   >
-                    {saving === "next" && <ActivityIndicator size="small" color="#7C3AED" />}
-                    <Text className="text-sm font-semibold text-violet-700">{dirty ? "Salvar e próxima" : "Próxima"}</Text>
-                    <Ionicons name="arrow-forward" size={14} color="#7C3AED" />
+                    {saving === "next" && <ActivityIndicator size="small" color="#1C3D63" />}
+                    <Text className="text-sm font-semibold text-brand">{dirty ? "Salvar e próxima" : "Próxima"}</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#1C3D63" />
                   </TouchableOpacity>
                   {dirty && (
-                    <TouchableOpacity onPress={() => setForm(initial)} disabled={saving !== null} className="px-4 py-2.5 rounded-xl border border-gray-200">
-                      <Text className="text-sm font-semibold text-gray-600">Descartar</Text>
+                    <TouchableOpacity onPress={() => setForm(initial)} disabled={saving !== null} className="px-4 py-2.5 rounded-ds-md border border-border">
+                      <Text className="text-sm font-semibold text-ink-muted">Descartar</Text>
                     </TouchableOpacity>
                   )}
                 </View>

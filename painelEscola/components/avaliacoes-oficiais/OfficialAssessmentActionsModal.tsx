@@ -27,8 +27,8 @@ type Props = {
 };
 
 const toneStyles: Record<ActionDef["tone"], { bg: string; icon: string }> = {
-  violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-  red: { bg: "bg-red-50", icon: "#EF4444" },
+  violet: { bg: "bg-brand-tint", icon: "#1C3D63" },
+  red: { bg: "bg-danger-tint", icon: "#B0261B" },
 };
 
 export default function OfficialAssessmentActionsModal({
@@ -71,11 +71,11 @@ export default function OfficialAssessmentActionsModal({
 
   return (
     <Modal visible={visible} title="Ações da avaliação" onClose={onClose} size="md">
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
-        <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3">
+        <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
           {assessment.title}
         </Text>
-        <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+        <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
           {assessment.school_class?.name ?? "—"} · {kindLabel(assessment.kind)}
         </Text>
         <View className="mt-2 self-start">
@@ -89,7 +89,7 @@ export default function OfficialAssessmentActionsModal({
       <View className="gap-2">
         {groups.map((group) => (
           <View key={group.key}>
-            <Text className="text-xs uppercase font-bold text-gray-500 tracking-wide mb-1">
+            <Text className="text-xs uppercase font-semibold text-ink-muted tracking-wide mb-1">
               {group.title}
             </Text>
             <View className="gap-1.5">
@@ -105,25 +105,25 @@ export default function OfficialAssessmentActionsModal({
                       onClose();
                     }}
                     disabled={disabled}
-                    className={`flex-row items-center gap-2.5 rounded-xl border px-3 py-2 ${
+                    className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       action.group === "danger"
-                        ? "border-red-100 bg-white"
-                        : "border-gray-100 bg-white"
+                        ? "border-danger bg-surface"
+                        : "border-border bg-surface"
                     }`}
                     style={{ opacity: disabled ? 0.45 : 1 }}
                     activeOpacity={0.85}
                   >
-                    <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
+                    <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${style.bg}`}>
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900">{action.label}</Text>
+                      <Text className="text-sm font-semibold text-ink">{action.label}</Text>
                       {action.description ? (
-                        <Text className="text-xs text-gray-500 mt-0.5">{action.description}</Text>
+                        <Text className="text-xs text-ink-muted mt-0.5">{action.description}</Text>
                       ) : null}
                     </View>
                     {!disabled ? (
-                      <Ionicons name="chevron-forward-outline" size={16} color="#9CA3AF" />
+                      <Ionicons name="chevron-forward-outline" size={16} color="#5F6878" />
                     ) : null}
                   </TouchableOpacity>
                 );

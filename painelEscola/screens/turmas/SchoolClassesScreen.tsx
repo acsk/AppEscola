@@ -166,40 +166,40 @@ export default function SchoolClassesScreen({ navigate }: Props) {
       {/* Header */}
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Turmas</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Turmas</Text>
+          <Text className="text-sm text-ink-muted">
             Turmas, períodos e horários
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => navigate("turmas-form")}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="white" />
           <Text className="text-white font-semibold text-sm ml-1.5">
-            Nova Turma
+            Nova turma
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Filters */}
-      <View className="bg-white border border-gray-200 rounded-2xl p-3 mb-4">
+      <View className="bg-surface border border-border rounded-ds-md p-3 mb-4">
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
             Filtros
           </Text>
-          <TouchableOpacity onPress={clearFilters} className="px-2 py-1 rounded-lg bg-gray-100" activeOpacity={0.8}>
-            <Text className="text-xs font-semibold text-gray-600">Limpar</Text>
+          <TouchableOpacity onPress={clearFilters} className="px-2 py-1 rounded-ds-md bg-surface-sunken" activeOpacity={0.8}>
+            <Text className="text-xs font-semibold text-ink-muted">Limpar</Text>
           </TouchableOpacity>
         </View>
 
         <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
           <View
-            className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3"
+            className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
             style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
-            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={16} color="#5F6878" />
             <input
               placeholder="Turma"
               value={search}
@@ -212,14 +212,14 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#374151",
+                color: "#111722",
                 marginLeft: 8,
                 backgroundColor: "transparent",
               }}
             />
             {!!search && (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={16} color="#5F6878" />
               </TouchableOpacity>
             )}
           </View>
@@ -231,12 +231,12 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "#111722",
+              backgroundColor: "#F7F8FA",
               height: 44,
               minWidth: isMobile ? "100%" : 200,
             }}
@@ -256,12 +256,12 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "#111722",
+              backgroundColor: "#F7F8FA",
               height: 44,
               minWidth: isMobile ? "100%" : 120,
             }}
@@ -281,12 +281,12 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "#111722",
+              backgroundColor: "#F7F8FA",
               height: 44,
               minWidth: isMobile ? "100%" : 150,
             }}
@@ -306,12 +306,12 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               setPage(1);
             }}
             style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 12,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "0 14px",
               fontSize: 14,
-              color: "#374151",
-              backgroundColor: "#F9FAFB",
+              color: "#111722",
+              backgroundColor: "#F7F8FA",
               height: 44,
               minWidth: isMobile ? "100%" : 140,
             }}
@@ -331,13 +331,10 @@ export default function SchoolClassesScreen({ navigate }: Props) {
         contentContainerStyle={{ width: "100%" }}
       >
       <View
-        className={isMobile ? "gap-3" : "bg-white rounded-2xl overflow-hidden"}
+        className={isMobile ? "gap-3" : "bg-surface rounded-ds-md overflow-hidden"}
         style={{
           width: "100%",
           minWidth: isMobile ? undefined : tableMinWidth,
-          shadowColor: isMobile ? undefined : "#000",
-          shadowOpacity: isMobile ? undefined : 0.05,
-          shadowRadius: isMobile ? undefined : 10,
           elevation: isMobile ? undefined : 2,
         }}
       >
@@ -364,12 +361,12 @@ export default function SchoolClassesScreen({ navigate }: Props) {
 
         {loading ? (
           <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color="#7C3AED" />
+            <ActivityIndicator size="large" color="#1C3D63" />
           </View>
         ) : rows.length === 0 ? (
           <View className="items-center justify-center py-16">
-            <Ionicons name="grid-outline" size={40} color="#E5E7EB" />
-            <Text className="text-gray-400 mt-3 text-sm">
+            <Ionicons name="grid-outline" size={40} color="#D9DDE3" />
+            <Text className="text-ink-subtle mt-3 text-sm">
               Nenhuma turma encontrada
             </Text>
           </View>
@@ -379,37 +376,37 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                 <>
                   <View className="flex-row items-start justify-between gap-3">
                     <View style={{ flex: 1 }}>
-                      <Text className="text-sm font-semibold text-gray-800">{item.name}</Text>
-                      <Text className="text-xs text-gray-500 mt-0.5">{item.course?.name ?? "Sem curso"}</Text>
+                      <Text className="text-sm font-semibold text-ink">{item.name}</Text>
+                      <Text className="text-xs text-ink-muted mt-0.5">{item.course?.name ?? "Sem curso"}</Text>
                     </View>
                     <View className="flex-row gap-2">
-                      <TouchableOpacity onPress={() => navigate("turmas-frequencia", { classId: item.id })} className="p-1.5 bg-emerald-50 rounded-lg">
-                        <Ionicons name="checkmark-done-outline" size={15} color="#059669" />
+                      <TouchableOpacity onPress={() => navigate("turmas-frequencia", { classId: item.id })} className="p-1.5 bg-success-tint rounded-ds-md">
+                        <Ionicons name="checkmark-done-outline" size={15} color="#1C6A45" />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => navigate("turmas-form", { classId: item.id })} className="p-1.5 bg-violet-50 rounded-lg">
-                        <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                      <TouchableOpacity onPress={() => navigate("turmas-form", { classId: item.id })} className="p-1.5 bg-brand-tint rounded-ds-md">
+                        <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
-                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                      <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-danger-tint rounded-ds-md">
+                        <Ionicons name="trash-outline" size={15} color="#B0261B" />
                       </TouchableOpacity>
                     </View>
                   </View>
                   <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
-                    <Text className="text-xs text-gray-500">Ano: {item.year ?? "—"}</Text>
-                    <Text className="text-xs text-gray-500">Período: {item.period ? periodMap[item.period] ?? item.period : "—"}</Text>
+                    <Text className="text-xs text-ink-muted">Ano: {item.year ?? "—"}</Text>
+                    <Text className="text-xs text-ink-muted">Período: {item.period ? periodMap[item.period] ?? item.period : "—"}</Text>
                     {(item.start_date || item.end_date) && (
-                      <Text className="text-xs text-gray-500">
+                      <Text className="text-xs text-ink-muted">
                         Datas: {fmtDate(item.start_date) ?? "?"} - {fmtDate(item.end_date) ?? "?"}
                       </Text>
                     )}
                   </View>
                   <View className="flex-row flex-wrap gap-1 mt-2">
                     {(item.schedules ?? []).length === 0 ? (
-                      <Text className="text-xs text-gray-400 italic">Sem horários</Text>
+                      <Text className="text-xs text-ink-subtle italic">Sem horários</Text>
                     ) : (
                       (item.schedules ?? []).map((s) => (
-                        <View key={s.id} className="bg-violet-50 rounded-md px-1.5 py-0.5">
-                          <Text className="text-xs text-violet-600 font-medium">
+                        <View key={s.id} className="bg-brand-tint rounded-ds-md px-1.5 py-0.5">
+                          <Text className="text-xs text-brand font-medium">
                             {WEEKDAY_SHORT[s.weekday] ?? s.weekday} {fmtTime(s.start_time)}-{fmtTime(s.end_time)}
                           </Text>
                         </View>
@@ -423,40 +420,40 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               ) : (
                 <>
               <View style={{ flex: 2 }}>
-                <Text className="text-xs font-medium text-gray-800">
+                <Text className="text-xs font-medium text-ink">
                   {item.name}
                 </Text>
                 {(item.start_date || item.end_date) && (
-                  <Text className="text-[11px] text-gray-400 mt-0.5">
+                  <Text className="text-[11px] text-ink-subtle mt-0.5">
                     {fmtDate(item.start_date) ?? "?"} - {fmtDate(item.end_date) ?? "?"}
                   </Text>
                 )}
               </View>
-              <Text className="text-xs text-gray-600" style={{ flex: 2 }}>
+              <Text className="text-xs text-ink-muted" style={{ flex: 2 }}>
                 {item.course?.name ?? "—"}
               </Text>
               <View style={{ flex: 1 }}>
-                <Text className="text-xs text-gray-700 font-medium">
+                <Text className="text-xs text-ink font-medium">
                   {item.year ?? "—"}
                 </Text>
                 {item.period && (
-                  <Text className="text-[11px] text-gray-400">
+                  <Text className="text-[11px] text-ink-subtle">
                     {periodMap[item.period] ?? item.period}
                   </Text>
                 )}
               </View>
               <View style={{ flex: 2 }} className="flex-row flex-wrap gap-1">
                 {(item.schedules ?? []).length === 0 ? (
-                  <Text className="text-xs text-gray-400 italic">
+                  <Text className="text-xs text-ink-subtle italic">
                     Sem horários
                   </Text>
                 ) : (
                   (item.schedules ?? []).map((s) => (
                     <View
                       key={s.id}
-                      className="bg-violet-50 rounded-md px-1.5 py-0.5"
+                      className="bg-brand-tint rounded-ds-md px-1.5 py-0.5"
                     >
-                      <Text className="text-xs text-violet-600 font-medium">
+                      <Text className="text-xs text-brand font-medium">
                         {WEEKDAY_SHORT[s.weekday] ?? s.weekday}{" "}
                         {fmtTime(s.start_time)}-{fmtTime(s.end_time)}
                       </Text>
@@ -476,10 +473,10 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               >
                 <TouchableOpacity
                   onPress={() => navigate("turmas-frequencia", { classId: item.id })}
-                  className="flex-row items-center px-2.5 py-1.5 bg-emerald-50 rounded-lg gap-1"
+                  className="flex-row items-center px-2.5 py-1.5 bg-success-tint rounded-ds-md gap-1"
                 >
-                  <Ionicons name="checkmark-done-outline" size={15} color="#059669" />
-                  <Text className="text-xs font-semibold text-emerald-700">
+                  <Ionicons name="checkmark-done-outline" size={15} color="#1C6A45" />
+                  <Text className="text-xs font-semibold text-success">
                     Frequência
                   </Text>
                 </TouchableOpacity>
@@ -487,15 +484,15 @@ export default function SchoolClassesScreen({ navigate }: Props) {
                   onPress={() =>
                     navigate("turmas-form", { classId: item.id })
                   }
-                  className="p-1.5 bg-violet-50 rounded-lg"
+                  className="p-1.5 bg-brand-tint rounded-ds-md"
                 >
-                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                  <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setDeleteId(item.id)}
-                  className="p-1.5 bg-red-50 rounded-lg"
+                  className="p-1.5 bg-danger-tint rounded-ds-md"
                 >
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  <Ionicons name="trash-outline" size={15} color="#B0261B" />
                 </TouchableOpacity>
               </View>
                 </>
@@ -505,12 +502,8 @@ export default function SchoolClassesScreen({ navigate }: Props) {
               return (
                 <View
                   key={item.id}
-                  className="bg-white border border-gray-200 rounded-xl p-3"
+                  className="bg-surface border border-border rounded-ds-md p-3"
                   style={{
-                    shadowColor: "#000",
-                    shadowOpacity: 0.04,
-                    shadowRadius: 8,
-                    elevation: 1,
                   }}
                 >
                   {rowContent}
@@ -527,7 +520,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
         )}
 
         {meta.total > 0 && (
-          <View className="px-4 border-t border-gray-100">
+          <View className="px-4 border-t border-border">
             <Pagination
               currentPage={meta.current_page}
               lastPage={meta.last_page}
@@ -542,7 +535,7 @@ export default function SchoolClassesScreen({ navigate }: Props) {
 
       <ConfirmModal
         visible={!!deleteId}
-        title="Excluir Turma"
+        title="Excluir turma"
         message="Esta ação não pode ser desfeita. Os horários vinculados também serão removidos."
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}

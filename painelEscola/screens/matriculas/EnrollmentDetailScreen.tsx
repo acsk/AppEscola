@@ -142,18 +142,18 @@ const INVOICE_STATUS_LABELS: Record<string, string> = {
 const METHOD_LABELS: Record<string, string> = {
   pix: "Pix",
   cash: "Dinheiro",
-  credit_card: "Cartão Crédito",
-  debit_card: "Cartão Débito",
+  credit_card: "Cartão crédito",
+  debit_card: "Cartão débito",
   bank_slip: "Boleto",
   bank_transfer: "Transferência",
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  enrollment_fee: "Taxa de Matrícula",
+  enrollment_fee: "Taxa de matrícula",
   monthly: "Mensalidade",
   other: "Outro",
   uniform: "Fardamento",
-  material: "Material Didático",
+  material: "Material didático",
   transport: "Transporte",
   late_fee: "Multa/Juros",
 };
@@ -281,21 +281,21 @@ export default function EnrollmentDetailScreen({
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; color: #111; background: #fff; padding: 32px; max-width: 680px; margin: 0 auto; }
-    .school-header { text-align: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px; margin-bottom: 16px; }
+    .school-header { text-align: center; border-bottom: 1px solid #D9DDE3; padding-bottom: 16px; margin-bottom: 16px; }
     .school-header .name { font-size: 15px; font-weight: 700; }
-    .school-header .sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .school-header .sub { font-size: 12px; color: #4B5463; margin-top: 2px; }
     .receipt-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .receipt-title h1 { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
-    .receipt-number { background: #ede9fe; color: #6d28d9; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; }
-    .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+    .receipt-number { background: #E9EFF6; color: #132C4A; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; }
+    .card { background: #F7F8FA; border: 1px solid #D9DDE3; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
     .row { display: flex; gap: 8px; margin-bottom: 4px; }
     .row:last-child { margin-bottom: 0; }
-    .label { color: #6b7280; min-width: 90px; flex-shrink: 0; }
-    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
-    .amount { font-size: 15px; font-weight: 700; color: #059669; }
-    .verify { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; }
-    .verify p { font-size: 11px; color: #6b7280; margin-bottom: 6px; }
-    .verify code { font-size: 10px; font-family: monospace; color: #9ca3af; word-break: break-all; }
+    .label { color: #4B5463; min-width: 90px; flex-shrink: 0; }
+    .divider { border: none; border-top: 1px solid #D9DDE3; margin: 8px 0; }
+    .amount { font-size: 15px; font-weight: 700; color: #1C6A45; }
+    .verify { background: #F7F8FA; border: 1px solid #D9DDE3; border-radius: 10px; padding: 12px 14px; }
+    .verify p { font-size: 11px; color: #4B5463; margin-bottom: 6px; }
+    .verify code { font-size: 10px; font-family: monospace; color: #5F6878; word-break: break-all; }
     @media print { body { padding: 16px; } }
   </style>
 </head>
@@ -1016,7 +1016,7 @@ export default function EnrollmentDetailScreen({
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <ActivityIndicator size="large" color="#1C3D63" />
       </View>
     );
   }
@@ -1024,10 +1024,10 @@ export default function EnrollmentDetailScreen({
   if (!enrollment) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-gray-500">Matrícula não encontrada.</Text>
+        <Text className="text-ink-muted">Matrícula não encontrada.</Text>
         <TouchableOpacity
           onPress={() => navigate("matriculas")}
-          className="mt-4 px-4 py-2 bg-violet-600 rounded-xl"
+          className="mt-4 px-4 py-2 bg-brand rounded-ds-md"
         >
           <Text className="text-white text-sm font-semibold">Voltar</Text>
         </TouchableOpacity>
@@ -1170,36 +1170,36 @@ export default function EnrollmentDetailScreen({
           setAuditInvoice(item);
           setAuditVisible(true);
         }}
-        className="items-center justify-center bg-blue-50 rounded-lg"
+        className="items-center justify-center bg-brand-tint rounded-ds-md"
         style={{ width: 30, height: 30 }}
         activeOpacity={0.8}
       >
-        <Ionicons name="information-circle-outline" size={15} color="#2563EB" />
+        <Ionicons name="information-circle-outline" size={15} color="#1C3D63" />
       </TouchableOpacity>
       {item.status === "paid" ? (
         <TouchableOpacity
           onPress={() => openReceiptModal(item)}
-          className="items-center justify-center bg-emerald-50 rounded-lg"
+          className="items-center justify-center bg-success-tint rounded-ds-md"
           style={{ width: 30, height: 30 }}
           activeOpacity={0.8}
         >
-          <Ionicons name="receipt-outline" size={15} color="#059669" />
+          <Ionicons name="receipt-outline" size={15} color="#1C6A45" />
         </TouchableOpacity>
       ) : null}
       <TouchableOpacity
         onPress={() => setActionsInvoice(item)}
-        className="items-center justify-center bg-gray-100 rounded-lg"
+        className="items-center justify-center bg-surface-sunken rounded-ds-md"
         style={{ width: 30, height: 30 }}
         activeOpacity={0.8}
       >
-        <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+        <Ionicons name="ellipsis-horizontal" size={16} color="#4B5463" />
       </TouchableOpacity>
     </View>
   );
 
   const renderTypeBadge = (type: string | null) => {
     if (!type) {
-      return <Text className="text-xs text-gray-400">—</Text>;
+      return <Text className="text-xs text-ink-subtle">—</Text>;
     }
 
     const variantMap: Record<
@@ -1220,19 +1220,19 @@ export default function EnrollmentDetailScreen({
   };
 
   const renderInvoiceCard = (item: Invoice) => (
-    <View key={item.id} className="bg-white rounded-xl border border-gray-100 p-3 gap-3">
+    <View key={item.id} className="bg-surface rounded-ds-md border border-border p-3 gap-3">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+          <Text className="text-xs font-mono font-semibold text-brand" numberOfLines={1}>
             ID #{item.id}
             {item.cora?.charge_id ? ` · Cora ${item.cora.charge_id}` : ""}
           </Text>
-          <Text className="text-sm font-semibold text-gray-800 mt-0.5" numberOfLines={2}>
+          <Text className="text-sm font-semibold text-ink mt-0.5" numberOfLines={2}>
             {item.description}
           </Text>
-          <Text className="text-xs text-gray-500 mt-0.5">Vence {fmt(item.due_date)}</Text>
+          <Text className="text-xs text-ink-muted mt-0.5">Vence {fmt(item.due_date)}</Text>
           {item.cora_due_date_hint ? (
-            <Text className="text-[11px] text-sky-800 mt-1 leading-relaxed">
+            <Text className="text-[11px] text-brand mt-1 leading-relaxed">
               {item.cora_due_date_hint}
             </Text>
           ) : null}
@@ -1242,16 +1242,16 @@ export default function EnrollmentDetailScreen({
       <View>{renderTypeBadge(item.type)}</View>
       <View className="flex-row items-end justify-between gap-3">
         <View>
-          <Text className="text-xs text-gray-400 uppercase font-semibold">Valor</Text>
-          <Text className="text-base font-bold text-gray-900">{money(item.amount)}</Text>
+          <Text className="text-xs text-ink-subtle uppercase font-semibold">Valor</Text>
+          <Text className="text-base font-semibold text-ink">{money(item.amount)}</Text>
         </View>
         <View className="items-end">
-          <Text className="text-xs text-gray-400 uppercase font-semibold">Forma</Text>
-          <Text className="text-sm text-gray-600">
+          <Text className="text-xs text-ink-subtle uppercase font-semibold">Forma</Text>
+          <Text className="text-sm text-ink-muted">
             {paymentMethodLabel(item.payment_method)}
           </Text>
           {item.status === "paid" && item.payment_reference ? (
-            <Text className="text-xs text-gray-400 mt-0.5" numberOfLines={1}>
+            <Text className="text-xs text-ink-subtle mt-0.5" numberOfLines={1}>
               Ref: {item.payment_reference}
             </Text>
           ) : null}
@@ -1260,19 +1260,19 @@ export default function EnrollmentDetailScreen({
       {!!item.cora?.charge_id && (
         <TouchableOpacity
           onPress={() => openChargeModal(item)}
-          className="flex-row items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2"
+          className="flex-row items-center gap-2 bg-brand-tint border border-border rounded-ds-md px-3 py-2"
           activeOpacity={0.8}
         >
           <Ionicons
             name={item.payment_method === "bank_slip" ? "barcode-outline" : "qr-code-outline"}
             size={14}
-            color="#7C3AED"
+            color="#1C3D63"
           />
-          <Text className="text-xs font-semibold text-violet-700 flex-1" numberOfLines={1}>
+          <Text className="text-xs font-semibold text-brand flex-1" numberOfLines={1}>
             Cobrança Cora · {item.cora.charge_id}
           </Text>
-          <Text className="text-xs text-violet-500">{item.cora.status ?? "—"}</Text>
-          <Ionicons name="chevron-forward-outline" size={13} color="#7C3AED" />
+          <Text className="text-xs text-brand">{item.cora.status ?? "—"}</Text>
+          <Ionicons name="chevron-forward-outline" size={13} color="#1C3D63" />
         </TouchableOpacity>
       )}
       {renderInvoiceActions(item)}
@@ -1286,17 +1286,17 @@ export default function EnrollmentDetailScreen({
     flex = 1
   ) => (
     <View
-      className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2"
+      className="bg-surface-sunken border border-border rounded-ds-md px-3 py-2"
       style={{ flex, minHeight: 70 }}
     >
-      <Text className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
+      <Text className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wide mb-1">
         {label}
       </Text>
-      <Text className="text-sm font-semibold text-gray-800" numberOfLines={1}>
+      <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
         {value || "—"}
       </Text>
       {!!detail && (
-        <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+        <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
           {detail}
         </Text>
       )}
@@ -1304,9 +1304,9 @@ export default function EnrollmentDetailScreen({
   );
 
   const renderFinanceBlock = (label: string, value: string) => (
-    <View className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-      <Text className="text-[11px] text-gray-400 uppercase font-semibold mb-1">{label}</Text>
-      <Text className="text-sm font-bold text-gray-800" numberOfLines={1}>
+    <View className="flex-1 bg-surface-sunken border border-border rounded-ds-md px-3 py-2">
+      <Text className="text-[11px] text-ink-subtle uppercase font-semibold mb-1">{label}</Text>
+      <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
         {value}
       </Text>
     </View>
@@ -1330,41 +1330,41 @@ export default function EnrollmentDetailScreen({
     onPress: () => void;
   }) => {
     const colors = {
-      violet: { border: "#7C3AED", bg: "#F5F3FF", text: "#6D28D9", soft: "#EDE9FE" },
-      amber: { border: "#F59E0B", bg: "#FFFBEB", text: "#B45309", soft: "#FEF3C7" },
-      blue: { border: "#2563EB", bg: "#EFF6FF", text: "#1D4ED8", soft: "#DBEAFE" },
+      violet: { border: "#1C3D63", bg: "#E9EFF6", text: "#132C4A", soft: "#E9EFF6" },
+      amber: { border: "#8A5200", bg: "#FBEFDC", text: "#8A5200", soft: "#FBEFDC" },
+      blue: { border: "#1C3D63", bg: "#E9EFF6", text: "#132C4A", soft: "#E9EFF6" },
     }[tone];
-    const inactive = "#9CA3AF";
+    const inactive = "#5F6878";
 
     return (
       <TouchableOpacity
         onPress={onPress}
         disabled={disabled}
         activeOpacity={0.82}
-        className="flex-1 rounded-xl border flex-row items-center"
+        className="flex-1 rounded-ds-md border flex-row items-center"
         style={{
           minHeight: 50,
           paddingHorizontal: 12,
           paddingVertical: 9,
-          borderColor: active ? colors.border : "#E5E7EB",
-          backgroundColor: active ? colors.bg : disabled ? "#F9FAFB" : "#FFFFFF",
+          borderColor: active ? colors.border : "#D9DDE3",
+          backgroundColor: active ? colors.bg : disabled ? "#F7F8FA" : "#FFFFFF",
           opacity: disabled ? 0.65 : 1,
           gap: 10,
         }}
       >
         <View
-          className="items-center justify-center rounded-lg"
+          className="items-center justify-center rounded-ds-md"
           style={{
             width: 32,
             height: 32,
-            backgroundColor: active ? colors.soft : "#F3F4F6",
+            backgroundColor: active ? colors.soft : "#F7F8FA",
           }}
         >
           <Ionicons name={icon} size={17} color={active ? colors.text : inactive} />
         </View>
         <View className="flex-1">
           <Text
-            className="text-sm font-bold"
+            className="text-sm font-semibold"
             style={{ color: active ? colors.text : inactive }}
             numberOfLines={1}
           >
@@ -1373,7 +1373,7 @@ export default function EnrollmentDetailScreen({
           {!!detail && (
             <Text
               className="text-xs"
-              style={{ color: active ? colors.text : "#C7CDD7" }}
+              style={{ color: active ? colors.text : "#D9DDE3" }}
               numberOfLines={1}
             >
               {detail}
@@ -1393,12 +1393,8 @@ export default function EnrollmentDetailScreen({
     >
       {/* Enrollment summary */}
       <View
-        className="bg-white rounded-2xl mb-5"
+        className="bg-surface rounded-ds-md mb-5 border border-border"
         style={{
-          shadowColor: "#000",
-          shadowOpacity: 0.04,
-          shadowRadius: 8,
-          elevation: 1,
           padding: isMobile ? 12 : 16,
           gap: 12,
         }}
@@ -1414,15 +1410,15 @@ export default function EnrollmentDetailScreen({
           <View className="flex-row items-center gap-3" style={{ flex: 1, minWidth: 0 }}>
             <TouchableOpacity
               onPress={() => navigate("matriculas")}
-              className="w-9 h-9 bg-violet-50 border border-violet-100 rounded-full items-center justify-center"
+              className="w-9 h-9 bg-brand-tint border border-border rounded-full items-center justify-center"
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back-outline" size={18} color="#7C3AED" />
+              <Ionicons name="arrow-back-outline" size={18} color="#1C3D63" />
             </TouchableOpacity>
             <View className="flex-1" style={{ minWidth: 0 }}>
               <View className="flex-row items-center gap-2" style={{ flexWrap: "wrap" }}>
                 <Text
-                  className={`${isMobile ? "text-lg" : "text-xl"} font-bold text-gray-900`}
+                  className={`${isMobile ? "text-lg" : "text-xl"} font-semibold text-ink`}
                   numberOfLines={1}
                 >
                   Matrícula {enrollment.enrollment_number ?? `#${enrollment.id}`}
@@ -1432,7 +1428,7 @@ export default function EnrollmentDetailScreen({
                   label={ENROLLMENT_STATUS_LABELS[enrollment.status] ?? enrollment.status}
                 />
               </View>
-              <Text className="text-sm text-gray-500" numberOfLines={1}>
+              <Text className="text-sm text-ink-muted" numberOfLines={1}>
                 {enrollment.student?.name ?? "—"}
               </Text>
             </View>
@@ -1446,17 +1442,17 @@ export default function EnrollmentDetailScreen({
                     studentName: enrollment.student?.name,
                   })
                 }
-                className="flex-row items-center justify-center bg-violet-50 border border-violet-200 px-3.5 py-2 rounded-lg"
+                className="flex-row items-center justify-center bg-brand-tint border border-border px-3.5 py-2 rounded-ds-md"
                 style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
                 activeOpacity={0.85}
               >
-                <Ionicons name="ribbon-outline" size={15} color="#7C3AED" />
-                <Text className="text-violet-700 font-semibold text-sm ml-1.5">Boletim</Text>
+                <Ionicons name="ribbon-outline" size={15} color="#1C3D63" />
+                <Text className="text-brand font-semibold text-sm ml-1.5">Boletim</Text>
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
               onPress={openEdit}
-              className="flex-row items-center justify-center bg-violet-600 px-3.5 py-2 rounded-lg"
+              className="flex-row items-center justify-center bg-brand px-3.5 py-2 rounded-ds-md"
               style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
               activeOpacity={0.85}
             >
@@ -1465,17 +1461,17 @@ export default function EnrollmentDetailScreen({
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setDeleteEnrollmentVisible(true)}
-              className="flex-row items-center justify-center bg-red-50 border border-red-200 px-3.5 py-2 rounded-lg"
+              className="flex-row items-center justify-center bg-danger-tint border border-danger px-3.5 py-2 rounded-ds-md"
               style={{ flex: isMobile ? 1 : undefined, minHeight: 36 }}
               activeOpacity={0.85}
             >
-              <Ionicons name="trash-outline" size={15} color="#EF4444" />
-              <Text className="text-red-600 font-semibold text-sm ml-1.5">Excluir</Text>
+              <Ionicons name="trash-outline" size={15} color="#B0261B" />
+              <Text className="text-danger font-semibold text-sm ml-1.5">Excluir</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <View className="h-px bg-gray-100" />
+        <View className="h-px bg-surface-sunken" />
 
         <View style={{ gap: 10 }}>
           <View style={{ flexDirection: isMobile ? "column" : "row", gap: 10 }}>
@@ -1545,13 +1541,13 @@ export default function EnrollmentDetailScreen({
         }}
       >
         <View>
-          <Text className="text-lg font-bold text-gray-800">Cobranças</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-lg font-semibold text-ink">Cobranças</Text>
+          <Text className="text-sm text-ink-muted">
             {invoices.length} cobrança{invoices.length !== 1 ? "s" : ""}
           </Text>
           {enrollment.charges_batch_generated && (
-            <View className="mt-1 self-start rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5">
-              <Text className="text-[11px] font-semibold text-emerald-700">
+            <View className="mt-1 self-start rounded-full bg-success-tint border border-success px-2 py-0.5">
+              <Text className="text-[11px] font-semibold text-success">
                 Lote gerado em {fmtDateTime(enrollment.charges_generated_at ?? null)}
               </Text>
             </View>
@@ -1567,94 +1563,81 @@ export default function EnrollmentDetailScreen({
         >
           <TouchableOpacity
             onPress={() => setContractModalVisible(true)}
-            className="flex-row items-center justify-center px-4 py-2.5 rounded-xl border bg-violet-50 border-violet-200"
+            className="flex-row items-center justify-center px-4 py-2.5 rounded-ds-md border bg-brand-tint border-border"
             activeOpacity={0.85}
             style={{ minHeight: 44 }}
           >
-            <Ionicons name="document-text-outline" size={16} color="#7C3AED" />
-            <Text className="font-bold text-sm ml-1 text-violet-700">
+            <Ionicons name="document-text-outline" size={16} color="#1C3D63" />
+            <Text className="font-semibold text-sm ml-1 text-brand">
               Cobranças do contrato
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setCarneModalVisible(true)}
-            className="flex-row items-center justify-center px-4 py-2.5 rounded-xl border bg-emerald-50 border-emerald-200"
+            className="flex-row items-center justify-center px-4 py-2.5 rounded-ds-md border bg-success-tint border-success"
             activeOpacity={0.85}
             style={{ minHeight: 44 }}
           >
-            <Ionicons name="newspaper-outline" size={16} color="#059669" />
-            <Text className="font-bold text-sm ml-1 text-emerald-800">
+            <Ionicons name="newspaper-outline" size={16} color="#1C6A45" />
+            <Text className="font-semibold text-sm ml-1 text-success">
               Todos os boletos
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={openCreateInvoice}
-            className="flex-row items-center justify-center bg-violet-600 px-4 py-2.5 rounded-xl"
+            className="flex-row items-center justify-center bg-brand px-4 py-2.5 rounded-ds-md"
             activeOpacity={0.85}
             style={{
               minHeight: 44,
-              shadowColor: "#6D28D9",
-              shadowOpacity: 0.2,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 4 },
-              elevation: 2,
             }}
           >
             <Ionicons name="add" size={16} color="white" />
-            <Text className="text-white font-bold text-sm ml-1">Nova Cobrança</Text>
+            <Text className="text-white font-semibold text-sm ml-1">Nova cobrança</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {invoices.length === 0 ? (
         <View
-          className="bg-white rounded-2xl items-center justify-center py-12"
+          className="bg-surface rounded-ds-md items-center justify-center py-12 border border-border"
           style={{
-            shadowColor: "#000",
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
-            elevation: 2,
           }}
         >
-          <Ionicons name="cash-outline" size={36} color="#E5E7EB" />
-          <Text className="text-gray-400 mt-3 text-sm">Nenhuma cobrança vinculada</Text>
+          <Ionicons name="cash-outline" size={36} color="#D9DDE3" />
+          <Text className="text-ink-subtle mt-3 text-sm">Nenhuma cobrança vinculada</Text>
         </View>
       ) : showInvoiceCards ? (
         <View className="gap-3">{invoices.map(renderInvoiceCard)}</View>
       ) : (
         <View
-          className="bg-white rounded-2xl overflow-hidden"
+          className="bg-surface rounded-ds-md overflow-hidden border border-border"
           style={{
             width: "100%",
-            shadowColor: "#000",
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
-            elevation: 2,
           }}
         >
-          <View className="flex-row bg-gray-50 border-b border-gray-100 px-4 py-2.5">
+          <View className="flex-row bg-surface-sunken border-b border-border px-4 py-2.5">
             <Text
-              className="text-xs font-semibold text-gray-500 uppercase tracking-wide"
+              className="text-xs font-semibold text-ink-muted uppercase tracking-wide"
               style={{ width: 88, minWidth: 88 }}
             >
               ID
             </Text>
-            <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 2.2 }}>
+            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 2.2 }}>
               Descrição
             </Text>
-            <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 0.85 }}>
+            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.85 }}>
               Tipo
             </Text>
-            <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 0.75 }}>
+            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.75 }}>
               Valor
             </Text>
-            <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 0.85 }}>
+            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.85 }}>
               Vencimento
             </Text>
-            <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 0.7 }}>
+            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.7 }}>
               Forma
             </Text>
-            <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ flex: 0.7 }}>
+            <Text className="text-xs font-semibold text-ink-muted uppercase tracking-wide" style={{ flex: 0.7 }}>
               Status
             </Text>
             <View style={{ width: 132 }} />
@@ -1663,31 +1646,31 @@ export default function EnrollmentDetailScreen({
           {invoices.map((item, i) => (
             <View
               key={item.id}
-              className={`flex-row items-center px-4 py-2 border-b border-gray-50 ${
-                i % 2 === 1 ? "bg-gray-50/40" : ""
+              className={`flex-row items-center px-4 py-2 border-b border-border ${
+                i % 2 === 1 ? "bg-surface-sunken" : ""
               }`}
             >
               <View style={{ width: 88, minWidth: 88, paddingRight: 8 }}>
-                <Text className="text-xs font-mono font-semibold text-violet-600" numberOfLines={1}>
+                <Text className="text-xs font-mono font-semibold text-brand" numberOfLines={1}>
                   #{item.id}
                 </Text>
                 {item.cora?.charge_id ? (
-                  <Text className="text-[10px] text-gray-400 mt-0.5" numberOfLines={1}>
+                  <Text className="text-[10px] text-ink-subtle mt-0.5" numberOfLines={1}>
                     {item.cora.charge_id}
                   </Text>
                 ) : null}
               </View>
-              <Text className="text-xs font-semibold text-gray-800" style={{ flex: 2.2 }} numberOfLines={1}>
+              <Text className="text-xs font-semibold text-ink" style={{ flex: 2.2 }} numberOfLines={1}>
                 {item.description}
               </Text>
               <View style={{ flex: 0.85 }}>{renderTypeBadge(item.type)}</View>
-              <Text className="text-xs font-semibold text-gray-800" style={{ flex: 0.75 }}>
+              <Text className="text-xs font-semibold text-ink" style={{ flex: 0.75 }}>
                 {money(item.amount)}
               </Text>
-              <Text className="text-xs text-gray-600" style={{ flex: 0.85 }}>
+              <Text className="text-xs text-ink-muted" style={{ flex: 0.85 }}>
                 {fmt(item.due_date)}
               </Text>
-              <Text className="text-xs text-gray-600" style={{ flex: 0.7 }} numberOfLines={1}>
+              <Text className="text-xs text-ink-muted" style={{ flex: 0.7 }} numberOfLines={1}>
                 {item.payment_method
                   ? (METHOD_LABELS[item.payment_method] ?? item.payment_method)
                   : "—"}
@@ -1718,26 +1701,26 @@ export default function EnrollmentDetailScreen({
       {/* ── Invoice Modal ────────────────────────────────────────────────────── */}
       <Modal
         visible={invoiceModalVisible}
-        title={invoiceEditId ? `Editar Cobrança #${invoiceEditId}` : "Nova Cobrança"}
+        title={invoiceEditId ? `Editar Cobrança #${invoiceEditId}` : "Nova cobrança"}
         onClose={() => setInvoiceModalVisible(false)}
         size="lg"
         footer={
           <>
             <TouchableOpacity
               onPress={() => setInvoiceModalVisible(false)}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 py-2.5 rounded-ds-md border border-border"
             >
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={saveInvoice}
               disabled={savingInvoice}
-              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              className="px-5 py-2.5 rounded-ds-md bg-brand"
             >
               {savingInvoice ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text className="text-sm font-bold text-white">Salvar</Text>
+                <Text className="text-sm font-semibold text-white">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -1749,7 +1732,7 @@ export default function EnrollmentDetailScreen({
           value={invoiceForm.description}
           onChangeText={(v) => setInvoiceForm({ ...invoiceForm, description: v })}
           error={invoiceErrors.description}
-          placeholder="Ex: Mensalidade Março/2026"
+          placeholder="Ex: Mensalidade março/2026"
         />
         <View className="flex-row gap-4">
           <View className="flex-1">
@@ -1796,7 +1779,7 @@ export default function EnrollmentDetailScreen({
         <View className="flex-row gap-4">
           <View className="flex-1">
             <FormSelect
-              label="Forma de Pagamento"
+              label="Forma de pagamento"
               value={invoiceForm.payment_method}
               options={methodOptions}
               onChange={(v) => setInvoiceForm({ ...invoiceForm, payment_method: v })}
@@ -1813,9 +1796,9 @@ export default function EnrollmentDetailScreen({
         />
         {invoiceEditId && (
           <>
-            <View className="bg-gray-50 rounded-xl px-4 py-3 mt-4 mb-4">
-              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                Motivo da Alteração
+            <View className="bg-surface-sunken rounded-ds-md px-4 py-3 mt-4 mb-4">
+              <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-2">
+                Motivo da alteração
               </Text>
               <FormInput
                 label=""
@@ -1839,47 +1822,47 @@ export default function EnrollmentDetailScreen({
         maxHeight="97%"
         headerContent={
           chargeInvoice ? (
-            <View className="mt-3 rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+            <View className="mt-3 rounded-ds-md bg-surface-sunken border border-border px-3 py-2.5">
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-row items-start gap-3 flex-1">
                   {chargeModalStep === "result" && (
                     <View
-                      className={`w-10 h-10 rounded-2xl items-center justify-center ${
-                        chargeMethod === "pix" ? "bg-emerald-50" : "bg-blue-50"
+                      className={`w-10 h-10 rounded-ds-md items-center justify-center ${
+                        chargeMethod === "pix" ? "bg-success-tint" : "bg-brand-tint"
                       }`}
                     >
                       {chargeMethod === "pix" ? (
-                        <PixLogoIcon size={25} color="#059669" weight="fill" />
+                        <PixLogoIcon size={25} color="#1C6A45" weight="fill" />
                       ) : (
-                        <Ionicons name="barcode-outline" size={20} color="#2563EB" />
+                        <Ionicons name="barcode-outline" size={20} color="#1C3D63" />
                       )}
                     </View>
                   )}
                   <View className="flex-1">
                     <View className="flex-row items-center gap-2 flex-wrap">
-                      <Text className="text-xs text-slate-500 uppercase font-bold" numberOfLines={1}>
+                      <Text className="text-xs text-ink-muted uppercase font-semibold" numberOfLines={1}>
                         Cobrança ID #{chargeInvoice.id}
                       </Text>
                       {chargeInvoice.cora?.charge_id ? (
-                        <Text className="text-[11px] font-mono text-violet-700" numberOfLines={1}>
+                        <Text className="text-[11px] font-mono text-brand" numberOfLines={1}>
                           Cora {chargeInvoice.cora.charge_id}
                         </Text>
                       ) : null}
-                      <View className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 flex-row items-center gap-1.5">
-                        <Ionicons name="calendar-outline" size={12} color="#7C3AED" />
-                        <Text className="text-xs font-bold text-violet-700">
+                      <View className="rounded-full border border-border bg-brand-tint px-2.5 py-1 flex-row items-center gap-1.5">
+                        <Ionicons name="calendar-outline" size={12} color="#1C3D63" />
+                        <Text className="text-xs font-semibold text-brand">
                           Vencimento {fmt(chargeInvoice.due_date)}
                         </Text>
                       </View>
                     </View>
-                    <Text className="text-sm font-bold text-gray-900 mt-0.5" numberOfLines={2}>
+                    <Text className="text-sm font-semibold text-ink mt-0.5" numberOfLines={2}>
                       {chargeInvoice.description}
                     </Text>
                   </View>
                 </View>
                 <View className="items-end" style={{ minWidth: 104 }}>
-                  <Text className="text-xs text-slate-500 uppercase font-bold">Total</Text>
-                  <Text className="text-xl font-bold text-violet-700">
+                  <Text className="text-xs text-ink-muted uppercase font-semibold">Total</Text>
+                  <Text className="text-xl font-semibold text-brand">
                     {money(chargeInvoice.amount)}
                   </Text>
                 </View>
@@ -1888,7 +1871,7 @@ export default function EnrollmentDetailScreen({
           ) : undefined
         }
         footerStyle={{
-          backgroundColor: "#F8FAFC",
+          backgroundColor: "#F7F8FA",
           flexWrap: "wrap",
           alignItems: "stretch",
           paddingHorizontal: isMobile ? 16 : 24,
@@ -1901,15 +1884,15 @@ export default function EnrollmentDetailScreen({
                 onPress={onCheckChargeStatus}
                 disabled={checkingStatus || !chargeInvoice}
                 activeOpacity={0.8}
-                className="px-3 py-2 rounded-xl border border-violet-200 bg-white items-center flex-row justify-center gap-2"
+                className="px-3 py-2 rounded-ds-md border border-border bg-surface items-center flex-row justify-center gap-2"
                 style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
               >
                 {checkingStatus ? (
-                  <ActivityIndicator size="small" color="#7C3AED" />
+                  <ActivityIndicator size="small" color="#1C3D63" />
                 ) : (
                   <>
-                    <Ionicons name="refresh-outline" size={15} color="#7C3AED" />
-                    <Text className="text-xs font-bold text-violet-700">Consultar status</Text>
+                    <Ionicons name="refresh-outline" size={15} color="#1C3D63" />
+                    <Text className="text-xs font-semibold text-brand">Consultar status</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1917,11 +1900,11 @@ export default function EnrollmentDetailScreen({
                 <TouchableOpacity
                   onPress={() => openPreviewModal(boletoPaymentUrl)}
                   activeOpacity={0.85}
-                  className="px-3 py-2 rounded-xl border border-violet-600 bg-violet-600 items-center flex-row justify-center gap-2"
+                  className="px-3 py-2 rounded-ds-md border border-brand bg-brand items-center flex-row justify-center gap-2"
                   style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
                 >
                   <Ionicons name="document-text-outline" size={15} color="white" />
-                  <Text className="text-xs font-bold text-white">Ver boleto</Text>
+                  <Text className="text-xs font-semibold text-white">Ver boleto</Text>
                 </TouchableOpacity>
               )}
               {typeof window !== "undefined" && window.location.hostname === "localhost" && (
@@ -1929,15 +1912,15 @@ export default function EnrollmentDetailScreen({
                   onPress={onPayCharge}
                   disabled={payingCharge || !chargeInvoice || chargeEnvironment !== "stage"}
                   activeOpacity={0.8}
-                  className="px-3 py-2 rounded-xl border border-emerald-300 bg-white items-center flex-row justify-center gap-2"
+                  className="px-3 py-2 rounded-ds-md border border-success bg-surface items-center flex-row justify-center gap-2"
                   style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
                 >
                   {payingCharge ? (
-                    <ActivityIndicator size="small" color="#059669" />
+                    <ActivityIndicator size="small" color="#1C6A45" />
                   ) : (
                     <>
-                      <Ionicons name="checkmark-circle-outline" size={15} color="#059669" />
-                      <Text className="text-xs font-bold text-emerald-700">Simular pagamento</Text>
+                      <Ionicons name="checkmark-circle-outline" size={15} color="#1C6A45" />
+                      <Text className="text-xs font-semibold text-success">Simular pagamento</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1947,11 +1930,11 @@ export default function EnrollmentDetailScreen({
             <TouchableOpacity
               onPress={closeChargeModal}
               activeOpacity={0.85}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white items-center flex-row justify-center gap-2"
+              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface items-center flex-row justify-center gap-2"
               style={{ minWidth: isMobile ? undefined : 140 }}
             >
-              <Ionicons name="arrow-back-outline" size={15} color="#374151" />
-              <Text className="text-xs font-bold text-gray-700">Voltar</Text>
+              <Ionicons name="arrow-back-outline" size={15} color="#111722" />
+              <Text className="text-xs font-semibold text-ink">Voltar</Text>
             </TouchableOpacity>
           )
         }
@@ -1965,26 +1948,26 @@ export default function EnrollmentDetailScreen({
                   emphasized={coraDueDateInfo.would_adjust}
                 />
                 {coraDueDateInfo.would_adjust ? (
-                  <Text className="text-xs text-amber-800 mt-2 leading-relaxed">
+                  <Text className="text-xs text-warning mt-2 leading-relaxed">
                     {`Vencimento local ${isoToDisplayDate(coraDueDateInfo.local_due_date)} será enviado à Cora como ${isoToDisplayDate(coraDueDateInfo.provider_due_date_preview)}.`}
                   </Text>
                 ) : null}
               </View>
             ) : null}
             <View className="mb-3">
-              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-2">
                 Escolha a forma de pagamento
               </Text>
               {loadingChargeOptions && (
-                <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 mb-2 flex-row items-center gap-2">
-                  <ActivityIndicator size="small" color="#6B7280" />
-                  <Text className="text-xs text-gray-600">Carregando opções de pagamento...</Text>
+                <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-2.5 mb-2 flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color="#4B5463" />
+                  <Text className="text-xs text-ink-muted">Carregando opções de pagamento...</Text>
                 </View>
               )}
               {resultDisplayMethod === "hybrid" && (hasDualPaymentAssets || hasHybridBoletoPdf) && (
-                <View className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 mb-2">
-                  <Text className="text-xs font-bold text-blue-700">Boleto + PIX</Text>
-                  <Text className="text-xs text-blue-700 mt-1">
+                <View className="rounded-ds-md border border-border bg-brand-tint px-3 py-2.5 mb-2">
+                  <Text className="text-xs font-semibold text-brand">Boleto + PIX</Text>
+                  <Text className="text-xs text-brand mt-1">
                     {hasDualPaymentAssets
                       ? "Esta cobrança possui os dois canais de pagamento. Você pode usar qualquer um sem gerar nova cobrança."
                       : "O QR Code PIX está no PDF do boleto. Use o botão Ver boleto para abrir e pagar."}
@@ -2022,8 +2005,8 @@ export default function EnrollmentDetailScreen({
                       subtitle: hasBoletoAssets ? "Cobrança disponível" : "Boleto bancário com linha digitável",
                       actionLabel: hasBoletoAssets ? "Usar boleto" : canUseHybrid ? "Gerar boleto + PIX" : "Gerar boleto",
                       icon: "barcode-outline",
-                      iconColor: "#2563EB",
-                      iconBg: "#EEF2FF",
+                      iconColor: "#1C3D63",
+                      iconBg: "#E9EFF6",
                       enabled: canGenerateBoleto,
                       hasAssets: hasBoletoAssets,
                       generateMethod: canUseHybrid ? "hybrid" : "boleto",
@@ -2034,8 +2017,8 @@ export default function EnrollmentDetailScreen({
                       subtitle: hasPixAssets ? "Cobrança disponível" : "QR Code e código copia e cola",
                       actionLabel: hasPixAssets ? "Usar PIX" : "Gerar PIX",
                       icon: "qr-code-outline",
-                      iconColor: "#0F766E",
-                      iconBg: "#ECFDF5",
+                      iconColor: "#1C3D63",
+                      iconBg: "#E5F1EA",
                       enabled: canUsePix,
                       hasAssets: hasPixAssets,
                     },
@@ -2064,59 +2047,55 @@ export default function EnrollmentDetailScreen({
                         }}
                         disabled={disabled}
                         activeOpacity={0.85}
-                        className={`rounded-2xl border px-4 py-4 ${
+                        className={`rounded-ds-md border px-4 py-4 ${
                           disabled
-                            ? "border-gray-200 bg-gray-100 opacity-60"
-                            : "border-gray-200 bg-white"
+                            ? "border-border bg-surface-sunken opacity-60"
+                            : "border-border bg-surface"
                         }`}
                         style={{
                           flexGrow: 1,
                           flexBasis: checkoutMethodCardsStacked ? "100%" : 0,
                           minHeight: checkoutMethodCardsStacked ? undefined : 164,
                           minWidth: 0,
-                          shadowColor: "#111827",
-                          shadowOpacity: disabled ? 0 : 0.04,
-                          shadowRadius: 8,
-                          shadowOffset: { width: 0, height: 3 },
                           elevation: disabled ? 0 : 1,
                         }}
                       >
                         <View className="flex-row items-start justify-between gap-3">
                           <View
-                            className="w-12 h-12 rounded-2xl items-center justify-center"
-                            style={{ backgroundColor: disabled ? "#F3F4F6" : m.iconBg }}
+                            className="w-12 h-12 rounded-ds-md items-center justify-center"
+                            style={{ backgroundColor: disabled ? "#F7F8FA" : m.iconBg }}
                           >
                             {m.key === "pix" ? (
                               <PixLogoIcon
                                 size={25}
-                                color={disabled ? "#9CA3AF" : m.iconColor}
+                                color={disabled ? "#5F6878" : m.iconColor}
                                 weight="fill"
                               />
                             ) : (
                               <Ionicons
                                 name={m.icon}
                                 size={24}
-                                color={disabled ? "#9CA3AF" : m.iconColor}
+                                color={disabled ? "#5F6878" : m.iconColor}
                               />
                             )}
                           </View>
                           {m.hasAssets && m.enabled && !lockedOut && (
-                            <View className="rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1">
-                              <Text className="text-[11px] font-bold text-emerald-700">Disponível</Text>
+                            <View className="rounded-full bg-success-tint border border-success px-2.5 py-1">
+                              <Text className="text-[11px] font-semibold text-success">Disponível</Text>
                             </View>
                           )}
                         </View>
                         <View className="mt-3 flex-1">
                           <Text
-                            className={`text-base font-bold ${
-                              disabled ? "text-gray-500" : "text-gray-900"
+                            className={`text-base font-semibold ${
+                              disabled ? "text-ink-muted" : "text-ink"
                             }`}
                             numberOfLines={1}
                           >
                             {m.title}
                           </Text>
                           <Text
-                            className={`text-xs mt-1 leading-4 ${disabled ? "text-gray-400" : "text-gray-500"}`}
+                            className={`text-xs mt-1 leading-4 ${disabled ? "text-ink-subtle" : "text-ink-muted"}`}
                             numberOfLines={2}
                           >
                             {!m.enabled
@@ -2128,20 +2107,20 @@ export default function EnrollmentDetailScreen({
                         </View>
                         <View className="mt-4 flex-row items-center justify-between gap-2">
                           <Text
-                            className={`text-xs font-bold ${
-                              disabled ? "text-gray-400" : "text-violet-700"
+                            className={`text-xs font-semibold ${
+                              disabled ? "text-ink-subtle" : "text-brand"
                             }`}
                             numberOfLines={1}
                           >
                             {m.actionLabel}
                           </Text>
                           {generatingCharge && chargeMethod === m.key ? (
-                            <ActivityIndicator size="small" color="#6B7280" />
+                            <ActivityIndicator size="small" color="#4B5463" />
                           ) : (
                             <Ionicons
                               name="chevron-forward-outline"
                               size={18}
-                              color={disabled ? "#CBD5E1" : "#94A3B8"}
+                              color={disabled ? "#7A8393" : "#5F6878"}
                             />
                           )}
                         </View>
@@ -2167,31 +2146,31 @@ export default function EnrollmentDetailScreen({
                 chargeStatusResult?.status?.toUpperCase() !== "PAID";
               if (!showToggle) return null;
               return (
-                <View className="rounded-2xl border border-slate-200 bg-slate-50 p-1 flex-row gap-1">
+                <View className="rounded-ds-md border border-border bg-surface-sunken p-1 flex-row gap-1">
                   {resultTabs.map((tab) => (
                     <TouchableOpacity
                       key={tab}
                       onPress={() => setChargeMethod(tab)}
                       activeOpacity={0.85}
-                      className={`flex-1 rounded-xl py-2.5 flex-row items-center justify-center gap-1.5 ${
-                        activeChargeMethod === tab ? "bg-violet-600" : "bg-white"
+                      className={`flex-1 rounded-ds-md py-2.5 flex-row items-center justify-center gap-1.5 ${
+                        activeChargeMethod === tab ? "bg-brand" : "bg-surface"
                       }`}
-                      style={activeChargeMethod === tab ? { shadowColor: "#4F46E5", shadowOpacity: 0.16, shadowRadius: 8, elevation: 1 } : undefined}
+                      style={activeChargeMethod === tab ? { } : undefined}
                     >
                       {tab === "pix" ? (
                         <PixLogoIcon
                           size={17}
-                          color={activeChargeMethod === tab ? "white" : "#64748B"}
+                          color={activeChargeMethod === tab ? "white" : "#4B5463"}
                           weight="fill"
                         />
                       ) : (
                         <Ionicons
                           name="barcode-outline"
                           size={16}
-                          color={activeChargeMethod === tab ? "white" : "#64748B"}
+                          color={activeChargeMethod === tab ? "white" : "#4B5463"}
                         />
                       )}
-                      <Text className={`text-xs font-bold ${activeChargeMethod === tab ? "text-white" : "text-slate-600"}`}>
+                      <Text className={`text-xs font-semibold ${activeChargeMethod === tab ? "text-white" : "text-ink-muted"}`}>
                         {tab === "boleto" ? "Boleto" : "PIX"}
                       </Text>
                     </TouchableOpacity>
@@ -2204,14 +2183,14 @@ export default function EnrollmentDetailScreen({
               {/* ── PIX ── */}
               {activeChargeMethod === "pix" && showPixResult && hasPixAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
                 <View
-                  className="rounded-2xl border border-gray-200 bg-white p-3"
+                  className="rounded-ds-md border border-border bg-surface p-3"
                   style={{
                     flexDirection: isMobile ? "column" : "row",
                     gap: isMobile ? 14 : 12,
                   }}
                 >
                   <View className="items-center justify-center">
-                    <View className="rounded-2xl border border-gray-200 bg-white p-2.5">
+                    <View className="rounded-ds-md border border-border bg-surface p-2.5">
                       {pixQrCodeImageUrl && pixQrCodeImageUrl !== "" ? (
                         <Image
                           source={{ uri: pixQrCodeImageUrl }}
@@ -2227,25 +2206,25 @@ export default function EnrollmentDetailScreen({
                         />
                       ) : (
                         <View className="items-center justify-center" style={{ width: checkoutQrSize, height: checkoutQrSize }}>
-                          <ActivityIndicator size="small" color="#6B7280" />
-                          <Text className="text-xs text-gray-500 mt-2">Gerando QR Code...</Text>
+                          <ActivityIndicator size="small" color="#4B5463" />
+                          <Text className="text-xs text-ink-muted mt-2">Gerando QR Code...</Text>
                         </View>
                       )}
                     </View>
                   </View>
                   {!!pixCopyPaste && (
                     <View className="flex-1 justify-center min-w-0">
-                      <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                      <Text className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wide mb-1.5">
                         Pix copia e cola
                       </Text>
-                      <View className="bg-slate-50 rounded-2xl border border-slate-200 px-3 py-2.5">
+                      <View className="bg-surface-sunken rounded-ds-md border border-border px-3 py-2.5">
                         <View className="flex-row items-center gap-2">
-                          <View className="w-8 h-8 rounded-xl items-center justify-center" style={{ backgroundColor: "#ECFDF5" }}>
-                            <PixLogoIcon size={19} color="#059669" weight="fill" />
+                          <View className="w-8 h-8 rounded-ds-md items-center justify-center" style={{ backgroundColor: "#E5F1EA" }}>
+                            <PixLogoIcon size={19} color="#1C6A45" weight="fill" />
                           </View>
                           <View className="flex-1 min-w-0">
                             <Text
-                              className="text-xs font-mono text-gray-900 leading-4"
+                              className="text-xs font-mono text-ink leading-4"
                               selectable
                               numberOfLines={2}
                               ellipsizeMode="middle"
@@ -2256,10 +2235,10 @@ export default function EnrollmentDetailScreen({
                           <TouchableOpacity
                             onPress={copyPixCode}
                             activeOpacity={0.8}
-                            className="rounded-xl bg-violet-600 px-3 py-2 flex-row items-center gap-1"
+                            className="rounded-ds-md bg-brand px-3 py-2 flex-row items-center gap-1"
                           >
                             <Ionicons name="copy-outline" size={14} color="white" />
-                            <Text className="text-xs font-bold text-white">Copiar</Text>
+                            <Text className="text-xs font-semibold text-white">Copiar</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -2272,14 +2251,14 @@ export default function EnrollmentDetailScreen({
               {activeChargeMethod === "boleto" && showBoletoResult && hasBoletoAssets && chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
                 <View className="gap-2.5">
                   {!!boletoDigitable && (
-                    <View className="bg-slate-50 rounded-2xl border border-slate-200 px-3 py-2.5 flex-row items-center gap-3">
-                      <View className="w-8 h-8 rounded-xl items-center justify-center bg-blue-50">
-                        <Ionicons name="barcode-outline" size={19} color="#2563EB" />
+                    <View className="bg-surface-sunken rounded-ds-md border border-border px-3 py-2.5 flex-row items-center gap-3">
+                      <View className="w-8 h-8 rounded-ds-md items-center justify-center bg-brand-tint">
+                        <Ionicons name="barcode-outline" size={19} color="#1C3D63" />
                       </View>
                       <View className="flex-1 min-w-0">
-                        <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Linha digitável</Text>
+                        <Text className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wide mb-1">Linha digitável</Text>
                         <Text
-                          className="text-sm font-mono text-gray-900 font-semibold leading-5"
+                          className="text-sm font-mono text-ink font-semibold leading-5"
                           selectable
                           numberOfLines={2}
                         >
@@ -2293,10 +2272,10 @@ export default function EnrollmentDetailScreen({
                           }
                         }}
                         activeOpacity={0.8}
-                        className="bg-violet-600 rounded-xl px-3 py-2 flex-row items-center gap-1"
+                        className="bg-brand rounded-ds-md px-3 py-2 flex-row items-center gap-1"
                       >
                         <Ionicons name="copy-outline" size={14} color="white" />
-                        <Text className="text-xs font-bold text-white">Copiar</Text>
+                        <Text className="text-xs font-semibold text-white">Copiar</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2306,17 +2285,17 @@ export default function EnrollmentDetailScreen({
           </View>
         )}
         {!!chargeActionError && !shouldHideMethodLockedNotice(chargeActionError) && (
-          <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 mt-3">
-            <Text className="text-sm font-bold text-red-700">Atenção</Text>
-            <Text className="text-xs text-red-700 mt-1">{chargeActionError}</Text>
+          <View className="rounded-ds-md border border-danger bg-danger-tint px-3 py-2.5 mt-3">
+            <Text className="text-sm font-semibold text-danger">Atenção</Text>
+            <Text className="text-xs text-danger mt-1">{chargeActionError}</Text>
           </View>
         )}
 
         {!!paidChargeResult && (
-          <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 mt-3">
-            <Text className="text-sm font-bold text-emerald-700">Pagamento simulado</Text>
-            <Text className="text-xs text-emerald-700 mt-1">Status: {paidChargeResult.status || "—"}</Text>
-            <Text className="text-xs text-emerald-700 mt-1">Pago em: {fmtDateTime(paidChargeResult.paid_at)}</Text>
+          <View className="rounded-ds-md border border-success bg-success-tint px-3 py-2.5 mt-3">
+            <Text className="text-sm font-semibold text-success">Pagamento simulado</Text>
+            <Text className="text-xs text-success mt-1">Status: {paidChargeResult.status || "—"}</Text>
+            <Text className="text-xs text-success mt-1">Pago em: {fmtDateTime(paidChargeResult.paid_at)}</Text>
           </View>
         )}
       </Modal>
@@ -2332,9 +2311,9 @@ export default function EnrollmentDetailScreen({
             <TouchableOpacity
               onPress={closePreviewModal}
               activeOpacity={0.85}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface"
             >
-              <Text className="text-xs font-bold text-gray-700">Fechar</Text>
+              <Text className="text-xs font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
             {!!previewUrl && (
               <TouchableOpacity
@@ -2342,11 +2321,11 @@ export default function EnrollmentDetailScreen({
                   if (typeof window !== "undefined") window.open(previewUrl, "_blank");
                 }}
                 activeOpacity={0.85}
-                className="px-4 py-2.5 rounded-xl bg-violet-600"
+                className="px-4 py-2.5 rounded-ds-md bg-brand"
               >
                 <View className="flex-row items-center gap-2">
                   <Ionicons name="download-outline" size={15} color="white" />
-                  <Text className="text-xs font-bold text-white">Baixar boleto</Text>
+                  <Text className="text-xs font-semibold text-white">Baixar boleto</Text>
                 </View>
               </TouchableOpacity>
             )}
@@ -2354,27 +2333,27 @@ export default function EnrollmentDetailScreen({
         }
       >
         {!previewUrl ? (
-          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <Text className="text-sm text-gray-600">Nenhum boleto disponível para visualização.</Text>
+          <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-4">
+            <Text className="text-sm text-ink-muted">Nenhum boleto disponível para visualização.</Text>
           </View>
         ) : Platform.OS !== "web" ? (
-          <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <Text className="text-sm text-gray-700">A visualização embutida está disponível no web.</Text>
-            <Text className="text-xs text-gray-500 mt-2">Use "Abrir em nova aba" para ver o boleto.</Text>
+          <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-4">
+            <Text className="text-sm text-ink">A visualização embutida está disponível no web.</Text>
+            <Text className="text-xs text-ink-muted mt-2">Use "Abrir em nova aba" para ver o boleto.</Text>
           </View>
         ) : isImagePreviewUrl(previewUrl) ? (
           <View>
             <Image
               source={{ uri: previewUrl }}
-              style={{ width: "100%", height: 640, borderRadius: 16, resizeMode: "contain", backgroundColor: "#F9FAFB" }}
+              style={{ width: "100%", height: 640, borderRadius: 4, resizeMode: "contain", backgroundColor: "#F7F8FA" }}
             />
           </View>
         ) : isPdfPreviewUrl(previewUrl) && PdfDocument && PdfPage ? (
-          <View style={{ width: "100%", maxHeight: 680, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" }}>
+          <View style={{ width: "100%", maxHeight: 680, borderRadius: 4, overflow: "hidden", borderWidth: 1, borderColor: "#D9DDE3", backgroundColor: "#F7F8FA" }}>
             <ScrollView contentContainerStyle={{ padding: 16, alignItems: "center", gap: 16 }}>
               <PdfDocument
                 file={previewUrl}
-                loading={<Text className="text-sm text-gray-600">Carregando PDF...</Text>}
+                loading={<Text className="text-sm text-ink-muted">Carregando PDF...</Text>}
                 onLoadSuccess={({ numPages }: { numPages: number }) => {
                   setPdfPageCount(numPages);
                   setPdfPreviewError(null);
@@ -2397,15 +2376,15 @@ export default function EnrollmentDetailScreen({
               </PdfDocument>
 
               {!!pdfPreviewError && (
-                <View className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                  <Text className="text-sm font-semibold text-red-700">Falha ao renderizar PDF</Text>
-                  <Text className="text-xs text-red-700 mt-1">{pdfPreviewError}</Text>
+                <View className="w-full rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+                  <Text className="text-sm font-semibold text-danger">Falha ao renderizar PDF</Text>
+                  <Text className="text-xs text-danger mt-1">{pdfPreviewError}</Text>
                 </View>
               )}
             </ScrollView>
           </View>
         ) : (
-          <View style={{ width: "100%", height: 680, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" }}>
+          <View style={{ width: "100%", height: 680, borderRadius: 4, overflow: "hidden", borderWidth: 1, borderColor: "#D9DDE3", backgroundColor: "#F7F8FA" }}>
             {React.createElement("iframe", {
               src: previewUrl,
               title: "Boleto",
@@ -2418,23 +2397,23 @@ export default function EnrollmentDetailScreen({
       {/* ── Audit Modal ──────────────────────────────────────────────────────── */}
       <Modal
         visible={auditVisible}
-        title="Informações da Cobrança"
+        title="Informações da cobrança"
         onClose={() => setAuditVisible(false)}
         size="md"
         footer={
           <TouchableOpacity
             onPress={() => setAuditVisible(false)}
-            className="px-5 py-2.5 rounded-xl bg-violet-600"
+            className="px-5 py-2.5 rounded-ds-md bg-brand"
           >
-            <Text className="text-sm font-bold text-white">Fechar</Text>
+            <Text className="text-sm font-semibold text-white">Fechar</Text>
           </TouchableOpacity>
         }
       >
         {auditInvoice && (
           <View className="gap-4">
             {/* Informações básicas */}
-            <View className="bg-gray-50 rounded-xl px-4 py-3">
-              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            <View className="bg-surface-sunken rounded-ds-md px-4 py-3">
+              <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-2">
                 Detalhes
               </Text>
               <View className="gap-2">
@@ -2455,8 +2434,8 @@ export default function EnrollmentDetailScreen({
                   { label: "Status", value: INVOICE_STATUS_LABELS[auditInvoice.status] ?? auditInvoice.status },
                 ].map((row) => (
                   <View key={row.label} className="flex-row justify-between gap-3">
-                    <Text className="text-xs text-gray-500">{row.label}</Text>
-                    <Text className="text-xs font-semibold text-gray-800 text-right flex-1" numberOfLines={2}>
+                    <Text className="text-xs text-ink-muted">{row.label}</Text>
+                    <Text className="text-xs font-semibold text-ink text-right flex-1" numberOfLines={2}>
                       {row.value}
                     </Text>
                   </View>
@@ -2465,23 +2444,23 @@ export default function EnrollmentDetailScreen({
             </View>
 
             {/* Informações de auditoria */}
-            <View className="bg-blue-50 rounded-xl px-4 py-3">
-              <Text className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">
+            <View className="bg-brand-tint rounded-ds-md px-4 py-3">
+              <Text className="text-xs font-semibold text-brand uppercase tracking-wide mb-2">
                 Auditoria
               </Text>
               <View className="gap-2">
                 {auditInvoice.created_by_user?.name && (
                   <View className="flex-row justify-between">
-                    <Text className="text-xs text-blue-700">Criado por</Text>
-                    <Text className="text-xs font-semibold text-blue-900">
+                    <Text className="text-xs text-brand">Criado por</Text>
+                    <Text className="text-xs font-semibold text-brand">
                       {auditInvoice.created_by_user.name}
                     </Text>
                   </View>
                 )}
                 {auditInvoice.updated_by_user?.name && (
                   <View className="flex-row justify-between">
-                    <Text className="text-xs text-blue-700">Última edição por</Text>
-                    <Text className="text-xs font-semibold text-blue-900">
+                    <Text className="text-xs text-brand">Última edição por</Text>
+                    <Text className="text-xs font-semibold text-brand">
                       {auditInvoice.updated_by_user.name}
                     </Text>
                   </View>
@@ -2491,11 +2470,11 @@ export default function EnrollmentDetailScreen({
 
             {/* Motivo da alteração */}
             {auditInvoice.edit_reason && (
-              <View className="bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
-                <Text className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
-                  Motivo da Alteração
+              <View className="bg-warning-tint rounded-ds-md px-4 py-3 border border-warning">
+                <Text className="text-xs font-semibold text-warning uppercase tracking-wide mb-2">
+                  Motivo da alteração
                 </Text>
-                <Text className="text-sm text-amber-800">{auditInvoice.edit_reason}</Text>
+                <Text className="text-sm text-warning">{auditInvoice.edit_reason}</Text>
               </View>
             )}
           </View>
@@ -2546,7 +2525,7 @@ export default function EnrollmentDetailScreen({
         title={
           cancelInvoiceId
             ? `Cancelar cobrança #${cancelInvoiceId}`
-            : "Cancelar Cobrança"
+            : "Cancelar cobrança"
         }
         message={
           cancelInvoiceTarget?.lifecycle_hint ??
@@ -2581,7 +2560,7 @@ export default function EnrollmentDetailScreen({
       />
       <ConfirmModal
         visible={deleteEnrollmentVisible}
-        title="Excluir Matrícula"
+        title="Excluir matrícula"
         message="Todas as cobranças pendentes serão canceladas no provedor quando aplicável. Se alguma cobrança PIX estiver ativa na Cora, a exclusão será bloqueada. Em seguida, a matrícula e os registros locais serão removidos."
         onConfirm={removeEnrollment}
         onCancel={() => setDeleteEnrollmentVisible(false)}
@@ -2609,7 +2588,7 @@ export default function EnrollmentDetailScreen({
       <Modal
         visible={receiptModalVisible}
         onClose={() => setReceiptModalVisible(false)}
-        title="Recibo de Pagamento"
+        title="Recibo de pagamento"
         size="md"
         footer={
           receiptData ? (
@@ -2618,10 +2597,10 @@ export default function EnrollmentDetailScreen({
                 <TouchableOpacity
                   onPress={() => printReceipt(receiptData)}
                   activeOpacity={0.85}
-                  className="px-4 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+                  className="px-4 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
                 >
                   <Ionicons name="print-outline" size={15} color="white" />
-                  <Text className="text-xs font-bold text-white">Imprimir</Text>
+                  <Text className="text-xs font-semibold text-white">Imprimir</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -2630,87 +2609,87 @@ export default function EnrollmentDetailScreen({
       >
         {loadingReceipt && (
           <View className="items-center py-8">
-            <ActivityIndicator size="small" color="#7C3AED" />
-            <Text className="text-xs text-gray-500 mt-2">Carregando recibo...</Text>
+            <ActivityIndicator size="small" color="#1C3D63" />
+            <Text className="text-xs text-ink-muted mt-2">Carregando recibo...</Text>
           </View>
         )}
         {!loadingReceipt && receiptError && (
-          <View className="bg-red-50 border border-red-200 rounded-xl p-3">
-            <Text className="text-xs text-red-700">{receiptError}</Text>
+          <View className="bg-danger-tint border border-danger rounded-ds-md p-3">
+            <Text className="text-xs text-danger">{receiptError}</Text>
           </View>
         )}
         {!loadingReceipt && receiptData && (
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Cabeçalho da escola */}
-            <View className="items-center pb-4 mb-4 border-b border-gray-200">
+            <View className="items-center pb-4 mb-4 border-b border-border">
               {receiptData.school.logo_url ? (
                 <Image
                   source={{ uri: receiptData.school.logo_url }}
-                  style={{ width: 64, height: 64, borderRadius: 8, marginBottom: 8 }}
+                  style={{ width: 64, height: 64, borderRadius: 4, marginBottom: 8 }}
                   resizeMode="contain"
                 />
               ) : (
-                <View className="w-16 h-16 rounded-xl bg-violet-100 items-center justify-center mb-2">
-                  <Ionicons name="school-outline" size={28} color="#7C3AED" />
+                <View className="w-16 h-16 rounded-ds-md bg-brand-tint items-center justify-center mb-2">
+                  <Ionicons name="school-outline" size={28} color="#1C3D63" />
                 </View>
               )}
-              <Text className="text-sm font-bold text-gray-900 text-center">
+              <Text className="text-sm font-semibold text-ink text-center">
                 {receiptData.school.name}
               </Text>
               {receiptData.school.corporate_name && (
-                <Text className="text-xs text-gray-500 text-center">{receiptData.school.corporate_name}</Text>
+                <Text className="text-xs text-ink-muted text-center">{receiptData.school.corporate_name}</Text>
               )}
-              <Text className="text-xs text-gray-500 mt-0.5">CNPJ: {receiptData.school.cnpj}</Text>
+              <Text className="text-xs text-ink-muted mt-0.5">CNPJ: {receiptData.school.cnpj}</Text>
               {receiptData.school.address && (
-                <Text className="text-xs text-gray-400 text-center mt-0.5">{receiptData.school.address}</Text>
+                <Text className="text-xs text-ink-subtle text-center mt-0.5">{receiptData.school.address}</Text>
               )}
             </View>
 
             {/* Número do recibo */}
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-sm font-bold text-gray-900">RECIBO DE PAGAMENTO</Text>
-              <View className="bg-violet-100 px-2.5 py-1 rounded-lg">
-                <Text className="text-xs font-bold text-violet-700">{receiptData.receipt_number}</Text>
+              <Text className="text-sm font-semibold text-ink">RECIBO DE PAGAMENTO</Text>
+              <View className="bg-brand-tint px-2.5 py-1 rounded-ds-md">
+                <Text className="text-xs font-semibold text-brand">{receiptData.receipt_number}</Text>
               </View>
             </View>
 
             {/* Seção Aluno / Pagador */}
-            <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3 gap-1.5">
+            <View className="bg-surface-sunken rounded-ds-md border border-border p-3 mb-3 gap-1.5">
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">Aluno:</Text>
-                <Text className="text-xs font-semibold text-gray-800 flex-1">{receiptData.student.name}</Text>
+                <Text className="text-xs text-ink-muted w-20">Aluno:</Text>
+                <Text className="text-xs font-semibold text-ink flex-1">{receiptData.student.name}</Text>
               </View>
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">CPF aluno:</Text>
-                <Text className="text-xs text-gray-700 flex-1">{receiptData.student.document}</Text>
+                <Text className="text-xs text-ink-muted w-20">CPF aluno:</Text>
+                <Text className="text-xs text-ink flex-1">{receiptData.student.document}</Text>
               </View>
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">Pagador:</Text>
-                <Text className="text-xs font-semibold text-gray-800 flex-1">
+                <Text className="text-xs text-ink-muted w-20">Pagador:</Text>
+                <Text className="text-xs font-semibold text-ink flex-1">
                   {receiptData.payer.is_guardian
                     ? receiptData.payer.guardian_name ?? receiptData.payer.name
                     : receiptData.payer.name}
                 </Text>
               </View>
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">CPF pagador:</Text>
-                <Text className="text-xs text-gray-700 flex-1">{receiptData.payer.document}</Text>
+                <Text className="text-xs text-ink-muted w-20">CPF pagador:</Text>
+                <Text className="text-xs text-ink flex-1">{receiptData.payer.document}</Text>
               </View>
             </View>
 
             {/* Matrícula */}
             {receiptData.enrollment && (
-              <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3 gap-1.5">
+              <View className="bg-surface-sunken rounded-ds-md border border-border p-3 mb-3 gap-1.5">
                 <View className="flex-row gap-1">
-                  <Text className="text-xs text-gray-500 w-20">Matrícula:</Text>
-                  <Text className="text-xs font-semibold text-gray-800 flex-1">
+                  <Text className="text-xs text-ink-muted w-20">Matrícula:</Text>
+                  <Text className="text-xs font-semibold text-ink flex-1">
                     {receiptData.enrollment.enrollment_number} — {receiptData.enrollment.school_class}
                   </Text>
                 </View>
                 {receiptData.enrollment.start_date && (
                   <View className="flex-row gap-1">
-                    <Text className="text-xs text-gray-500 w-20">Período:</Text>
-                    <Text className="text-xs text-gray-700 flex-1">
+                    <Text className="text-xs text-ink-muted w-20">Período:</Text>
+                    <Text className="text-xs text-ink flex-1">
                       {isoToDisplay(receiptData.enrollment.start_date)}
                       {receiptData.enrollment.end_date
                         ? ` até ${isoToDisplay(receiptData.enrollment.end_date)}`
@@ -2722,10 +2701,10 @@ export default function EnrollmentDetailScreen({
             )}
 
             {/* Dados da cobrança */}
-            <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3 gap-1.5">
+            <View className="bg-surface-sunken rounded-ds-md border border-border p-3 mb-3 gap-1.5">
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">ID:</Text>
-                <Text className="text-xs font-mono font-semibold text-violet-700 flex-1">
+                <Text className="text-xs text-ink-muted w-20">ID:</Text>
+                <Text className="text-xs font-mono font-semibold text-brand flex-1">
                   #{receiptData.invoice.id}
                   {receiptData.invoice.cora_charge_id
                     ? ` · Cora ${receiptData.invoice.cora_charge_id}`
@@ -2733,35 +2712,35 @@ export default function EnrollmentDetailScreen({
                 </Text>
               </View>
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">Descrição:</Text>
-                <Text className="text-xs font-semibold text-gray-800 flex-1">{receiptData.invoice.description}</Text>
+                <Text className="text-xs text-ink-muted w-20">Descrição:</Text>
+                <Text className="text-xs font-semibold text-ink flex-1">{receiptData.invoice.description}</Text>
               </View>
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">Vencimento:</Text>
-                <Text className="text-xs text-gray-700 flex-1">{isoToDisplay(receiptData.invoice.due_date)}</Text>
+                <Text className="text-xs text-ink-muted w-20">Vencimento:</Text>
+                <Text className="text-xs text-ink flex-1">{isoToDisplay(receiptData.invoice.due_date)}</Text>
               </View>
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">Pagamento:</Text>
-                <Text className="text-xs text-gray-700 flex-1">
+                <Text className="text-xs text-ink-muted w-20">Pagamento:</Text>
+                <Text className="text-xs text-ink flex-1">
                   {isoToDisplay(receiptData.invoice.paid_at_date)} às {receiptData.invoice.paid_at_time}
                 </Text>
               </View>
               <View className="flex-row gap-1">
-                <Text className="text-xs text-gray-500 w-20">Método:</Text>
-                <Text className="text-xs text-gray-700 flex-1">{receiptData.invoice.payment_method}</Text>
+                <Text className="text-xs text-ink-muted w-20">Método:</Text>
+                <Text className="text-xs text-ink flex-1">{receiptData.invoice.payment_method}</Text>
               </View>
-              <View className="h-px bg-gray-200 my-1" />
+              <View className="h-px bg-border my-1" />
               <View className="flex-row gap-1 items-center">
-                <Text className="text-xs text-gray-500 w-20">Valor:</Text>
-                <Text className="text-sm font-bold text-emerald-700 flex-1">R$ {receiptData.invoice.amount}</Text>
+                <Text className="text-xs text-ink-muted w-20">Valor:</Text>
+                <Text className="text-sm font-semibold text-success flex-1">R$ {receiptData.invoice.amount}</Text>
               </View>
             </View>
 
             {/* Verificação */}
-            <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 gap-1.5">
-              <Text className="text-xs text-gray-500">{receiptData.verification.message}</Text>
+            <View className="bg-surface-sunken rounded-ds-md border border-border p-3 gap-1.5">
+              <Text className="text-xs text-ink-muted">{receiptData.verification.message}</Text>
               <Text
-                className="text-xs font-mono text-gray-400"
+                className="text-xs font-mono text-ink-subtle"
                 numberOfLines={2}
                 selectable
               >

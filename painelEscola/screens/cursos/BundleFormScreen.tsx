@@ -12,6 +12,7 @@ import { parseApiErrors } from "../../utils/apiErrors";
 import FormInput from "../../components/ui/FormInput";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -220,48 +221,31 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
         contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
       >
-      {/* Breadcrumb */}
-      <View className="flex-row items-center gap-2 mb-6">
-        <TouchableOpacity
-          onPress={() => navigate("pacotes")}
-          className="flex-row items-center gap-1.5"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-          <Text className="text-sm font-medium text-violet-600">Pacotes</Text>
-        </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        <Text className="text-sm text-gray-500">
-          {isEdit ? "Editar Pacote" : "Novo Pacote"}
-        </Text>
-      </View>
+      <ScreenBreadcrumb items={[{ label: "Pacotes", onPress: () => navigate("pacotes") }, { label: isEdit ? "Editar pacote" : "Novo pacote" }]} />
 
       <View className="mb-6">
-        <Text className="text-2xl font-bold text-gray-800">
-          {isEdit ? "Editar Pacote" : "Novo Pacote"}
+        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">
+          {isEdit ? "Editar pacote" : "Novo pacote"}
         </Text>
-        <Text className="text-sm text-gray-500">
+        <Text className="text-sm text-ink-muted">
           Agrupe 2 ou mais cursos com cobrança unificada
         </Text>
       </View>
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#7C3AED" />
+          <ActivityIndicator size="large" color="#1C3D63" />
         </View>
       ) : (
         <View>
           {/* ── Card: Dados do Pacote ── */}
           <View
-            className="bg-white rounded-2xl p-6 mb-5"
-            style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
+            className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
+            style={{ }}
           >
             <View className="flex-row items-center gap-2 mb-5">
-              <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-                <Ionicons name="albums-outline" size={16} color="#7C3AED" />
-              </View>
-              <Text className="text-base font-semibold text-gray-800">
-                Dados do Pacote
+              <Text className="text-base font-semibold text-ink">
+                Dados do pacote
               </Text>
             </View>
 
@@ -286,8 +270,8 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
 
             <View className="flex-row gap-4 mt-1">
               <View className="flex-1">
-                <Text className="text-xs font-medium text-gray-600 mb-1.5">
-                  Ciclo de Cobrança <Text className="text-red-500">*</Text>
+                <Text className="text-xs font-medium text-ink-muted mb-1.5">
+                  Ciclo de Cobrança <Text className="text-danger">*</Text>
                 </Text>
                 <select
                   value={form.billing_cycle}
@@ -296,11 +280,11 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
                   }
                   style={{
                     width: "100%",
-                    border: "1px solid #E5E7EB",
-                    borderRadius: 8,
+                    border: "1px solid #D9DDE3",
+                    borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: "#374151",
+                    color: "#111722",
                     backgroundColor: "white",
                   }}
                 >
@@ -325,18 +309,18 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
             </View>
 
             {monthly !== null && (
-              <View className="flex-row items-center gap-2 bg-violet-50 rounded-lg px-3 py-2 mt-2">
-                <Ionicons name="trending-down-outline" size={14} color="#7C3AED" />
-                <Text className="text-xs text-violet-600">
+              <View className="flex-row items-center gap-2 bg-brand-tint rounded-ds-md px-3 py-2 mt-2">
+                <Ionicons name="trending-down-outline" size={14} color="#1C3D63" />
+                <Text className="text-xs text-brand">
                   Equivalente a{" "}
-                  <Text className="font-bold">{fmtBRL(monthly)}/mês</Text> por
+                  <Text className="font-semibold">{fmtBRL(monthly)}/mês</Text> por
                   aluno
                 </Text>
               </View>
             )}
 
             <View className="mt-3">
-              <Text className="text-xs font-medium text-gray-600 mb-1.5">
+              <Text className="text-xs font-medium text-ink-muted mb-1.5">
                 Status
               </Text>
               <select
@@ -346,11 +330,11 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
                 }
                 style={{
                   width: "100%",
-                  border: "1px solid #E5E7EB",
-                  borderRadius: 8,
+                  border: "1px solid #D9DDE3",
+                  borderRadius: 4,
                   padding: "9px 12px",
                   fontSize: 14,
-                  color: "#374151",
+                  color: "#111722",
                   backgroundColor: "white",
                 }}
               >
@@ -365,32 +349,29 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
 
           {/* ── Card: Cursos do Pacote ── */}
           <View
-            className="bg-white rounded-2xl p-6 mb-5"
-            style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
+            className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
+            style={{ }}
           >
             <View className="flex-row items-center gap-2 mb-1">
-              <View className="w-8 h-8 bg-amber-100 rounded-lg items-center justify-center">
-                <Ionicons name="book-outline" size={16} color="#D97706" />
-              </View>
-              <Text className="text-base font-semibold text-gray-800">
-                Cursos do Pacote
+              <Text className="text-base font-semibold text-ink">
+                Cursos do pacote
               </Text>
             </View>
-            <Text className="text-xs text-gray-400 mb-4">
+            <Text className="text-xs text-ink-subtle mb-4">
               Selecione no mínimo 2 cursos
             </Text>
 
             {errors.course_ids && (
-              <View className="flex-row items-center gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">
-                <Ionicons name="alert-circle-outline" size={14} color="#EF4444" />
-                <Text className="text-xs text-red-600">{errors.course_ids}</Text>
+              <View className="flex-row items-center gap-2 bg-danger-tint border border-danger rounded-ds-md px-3 py-2 mb-3">
+                <Ionicons name="alert-circle-outline" size={14} color="#B0261B" />
+                <Text className="text-xs text-danger">{errors.course_ids}</Text>
               </View>
             )}
 
             {courseOptions.length === 0 ? (
               <View className="items-center py-8">
-                <Ionicons name="book-outline" size={32} color="#E5E7EB" />
-                <Text className="text-gray-400 text-sm mt-2">
+                <Ionicons name="book-outline" size={32} color="#D9DDE3" />
+                <Text className="text-ink-subtle text-sm mt-2">
                   Nenhum curso ativo disponível
                 </Text>
               </View>
@@ -403,20 +384,20 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
                       key={course.id}
                       onPress={() => toggleCourse(course.id)}
                       activeOpacity={0.7}
-                      className={`flex-row items-center gap-3 px-4 py-3 rounded-xl border ${
+                      className={`flex-row items-center gap-3 px-4 py-3 rounded-ds-md border ${
                         selected
-                          ? "bg-violet-50 border-violet-200"
-                          : "bg-gray-50 border-gray-100"
+                          ? "bg-brand-tint border-border"
+                          : "bg-surface-sunken border-border"
                       }`}
                     >
                       <Ionicons
                         name={selected ? "checkbox" : "square-outline"}
                         size={20}
-                        color={selected ? "#7C3AED" : "#9CA3AF"}
+                        color={selected ? "#1C3D63" : "#5F6878"}
                       />
                       <Text
                         className={`text-sm font-medium ${
-                          selected ? "text-violet-700" : "text-gray-700"
+                          selected ? "text-brand" : "text-ink"
                         }`}
                       >
                         {course.name}
@@ -428,9 +409,9 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
             )}
 
             {form.course_ids.length > 0 && (
-              <View className="flex-row items-center gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2 mt-3">
-                <Ionicons name="checkmark-circle-outline" size={14} color="#16A34A" />
-                <Text className="text-xs text-green-600">
+              <View className="flex-row items-center gap-2 bg-success-tint border border-success rounded-ds-md px-3 py-2 mt-3">
+                <Ionicons name="checkmark-circle-outline" size={14} color="#1C6A45" />
+                <Text className="text-xs text-success">
                   {form.course_ids.length} curso
                   {form.course_ids.length !== 1 ? "s" : ""} selecionado
                   {form.course_ids.length !== 1 ? "s" : ""}
@@ -444,17 +425,17 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
           <View className="flex-row justify-end gap-3 mt-2">
             <TouchableOpacity
               onPress={() => navigate("pacotes")}
-              className="px-6 py-3 rounded-xl border border-gray-200 bg-white"
+              className="px-6 py-3 rounded-ds-md border border-border bg-surface"
               activeOpacity={0.8}
             >
-              <Text className="text-sm font-semibold text-gray-700">
+              <Text className="text-sm font-semibold text-ink">
                 Cancelar
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={save}
               disabled={saving}
-              className="flex-row items-center gap-2 px-8 py-3 rounded-xl bg-violet-600"
+              className="flex-row items-center gap-2 px-8 py-3 rounded-ds-md bg-brand"
               activeOpacity={0.85}
             >
               {saving ? (
@@ -462,8 +443,8 @@ export default function BundleFormScreen({ bundleId, navigate }: Props) {
               ) : (
                 <>
                   <Ionicons name="checkmark" size={16} color="white" />
-                  <Text className="text-sm font-bold text-white">
-                    {isEdit ? "Salvar Alterações" : "Cadastrar Pacote"}
+                  <Text className="text-sm font-semibold text-white">
+                    {isEdit ? "Salvar alterações" : "Cadastrar pacote"}
                   </Text>
                 </>
               )}

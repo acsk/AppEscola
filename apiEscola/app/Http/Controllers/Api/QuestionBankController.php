@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BatchQuestionClassificationRequest;
+use App\Http\Requests\SaveStandaloneQuestionRequest;
 use App\Http\Requests\UpdateQuestionClassificationRequest;
 use App\Http\Resources\QuestionBankQuestionResource;
 use App\Models\ExamQuestion;
 use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
 use App\Services\QuestionClassificationService;
+use App\Services\QuestionContentService;
+use App\Services\TenantUploadSettingsService;
+use App\Models\Tenant;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +28,7 @@ class QuestionBankController extends Controller
         private readonly ExamAccessService $examAccess,
         private readonly QuestionBankQueryService $queries,
         private readonly QuestionClassificationService $classification,
+        private readonly QuestionContentService $content,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -84,6 +89,51 @@ class QuestionBankController extends Controller
             'failed'  => $failed,
             'results' => $results,
         ], $message);
+    }
+
+    /** Cria questão avulsa (sem simulado), com conteúdo e, opcionalmente, classificação. */
+    public function store(SaveStandaloneQuestionRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $question = $this->content->createStandalone($tenantId, $request->validated());
+        $question->load('options');
+
+        return $this->created(new QuestionBankQuestionResource($question), 'Questão criada com sucesso.');
+    }
+
+    /** Edita o conteúdo de questão avulsa (questão de simulado: 409, editar pelo simulado). */
+    public function update(SaveStandaloneQuestionRequest $request, int $question): JsonResponse
+    {
+        $model = $this->content->updateStandalone($this->findQuestion($request, $question), $request->validated());
+        $model->load('options');
+
+        return $this->success(new QuestionBankQuestionResource($model), 'Questão atualizada com sucesso.');
+    }
+
+    public function destroy(Request $request, int $question): JsonResponse
+    {
+        $this->content->deleteStandalone($this->findQuestion($request, $question));
+
+        return $this->deleted('Questão removida com sucesso.');
+    }
+
+    /** Upload da imagem do enunciado de questão avulsa. */
+    public function uploadImage(Request $request, TenantUploadSettingsService $uploadSettings): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $request->validate([
+            'question_id' => ['nullable', 'integer'],
+            'image'       => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120'],
+        ]);
+
+        $tenant = Tenant::findOrFail($tenantId);
+        $directory = $uploadSettings->buildQuestionBankDirectory($tenant, $request->integer('question_id') ?: 'draft');
+        $path = $request->file('image')->store($directory['directory'], $directory['disk']);
+
+        return $this->created([
+            'image_url' => $uploadSettings->url($directory['disk'], $path),
+            'path'      => $path,
+        ], 'Imagem enviada com sucesso.');
     }
 
     private function authorizeStaff(Request $request): int

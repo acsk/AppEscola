@@ -30,6 +30,7 @@ import {
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import { foldText } from "../../utils/questionBankQuery";
 import type { CatalogDefinition, CatalogItem, CatalogKey, SubjectTopic } from "../../types/questionBank";
+import Tabs from "../../components/ui/Tabs";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -154,8 +155,8 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   };
 
   const IconButton = ({ icon, label, onPress, danger }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean }) => (
-    <TouchableOpacity onPress={onPress} aria-label={label} className="p-1.5 rounded-lg">
-      <Ionicons name={icon} size={16} color={danger ? "#EF4444" : "#6B7280"} />
+    <TouchableOpacity onPress={onPress} aria-label={label} className="p-1.5 rounded-ds-md">
+      <Ionicons name={icon} size={16} color={danger ? "#B0261B" : "#4B5463"} />
     </TouchableOpacity>
   );
 
@@ -168,38 +169,23 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
     <View className="flex-1">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
         <ScreenBreadcrumb items={[{ label: "Banco de questões", onPress: () => navigate("questoes") }, { label: "Taxonomia" }]} />
-        <Text className="text-2xl font-bold text-gray-800">Taxonomia</Text>
-        <Text className="text-sm text-gray-500 mt-1 mb-4">
+        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Taxonomia</Text>
+        <Text className="text-sm text-ink-muted mt-1 mb-4">
           Disciplinas, assuntos e cadastros usados para classificar as questões. Itens em uso não podem ser excluídos.
         </Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-          <View className="flex-row gap-2" role="tablist">
-            {sectionTabs.map((tab) => {
-              const active = section === tab.key;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  role="tab"
-                  aria-selected={active}
-                  onPress={() => setSection(tab.key)}
-                  className={`px-3 py-2 rounded-xl border ${active ? "bg-violet-600 border-violet-600" : "bg-white border-gray-200"}`}
-                >
-                  <Text className={`text-xs font-semibold ${active ? "text-white" : "text-gray-700"}`}>{tab.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+        <View className="mb-4">
+          <Tabs accessibilityLabel="Seções da taxonomia" items={sectionTabs.map((t) => ({ id: t.key, label: t.label }))} value={section} onChange={setSection} />
+        </View>
 
         {loading ? (
           <View className="py-16 items-center">
-            <ActivityIndicator color="#7C3AED" />
+            <ActivityIndicator color="#1C3D63" />
           </View>
         ) : loadError ? (
           <View className="py-14 items-center gap-3">
-            <Text className="text-sm text-gray-600 text-center">{loadError}</Text>
-            <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-xl bg-violet-600">
+            <Text className="text-sm text-ink-muted text-center">{loadError}</Text>
+            <TouchableOpacity onPress={() => void load()} className="px-4 py-2 rounded-ds-md bg-brand">
               <Text className="text-sm font-semibold text-white">Tentar novamente</Text>
             </TouchableOpacity>
           </View>
@@ -209,7 +195,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
               <FormInput label="Filtrar" value={filter} onChangeText={setFilter} placeholder="Disciplina ou assunto..." />
             </View>
             {visibleSubjects.length === 0 ? (
-              <Text className="text-sm text-gray-500 py-8 text-center">
+              <Text className="text-sm text-ink-muted py-8 text-center">
                 {subjects.length === 0 ? "Nenhuma disciplina ativa. Cadastre em Acadêmico › Disciplinas." : "Nada encontrado."}
               </Text>
             ) : (
@@ -217,7 +203,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                 const subjectTopics = topicsBySubject.get(subject.id) ?? [];
                 const open = expanded.has(subject.id) || foldText(filter) !== "";
                 return (
-                  <View key={subject.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <View key={subject.id} className="bg-surface rounded-ds-md border border-border overflow-hidden">
                     <TouchableOpacity
                       onPress={() =>
                         setExpanded((prev) => {
@@ -229,14 +215,14 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                       aria-expanded={open}
                       className="flex-row items-center px-4 py-3 gap-3"
                     >
-                      <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={16} color="#6B7280" />
+                      <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={16} color="#4B5463" />
                       <Text className={`${TABLE_CELL_SEMIBOLD} flex-1`}>{subject.name}</Text>
                       <Text className={TABLE_CELL_MUTED}>
                         {subjectTopics.length} assunto(s) · {countLabel(subject.questions_count)}
                       </Text>
                     </TouchableOpacity>
                     {open && (
-                      <View className="border-t border-gray-100">
+                      <View className="border-t border-border">
                         {subjectTopics.map((topic, i) => (
                           <DataTableRow key={topic.id} index={i} style={{ paddingLeft: 44 }}>
                             <Text className={`${TABLE_CELL} flex-1`}>{topic.name}</Text>
@@ -263,8 +249,8 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                           className="flex-row items-center gap-2 px-4 py-3"
                           style={{ paddingLeft: 44 }}
                         >
-                          <Ionicons name="add-circle-outline" size={16} color="#7C3AED" />
-                          <Text className="text-xs font-semibold text-violet-700">Novo assunto em {subject.name}</Text>
+                          <Ionicons name="add-circle-outline" size={16} color="#1C3D63" />
+                          <Text className="text-xs font-semibold text-brand">Novo assunto em {subject.name}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -278,15 +264,15 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
             {currentDefinition?.editable ? (
               <TouchableOpacity
                 onPress={() => setEdit({ kind: "catalog", catalog: section, name: "", description: "" })}
-                className="self-start flex-row items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600"
+                className="self-start flex-row items-center gap-1.5 px-3 py-2 rounded-ds-md bg-brand"
               >
                 <Ionicons name="add" size={16} color="#FFFFFF" />
                 <Text className="text-xs font-semibold text-white">Novo item</Text>
               </TouchableOpacity>
             ) : (
-              <Text className="text-xs text-gray-500">Cadastro fixo do sistema (somente leitura).</Text>
+              <Text className="text-xs text-ink-muted">Cadastro fixo do sistema (somente leitura).</Text>
             )}
-            <View className="bg-white rounded-2xl overflow-hidden border border-gray-200">
+            <View className="bg-surface rounded-ds-md overflow-hidden border border-border">
               <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
                 <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Nome</Text>
                 {!isMobile && <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Descrição</Text>}
@@ -294,7 +280,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                 {currentDefinition?.editable && <View style={{ width: 72 }} />}
               </View>
               {items.length === 0 ? (
-                <Text className="text-sm text-gray-500 py-10 text-center">Nenhum item cadastrado.</Text>
+                <Text className="text-sm text-ink-muted py-10 text-center">Nenhum item cadastrado.</Text>
               ) : (
                 items.map((item, i) => (
                   <DataTableRow key={item.id} index={i}>
@@ -332,10 +318,10 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
         compact
         footer={
           <View className="flex-row justify-end gap-3">
-            <TouchableOpacity onPress={() => setEdit(null)} disabled={saving} className="px-4 py-2.5 rounded-xl border border-gray-200">
-              <Text className="text-sm font-semibold text-gray-600">Cancelar</Text>
+            <TouchableOpacity onPress={() => setEdit(null)} disabled={saving} className="px-4 py-2.5 rounded-ds-md border border-border">
+              <Text className="text-sm font-semibold text-ink-muted">Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={submitEdit} disabled={saving} className={`px-4 py-2.5 rounded-xl flex-row items-center gap-2 ${saving ? "bg-violet-300" : "bg-violet-600"}`}>
+            <TouchableOpacity onPress={submitEdit} disabled={saving} className={`px-4 py-2.5 rounded-ds-md flex-row items-center gap-2 ${saving ? "bg-brand-tint" : "bg-brand"}`}>
               {saving && <ActivityIndicator size="small" color="#FFFFFF" />}
               <Text className="text-sm font-semibold text-white">Salvar</Text>
             </TouchableOpacity>

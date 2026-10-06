@@ -1,6 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Text, TouchableOpacity, View } from "react-native";
 
 export type BreadcrumbItem = {
   label: string;
@@ -9,39 +8,45 @@ export type BreadcrumbItem = {
 
 type Props = {
   items: BreadcrumbItem[];
+  /** Dentro do PageHeader a margem inferior fica por conta dele. */
+  inline?: boolean;
 };
 
-/**
- * Navegação hierárquica em subtelas (formulários, detalhes, passos).
- * Primeiro item: link com chevron-back violeta; último: texto cinza (página atual).
- */
-export default function ScreenBreadcrumb({ items }: Props) {
+/** Trilha de localização separada por "/"; o último item é a página atual. */
+export default function ScreenBreadcrumb({ items, inline = false }: Props) {
   if (items.length === 0) return null;
 
   return (
-    <View className="flex-row items-center flex-wrap gap-2 mb-6">
+    <View
+      role="navigation"
+      aria-label="Trilha de navegação"
+      className="flex-row items-center flex-wrap"
+      style={{ gap: 8, marginBottom: inline ? 0 : 16 }}
+    >
       {items.map((item, index) => {
-        const isFirst = index === 0;
         const isLast = index === items.length - 1;
 
         return (
           <React.Fragment key={`${item.label}-${index}`}>
             {index > 0 ? (
-              <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
+              <Text className="text-border-strong" style={{ fontSize: 13, lineHeight: 18 }} aria-hidden>
+                /
+              </Text>
             ) : null}
             {isLast ? (
-              <Text className="text-sm text-gray-500">{item.label}</Text>
+              <Text className="text-ink" style={{ fontSize: 13, lineHeight: 18 }} aria-current="page">
+                {item.label}
+              </Text>
             ) : item.onPress ? (
-              <TouchableOpacity
-                onPress={item.onPress}
-                className="flex-row items-center gap-1.5"
-                activeOpacity={0.7}
-              >
-                {isFirst ? <Ionicons name="chevron-back" size={18} color="#7C3AED" /> : null}
-                <Text className="text-sm font-medium text-violet-600">{item.label}</Text>
+              <TouchableOpacity onPress={item.onPress} role="link" activeOpacity={0.7}>
+                <Text className="text-ink-muted" style={{ fontSize: 13, lineHeight: 18 }}>
+                  {item.label}
+                </Text>
               </TouchableOpacity>
             ) : (
-              <Text className="text-sm font-medium text-violet-600">{item.label}</Text>
+              <Text className="text-ink-subtle" style={{ fontSize: 13, lineHeight: 18 }}>
+                {item.label}
+              </Text>
             )}
           </React.Fragment>
         );

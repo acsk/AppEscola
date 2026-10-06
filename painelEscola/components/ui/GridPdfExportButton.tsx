@@ -38,7 +38,7 @@ export default function GridPdfExportButton<T extends Record<string, any>>({
   rows = [],
   groups,
   onBeforeExport,
-  className = "flex-row items-center bg-violet-600 px-4 py-2.5 rounded-xl",
+  className = "flex-row items-center bg-brand px-4 py-2.5 rounded-ds-md",
 }: Props<T>) {
   const [exporting, setExporting] = useState(false);
 

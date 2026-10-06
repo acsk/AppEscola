@@ -217,7 +217,7 @@ export default function ExamTypesScreen() {
                   <View className="w-24 items-center">
                     <Badge
                       label={row.is_active ? "Ativo" : "Inativo"}
-                      tone={row.is_active ? "emerald" : "gray"}
+                      tone={row.is_active ? "success" : "neutral"}
                     />
                   </View>
                   <Text className="text-[10px] text-gray-400 w-28 text-center">

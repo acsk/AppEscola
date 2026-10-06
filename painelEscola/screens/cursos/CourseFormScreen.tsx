@@ -16,6 +16,7 @@ import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -319,28 +320,14 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
         contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
       >
-      {/* Breadcrumb */}
-      <View className="flex-row items-center gap-2 mb-6">
-        <TouchableOpacity
-          onPress={() => navigate("cursos")}
-          className="flex-row items-center gap-1.5"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-          <Text className="text-sm font-medium text-violet-600">Cursos</Text>
-        </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        <Text className="text-sm text-gray-500">
-          {isEdit ? "Editar Curso" : "Novo Curso"}
-        </Text>
-      </View>
+      <ScreenBreadcrumb items={[{ label: "Cursos", onPress: () => navigate("cursos") }, { label: isEdit ? "Editar curso" : "Novo curso" }]} />
 
       <View className="flex-row items-center justify-between mb-6">
         <View>
-          <Text className="text-2xl font-bold text-gray-800">
-            {isEdit ? "Editar Curso" : "Novo Curso"}
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">
+            {isEdit ? "Editar curso" : "Novo curso"}
           </Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-sm text-ink-muted">
             {isEdit
               ? "Atualize os dados e gerencie os planos de cobrança"
               : "Preencha os dados para cadastrar um novo curso"}
@@ -350,22 +337,19 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#7C3AED" />
-          <Text className="text-gray-500 text-sm mt-3">Carregando...</Text>
+          <ActivityIndicator size="large" color="#1C3D63" />
+          <Text className="text-ink-muted text-sm mt-3">Carregando...</Text>
         </View>
       ) : (
         <View>
           {/* ── Card: Dados do Curso ── */}
           <View
-            className="bg-white rounded-2xl p-6 mb-5"
-            style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
+            className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
+            style={{ }}
           >
             <View className="flex-row items-center gap-2 mb-5">
-              <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-                <Ionicons name="book-outline" size={16} color="#7C3AED" />
-              </View>
-              <Text className="text-base font-semibold text-gray-800">
-                Dados do Curso
+              <Text className="text-base font-semibold text-ink">
+                Dados do curso
               </Text>
             </View>
 
@@ -389,7 +373,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             </View>
 
             <View className="mt-1">
-              <Text className="text-xs font-medium text-gray-600 mb-1.5">
+              <Text className="text-xs font-medium text-ink-muted mb-1.5">
                 Status
               </Text>
               <select
@@ -397,11 +381,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                 onChange={(e: any) => setForm({ ...form, status: e.target.value })}
                 style={{
                   width: "100%",
-                  border: `1px solid ${errors.status ? "#EF4444" : "#E5E7EB"}`,
-                  borderRadius: 8,
+                  border: `1px solid ${errors.status ? "#B0261B" : "#D9DDE3"}`,
+                  borderRadius: 4,
                   padding: "9px 12px",
                   fontSize: 14,
-                  color: "#374151",
+                  color: "#111722",
                   backgroundColor: "white",
                 }}
               >
@@ -417,42 +401,39 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           {/* ── Card: Planos de Cobrança (só no modo edição) ── */}
           {isEdit && (
             <View
-              className="bg-white rounded-2xl p-6 mb-5"
-              style={{ shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 }}
+              className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
+              style={{ }}
             >
               <View className="flex-row items-center justify-between mb-5">
                 <View className="flex-row items-center gap-2">
-                  <View className="w-8 h-8 bg-amber-100 rounded-lg items-center justify-center">
-                    <Ionicons name="wallet-outline" size={16} color="#D97706" />
-                  </View>
-                  <Text className="text-base font-semibold text-gray-800">
-                    Planos de Cobrança
+                  <Text className="text-base font-semibold text-ink">
+                    Planos de cobrança
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={openCreatePlan}
-                  className="flex-row items-center bg-violet-600 px-4 py-2 rounded-xl"
+                  className="flex-row items-center bg-brand px-4 py-2 rounded-ds-md"
                   activeOpacity={0.85}
                 >
                   <Ionicons name="add" size={16} color="white" />
                   <Text className="text-white font-semibold text-xs ml-1">
-                    Adicionar Plano
+                    Adicionar plano
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {loadingPlans ? (
                 <View className="items-center py-10">
-                  <ActivityIndicator color="#7C3AED" />
+                  <ActivityIndicator color="#1C3D63" />
                 </View>
               ) : plans.length === 0 ? (
                 <View className="items-center py-10">
-                  <Ionicons name="wallet-outline" size={32} color="#E5E7EB" />
-                  <Text className="text-gray-400 text-sm mt-2">
+                  <Ionicons name="wallet-outline" size={32} color="#D9DDE3" />
+                  <Text className="text-ink-subtle text-sm mt-2">
                     Nenhum plano cadastrado
                   </Text>
-                  <Text className="text-gray-400 text-xs mt-1">
-                    Clique em "Adicionar Plano" para começar
+                  <Text className="text-ink-subtle text-xs mt-1">
+                    Clique em "Adicionar plano" para começar
                   </Text>
                 </View>
               ) : (
@@ -462,11 +443,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                     return (
                       <View
                         key={plan.id}
-                        className="flex-row items-center border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/50"
+                        className="flex-row items-center border border-border rounded-ds-md px-4 py-3 bg-surface-sunken"
                       >
                         <View className="flex-1">
                           <View className="flex-row items-center gap-2">
-                            <Text className="text-sm font-semibold text-gray-800">
+                            <Text className="text-sm font-semibold text-ink">
                               {plan.name}
                             </Text>
                             <Badge
@@ -474,14 +455,14 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                               label={plan.status === "active" ? "Ativo" : "Inativo"}
                             />
                           </View>
-                          <Text className="text-xs text-gray-500 mt-0.5">
+                          <Text className="text-xs text-ink-muted mt-0.5">
                             {plan.cycle_label} — {fmtBRL(parseFloat(plan.price))}
                             {"  "}
-                            <Text className="text-violet-500">
+                            <Text className="text-brand">
                               (equiv. {fmtBRL(monthly)}/mês)
                             </Text>
                             {plan.enrollment_fee_amount ? (
-                              <Text className="text-amber-600">
+                              <Text className="text-warning">
                                 {"  "}· taxa matrícula {fmtBRL(parseFloat(plan.enrollment_fee_amount))}
                               </Text>
                             ) : null}
@@ -490,15 +471,15 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                         <View className="flex-row gap-2">
                           <TouchableOpacity
                             onPress={() => openEditPlan(plan)}
-                            className="p-1.5 bg-violet-50 rounded-lg"
+                            className="p-1.5 bg-brand-tint rounded-ds-md"
                           >
-                            <Ionicons name="pencil-outline" size={14} color="#7C3AED" />
+                            <Ionicons name="pencil-outline" size={14} color="#1C3D63" />
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => setDeletePlanId(plan.id)}
-                            className="p-1.5 bg-red-50 rounded-lg"
+                            className="p-1.5 bg-danger-tint rounded-ds-md"
                           >
-                            <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                            <Ionicons name="trash-outline" size={14} color="#B0261B" />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -510,9 +491,9 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           )}
 
           {!isEdit && (
-            <View className="flex-row items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5">
-              <Ionicons name="information-circle-outline" size={18} color="#3B82F6" />
-              <Text className="text-sm text-blue-600 flex-1">
+            <View className="flex-row items-center gap-2 bg-brand-tint border border-border rounded-ds-md px-4 py-3 mb-5">
+              <Ionicons name="information-circle-outline" size={18} color="#1C3D63" />
+              <Text className="text-sm text-brand flex-1">
                 Após salvar o curso, você poderá adicionar os planos de cobrança.
               </Text>
             </View>
@@ -522,17 +503,17 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           <View className="flex-row justify-end gap-3 mt-2">
             <TouchableOpacity
               onPress={() => navigate("cursos")}
-              className="px-6 py-3 rounded-xl border border-gray-200 bg-white"
+              className="px-6 py-3 rounded-ds-md border border-border bg-surface"
               activeOpacity={0.8}
             >
-              <Text className="text-sm font-semibold text-gray-700">
+              <Text className="text-sm font-semibold text-ink">
                 Cancelar
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={save}
               disabled={saving}
-              className="flex-row items-center gap-2 px-8 py-3 rounded-xl bg-violet-600"
+              className="flex-row items-center gap-2 px-8 py-3 rounded-ds-md bg-brand"
               activeOpacity={0.85}
             >
               {saving ? (
@@ -540,8 +521,8 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
               ) : (
                 <>
                   <Ionicons name="checkmark" size={16} color="white" />
-                  <Text className="text-sm font-bold text-white">
-                    {isEdit ? "Salvar Alterações" : "Cadastrar Curso"}
+                  <Text className="text-sm font-semibold text-white">
+                    {isEdit ? "Salvar alterações" : "Cadastrar curso"}
                   </Text>
                 </>
               )}
@@ -553,28 +534,28 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
       {/* ── Modal: Plano ── */}
       <Modal
         visible={planModal}
-        title={editPlanId ? "Editar Plano" : "Novo Plano"}
+        title={editPlanId ? "Editar plano" : "Novo plano"}
         onClose={() => setPlanModal(false)}
         size="sm"
         footer={
           <>
             <TouchableOpacity
               onPress={() => setPlanModal(false)}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 py-2.5 rounded-ds-md border border-border"
             >
-              <Text className="text-sm font-semibold text-gray-700">
+              <Text className="text-sm font-semibold text-ink">
                 Cancelar
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={savePlan}
               disabled={savingPlan}
-              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              className="px-5 py-2.5 rounded-ds-md bg-brand"
             >
               {savingPlan ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text className="text-sm font-bold text-white">Salvar</Text>
+                <Text className="text-sm font-semibold text-white">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -586,12 +567,12 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           value={planForm.name}
           onChangeText={(v) => setPlanForm({ ...planForm, name: v })}
           error={planErrors.name}
-          placeholder="Ex: Plano Mensal"
+          placeholder="Ex: Plano mensal"
         />
 
         <View className="mt-1">
-          <Text className="text-xs font-medium text-gray-600 mb-1.5">
-            Ciclo de Cobrança <Text className="text-red-500">*</Text>
+          <Text className="text-xs font-medium text-ink-muted mb-1.5">
+            Ciclo de Cobrança <Text className="text-danger">*</Text>
           </Text>
           <select
             value={planForm.billing_cycle}
@@ -600,11 +581,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             }
             style={{
               width: "100%",
-              border: "1px solid #E5E7EB",
-              borderRadius: 8,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "9px 12px",
               fontSize: 14,
-              color: "#374151",
+              color: "#111722",
               backgroundColor: "white",
             }}
           >
@@ -637,23 +618,23 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             placeholder="Ex: 100,00"
             keyboardType="decimal-pad"
           />
-          <Text className="text-xs text-gray-500 mt-1">
+          <Text className="text-xs text-ink-muted mt-1">
             Valor usado na cobrança de matrícula vinculada a este plano. Obrigatório quando a escola cobra taxa de matrícula.
           </Text>
         </View>
 
         {cycleMonthly !== null && (
-          <View className="flex-row items-center gap-2 bg-violet-50 rounded-lg px-3 py-2 mt-1">
-            <Ionicons name="trending-down-outline" size={14} color="#7C3AED" />
-            <Text className="text-xs text-violet-600">
+          <View className="flex-row items-center gap-2 bg-brand-tint rounded-ds-md px-3 py-2 mt-1">
+            <Ionicons name="trending-down-outline" size={14} color="#1C3D63" />
+            <Text className="text-xs text-brand">
               Equivalente a{" "}
-              <Text className="font-bold">{fmtBRL(cycleMonthly)}/mês</Text>
+              <Text className="font-semibold">{fmtBRL(cycleMonthly)}/mês</Text>
             </Text>
           </View>
         )}
 
         <View className="mt-2">
-          <Text className="text-xs font-medium text-gray-600 mb-1.5">
+          <Text className="text-xs font-medium text-ink-muted mb-1.5">
             Status
           </Text>
           <select
@@ -663,11 +644,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
             }
             style={{
               width: "100%",
-              border: "1px solid #E5E7EB",
-              borderRadius: 8,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "9px 12px",
               fontSize: 14,
-              color: "#374151",
+              color: "#111722",
               backgroundColor: "white",
             }}
           >
@@ -682,7 +663,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
 
         <ConfirmModal
           visible={!!deletePlanId}
-          title="Excluir Plano"
+          title="Excluir plano"
           message="Este plano será removido permanentemente."
           onConfirm={removePlan}
           onCancel={() => setDeletePlanId(null)}

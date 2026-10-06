@@ -1,15 +1,17 @@
 import React from "react";
 import { View, Text } from "react-native";
+import { tone as tones, type Tone } from "../../constants/theme";
 
 type Variant = "success" | "warning" | "error" | "info" | "default" | "secondary";
 
-const VARIANTS: Record<Variant, { bg: string; text: string }> = {
-  success: { bg: "#ECFDF5", text: "#065F46" },
-  warning: { bg: "#FFFBEB", text: "#92400E" },
-  error: { bg: "#FEF2F2", text: "#991B1B" },
-  info: { bg: "#EFF6FF", text: "#1E40AF" },
-  default: { bg: "#F3F4F6", text: "#374151" },
-  secondary: { bg: "#F1F5F9", text: "#334155" },
+/** Variantes antigas → tons do design system. */
+const VARIANT_TONE: Record<Variant, Tone> = {
+  success: "success",
+  warning: "warning",
+  error: "danger",
+  info: "brand",
+  default: "neutral",
+  secondary: "neutral",
 };
 
 const SLUG_MAP: Record<string, Variant> = {
@@ -31,23 +33,34 @@ type Props = {
   label: string;
   slug?: string;
   variant?: Variant;
+  /** Tom direto do design system (tem prioridade sobre `variant`/`slug`). */
+  tone?: Tone;
+  /** Ponto quadrado que reforça o tom (a palavra continua sendo a pista principal). */
+  dot?: boolean;
 };
 
-export default function Badge({ label, slug, variant }: Props) {
+/** Etiqueta de status: 22px, raio 2px, sempre com palavra. Tons semânticos só para estado. */
+export default function Badge({ label, slug, variant, tone, dot = false }: Props) {
   const v = variant ?? (slug ? (SLUG_MAP[slug] ?? "default") : "default");
-  const style = VARIANTS[v];
+  const t = tones[tone ?? VARIANT_TONE[v]];
 
   return (
     <View
+      className="rounded-ds-sm"
       style={{
-        backgroundColor: style.bg,
-        borderRadius: 100,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
+        backgroundColor: t.bg,
+        borderWidth: 1,
+        borderColor: t.border,
+        height: 22,
+        paddingHorizontal: 8,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
         alignSelf: "flex-start",
       }}
     >
-      <Text style={{ color: style.text, fontSize: 12, fontWeight: "600" }}>
+      {dot && <View style={{ width: 6, height: 6, backgroundColor: t.fg }} />}
+      <Text style={{ color: t.fg, fontSize: 12, lineHeight: 16 }} className="font-medium" numberOfLines={1}>
         {label}
       </Text>
     </View>

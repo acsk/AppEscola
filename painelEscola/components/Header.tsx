@@ -1,101 +1,93 @@
 import React, { useState } from "react";
-import {
-  Platform,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-} from "react-native";
-import { Ionicons, Feather } from "@expo/vector-icons";
+import { View, Text, TextInput, TouchableOpacity } from "react-native";
+import { Bell, LogOut, Menu, Search, Settings } from "lucide-react-native";
 import { useAuth } from "../contexts/AuthContext";
+import Icon from "./ui/Icon";
+import { color, size } from "../constants/theme";
+import { roleLabel } from "../utils/permissions";
 
 type HeaderProps = {
   isMobile?: boolean;
   onOpenMenu?: () => void;
 };
 
+/** Barra superior (TopBar): busca à esquerda; utilitários e usuário (nome + papel) à direita. */
 export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
   const [search, setSearch] = useState("");
   const { logout, user } = useAuth();
-  const headerShadowStyle = Platform.OS === "web"
-    ? ({ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)" } as any)
-    : { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 };
   const initials = user?.name
-    ? user.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()
+    ? user.name
+        .split(" ")
+        .slice(0, 2)
+        .map((w: string) => w[0])
+        .join("")
+        .toUpperCase()
     : "?";
+
+  const IconButton = ({ icon, label, onPress }: { icon: typeof Bell; label: string; onPress?: () => void }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      aria-label={label}
+      className="items-center justify-center rounded-ds-md"
+      style={{ width: size["control-md"], height: size["control-md"] }}
+      activeOpacity={0.7}
+    >
+      <Icon icon={icon} />
+    </TouchableOpacity>
+  );
 
   return (
     <View
-      className="h-16 bg-white border-b border-gray-100 flex-row items-center"
-      style={headerShadowStyle}
+      className="bg-surface border-b border-border flex-row items-center"
+      style={{ height: size["topbar-height"], paddingHorizontal: isMobile ? 12 : 32, gap: 16 }}
     >
-      <View style={{ width: isMobile ? 12 : 24 }} />
-      {isMobile && (
-        <TouchableOpacity
-          onPress={onOpenMenu}
-          className="w-10 h-10 items-center justify-center rounded-full bg-gray-50 border border-gray-200 mr-2"
-          activeOpacity={0.8}
-        >
-          <Ionicons name="menu" size={21} color="#374151" />
-        </TouchableOpacity>
-      )}
-      {/* Search */}
+      {isMobile && <IconButton icon={Menu} label="Abrir menu" onPress={onOpenMenu} />}
+
       {!isMobile && (
-      <View className="flex-row items-center bg-gray-50 rounded-full px-4 py-2 border border-gray-200" style={{ width: 240 }}>
-        <Ionicons name="search-outline" size={16} color="#9CA3AF" />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Pesquisar..."
-          placeholderTextColor="#9CA3AF"
-          className="ml-2 flex-1 text-sm text-gray-700"
-          style={{ outline: "none" } as any}
-        />
-      </View>
+        <View
+          className="flex-row items-center bg-surface border border-border-strong rounded-ds-md px-3"
+          style={{ width: 320, height: size["control-sm"], gap: 8 }}
+        >
+          <Icon icon={Search} color={color["ink-subtle"]} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Pesquisar"
+            placeholderTextColor={color["ink-subtle"]}
+            aria-label="Pesquisar"
+            className="flex-1 text-sm text-ink"
+          />
+        </View>
       )}
 
       <View className="flex-1" />
 
-      {/* Configurações */}
-      <TouchableOpacity
-        className="w-10 h-10 items-center justify-center rounded-full bg-gray-50 border border-gray-200 mr-3"
-        activeOpacity={0.7}
-      >
-        <Feather name="settings" size={17} color="#6B7280" />
-      </TouchableOpacity>
+      <View className="flex-row items-center" style={{ gap: 8 }}>
+        <IconButton icon={Settings} label="Configurações" />
+        <IconButton icon={Bell} label="Notificações" />
 
-      {/* Notificações */}
-      <TouchableOpacity
-        className="w-10 h-10 items-center justify-center rounded-full bg-gray-50 border border-gray-200"
-        style={{ marginRight: isMobile ? 8 : 20 }}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="notifications-outline" size={19} color="#6B7280" />
-        <View className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
-      </TouchableOpacity>
-
-      {/* User */}
-      <View className="flex-row items-center">
-        {!isMobile && (
-        <View className="mr-3 items-end">
-          <Text className="text-sm font-semibold text-gray-800">{user?.name ?? "Usuário"}</Text>
-          <Text className="text-xs text-gray-500">{user?.email ?? ""}</Text>
-        </View>
-        )}
-        <View className="w-10 h-10 bg-violet-100 rounded-full items-center justify-center border-2 border-violet-200">
-          <Text className="text-violet-700 font-bold text-sm">{initials}</Text>
+        <View
+          className="flex-row items-center border-l border-border"
+          style={{ gap: 12, paddingLeft: 16, marginLeft: 8 }}
+        >
+          {!isMobile && (
+            <View className="items-end">
+              <Text className="text-sm font-medium text-ink" numberOfLines={1}>
+                {user?.name ?? "Usuário"}
+              </Text>
+              <Text className="text-xs text-ink-subtle">{roleLabel(user?.role)}</Text>
+            </View>
+          )}
+          <View
+            className="bg-surface-sunken border border-border rounded-ds-md items-center justify-center"
+            style={{ width: 32, height: 32 }}
+            aria-hidden
+          >
+            <Text className="text-xs font-semibold text-ink">{initials}</Text>
+          </View>
+          <IconButton icon={LogOut} label="Sair" onPress={logout} />
         </View>
       </View>
-
-      {/* Logout */}
-      <TouchableOpacity
-        onPress={logout}
-        className="w-10 h-10 items-center justify-center rounded-full bg-red-50 border border-red-100 ml-2"
-        activeOpacity={0.7}
-      >
-        <Ionicons name="log-out-outline" size={19} color="#EF4444" />
-      </TouchableOpacity>
-      <View style={{ width: isMobile ? 12 : 24 }} />
     </View>
   );
 }

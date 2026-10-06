@@ -71,10 +71,10 @@ export default function Calendar({
           style={{ padding: 8 }}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={20} color="#6B7280" />
+          <Ionicons name="chevron-back" size={20} color="#4B5463" />
         </TouchableOpacity>
 
-        <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827" }}>
+        <Text style={{ fontSize: 15, fontWeight: "600", color: "#111722" }}>
           {formatMonthYear(viewDate)}
         </Text>
 
@@ -83,14 +83,14 @@ export default function Calendar({
           style={{ padding: 8 }}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          <Ionicons name="chevron-forward" size={20} color="#4B5463" />
         </TouchableOpacity>
       </View>
 
       <View style={{ flexDirection: "row", marginBottom: 6 }}>
         {WEEKDAY_LABELS_SHORT.map((label) => (
           <View key={label} style={{ flex: 1, alignItems: "center" }}>
-            <Text style={{ fontSize: 11, fontWeight: "700", color: "#9CA3AF" }}>{label}</Text>
+            <Text style={{ fontSize: 11, fontWeight: "600", color: "#5F6878" }}>{label}</Text>
           </View>
         ))}
       </View>
@@ -103,18 +103,18 @@ export default function Calendar({
           const disabled = isDateDisabled(date, minDate, maxDate);
 
           let backgroundColor = "transparent";
-          let textColor = inCurrentMonth ? "#374151" : "#D1D5DB";
+          let textColor = inCurrentMonth ? "#111722" : "#7A8393";
           let fontWeight: "400" | "600" | "700" = "600";
 
           if (disabled) {
-            textColor = "#E5E7EB";
+            textColor = "#D9DDE3";
           } else if (selected) {
-            backgroundColor = "#7C3AED";
+            backgroundColor = "#1C3D63";
             textColor = "#FFFFFF";
             fontWeight = "700";
           } else if (isToday) {
-            backgroundColor = "#EDE9FE";
-            textColor = "#6D28D9";
+            backgroundColor = "#E9EFF6";
+            textColor = "#132C4A";
             fontWeight = "700";
           }
 
@@ -131,10 +131,10 @@ export default function Calendar({
                   flex: 1,
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: 10,
+                  borderRadius: 4,
                   backgroundColor,
                   borderWidth: isToday && !selected ? 1 : 0,
-                  borderColor: "#C4B5FD",
+                  borderColor: "#D9DDE3",
                 }}
               >
                 <Text style={{ fontSize: 13, fontWeight, color: textColor }}>
@@ -154,7 +154,7 @@ export default function Calendar({
             marginTop: 12,
             paddingTop: 12,
             borderTopWidth: 1,
-            borderTopColor: "#F3F4F6",
+            borderTopColor: "#F7F8FA",
           }}
         >
           <TouchableOpacity
@@ -163,7 +163,7 @@ export default function Calendar({
             style={{ paddingVertical: 6, paddingHorizontal: 8, opacity: onClear ? 1 : 0.4 }}
             activeOpacity={0.7}
           >
-            <Text style={{ fontSize: 13, fontWeight: "600", color: "#7C3AED" }}>Limpar</Text>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: "#1C3D63" }}>Limpar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
@@ -180,7 +180,7 @@ export default function Calendar({
             }}
             activeOpacity={0.7}
           >
-            <Text style={{ fontSize: 13, fontWeight: "600", color: "#7C3AED" }}>Hoje</Text>
+            <Text style={{ fontSize: 13, fontWeight: "600", color: "#1C3D63" }}>Hoje</Text>
           </TouchableOpacity>
         </View>
       ) : null}

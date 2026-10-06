@@ -362,11 +362,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
   };
 
   const selectStyle = {
-    border: "1px solid #E5E7EB",
-    borderRadius: 12,
+    border: "1px solid #D9DDE3",
+    borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#374151",
+    color: "#111722",
     backgroundColor: "white",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
@@ -399,23 +399,19 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
       return (
         <View
           key={row.id}
-          className="bg-white border border-gray-200 rounded-xl p-3"
+          className="bg-surface border border-border rounded-ds-md p-3"
           style={{
-            shadowColor: "#000",
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            elevation: 1,
           }}
         >
           <View className="flex-row items-start justify-between gap-3">
             <View style={{ flex: 1 }}>
-              <Text className="text-sm font-semibold text-gray-800">{row.title}</Text>
-              <Text className="text-xs text-gray-400 mt-0.5">
+              <Text className="text-sm font-semibold text-ink">{row.title}</Text>
+              <Text className="text-xs text-ink-subtle mt-0.5">
                 {[row.material_kind_label, dateLabel, row.exam_type_label, row.subject?.name]
                   .filter(Boolean)
                   .join(" · ")}
               </Text>
-              <Text className="text-xs text-gray-500 mt-1" numberOfLines={2}>
+              <Text className="text-xs text-ink-muted mt-1" numberOfLines={2}>
                 {courseNamesForRow(row)}
                 {sizeLabel ? ` · ${sizeLabel}` : ""}
               </Text>
@@ -425,34 +421,34 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
               slug={row.is_published ? "published" : "draft"}
             />
           </View>
-          <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-gray-100">
+          <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-border">
             <View className="flex-row items-center gap-2">
-              <Text className="text-[10px] text-gray-400">Publicado</Text>
+              <Text className="text-[10px] text-ink-subtle">Publicado</Text>
               <Switch value={row.is_published} onValueChange={(v) => togglePublished(row, v)} />
             </View>
             <View className="flex-row gap-1">
               {row.content ? (
                 <TouchableOpacity
                   onPress={() => window.open(row.content, "_blank", "noopener,noreferrer")}
-                  className="p-2 rounded-lg bg-blue-50"
+                  className="p-2 rounded-ds-md bg-brand-tint"
                   accessibilityLabel="Abrir PDF"
                 >
-                  <Ionicons name="open-outline" size={15} color="#3B82F6" />
+                  <Ionicons name="open-outline" size={15} color="#1C3D63" />
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity
                 onPress={() => openEdit(row)}
-                className="p-2 rounded-lg bg-violet-50"
+                className="p-2 rounded-ds-md bg-brand-tint"
                 accessibilityLabel="Editar prova"
               >
-                <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setDeleteId(row.id)}
-                className="p-2 rounded-lg bg-red-50"
+                className="p-2 rounded-ds-md bg-danger-tint"
                 accessibilityLabel="Remover prova"
               >
-                <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                <Ionicons name="trash-outline" size={15} color="#B0261B" />
               </TouchableOpacity>
             </View>
           </View>
@@ -495,25 +491,25 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           {row.content ? (
             <TouchableOpacity
               onPress={() => window.open(row.content, "_blank", "noopener,noreferrer")}
-              className="p-2 rounded-lg bg-blue-50"
+              className="p-2 rounded-ds-md bg-brand-tint"
               accessibilityLabel="Abrir PDF"
             >
-              <Ionicons name="open-outline" size={15} color="#3B82F6" />
+              <Ionicons name="open-outline" size={15} color="#1C3D63" />
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
             onPress={() => openEdit(row)}
-            className="p-2 rounded-lg bg-violet-50"
+            className="p-2 rounded-ds-md bg-brand-tint"
             accessibilityLabel="Editar prova"
           >
-            <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+            <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setDeleteId(row.id)}
-            className="p-2 rounded-lg bg-red-50"
+            className="p-2 rounded-ds-md bg-danger-tint"
             accessibilityLabel="Remover prova"
           >
-            <Ionicons name="trash-outline" size={15} color="#EF4444" />
+            <Ionicons name="trash-outline" size={15} color="#B0261B" />
           </TouchableOpacity>
         </View>
       </DataTableRow>
@@ -670,14 +666,14 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Provas/Materiais</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Provas/Materiais</Text>
+          <Text className="text-sm text-ink-muted">
             Biblioteca de provas e exercícios em PDF visível no app do aluno
           </Text>
         </View>
         <TouchableOpacity
           onPress={openCreate}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="white" />
@@ -687,11 +683,11 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
 
       <View className="mb-4 gap-3">
         <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-semibold text-gray-700">Filtros</Text>
+          <Text className="text-sm font-semibold text-ink">Filtros</Text>
           {hasActiveFilters ? (
             <TouchableOpacity onPress={clearFilters} className="flex-row items-center gap-1">
-              <Ionicons name="close-circle-outline" size={16} color="#7C3AED" />
-              <Text className="text-xs font-semibold text-violet-600">Limpar filtros</Text>
+              <Ionicons name="close-circle-outline" size={16} color="#1C3D63" />
+              <Text className="text-xs font-semibold text-brand">Limpar filtros</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -704,10 +700,10 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
           }}
         >
           <View
-            className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
+            className="flex-row items-center bg-surface border border-border rounded-ds-md px-4"
             style={{ height: 44, minWidth: isMobile ? "100%" : 260, flex: isMobile ? undefined : 2 }}
           >
-            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={16} color="#5F6878" />
             <TextInput
               value={search}
               onChangeText={(v) => {
@@ -715,12 +711,12 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 setPage(1);
               }}
               placeholder="Buscar por título ou descrição..."
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 ml-2 text-sm text-gray-800"
+              placeholderTextColor="#5F6878"
+              className="flex-1 ml-2 text-sm text-ink"
             />
             {!!search && (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={16} color="#5F6878" />
               </TouchableOpacity>
             )}
           </View>
@@ -826,13 +822,10 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
         contentContainerStyle={{ width: "100%" }}
       >
         <View
-          className={isMobile ? "gap-3" : "bg-white rounded-2xl overflow-hidden"}
+          className={isMobile ? "gap-3" : "bg-surface rounded-ds-md overflow-hidden"}
           style={{
             width: "100%",
             minWidth: isMobile ? undefined : tableMinWidth,
-            shadowColor: isMobile ? undefined : "#000",
-            shadowOpacity: isMobile ? undefined : 0.05,
-            shadowRadius: isMobile ? undefined : 10,
             elevation: isMobile ? undefined : 2,
           }}
         >
@@ -862,12 +855,12 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
 
           {loading ? (
             <View className="py-16 items-center">
-              <ActivityIndicator color="#7C3AED" />
+              <ActivityIndicator color="#1C3D63" />
             </View>
           ) : rows.length === 0 ? (
             <View className="py-16 items-center gap-2 px-4">
-              <Ionicons name="document-text-outline" size={32} color="#D1D5DB" />
-              <Text className="text-sm text-gray-400 text-center">
+              <Ionicons name="document-text-outline" size={32} color="#7A8393" />
+              <Text className="text-sm text-ink-subtle text-center">
                 {hasActiveFilters
                   ? "Nenhuma prova encontrada com os filtros selecionados."
                   : "Nenhuma prova cadastrada."}
@@ -894,7 +887,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
 
     <Modal
         visible={modalOpen}
-      title={editingId ? "Editar Prova/Material" : "Nova Prova/Material"}
+      title={editingId ? "Editar prova/material" : "Nova prova/material"}
         onClose={closeModal}
         size="lg"
         compact
@@ -906,15 +899,15 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
             <TouchableOpacity
               onPress={closeModal}
               disabled={saving}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white items-center"
+              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface items-center"
               style={{ flex: 1 }}
             >
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={save}
               disabled={saving}
-              className="bg-violet-600 px-5 py-2.5 rounded-xl items-center"
+              className="bg-brand px-5 py-2.5 rounded-ds-md items-center"
               style={{ flex: 1, zIndex: 2 }}
               accessibilityRole="button"
             >
@@ -929,9 +922,9 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
       >
         <View style={{ gap: 12 }}>
           {hasFormErrors ? (
-            <View className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 flex-row items-start gap-2">
-              <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
-              <Text className="flex-1 text-xs text-red-700">
+            <View className="rounded-ds-md border border-danger bg-danger-tint px-3 py-2 flex-row items-start gap-2">
+              <Ionicons name="alert-circle-outline" size={16} color="#B0261B" />
+              <Text className="flex-1 text-xs text-danger">
                 {Object.values(errors).join(" ")}
               </Text>
             </View>
@@ -1132,7 +1125,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                 disabled={courseOptions.length === 0 || availableCourseOptions.length === 0}
                 onChange={addCourseFromPicker}
               />
-              <Text className="text-xs text-gray-400 leading-4">
+              <Text className="text-xs text-ink-subtle leading-4">
                 Opcional. Sem curso, todos os alunos da escola veem a prova.
               </Text>
               {form.course_ids.length > 0 ? (
@@ -1142,9 +1135,9 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                     return (
                       <View
                         key={id}
-                        className="flex-row items-center gap-1.5 rounded-full bg-violet-50 border border-violet-200 px-2.5 py-1"
+                        className="flex-row items-center gap-1.5 rounded-full bg-brand-tint border border-border px-2.5 py-1"
                       >
-                        <Text className="text-xs font-semibold text-violet-800">
+                        <Text className="text-xs font-semibold text-brand">
                           {course?.name ?? `Curso #${id}`}
                         </Text>
                         <TouchableOpacity
@@ -1152,7 +1145,7 @@ export default function PastExamsScreen({ navigate }: WithNavigate) {
                           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                           accessibilityLabel={`Remover ${course?.name ?? "curso"}`}
                         >
-                          <Ionicons name="close-circle" size={16} color="#7C3AED" />
+                          <Ionicons name="close-circle" size={16} color="#1C3D63" />
                         </TouchableOpacity>
                       </View>
                     );

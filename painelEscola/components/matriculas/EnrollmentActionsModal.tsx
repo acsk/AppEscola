@@ -23,9 +23,9 @@ type Props = {
 };
 
 const toneStyles: Record<ActionItem["tone"], { bg: string; icon: string }> = {
-  blue: { bg: "bg-blue-50", icon: "#2563EB" },
-  violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-  red: { bg: "bg-red-50", icon: "#EF4444" },
+  blue: { bg: "bg-brand-tint", icon: "#1C3D63" },
+  violet: { bg: "bg-brand-tint", icon: "#1C3D63" },
+  red: { bg: "bg-danger-tint", icon: "#B0261B" },
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -91,24 +91,24 @@ export default function EnrollmentActionsModal({
 
   return (
     <Modal visible={visible} title="Ações da matrícula" onClose={onClose} size="md">
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
-        <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3">
+        <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
           {enrollment.student?.name ?? "Aluno"}
         </Text>
-        <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
+        <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={2}>
           {enrollment.enrollment_number ?? "—"}
           {enrollment.school_class?.name ? ` · ${enrollment.school_class.name}` : ""}
         </Text>
         <View className="flex-row flex-wrap gap-2 mt-2">
-          <View className="rounded-md bg-white border border-gray-100 px-2 py-1">
-            <Text className="text-[10px] uppercase font-semibold text-gray-500">Mensalidade</Text>
-            <Text className="text-[11px] font-bold text-gray-800">
+          <View className="rounded-ds-md bg-surface border border-border px-2 py-1">
+            <Text className="text-[10px] uppercase font-semibold text-ink-muted">Mensalidade</Text>
+            <Text className="text-[11px] font-semibold text-ink">
               {fmtMoney(enrollment.monthly_amount)}
             </Text>
           </View>
-          <View className="rounded-md bg-white border border-gray-100 px-2 py-1">
-            <Text className="text-[10px] uppercase font-semibold text-gray-500">Status</Text>
-            <Text className="text-[11px] font-bold text-gray-800">
+          <View className="rounded-ds-md bg-surface border border-border px-2 py-1">
+            <Text className="text-[10px] uppercase font-semibold text-ink-muted">Status</Text>
+            <Text className="text-[11px] font-semibold text-ink">
               {STATUS_LABELS[enrollment.status] ?? enrollment.status}
             </Text>
           </View>
@@ -118,7 +118,7 @@ export default function EnrollmentActionsModal({
       <View className="gap-2">
         {groups.map((group) => (
           <View key={group.key}>
-            <Text className="text-[10px] uppercase font-bold text-gray-500 tracking-wide mb-1">
+            <Text className="text-[10px] uppercase font-semibold text-ink-muted tracking-wide mb-1">
               {group.title}
             </Text>
             <View className="gap-1.5">
@@ -132,23 +132,23 @@ export default function EnrollmentActionsModal({
                       onSelect(action.key);
                       onClose();
                     }}
-                    className={`flex-row items-center gap-2.5 rounded-xl border px-3 py-2 ${
+                    className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       action.group === "danger"
-                        ? "border-red-100 bg-white"
-                        : "border-gray-100 bg-white"
+                        ? "border-danger bg-surface"
+                        : "border-border bg-surface"
                     }`}
                     activeOpacity={0.85}
                   >
-                    <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
+                    <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${style.bg}`}>
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900">{action.label}</Text>
+                      <Text className="text-sm font-semibold text-ink">{action.label}</Text>
                       {action.description ? (
-                        <Text className="text-[11px] text-gray-500 mt-0.5">{action.description}</Text>
+                        <Text className="text-[11px] text-ink-muted mt-0.5">{action.description}</Text>
                       ) : null}
                     </View>
-                    <Ionicons name="chevron-forward-outline" size={16} color="#9CA3AF" />
+                    <Ionicons name="chevron-forward-outline" size={16} color="#5F6878" />
                   </TouchableOpacity>
                 );
               })}

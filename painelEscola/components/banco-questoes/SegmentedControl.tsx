@@ -16,13 +16,13 @@ type Props = {
 export default function SegmentedControl({ label, options, value, onChange, allowClear = true }: Props) {
   return (
     <View className="mb-3">
-      <Text className="text-xs font-medium text-gray-600 mb-1" nativeID={`seg-${label}`}>
+      <Text className="text-xs font-medium text-ink-muted mb-1" nativeID={`seg-${label}`}>
         {label}
       </Text>
       <View
         role="radiogroup"
         aria-labelledby={`seg-${label}`}
-        className="flex-row rounded-xl border border-gray-200 overflow-hidden"
+        className="flex-row rounded-ds-md border border-border overflow-hidden"
       >
         {options.map((option, i) => {
           const selected = option.value === value;
@@ -32,11 +32,11 @@ export default function SegmentedControl({ label, options, value, onChange, allo
               role="radio"
               aria-checked={selected}
               onPress={() => onChange(selected && allowClear ? null : option.value)}
-              className={`flex-1 items-center justify-center px-2 ${selected ? "bg-violet-600" : "bg-white"}`}
-              style={{ height: 40, borderLeftWidth: i === 0 ? 0 : 1, borderLeftColor: "#E5E7EB" }}
+              className={`flex-1 items-center justify-center px-2 ${selected ? "bg-brand" : "bg-surface"}`}
+              style={{ height: 40, borderLeftWidth: i === 0 ? 0 : 1, borderLeftColor: "#D9DDE3" }}
               activeOpacity={0.85}
             >
-              <Text className={`text-xs font-semibold ${selected ? "text-white" : "text-gray-700"}`}>
+              <Text className={`text-xs font-semibold ${selected ? "text-white" : "text-ink"}`}>
                 {option.label}
               </Text>
             </TouchableOpacity>

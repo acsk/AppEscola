@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Modal as RNModal,
   Platform,
@@ -10,7 +10,9 @@ import {
   ViewStyle,
 } from "react-native";
 import { createPortal } from "react-dom";
-import { Ionicons } from "@expo/vector-icons";
+import { X } from "lucide-react-native";
+import Icon from "./Icon";
+import { color, shadow } from "../../constants/theme";
 
 type Props = {
   visible: boolean;
@@ -69,6 +71,22 @@ export default function Modal({
   const horizontalInset = compact ? (isMobile ? 14 : 18) : isMobile ? 16 : 24;
   const bodyPaddingY = compact ? 10 : 16;
 
+  const closeRef = useRef<View>(null);
+
+  // Web: Esc fecha; o foco vai para o botão de fechar ao abrir.
+  useEffect(() => {
+    if (!isWeb || !visible || typeof document === "undefined") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const focusTimer = setTimeout(() => (closeRef.current as unknown as HTMLElement | null)?.focus?.(), 0);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      clearTimeout(focusTimer);
+    };
+  }, [isWeb, visible, onClose]);
+
   // Evita scroll do body/layout enquanto o modal cobre a tela no web.
   useEffect(() => {
     if (!isWeb || !visible || typeof document === "undefined") return;
@@ -87,14 +105,18 @@ export default function Modal({
       className="items-center justify-center"
       style={{
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.45)",
+        backgroundColor: "rgba(17,23,34,0.45)",
         paddingHorizontal: viewportPaddingX,
         paddingVertical: viewportPaddingY,
       }}
     >
       <View
-        className="bg-white rounded-2xl overflow-hidden"
+        className="bg-surface rounded-ds-lg overflow-hidden"
+        role="dialog"
+        aria-modal
+        aria-label={title}
         style={{
+          ...(isWeb ? ({ boxShadow: shadow.overlay } as object) : {}),
           width: "100%",
           maxWidth: Math.min(width - viewportPaddingX * 2, widths[size]),
           maxHeight: panelMaxHeight,
@@ -104,7 +126,7 @@ export default function Modal({
       >
         {/* Header */}
         <View
-          className="border-b border-gray-100"
+          className="border-b border-border"
           style={{
             flexShrink: 0,
             paddingHorizontal: horizontalInset,
@@ -114,16 +136,20 @@ export default function Modal({
         >
           <View className="flex-row items-center justify-between">
             <Text
-              className={`font-bold text-gray-800 ${compact ? "text-sm" : "text-base"}`}
+              className="font-semibold text-ink flex-1"
+              style={compact ? { fontSize: 16, lineHeight: 24 } : { fontSize: 20, lineHeight: 28 }}
             >
               {title}
             </Text>
             <TouchableOpacity
+              ref={closeRef}
               onPress={onClose}
-              className="p-1 rounded-lg bg-gray-100"
+              aria-label="Fechar"
+              className="items-center justify-center rounded-ds-md"
+              style={{ width: 32, height: 32 }}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={18} color="#6B7280" />
+              <Icon icon={X} color={color["ink-muted"]} />
             </TouchableOpacity>
           </View>
           {headerContent}
@@ -152,12 +178,13 @@ export default function Modal({
         {/* Footer */}
         {footer && (
           <View
-            className="border-t border-gray-100 bg-white"
+            className="border-t border-border bg-surface-sunken"
             style={{
               flexShrink: 0,
               width: "100%",
               flexDirection: isMobile ? "column" : "row",
               alignItems: "stretch",
+              justifyContent: "flex-end",
               gap: compact ? 8 : 10,
               paddingHorizontal: horizontalInset,
               paddingVertical: compact ? 10 : 12,

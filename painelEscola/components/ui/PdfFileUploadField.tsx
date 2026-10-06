@@ -3,16 +3,16 @@ import { View, Text, TouchableOpacity, Platform, StyleSheet } from "react-native
 import { Ionicons } from "@expo/vector-icons";
 
 const THEME = {
-  primary: "#4F46E5",
-  primaryDark: "#4338CA",
-  soft: "#EEF2FF",
-  border: "#DDE3F5",
-  ink: "#1E1B4B",
-  muted: "#64748B",
+  primary: "#1C3D63",
+  primaryDark: "#132C4A",
+  soft: "#E9EFF6",
+  border: "#D9DDE3",
+  ink: "#111722",
+  muted: "#4B5463",
   surface: "#FFFFFF",
-  error: "#DC2626",
-  errorBg: "#FEF2F2",
-  errorBorder: "#FECACA",
+  error: "#B0261B",
+  errorBg: "#FBE9E7",
+  errorBorder: "#B0261B",
 } as const;
 
 type Props = {
@@ -200,14 +200,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   dropzone: {
-    borderRadius: 14,
+    borderRadius: 4,
     borderWidth: 1,
     padding: 16,
     backgroundColor: THEME.surface,
   },
   dropzoneCompact: {
     padding: 10,
-    borderRadius: 12,
+    borderRadius: 4,
   },
   dropzoneEmpty: {
     borderColor: THEME.border,
@@ -237,14 +237,14 @@ const styles = StyleSheet.create({
   },
   fileStatus: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "600",
     color: THEME.primary,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
   fileName: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: THEME.ink,
     lineHeight: 20,
   },
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
     color: THEME.ink,
     marginTop: 4,
   },
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.primary,
     paddingHorizontal: 20,
     paddingVertical: 11,
-    borderRadius: 12,
+    borderRadius: 4,
     marginTop: 6,
   },
   btnPrimaryCompact: {
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     color: THEME.surface,
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   btnSecondary: {
     flexDirection: "row",
@@ -308,14 +308,14 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 4,
     backgroundColor: THEME.soft,
     borderWidth: 1,
     borderColor: THEME.border,
   },
   btnSecondaryText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     color: THEME.primary,
   },
   btnGhost: {
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   pdfIconWrap: {
-    borderRadius: 14,
+    borderRadius: 4,
     backgroundColor: THEME.soft,
     borderWidth: 1,
     borderColor: THEME.border,
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   },
   pdfIconBadgeText: {
     fontSize: 9,
-    fontWeight: "800",
+    fontWeight: "600",
     color: THEME.surface,
     letterSpacing: 0.4,
   },

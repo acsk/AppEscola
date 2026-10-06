@@ -183,11 +183,11 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     !!search.trim() || !!statusFilter || !!courseFilter || !!classFilter;
 
   const filterSelectStyle = {
-    border: "1px solid #E5E7EB",
-    borderRadius: 12,
+    border: "1px solid #D9DDE3",
+    borderRadius: 4,
     padding: "0 14px",
     fontSize: 14,
-    color: "#374151",
+    color: "#111722",
     backgroundColor: "white",
     height: 44,
     minWidth: isMobile ? "100%" : 160,
@@ -327,13 +327,13 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
     const isBundle = enrollmentProductKind(item) === "bundle";
     return (
       <View
-        className={`self-start rounded-md px-1.5 py-0.5 ${
-          isBundle ? "bg-violet-100" : "bg-sky-100"
+        className={`self-start rounded-ds-md px-1.5 py-0.5 ${
+          isBundle ? "bg-brand-tint" : "bg-brand-tint"
         }`}
       >
         <Text
-          className={`text-[10px] font-bold uppercase ${
-            isBundle ? "text-violet-700" : "text-sky-700"
+          className={`text-[10px] font-semibold uppercase ${
+            isBundle ? "text-brand" : "text-brand"
           }`}
         >
           {isBundle ? "Pacote" : "Plano"}
@@ -350,48 +350,44 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
         key={item.id}
         onPress={() => navigate("matriculas-detail", { enrollmentId: item.id })}
         activeOpacity={0.86}
-        className="bg-white rounded-2xl border border-gray-200 p-4"
+        className="bg-surface rounded-ds-md border border-border p-4"
         style={{
-          shadowColor: "#000",
-          shadowOpacity: 0.04,
-          shadowRadius: 8,
-          elevation: 1,
         }}
       >
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1" style={{ minWidth: 0 }}>
-            <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+            <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
               {item.student?.name ?? "—"}
             </Text>
-            <Text className="text-xs font-semibold text-gray-500 mt-1" numberOfLines={1}>
+            <Text className="text-xs font-semibold text-ink-muted mt-1" numberOfLines={1}>
               {item.enrollment_number ?? "—"}
             </Text>
           </View>
           <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
         </View>
 
-        <View className="mt-3 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
+        <View className="mt-3 rounded-ds-md bg-surface-sunken border border-border px-3 py-2.5">
           {renderProductBadge(item)}
-          <Text className="text-sm font-bold text-gray-900 mt-1" numberOfLines={1}>
+          <Text className="text-sm font-semibold text-ink mt-1" numberOfLines={1}>
             {enrollmentProductTitle(item)}
           </Text>
           {!!subtitle && (
-            <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={2}>
+            <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={2}>
               {subtitle}
             </Text>
           )}
         </View>
 
         <View className="flex-row gap-2 mt-3">
-          <View className="flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
-            <Text className="text-[11px] font-semibold uppercase text-gray-400">Início</Text>
-            <Text className="text-sm font-semibold text-gray-800 mt-0.5">
+          <View className="flex-1 rounded-ds-md bg-surface-sunken border border-border px-3 py-2">
+            <Text className="text-[11px] font-semibold uppercase text-ink-subtle">Início</Text>
+            <Text className="text-sm font-semibold text-ink mt-0.5">
               {fmt(item.start_date)}
             </Text>
           </View>
-          <View className="flex-1 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2">
-            <Text className="text-[11px] font-semibold uppercase text-gray-400">Mensalidade</Text>
-            <Text className="text-sm font-semibold text-gray-800 mt-0.5" numberOfLines={1}>
+          <View className="flex-1 rounded-ds-md bg-surface-sunken border border-border px-3 py-2">
+            <Text className="text-[11px] font-semibold uppercase text-ink-subtle">Mensalidade</Text>
+            <Text className="text-sm font-semibold text-ink mt-0.5" numberOfLines={1}>
               {formatCurrency(item.monthly_amount)}
             </Text>
           </View>
@@ -403,21 +399,21 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
               event?.stopPropagation?.();
               navigate("matriculas-detail", { enrollmentId: item.id });
             }}
-            className="h-9 px-3 rounded-lg bg-violet-50 border border-violet-100 flex-row items-center justify-center"
+            className="h-9 px-3 rounded-ds-md bg-brand-tint border border-border flex-row items-center justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="eye-outline" size={15} color="#7C3AED" />
-            <Text className="text-xs font-bold text-violet-700 ml-1.5">Detalhes</Text>
+            <Ionicons name="eye-outline" size={15} color="#1C3D63" />
+            <Text className="text-xs font-semibold text-brand ml-1.5">Detalhes</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={(event: any) => {
               event?.stopPropagation?.();
               setMenuEnrollment(item);
             }}
-            className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 items-center justify-center"
+            className="w-9 h-9 rounded-ds-md bg-surface-sunken border border-border items-center justify-center"
             activeOpacity={0.85}
           >
-            <Ionicons name="ellipsis-horizontal" size={17} color="#4B5563" />
+            <Ionicons name="ellipsis-horizontal" size={17} color="#4B5463" />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -435,47 +431,47 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
       {/* Header */}
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Matrículas</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Matrículas</Text>
+          <Text className="text-sm text-ink-muted">
             Gerencie as matrículas de alunos em turmas
           </Text>
         </View>
         <TouchableOpacity
           onPress={() => navigate("matriculas-form")}
-          className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+          className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
           style={{ justifyContent: "center", width: isMobile ? "100%" : undefined }}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="white" />
           <Text className="text-white font-semibold text-sm ml-1.5">
-            Nova Matrícula
+            Nova matrícula
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Filters */}
-      <View className="bg-white border border-gray-200 rounded-2xl p-3 mb-4">
+      <View className="bg-surface border border-border rounded-ds-md p-3 mb-4">
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
             Filtros
           </Text>
           {hasActiveFilters ? (
             <TouchableOpacity
               onPress={clearFilters}
-              className="px-2 py-1 rounded-lg bg-gray-100"
+              className="px-2 py-1 rounded-ds-md bg-surface-sunken"
               activeOpacity={0.8}
             >
-              <Text className="text-xs font-semibold text-gray-600">Limpar</Text>
+              <Text className="text-xs font-semibold text-ink-muted">Limpar</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
         <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
           <View
-            className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3"
+            className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
             style={{ height: 44, minWidth: isMobile ? "100%" : 220, flexGrow: 1 }}
           >
-            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={16} color="#5F6878" />
             <input
               placeholder="Aluno ou matrícula..."
               value={search}
@@ -488,14 +484,14 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                 border: "none",
                 outline: "none",
                 fontSize: 14,
-                color: "#374151",
+                color: "#111722",
                 marginLeft: 8,
                 backgroundColor: "transparent",
               }}
             />
             {!!search.trim() ? (
               <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
-                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={16} color="#5F6878" />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -556,13 +552,13 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
       {isMobile ? (
         <View className="gap-3">
           {loading ? (
-            <View className="items-center justify-center py-16 bg-white rounded-2xl border border-gray-200">
-              <ActivityIndicator size="large" color="#7C3AED" />
+            <View className="items-center justify-center py-16 bg-surface rounded-ds-md border border-border">
+              <ActivityIndicator size="large" color="#1C3D63" />
             </View>
           ) : rows.length === 0 ? (
-            <View className="items-center justify-center py-14 bg-white rounded-2xl border border-gray-200">
-              <Ionicons name="clipboard-outline" size={40} color="#E5E7EB" />
-              <Text className="text-gray-400 mt-3 text-sm">
+            <View className="items-center justify-center py-14 bg-surface rounded-ds-md border border-border">
+              <Ionicons name="clipboard-outline" size={40} color="#D9DDE3" />
+              <Text className="text-ink-subtle mt-3 text-sm">
                 Nenhuma matrícula encontrada
               </Text>
             </View>
@@ -571,7 +567,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           )}
 
           {meta.total > 0 && (
-            <View className="bg-white rounded-2xl border border-gray-200 px-4">
+            <View className="bg-surface rounded-ds-md border border-border px-4">
               <Pagination
                 currentPage={meta.current_page}
                 lastPage={meta.last_page}
@@ -590,14 +586,10 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           contentContainerStyle={{ width: "100%" }}
         >
         <View
-          className="bg-white rounded-2xl overflow-hidden border border-gray-200"
+          className="bg-surface rounded-ds-md overflow-hidden border border-border"
           style={{
             width: "100%",
             minWidth: 980,
-            shadowColor: "#000",
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
-            elevation: 2,
           }}
         >
           <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
@@ -624,12 +616,12 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
 
           {loading ? (
             <View className="items-center justify-center py-20">
-              <ActivityIndicator size="large" color="#7C3AED" />
+              <ActivityIndicator size="large" color="#1C3D63" />
             </View>
           ) : rows.length === 0 ? (
             <View className="items-center justify-center py-16">
-              <Ionicons name="clipboard-outline" size={40} color="#E5E7EB" />
-              <Text className="text-gray-400 mt-3 text-sm">
+              <Ionicons name="clipboard-outline" size={40} color="#D9DDE3" />
+              <Text className="text-ink-subtle mt-3 text-sm">
                 Nenhuma matrícula encontrada
               </Text>
             </View>
@@ -669,10 +661,10 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                       event?.stopPropagation?.();
                       setMenuEnrollment(item);
                     }}
-                    className="p-1.5 bg-gray-100 rounded-lg border border-gray-200"
+                    className="p-1.5 bg-surface-sunken rounded-ds-md border border-border"
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="ellipsis-horizontal" size={16} color="#4B5563" />
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#4B5463" />
                   </TouchableOpacity>
                 </View>
               </DataTableRow>
@@ -680,7 +672,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           )}
 
           {meta.total > 0 && (
-            <View className="px-4 border-t border-gray-100">
+            <View className="px-4 border-t border-border">
               <Pagination
                 currentPage={meta.current_page}
                 lastPage={meta.last_page}
@@ -697,24 +689,24 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
       {/* View Modal */}
       <Modal
         visible={viewVisible}
-        title="Detalhes da Matrícula"
+        title="Detalhes da matrícula"
         onClose={() => setViewVisible(false)}
         size="lg"
         footer={
           <>
             <TouchableOpacity
               onPress={() => setViewVisible(false)}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 py-2.5 rounded-ds-md border border-border"
             >
-              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+              <Text className="text-sm font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
             {viewData && (
               <TouchableOpacity
                 onPress={() => { setViewVisible(false); openEdit(viewData); }}
-                className="px-5 py-2.5 rounded-xl bg-violet-600 flex-row items-center gap-2"
+                className="px-5 py-2.5 rounded-ds-md bg-brand flex-row items-center gap-2"
               >
                 <Ionicons name="pencil-outline" size={14} color="white" />
-                <Text className="text-sm font-bold text-white">Editar</Text>
+                <Text className="text-sm font-semibold text-white">Editar</Text>
               </TouchableOpacity>
             )}
           </>
@@ -722,15 +714,15 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
       >
         {loadingView ? (
           <View className="items-center py-10">
-            <ActivityIndicator size="large" color="#7C3AED" />
+            <ActivityIndicator size="large" color="#1C3D63" />
           </View>
         ) : viewData ? (
           <View className="gap-5">
             {/* Número e status */}
-            <View className="flex-row items-center justify-between bg-violet-50 rounded-xl px-4 py-3">
+            <View className="flex-row items-center justify-between bg-brand-tint rounded-ds-md px-4 py-3">
               <View>
-                <Text className="text-xs text-violet-400 font-medium uppercase tracking-wide mb-0.5">Nº Matrícula</Text>
-                <Text className="text-xl font-bold text-violet-700 tracking-widest">
+                <Text className="text-xs text-brand-tint font-medium uppercase tracking-wide mb-0.5">Nº Matrícula</Text>
+                <Text className="text-xl font-semibold text-brand tracking-widest">
                   {viewData.enrollment_number ?? "—"}
                 </Text>
               </View>
@@ -738,35 +730,35 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
             </View>
 
             {/* Aluno */}
-            <View className="bg-gray-50 rounded-xl px-4 py-3 gap-1">
-              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Aluno</Text>
-              <Text className="text-sm font-semibold text-gray-800">{viewData.student?.name ?? "—"}</Text>
+            <View className="bg-surface-sunken rounded-ds-md px-4 py-3 gap-1">
+              <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-1">Aluno</Text>
+              <Text className="text-sm font-semibold text-ink">{viewData.student?.name ?? "—"}</Text>
               {viewData.student?.enrollment_number && (
-                <Text className="text-xs text-gray-500">Matr.: {viewData.student.enrollment_number}</Text>
+                <Text className="text-xs text-ink-muted">Matr.: {viewData.student.enrollment_number}</Text>
               )}
               {viewData.guardian && (
-                <Text className="text-xs text-gray-500">Responsável: {viewData.guardian.name}</Text>
+                <Text className="text-xs text-ink-muted">Responsável: {viewData.guardian.name}</Text>
               )}
             </View>
 
             {/* Curso / Pacote */}
-            <View className="bg-gray-50 rounded-xl px-4 py-3 gap-1">
-              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+            <View className="bg-surface-sunken rounded-ds-md px-4 py-3 gap-1">
+              <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-1">
                 {enrollmentProductKind(viewData) === "bundle" ? "Pacote" : "Curso / Plano"}
               </Text>
-              <Text className="text-sm font-semibold text-gray-800">
+              <Text className="text-sm font-semibold text-ink">
                 {enrollmentProductTitle(viewData)}
               </Text>
               {enrollmentProductSubtitle(viewData) ? (
-                <Text className="text-xs text-gray-500">{enrollmentProductSubtitle(viewData)}</Text>
+                <Text className="text-xs text-ink-muted">{enrollmentProductSubtitle(viewData)}</Text>
               ) : null}
               {viewData.bundle?.cycle_label && (
-                <Text className="text-xs text-gray-500">
+                <Text className="text-xs text-ink-muted">
                   Cobrança {viewData.bundle.cycle_label.toLowerCase()}
                 </Text>
               )}
               {viewData.course_plan && enrollmentProductKind(viewData) !== "bundle" && (
-                <Text className="text-xs text-gray-500">
+                <Text className="text-xs text-ink-muted">
                   Plano: {viewData.course_plan.name} • {viewData.course_plan.cycle_label}
                 </Text>
               )}
@@ -774,19 +766,19 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
 
             {/* Datas */}
             <View className="flex-row gap-3">
-              <View className="flex-1 bg-gray-50 rounded-xl px-4 py-3">
-                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Início</Text>
-                <Text className="text-sm font-semibold text-gray-800">{fmt(viewData.start_date)}</Text>
+              <View className="flex-1 bg-surface-sunken rounded-ds-md px-4 py-3">
+                <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-1">Início</Text>
+                <Text className="text-sm font-semibold text-ink">{fmt(viewData.start_date)}</Text>
               </View>
-              <View className="flex-1 bg-gray-50 rounded-xl px-4 py-3">
-                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Término</Text>
-                <Text className="text-sm font-semibold text-gray-800">{fmt(viewData.end_date ?? null)}</Text>
+              <View className="flex-1 bg-surface-sunken rounded-ds-md px-4 py-3">
+                <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-1">Término</Text>
+                <Text className="text-sm font-semibold text-ink">{fmt(viewData.end_date ?? null)}</Text>
               </View>
             </View>
 
             {/* Financeiro */}
-            <View className="bg-gray-50 rounded-xl px-4 py-3">
-              <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Financeiro</Text>
+            <View className="bg-surface-sunken rounded-ds-md px-4 py-3">
+              <Text className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-3">Financeiro</Text>
               <View className="gap-2">
                 {[
                   { label: "Mensalidade", value: viewData.monthly_amount ? `R$ ${parseFloat(viewData.monthly_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—" },
@@ -794,22 +786,22 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                   { label: "Dia de vencimento", value: viewData.payment_due_day ? `Dia ${viewData.payment_due_day}` : "—" },
                 ].map((row) => (
                   <View key={row.label} className="flex-row justify-between items-center">
-                    <Text className="text-sm text-gray-500">{row.label}</Text>
-                    <Text className="text-sm font-semibold text-gray-800">{row.value}</Text>
+                    <Text className="text-sm text-ink-muted">{row.label}</Text>
+                    <Text className="text-sm font-semibold text-ink">{row.value}</Text>
                   </View>
                 ))}
               </View>
             </View>
 
             {viewData.created_at && (
-              <Text className="text-xs text-gray-400 text-right">
+              <Text className="text-xs text-ink-subtle text-right">
                 Criado em {fmt(viewData.created_at.slice(0, 10))}
               </Text>
             )}
           </View>
         ) : (
           <View className="items-center py-10">
-            <Text className="text-sm text-gray-400">Não foi possível carregar os dados.</Text>
+            <Text className="text-sm text-ink-subtle">Não foi possível carregar os dados.</Text>
           </View>
         )}
       </Modal>
@@ -837,7 +829,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
 
       <ConfirmModal
         visible={!!deleteId}
-        title="Excluir Matrícula"
+        title="Excluir matrícula"
         message="Esta ação não pode ser desfeita."
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}

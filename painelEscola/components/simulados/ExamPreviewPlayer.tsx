@@ -34,12 +34,12 @@ type Props = {
 
 const textAreaStyle = {
   width: "100%" as const,
-  border: "1px solid #E5E7EB",
-  borderRadius: 12,
+  border: "1px solid #D9DDE3",
+  borderRadius: 4,
   padding: "10px 14px",
   fontSize: 14,
-  color: "#1F2937",
-  backgroundColor: "#F9FAFB",
+  color: "#111722",
+  backgroundColor: "#F7F8FA",
   resize: "vertical" as const,
   fontFamily: "inherit",
   outline: "none",
@@ -72,10 +72,10 @@ function AnswerTextArea({
       value={value}
       onChangeText={onChange}
       placeholder={placeholder}
-      placeholderTextColor="#9CA3AF"
+      placeholderTextColor="#5F6878"
       multiline
       numberOfLines={rows}
-      className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 min-h-[96px]"
+      className="rounded-ds-md border border-border bg-surface-sunken px-4 py-3 text-sm text-ink min-h-[96px]"
       textAlignVertical="top"
     />
   );
@@ -205,7 +205,7 @@ export default function ExamPreviewPlayer({
   if (loading) {
     return (
       <View className="py-12 items-center">
-        <ActivityIndicator color="#7C3AED" size="large" />
+        <ActivityIndicator color="#1C3D63" size="large" />
       </View>
     );
   }
@@ -213,8 +213,8 @@ export default function ExamPreviewPlayer({
   if (questions.length === 0) {
     return (
       <View className="py-12 items-center gap-2">
-        <Ionicons name="help-circle-outline" size={32} color="#D1D5DB" />
-        <Text className="text-sm text-gray-400 text-center">{emptyMessage}</Text>
+        <Ionicons name="help-circle-outline" size={32} color="#7A8393" />
+        <Text className="text-sm text-ink-subtle text-center">{emptyMessage}</Text>
       </View>
     );
   }
@@ -222,17 +222,17 @@ export default function ExamPreviewPlayer({
   return (
     <View>
       <View
-        className="flex-row items-center gap-2 mb-4 px-4 py-3 rounded-xl"
-        style={{ backgroundColor: phase === "results" ? "#ECFDF5" : "#EFF6FF" }}
+        className="flex-row items-center gap-2 mb-4 px-4 py-3 rounded-ds-md"
+        style={{ backgroundColor: phase === "results" ? "#E5F1EA" : "#E9EFF6" }}
       >
         <Ionicons
           name={phase === "results" ? "checkmark-circle-outline" : "flask-outline"}
           size={18}
-          color={phase === "results" ? "#059669" : "#3B82F6"}
+          color={phase === "results" ? "#1C6A45" : "#1C3D63"}
         />
         <Text
           className="text-sm font-medium flex-1"
-          style={{ color: phase === "results" ? "#047857" : "#1D4ED8" }}
+          style={{ color: phase === "results" ? "#1C6A45" : "#132C4A" }}
         >
           {phase === "results"
             ? "Resultado do teste (simulação local — nada é salvo)"
@@ -243,13 +243,13 @@ export default function ExamPreviewPlayer({
       {header}
 
       {phase === "results" && canGrade && results && (
-        <View className="mb-5 p-4 rounded-2xl border border-emerald-200 bg-emerald-50">
-          <Text className="text-sm font-bold text-emerald-900">Objetivas (simulado)</Text>
-          <Text className="text-2xl font-bold text-emerald-800 mt-1">
+        <View className="mb-5 p-4 rounded-ds-md border border-success bg-success-tint">
+          <Text className="text-sm font-semibold text-emerald-900">Objetivas (simulado)</Text>
+          <Text className="text-2xl font-semibold text-success mt-1">
             {results.earned.toFixed(1)} / {results.maxObjective.toFixed(1)} pts
             {results.percentage != null ? ` (${results.percentage}%)` : ""}
           </Text>
-          <Text className="text-xs text-emerald-700 mt-1">
+          <Text className="text-xs text-success mt-1">
             Questões discursivas não entram na nota automática.
           </Text>
         </View>
@@ -263,27 +263,27 @@ export default function ExamPreviewPlayer({
         return (
           <View
             key={q.id}
-            className="mb-5 rounded-2xl border border-gray-100 overflow-hidden"
+            className="mb-5 rounded-ds-md border border-border overflow-hidden"
           >
             <View
               className="flex-row items-center justify-between px-5 py-3"
               style={{
                 backgroundColor:
                   showGabarito && qResult?.status === "correct"
-                    ? "#ECFDF5"
+                    ? "#E5F1EA"
                     : showGabarito && qResult?.status === "wrong"
-                      ? "#FEF2F2"
-                      : "#F5F3FF",
+                      ? "#FBE9E7"
+                      : "#E9EFF6",
               }}
             >
               <View className="flex-row items-center gap-2 flex-1">
                 <View
-                  className="items-center justify-center rounded-lg"
-                  style={{ width: 28, height: 28, backgroundColor: "#7C3AED" }}
+                  className="items-center justify-center rounded-ds-md"
+                  style={{ width: 28, height: 28, backgroundColor: "#1C3D63" }}
                 >
-                  <Text className="text-xs font-bold text-white">{q.order}</Text>
+                  <Text className="text-xs font-semibold text-white">{q.order}</Text>
                 </View>
-                <Text className="text-xs font-semibold text-violet-700">
+                <Text className="text-xs font-semibold text-brand">
                   {q.type === "essay"
                     ? "Discursiva"
                     : q.options.some((o) => o.triggers_text_input)
@@ -291,42 +291,42 @@ export default function ExamPreviewPlayer({
                       : "Objetiva"}
                 </Text>
                 {showGabarito && qResult?.status === "correct" && (
-                  <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                  <Ionicons name="checkmark-circle" size={16} color="#1C6A45" />
                 )}
                 {showGabarito && qResult?.status === "wrong" && (
-                  <Ionicons name="close-circle" size={16} color="#DC2626" />
+                  <Ionicons name="close-circle" size={16} color="#B0261B" />
                 )}
                 {showGabarito && qResult?.status === "unanswered" && (
-                  <Text className="text-[10px] text-amber-700 font-semibold">
+                  <Text className="text-[10px] text-warning font-semibold">
                     Não assinalou a opção
                   </Text>
                 )}
               </View>
-              <Text className="text-xs text-violet-600 font-semibold">
+              <Text className="text-xs text-brand font-semibold">
                 {q.points} pt{q.points !== 1 ? "s" : ""}
               </Text>
             </View>
 
             <View className="px-5 py-4">
-              <Text className="text-sm font-medium text-gray-800 mb-4 leading-relaxed">
+              <Text className="text-sm font-medium text-ink mb-4 leading-relaxed">
                 {q.question_text || "[Enunciado em imagem]"}
               </Text>
 
               {q.image_url ? (
-                <View className="mb-4 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                <View className="mb-4 rounded-ds-md overflow-hidden border border-border bg-surface-sunken">
                   {!brokenImages[q.id] ? (
                     <Image
                       source={{ uri: q.image_url }}
-                      style={{ width: "100%", height: 220, backgroundColor: "#F3F4F6" }}
+                      style={{ width: "100%", height: 220, backgroundColor: "#F7F8FA" }}
                       resizeMode="contain"
                       onError={() =>
                         setBrokenImages((prev) => ({ ...prev, [q.id]: true }))
                       }
                     />
                   ) : (
-                    <View className="h-[220px] items-center justify-center bg-gray-100">
-                      <Ionicons name="image-outline" size={28} color="#9CA3AF" />
-                      <Text className="text-xs text-gray-400 mt-2">
+                    <View className="h-[220px] items-center justify-center bg-surface-sunken">
+                      <Ionicons name="image-outline" size={28} color="#5F6878" />
+                      <Text className="text-xs text-ink-subtle mt-2">
                         Não foi possível carregar a imagem
                       </Text>
                     </View>
@@ -337,11 +337,11 @@ export default function ExamPreviewPlayer({
               {q.video_url ? (
                 <TouchableOpacity
                   onPress={() => Linking.openURL(q.video_url!)}
-                  className="flex-row items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100"
+                  className="flex-row items-center gap-2 mb-4 px-3 py-2 rounded-ds-md bg-brand-tint border border-border"
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="play-circle-outline" size={18} color="#2563EB" />
-                  <Text className="text-xs font-semibold text-blue-700">Abrir vídeo do enunciado</Text>
+                  <Ionicons name="play-circle-outline" size={18} color="#1C3D63" />
+                  <Text className="text-xs font-semibold text-brand">Abrir vídeo do enunciado</Text>
                 </TouchableOpacity>
               ) : null}
 
@@ -352,13 +352,13 @@ export default function ExamPreviewPlayer({
                   const showCorrect = showGabarito && isCorrect;
                   const showWrong = showGabarito && isSelected && !isCorrect;
 
-                  let borderClass = "border-gray-200 bg-white";
+                  let borderClass = "border-border bg-surface";
                   if (phase === "answering" && isSelected) {
-                    borderClass = "border-violet-400 bg-violet-50";
+                    borderClass = "border-brand bg-brand-tint";
                   } else if (showCorrect) {
-                    borderClass = "border-emerald-400 bg-emerald-50";
+                    borderClass = "border-emerald-400 bg-success-tint";
                   } else if (showWrong) {
-                    borderClass = "border-red-300 bg-red-50";
+                    borderClass = "border-danger bg-danger-tint";
                   }
 
                   return (
@@ -373,17 +373,17 @@ export default function ExamPreviewPlayer({
                         }
                       }}
                       activeOpacity={phase === "results" ? 1 : 0.75}
-                      className={`flex-row items-center gap-3 mb-2.5 px-4 py-3 rounded-xl border ${borderClass}`}
+                      className={`flex-row items-center gap-3 mb-2.5 px-4 py-3 rounded-ds-md border ${borderClass}`}
                     >
                       <View
                         className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
                           isSelected || showCorrect
                             ? showWrong
-                              ? "border-red-500"
-                              : "border-violet-500"
+                              ? "border-danger"
+                              : "border-brand"
                             : showCorrect
                               ? "border-emerald-500"
-                              : "border-gray-300"
+                              : "border-border-strong"
                         }`}
                       >
                         {(isSelected || showCorrect) && (
@@ -393,10 +393,10 @@ export default function ExamPreviewPlayer({
                               width: 10,
                               height: 10,
                               backgroundColor: showWrong
-                                ? "#EF4444"
+                                ? "#B0261B"
                                 : showCorrect
-                                  ? "#10B981"
-                                  : "#7C3AED",
+                                  ? "#1C6A45"
+                                  : "#1C3D63",
                             }}
                           />
                         )}
@@ -404,18 +404,18 @@ export default function ExamPreviewPlayer({
                       <Text
                         className={`text-sm flex-1 ${
                           showWrong
-                            ? "text-red-800"
+                            ? "text-danger"
                             : showCorrect
-                              ? "text-emerald-800 font-medium"
+                              ? "text-success font-medium"
                               : isSelected
-                                ? "text-violet-800 font-medium"
-                                : "text-gray-700"
+                                ? "text-brand font-medium"
+                                : "text-ink"
                         }`}
                       >
                         {opt.option_text}
                       </Text>
                       {showGabarito && isCorrect && (
-                        <Text className="text-[10px] font-bold text-emerald-700">Gabarito</Text>
+                        <Text className="text-[10px] font-semibold text-success">Gabarito</Text>
                       )}
                     </TouchableOpacity>
                   );
@@ -434,7 +434,7 @@ export default function ExamPreviewPlayer({
                 optionId != null &&
                 q.options.find((o) => o.id === optionId)?.triggers_text_input && (
                   <View className="mt-2">
-                    <Text className="text-xs font-semibold text-gray-500 mb-2">Especifique:</Text>
+                    <Text className="text-xs font-semibold text-ink-muted mb-2">Especifique:</Text>
                     <AnswerTextArea
                       value={texts[q.id] ?? ""}
                       onChange={(v) => setTexts((prev) => ({ ...prev, [q.id]: v }))}
@@ -445,33 +445,33 @@ export default function ExamPreviewPlayer({
                 )}
 
               {phase === "results" && qResult?.status === "unanswered" && (
-                <View className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
-                  <Text className="text-xs text-amber-800 font-semibold">
+                <View className="mt-3 rounded-ds-md border border-warning bg-warning-tint px-3 py-2">
+                  <Text className="text-xs text-warning font-semibold">
                     O aluno não assinalou a opção.
                   </Text>
                 </View>
               )}
 
               {phase === "results" && q.type === "essay" && !(texts[q.id] ?? "").trim() && (
-                <View className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
-                  <Text className="text-xs text-amber-800 font-semibold">
+                <View className="mt-3 rounded-ds-md border border-warning bg-warning-tint px-3 py-2">
+                  <Text className="text-xs text-warning font-semibold">
                     O aluno não respondeu esta questão.
                   </Text>
                 </View>
               )}
 
               {phase === "results" && q.explanation?.trim() ? (
-                <View className="mt-4 rounded-xl border border-violet-100 bg-violet-50 px-3 py-3">
-                  <Text className="text-[10px] font-bold text-violet-700 uppercase mb-1">
+                <View className="mt-4 rounded-ds-md border border-border bg-brand-tint px-3 py-3">
+                  <Text className="text-[10px] font-semibold text-brand uppercase mb-1">
                     Explicação / gabarito
                   </Text>
-                  <Text className="text-xs text-violet-900 leading-relaxed">{q.explanation}</Text>
+                  <Text className="text-xs text-brand leading-relaxed">{q.explanation}</Text>
                 </View>
               ) : null}
 
               {phase === "results" && q.type === "essay" && (texts[q.id] ?? "").trim() ? (
-                <View className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2">
-                  <Text className="text-xs text-amber-800">
+                <View className="mt-3 rounded-ds-md border border-warning bg-warning-tint px-3 py-2">
+                  <Text className="text-xs text-warning">
                     Discursiva: na versão do aluno, aguardaria correção manual.
                   </Text>
                 </View>
@@ -486,29 +486,29 @@ export default function ExamPreviewPlayer({
           <>
             <TouchableOpacity
               onPress={handleFinalizePress}
-              className="px-6 py-3 rounded-xl bg-violet-600 flex-row items-center gap-2"
+              className="px-6 py-3 rounded-ds-md bg-brand flex-row items-center gap-2"
               activeOpacity={0.85}
             >
               <Ionicons name="checkmark-done-outline" size={18} color="#FFFFFF" />
-              <Text className="text-sm font-bold text-white">Finalizar teste</Text>
+              <Text className="text-sm font-semibold text-white">Finalizar teste</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleExportPdf}
               disabled={exportingPdf}
-              className="px-5 py-3 rounded-xl border border-violet-200 bg-violet-50 flex-row items-center gap-2"
+              className="px-5 py-3 rounded-ds-md border border-border bg-brand-tint flex-row items-center gap-2"
               activeOpacity={0.85}
               style={{ opacity: exportingPdf ? 0.7 : 1 }}
             >
               {exportingPdf ? (
-                <ActivityIndicator size="small" color="#7C3AED" />
+                <ActivityIndicator size="small" color="#1C3D63" />
               ) : (
-                <Ionicons name="download-outline" size={18} color="#7C3AED" />
+                <Ionicons name="download-outline" size={18} color="#1C3D63" />
               )}
-              <Text className="text-sm font-bold text-violet-700">
+              <Text className="text-sm font-semibold text-brand">
                 {exportingPdf ? "Gerando PDF..." : "Gerar PDF"}
               </Text>
             </TouchableOpacity>
-            <Text className="text-xs text-gray-400 self-center">
+            <Text className="text-xs text-ink-subtle self-center">
               {answeredCount}/{questions.length} respondida{answeredCount !== 1 ? "s" : ""}
             </Text>
           </>
@@ -516,32 +516,32 @@ export default function ExamPreviewPlayer({
           <>
             <TouchableOpacity
               onPress={resetTest}
-              className="px-6 py-3 rounded-xl border border-violet-200 bg-violet-50 flex-row items-center gap-2"
+              className="px-6 py-3 rounded-ds-md border border-border bg-brand-tint flex-row items-center gap-2"
               activeOpacity={0.85}
             >
-              <Ionicons name="refresh-outline" size={18} color="#7C3AED" />
-              <Text className="text-sm font-bold text-violet-700">Testar novamente</Text>
+              <Ionicons name="refresh-outline" size={18} color="#1C3D63" />
+              <Text className="text-sm font-semibold text-brand">Testar novamente</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setPhase("answering")}
-              className="px-5 py-3 rounded-xl border border-gray-200 bg-white"
+              className="px-5 py-3 rounded-ds-md border border-border bg-surface"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-gray-700">Revisar respostas</Text>
+              <Text className="text-sm font-semibold text-ink">Revisar respostas</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleExportPdf}
               disabled={exportingPdf}
-              className="px-5 py-3 rounded-xl border border-violet-200 bg-violet-50 flex-row items-center gap-2"
+              className="px-5 py-3 rounded-ds-md border border-border bg-brand-tint flex-row items-center gap-2"
               activeOpacity={0.85}
               style={{ opacity: exportingPdf ? 0.7 : 1 }}
             >
               {exportingPdf ? (
-                <ActivityIndicator size="small" color="#7C3AED" />
+                <ActivityIndicator size="small" color="#1C3D63" />
               ) : (
-                <Ionicons name="download-outline" size={18} color="#7C3AED" />
+                <Ionicons name="download-outline" size={18} color="#1C3D63" />
               )}
-              <Text className="text-sm font-bold text-violet-700">
+              <Text className="text-sm font-semibold text-brand">
                 {exportingPdf ? "Gerando PDF..." : "Gerar PDF"}
               </Text>
             </TouchableOpacity>

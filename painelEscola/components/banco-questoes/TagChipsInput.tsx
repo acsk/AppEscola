@@ -30,19 +30,19 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
 
   return (
     <View className="mb-3">
-      <Text className="text-xs font-medium text-gray-600 mb-1" nativeID={`tags-${label}`}>
+      <Text className="text-xs font-medium text-ink-muted mb-1" nativeID={`tags-${label}`}>
         {label}
       </Text>
-      <View className="rounded-xl border border-gray-200 bg-white px-2 py-1.5 flex-row flex-wrap items-center gap-1.5">
+      <View className="rounded-ds-md border border-border bg-surface px-2 py-1.5 flex-row flex-wrap items-center gap-1.5">
         {value.map((tag) => (
-          <View key={tag} className="flex-row items-center rounded-full bg-violet-50 border border-violet-200 pl-2 pr-1 py-0.5">
-            <Text className="text-xs text-violet-700">{tag}</Text>
+          <View key={tag} className="flex-row items-center rounded-full bg-brand-tint border border-border pl-2 pr-1 py-0.5">
+            <Text className="text-xs text-brand">{tag}</Text>
             <TouchableOpacity
               onPress={() => onChange(value.filter((t) => t !== tag))}
               aria-label={`Remover tag ${tag}`}
               className="ml-1"
             >
-              <Ionicons name="close" size={12} color="#6D28D9" />
+              <Ionicons name="close" size={12} color="#132C4A" />
             </TouchableOpacity>
           </View>
         ))}
@@ -52,9 +52,9 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
           onSubmitEditing={() => commit(text)}
           blurOnSubmit={false}
           placeholder={value.length ? "" : "Digite e tecle Enter"}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#5F6878"
           aria-labelledby={`tags-${label}`}
-          className="text-xs text-gray-800"
+          className="text-xs text-ink"
           style={{ minWidth: 120, flexGrow: 1, height: 28 }}
           maxLength={50}
         />
@@ -65,9 +65,9 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
             <TouchableOpacity
               key={name}
               onPress={() => commit(name)}
-              className="rounded-full border border-gray-200 px-2 py-0.5"
+              className="rounded-full border border-border px-2 py-0.5"
             >
-              <Text className="text-xs text-gray-600">+ {name}</Text>
+              <Text className="text-xs text-ink-muted">+ {name}</Text>
             </TouchableOpacity>
           ))}
         </View>

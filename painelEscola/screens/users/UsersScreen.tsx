@@ -14,6 +14,7 @@ import Pagination from "../../components/ui/Pagination";
 import Badge from "../../components/ui/Badge";
 import { useAuth } from "../../contexts/AuthContext";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import { roleLabel } from "../../utils/permissions";
 
 type UserRow = {
   id: number;
@@ -50,15 +51,6 @@ type Props = {
   flashMessage?: string;
 };
 
-function roleLabel(role: string) {
-  if (role === "super_admin") return "Super Admin";
-  if (role === "admin") return "Admin";
-  if (role === "secretaria") return "Secretaria";
-  if (role === "professor") return "Professor";
-  if (role === "financeiro") return "Financeiro";
-  if (role === "aluno") return "Aluno";
-  return role;
-}
 
 function statusLabel(status: string) {
   if (status === "active") return "Ativo";

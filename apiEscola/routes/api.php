@@ -331,6 +331,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::prefix('question-bank')->group(function () {
         Route::get('questions',                          [QuestionBankController::class, 'index']);
         Route::get('questions/ids',                      [QuestionBankController::class, 'ids']);
+        Route::post('questions',                         [QuestionBankController::class, 'store']);
+        Route::post('questions/upload-image',            [QuestionBankController::class, 'uploadImage']);
+        Route::put('questions/{question}',               [QuestionBankController::class, 'update'])->whereNumber('question');
+        Route::delete('questions/{question}',            [QuestionBankController::class, 'destroy'])->whereNumber('question');
         Route::get('questions/years',                    [QuestionBankController::class, 'years']);
         Route::patch('questions/classification',         [QuestionBankController::class, 'batchClassification']);
         Route::get('questions/{question}',               [QuestionBankController::class, 'show'])->whereNumber('question');

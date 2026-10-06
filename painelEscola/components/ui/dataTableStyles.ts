@@ -1,16 +1,18 @@
 import type { StyleProp, ViewStyle } from "react-native";
+import { color } from "../../constants/theme";
 
 /**
- * Padrão visual de tabelas desktop no painel (ver painel-escola.md).
+ * Padrão de tabelas do painel (design system "Cursinho Hub"; ver painel-escola.md).
+ * Sem zebra: linhas separadas por borda `border`, hover em `surface-sunken`, cabeçalho em `surface-sunken`.
  * Cores via style (RN Web não aplica bem bg com opacidade no className).
  */
 
-/** Fundos das linhas — usar com tableBodyRowStyle() */
+/** Fundos das linhas. `even`/`odd` iguais (sem zebra); mantidos por compatibilidade. */
 export const TABLE_ROW_BG = {
-  even: "#FFFFFF",
-  odd: "#F1F5F9",
-  hover: "#EDE9FE",
-  header: "#F3F4F6",
+  even: color.surface,
+  odd: color.surface,
+  hover: color["surface-sunken"],
+  header: color["surface-sunken"],
 } as const;
 
 export const TABLE_BODY_ROW_LAYOUT: ViewStyle = {
@@ -18,54 +20,53 @@ export const TABLE_BODY_ROW_LAYOUT: ViewStyle = {
   alignItems: "center",
   alignSelf: "stretch",
   width: "100%",
-  paddingHorizontal: 12,
-  paddingVertical: 10,
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: color.border,
 };
 
 /** Linha de cabeçalho — className + style */
-export const TABLE_HEADER_ROW = "flex-row border-b border-gray-200 px-3 py-2.5";
+export const TABLE_HEADER_ROW = "flex-row border-b border-border px-4 py-2.5";
 
 export const TABLE_HEADER_ROW_STYLE: ViewStyle = {
   backgroundColor: TABLE_ROW_BG.header,
 };
 
-/** Texto das colunas do cabeçalho */
-export const TABLE_HEADER_CELL = "text-xs font-semibold text-gray-600 uppercase tracking-wide";
+/** Texto das colunas do cabeçalho (12px/500, sem caixa alta) */
+export const TABLE_HEADER_CELL = "text-xs font-medium text-ink-muted tracking-wide";
 
-/** Fundo zebrado por índice (obrigatório no style da linha) */
-export function tableBodyRowStyle(index: number): ViewStyle {
-  return {
-    backgroundColor: index % 2 === 1 ? TABLE_ROW_BG.odd : TABLE_ROW_BG.even,
-  };
+/** Fundo da linha do corpo (sem zebra; o índice é mantido por compatibilidade). */
+export function tableBodyRowStyle(_index: number): ViewStyle {
+  return { backgroundColor: TABLE_ROW_BG.even };
 }
 
 /** @deprecated Preferir tableBodyRowStyle(index) + DataTableRow */
 export function tableBodyRowClass(_index: number): string {
-  return "flex-row items-center px-3 py-2.5";
+  return "flex-row items-center px-4 py-3 border-b border-border";
 }
 
-/** Célula padrão */
-export const TABLE_CELL = "text-xs text-gray-800";
+/** Célula padrão (14px) */
+export const TABLE_CELL = "text-sm text-ink";
 
 /** Célula com ênfase (nome, título) */
-export const TABLE_CELL_SEMIBOLD = "text-xs font-semibold text-gray-800";
+export const TABLE_CELL_SEMIBOLD = "text-sm font-medium text-ink";
 
 /** Célula secundária / metadado */
-export const TABLE_CELL_MUTED = "text-xs text-gray-500";
+export const TABLE_CELL_MUTED = "text-sm text-ink-muted";
 
 /** Subtítulo abaixo do valor principal na mesma coluna */
-export const TABLE_CELL_SUBLINE = "text-xs text-gray-500 mt-0.5";
+export const TABLE_CELL_SUBLINE = "text-xs text-ink-subtle mt-0.5";
 
-/** Matrícula (tema violeta, mono) */
-export const TABLE_CELL_ENROLLMENT = "text-xs font-mono font-semibold text-violet-600";
+/** Matrícula, datas, horários, quantidades (mono, tabular) */
+export const TABLE_CELL_ENROLLMENT = "text-sm font-mono text-ink";
 
-/** Container da tabela dentro do card */
-export const TABLE_CONTAINER =
-  "bg-white rounded-2xl overflow-hidden border border-gray-200";
+/** Dados tabulares em mono (datas, horários, códigos). */
+export const TABLE_CELL_MONO = "text-sm font-mono text-ink";
 
-export function mergeTableRowStyle(
-  index: number,
-  extra?: StyleProp<ViewStyle>
-): StyleProp<ViewStyle> {
+/** Container da tabela */
+export const TABLE_CONTAINER = "bg-surface rounded-ds-md overflow-hidden border border-border";
+
+export function mergeTableRowStyle(index: number, extra?: StyleProp<ViewStyle>): StyleProp<ViewStyle> {
   return [TABLE_BODY_ROW_LAYOUT, tableBodyRowStyle(index), extra];
 }

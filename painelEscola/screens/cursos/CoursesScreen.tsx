@@ -90,30 +90,30 @@ export default function CoursesScreen({ navigate }: Props) {
         style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}
       >
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Cursos</Text>
-          <Text className="text-sm text-gray-500">
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Cursos</Text>
+          <Text className="text-sm text-ink-muted">
             Cursos oferecidos pelo cursinho
           </Text>
         </View>
         <View style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
           <TouchableOpacity
             onPress={() => navigate("pacotes")}
-            className="flex-row items-center bg-white border border-violet-200 px-4 py-2.5 rounded-xl"
+            className="flex-row items-center bg-surface border border-border px-4 py-2.5 rounded-ds-md"
             activeOpacity={0.85}
           >
-            <Ionicons name="albums-outline" size={16} color="#7C3AED" />
-            <Text className="text-violet-600 font-semibold text-sm ml-1.5">
+            <Ionicons name="albums-outline" size={16} color="#1C3D63" />
+            <Text className="text-brand font-semibold text-sm ml-1.5">
               Pacotes
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigate("cursos-form")}
-            className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+            className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
             activeOpacity={0.85}
           >
             <Ionicons name="add" size={18} color="white" />
             <Text className="text-white font-semibold text-sm ml-1.5">
-              Novo Curso
+              Novo curso
             </Text>
           </TouchableOpacity>
         </View>
@@ -122,10 +122,10 @@ export default function CoursesScreen({ navigate }: Props) {
       {/* Filtros */}
       <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
         <View
-          className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4"
+          className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4"
           style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}
         >
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={16} color="#5F6878" />
           <TextInput
             value={search}
             onChangeText={(v) => {
@@ -133,12 +133,12 @@ export default function CoursesScreen({ navigate }: Props) {
               setPage(1);
             }}
             placeholder="Buscar curso..."
-            placeholderTextColor="#9CA3AF"
-            className="flex-1 ml-2 text-sm text-gray-800"
+            placeholderTextColor="#5F6878"
+            className="flex-1 ml-2 text-sm text-ink"
           />
           {!!search && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={16} color="#5F6878" />
             </TouchableOpacity>
           )}
         </View>
@@ -149,11 +149,11 @@ export default function CoursesScreen({ navigate }: Props) {
             setPage(1);
           }}
           style={{
-            border: "1px solid #E5E7EB",
-            borderRadius: 12,
+            border: "1px solid #D9DDE3",
+            borderRadius: 4,
             padding: "0 14px",
             fontSize: 14,
-            color: "#374151",
+            color: "#111722",
             backgroundColor: "white",
             height: 44,
             minWidth: isMobile ? "100%" : 160,
@@ -173,14 +173,10 @@ export default function CoursesScreen({ navigate }: Props) {
         contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
       >
       <View
-        className="bg-white rounded-2xl overflow-hidden"
+        className="bg-surface rounded-ds-md overflow-hidden border border-border"
         style={{
           width: "100%",
           minWidth: tableMinWidth,
-          shadowColor: "#000",
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 2,
         }}
       >
         <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
@@ -198,12 +194,12 @@ export default function CoursesScreen({ navigate }: Props) {
 
         {loading ? (
           <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color="#7C3AED" />
+            <ActivityIndicator size="large" color="#1C3D63" />
           </View>
         ) : rows.length === 0 ? (
           <View className="items-center justify-center py-16">
-            <Ionicons name="book-outline" size={40} color="#E5E7EB" />
-            <Text className="text-gray-400 mt-3 text-sm">
+            <Ionicons name="book-outline" size={40} color="#D9DDE3" />
+            <Text className="text-ink-subtle mt-3 text-sm">
               Nenhum curso encontrado
             </Text>
           </View>
@@ -230,15 +226,15 @@ export default function CoursesScreen({ navigate }: Props) {
                   onPress={() =>
                     navigate("cursos-form", { courseId: item.id })
                   }
-                  className="p-1.5 bg-violet-50 rounded-lg"
+                  className="p-1.5 bg-brand-tint rounded-ds-md"
                 >
-                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                  <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setDeleteId(item.id)}
-                  className="p-1.5 bg-red-50 rounded-lg"
+                  className="p-1.5 bg-danger-tint rounded-ds-md"
                 >
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                  <Ionicons name="trash-outline" size={15} color="#B0261B" />
                 </TouchableOpacity>
               </View>
             </DataTableRow>
@@ -246,7 +242,7 @@ export default function CoursesScreen({ navigate }: Props) {
         )}
 
         {meta.total > 0 && (
-          <View className="px-4 border-t border-gray-100">
+          <View className="px-4 border-t border-border">
             <Pagination
               currentPage={meta.current_page}
               lastPage={meta.last_page}
@@ -261,7 +257,7 @@ export default function CoursesScreen({ navigate }: Props) {
 
       <ConfirmModal
         visible={!!deleteId}
-        title="Excluir Curso"
+        title="Excluir curso"
         message="Esta ação não pode ser desfeita. O curso e todos os seus planos serão removidos."
         onConfirm={remove}
         onCancel={() => setDeleteId(null)}

@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import React, { useEffect, type ReactNode } from "react";
 import { Modal, Platform, View, type ViewStyle } from "react-native";
 import { createPortal } from "react-dom";
 
@@ -22,11 +22,24 @@ export default function OverlayPortal({
   children,
   contentPadding = 0,
 }: Props) {
+  // Web: Esc fecha o overlay.
+  useEffect(() => {
+    if (!open || Platform.OS !== "web" || typeof document === "undefined") return;
+    // Captura + stopImmediatePropagation: um seletor aberto sobre um Modal fecha sozinho, sem fechar o Modal.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopImmediatePropagation();
+      onClose();
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const shellStyle: ViewStyle = {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(17,23,34,0.45)",
     alignItems: "center",
     justifyContent: "center",
     padding: contentPadding,

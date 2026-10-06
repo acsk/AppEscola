@@ -1,26 +1,16 @@
 import React from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import Badge from "../ui/Badge";
 
 type Props = { isAnnulled: boolean; isOutdated: boolean };
 
-/** Situação da questão com texto (não só cor). */
+/** Situação da questão com palavra (a cor nunca é a única pista). */
 export default function QuestionStatusBadge({ isAnnulled, isOutdated }: Props) {
-  const items = [
-    isAnnulled && { label: "Anulada", bg: "#FEE2E2", fg: "#B91C1C" },
-    isOutdated && { label: "Desatualizada", bg: "#FEF3C7", fg: "#B45309" },
-  ].filter(Boolean) as { label: string; bg: string; fg: string }[];
-
-  if (items.length === 0) items.push({ label: "Regular", bg: "#DCFCE7", fg: "#15803D" });
-
+  if (!isAnnulled && !isOutdated) return <Badge label="Regular" tone="success" dot />;
   return (
-    <View className="flex-row flex-wrap gap-1">
-      {items.map((item) => (
-        <View key={item.label} className="rounded-full px-2 py-0.5" style={{ backgroundColor: item.bg }}>
-          <Text className="text-xs font-semibold" style={{ color: item.fg }}>
-            {item.label}
-          </Text>
-        </View>
-      ))}
+    <View className="flex-row flex-wrap" style={{ gap: 4 }}>
+      {isAnnulled && <Badge label="Anulada" tone="danger" dot />}
+      {isOutdated && <Badge label="Desatualizada" tone="warning" dot />}
     </View>
   );
 }

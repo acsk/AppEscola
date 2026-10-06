@@ -41,6 +41,19 @@ class TenantUploadSettingsService
         ];
     }
 
+    /** Imagens de questões avulsas do banco de questões (sem simulado). */
+    public function buildQuestionBankDirectory(Tenant $tenant, string|int $questionSegment): array
+    {
+        $config = $this->getForTenant($tenant);
+
+        return [
+            'disk' => $config['disk'],
+            'directory' => $this->normalizePath(
+                $config['base_path'] . '/question-bank/' . $tenant->id . '/' . $questionSegment
+            ),
+        ];
+    }
+
     public function buildStudentPhotoDirectory(Tenant $tenant, int $studentId): array
     {
         $config = $this->getForTenant($tenant);

@@ -69,16 +69,16 @@ export default function DatePickerInput({
     setOpen(false);
   };
 
-  const borderColor = error ? "#EF4444" : "#E5E7EB";
+  const borderColor = error ? "#B0261B" : "#7A8393"; // `border-strong` em controles
   const modalWidth = Math.min(width - 32, 340);
 
   return (
     <View className={compact ? "mb-2" : "mb-4"}>
       <Text
-        className={`font-semibold text-gray-700 ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
+        className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}
       >
         {label}
-        {required && <Text className="text-red-500"> *</Text>}
+        {required && <Text className="text-danger"> *</Text>}
       </Text>
 
       <View
@@ -87,10 +87,10 @@ export default function DatePickerInput({
           alignItems: "center",
           borderWidth: 1,
           borderColor,
-          borderRadius: 12,
-          paddingHorizontal: 14,
-          height: 44,
-          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
+          borderRadius: 4,
+          paddingHorizontal: 12,
+          height: 38,
+          backgroundColor: disabled ? "#F7F8FA" : "#FFFFFF",
           opacity: disabled ? 0.7 : 1,
         }}
       >
@@ -98,8 +98,9 @@ export default function DatePickerInput({
           value={value}
           onChangeText={(v) => onChangeText(maskDate(v))}
           placeholder="DD/MM/AAAA"
-          placeholderTextColor="#9CA3AF"
-          className={`flex-1 text-sm ${disabled ? "text-gray-400" : "text-gray-800"}`}
+          placeholderTextColor="#5F6878"
+          className={`flex-1 text-sm ${disabled ? "text-ink-subtle" : "text-ink"}`}
+          style={{ minWidth: 0 }}
           maxLength={10}
           keyboardType="numeric"
           editable={!disabled}
@@ -111,26 +112,26 @@ export default function DatePickerInput({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ marginRight: 8 }}
           >
-            <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+            <Ionicons name="close-circle" size={16} color="#5F6878" />
           </TouchableOpacity>
         ) : null}
 
         <TouchableOpacity onPress={openPicker} disabled={disabled} activeOpacity={0.85}>
-          <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
         </TouchableOpacity>
       </View>
 
-      {error ? <Text className="text-xs text-red-500 mt-1">{error}</Text> : null}
+      {error ? <Text className="text-xs text-danger mt-1">{error}</Text> : null}
 
       <OverlayPortal open={open} onClose={() => setOpen(false)} contentPadding={16}>
             <View
               style={{
                 width: modalWidth,
                 backgroundColor: "white",
-                borderRadius: 16,
+                borderRadius: 4,
                 overflow: "hidden",
                 borderWidth: 1,
-                borderColor: "#E5E7EB",
+                borderColor: "#D9DDE3",
               }}
             >
               <View
@@ -141,17 +142,17 @@ export default function DatePickerInput({
                   paddingHorizontal: 16,
                   paddingVertical: 14,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#F3F4F6",
+                  borderBottomColor: "#F7F8FA",
                 }}
               >
-                <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "#111722" }}>
                   {modalTitle}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setOpen(false)}
-                  style={{ padding: 4, backgroundColor: "#F3F4F6", borderRadius: 8 }}
+                  style={{ padding: 4, backgroundColor: "#F7F8FA", borderRadius: 4 }}
                 >
-                  <Ionicons name="close" size={18} color="#6B7280" />
+                  <Ionicons name="close" size={18} color="#4B5463" />
                 </TouchableOpacity>
               </View>
 

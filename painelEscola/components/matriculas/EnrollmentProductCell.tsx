@@ -25,13 +25,13 @@ export default function EnrollmentProductCell({ item, compact = false, flex = 2 
       {badge ? (
         <View className="flex-row items-center mb-0.5">
           <View
-            className={`${compact ? "px-1 py-0" : "px-1.5 py-0.5"} rounded ${
-              kind === "bundle" ? "bg-violet-100" : "bg-sky-100"
+            className={`${compact ? "px-1 py-0" : "px-1.5 py-0.5"} rounded-ds-md ${
+              kind === "bundle" ? "bg-brand-tint" : "bg-brand-tint"
             }`}
           >
             <Text
-              className={`${compact ? "text-[9px]" : "text-[10px]"} font-bold uppercase tracking-wide ${
-                kind === "bundle" ? "text-violet-700" : "text-sky-700"
+              className={`${compact ? "text-[9px]" : "text-[10px]"} font-semibold uppercase tracking-wide ${
+                kind === "bundle" ? "text-brand" : "text-brand"
               }`}
             >
               {badge}
@@ -40,14 +40,14 @@ export default function EnrollmentProductCell({ item, compact = false, flex = 2 
         </View>
       ) : null}
       <Text
-        className={`${compact ? "text-xs" : "text-sm"} font-semibold text-gray-800`}
+        className={`${compact ? "text-xs" : "text-sm"} font-semibold text-ink`}
         numberOfLines={1}
       >
         {title}
       </Text>
       {subtitle ? (
         <Text
-          className={`${compact ? "text-[11px]" : "text-xs"} text-gray-500 mt-0.5`}
+          className={`${compact ? "text-[11px]" : "text-xs"} text-ink-muted mt-0.5`}
           numberOfLines={compact ? 1 : 2}
         >
           {subtitle}

@@ -53,6 +53,33 @@ export async function patchQuestionClassification(id: number, patch: Classificat
   return data as { type: string; message: string; body: QuestionBankQuestion };
 }
 
+// ── Questões avulsas (conteúdo) ─────────────────────────────────────────────
+
+/** Cria questão avulsa (conteúdo + classificação opcional). Devolve o envelope (toast usa a mensagem da API). */
+export async function createStandaloneQuestion(payload: Record<string, unknown>) {
+  const { data } = await api.post("/question-bank/questions", payload);
+  return data as { type: string; message: string; body: QuestionBankQuestion };
+}
+
+export async function updateStandaloneQuestion(id: number, payload: Record<string, unknown>) {
+  const { data } = await api.put(`/question-bank/questions/${id}`, payload);
+  return data as { type: string; message: string; body: QuestionBankQuestion };
+}
+
+export async function deleteStandaloneQuestion(id: number) {
+  const { data } = await api.delete(`/question-bank/questions/${id}`);
+  return data;
+}
+
+/** Upload da imagem do enunciado; devolve a URL pública. */
+export async function uploadQuestionBankImage(file: File, questionId?: number) {
+  const formData = new FormData();
+  formData.append("image", file);
+  if (questionId) formData.append("question_id", String(questionId));
+  const { data } = await api.post("/question-bank/questions/upload-image", formData);
+  return data as { type: string; message: string; body: { image_url: string } };
+}
+
 /**
  * Classificação em lote, em blocos sequenciais. Um bloco que falha inteiro (rede, 5xx)
  * vira falha de cada item dele; os demais blocos continuam.

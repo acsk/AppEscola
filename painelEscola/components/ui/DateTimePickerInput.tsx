@@ -60,24 +60,25 @@ export default function DateTimePickerInput({
 
   return (
     <View className="mb-4">
-      <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+      <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
         {label}
-        {required && <Text className="text-red-500"> *</Text>}
+        {required && <Text className="text-danger"> *</Text>}
       </Text>
 
       <View
-        className={`flex-row items-center border rounded-xl px-4 ${
-          disabled ? "bg-gray-100" : "bg-gray-50"
-        } ${error ? "border-red-400" : "border-gray-200"}`}
-        style={{ height: 44 }}
+        className={`flex-row items-center border rounded-ds-md px-3 ${
+          disabled ? "bg-surface-sunken" : "bg-surface"
+        } ${error ? "border-danger" : "border-border-strong"}`}
+        style={{ height: 38 }}
       >
         <TextInput
           ref={inputRef}
           value={value}
           onChangeText={(v) => onChangeText(maskDateTime(v))}
           placeholder="DD/MM/AAAA HH:MM"
-          placeholderTextColor="#9CA3AF"
-          className={`flex-1 text-sm ${disabled ? "text-gray-400" : "text-gray-800"}`}
+          placeholderTextColor="#5F6878"
+          className={`flex-1 text-sm ${disabled ? "text-ink-subtle" : "text-ink"}`}
+          style={{ minWidth: 0 }}
           maxLength={16}
           keyboardType="numeric"
           editable={!disabled}
@@ -93,7 +94,7 @@ export default function DateTimePickerInput({
           activeOpacity={disabled ? 1 : 0.7}
           disabled={disabled}
         >
-          <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
+          <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
         </TouchableOpacity>
 
         {Platform.OS === "web" && (
@@ -116,7 +117,7 @@ export default function DateTimePickerInput({
         )}
       </View>
 
-      {error ? <Text className="text-xs text-red-500 mt-1">{error}</Text> : null}
+      {error ? <Text className="text-xs text-danger mt-1">{error}</Text> : null}
     </View>
   );
 }

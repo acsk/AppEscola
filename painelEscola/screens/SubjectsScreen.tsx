@@ -81,10 +81,11 @@ const ICON_LABELS: Record<string, string> = {
   sigma: "Sigma",
 };
 
+/** Cores que o usuário escolhe para a disciplina (dado gravado e usado no app do aluno) — fora dos tokens. */
 const COLOR_PRESETS = [
-  "#3B82F6", "#10B981", "#EF4444", "#F97316",
-  "#8B5CF6", "#EC4899", "#EAB308", "#14B8A6",
-  "#6366F1", "#84CC16", "#F43F5E", "#64748B",
+  "#3B82F6", "#10B981", "#EF4444", "#F97316",  // ds-keep
+  "#8B5CF6", "#EC4899", "#EAB308", "#14B8A6",  // ds-keep
+  "#6366F1", "#84CC16", "#F43F5E", "#64748B",  // ds-keep
 ];
 
 function SubjectIcon({
@@ -96,14 +97,14 @@ function SubjectIcon({
   color?: string | null;
   size?: number;
 }) {
-  const bg = color ?? "#8B5CF6";
+  const bg = color ?? "#8B5CF6";  // ds-keep
   const IconComp = icon ? ICON_MAP[icon] : null;
   return (
     <View
       style={{
         width: size + 16,
         height: size + 16,
-        borderRadius: 10,
+        borderRadius: 4,
         backgroundColor: bg + "22",
         alignItems: "center",
         justifyContent: "center",
@@ -129,11 +130,11 @@ function PickerField({
 }) {
   return (
     <View style={{ flex: 1 }}>
-      <Text className="text-sm font-semibold text-gray-700 mb-2">{label}</Text>
-      <View className="border border-gray-200 rounded-2xl bg-white relative">
+      <Text className="text-sm font-semibold text-ink mb-2">{label}</Text>
+      <View className="border border-border rounded-ds-md bg-surface relative">
         {children}
       </View>
-      {error && <Text className="text-xs text-red-500 mt-1">{error}</Text>}
+      {error && <Text className="text-xs text-danger mt-1">{error}</Text>}
     </View>
   );
 }
@@ -154,13 +155,13 @@ function DropdownTrigger({
       ref={triggerRef as any}
       onPress={onPress}
       activeOpacity={0.8}
-      className="flex-row items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100"
+      className="flex-row items-center justify-between px-4 py-3 bg-surface-sunken border-b border-border"
     >
       <View style={{ flex: 1 }}>{children}</View>
       <Ionicons
         name={open ? "chevron-up" : "chevron-down"}
         size={18}
-        color="#6B7280"
+        color="#4B5463"
       />
     </TouchableOpacity>
   );
@@ -209,10 +210,10 @@ function IconDropdownPicker({
         <View className="flex-row items-center gap-3">
           <SubjectIcon icon={value || null} color={color || null} size={18} />
           <View>
-            <Text className="text-sm font-medium text-gray-800">
+            <Text className="text-sm font-medium text-ink">
               {value ? ICON_LABELS[value] ?? value : "Sem ícone selecionado"}
             </Text>
-            <Text className="text-xs text-gray-500">Selecione um ícone</Text>
+            <Text className="text-xs text-ink-muted">Selecione um ícone</Text>
           </View>
         </View>
       </DropdownTrigger>
@@ -231,15 +232,11 @@ function IconDropdownPicker({
                 left,
                 width: Math.max(260, anchor.w),
                 zIndex: 9999,
-                elevation: 30,
                 backgroundColor: "white",
                 borderWidth: 1,
-                borderColor: "#E5E7EB",
-                borderRadius: 16,
+                borderColor: "#D9DDE3",
+                borderRadius: 4,
                 overflow: "hidden",
-                shadowColor: "#000",
-                shadowOpacity: 0.16,
-                shadowRadius: 18,
               }}
             >
               <ScrollView
@@ -250,13 +247,13 @@ function IconDropdownPicker({
                 <TouchableOpacity
                   onPress={() => handleSelect("")}
                   activeOpacity={0.7}
-                  className="flex-row items-center gap-3 px-4 py-3 border-b border-gray-50"
-                  style={{ backgroundColor: !value ? "#F5F3FF" : "white" }}
+                  className="flex-row items-center gap-3 px-4 py-3 border-b border-border"
+                  style={{ backgroundColor: !value ? "#E9EFF6" : "white" }}
                 >
-                  <View className="w-9 h-9 rounded-xl items-center justify-center bg-gray-100">
-                    <Ionicons name="close-outline" size={18} color="#9CA3AF" />
+                  <View className="w-9 h-9 rounded-ds-md items-center justify-center bg-surface-sunken">
+                    <Ionicons name="close-outline" size={18} color="#5F6878" />
                   </View>
-                  <Text className="text-sm font-medium text-gray-700">Sem ícone</Text>
+                  <Text className="text-sm font-medium text-ink">Sem ícone</Text>
                 </TouchableOpacity>
                 {ICON_OPTIONS.map((key) => {
                   const selected = value === key;
@@ -265,13 +262,13 @@ function IconDropdownPicker({
                       key={key}
                       onPress={() => handleSelect(key)}
                       activeOpacity={0.7}
-                      className="flex-row items-center gap-3 px-4 py-3 border-b border-gray-50"
-                      style={{ backgroundColor: selected ? "#F5F3FF" : "white" }}
+                      className="flex-row items-center gap-3 px-4 py-3 border-b border-border"
+                      style={{ backgroundColor: selected ? "#E9EFF6" : "white" }}
                     >
                       <SubjectIcon icon={key} color={color} size={18} />
                       <Text
                         className="text-sm"
-                        style={{ color: selected ? "#5B21B6" : "#374151", fontWeight: selected ? "600" : "500" }}
+                        style={{ color: selected ? "#132C4A" : "#111722", fontWeight: selected ? "600" : "500" }}
                       >
                         {ICON_LABELS[key] ?? key}
                       </Text>
@@ -330,15 +327,15 @@ function ColorDropdownPicker({
             style={{
               width: 34,
               height: 34,
-              borderRadius: 10,
-              backgroundColor: value || "#8B5CF6",
+              borderRadius: 4,
+              backgroundColor: value || "#8B5CF6",  // ds-keep
               borderWidth: 1,
-              borderColor: "#E5E7EB",
+              borderColor: "#D9DDE3",
             }}
           />
           <View>
-            <Text className="text-sm font-medium text-gray-800">{value}</Text>
-            <Text className="text-xs text-gray-500">Selecione uma cor</Text>
+            <Text className="text-sm font-medium text-ink">{value}</Text>
+            <Text className="text-xs text-ink-muted">Selecione uma cor</Text>
           </View>
         </View>
       </DropdownTrigger>
@@ -357,15 +354,11 @@ function ColorDropdownPicker({
                 left,
                 width: Math.max(260, anchor.w),
                 zIndex: 9999,
-                elevation: 30,
                 backgroundColor: "white",
                 borderWidth: 1,
-                borderColor: "#E5E7EB",
-                borderRadius: 16,
+                borderColor: "#D9DDE3",
+                borderRadius: 4,
                 overflow: "hidden",
-                shadowColor: "#000",
-                shadowOpacity: 0.16,
-                shadowRadius: 18,
               }}
             >
               <ScrollView
@@ -380,22 +373,22 @@ function ColorDropdownPicker({
                       key={colorOption}
                       onPress={() => handleSelect(colorOption)}
                       activeOpacity={0.7}
-                      className="flex-row items-center gap-3 px-4 py-3 border-b border-gray-50"
-                      style={{ backgroundColor: selected ? "#F5F3FF" : "white" }}
+                      className="flex-row items-center gap-3 px-4 py-3 border-b border-border"
+                      style={{ backgroundColor: selected ? "#E9EFF6" : "white" }}
                     >
                       <View
                         style={{
                           width: 34,
                           height: 34,
-                          borderRadius: 10,
+                          borderRadius: 4,
                           backgroundColor: colorOption,
                           borderWidth: 2,
-                          borderColor: selected ? "#1F2937" : "#E5E7EB",
+                          borderColor: selected ? "#111722" : "#D9DDE3",
                         }}
                       />
                       <Text
                         className="text-sm"
-                        style={{ color: selected ? "#5B21B6" : "#374151", fontWeight: selected ? "600" : "500" }}
+                        style={{ color: selected ? "#132C4A" : "#111722", fontWeight: selected ? "600" : "500" }}
                       >
                         {colorOption}
                       </Text>
@@ -423,7 +416,7 @@ type Subject = {
 };
 
 type Form = { name: string; description: string; icon: string; color: string; status: string };
-const EMPTY: Form = { name: "", description: "", icon: "", color: "#8B5CF6", status: "active" };
+const EMPTY: Form = { name: "", description: "", icon: "", color: "#8B5CF6", status: "active" };  // ds-keep
 const STATUS_OPTIONS = [
   { value: "active", label: "Ativo" },
   { value: "inactive", label: "Inativo" },
@@ -464,7 +457,7 @@ export default function SubjectsScreen() {
   const openCreate = () => { setEditId(null); setForm(EMPTY); setErrors({}); setModalVisible(true); };
   const openEdit = (s: Subject) => {
     setEditId(s.id);
-    setForm({ name: s.name, description: s.description ?? "", icon: s.icon ?? "", color: s.color ?? "#8B5CF6", status: s.status });
+    setForm({ name: s.name, description: s.description ?? "", icon: s.icon ?? "", color: s.color ?? "#8B5CF6", status: s.status });  // ds-keep
     setErrors({});
     setModalVisible(true);
   };
@@ -503,22 +496,22 @@ export default function SubjectsScreen() {
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
-          <Text className="text-2xl font-bold text-gray-800">Disciplinas</Text>
-          <Text className="text-sm text-gray-500">Matérias lecionadas no cursinho</Text>
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Disciplinas</Text>
+          <Text className="text-sm text-ink-muted">Matérias lecionadas no cursinho</Text>
         </View>
-        <TouchableOpacity onPress={openCreate} className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl" activeOpacity={0.85}>
+        <TouchableOpacity onPress={openCreate} className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md" activeOpacity={0.85}>
           <Ionicons name="add" size={18} color="white" />
-          <Text className="text-white font-semibold text-sm ml-1.5">Nova Disciplina</Text>
+          <Text className="text-white font-semibold text-sm ml-1.5">Nova disciplina</Text>
         </TouchableOpacity>
       </View>
 
       <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
-        <View className="flex-1 flex-row items-center bg-white border border-gray-200 rounded-xl px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}>
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
-          <TextInput value={search} onChangeText={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar disciplina..." placeholderTextColor="#9CA3AF" className="flex-1 ml-2 text-sm text-gray-800" />
-          {!!search && <TouchableOpacity onPress={() => setSearch("")}><Ionicons name="close-circle" size={16} color="#9CA3AF" /></TouchableOpacity>}
+        <View className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 360 }}>
+          <Ionicons name="search-outline" size={16} color="#5F6878" />
+          <TextInput value={search} onChangeText={(v) => { setSearch(v); setPage(1); }} placeholder="Buscar disciplina..." placeholderTextColor="#5F6878" className="flex-1 ml-2 text-sm text-ink" />
+          {!!search && <TouchableOpacity onPress={() => setSearch("")}><Ionicons name="close-circle" size={16} color="#5F6878" /></TouchableOpacity>}
         </View>
-        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: "0 14px", fontSize: 14, color: "#374151", backgroundColor: "white", height: 44, minWidth: isMobile ? "100%" : 160 }}>
+        <select value={statusFilter} onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }} style={{ border: "1px solid #D9DDE3", borderRadius: 4, padding: "0 14px", fontSize: 14, color: "#111722", backgroundColor: "white", height: 44, minWidth: isMobile ? "100%" : 160 }}>
           <option value="">Todos</option>
           <option value="active">Ativo</option>
           <option value="inactive">Inativo</option>
@@ -531,7 +524,7 @@ export default function SubjectsScreen() {
         style={{ width: "100%" }}
         contentContainerStyle={{ width: isMobile ? undefined : "100%" }}
       >
-      <View className="bg-white rounded-2xl overflow-hidden" style={{ width: "100%", minWidth: tableMinWidth, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}>
+      <View className="bg-surface rounded-ds-md overflow-hidden border border-border" style={{ width: "100%", minWidth: tableMinWidth, }}>
         <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>Nome</Text>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 3 }}>Descrição</Text>
@@ -540,11 +533,11 @@ export default function SubjectsScreen() {
         </View>
 
         {loading ? (
-          <View className="items-center justify-center py-20"><ActivityIndicator size="large" color="#7C3AED" /></View>
+          <View className="items-center justify-center py-20"><ActivityIndicator size="large" color="#1C3D63" /></View>
         ) : rows.length === 0 ? (
           <View className="items-center justify-center py-16">
-            <Ionicons name="library-outline" size={40} color="#E5E7EB" />
-            <Text className="text-gray-400 mt-3 text-sm">Nenhuma disciplina encontrada</Text>
+            <Ionicons name="library-outline" size={40} color="#D9DDE3" />
+            <Text className="text-ink-subtle mt-3 text-sm">Nenhuma disciplina encontrada</Text>
           </View>
         ) : (
           rows.map((item, i) => (
@@ -558,11 +551,11 @@ export default function SubjectsScreen() {
                 <Badge slug={item.status} label={item.status === "active" ? "Ativo" : "Inativo"} />
               </View>
               <View style={{ width: 72 }} className="flex-row justify-end gap-2">
-                <TouchableOpacity onPress={() => openEdit(item)} className="p-1.5 bg-violet-50 rounded-lg">
-                  <Ionicons name="pencil-outline" size={15} color="#7C3AED" />
+                <TouchableOpacity onPress={() => openEdit(item)} className="p-1.5 bg-brand-tint rounded-ds-md">
+                  <Ionicons name="pencil-outline" size={15} color="#1C3D63" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-red-50 rounded-lg">
-                  <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                <TouchableOpacity onPress={() => setDeleteId(item.id)} className="p-1.5 bg-danger-tint rounded-ds-md">
+                  <Ionicons name="trash-outline" size={15} color="#B0261B" />
                 </TouchableOpacity>
               </View>
             </DataTableRow>
@@ -570,21 +563,21 @@ export default function SubjectsScreen() {
         )}
 
         {meta.total > 0 && (
-          <View className="px-4 border-t border-gray-100">
+          <View className="px-4 border-t border-border">
             <Pagination currentPage={meta.current_page} lastPage={meta.last_page} total={meta.total} perPage={meta.per_page} onPageChange={setPage} />
           </View>
         )}
       </View>
       </ScrollView>
 
-      <Modal visible={modalVisible} title={editId ? "Editar Disciplina" : "Nova Disciplina"} onClose={() => setModalVisible(false)} size="lg"
+      <Modal visible={modalVisible} title={editId ? "Editar disciplina" : "Nova disciplina"} onClose={() => setModalVisible(false)} size="lg"
         footer={
           <>
-            <TouchableOpacity onPress={() => setModalVisible(false)} className="px-5 py-2.5 rounded-xl border border-gray-200">
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+            <TouchableOpacity onPress={() => setModalVisible(false)} className="px-5 py-2.5 rounded-ds-md border border-border">
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={save} disabled={saving} className="px-5 py-2.5 rounded-xl bg-violet-600">
-              {saving ? <ActivityIndicator color="white" size="small" /> : <Text className="text-sm font-bold text-white">Salvar</Text>}
+            <TouchableOpacity onPress={save} disabled={saving} className="px-5 py-2.5 rounded-ds-md bg-brand">
+              {saving ? <ActivityIndicator color="white" size="small" /> : <Text className="text-sm font-semibold text-white">Salvar</Text>}
             </TouchableOpacity>
           </>
         }
@@ -612,7 +605,7 @@ export default function SubjectsScreen() {
         <FormSelect label="Status" value={form.status} options={STATUS_OPTIONS} onChange={(v) => setForm({ ...form, status: v })} error={errors.status} />
       </Modal>
 
-      <ConfirmModal visible={!!deleteId} title="Excluir Disciplina" message="Esta ação não pode ser desfeita." onConfirm={remove} onCancel={() => setDeleteId(null)} loading={deleting} />
+      <ConfirmModal visible={!!deleteId} title="Excluir disciplina" message="Esta ação não pode ser desfeita." onConfirm={remove} onCancel={() => setDeleteId(null)} loading={deleting} />
     </ScrollView>
   );
 }

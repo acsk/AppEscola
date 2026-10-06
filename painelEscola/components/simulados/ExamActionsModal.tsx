@@ -32,10 +32,10 @@ type Props = {
 };
 
 const toneStyles: Record<ActionDef["tone"], { bg: string; icon: string }> = {
-  blue: { bg: "bg-blue-50", icon: "#3B82F6" },
-  violet: { bg: "bg-violet-50", icon: "#7C3AED" },
-  emerald: { bg: "bg-emerald-50", icon: "#059669" },
-  red: { bg: "bg-red-50", icon: "#EF4444" },
+  blue: { bg: "bg-brand-tint", icon: "#1C3D63" },
+  violet: { bg: "bg-brand-tint", icon: "#1C3D63" },
+  emerald: { bg: "bg-success-tint", icon: "#1C6A45" },
+  red: { bg: "bg-danger-tint", icon: "#B0261B" },
 };
 
 function fmtRespondedPct(value: number | null | undefined) {
@@ -114,17 +114,17 @@ export default function ExamActionsModal({
 
   return (
     <Modal visible={visible} title="Ações do simulado" onClose={onClose} size="md">
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
-        <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3">
+        <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
           {exam.title}
         </Text>
-        <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+        <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={1}>
           {courseLabel}
           {exam.subject?.name ? ` · ${exam.subject.name}` : ""}
         </Text>
         <View className="flex-row items-center gap-2 mt-2 flex-wrap">
           <Badge label={exam.status_label ?? exam.status} slug={exam.status} />
-          <Text className="text-xs text-gray-500">
+          <Text className="text-xs text-ink-muted">
             Entregues: {fmtRespondedPct(exam.responded_students_percentage)} (
             {exam.responded_students_count ?? 0}/{exam.eligible_students_count ?? 0})
           </Text>
@@ -134,7 +134,7 @@ export default function ExamActionsModal({
       <View className="gap-2">
         {groups.map((group) => (
           <View key={group.key}>
-            <Text className="text-xs uppercase font-bold text-gray-500 tracking-wide mb-1">
+            <Text className="text-xs uppercase font-semibold text-ink-muted tracking-wide mb-1">
               {group.title}
             </Text>
             <View className="gap-1.5">
@@ -149,23 +149,23 @@ export default function ExamActionsModal({
                         onClose();
                       }
                     }}
-                    className={`flex-row items-center gap-2.5 rounded-xl border px-3 py-2 ${
+                    className={`flex-row items-center gap-2.5 rounded-ds-md border px-3 py-2 ${
                       action.group === "danger"
-                        ? "border-red-100 bg-white"
-                        : "border-gray-100 bg-white"
+                        ? "border-danger bg-surface"
+                        : "border-border bg-surface"
                     }`}
                     activeOpacity={0.85}
                   >
-                    <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
+                    <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${style.bg}`}>
                       <Ionicons name={action.icon} size={17} color={style.icon} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900">{action.label}</Text>
+                      <Text className="text-sm font-semibold text-ink">{action.label}</Text>
                       {action.description ? (
-                        <Text className="text-xs text-gray-500 mt-0.5">{action.description}</Text>
+                        <Text className="text-xs text-ink-muted mt-0.5">{action.description}</Text>
                       ) : null}
                     </View>
-                    <Ionicons name="chevron-forward-outline" size={16} color="#9CA3AF" />
+                    <Ionicons name="chevron-forward-outline" size={16} color="#5F6878" />
                   </TouchableOpacity>
                 );
               })}
@@ -254,8 +254,8 @@ export function ExamDeliveryReportsModal({
 
   const exportingAny = exportingPdfKind != null;
   const reportToneStyles = {
-    emerald: { bg: "bg-emerald-50", icon: "#059669" },
-    amber: { bg: "bg-amber-50", icon: "#D97706" },
+    emerald: { bg: "bg-success-tint", icon: "#1C6A45" },
+    amber: { bg: "bg-warning-tint", icon: "#8A5200" },
   };
 
   return (
@@ -267,11 +267,11 @@ export function ExamDeliveryReportsModal({
       }}
       size="md"
     >
-      <View className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3">
-        <Text className="text-sm font-bold text-gray-900" numberOfLines={2}>
+      <View className="rounded-ds-md border border-border bg-surface-sunken px-3 py-3 mb-3">
+        <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
           {exam.title}
         </Text>
-        <Text className="text-xs text-gray-500 mt-1">
+        <Text className="text-xs text-ink-muted mt-1">
           Escolha o tipo de PDF. Cada opção gera um arquivo separado.
         </Text>
       </View>
@@ -282,15 +282,15 @@ export function ExamDeliveryReportsModal({
           className="flex-row items-center gap-1.5 mb-3 self-start"
           activeOpacity={0.85}
         >
-          <Ionicons name="arrow-back-outline" size={16} color="#6B7280" />
-          <Text className="text-xs font-semibold text-gray-500">Voltar às ações</Text>
+          <Ionicons name="arrow-back-outline" size={16} color="#4B5463" />
+          <Text className="text-xs font-semibold text-ink-muted">Voltar às ações</Text>
         </TouchableOpacity>
       ) : null}
 
       <View className="gap-3">
         {REPORT_GROUPS.map((group) => (
           <View key={group.title}>
-            <Text className="text-xs uppercase font-bold text-gray-500 tracking-wide mb-1.5">
+            <Text className="text-xs uppercase font-semibold text-ink-muted tracking-wide mb-1.5">
               {group.title}
             </Text>
             <View className="gap-1.5">
@@ -306,11 +306,11 @@ export function ExamDeliveryReportsModal({
                       onSelect(item.kind);
                     }}
                     disabled={disabled}
-                    className="flex-row items-center gap-2.5 rounded-xl border border-gray-100 bg-white px-3 py-2.5"
+                    className="flex-row items-center gap-2.5 rounded-ds-md border border-border bg-surface px-3 py-2.5"
                     style={{ opacity: disabled && !exporting ? 0.55 : 1 }}
                     activeOpacity={0.85}
                   >
-                    <View className={`w-9 h-9 rounded-lg items-center justify-center ${style.bg}`}>
+                    <View className={`w-9 h-9 rounded-ds-md items-center justify-center ${style.bg}`}>
                       {exporting ? (
                         <ActivityIndicator size="small" color={style.icon} />
                       ) : (
@@ -318,13 +318,13 @@ export function ExamDeliveryReportsModal({
                       )}
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-gray-900">
+                      <Text className="text-sm font-semibold text-ink">
                         {exporting ? "Gerando PDF..." : item.label}
                       </Text>
-                      <Text className="text-xs text-gray-500 mt-0.5">{item.description}</Text>
+                      <Text className="text-xs text-ink-muted mt-0.5">{item.description}</Text>
                     </View>
                     {!disabled ? (
-                      <Ionicons name="download-outline" size={16} color="#9CA3AF" />
+                      <Ionicons name="download-outline" size={16} color="#5F6878" />
                     ) : null}
                   </TouchableOpacity>
                 );

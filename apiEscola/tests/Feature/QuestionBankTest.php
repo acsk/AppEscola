@@ -382,6 +382,92 @@ class QuestionBankTest extends TestCase
         $this->assertSame([0, 0, 0], [$second['subjects_created'], $second['topics_created'], $second['boards_created']]);
     }
 
+    // ── Questões avulsas (conteúdo) ────────────────────────────────────────
+
+    private function mcPayload(array $extra = []): array
+    {
+        return array_merge([
+            'type'          => 'multiple_choice',
+            'question_text' => 'Quanto é 2 + 2?',
+            'explanation'   => 'Soma simples.',
+            'options'       => [
+                ['option_text' => '3', 'is_correct' => false],
+                ['option_text' => '4', 'is_correct' => true],
+                ['option_text' => '5', 'is_correct' => false],
+            ],
+        ], $extra);
+    }
+
+    public function test_creates_standalone_question_with_options_and_classification(): void
+    {
+        [$math, $algebra] = $this->subjectWithTopics('Matemática', ['Álgebra']);
+
+        $response = $this->postJson('/api/question-bank/questions', $this->mcPayload(['topic_ids' => [$algebra->id], 'year' => 2024]))
+            ->assertCreated()
+            ->assertJsonPath('body.origin', 'avulsa')
+            ->assertJsonPath('body.subject_id', $math->id)
+            ->assertJsonPath('body.year', 2024)
+            ->assertJsonCount(3, 'body.options')
+            ->assertJsonPath('body.options.1.is_correct', true);
+
+        $question = ExamQuestion::findOrFail($response->json('body.id'));
+        $this->assertNull($question->exam_id);
+        $this->assertTrue($question->isComplete());
+    }
+
+    public function test_multiple_choice_needs_exactly_one_correct_option(): void
+    {
+        $noCorrect = $this->mcPayload(['options' => [['option_text' => 'a', 'is_correct' => false], ['option_text' => 'b', 'is_correct' => false]]]);
+        $this->postJson('/api/question-bank/questions', $noCorrect)
+            ->assertStatus(422)
+            ->assertJsonPath('errors.options.0', 'Marque exatamente uma alternativa como correta.');
+
+        $oneOption = $this->mcPayload(['options' => [['option_text' => 'a', 'is_correct' => true]]]);
+        $this->postJson('/api/question-bank/questions', $oneOption)->assertStatus(422);
+
+        $this->postJson('/api/question-bank/questions', ['type' => 'essay'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.question_text.0', 'Informe o texto do enunciado, a imagem, ou ambos.');
+
+        $this->postJson('/api/question-bank/questions', ['type' => 'essay', 'question_text' => 'Disserte.'])->assertCreated();
+    }
+
+    public function test_updates_and_deletes_standalone_but_not_exam_question(): void
+    {
+        $id = $this->postJson('/api/question-bank/questions', $this->mcPayload())->json('body.id');
+
+        $this->putJson("/api/question-bank/questions/{$id}", ['question_text' => 'Quanto é 3 + 3?', 'options' => [
+            ['option_text' => '6', 'is_correct' => true],
+            ['option_text' => '7', 'is_correct' => false],
+        ]])->assertOk()->assertJsonPath('body.question_text', 'Quanto é 3 + 3?')->assertJsonCount(2, 'body.options');
+
+        $this->putJson("/api/question-bank/questions/{$id}", ['type' => 'essay'])->assertOk()->assertJsonCount(0, 'body.options');
+
+        $exam = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Simulado A']);
+        $examQuestion = $this->question(['exam_id' => $exam->id]);
+        $this->putJson("/api/question-bank/questions/{$examQuestion->id}", ['question_text' => 'x'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Esta questão pertence a um simulado. Edite o conteúdo pelo simulado.');
+        $this->deleteJson("/api/question-bank/questions/{$examQuestion->id}")->assertStatus(409);
+
+        $this->deleteJson("/api/question-bank/questions/{$id}")->assertOk();
+        $this->assertSoftDeleted('exam_questions', ['id' => $id]);
+    }
+
+    public function test_exam_form_still_replaces_options_through_shared_service(): void
+    {
+        $exam = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Simulado B']);
+        $question = $this->question(['exam_id' => $exam->id]);
+        $question->options()->create(['option_text' => 'antiga', 'is_correct' => true, 'order' => 1]);
+
+        $this->putJson("/api/exams/{$exam->id}/questions/{$question->id}", ['options' => [
+            ['option_text' => 'nova A', 'is_correct' => false],
+            ['option_text' => 'nova B', 'is_correct' => true],
+        ]])->assertOk();
+
+        $this->assertSame(['nova A', 'nova B'], $question->options()->pluck('option_text')->all());
+    }
+
     // ── Segurança ──────────────────────────────────────────────────────────
 
     public function test_student_cannot_access_question_bank(): void
@@ -390,6 +476,7 @@ class QuestionBankTest extends TestCase
 
         $this->getJson('/api/question-bank/questions')->assertForbidden();
         $this->patchClassification($this->question(), ['year' => 2020])->assertForbidden();
+        $this->postJson('/api/question-bank/questions', $this->mcPayload())->assertForbidden();
     }
 
     public function test_exam_route_rejects_question_from_another_exam_or_standalone(): void

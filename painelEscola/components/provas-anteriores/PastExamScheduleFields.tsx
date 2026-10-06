@@ -65,7 +65,7 @@ export default function PastExamScheduleFields({
   return (
     <View className={compact ? "mb-0" : "mb-1"}>
       <Text
-        className={`font-semibold text-gray-700 ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
+        className={`font-semibold text-ink ${compact ? "text-xs mb-1" : "text-sm mb-1.5"}`}
       >
         {materialKind === "material" ? "Data do material" : "Data do exercício"}
       </Text>
@@ -79,14 +79,14 @@ export default function PastExamScheduleFields({
               onPress={() => setMode(opt.value)}
               className={`px-3 py-2 rounded-full border ${
                 active
-                  ? "bg-violet-600 border-violet-600"
-                  : "bg-white border-gray-200"
+                  ? "bg-brand border-brand"
+                  : "bg-surface border-border"
               }`}
               activeOpacity={0.85}
             >
               <Text
                 className={`text-xs font-semibold ${
-                  active ? "text-white" : "text-gray-600"
+                  active ? "text-white" : "text-ink-muted"
                 }`}
               >
                 {opt.label}
@@ -118,7 +118,7 @@ export default function PastExamScheduleFields({
       ) : null}
 
       {value.mode === "none" ? (
-        <Text className="text-xs text-gray-400 mt-1 mb-1">
+        <Text className="text-xs text-ink-subtle mt-1 mb-1">
           {materialKind === "material"
             ? "Opcional — material sem data ou ano definido."
             : "Opcional — exercício sem data ou ano definido."}

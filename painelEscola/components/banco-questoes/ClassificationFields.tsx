@@ -122,10 +122,10 @@ function SwitchRow({ label, value, onChange }: { label: string; value: boolean; 
         value={value}
         onValueChange={onChange}
         aria-label={label}
-        trackColor={{ true: "#8B5CF6", false: "#D1D5DB" }}
+        trackColor={{ true: "#1C3D63", false: "#7A8393" }}
         thumbColor="#FFFFFF"
       />
-      <Text className="text-xs text-gray-700">{label}</Text>
+      <Text className="text-xs text-ink">{label}</Text>
     </View>
   );
 }

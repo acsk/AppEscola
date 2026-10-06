@@ -13,6 +13,7 @@ import Modal from "../components/ui/Modal";
 import api from "../services/api";
 import appJson from "../app.json";
 import buildInfo from "../buildInfo.json";
+import { color } from "../constants/theme";
 
 const APP_VERSION = (appJson as any)?.expo?.version ?? "0.0.0";
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
@@ -504,16 +505,16 @@ export default function LoginScreen() {
   };
 
   const verificationBadgeStyles = {
-    pending: { wrap: "border-violet-200 bg-violet-50", text: "text-violet-800" },
-    success: { wrap: "border-emerald-200 bg-emerald-50", text: "text-emerald-800" },
-    error: { wrap: "border-red-200 bg-red-50", text: "text-red-700" },
+    pending: { wrap: "border-border bg-brand-tint", text: "text-brand" },
+    success: { wrap: "border-success bg-success-tint", text: "text-success" },
+    error: { wrap: "border-danger bg-danger-tint", text: "text-danger" },
   }[verificationBadge.status];
 
   return (
     <ScrollView
       className="flex-1"
       keyboardShouldPersistTaps="handled"
-      style={{ backgroundColor: "#EEEEFF" }}
+      style={{ backgroundColor: color.bg }}
       contentContainerStyle={{
         minHeight: "100%",
         alignItems: "center",
@@ -522,77 +523,67 @@ export default function LoginScreen() {
       }}
     >
       {/* Card */}
-      <View
-        className="bg-white rounded-3xl p-10 w-full"
-        style={{
-          maxWidth: 420,
-          boxShadow: "0 18px 48px rgba(124, 58, 237, 0.12)",
-        }}
-      >
-        {/* Logo */}
-        <View className="items-center mb-8">
-          <View className="w-16 h-16 bg-violet-600 rounded-2xl items-center justify-center mb-4">
-            <Ionicons name="school" size={32} color="white" />
+      <View className="bg-surface border border-border rounded-ds-md w-full" style={{ maxWidth: 420, padding: 32 }}>
+        {/* Marca */}
+        <View className="flex-row items-center mb-6" style={{ gap: 12 }}>
+          <View className="bg-brand rounded-ds-sm items-center justify-center" style={{ width: 32, height: 32 }} aria-hidden>
+            <Text className="text-xs font-semibold text-on-brand" style={{ letterSpacing: 0.3 }}>
+              CH
+            </Text>
           </View>
-          <Text className="text-2xl font-bold text-gray-800">AppCurso</Text>
-          <Text className="text-sm text-gray-400 mt-1">
-            Gerência de Cursinho — Painel Admin
+          <Text className="font-semibold text-ink" style={{ fontSize: 16, lineHeight: 20 }}>
+            Cursinho Hub
           </Text>
-          <View className="mt-3 items-center">
-            <Text className="text-[11px] font-semibold text-violet-600">
-              API v{apiVersion} • App {(buildInfo as any)?.version ?? "-"}
-            </Text>
-            <Text className="text-[10px] text-gray-400 mt-0.5">
-              Contrato {formatDateToPtBr(contractVersion)}
-            </Text>
-            <Text className="text-[10px] text-gray-400">
-              Build: {(buildInfo as any)?.version ?? "-"} • {formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}
-            </Text>
-          </View>
         </View>
+        <Text role="heading" aria-level={1} className="font-semibold text-ink" style={{ fontSize: 20, lineHeight: 28 }}>
+          Entrar no painel
+        </Text>
+        <Text className="text-sm text-ink-muted mb-6" style={{ marginTop: 2 }}>
+          Painel administrativo do cursinho.
+        </Text>
 
         {metaLoading && (
-          <View className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex-row items-center gap-2">
-            <ActivityIndicator size="small" color="#2563EB" />
-            <Text className="text-sm text-blue-700">Validando versão da API...</Text>
+          <View className="mb-4 rounded-ds-md border border-border bg-brand-tint px-4 py-3 flex-row items-center gap-2">
+            <ActivityIndicator size="small" color="#1C3D63" />
+            <Text className="text-sm text-brand">Validando versão da API...</Text>
           </View>
         )}
 
         {!metaLoading && mustUpdate && (
-          <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-            <Text className="text-sm font-semibold text-red-700">Atualização obrigatória</Text>
-            <Text className="text-xs text-red-600 mt-1">
+          <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+            <Text className="text-sm font-semibold text-danger">Atualização obrigatória</Text>
+            <Text className="text-xs text-danger mt-1">
               Versão mínima: {minSupportedVersion}. Atual: {APP_VERSION}. Atualize o app para continuar.
             </Text>
           </View>
         )}
 
         {!metaLoading && shouldRecommendUpdate && (
-          <View className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <Text className="text-sm font-semibold text-amber-700">Atualização recomendada</Text>
-            <Text className="text-xs text-amber-600 mt-1">
+          <View className="mb-4 rounded-ds-md border border-warning bg-warning-tint px-4 py-3">
+            <Text className="text-sm font-semibold text-warning">Atualização recomendada</Text>
+            <Text className="text-xs text-warning mt-1">
               Recomendado: {recommendedVersion}. Atual: {APP_VERSION}.
             </Text>
           </View>
         )}
 
         {!metaLoading && !!metaError && (
-          <View className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <Text className="text-xs text-gray-600">{metaError}</Text>
+          <View className="mb-4 rounded-ds-md border border-border bg-surface-sunken px-4 py-3">
+            <Text className="text-xs text-ink-muted">{metaError}</Text>
           </View>
         )}
 
         {/* Email */}
         <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5" >
+          <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }} >
             E-mail ou matrícula
           </Text>
           <View
-            className={`flex-row items-center border rounded-xl px-4 bg-gray-50 ${
-              error ? "border-red-300" : "border-gray-200"
+            className={`flex-row items-center border rounded-ds-md px-3 bg-surface ${
+              error ? "border-danger" : "border-border-strong"
             }`}
           >
-            <Ionicons name="mail-outline" size={18} color="#9CA3AF" />
+            <Ionicons name="mail-outline" size={18} color="#5F6878" />
             <TextInput
               value={email}
               onChangeText={(v) => {
@@ -610,23 +601,24 @@ export default function LoginScreen() {
               importantForAutofill="no"
               autoCorrect={false}
               placeholder="seu@email.com ou matrícula"
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 ml-2 py-3 text-sm text-gray-800"
+              placeholderTextColor="#5F6878"
+              className="flex-1 ml-2 text-sm text-ink"
+              style={{ height: 36, minWidth: 0 }}
             />
           </View>
         </View>
 
         {/* Senha */}
         <View className="mb-6">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+          <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
             Senha
           </Text>
           <View
-            className={`flex-row items-center border rounded-xl px-4 bg-gray-50 ${
-              error ? "border-red-300" : "border-gray-200"
+            className={`flex-row items-center border rounded-ds-md px-3 bg-surface ${
+              error ? "border-danger" : "border-border-strong"
             }`}
           >
-            <Ionicons name="lock-closed-outline" size={18} color="#9CA3AF" />
+            <Ionicons name="lock-closed-outline" size={18} color="#5F6878" />
             <TextInput
               value={password}
               onChangeText={(v) => {
@@ -643,8 +635,9 @@ export default function LoginScreen() {
               importantForAutofill="no"
               autoCorrect={false}
               placeholder="••••••••"
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 ml-2 py-3 text-sm text-gray-800"
+              placeholderTextColor="#5F6878"
+              className="flex-1 ml-2 text-sm text-ink"
+              style={{ height: 36, minWidth: 0 }}
               onSubmitEditing={handleLogin}
             />
             <TouchableOpacity
@@ -658,7 +651,7 @@ export default function LoginScreen() {
               <Ionicons
                 name={showPass ? "eye-off-outline" : "eye-outline"}
                 size={18}
-                color="#9CA3AF"
+                color="#5F6878"
               />
             </TouchableOpacity>
           </View>
@@ -666,15 +659,15 @@ export default function LoginScreen() {
 
         {/* Tenant opcional */}
         <View className="mb-6">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+          <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
             Tenant ID (opcional)
           </Text>
           <View
-            className={`flex-row items-center border rounded-xl px-4 bg-gray-50 ${
-              error ? "border-red-300" : "border-gray-200"
+            className={`flex-row items-center border rounded-ds-md px-3 bg-surface ${
+              error ? "border-danger" : "border-border-strong"
             }`}
           >
-            <Ionicons name="business-outline" size={18} color="#9CA3AF" />
+            <Ionicons name="business-outline" size={18} color="#5F6878" />
             <TextInput
               value={tenantId}
               onChangeText={(v) => {
@@ -691,11 +684,12 @@ export default function LoginScreen() {
               importantForAutofill="no"
               autoCorrect={false}
               placeholder="Ex.: 2 (apenas super admin)"
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 ml-2 py-3 text-sm text-gray-800"
+              placeholderTextColor="#5F6878"
+              className="flex-1 ml-2 text-sm text-ink"
+              style={{ height: 36, minWidth: 0 }}
             />
           </View>
-          <Text className="text-xs text-gray-400 mt-1">
+          <Text className="text-xs text-ink-subtle mt-1">
             Se preenchido, o login será feito no tenant informado.
           </Text>
         </View>
@@ -703,14 +697,14 @@ export default function LoginScreen() {
         {/* Verificação inline */}
         {verificationBadge.visible && (
           <View
-            className={`mb-4 flex-row items-center justify-center gap-2 self-center rounded-full border px-4 py-2 ${verificationBadgeStyles.wrap}`}
+            className={`mb-4 flex-row items-center justify-center gap-2 self-center rounded-ds-sm border px-3 py-1.5 ${verificationBadgeStyles.wrap}`}
           >
             {verificationBadge.status === "pending" ? (
-              <ActivityIndicator size="small" color="#7C3AED" />
+              <ActivityIndicator size="small" color="#1C3D63" />
             ) : verificationBadge.status === "success" ? (
-              <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+              <Ionicons name="checkmark-circle" size={18} color="#1C6A45" />
             ) : (
-              <Ionicons name="close-circle" size={18} color="#DC2626" />
+              <Ionicons name="close-circle" size={18} color="#B0261B" />
             )}
             <Text className={`text-xs font-semibold ${verificationBadgeStyles.text}`}>
               {verificationBadge.label}
@@ -720,9 +714,9 @@ export default function LoginScreen() {
 
         {/* Erro */}
         {!!error && (
-          <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 flex-row items-center">
-            <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
-            <Text className="text-sm text-red-600 ml-2 flex-1">{error}</Text>
+          <View className="bg-danger-tint border border-danger rounded-ds-md px-4 py-3 mb-4 flex-row items-center">
+            <Ionicons name="alert-circle-outline" size={16} color="#B0261B" />
+            <Text className="text-sm text-danger ml-2 flex-1">{error}</Text>
           </View>
         )}
 
@@ -730,18 +724,18 @@ export default function LoginScreen() {
         <TouchableOpacity
           onPress={handleLogin}
           disabled={loading || metaLoading || mustUpdate}
-          className="bg-violet-600 rounded-xl py-3.5 items-center"
+          className="bg-brand rounded-ds-md items-center justify-center"
+          style={{ height: 38, opacity: loading || metaLoading || mustUpdate ? 0.45 : 1 }}
           activeOpacity={0.85}
          
           testID="login-submit-button"
           accessibilityLabel={mustUpdate ? "Atualização obrigatória" : "Entrar"}
           accessibilityRole="button"
-          style={{ opacity: loading || metaLoading || mustUpdate ? 0.75 : 1 }}
         >
           {loading || metaLoading ? (
             <ActivityIndicator color="white" size="small" />
           ) : (
-            <Text className="text-white font-bold text-sm">
+            <Text className="text-on-brand font-medium text-sm">
               {mustUpdate ? "Atualização obrigatória" : "Entrar"}
             </Text>
           )}
@@ -749,16 +743,25 @@ export default function LoginScreen() {
 
         {/* Info dev */}
         {isLocalhost && (
-          <View className="mt-6 bg-violet-50 rounded-xl p-4 border border-violet-100">
-            <Text className="text-xs font-semibold text-violet-700 mb-1">
+          <View className="mt-6 bg-brand-tint rounded-ds-md p-4 border border-border">
+            <Text className="text-xs font-semibold text-brand mb-1">
               Acesso de demonstração
             </Text>
-            <Text className="text-xs text-violet-600">
+            <Text className="text-xs text-brand">
               admin@cursinhoexemplo.com{"\n"}Senha: 123456
             </Text>
           </View>
         )}
 
+        {/* Versão */}
+        <View className="border-t border-border mt-6 pt-4" style={{ gap: 2 }}>
+          <Text className="font-mono text-ink-subtle" style={{ fontSize: 11, lineHeight: 16 }}>
+            API {apiVersion} · App {(buildInfo as any)?.version ?? "-"} · Contrato {formatDateToPtBr(contractVersion)}
+          </Text>
+          <Text className="font-mono text-ink-subtle" style={{ fontSize: 11, lineHeight: 16 }}>
+            Build {(buildInfo as any)?.version ?? "-"} · {formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}
+          </Text>
+        </View>
       </View>
 
       <Modal
@@ -770,24 +773,24 @@ export default function LoginScreen() {
           <>
             <TouchableOpacity
               onPress={closeDebug}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 py-2.5 rounded-ds-md border border-border"
               activeOpacity={0.75}
             >
-              <Text className="text-sm font-semibold text-gray-700">Fechar</Text>
+              <Text className="text-sm font-semibold text-ink">Fechar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={copyDebugInfo}
-              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              className="px-5 py-2.5 rounded-ds-md bg-brand"
               activeOpacity={0.8}
             >
-              <Text className="text-sm font-bold text-white">
+              <Text className="text-sm font-semibold text-white">
                 {debugCopied ? "Copiado!" : "Copiar JSON"}
               </Text>
             </TouchableOpacity>
           </>
         }
       >
-        <View className="bg-gray-950 rounded-xl p-3">
+        <View className="bg-gray-950 rounded-ds-md p-3">
           <Text
             selectable
             className="text-gray-200 text-xs leading-relaxed"
@@ -807,24 +810,24 @@ export default function LoginScreen() {
           <>
             <TouchableOpacity
               onPress={closeReloadConfirmation}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 py-2.5 rounded-ds-md border border-border"
               activeOpacity={0.75}
             >
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={confirmReloadAndRefresh}
-              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              className="px-5 py-2.5 rounded-ds-md bg-brand"
               activeOpacity={0.8}
             >
-              <Text className="text-sm font-bold text-white">OK, Recarregar</Text>
+              <Text className="text-sm font-semibold text-white">OK, Recarregar</Text>
             </TouchableOpacity>
           </>
         }
       >
         <View className="items-center gap-3">
-          <Ionicons name="refresh-outline" size={32} color="#7C3AED" />
-          <Text className="text-sm text-gray-700 text-center leading-relaxed">
+          <Ionicons name="refresh-outline" size={32} color="#1C3D63" />
+          <Text className="text-sm text-ink text-center leading-relaxed">
             {reloadConfirmationMessage}
           </Text>
         </View>

@@ -100,33 +100,33 @@ export default function AttendanceDateBar({
 
   return (
     <View>
-      <View className="rounded-2xl border border-gray-200 bg-white px-3 py-1.5">
+      <View className="rounded-ds-md border border-border bg-surface px-3 py-1.5">
         <View className="flex-row items-center gap-1">
           <TouchableOpacity
             onPress={() => onChange(addDays(value, -1))}
             disabled={disabled}
             activeOpacity={0.8}
-            className="h-11 w-11 rounded-xl items-center justify-center"
+            className="h-11 w-11 rounded-ds-md items-center justify-center"
             accessibilityLabel="Dia anterior"
           >
-            <Ionicons name="chevron-back" size={20} color={disabled ? "#D1D5DB" : "#6B7280"} />
+            <Ionicons name="chevron-back" size={20} color={disabled ? "#7A8393" : "#4B5463"} />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={openCalendar}
             disabled={disabled}
             activeOpacity={0.8}
-            className="flex-1 min-w-[180px] h-12 px-3 rounded-xl items-center justify-center"
+            className="flex-1 min-w-[180px] h-12 px-3 rounded-ds-md items-center justify-center"
             accessibilityLabel="Selecionar data da frequência"
           >
             <View className="flex-row items-center gap-2.5">
-              <Ionicons name="calendar-outline" size={18} color={disabled ? "#D1D5DB" : "#7C3AED"} />
-              <Text className={`text-xl font-bold ${disabled ? "text-gray-400" : "text-gray-800"}`}>
+              <Ionicons name="calendar-outline" size={18} color={disabled ? "#7A8393" : "#1C3D63"} />
+              <Text className={`text-xl font-semibold ${disabled ? "text-ink-subtle" : "text-ink"}`}>
                 {displayDate}
               </Text>
             </View>
             <Text
-              className={`text-xs mt-0.5 capitalize ${disabled ? "text-gray-300" : "text-gray-500"}`}
+              className={`text-xs mt-0.5 capitalize ${disabled ? "text-ink-subtle" : "text-ink-muted"}`}
               numberOfLines={1}
             >
               {weekdayLabel}
@@ -141,10 +141,10 @@ export default function AttendanceDateBar({
             }}
             disabled={isNextDisabled}
             activeOpacity={0.8}
-            className="h-11 w-11 rounded-xl items-center justify-center"
+            className="h-11 w-11 rounded-ds-md items-center justify-center"
             accessibilityLabel="Próximo dia"
           >
-            <Ionicons name="chevron-forward" size={20} color={isNextDisabled ? "#D1D5DB" : "#6B7280"} />
+            <Ionicons name="chevron-forward" size={20} color={isNextDisabled ? "#7A8393" : "#4B5463"} />
           </TouchableOpacity>
         </View>
       </View>
@@ -160,7 +160,7 @@ export default function AttendanceDateBar({
           style={{ backgroundColor: "rgba(15,23,42,0.36)" }}
         >
           <View
-            className="rounded-2xl bg-white p-5"
+            className="rounded-ds-md bg-surface p-5"
             style={{
               width: "100%",
               maxWidth: 480,
@@ -173,16 +173,16 @@ export default function AttendanceDateBar({
             <View className="flex-row items-center justify-between mb-5">
               <TouchableOpacity
                 onPress={() => setVisibleMonth(addMonths(visibleMonth, -1))}
-                className="h-11 w-11 rounded-xl items-center justify-center bg-gray-50"
+                className="h-11 w-11 rounded-ds-md items-center justify-center bg-surface-sunken"
                 activeOpacity={0.75}
                 accessibilityLabel="Mês anterior"
               >
-                <Ionicons name="chevron-back" size={21} color="#374151" />
+                <Ionicons name="chevron-back" size={21} color="#111722" />
               </TouchableOpacity>
 
               <View className="items-center">
-                <Text className="text-lg font-bold text-gray-900 capitalize">{monthTitle(visibleMonth)}</Text>
-                <Text className="text-xs text-gray-500 mt-0.5">Escolha a data da frequência</Text>
+                <Text className="text-lg font-semibold text-ink capitalize">{monthTitle(visibleMonth)}</Text>
+                <Text className="text-xs text-ink-muted mt-0.5">Escolha a data da frequência</Text>
               </View>
 
               <TouchableOpacity
@@ -190,17 +190,17 @@ export default function AttendanceDateBar({
                   if (canGoNextMonth) setVisibleMonth(addMonths(visibleMonth, 1));
                 }}
                 disabled={!canGoNextMonth}
-                className="h-11 w-11 rounded-xl items-center justify-center bg-gray-50"
+                className="h-11 w-11 rounded-ds-md items-center justify-center bg-surface-sunken"
                 activeOpacity={0.75}
                 accessibilityLabel="Próximo mês"
               >
-                <Ionicons name="chevron-forward" size={21} color={canGoNextMonth ? "#374151" : "#D1D5DB"} />
+                <Ionicons name="chevron-forward" size={21} color={canGoNextMonth ? "#111722" : "#7A8393"} />
               </TouchableOpacity>
             </View>
 
             <View className="flex-row mb-2">
               {["Dom", "Seg", "Ter", "Qua", "Qui", "Sext", "Sáb"].map((day) => (
-                <Text key={day} className="flex-1 text-center text-xs font-semibold text-gray-500">
+                <Text key={day} className="flex-1 text-center text-xs font-semibold text-ink-muted">
                   {day}
                 </Text>
               ))}
@@ -225,11 +225,11 @@ export default function AttendanceDateBar({
                     accessibilityLabel={`Selecionar ${formatDateLabel(iso)}`}
                   >
                     <View
-                      className={`h-11 w-11 rounded-xl items-center justify-center ${
+                      className={`h-11 w-11 rounded-ds-md items-center justify-center ${
                         isSelected
-                          ? "bg-violet-600"
+                          ? "bg-brand"
                           : isToday
-                            ? "border border-violet-300 bg-violet-50"
+                            ? "border border-border bg-brand-tint"
                             : "bg-transparent"
                       }`}
                     >
@@ -238,10 +238,10 @@ export default function AttendanceDateBar({
                           isSelected
                             ? "text-white"
                             : isFuture
-                              ? "text-gray-300"
+                              ? "text-ink-subtle"
                               : isMuted
-                                ? "text-gray-400"
-                                : "text-gray-800"
+                                ? "text-ink-subtle"
+                                : "text-ink"
                         }`}
                       >
                         {date.getDate()}
@@ -252,18 +252,18 @@ export default function AttendanceDateBar({
               })}
             </View>
 
-            <View className="flex-row items-center justify-between mt-5 pt-4 border-t border-gray-100">
+            <View className="flex-row items-center justify-between mt-5 pt-4 border-t border-border">
               <TouchableOpacity
                 onPress={() => setCalendarVisible(false)}
-                className="h-11 px-4 rounded-xl items-center justify-center bg-gray-100"
+                className="h-11 px-4 rounded-ds-md items-center justify-center bg-surface-sunken"
                 activeOpacity={0.75}
               >
-                <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+                <Text className="text-sm font-semibold text-ink">Cancelar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => selectDate(today)}
-                className="h-11 px-4 rounded-xl items-center justify-center bg-violet-600"
+                className="h-11 px-4 rounded-ds-md items-center justify-center bg-brand"
                 activeOpacity={0.8}
               >
                 <Text className="text-sm font-semibold text-white">Hoje</Text>

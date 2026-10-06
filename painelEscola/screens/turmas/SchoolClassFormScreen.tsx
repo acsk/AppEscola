@@ -19,6 +19,8 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { usePeriods, domainToOptions } from "../../hooks/useDomains";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
+import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
+import Tabs from "../../components/ui/Tabs";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -536,68 +538,46 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
       contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Breadcrumb */}
-      <View className="flex-row items-center gap-2 mb-6">
-        <TouchableOpacity
-          onPress={() => navigate("turmas")}
-          className="flex-row items-center gap-1.5"
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={18} color="#7C3AED" />
-          <Text className="text-sm font-medium text-violet-600">Turmas</Text>
-        </TouchableOpacity>
-        <Ionicons name="chevron-forward" size={14} color="#D1D5DB" />
-        <Text className="text-sm text-gray-500">
-          {isEdit ? "Editar Turma" : "Nova Turma"}
-        </Text>
-      </View>
+      <ScreenBreadcrumb items={[{ label: "Turmas", onPress: () => navigate("turmas") }, { label: isEdit ? "Editar turma" : "Nova turma" }]} />
 
       <View className="mb-6">
-        <Text className="text-2xl font-bold text-gray-800">
-          {isEdit ? "Editar Turma" : "Nova Turma"}
+        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">
+          {isEdit ? "Editar turma" : "Nova turma"}
         </Text>
-        <Text className="text-sm text-gray-500">
+        <Text className="text-sm text-ink-muted">
           Dados da turma e horários de aula
         </Text>
       </View>
 
       {!!savedClassId && (
-        <View className="flex-row gap-3 mb-5">
-          <View className="px-4 py-2.5 rounded-xl bg-violet-600">
-            <Text className="text-sm font-semibold text-white">Dados e Horários</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => navigate("turmas-frequencia", { classId: savedClassId })}
-            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
-            activeOpacity={0.8}
-          >
-            <Text className="text-sm font-semibold text-gray-700">Frequência</Text>
-          </TouchableOpacity>
+        <View className="mb-6">
+          <Tabs
+            accessibilityLabel="Seções da turma"
+            items={[
+              { id: "dados", label: "Dados e horários" },
+              { id: "frequencia", label: "Frequência" },
+            ]}
+            value="dados"
+            onChange={(id) => id === "frequencia" && navigate("turmas-frequencia", { classId: savedClassId })}
+          />
         </View>
       )}
 
       {loading ? (
         <View className="items-center justify-center py-24">
-          <ActivityIndicator size="large" color="#7C3AED" />
+          <ActivityIndicator size="large" color="#1C3D63" />
         </View>
       ) : (
         <View>
           {/* ── Card: Dados da Turma ── */}
           <View
-            className="bg-white rounded-2xl p-6 mb-5"
+            className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
             style={{
-              shadowColor: "#000",
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
             }}
           >
             <View className="flex-row items-center gap-2 mb-5">
-              <View className="w-8 h-8 bg-violet-100 rounded-lg items-center justify-center">
-                <Ionicons name="grid-outline" size={16} color="#7C3AED" />
-              </View>
-              <Text className="text-base font-semibold text-gray-800">
-                Dados da Turma
+              <Text className="text-base font-semibold text-ink">
+                Dados da turma
               </Text>
             </View>
 
@@ -613,13 +593,13 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                 }}
                 options={courseOptions}
                 placeholder="SELECIONE O CURSO"
-                modalTitle="Selecionar Curso"
+                modalTitle="Selecionar curso"
                 error={errors.course_id}
               />
             </View>
 
             <FormInput
-              label="Nome da Turma"
+              label="Nome da turma"
               required
               value={form.name}
               onChangeText={(v) => setForm({ ...form, name: v.toUpperCase() })}
@@ -630,7 +610,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             <View className="flex-row gap-4 mt-1">
               <View className="flex-1">
                 <DatePickerInput
-                  label="Data de Início"
+                  label="Data de início"
                   required
                   value={isoToDisplay(form.start_date)}
                   onChangeText={(v) => setForm({ ...form, start_date: displayToISO(v) })}
@@ -639,7 +619,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
               </View>
               <View className="flex-1">
                 <DatePickerInput
-                  label="Data de Término"
+                  label="Data de término"
                   required
                   value={isoToDisplay(form.end_date)}
                   onChangeText={(v) => setForm({ ...form, end_date: displayToISO(v) })}
@@ -651,7 +631,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             <View className="flex-row gap-4 mt-1">
               <View className="flex-1">
                 <FormInput
-                  label="Ano Letivo"
+                  label="Ano letivo"
                   value={form.year}
                   onChangeText={(v) => setForm({ ...form, year: v })}
                   error={errors.year}
@@ -660,7 +640,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                 />
               </View>
               <View className="flex-1">
-                <Text className="text-xs font-medium text-gray-600 mb-1.5">
+                <Text className="text-xs font-medium text-ink-muted mb-1.5">
                   Período
                 </Text>
                 <select
@@ -670,11 +650,11 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                   }
                   style={{
                     width: "100%",
-                    border: "1px solid #E5E7EB",
-                    borderRadius: 8,
+                    border: "1px solid #D9DDE3",
+                    borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: form.period ? "#374151" : "#9CA3AF",
+                    color: form.period ? "#111722" : "#5F6878",
                     backgroundColor: "white",
                   }}
                 >
@@ -700,7 +680,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                 />
               </View>
               <View className="flex-1">
-                <Text className="text-xs font-medium text-gray-600 mb-1.5">
+                <Text className="text-xs font-medium text-ink-muted mb-1.5">
                   Status
                 </Text>
                 <select
@@ -710,11 +690,11 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                   }
                   style={{
                     width: "100%",
-                    border: "1px solid #E5E7EB",
-                    borderRadius: 8,
+                    border: "1px solid #D9DDE3",
+                    borderRadius: 4,
                     padding: "9px 12px",
                     fontSize: 14,
-                    color: "#374151",
+                    color: "#111722",
                     backgroundColor: "white",
                   }}
                 >
@@ -731,17 +711,17 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             <View className="flex-row justify-end gap-3 mt-4">
               <TouchableOpacity
                 onPress={() => navigate("turmas")}
-                className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white"
+                className="px-5 py-2.5 rounded-ds-md border border-border bg-surface"
                 activeOpacity={0.8}
               >
-                <Text className="text-sm font-semibold text-gray-700">
+                <Text className="text-sm font-semibold text-ink">
                   Cancelar
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={saveClass}
                 disabled={saving}
-                className="flex-row items-center gap-2 px-6 py-2.5 rounded-xl bg-violet-600"
+                className="flex-row items-center gap-2 px-6 py-2.5 rounded-ds-md bg-brand"
                 activeOpacity={0.85}
               >
                 {saving ? (
@@ -749,8 +729,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                 ) : (
                   <>
                     <Ionicons name="checkmark" size={16} color="white" />
-                    <Text className="text-sm font-bold text-white">
-                      {isEdit ? "Salvar Alterações" : "Criar Turma"}
+                    <Text className="text-sm font-semibold text-white">
+                      {isEdit ? "Salvar alterações" : "Criar turma"}
                     </Text>
                   </>
                 )}
@@ -762,24 +742,17 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           {savedClassId ? (
             <>
               <View
-                className="bg-white rounded-2xl p-6 mb-5"
+                className="bg-surface rounded-ds-md p-6 mb-5 border border-border"
                 style={{
-                  shadowColor: "#000",
-                  shadowOpacity: 0.04,
-                  shadowRadius: 8,
-                  elevation: 1,
                 }}
               >
               <View className="flex-row items-center justify-between mb-4">
                 <View className="flex-row items-center gap-2">
-                  <View className="w-8 h-8 bg-amber-100 rounded-lg items-center justify-center">
-                    <Ionicons name="time-outline" size={16} color="#D97706" />
-                  </View>
                   <View>
-                    <Text className="text-base font-semibold text-gray-800">
+                    <Text className="text-base font-semibold text-ink">
                       Horários
                     </Text>
-                    <Text className="text-xs text-gray-400">
+                    <Text className="text-xs text-ink-subtle">
                       {schedules.length} horário
                       {schedules.length !== 1 ? "s" : ""} cadastrado
                       {schedules.length !== 1 ? "s" : ""}
@@ -788,24 +761,24 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                 </View>
                 <TouchableOpacity
                   onPress={openAddSchedule}
-                  className="flex-row items-center gap-1.5 bg-amber-500 px-4 py-2 rounded-xl"
+                  className="flex-row items-center gap-1.5 bg-surface border border-border-strong px-3 py-1.5 rounded-ds-md"
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="add" size={16} color="white" />
-                  <Text className="text-sm font-semibold text-white">
-                    Adicionar Horário
+                  <Ionicons name="add" size={16} color="#111722" />
+                  <Text className="text-sm font-medium text-ink">
+                    Adicionar horário
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {schedules.length === 0 ? (
                 <View className="items-center py-8">
-                  <Ionicons name="time-outline" size={32} color="#E5E7EB" />
-                  <Text className="text-gray-400 text-sm mt-2">
+                  <Ionicons name="time-outline" size={32} color="#D9DDE3" />
+                  <Text className="text-ink-subtle text-sm mt-2">
                     Nenhum horário cadastrado
                   </Text>
-                  <Text className="text-gray-400 text-xs mt-1">
-                    Clique em "Adicionar Horário" para começar
+                  <Text className="text-ink-subtle text-xs mt-1">
+                    Clique em "Adicionar horário" para começar
                   </Text>
                 </View>
               ) : (
@@ -813,10 +786,10 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                   {schedules.map((s) => (
                     <View
                       key={s.id}
-                      className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3"
+                      className="flex-row items-center bg-surface-sunken rounded-ds-md px-4 py-3"
                     >
                       <View className="w-28">
-                        <Text className="text-sm font-semibold text-violet-700">
+                        <Text className="text-sm font-semibold text-brand">
                           {WEEKDAY_LABELS[s.weekday] ?? s.weekday}
                         </Text>
                       </View>
@@ -824,17 +797,17 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                         <Ionicons
                           name="time-outline"
                           size={14}
-                          color="#6B7280"
+                          color="#4B5463"
                         />
-                        <Text className="text-sm text-gray-700">
+                        <Text className="text-sm text-ink">
                           {fmtTime(s.start_time)} – {fmtTime(s.end_time)}
                         </Text>
                       </View>
                       <View className="flex-1">
-                        <Text className="text-xs text-gray-600" numberOfLines={1}>
+                        <Text className="text-xs text-ink-muted" numberOfLines={1}>
                           {s.subject?.name ?? (s.subject_id ? subjectNameById.get(s.subject_id) : null) ?? "Sem disciplina"}
                         </Text>
-                        <Text className="text-xs text-gray-500" numberOfLines={1}>
+                        <Text className="text-xs text-ink-muted" numberOfLines={1}>
                           {Array.isArray(s.teacher_ids) && s.teacher_ids.length > 0
                             ? teacherNameById.get(s.teacher_ids[s.teacher_ids.length - 1]) || "Sem professor"
                             : s.teacher?.name ?? (s.teacher_id ? teacherNameById.get(s.teacher_id) : null) ?? "Sem professor"}
@@ -845,30 +818,30 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                           <Ionicons
                             name="location-outline"
                             size={13}
-                            color="#9CA3AF"
+                            color="#5F6878"
                           />
-                          <Text className="text-xs text-gray-500">{s.room}</Text>
+                          <Text className="text-xs text-ink-muted">{s.room}</Text>
                         </View>
                       )}
                       <View className="flex-row gap-2">
                         <TouchableOpacity
                           onPress={() => openEditSchedule(s)}
-                          className="p-1.5 bg-violet-50 rounded-lg"
+                          className="p-1.5 bg-brand-tint rounded-ds-md"
                         >
                           <Ionicons
                             name="pencil-outline"
                             size={14}
-                            color="#7C3AED"
+                            color="#1C3D63"
                           />
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => setDeleteScheduleId(s.id)}
-                          className="p-1.5 bg-red-50 rounded-lg"
+                          className="p-1.5 bg-danger-tint rounded-ds-md"
                         >
                           <Ionicons
                             name="trash-outline"
                             size={14}
-                            color="#EF4444"
+                            color="#B0261B"
                           />
                         </TouchableOpacity>
                       </View>
@@ -880,9 +853,9 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
             </>
           ) : (
-            <View className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex-row items-center gap-3">
-              <Ionicons name="information-circle-outline" size={20} color="#3B82F6" />
-              <Text className="text-sm text-blue-600 flex-1">
+            <View className="bg-brand-tint border border-border rounded-ds-md px-5 py-4 flex-row items-center gap-3">
+              <Ionicons name="information-circle-outline" size={20} color="#1C3D63" />
+              <Text className="text-sm text-brand flex-1">
                 Após criar a turma, você poderá adicionar os horários de aula.
               </Text>
             </View>
@@ -893,28 +866,28 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
       {/* Schedule modal */}
       <Modal
         visible={scheduleModal}
-        title={editScheduleId ? "Editar Horário" : "Novo Horário"}
+        title={editScheduleId ? "Editar horário" : "Novo horário"}
         onClose={() => setScheduleModal(false)}
         size="md"
         footer={
           <>
             <TouchableOpacity
               onPress={() => setScheduleModal(false)}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 py-2.5 rounded-ds-md border border-border"
             >
-              <Text className="text-sm font-semibold text-gray-700">
+              <Text className="text-sm font-semibold text-ink">
                 Cancelar
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={saveSchedule}
               disabled={savingSchedule}
-              className="px-5 py-2.5 rounded-xl bg-amber-500"
+              className="px-5 py-2.5 rounded-ds-md bg-brand"
             >
               {savingSchedule ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text className="text-sm font-bold text-white">Salvar</Text>
+                <Text className="text-sm font-semibold text-white">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
@@ -935,21 +908,21 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             }}
             options={subjectOptions}
             placeholder="SELECIONE A DISCIPLINA"
-            modalTitle="Selecionar Disciplina"
+            modalTitle="Selecionar disciplina"
             error={scheduleErrors.subject_id}
           />
         </View>
 
         <View className="mb-3">
-          <Text className="text-xs font-medium text-gray-600 mb-1.5">
-            Professor <Text className="text-red-500">*</Text>
+          <Text className="text-xs font-medium text-ink-muted mb-1.5">
+            Professor <Text className="text-danger">*</Text>
           </Text>
 
           <View
             style={{
               borderWidth: 1,
-              borderColor: scheduleErrors.teacher_ids ? "#EF4444" : "#E5E7EB",
-              borderRadius: 8,
+              borderColor: scheduleErrors.teacher_ids ? "#B0261B" : "#D9DDE3",
+              borderRadius: 4,
               padding: 10,
               maxHeight: 180,
               backgroundColor: "white",
@@ -970,9 +943,9 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
                     <Ionicons
                       name={selected ? "radio-button-on" : "radio-button-off"}
                       size={18}
-                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                      color={selected ? "#1C3D63" : "#5F6878"}
                     />
-                    <Text className="text-sm text-gray-700 ml-2">{t.name.toUpperCase()}</Text>
+                    <Text className="text-sm text-ink ml-2">{t.name.toUpperCase()}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -980,11 +953,11 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           </View>
 
           {!!scheduleErrors.teacher_ids && (
-            <Text className="text-xs text-red-500 mt-1">{scheduleErrors.teacher_ids}</Text>
+            <Text className="text-xs text-danger mt-1">{scheduleErrors.teacher_ids}</Text>
           )}
 
           {scheduleTeachers.length === 0 && (
-            <Text className="text-xs text-amber-600 mt-1">
+            <Text className="text-xs text-warning mt-1">
               {!scheduleForm.subject_id
                 ? "Selecione uma disciplina para listar os professores disponíveis."
                 : "Nenhum professor encontrado para esta disciplina."}
@@ -993,8 +966,8 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         </View>
 
         <View className="mb-3">
-          <Text className="text-xs font-medium text-gray-600 mb-1.5">
-            Dia da Semana <Text className="text-red-500">*</Text>
+          <Text className="text-xs font-medium text-ink-muted mb-1.5">
+            Dia da Semana <Text className="text-danger">*</Text>
           </Text>
           <select
             value={scheduleForm.weekday}
@@ -1003,11 +976,11 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
             }
             style={{
               width: "100%",
-              border: "1px solid #E5E7EB",
-              borderRadius: 8,
+              border: "1px solid #D9DDE3",
+              borderRadius: 4,
               padding: "9px 12px",
               fontSize: 14,
-              color: "#374151",
+              color: "#111722",
               backgroundColor: "white",
             }}
           >
@@ -1022,7 +995,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         <View className="flex-row gap-4">
           <View className="flex-1">
             <FormInput
-              label="Hora de Início"
+              label="Hora de início"
               required
               value={scheduleForm.start_time}
               onChangeText={(v) =>
@@ -1035,7 +1008,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           </View>
           <View className="flex-1">
             <FormInput
-              label="Hora de Término"
+              label="Hora de término"
               required
               value={scheduleForm.end_time}
               onChangeText={(v) =>
@@ -1059,7 +1032,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
 
       <ConfirmModal
         visible={!!deleteScheduleId}
-        title="Remover Horário"
+        title="Remover horário"
         message="Este horário será removido permanentemente."
         onConfirm={deleteSchedule}
         onCancel={() => setDeleteScheduleId(null)}

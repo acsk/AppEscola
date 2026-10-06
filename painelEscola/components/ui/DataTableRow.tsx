@@ -11,7 +11,7 @@ type Props = {
 };
 
 /**
- * Linha de tabela com zebrado (style inline) e hover no web.
+ * Linha de tabela: separada por borda, hover em `surface-sunken` no web (sem zebra).
  */
 export default function DataTableRow({ index, children, onPress, style, className }: Props) {
   return (

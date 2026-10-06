@@ -9,9 +9,9 @@ use App\Http\Requests\UpdateExamQuestionRequest;
 use App\Http\Resources\ExamQuestionResource;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
-use App\Models\ExamQuestionOption;
 use App\Services\ExamAccessService;
 use App\Services\ExamPublishValidator;
+use App\Services\QuestionContentService;
 use App\Services\ExamTypeService;
 use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
@@ -165,15 +165,7 @@ class ExamQuestionController extends Controller
             ]);
 
             if ($request->type === 'multiple_choice' && $request->options) {
-                foreach ($request->options as $i => $opt) {
-                    ExamQuestionOption::create([
-                        'question_id'        => $question->id,
-                        'option_text'        => $opt['option_text'],
-                        'is_correct'         => $opt['is_correct'],
-                        'order'              => $opt['order'] ?? ($i + 1),
-                        'triggers_text_input' => $opt['triggers_text_input'] ?? false,
-                    ]);
-                }
+                app(QuestionContentService::class)->syncOptions($question, $request->options);
             }
 
             return $question;
@@ -265,16 +257,7 @@ class ExamQuestionController extends Controller
 
             if ($request->has('options') && $request->options !== null) {
                 // Remove as antigas e recria
-                $question->options()->delete();
-                foreach ($request->options as $i => $opt) {
-                    ExamQuestionOption::create([
-                        'question_id'        => $question->id,
-                        'option_text'        => $opt['option_text'],
-                        'is_correct'         => $opt['is_correct'],
-                        'order'              => $opt['order'] ?? ($i + 1),
-                        'triggers_text_input' => $opt['triggers_text_input'] ?? false,
-                    ]);
-                }
+                app(QuestionContentService::class)->syncOptions($question, $request->options);
             }
         });
 

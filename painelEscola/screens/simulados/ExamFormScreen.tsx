@@ -824,18 +824,18 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator color="#7C3AED" />
+        <ActivityIndicator color="#1C3D63" />
       </View>
     );
   }
 
   const inputStyle = {
-    border: "1px solid #E5E7EB",
-    borderRadius: 12,
+    border: "1px solid #D9DDE3",
+    borderRadius: 4,
     padding: "10px 14px",
     fontSize: 14,
-    color: "#1F2937",
-    backgroundColor: "#F9FAFB",
+    color: "#111722",
+    backgroundColor: "#F7F8FA",
     width: "100%",
     resize: "vertical" as const,
     minHeight: 80,
@@ -875,16 +875,16 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         <View className="flex-row items-center gap-3">
           <TouchableOpacity
             onPress={() => navigate("simulados")}
-            className="p-2 rounded-xl bg-white border border-gray-200"
+            className="p-2 rounded-ds-md bg-surface border border-border"
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={18} color="#374151" />
+            <Ionicons name="arrow-back" size={18} color="#111722" />
           </TouchableOpacity>
           <View>
-            <Text className="text-2xl font-bold text-gray-800">
-              {canManageContent ? "Editar Simulado" : "Novo Simulado"}
+            <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">
+              {canManageContent ? "Editar simulado" : "Novo simulado"}
             </Text>
-            <Text className="text-sm text-gray-500">
+            <Text className="text-sm text-ink-muted">
               {canManageContent
                 ? "Atualize as informações, questões e materiais do simulado"
                 : "Informe o título e, se quiser, os demais dados do formulário"}
@@ -895,11 +895,11 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           <View className="flex-row items-center gap-2 flex-wrap justify-end">
             <TouchableOpacity
               onPress={() => setErrorsReportOpen(true)}
-              className="flex-row items-center bg-white border border-violet-200 px-3 py-2 rounded-xl"
+              className="flex-row items-center bg-surface border border-border px-3 py-2 rounded-ds-md"
               activeOpacity={0.85}
             >
-              <Ionicons name="analytics-outline" size={16} color="#7C3AED" />
-              <Text className="text-violet-700 font-semibold text-xs ml-1.5">
+              <Ionicons name="analytics-outline" size={16} color="#1C3D63" />
+              <Text className="text-brand font-semibold text-xs ml-1.5">
                 Questões com mais erros
               </Text>
             </TouchableOpacity>
@@ -919,25 +919,25 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <TouchableOpacity
                 key={step.id}
                 onPress={() => setActiveStep(step.id)}
-                className={`flex-1 rounded-2xl border px-4 py-3 ${
-                  active ? "border-violet-500 bg-violet-50" : "border-gray-200 bg-white"
+                className={`flex-1 rounded-ds-md border px-4 py-3 ${
+                  active ? "border-brand bg-brand-tint" : "border-border bg-surface"
                 }`}
                 activeOpacity={0.85}
               >
                 <View className="flex-row items-center gap-3">
                   <View
                     className="items-center justify-center rounded-full"
-                    style={{ width: 28, height: 28, backgroundColor: active ? "#7C3AED" : "#E5E7EB" }}
+                    style={{ width: 28, height: 28, backgroundColor: active ? "#1C3D63" : "#D9DDE3" }}
                   >
-                    <Text className={`text-xs font-bold ${active ? "text-white" : "text-gray-600"}`}>
+                    <Text className={`text-xs font-semibold ${active ? "text-white" : "text-ink-muted"}`}>
                       {step.id}
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text className={`text-sm font-semibold ${active ? "text-violet-700" : "text-gray-700"}`}>
+                    <Text className={`text-sm font-semibold ${active ? "text-brand" : "text-ink"}`}>
                       {step.title}
                     </Text>
-                    <Text className="text-xs text-gray-400">{step.description}</Text>
+                    <Text className="text-xs text-ink-subtle">{step.description}</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -949,15 +949,15 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       {/* Formulário principal */}
       {(activeStep === 1 || !canManageContent) && (
         <View
-          className="bg-white rounded-2xl p-6 mb-6"
-          style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+          className="bg-surface rounded-ds-md p-6 mb-6 border border-border"
+          style={{ }}
         >
-        <Text className="text-base font-bold text-gray-800 mb-4">Informações do Simulado</Text>
+        <Text className="text-base font-semibold text-ink mb-4">Informações do simulado</Text>
 
         {Object.keys(errors).length > 0 ? (
-          <View className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
             {Object.entries(errors).map(([field, message]) => (
-              <Text key={field} className="text-sm text-red-700">
+              <Text key={field} className="text-sm text-danger">
                 {message}
               </Text>
             ))}
@@ -997,12 +997,12 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         </View>
 
         <View className="mb-4">
-          <Text className="text-sm font-medium text-gray-700 mb-1">Cursos</Text>
-          <Text className="text-xs text-gray-400 mb-3">
+          <Text className="text-sm font-medium text-ink mb-1">Cursos</Text>
+          <Text className="text-xs text-ink-subtle mb-3">
             Selecione um ou mais cursos. Alunos matriculados em qualquer um deles verão o simulado.
           </Text>
           {courseOptions.length === 0 ? (
-            <Text className="text-sm text-gray-400">Nenhum curso disponível</Text>
+            <Text className="text-sm text-ink-subtle">Nenhum curso disponível</Text>
           ) : (
             <View className="gap-2">
               {courseOptions.map((course) => {
@@ -1012,18 +1012,18 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                     key={course.id}
                     onPress={() => toggleCourse(course.id)}
                     activeOpacity={0.7}
-                    className={`flex-row items-center gap-3 px-4 py-3 rounded-xl border ${
-                      selected ? "bg-violet-50 border-violet-200" : "bg-gray-50 border-gray-100"
+                    className={`flex-row items-center gap-3 px-4 py-3 rounded-ds-md border ${
+                      selected ? "bg-brand-tint border-border" : "bg-surface-sunken border-border"
                     }`}
                   >
                     <Ionicons
                       name={selected ? "checkbox" : "square-outline"}
                       size={20}
-                      color={selected ? "#7C3AED" : "#9CA3AF"}
+                      color={selected ? "#1C3D63" : "#5F6878"}
                     />
                     <Text
                       className={`text-sm font-medium ${
-                        selected ? "text-violet-700" : "text-gray-700"
+                        selected ? "text-brand" : "text-ink"
                       }`}
                     >
                       {course.name}
@@ -1034,7 +1034,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             </View>
           )}
           {form.course_ids.length > 0 && (
-            <Text className="text-xs text-green-600 mt-2">
+            <Text className="text-xs text-success mt-2">
               {form.course_ids.length} curso{form.course_ids.length !== 1 ? "s" : ""} selecionado
               {form.course_ids.length !== 1 ? "s" : ""}
             </Text>
@@ -1134,7 +1134,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         </View>
 
         {form.release_results_after_end === "true" && (
-          <Text className="text-xs text-cyan-700 mb-4 -mt-2">
+          <Text className="text-xs text-brand mb-4 -mt-2">
             O aluno só verá nota e gabarito depois que a data final do simulado for atingida.
           </Text>
         )}
@@ -1154,7 +1154,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           </View>
           <View style={{ flex: 1.4, minWidth: 280 }}>
             <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 mb-1.5">Descrição</Text>
+              <Text className="text-sm font-semibold text-ink mb-1.5">Descrição</Text>
               <textarea
                 value={form.description}
                 onChange={(e: any) => setField("description", e.target.value)}
@@ -1167,7 +1167,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         </View>
 
         {form.allow_retake !== "true" && (
-          <Text className="text-xs text-gray-400 mb-4 -mt-2">
+          <Text className="text-xs text-ink-subtle mb-4 -mt-2">
             Retentativa desativada: após concluir, o aluno não poderá iniciar nova tentativa.
           </Text>
         )}
@@ -1175,22 +1175,22 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         <View className="flex-row gap-3 mt-2">
           <TouchableOpacity
             onPress={() => navigate("simulados")}
-            className="flex-1 border border-gray-200 py-3 rounded-xl items-center"
+            className="flex-1 border border-border py-3 rounded-ds-md items-center"
             activeOpacity={0.7}
           >
-            <Text className="text-sm font-semibold text-gray-600">Cancelar</Text>
+            <Text className="text-sm font-semibold text-ink-muted">Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={saveExam}
             disabled={saving}
-            className="flex-1 bg-violet-600 py-3 rounded-xl items-center"
+            className="flex-1 bg-brand py-3 rounded-ds-md items-center"
             activeOpacity={0.85}
           >
             {saving ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
               <Text className="text-sm font-semibold text-white">
-                {canManageContent ? "Salvar Alterações" : "Criar Formulário"}
+                {canManageContent ? "Salvar alterações" : "Criar formulário"}
               </Text>
             )}
           </TouchableOpacity>
@@ -1203,7 +1203,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                 fetchQuestions();
                 scrollToTop();
               }}
-              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              className="px-4 py-2.5 rounded-ds-md bg-brand"
               activeOpacity={0.85}
             >
               <Text className="text-sm font-semibold text-white">Ir para questões</Text>
@@ -1216,31 +1216,31 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       {/* Seção de Questões – só exibe quando o simulado já existe */}
       {canManageContent && activeStep === 2 && (
         <View
-          className="bg-white rounded-2xl overflow-hidden"
-          style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+          className="bg-surface rounded-ds-md overflow-hidden border border-border"
+          style={{ }}
         >
           {/* Header da seção */}
           <View
-            className={`px-6 py-4 border-b border-gray-100 gap-3 ${
+            className={`px-6 py-4 border-b border-border gap-3 ${
               isMobile ? "flex-col" : "flex-row items-center justify-between"
             }`}
           >
             <View style={{ flex: 1 }}>
-              <Text className="text-base font-bold text-gray-800">Questões</Text>
-              <Text className="text-xs text-gray-400">
+              <Text className="text-base font-semibold text-ink">Questões</Text>
+              <Text className="text-xs text-ink-subtle">
                 {questions.length} questão{questions.length !== 1 ? "ões" : ""} · {totalPoints.toFixed(1)} pontos no total
               </Text>
             </View>
             {questions.length > 0 && (
               <TouchableOpacity
                 onPress={openNewQuestion}
-                className={`flex-row items-center justify-center bg-violet-600 px-4 py-2.5 rounded-xl ${
+                className={`flex-row items-center justify-center bg-brand px-4 py-2.5 rounded-ds-md ${
                   isMobile ? "w-full" : ""
                 }`}
                 activeOpacity={0.85}
               >
                 <Ionicons name="add" size={16} color="white" />
-                <Text className="text-white text-sm font-semibold ml-1">Nova Questão</Text>
+                <Text className="text-white text-sm font-semibold ml-1">Nova questão</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1248,36 +1248,36 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           {/* Lista de questões */}
           {loadingQuestions ? (
             <View className="py-12 items-center">
-              <ActivityIndicator color="#7C3AED" />
+              <ActivityIndicator color="#1C3D63" />
             </View>
           ) : questions.length === 0 ? (
             <View className="py-12 items-center gap-3 px-6">
-              <Ionicons name="help-circle-outline" size={32} color="#D1D5DB" />
-              <Text className="text-sm text-gray-400 text-center">Nenhuma questão adicionada ainda</Text>
+              <Ionicons name="help-circle-outline" size={32} color="#7A8393" />
+              <Text className="text-sm text-ink-subtle text-center">Nenhuma questão adicionada ainda</Text>
               <TouchableOpacity
                 onPress={openNewQuestion}
-                className="flex-row items-center bg-violet-600 px-5 py-2.5 rounded-xl"
+                className="flex-row items-center bg-brand px-5 py-2.5 rounded-ds-md"
                 activeOpacity={0.85}
               >
                 <Ionicons name="add" size={16} color="white" />
-                <Text className="text-sm font-semibold text-white ml-1">Nova Questão</Text>
+                <Text className="text-sm font-semibold text-white ml-1">Nova questão</Text>
               </TouchableOpacity>
             </View>
           ) : (
             questions.map((q, i) => (
               <View
                 key={q.id}
-                className={`px-6 py-4 ${i < questions.length - 1 ? "border-b border-gray-50" : ""}`}
+                className={`px-6 py-4 ${i < questions.length - 1 ? "border-b border-border" : ""}`}
               >
                 <View className="flex-row items-start gap-3">
                   <View
-                    className="items-center justify-center rounded-lg"
-                    style={{ width: 32, height: 32, backgroundColor: "#EDE9FE", flexShrink: 0 }}
+                    className="items-center justify-center rounded-ds-md"
+                    style={{ width: 32, height: 32, backgroundColor: "#E9EFF6", flexShrink: 0 }}
                   >
-                    <Text className="text-xs font-bold text-violet-700">{q.order}</Text>
+                    <Text className="text-xs font-semibold text-brand">{q.order}</Text>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-sm text-gray-800 font-medium" numberOfLines={2}>
+                    <Text className="text-sm text-ink font-medium" numberOfLines={2}>
                       {q.question_text || "Questão sem texto"}
                     </Text>
                     <View className="flex-row gap-3 mt-1.5 flex-wrap">
@@ -1291,9 +1291,9 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                               : "radio-button-on-outline"
                           }
                           size={12}
-                          color="#9CA3AF"
+                          color="#5F6878"
                         />
-                        <Text className="text-xs text-gray-400">
+                        <Text className="text-xs text-ink-subtle">
                           {q.type === "essay"
                             ? "Discursiva"
                             : q.options.some((o) => o.triggers_text_input)
@@ -1302,28 +1302,28 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                         </Text>
                       </View>
                       {q.subject && (
-                        <Text className="text-xs text-gray-400">· {q.subject.name}</Text>
+                        <Text className="text-xs text-ink-subtle">· {q.subject.name}</Text>
                       )}
-                      <Text className="text-xs text-gray-400">· {q.points} pts</Text>
+                      <Text className="text-xs text-ink-subtle">· {q.points} pts</Text>
                       {q.type === "multiple_choice" && (
-                        <Text className="text-xs text-gray-400">· {q.options.length} opções</Text>
+                        <Text className="text-xs text-ink-subtle">· {q.options.length} opções</Text>
                       )}
                     </View>
                   </View>
                   <View className="flex-row gap-1">
                     <TouchableOpacity
                       onPress={() => openEditQuestion(q)}
-                      className="p-2 rounded-lg bg-violet-50"
+                      className="p-2 rounded-ds-md bg-brand-tint"
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="pencil-outline" size={14} color="#7C3AED" />
+                      <Ionicons name="pencil-outline" size={14} color="#1C3D63" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => setDeleteQuestionId(q.id)}
-                      className="p-2 rounded-lg bg-red-50"
+                      className="p-2 rounded-ds-md bg-danger-tint"
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={14} color="#B0261B" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1332,37 +1332,37 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           )}
 
           <View
-            className={`px-6 py-4 border-t border-gray-100 gap-3 ${
+            className={`px-6 py-4 border-t border-border gap-3 ${
               isMobile ? "flex-col" : "flex-row flex-wrap justify-between"
             }`}
           >
             <TouchableOpacity
               onPress={() => setActiveStep(1)}
-              className={`px-4 py-2.5 rounded-xl border border-gray-200 bg-white items-center ${
+              className={`px-4 py-2.5 rounded-ds-md border border-border bg-surface items-center ${
                 isMobile ? "w-full" : ""
               }`}
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-gray-700">Voltar para dados</Text>
+              <Text className="text-sm font-semibold text-ink">Voltar para dados</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveStep(3)}
-              className={`px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50 items-center ${
+              className={`px-4 py-2.5 rounded-ds-md border border-border bg-brand-tint items-center ${
                 isMobile ? "w-full" : ""
               }`}
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-violet-700">Materiais de apoio</Text>
+              <Text className="text-sm font-semibold text-brand">Materiais de apoio</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={openNewQuestion}
-              className={`px-4 py-2.5 rounded-xl bg-violet-600 flex-row items-center justify-center ${
+              className={`px-4 py-2.5 rounded-ds-md bg-brand flex-row items-center justify-center ${
                 isMobile ? "w-full" : ""
               }`}
               activeOpacity={0.85}
             >
               <Ionicons name="add" size={16} color="white" />
-              <Text className="text-sm font-semibold text-white ml-1">Nova Questão</Text>
+              <Text className="text-sm font-semibold text-white ml-1">Nova questão</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1370,72 +1370,72 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
       {canManageContent && activeStep === 3 && (
         <View
-          className="bg-white rounded-2xl overflow-hidden mb-6"
-          style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+          className="bg-surface rounded-ds-md overflow-hidden mb-6 border border-border"
+          style={{ }}
         >
-          <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-100">
+          <View className="flex-row items-center justify-between px-6 py-4 border-b border-border">
             <View>
-              <Text className="text-base font-bold text-gray-800">Materiais de apoio</Text>
-              <Text className="text-xs text-gray-400">
+              <Text className="text-base font-semibold text-ink">Materiais de apoio</Text>
+              <Text className="text-xs text-ink-subtle">
                 Links e arquivos para auxiliar os alunos antes ou durante o simulado
               </Text>
             </View>
             <TouchableOpacity
               onPress={openNewSupportMaterial}
-              className="flex-row items-center bg-violet-600 px-4 py-2 rounded-xl"
+              className="flex-row items-center bg-brand px-4 py-2 rounded-ds-md"
               activeOpacity={0.85}
             >
               <Ionicons name="add" size={16} color="white" />
-              <Text className="text-white text-sm font-semibold ml-1">Novo Material</Text>
+              <Text className="text-white text-sm font-semibold ml-1">Novo material</Text>
             </TouchableOpacity>
           </View>
 
           {loadingSupportMaterials ? (
             <View className="py-12 items-center">
-              <ActivityIndicator color="#7C3AED" />
+              <ActivityIndicator color="#1C3D63" />
             </View>
           ) : supportMaterials.length === 0 ? (
             <View className="py-12 items-center gap-2">
-              <Ionicons name="library-outline" size={30} color="#D1D5DB" />
-              <Text className="text-sm text-gray-400">Nenhum material de apoio cadastrado.</Text>
+              <Ionicons name="library-outline" size={30} color="#7A8393" />
+              <Text className="text-sm text-ink-subtle">Nenhum material de apoio cadastrado.</Text>
               <TouchableOpacity onPress={openNewSupportMaterial} activeOpacity={0.7}>
-                <Text className="text-sm text-violet-600 font-semibold">Adicionar primeiro material</Text>
+                <Text className="text-sm text-brand font-semibold">Adicionar primeiro material</Text>
               </TouchableOpacity>
             </View>
           ) : (
             supportMaterials.map((material, idx) => (
               <View
                 key={material.id}
-                className={`px-6 py-4 ${idx < supportMaterials.length - 1 ? "border-b border-gray-50" : ""}`}
+                className={`px-6 py-4 ${idx < supportMaterials.length - 1 ? "border-b border-border" : ""}`}
               >
                 <View className="flex-row items-start gap-3">
                   <View
-                    className={`w-9 h-9 rounded-xl items-center justify-center ${
-                      material.type === "link" ? "bg-sky-50" : "bg-emerald-50"
+                    className={`w-9 h-9 rounded-ds-md items-center justify-center ${
+                      material.type === "link" ? "bg-brand-tint" : "bg-success-tint"
                     }`}
                   >
                     <Ionicons
                       name={material.type === "link" ? "link-outline" : "document-attach-outline"}
                       size={17}
-                      color={material.type === "link" ? "#0369A1" : "#047857"}
+                      color={material.type === "link" ? "#1C3D63" : "#1C6A45"}
                     />
                   </View>
                   <View className="flex-1">
                     <View className="flex-row items-center gap-2 mb-1">
-                      <Text className="text-sm font-semibold text-gray-800">{material.title}</Text>
+                      <Text className="text-sm font-semibold text-ink">{material.title}</Text>
                       <Badge
                         label={material.type === "link" ? "Link" : "Arquivo"}
                         slug={material.type === "link" ? "active" : "published"}
                       />
                     </View>
                     {!!material.description && (
-                      <Text className="text-xs text-gray-500 mb-1">{material.description}</Text>
+                      <Text className="text-xs text-ink-muted mb-1">{material.description}</Text>
                     )}
-                    <Text className="text-xs text-violet-700" numberOfLines={1}>
+                    <Text className="text-xs text-brand" numberOfLines={1}>
                       {material.content}
                     </Text>
                     {material.type === "file" && (
-                      <Text className="text-xs text-gray-400 mt-1">
+                      <Text className="text-xs text-ink-subtle mt-1">
                         {material.file_type ? `Tipo: ${material.file_type.toUpperCase()} · ` : ""}
                         Tamanho: {formatFileSize(material.file_size)}
                       </Text>
@@ -1444,17 +1444,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                   <View className="flex-row gap-1">
                     <TouchableOpacity
                       onPress={() => openEditSupportMaterial(material)}
-                      className="p-2 rounded-lg bg-violet-50"
+                      className="p-2 rounded-ds-md bg-brand-tint"
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="pencil-outline" size={14} color="#7C3AED" />
+                      <Ionicons name="pencil-outline" size={14} color="#1C3D63" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => setDeleteSupportMaterialId(material.id)}
-                      className="p-2 rounded-lg bg-red-50"
+                      className="p-2 rounded-ds-md bg-danger-tint"
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={14} color="#B0261B" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1462,27 +1462,27 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             ))
           )}
 
-          <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
+          <View className="px-6 py-4 border-t border-border flex-row justify-between">
             <TouchableOpacity
               onPress={() => setActiveStep(2)}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-gray-700">Voltar para questões</Text>
+              <Text className="text-sm font-semibold text-ink">Voltar para questões</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveStep(4)}
-              className="px-4 py-2.5 rounded-xl border border-violet-200 bg-violet-50"
+              className="px-4 py-2.5 rounded-ds-md border border-border bg-brand-tint"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-violet-700">Ir para teste</Text>
+              <Text className="text-sm font-semibold text-brand">Ir para teste</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={openNewSupportMaterial}
-              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              className="px-4 py-2.5 rounded-ds-md bg-brand"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-white">Novo Material</Text>
+              <Text className="text-sm font-semibold text-white">Novo material</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1490,19 +1490,19 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
       {canManageContent && activeStep === 4 && (
         <View
-          className="bg-white rounded-2xl overflow-hidden"
-          style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 }}
+          className="bg-surface rounded-ds-md overflow-hidden border border-border"
+          style={{ }}
         >
-          <View className="px-6 py-4 border-b border-gray-100 flex-row items-center justify-between">
+          <View className="px-6 py-4 border-b border-border flex-row items-center justify-between">
             <View>
-              <Text className="text-base font-bold text-gray-800">Testar simulado</Text>
-              <Text className="text-xs text-gray-400">
+              <Text className="text-base font-semibold text-ink">Testar simulado</Text>
+              <Text className="text-xs text-ink-subtle">
                 Responda como o aluno e confira gabarito e comportamento
               </Text>
             </View>
-            <View className="flex-row items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <Ionicons name="eye-outline" size={16} color="#6B7280" />
-              <Text className="text-xs font-semibold text-gray-600">
+            <View className="flex-row items-center gap-2 px-3 py-2 rounded-ds-md bg-surface-sunken border border-border">
+              <Ionicons name="eye-outline" size={16} color="#4B5463" />
+              <Text className="text-xs font-semibold text-ink-muted">
                 {questions.length} questões · {totalPoints.toFixed(1)} pontos
               </Text>
             </View>
@@ -1535,17 +1535,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                   : null,
               }}
               header={
-                <View className="mb-5 p-5 rounded-2xl border border-violet-100 bg-violet-50">
-                  <Text className="text-lg font-bold text-violet-900">
+                <View className="mb-5 p-5 rounded-ds-md border border-border bg-brand-tint">
+                  <Text className="text-lg font-semibold text-brand">
                     {form.title || "Título do simulado"}
                   </Text>
-                  <Text className="text-sm text-violet-700 mt-1">
+                  <Text className="text-sm text-brand mt-1">
                     {examTypeOptions.find((o) => o.value === form.exam_type)?.label ?? form.exam_type}
                     {form.subject_id
                       ? ` · ${subjectOptions.find((o) => o.value === form.subject_id)?.label ?? "Matéria"}`
                       : ""}
                   </Text>
-                  <Text className="text-xs text-violet-600 mt-2">
+                  <Text className="text-xs text-brand mt-2">
                     Duração: {form.duration_minutes || "--"} min · Nota mínima:{" "}
                     {form.passing_score || "--"}%
                   </Text>
@@ -1554,17 +1554,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             />
           </View>
 
-          <View className="px-6 py-4 border-t border-gray-100 flex-row justify-between">
+          <View className="px-6 py-4 border-t border-border flex-row justify-between">
             <TouchableOpacity
               onPress={() => setActiveStep(3)}
-              className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white"
+              className="px-4 py-2.5 rounded-ds-md border border-border bg-surface"
               activeOpacity={0.85}
             >
-              <Text className="text-sm font-semibold text-gray-700">Voltar para materiais</Text>
+              <Text className="text-sm font-semibold text-ink">Voltar para materiais</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigate("simulados")}
-              className="px-4 py-2.5 rounded-xl bg-violet-600"
+              className="px-4 py-2.5 rounded-ds-md bg-brand"
               activeOpacity={0.85}
             >
               <Text className="text-sm font-semibold text-white">Finalizar</Text>
@@ -1576,7 +1576,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       {/* Modal de Questão */}
       <Modal
         visible={questionModal}
-        title={editQuestionId ? "Editar Questão" : "Nova Questão"}
+        title={editQuestionId ? "Editar questão" : "Nova questão"}
         onClose={closeQuestionModal}
         size="md"
         showScrollIndicator
@@ -1591,18 +1591,18 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                   return next;
                 });
               }}
-              className="flex-1 border border-gray-200 py-2.5 rounded-xl items-center justify-center"
+              className="flex-1 border border-border py-2.5 rounded-ds-md items-center justify-center"
               style={{ minWidth: 0 }}
               activeOpacity={0.7}
             >
-              <Text className="text-sm font-semibold text-gray-600">
+              <Text className="text-sm font-semibold text-ink-muted">
                 {questionModalStep === 1 ? "Cancelar" : "Voltar"}
               </Text>
             </TouchableOpacity>
             {questionModalStep === 1 ? (
               <TouchableOpacity
                 onPress={goToQuestionStep2}
-                className="flex-1 bg-violet-600 py-2.5 rounded-xl items-center justify-center"
+                className="flex-1 bg-brand py-2.5 rounded-ds-md items-center justify-center"
                 style={{ minWidth: 0 }}
                 activeOpacity={0.85}
               >
@@ -1614,7 +1614,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <TouchableOpacity
                 onPress={saveQuestion}
                 disabled={savingQuestion}
-                className="flex-1 bg-violet-600 py-2.5 rounded-xl items-center justify-center"
+                className="flex-1 bg-brand py-2.5 rounded-ds-md items-center justify-center"
                 style={{ minWidth: 0 }}
                 activeOpacity={0.85}
               >
@@ -1640,33 +1640,33 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
               return (
                 <React.Fragment key={item.step}>
-                  {index > 0 ? <Ionicons name="chevron-forward" size={14} color="#9CA3AF" /> : null}
+                  {index > 0 ? <Ionicons name="chevron-forward" size={14} color="#5F6878" /> : null}
                   <View
-                    className="flex-1 rounded-xl px-3 py-2.5"
+                    className="flex-1 rounded-ds-md px-3 py-2.5"
                     style={{
-                      backgroundColor: active ? "#7C3AED" : complete ? "#F5F3FF" : "#F9FAFB",
+                      backgroundColor: active ? "#1C3D63" : complete ? "#E9EFF6" : "#F7F8FA",
                       borderWidth: 1,
-                      borderColor: active ? "#7C3AED" : complete ? "#C4B5FD" : "#E5E7EB",
+                      borderColor: active ? "#1C3D63" : complete ? "#D9DDE3" : "#D9DDE3",
                     }}
                   >
                     <View className="flex-row items-center gap-2">
                       <View
                         className="w-5 h-5 rounded-full items-center justify-center"
                         style={{
-                          backgroundColor: active ? "#FFFFFF" : complete ? "#DDD6FE" : "#EEF2F7",
+                          backgroundColor: active ? "#FFFFFF" : complete ? "#D9DDE3" : "#F7F8FA",
                         }}
                       >
                         <Text
-                          className="text-[10px] font-bold"
-                          style={{ color: active ? "#7C3AED" : complete ? "#6D28D9" : "#9CA3AF" }}
+                          className="text-[10px] font-semibold"
+                          style={{ color: active ? "#1C3D63" : complete ? "#132C4A" : "#5F6878" }}
                         >
                           {item.step}
                         </Text>
                       </View>
                       <Text
-                        className="text-[11px] font-bold uppercase"
+                        className="text-[11px] font-semibold uppercase"
                         numberOfLines={1}
-                        style={{ color: active ? "#FFFFFF" : complete ? "#6D28D9" : "#6B7280" }}
+                        style={{ color: active ? "#FFFFFF" : complete ? "#132C4A" : "#4B5463" }}
                       >
                         {item.label}
                       </Text>
@@ -1681,35 +1681,35 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         {questionModalStep === 1 ? (
           <View className="gap-4">
             {qErrors.enunciado && (
-              <View className="rounded-xl bg-red-50 border border-red-200 px-3 py-2">
-                <Text className="text-xs text-red-600">{qErrors.enunciado}</Text>
+              <View className="rounded-ds-md bg-danger-tint border border-danger px-3 py-2">
+                <Text className="text-xs text-danger">{qErrors.enunciado}</Text>
               </View>
             )}
 
-            <View className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-              <Text className="text-xs font-semibold text-gray-500 mb-2">Formato</Text>
-              <View className="flex-row bg-white rounded-xl p-1 border border-gray-200">
+            <View className="rounded-ds-md border border-border p-3 bg-surface-sunken">
+              <Text className="text-xs font-semibold text-ink-muted mb-2">Formato</Text>
+              <View className="flex-row bg-surface rounded-ds-md p-1 border border-border">
                 {(["multiple_choice", "essay"] as const).map((t) => {
                   const selected = qForm.type === t;
                   return (
                     <TouchableOpacity
                       key={t}
                       onPress={() => setQField("type", t)}
-                      className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-lg"
+                      className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-ds-md"
                       style={{
-                        backgroundColor: selected ? "#7C3AED" : "transparent",
+                        backgroundColor: selected ? "#1C3D63" : "transparent",
                         borderWidth: 1,
-                        borderColor: selected ? "#7C3AED" : "transparent",
+                        borderColor: selected ? "#1C3D63" : "transparent",
                       }}
                       activeOpacity={0.7}
                     >
                       <Ionicons
                         name={t === "multiple_choice" ? "list-outline" : "create-outline"}
                         size={15}
-                        color={selected ? "#FFFFFF" : "#6B7280"}
+                        color={selected ? "#FFFFFF" : "#4B5463"}
                       />
                       <Text
-                        className={`text-sm font-semibold ${selected ? "text-white" : "text-gray-600"}`}
+                        className={`text-sm font-semibold ${selected ? "text-white" : "text-ink-muted"}`}
                       >
                         {t === "multiple_choice" ? "Objetiva" : "Discursiva"}
                       </Text>
@@ -1720,7 +1720,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             </View>
 
             <View>
-              <Text className="text-sm font-semibold text-gray-700 mb-1.5">Enunciado</Text>
+              <Text className="text-sm font-semibold text-ink mb-1.5">Enunciado</Text>
               <textarea
                 value={qForm.question_text}
                 onChange={(e: any) => {
@@ -1737,12 +1737,12 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                 style={{
                   ...inputStyle,
                   minHeight: 88,
-                  borderColor: qErrors.enunciado ? "#FCA5A5" : "#E5E7EB",
+                  borderColor: qErrors.enunciado ? "#B0261B" : "#D9DDE3",
                 }}
                 rows={3}
               />
               {!qErrors.enunciado && (
-                <Text className="text-xs text-gray-400 mt-1">
+                <Text className="text-xs text-ink-subtle mt-1">
                   Informe texto, imagem, ou ambos.
                 </Text>
               )}
@@ -1795,18 +1795,18 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             </View>
 
             <View
-              className="rounded-xl border p-3"
+              className="rounded-ds-md border p-3"
               style={{
-                borderColor: qErrors.enunciado ? "#FCA5A5" : "#E5E7EB",
-                backgroundColor: "#FAFAFA",
+                borderColor: qErrors.enunciado ? "#B0261B" : "#D9DDE3",
+                backgroundColor: "#F7F8FA",
               }}
             >
-              <Text className="text-sm font-semibold text-gray-700 mb-2">Mídia (opcional)</Text>
+              <Text className="text-sm font-semibold text-ink mb-2">Mídia (opcional)</Text>
               <View className="flex-row items-center gap-3 flex-wrap">
                 <TouchableOpacity
                   onPress={() => questionImageInputRef.current?.click()}
                   disabled={uploadingQuestionImage || !effectiveExamId}
-                  className="px-4 py-2.5 rounded-xl bg-violet-600"
+                  className="px-4 py-2.5 rounded-ds-md bg-brand"
                   activeOpacity={0.85}
                   style={{ opacity: uploadingQuestionImage || !effectiveExamId ? 0.7 : 1 }}
                 >
@@ -1821,21 +1821,21 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                 {qForm.image_url ? (
                   <TouchableOpacity
                     onPress={() => setQField("image_url", "")}
-                    className="px-3 py-2 rounded-xl border border-gray-200 bg-white"
+                    className="px-3 py-2 rounded-ds-md border border-border bg-surface"
                     activeOpacity={0.7}
                   >
-                    <Text className="text-xs font-semibold text-gray-600">Remover imagem</Text>
+                    <Text className="text-xs font-semibold text-ink-muted">Remover imagem</Text>
                   </TouchableOpacity>
                 ) : null}
                 {qForm.image_url ? (
-                  <Text className="text-xs text-emerald-700" numberOfLines={1}>
+                  <Text className="text-xs text-success" numberOfLines={1}>
                     Imagem pronta para uso no enunciado.
                   </Text>
                 ) : (
-                  <Text className="text-xs text-gray-400">Nenhuma imagem enviada</Text>
+                  <Text className="text-xs text-ink-subtle">Nenhuma imagem enviada</Text>
                 )}
               </View>
-              <Text className="text-xs text-gray-400 mt-2">
+              <Text className="text-xs text-ink-subtle mt-2">
                 Tipos aceitos: JPG, JPEG, PNG, WEBP e GIF. Máximo: 5 MB.
               </Text>
               <input
@@ -1850,7 +1850,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                 }}
               />
               {qErrors.image_url && (
-                <Text className="text-xs text-red-500 mt-1">{qErrors.image_url}</Text>
+                <Text className="text-xs text-danger mt-1">{qErrors.image_url}</Text>
               )}
 
               {qForm.image_url ? (
@@ -1880,41 +1880,41 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           <View className="gap-4">
             {qForm.type === "multiple_choice" ? (
               <View>
-                <Text className="text-sm font-semibold text-gray-800 mb-1">
+                <Text className="text-sm font-semibold text-ink mb-1">
                   Alternativas de resposta
                 </Text>
-                <Text className="text-xs text-gray-400 mb-3">
+                <Text className="text-xs text-ink-subtle mb-3">
                   Marque a opção correta e preencha pelo menos duas alternativas.
                 </Text>
                 <View className="flex-row items-center justify-between mb-2">
-                  <Text className="text-xs font-medium text-gray-600">Opções</Text>
+                  <Text className="text-xs font-medium text-ink-muted">Opções</Text>
                   <TouchableOpacity
                     onPress={addOption}
                     activeOpacity={0.7}
-                    className="flex-row items-center gap-1 px-2 py-1 rounded-md bg-gray-100"
+                    className="flex-row items-center gap-1 px-2 py-1 rounded-ds-md bg-surface-sunken"
                   >
-                    <Ionicons name="add" size={14} color="#374151" />
-                    <Text className="text-xs text-gray-700 font-semibold">Opção</Text>
+                    <Ionicons name="add" size={14} color="#111722" />
+                    <Text className="text-xs text-ink font-semibold">Opção</Text>
                   </TouchableOpacity>
                 </View>
 
                 {qErrors.options && (
-                  <Text className="text-xs text-red-500 mb-2">{qErrors.options}</Text>
+                  <Text className="text-xs text-danger mb-2">{qErrors.options}</Text>
                 )}
 
                 {qForm.options.map((opt, idx) => (
                   <View
                     key={idx}
-                    className={`mb-2.5 rounded-xl border px-3 py-2.5 ${
+                    className={`mb-2.5 rounded-ds-md border px-3 py-2.5 ${
                       opt.is_correct
-                        ? "border-emerald-300 bg-emerald-50"
-                        : "border-gray-200 bg-white"
+                        ? "border-success bg-success-tint"
+                        : "border-border bg-surface"
                     }`}
                   >
                     {opt.is_correct && (
                       <View className="flex-row items-center gap-1.5 mb-2">
-                        <Ionicons name="checkmark-circle" size={14} color="#059669" />
-                        <Text className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">
+                        <Ionicons name="checkmark-circle" size={14} color="#1C6A45" />
+                        <Text className="text-[11px] font-semibold text-success uppercase tracking-wide">
                           Resposta correta
                         </Text>
                       </View>
@@ -1930,7 +1930,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                         <Ionicons
                           name={opt.is_correct ? "radio-button-on" : "radio-button-off"}
                           size={22}
-                          color={opt.is_correct ? "#059669" : "#D1D5DB"}
+                          color={opt.is_correct ? "#1C6A45" : "#7A8393"}
                         />
                       </TouchableOpacity>
                       <View style={{ flex: 1 }}>
@@ -1938,11 +1938,11 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                           value={opt.option_text}
                           onChangeText={(v) => setOptionField(idx, "option_text", v)}
                           placeholder={`Opção ${idx + 1}`}
-                          placeholderTextColor="#9CA3AF"
-                          className={`border rounded-lg px-3 py-2 text-sm text-gray-800 ${
+                          placeholderTextColor="#5F6878"
+                          className={`border rounded-ds-md px-3 py-2 text-sm text-ink ${
                             opt.is_correct
-                              ? "border-emerald-200 bg-white"
-                              : "border-gray-200 bg-gray-50"
+                              ? "border-success bg-surface"
+                              : "border-border bg-surface-sunken"
                           }`}
                         />
                       </View>
@@ -1955,26 +1955,26 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                         <Ionicons
                           name={opt.triggers_text_input ? "chatbox" : "chatbox-outline"}
                           size={17}
-                          color={opt.triggers_text_input ? "#F59E0B" : "#D1D5DB"}
+                          color={opt.triggers_text_input ? "#8A5200" : "#7A8393"}
                         />
                       </TouchableOpacity>
                       {qForm.options.length > 2 && (
                         <TouchableOpacity onPress={() => removeOption(idx)} activeOpacity={0.7}>
-                          <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                          <Ionicons name="close-circle" size={18} color="#5F6878" />
                         </TouchableOpacity>
                       )}
                     </View>
                   </View>
                 ))}
 
-                <Text className="text-[11px] text-gray-400 mt-1 mb-2">
+                <Text className="text-[11px] text-ink-subtle mt-1 mb-2">
                   Toque no círculo para marcar a correta · ícone de chat = &quot;Outro&quot;
                 </Text>
               </View>
             ) : null}
 
-            <View className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-              <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+            <View className="rounded-ds-md border border-border p-3 bg-surface-sunken">
+              <Text className="text-sm font-semibold text-ink mb-1.5">
                 Gabarito / explicação (opcional)
               </Text>
               <textarea
@@ -1992,28 +1992,28 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       {/* Modal de Material de Apoio */}
       <Modal
         visible={supportMaterialModal}
-        title={editSupportMaterialId ? "Editar Material de Apoio" : "Novo Material de Apoio"}
+        title={editSupportMaterialId ? "Editar material de apoio" : "Novo material de apoio"}
         onClose={() => {
           setSupportMaterialModal(false);
           setUploadingSupportMaterialFile(false);
         }}
         size="lg"
         footer={
-          <View className="flex-row gap-3 px-6 py-4 border-t border-gray-100">
+          <View className="flex-row gap-3 px-6 py-4 border-t border-border">
             <TouchableOpacity
               onPress={() => {
                 setSupportMaterialModal(false);
                 setUploadingSupportMaterialFile(false);
               }}
-              className="flex-1 border border-gray-200 py-2.5 rounded-xl items-center"
+              className="flex-1 border border-border py-2.5 rounded-ds-md items-center"
               activeOpacity={0.7}
             >
-              <Text className="text-sm font-semibold text-gray-600">Cancelar</Text>
+              <Text className="text-sm font-semibold text-ink-muted">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={saveSupportMaterial}
               disabled={savingSupportMaterial}
-              className="flex-1 bg-violet-600 py-2.5 rounded-xl items-center"
+              className="flex-1 bg-brand py-2.5 rounded-ds-md items-center"
               activeOpacity={0.85}
             >
               {savingSupportMaterial ? (
@@ -2037,7 +2037,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         />
 
         <View className="mb-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-1.5">Descrição (opcional)</Text>
+          <Text className="text-sm font-semibold text-ink mb-1.5">Descrição (opcional)</Text>
           <textarea
             value={supportMaterialForm.description}
             onChange={(e: any) => setSupportMaterialField("description", e.target.value)}
@@ -2075,7 +2075,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           />
         ) : (
           <View className="mb-4">
-            <Text className="text-sm font-semibold text-gray-700 mb-1.5">
+            <Text className="text-sm font-semibold text-ink mb-1.5">
               Arquivo (PDF, imagem ou vídeo)
             </Text>
             {!editSupportMaterialId ? (
@@ -2084,7 +2084,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                   <TouchableOpacity
                     onPress={() => supportMaterialFileInputRef.current?.click()}
                     disabled={uploadingSupportMaterialFile}
-                    className="px-4 py-2.5 rounded-xl bg-violet-600"
+                    className="px-4 py-2.5 rounded-ds-md bg-brand"
                     activeOpacity={0.85}
                   >
                     <Text className="text-sm font-semibold text-white">
@@ -2092,16 +2092,16 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                     </Text>
                   </TouchableOpacity>
                   {supportMaterialFile ? (
-                    <View className="px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 min-w-[220px]">
-                      <Text className="text-xs font-semibold text-violet-700" numberOfLines={1}>
+                    <View className="px-3 py-2 rounded-ds-md border border-border bg-brand-tint min-w-[220px]">
+                      <Text className="text-xs font-semibold text-brand" numberOfLines={1}>
                         {supportMaterialFile.name}
                       </Text>
                     </View>
                   ) : (
-                    <Text className="text-xs text-gray-400">Nenhum arquivo selecionado</Text>
+                    <Text className="text-xs text-ink-subtle">Nenhum arquivo selecionado</Text>
                   )}
                 </View>
-                <Text className="text-xs text-gray-400 mt-2">
+                <Text className="text-xs text-ink-subtle mt-2">
                   Tipos aceitos: PDF, JPG, PNG, WEBP, MP4, MOV, AVI, MKV. Máximo: 50 MB.
                 </Text>
                 <input
@@ -2116,15 +2116,15 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                   }}
                 />
                 {supportMaterialErrors.file && (
-                  <Text className="text-xs text-red-500 mt-1">{supportMaterialErrors.file}</Text>
+                  <Text className="text-xs text-danger mt-1">{supportMaterialErrors.file}</Text>
                 )}
               </>
             ) : (
-              <View className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                <Text className="text-xs text-gray-500">
+              <View className="rounded-ds-md border border-border bg-surface-sunken px-4 py-3">
+                <Text className="text-xs text-ink-muted">
                   Para alterar o arquivo, remova este material e crie um novo upload.
                 </Text>
-                <Text className="text-xs text-violet-600 mt-1" numberOfLines={1}>
+                <Text className="text-xs text-brand mt-1" numberOfLines={1}>
                   {supportMaterialForm.content}
                 </Text>
               </View>

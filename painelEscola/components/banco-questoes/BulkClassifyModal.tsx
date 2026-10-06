@@ -126,14 +126,14 @@ export default function BulkClassifyModal({
       <TouchableOpacity
         onPress={step === "confirm" && !applying ? () => setStep("form") : onClose}
         disabled={applying}
-        className="px-4 py-2.5 rounded-xl border border-gray-200"
+        className="px-4 py-2.5 rounded-ds-md border border-border"
       >
-        <Text className="text-sm font-semibold text-gray-600">{step === "confirm" ? "Voltar" : "Cancelar"}</Text>
+        <Text className="text-sm font-semibold text-ink-muted">{step === "confirm" ? "Voltar" : "Cancelar"}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         onPress={() => (step === "form" ? setStep("confirm") : built && onApply(built.patch, built.description))}
         disabled={!built || applying}
-        className={`px-4 py-2.5 rounded-xl flex-row items-center gap-2 ${!built || applying ? "bg-violet-300" : "bg-violet-600"}`}
+        className={`px-4 py-2.5 rounded-ds-md flex-row items-center gap-2 ${!built || applying ? "bg-brand-tint" : "bg-brand"}`}
       >
         {applying && <ActivityIndicator size="small" color="#FFFFFF" />}
         <Text className="text-sm font-semibold text-white">
@@ -147,24 +147,21 @@ export default function BulkClassifyModal({
     <Modal visible={visible} title="Classificar em massa" onClose={applying ? () => {} : onClose} size="md" compact maxHeight="88%" showScrollIndicator footer={footer}>
       {step === "confirm" && built ? (
         <View className="items-center py-4 gap-3">
-          <View className="w-12 h-12 rounded-full bg-violet-100 items-center justify-center">
-            <Ionicons name="layers-outline" size={22} color="#7C3AED" />
-          </View>
-          <Text className="text-base font-semibold text-gray-800 text-center">
+          <Text className="text-base font-semibold text-ink text-center">
             {built.description} em {countLabel}?
           </Text>
-          <Text className="text-xs text-gray-500 text-center">
+          <Text className="text-xs text-ink-muted text-center">
             Você poderá desfazer logo depois, pelo aviso no rodapé.
           </Text>
           {applying && progress && (
-            <Text className="text-xs text-violet-700" aria-live="polite">
+            <Text className="text-xs text-brand" aria-live="polite">
               Aplicando… {progress.done} de {progress.total}
             </Text>
           )}
         </View>
       ) : (
         <View style={{ gap: 4 }}>
-          <Text className="text-xs text-gray-500 mb-2">{countLabel} selecionada(s).</Text>
+          <Text className="text-xs text-ink-muted mb-2">{countLabel} selecionada(s).</Text>
           <FormSelect dense label="Ação" value={action} options={ACTIONS} onChange={(v) => setAction(v as BulkAction)} />
 
           {action === "difficulty" && (
@@ -199,7 +196,7 @@ export default function BulkClassifyModal({
                 disabled={!subjectId}
                 loading={topicsLoading}
               />
-              <Text className="text-xs text-gray-500">
+              <Text className="text-xs text-ink-muted">
                 Substitui a disciplina e os assuntos atuais das questões selecionadas.
               </Text>
             </>

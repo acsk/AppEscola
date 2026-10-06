@@ -1,13 +1,37 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions } from "react-native";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  useWindowDimensions,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+  Archive,
+  Bell,
+  BookOpen,
+  Building2,
+  Calculator,
+  Calendar,
+  ChartColumn,
+  Check,
+  ClipboardCheck,
+  ClipboardList,
+  Copy,
+  CreditCard,
+  FileQuestionMark,
+  FileText,
+  House,
+  Landmark,
+  LayoutGrid,
+  Library,
+  Link2,
+  Palette,
+  Tags,
+  UserCog,
+  UserRound,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react-native";
 import buildInfo from "../buildInfo.json";
+import Icon from "./ui/Icon";
+import { color, size } from "../constants/theme";
+import type { SidebarProps } from "../types/components";
 
 const formatBuildDateTime = (isoDate: string): string => {
   try {
@@ -23,55 +47,10 @@ const formatBuildDateTime = (isoDate: string): string => {
   }
 };
 
-import type { IoniconName, NavItem, SidebarProps } from "../types/components";
+type SidebarItem = { id: string; label: string; icon: LucideIcon };
 
-type SidebarGroup = {
-  title: string;
-  icon: IoniconName;
-  tone: "violet" | "blue" | "emerald" | "amber" | "slate";
-  items: NavItem[];
-};
-
-const groupToneStyles: Record<
-  SidebarGroup["tone"],
-  { iconBg: string; icon: string; activeBg: string; activeBorder: string; label: string }
-> = {
-  violet: {
-    iconBg: "bg-violet-100",
-    icon: "#7C3AED",
-    activeBg: "bg-violet-50",
-    activeBorder: "border-violet-200",
-    label: "text-violet-700",
-  },
-  blue: {
-    iconBg: "bg-blue-100",
-    icon: "#2563EB",
-    activeBg: "bg-blue-50",
-    activeBorder: "border-blue-200",
-    label: "text-blue-700",
-  },
-  emerald: {
-    iconBg: "bg-emerald-100",
-    icon: "#059669",
-    activeBg: "bg-emerald-50",
-    activeBorder: "border-emerald-200",
-    label: "text-emerald-700",
-  },
-  amber: {
-    iconBg: "bg-amber-100",
-    icon: "#D97706",
-    activeBg: "bg-amber-50",
-    activeBorder: "border-amber-200",
-    label: "text-amber-700",
-  },
-  slate: {
-    iconBg: "bg-slate-100",
-    icon: "#64748B",
-    activeBg: "bg-slate-50",
-    activeBorder: "border-slate-200",
-    label: "text-slate-700",
-  },
-};
+/** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */
+type SidebarSection = { label?: string; items: SidebarItem[] };
 
 export default function Sidebar({
   activeItem: externalActive,
@@ -88,123 +67,73 @@ export default function Sidebar({
   const [internalActive, setInternalActive] = useState("dashboard");
   const [versionCopied, setVersionCopied] = useState(false);
   const activeItem = externalActive ?? internalActive;
-  const menuGroups: SidebarGroup[] = [
+
+  const sections: SidebarSection[] = [
+    { items: [{ id: "dashboard", label: "Dashboard", icon: House }] },
     {
-      title: "Início",
-      icon: "home-outline",
-      tone: "violet",
-      items: [{ id: "dashboard", label: "Dashboard", icon: "home-outline" }],
-    },
-    {
-      title: "Pessoas",
-      icon: "people-outline",
-      tone: "blue",
+      label: "Pessoas",
       items: [
-        { id: "alunos", label: "Alunos", icon: "people-outline" },
-        { id: "responsaveis", label: "Responsáveis", icon: "person-outline" },
-        ...(canManageUsers
-          ? [{ id: "users", label: "Usuários", icon: "people-circle-outline" as const }]
-          : []),
+        { id: "alunos", label: "Alunos", icon: Users },
+        { id: "responsaveis", label: "Responsáveis", icon: UserRound },
+        ...(canManageUsers ? [{ id: "users", label: "Usuários", icon: UserCog }] : []),
       ],
     },
     {
-      title: "Acadêmico",
-      icon: "school-outline",
-      tone: "emerald",
+      label: "Acadêmico",
       items: [
-        { id: "disciplinas", label: "Disciplinas", icon: "library-outline" },
-        { id: "turmas", label: "Turmas", icon: "grid-outline" },
-        { id: "cursos", label: "Cursos", icon: "book-outline" },
+        { id: "disciplinas", label: "Disciplinas", icon: Library },
+        { id: "turmas", label: "Turmas", icon: LayoutGrid },
+        { id: "cursos", label: "Cursos", icon: BookOpen },
         ...(canManageExams
           ? [
-              { id: "simulados", label: "Simulados", icon: "document-text-outline" as const },
-              { id: "questoes", label: "Banco de questões", icon: "help-circle-outline" as const },
+              { id: "simulados", label: "Simulados", icon: FileText },
+              { id: "questoes", label: "Banco de questões", icon: FileQuestionMark },
             ]
           : []),
-        { id: "avaliacoes-oficiais", label: "Avaliações presenciais", icon: "clipboard-outline" },
-        { id: "provas-anteriores", label: "Provas/Materiais", icon: "archive-outline" },
-        { id: "matriculas", label: "Matrículas", icon: "clipboard-outline" },
+        { id: "avaliacoes-oficiais", label: "Avaliações presenciais", icon: ClipboardCheck },
+        { id: "provas-anteriores", label: "Provas e materiais", icon: Archive },
+        { id: "matriculas", label: "Matrículas", icon: ClipboardList },
       ],
     },
-    {
-      title: "Relatórios",
-      icon: "bar-chart-outline",
-      tone: "slate",
-      items: [
-        { id: "relatorios-turmas", label: "Turmas (alunos)", icon: "document-text-outline" },
-      ],
-    },
+    { label: "Relatórios", items: [{ id: "relatorios-turmas", label: "Turmas (alunos)", icon: ChartColumn }] },
     ...(canSendNotifications
       ? [
           {
-            title: "Comunicação",
-            icon: "chatbubbles-outline" as const,
-            tone: "amber" as const,
+            label: "Comunicação",
             items: [
-              { id: "notificacoes", label: "Notificações", icon: "notifications-outline" },
-              { id: "calendario", label: "Calendário", icon: "calendar-outline" },
+              { id: "notificacoes", label: "Notificações", icon: Bell },
+              { id: "calendario", label: "Calendário", icon: Calendar },
             ],
           },
         ]
       : []),
     {
-      title: "Financeiro",
-      icon: "wallet-outline",
-      tone: "violet",
+      label: "Financeiro",
       items: [
-        { id: "cobrancas", label: "Gestão de pagamentos", icon: "card-outline" },
-        { id: "bancos_crud", label: "Bancos", icon: "business-outline" },
-        { id: "pagamentos", label: "Provedores de pagamento", icon: "link-outline" },
+        { id: "cobrancas", label: "Gestão de pagamentos", icon: CreditCard },
+        { id: "bancos_crud", label: "Bancos", icon: Landmark },
+        { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
       ],
     },
     {
-      title: "Configurações",
-      icon: "settings-outline",
-      tone: "slate",
+      label: "Configurações",
       items: [
-        {
-          id: "configuracoes-cobranca",
-          label: "Regras de cobrança",
-          icon: "calculator-outline",
-        },
-        {
-          id: "configuracoes-tema-mobile",
-          label: "Tema do app mobile",
-          icon: "color-palette-outline",
-        },
+        { id: "configuracoes-cobranca", label: "Regras de cobrança", icon: Calculator },
+        { id: "configuracoes-tema-mobile", label: "Tema do app mobile", icon: Palette },
       ],
     },
     ...(canManageTenants
       ? [
           {
-            title: "Administração",
-            icon: "business-outline" as const,
-            tone: "slate" as const,
+            label: "Administração",
             items: [
-              { id: "tenants", label: "Tenants", icon: "business-outline" },
-              { id: "tipos-prova", label: "Tipos de prova", icon: "library-outline" },
+              { id: "tenants", label: "Tenants", icon: Building2 },
+              { id: "tipos-prova", label: "Tipos de prova", icon: Tags },
             ],
           },
         ]
       : []),
-  ].filter((group) => group.items.length > 0);
-  const activeGroupTitle = useMemo(
-    () => menuGroups.find((group) => group.items.some((item) => item.id === activeItem))?.title,
-    [activeItem, menuGroups]
-  );
-  const [openGroups, setOpenGroups] = useState<Set<string>>(
-    () => new Set(activeGroupTitle ? [activeGroupTitle] : ["Início"])
-  );
-
-  useEffect(() => {
-    if (!activeGroupTitle) return;
-    setOpenGroups((prev) => {
-      if (prev.has(activeGroupTitle)) return prev;
-      const next = new Set(prev);
-      next.add(activeGroupTitle);
-      return next;
-    });
-  }, [activeGroupTitle]);
+  ].filter((section) => section.items.length > 0);
 
   const handlePress = (id: string) => {
     setInternalActive(id);
@@ -212,21 +141,11 @@ export default function Sidebar({
     if (isMobile) onClose?.();
   };
 
-  const toggleGroup = (title: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(title)) next.delete(title);
-      else next.add(title);
-      return next;
-    });
-  };
+  const appVersion = (buildInfo as any)?.version ?? "-";
+  const buildDate = formatBuildDateTime((buildInfo as any)?.buildDate ?? "");
 
   const copyVersionInfo = async () => {
-    const versionText = [
-      `API v${apiVersion}`,
-      `App ${(buildInfo as any)?.version ?? "-"}`,
-      `Build: ${(buildInfo as any)?.version ?? "-"} • ${formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}`,
-    ].join("\n");
+    const versionText = [`API v${apiVersion}`, `App ${appVersion}`, `Build: ${appVersion} • ${buildDate}`].join("\n");
 
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(versionText);
@@ -235,146 +154,101 @@ export default function Sidebar({
     }
   };
 
-  const renderItem = (item: NavItem, groupTone: SidebarGroup["tone"]) => {
+  const renderItem = (item: SidebarItem) => {
     const isActive = activeItem === item.id;
-    const tone = groupToneStyles[groupTone];
     return (
       <TouchableOpacity
         key={item.id}
         onPress={() => handlePress(item.id)}
-        className={`flex-row items-center px-2.5 py-2 rounded-lg mb-1 border ${
-          isActive ? "bg-white border-violet-200" : "bg-transparent border-transparent"
-        }`}
-        style={isActive ? { shadowColor: "#7C3AED", shadowOpacity: 0.08, shadowRadius: 8 } : undefined}
+        role="link"
+        aria-current={isActive ? "page" : undefined}
+        className={`flex-row items-center rounded-ds-md px-3 ${isActive ? "bg-brand-tint" : ""}`}
+        style={{ height: 34, gap: 12 }}
         activeOpacity={0.7}
       >
-        <Ionicons
-          name={item.icon}
-          size={16}
-          color={isActive ? tone.icon : "#94A3B8"}
-        />
+        {/* Barra de acento do item ativo: o único uso de `accent` na navegação. */}
+        {isActive && (
+          <View style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, backgroundColor: color.accent }} />
+        )}
+        <Icon icon={item.icon} color={isActive ? color.brand : color["ink-muted"]} />
         <Text
-          className={`ml-2 text-[13px] flex-1 ${
-            isActive ? `font-bold ${tone.label}` : "font-medium text-gray-600"
-          }`}
-          numberOfLines={2}
+          className={`text-sm flex-1 ${isActive ? "font-medium text-brand" : "text-ink-muted"}`}
+          numberOfLines={1}
         >
           {item.label}
         </Text>
-        {isActive ? <View className="w-1.5 h-1.5 rounded-full bg-violet-500" /> : null}
       </TouchableOpacity>
-    );
-  };
-
-  const renderGroup = (group: SidebarGroup) => {
-    const isOpen = openGroups.has(group.title);
-    const hasActiveItem = group.items.some((item) => item.id === activeItem);
-    const tone = groupToneStyles[group.tone];
-
-    return (
-      <View
-        key={group.title}
-        className={`mb-2 rounded-2xl border px-2 py-2 ${
-          hasActiveItem ? `${tone.activeBg} ${tone.activeBorder}` : "bg-gray-50/80 border-gray-100"
-        }`}
-      >
-        <TouchableOpacity
-          onPress={() => toggleGroup(group.title)}
-          className="flex-row items-center gap-2"
-          activeOpacity={0.78}
-        >
-          <View className={`w-8 h-8 rounded-xl items-center justify-center ${tone.iconBg}`}>
-            <Ionicons name={group.icon} size={16} color={tone.icon} />
-          </View>
-          <View className="flex-1">
-            <Text className={`text-[11px] font-extrabold uppercase tracking-wide ${hasActiveItem ? tone.label : "text-gray-600"}`}>
-              {group.title}
-            </Text>
-            <Text className="text-[10px] text-gray-400 mt-0.5">
-              {group.items.length} {group.items.length === 1 ? "item" : "itens"}
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-1.5">
-            {hasActiveItem ? <View className="w-2 h-2 rounded-full bg-violet-500" /> : null}
-            <Ionicons
-              name={isOpen ? "chevron-up" : "chevron-down"}
-              size={15}
-              color={hasActiveItem ? tone.icon : "#94A3B8"}
-            />
-          </View>
-        </TouchableOpacity>
-
-        {isOpen ? (
-          <View className="mt-2 pt-2 border-t border-white/70">
-            {group.items.map((item) => renderItem(item, group.tone))}
-          </View>
-        ) : null}
-      </View>
     );
   };
 
   return (
     <View
-      className="bg-white pt-3 px-2.5 border-r border-gray-100"
+      className="bg-surface border-r border-border"
       style={{
-        width: isMobile ? Math.min(304, width * 0.86) : 244,
+        width: isMobile ? Math.min(304, width * 0.86) : size["sidebar-width"],
         height: "100%",
-        boxShadow: isMobile ? "0px 8px 24px rgba(0, 0, 0, 0.16)" : "0px 4px 12px rgba(0, 0, 0, 0.04)",
-        elevation: 8,
       }}
     >
-      {/* Logo */}
-      <View className="flex-row items-center justify-between px-1.5 mb-3">
-        <View className="flex-1">
-          <View className="flex-row items-center">
-            <View className="w-9 h-9 bg-violet-600 rounded-xl items-center justify-center mr-2">
-              <Ionicons name="school" size={20} color="white" />
-            </View>
-            <View>
-              <Text className="text-base font-bold text-gray-800 leading-tight">
-                Cursinho
-              </Text>
-              <Text className="text-xs text-violet-500 font-semibold leading-tight">
-                Hub
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={copyVersionInfo}
-            activeOpacity={0.7}
-            className="mt-1.5 ml-0"
-          >
-            <Text className="text-[10px] font-medium text-violet-600">
-              API v{apiVersion}
-            </Text>
-            <Text className="text-[10px] font-medium text-violet-600 mt-0.5">
-              App {(buildInfo as any)?.version ?? "-"}
-            </Text>
-            <View className="flex-row items-center mt-0.5">
-              <Text className="text-[9px] text-gray-400 flex-1">
-                Build: {(buildInfo as any)?.version ?? "-"} • {formatBuildDateTime((buildInfo as any)?.buildDate ?? "")}
-              </Text>
-              <Ionicons
-                name={versionCopied ? "checkmark" : "copy-outline"}
-                size={12}
-                color={versionCopied ? "#10B981" : "#9CA3AF"}
-              />
-            </View>
-          </TouchableOpacity>
+      {/* Marca + versão */}
+      <View
+        className="flex-row items-center border-b border-border px-4"
+        style={{ height: size["topbar-height"], gap: 12 }}
+      >
+        <View
+          className="bg-brand rounded-ds-sm items-center justify-center"
+          style={{ width: 28, height: 28 }}
+          aria-hidden
+        >
+          <Text className="text-xs font-semibold text-on-brand" style={{ letterSpacing: 0.3 }}>
+            CH
+          </Text>
         </View>
+        <TouchableOpacity
+          onPress={copyVersionInfo}
+          activeOpacity={0.7}
+          className="flex-1"
+          aria-label={`Cursinho Hub. Versão: API ${apiVersion}, app ${appVersion}. Copiar informações de versão`}
+        >
+          <Text className="font-semibold text-ink" style={{ fontSize: 15, lineHeight: 18 }}>
+            Cursinho Hub
+          </Text>
+          <View className="flex-row items-center" style={{ gap: 4 }}>
+            <Text className="font-mono text-ink-subtle" style={{ fontSize: 11, lineHeight: 14 }} numberOfLines={1}>
+              {appVersion} · API {apiVersion}
+            </Text>
+            <Icon icon={versionCopied ? Check : Copy} size={16} color={versionCopied ? color.success : color["ink-subtle"]} />
+          </View>
+        </TouchableOpacity>
         {isMobile && (
           <TouchableOpacity
             onPress={onClose}
-            className="w-9 h-9 rounded-full bg-gray-50 border border-gray-200 items-center justify-center"
+            className="items-center justify-center rounded-ds-md"
+            style={{ width: 32, height: 32 }}
+            aria-label="Fechar menu"
             activeOpacity={0.8}
           >
-            <Ionicons name="close" size={18} color="#6B7280" />
+            <Icon icon={X} />
           </TouchableOpacity>
         )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        {menuGroups.map(renderGroup)}
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 12 }} aria-label="Navegação principal">
+        {sections.map((section, index) => (
+          <View key={section.label ?? `secao-${index}`} style={{ marginTop: index === 0 ? 0 : 12 }}>
+            {section.label && (
+              <Text
+                className="font-semibold text-ink-subtle uppercase px-4 py-2"
+                style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.9 }}
+              >
+                {section.label}
+              </Text>
+            )}
+            <View className="px-2">{section.items.map(renderItem)}</View>
+          </View>
+        ))}
+        <Text className="font-mono text-ink-subtle px-4 mt-4" style={{ fontSize: 11, lineHeight: 14 }}>
+          Build {buildDate}
+        </Text>
       </ScrollView>
     </View>
   );

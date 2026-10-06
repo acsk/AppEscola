@@ -88,35 +88,35 @@ export default function EnrollmentEditModal({
     <>
       <Modal
         visible={visible}
-        title="Editar Matrícula"
+        title="Editar matrícula"
         onClose={onClose}
         size="lg"
         footer={
           <>
             <TouchableOpacity
               onPress={onClose}
-              className="px-5 py-2.5 rounded-xl border border-gray-200"
+              className="px-5 py-2.5 rounded-ds-md border border-border"
             >
-              <Text className="text-sm font-semibold text-gray-700">Cancelar</Text>
+              <Text className="text-sm font-semibold text-ink">Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSavePress}
               disabled={saving}
-              className="px-5 py-2.5 rounded-xl bg-violet-600"
+              className="px-5 py-2.5 rounded-ds-md bg-brand"
             >
               {saving ? (
                 <ActivityIndicator color="white" size="small" />
               ) : (
-                <Text className="text-sm font-bold text-white">Salvar</Text>
+                <Text className="text-sm font-semibold text-white">Salvar</Text>
               )}
             </TouchableOpacity>
           </>
         }
       >
         {financialFieldsLocked && (
-          <View className="flex-row items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-4">
-            <Ionicons name="lock-closed-outline" size={14} color="#D97706" />
-            <Text className="text-xs text-amber-800 flex-1">
+          <View className="flex-row items-center gap-1.5 bg-warning-tint border border-warning rounded-ds-md px-3 py-2.5 mb-4">
+            <Ionicons name="lock-closed-outline" size={14} color="#8A5200" />
+            <Text className="text-xs text-warning flex-1">
               Datas, mensalidade e desconto estão bloqueados porque já existem cobranças baixadas nesta matrícula.
             </Text>
           </View>
@@ -127,7 +127,7 @@ export default function EnrollmentEditModal({
             label="Turma"
             required
             placeholder="Selecione a turma"
-            modalTitle="Selecionar Turma"
+            modalTitle="Selecionar turma"
             value={form.school_class_id}
             onChange={(v) => setForm((prev) => ({ ...prev, school_class_id: v }))}
             error={errors.school_class_id}
@@ -138,7 +138,7 @@ export default function EnrollmentEditModal({
         <View className="flex-row gap-4">
           <View className="flex-1">
             <DatePickerInput
-              label="Data de Início"
+              label="Data de início"
               required
               value={form.start_date}
               onChangeText={(v) => setForm((prev) => ({ ...prev, start_date: v }))}
@@ -148,7 +148,7 @@ export default function EnrollmentEditModal({
           </View>
           <View className="flex-1">
             <DatePickerInput
-              label="Data de Término"
+              label="Data de término"
               value={form.end_date}
               onChangeText={(v) => setForm((prev) => ({ ...prev, end_date: v }))}
               error={errors.end_date}
@@ -206,11 +206,11 @@ export default function EnrollmentEditModal({
 
         {!financialFieldsLocked &&
         (form.monthly_amount.trim() || form.discount_amount.trim()) ? (
-          <View className="flex-row items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 -mt-1 mb-2">
-            <Ionicons name="calculator-outline" size={14} color="#16A34A" />
-            <Text className="text-xs text-emerald-800">
+          <View className="flex-row items-center gap-2 bg-success-tint border border-success rounded-ds-md px-3 py-2 -mt-1 mb-2">
+            <Ionicons name="calculator-outline" size={14} color="#1C6A45" />
+            <Text className="text-xs text-success">
               Mensalidade líquida:{" "}
-              <Text className="font-bold">
+              <Text className="font-semibold">
                 {(enrollmentNetMonthlyPreview(form) ?? 0).toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
