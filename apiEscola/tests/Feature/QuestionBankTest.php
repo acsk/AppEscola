@@ -356,6 +356,32 @@ class QuestionBankTest extends TestCase
             ->assertJsonPath('message', 'Classificação de prova inválida ou inativa.');
     }
 
+    public function test_taxonomy_import_is_idempotent_and_uses_aliases(): void
+    {
+        Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português']);
+        $data = [
+            'disciplinas' => [
+                ['nome' => 'Língua Portuguesa', 'aliases' => ['Português'], 'assuntos' => ['Crase', 'Crase', 'Pontuação']],
+                ['nome' => 'Informática', 'assuntos' => ['Linux']],
+            ],
+            'bancas' => [['nome' => 'CEBRASPE', 'nome_anterior' => 'CESPE'], ['nome' => 'ESAF', 'ativo' => false]],
+        ];
+        $importer = app(\App\Services\QuestionTaxonomyImporter::class);
+
+        $dry = $importer->import($this->tenant->id, $data, dryRun: true);
+        $this->assertSame(3, $dry['topics_created']);
+        $this->assertDatabaseCount('subject_topics', 0);
+
+        $first = $importer->import($this->tenant->id, $data);
+        $this->assertSame([1, 1, 3, 2], [$first['subjects_created'], $first['subjects_existing'], $first['topics_created'], $first['boards_created']]);
+        $this->assertSame(2, Subject::where('tenant_id', $this->tenant->id)->count());
+        $this->assertDatabaseHas('question_boards', ['name' => 'CEBRASPE', 'description' => 'Antiga CESPE']);
+        $this->assertDatabaseHas('question_boards', ['name' => 'ESAF', 'description' => 'Banca inativa']);
+
+        $second = $importer->import($this->tenant->id, $data);
+        $this->assertSame([0, 0, 0], [$second['subjects_created'], $second['topics_created'], $second['boards_created']]);
+    }
+
     // ── Segurança ──────────────────────────────────────────────────────────
 
     public function test_student_cannot_access_question_bank(): void
