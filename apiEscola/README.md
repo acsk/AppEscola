@@ -92,6 +92,12 @@ conteudo. A edicao carrega e permite alterar a classificacao junto com o conteud
 O autocompletar preenche alternativas/gabarito e classificacao tambem na edicao,
 preservando textos e campos de classificacao ja preenchidos. Conteudo e alteracoes
 de classificacao sao salvos juntos pelo endpoint existente de questao avulsa.
+O seletor de disciplinas usa o catalogo completo de `/question-bank/subjects`,
+evitando que disciplinas sugeridas pela IA fiquem invisiveis por paginacao.
+A recriacao multimodal inclui `possui_imagem` e `image_spec` no mesmo contrato
+JSON da nova questao. Se o provedor omitir a decisao visual ou retornar um valor
+nao booleano, a analise fica `NEEDS_REVIEW`, com motivo explicito, sem gerar imagem,
+presumir que ela e dispensavel ou repetir automaticamente chamadas pagas.
 
 Testes visuais com servidor Expo web e API simulada, sem cobrancas:
 

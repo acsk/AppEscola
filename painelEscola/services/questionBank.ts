@@ -158,8 +158,8 @@ export async function fetchSubjectsWithCounts(): Promise<(SubjectSummary & { que
 }
 
 export async function fetchActiveSubjects(): Promise<SubjectSummary[]> {
-  const { data } = await api.get("/subjects", { params: { status: "active", per_page: 200 } });
-  return (data.data ?? data).map((s: SubjectSummary) => ({ id: s.id, name: s.name }));
+  const subjects = await fetchSubjectsWithCounts();
+  return subjects.map(({ id, name }) => ({ id, name }));
 }
 
 export async function fetchActiveExamTypes(): Promise<ExamTypeSummary[]> {

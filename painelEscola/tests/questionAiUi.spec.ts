@@ -29,7 +29,7 @@ async function setup(page: Page, available = true, statusCode = 200, questionOve
   image_url?: string;
   subject_id?: number | null;
   is_annulled?: boolean;
-} = {}) {
+} = {}, paginatedSubjects = false) {
   let saved = 0;
   let aiRequests = 0;
   let currentStatusCode = statusCode;
@@ -45,10 +45,15 @@ async function setup(page: Page, available = true, statusCode = 200, questionOve
     const path = new URL(request.url()).pathname;
     let body: unknown = [];
     let status = 200;
-    if (path.endsWith("/subjects")) {
+    if (path === "/api/subjects") {
       await route.fulfill({
         headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
-        json: { data: [{ id: 10, name: "Matemática" }, { id: 11, name: "Português" }] },
+        json: {
+          data: paginatedSubjects
+            ? Array.from({ length: 20 }, (_, i) => ({ id: 100 + i, name: `Disciplina ${i + 1}` }))
+            : [{ id: 10, name: "Matemática" }, { id: 11, name: "Português" }],
+          meta: { current_page: 1, last_page: paginatedSubjects ? 2 : 1 },
+        },
       });
       return;
     }
@@ -61,9 +66,13 @@ async function setup(page: Page, available = true, statusCode = 200, questionOve
       options: [{ option_text: "Quatro", is_correct: true }, { option_text: "Cinco", is_correct: false }],
       subject_id: 10, topic_ids: [20], difficulty_id: 30, board_id: 40, year: 2020, tags: ["soma"],
     };
+    else if (path === "/api/question-bank/subjects") body = [
+      ...(paginatedSubjects ? Array.from({ length: 20 }, (_, i) => ({ id: 100 + i, name: `Disciplina ${i + 1}` })) : []),
+      { id: 10, name: "Matemática" }, { id: 11, name: "Português" },
+    ];
     else if (path.endsWith("/difficulties")) body = [{ id: 30, name: "Fácil" }];
     else if (path.endsWith("/boards")) body = [{ id: 40, name: "ENEM" }];
-    else if (path.endsWith("/topics")) body = [{ id: 20, subject_id: 10, name: "Aritmética" }];
+    else if (path.endsWith("/topics")) body = [{ id: 20, subject_id: 10, name: paginatedSubjects ? "Equações" : "Aritmética" }];
     else if (path.endsWith("/questions/123")) {
       if (request.method() === "PUT") {
         saved++;
@@ -137,6 +146,18 @@ test("Nova questão mostra autocompletar, preenche e aguarda revisão sem salvar
   await expect(page.getByText("Matemática", { exact: true })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Aritmética" })).toHaveAttribute("aria-checked", "true");
   expect(state.saved()).toBe(0);
+});
+
+test("autocompletar exibe Matemática com Equações mesmo após a primeira página de disciplinas", async ({ page }) => {
+  const state = await setup(page, true, 200, { type: "multiple_choice", image_url: "" }, true);
+  await page.goto(`${baseUrl}/#/questoes/123/editar`);
+  await expect(page.getByText("Escreva ao menos 15 caracteres", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Autocompletar com IA", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "Equações" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("Matemática", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+  await expect.poll(state.saved).toBe(1);
+  expect(state.saves[0]).toMatchObject({ subject_id: 10, topic_ids: [20] });
 });
 
 test("edição autocompleta respostas e classificação e salva juntas", async ({ page }) => {

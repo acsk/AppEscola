@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class QuestionImageTest extends TestCase
@@ -121,6 +122,44 @@ class QuestionImageTest extends TestCase
         $this->similar($this->source())->assertOk()->assertJsonPath('body.questions.0.possui_imagem', false);
         Http::assertNotSent(fn (Request $request) => str_ends_with($request->url(), '/images'));
         $this->assertDatabaseCount('question_image_generations', 1);
+    }
+
+    public function test_recreation_prompt_includes_visual_fields_inside_question_format(): void
+    {
+        $this->fakePipeline(false);
+        $this->similar($this->source())->assertOk();
+        Http::assertSent(function (Request $request) {
+            $prompt = $request['messages'][1]['content'][0]['text'] ?? '';
+            if (! str_contains($prompt, 'Formato da resposta:')) {
+                return false;
+            }
+            $format = explode("\n\nANÁLISE VISUAL", explode("Formato da resposta:\n", $prompt, 2)[1], 2)[0];
+            $template = json_decode($format, true, 512, JSON_THROW_ON_ERROR);
+            $this->assertTrue($template['questions'][0]['possui_imagem']);
+            $this->assertArrayHasKey('labels', $template['questions'][0]['image_spec']);
+            $this->assertStringContainsString('nunca texto, número, null nem campo omitido', $prompt);
+
+            return true;
+        });
+    }
+
+    #[DataProvider('invalidImageDecisions')]
+    public function test_missing_or_non_boolean_image_decision_needs_review_without_generating_image(mixed $decision): void
+    {
+        $this->fakePipeline(true, null, 200, [], self::PNG, ['possui_imagem' => $decision]);
+        $response = $this->similar($this->source())->assertStatus(422)
+            ->assertJsonPath('body.code', 'image_needs_review')
+            ->assertJsonPath('body.status', 'NEEDS_REVIEW');
+        $this->assertStringContainsString('possui_imagem', $response->json('message'));
+        $this->assertDatabaseHas('question_image_generations', [
+            'tenant_id' => $this->tenant->id, 'status' => 'NEEDS_REVIEW', 'error' => $response->json('message'),
+        ]);
+        Http::assertNotSent(fn (Request $request) => str_ends_with($request->url(), '/images'));
+    }
+
+    public static function invalidImageDecisions(): array
+    {
+        return [[null], ['true'], ['false'], [1], [0]];
     }
 
     public function test_inconsistent_numbers_retry_then_succeed(): void
@@ -294,14 +333,14 @@ class QuestionImageTest extends TestCase
         return $this->postJson("/api/question-bank/questions/{$source->id}/ai/similar", ['quantity' => 1]);
     }
 
-    private function fakePipeline(bool $needsImage = true, ?array $validations = null, int $imageStatus = 200, array $analysisOverrides = [], string $image = self::PNG): void
+    private function fakePipeline(bool $needsImage = true, ?array $validations = null, int $imageStatus = 200, array $analysisOverrides = [], string $image = self::PNG, array $questionOverrides = []): void
     {
         $sequence = Http::sequence()
             ->push($this->chat(array_replace($this->analysis(), $analysisOverrides)))
-            ->push($this->chat(['questions' => [[
+            ->push($this->chat(['questions' => [array_filter(array_replace([
                 'question_text' => 'Triângulo com 6 cm, 8 cm e 10 cm.',
                 'explanation' => 'Resposta secreta', 'possui_imagem' => $needsImage, 'image_spec' => $this->spec(),
-            ]]]));
+            ], $questionOverrides), fn ($value) => $value !== null)]]));
         foreach ($validations ?? [$this->valid()] as $validation) {
             $sequence->push($this->chat($validation));
         }

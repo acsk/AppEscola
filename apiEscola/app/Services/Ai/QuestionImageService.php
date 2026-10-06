@@ -94,7 +94,15 @@ class QuestionImageService
     public function create(?User $user, int $tenantId, ExamQuestion $source, array $content, array $raw, array $context): array
     {
         if (! is_bool($raw['possui_imagem'] ?? null)) {
-            throw AiException::invalidResponse();
+            $message = 'A IA não informou corretamente se a nova questão precisa de imagem (possui_imagem deve ser true ou false). '
+                .'A geração foi interrompida para não descartar uma imagem necessária. Revise a referência antes de tentar novamente.';
+            QuestionImageGeneration::query()->where('tenant_id', $tenantId)->whereKey($context['analysis_id'])
+                ->update(['status' => 'NEEDS_REVIEW', 'error' => $message]);
+            Log::warning('IA: decisão visual inválida', [
+                'tenant_id' => $tenantId, 'analysis_id' => $context['analysis_id'],
+                'field' => 'possui_imagem', 'received_type' => get_debug_type($raw['possui_imagem'] ?? null),
+            ]);
+            throw new AiException($message, 422, 'image_needs_review');
         }
         if ($raw['possui_imagem'] === false) {
             return $content + ['possui_imagem' => false];
