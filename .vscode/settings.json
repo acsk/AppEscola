@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^git status --short --branch; git --no-pager log -6 --format='%h %s'; git rev-parse HEAD; git rev-parse origin/main; git --no-pager log origin/main\\.\\.HEAD --format='%h %s'; git --no-pager show --format=fuller --no-patch bb4554de9919e97ad0f76e2031b275ab373e16f2$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
