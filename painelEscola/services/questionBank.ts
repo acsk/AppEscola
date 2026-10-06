@@ -11,6 +11,8 @@ import type {
   QuestionBankTabCounts,
   SubjectSummary,
   SubjectTopic,
+  TaxonomyImportReport,
+  TaxonomySubject,
 } from "../types/questionBank";
 import { BATCH_CHUNK_SIZE, chunk } from "../utils/questionBankQuery";
 
@@ -155,6 +157,18 @@ export async function deleteTopic(id: number) {
 export async function fetchSubjectsWithCounts(): Promise<(SubjectSummary & { questions_count: number })[]> {
   const { data } = await api.get("/question-bank/subjects");
   return data.body ?? [];
+}
+
+/** Disciplinas ativas com os assuntos aninhados (lista completa, sem paginação). */
+export async function fetchTaxonomy(): Promise<TaxonomySubject[]> {
+  const { data } = await api.get("/question-bank/taxonomy");
+  return data.body ?? [];
+}
+
+/** Importa a taxonomia padrão (só cria o que falta). Devolve o envelope (toast usa a mensagem da API). */
+export async function importDefaultTaxonomy() {
+  const { data } = await api.post("/question-bank/taxonomy/import-default");
+  return data as { type: string; message: string; body: TaxonomyImportReport };
 }
 
 export async function fetchActiveSubjects(): Promise<SubjectSummary[]> {

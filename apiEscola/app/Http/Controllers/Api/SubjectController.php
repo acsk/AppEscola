@@ -40,7 +40,10 @@ class SubjectController extends Controller
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
             ->when($request->query('search'), fn ($q, $v) => $q->where('name', 'like', "%{$v}%"));
 
-        return SubjectResource::collection($query->orderBy('name')->paginate(20));
+        // per_page opcional (o painel pede listas completas para selects); padrão 20, máximo 200.
+        $perPage = min(200, max(1, (int) $request->query('per_page', 20)));
+
+        return SubjectResource::collection($query->orderBy('name')->paginate($perPage));
     }
 
     #[OA\Post(

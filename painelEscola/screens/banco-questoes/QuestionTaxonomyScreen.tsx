@@ -24,6 +24,7 @@ import {
   fetchCatalogDefinitions,
   fetchSubjectsWithCounts,
   fetchTopics,
+  importDefaultTaxonomy,
   saveCatalogItem,
   saveTopic,
 } from "../../services/questionBank";
@@ -31,6 +32,10 @@ import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiT
 import { foldText } from "../../utils/questionBankQuery";
 import type { CatalogDefinition, CatalogItem, CatalogKey, SubjectTopic } from "../../types/questionBank";
 import Tabs from "../../components/ui/Tabs";
+import PageHeader from "../../components/ui/PageHeader";
+import Button from "../../components/ui/Button";
+import { Download } from "lucide-react-native";
+import { useAuth } from "../../contexts/AuthContext";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -65,6 +70,10 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<DeleteState | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { user } = useAuth();
+  const canImport = user?.role === "admin" || user?.role === "super_admin";
+  const [confirmImport, setConfirmImport] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
     type: "success",
@@ -95,6 +104,21 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Importa a taxonomia padrão (ENEM/vestibular e concursos). Idempotente: só cria o que falta. */
+  const runImport = async () => {
+    setImporting(true);
+    try {
+      const response = await importDefaultTaxonomy();
+      showApiToast(setToast, response, "Taxonomia importada.");
+      setConfirmImport(false);
+      await load();
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível importar a taxonomia.");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const topicsBySubject = useMemo(() => {
     const map = new Map<number, SubjectTopic[]>();
@@ -168,11 +192,16 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   return (
     <View className="flex-1">
       <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
-        <ScreenBreadcrumb items={[{ label: "Banco de questões", onPress: () => navigate("questoes") }, { label: "Taxonomia" }]} />
-        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Taxonomia</Text>
-        <Text className="text-sm text-ink-muted mt-1 mb-4">
-          Disciplinas, assuntos e cadastros usados para classificar as questões. Itens em uso não podem ser excluídos.
-        </Text>
+        <View className="mb-4">
+          <PageHeader
+            breadcrumb={[{ label: "Banco de questões", onPress: () => navigate("questoes") }, { label: "Taxonomia" }]}
+            title="Taxonomia"
+            description="Disciplinas, assuntos e cadastros usados para classificar as questões. Itens em uso não podem ser excluídos."
+            actions={
+              canImport ? <Button icon={Download} label="Importar taxonomia padrão" onPress={() => setConfirmImport(true)} /> : undefined
+            }
+          />
+        </View>
 
         <View className="mb-4">
           <Tabs accessibilityLabel="Seções da taxonomia" items={sectionTabs.map((t) => ({ id: t.key, label: t.label }))} value={section} onChange={setSection} />
@@ -367,6 +396,17 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
         loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setToDelete(null)}
+      />
+
+      <ConfirmModal
+        visible={confirmImport}
+        tone="primary"
+        title="Importar taxonomia padrão"
+        message="Cria as disciplinas, os assuntos e as bancas padrão que ainda não existem (ENEM/vestibular e concursos). Nada do que já existe é alterado ou removido. As disciplinas novas também aparecem em Acadêmico › Disciplinas."
+        confirmLabel="Importar"
+        loading={importing}
+        onConfirm={() => void runImport()}
+        onCancel={() => setConfirmImport(false)}
       />
 
       <ToastBanner

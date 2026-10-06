@@ -2,7 +2,9 @@
   "disciplinas": [
     {
       "nome": "Língua Portuguesa",
-      "aliases": ["Português"],
+      "aliases": [
+        "Português"
+      ],
       "assuntos": [
         "Interpretação e Compreensão de Textos",
         "Tipologia e Gêneros Textuais",
@@ -679,48 +681,383 @@
         "Lei de Licitações e Contratos",
         "Legislação Específica do Órgão"
       ]
+    },
+    {
+      "nome": "Biologia",
+      "assuntos": [
+        "Citologia",
+        "Bioquímica Celular",
+        "Metabolismo Energético",
+        "Divisão Celular",
+        "Histologia",
+        "Embriologia",
+        "Fisiologia Humana",
+        "Genética",
+        "Biotecnologia",
+        "Evolução",
+        "Ecologia",
+        "Ciclos Biogeoquímicos",
+        "Botânica",
+        "Zoologia",
+        "Microbiologia e Vírus",
+        "Parasitologia",
+        "Saúde e Doenças",
+        "Taxonomia e Classificação dos Seres Vivos"
+      ]
+    },
+    {
+      "nome": "Física",
+      "assuntos": [
+        "Cinemática",
+        "Dinâmica e Leis de Newton",
+        "Trabalho, Energia e Potência",
+        "Impulso e Quantidade de Movimento",
+        "Gravitação",
+        "Estática",
+        "Hidrostática",
+        "Termologia e Calorimetria",
+        "Termodinâmica",
+        "Óptica Geométrica",
+        "Ondulatória",
+        "Acústica",
+        "Eletrostática",
+        "Eletrodinâmica",
+        "Circuitos Elétricos",
+        "Magnetismo e Eletromagnetismo",
+        "Física Moderna"
+      ]
+    },
+    {
+      "nome": "Química",
+      "assuntos": [
+        "Estrutura Atômica",
+        "Tabela Periódica",
+        "Ligações Químicas",
+        "Funções Inorgânicas",
+        "Reações Químicas",
+        "Estequiometria",
+        "Gases",
+        "Soluções",
+        "Propriedades Coligativas",
+        "Termoquímica",
+        "Cinética Química",
+        "Equilíbrio Químico",
+        "pH e pOH",
+        "Eletroquímica",
+        "Radioatividade",
+        "Química Orgânica",
+        "Funções Orgânicas",
+        "Isomeria",
+        "Reações Orgânicas",
+        "Polímeros",
+        "Química Ambiental"
+      ]
+    },
+    {
+      "nome": "História",
+      "assuntos": [
+        "Pré-História",
+        "Antiguidade Oriental",
+        "Grécia Antiga",
+        "Roma Antiga",
+        "Idade Média",
+        "Renascimento e Reformas",
+        "Absolutismo e Mercantilismo",
+        "Grandes Navegações",
+        "Brasil Colônia",
+        "Iluminismo",
+        "Revolução Francesa",
+        "Revolução Industrial",
+        "Independência do Brasil",
+        "Brasil Império",
+        "Imperialismo",
+        "Primeira Guerra Mundial",
+        "Revolução Russa",
+        "Período Entreguerras",
+        "Segunda Guerra Mundial",
+        "Guerra Fria",
+        "República Velha",
+        "Era Vargas",
+        "República Populista",
+        "Ditadura Militar",
+        "Redemocratização e Nova República",
+        "História da África",
+        "História da América"
+      ]
+    },
+    {
+      "nome": "Geografia",
+      "assuntos": [
+        "Cartografia",
+        "Geologia e Relevo",
+        "Clima",
+        "Hidrografia",
+        "Biomas e Vegetação",
+        "Questões Ambientais",
+        "População e Demografia",
+        "Urbanização",
+        "Industrialização",
+        "Agropecuária e Espaço Agrário",
+        "Energia",
+        "Transportes",
+        "Globalização",
+        "Geopolítica",
+        "Blocos Econômicos",
+        "Geografia do Brasil",
+        "Regionalização do Brasil"
+      ]
+    },
+    {
+      "nome": "Filosofia",
+      "assuntos": [
+        "Filosofia Antiga",
+        "Pré-Socráticos",
+        "Sócrates, Platão e Aristóteles",
+        "Filosofia Medieval",
+        "Filosofia Moderna",
+        "Iluminismo e Contratualistas",
+        "Filosofia Contemporânea",
+        "Ética e Moral",
+        "Filosofia Política",
+        "Teoria do Conhecimento",
+        "Lógica",
+        "Estética"
+      ]
+    },
+    {
+      "nome": "Sociologia",
+      "assuntos": [
+        "Clássicos da Sociologia",
+        "Cultura e Sociedade",
+        "Trabalho e Sociedade",
+        "Estratificação e Desigualdade Social",
+        "Movimentos Sociais",
+        "Cidadania e Direitos",
+        "Estado, Poder e Política",
+        "Indústria Cultural e Meios de Comunicação",
+        "Religião e Sociedade",
+        "Gênero, Raça e Etnia"
+      ]
+    },
+    {
+      "nome": "Literatura",
+      "assuntos": [
+        "Teoria Literária",
+        "Gêneros Literários",
+        "Trovadorismo e Humanismo",
+        "Classicismo",
+        "Quinhentismo",
+        "Barroco",
+        "Arcadismo",
+        "Romantismo",
+        "Realismo e Naturalismo",
+        "Parnasianismo",
+        "Simbolismo",
+        "Pré-Modernismo",
+        "Modernismo",
+        "Literatura Contemporânea",
+        "Literatura Portuguesa"
+      ]
+    },
+    {
+      "nome": "Língua Inglesa",
+      "aliases": [
+        "Inglês"
+      ],
+      "assuntos": [
+        "Interpretação de Textos",
+        "Vocabulário",
+        "Falsos Cognatos",
+        "Tempos Verbais",
+        "Verbos Modais",
+        "Pronomes",
+        "Preposições",
+        "Conectivos",
+        "Voz Passiva",
+        "Discurso Indireto"
+      ]
+    },
+    {
+      "nome": "Língua Espanhola",
+      "aliases": [
+        "Espanhol"
+      ],
+      "assuntos": [
+        "Interpretação de Textos",
+        "Vocabulário",
+        "Falsos Cognatos (Heterosemánticos)",
+        "Tempos Verbais",
+        "Pronomes",
+        "Artigos e Contrações",
+        "Preposições",
+        "Conectivos"
+      ]
+    },
+    {
+      "nome": "Redação",
+      "assuntos": [
+        "Dissertação Argumentativa",
+        "Competências do ENEM",
+        "Proposta de Intervenção",
+        "Repertório Sociocultural",
+        "Coesão e Coerência",
+        "Estrutura do Texto",
+        "Gêneros Textuais"
+      ]
+    },
+    {
+      "nome": "Artes",
+      "assuntos": [
+        "História da Arte",
+        "Arte Brasileira",
+        "Vanguardas Europeias",
+        "Linguagens Artísticas",
+        "Patrimônio Cultural"
+      ]
     }
   ],
-
   "bancas": [
-    { "nome": "CEBRASPE", "nome_anterior": "CESPE" },
-    { "nome": "FGV", "nome_completo": "Fundação Getulio Vargas" },
-    { "nome": "FCC", "nome_completo": "Fundação Carlos Chagas" },
-    { "nome": "VUNESP", "nome_completo": "Fundação VUNESP" },
-    { "nome": "CESGRANRIO", "nome_completo": "Fundação Cesgranrio" },
-    { "nome": "Instituto AOCP" },
-    { "nome": "IBFC", "nome_completo": "Instituto Brasileiro de Formação e Capacitação" },
-    { "nome": "IDECAN", "nome_completo": "Instituto de Desenvolvimento Educacional, Cultural e Assistencial Nacional" },
-    { "nome": "IADES", "nome_completo": "Instituto Americano de Desenvolvimento" },
-    { "nome": "Instituto Consulplan" },
-    { "nome": "FUNDATEC" },
-    { "nome": "Quadrix" },
-    { "nome": "Instituto ACCESS" },
-    { "nome": "Instituto Verbena" },
-    { "nome": "Instituto Selecon" },
-    { "nome": "Instituto Avalia" },
-    { "nome": "Instituto Legatus" },
-    { "nome": "Instituto Mais" },
-    { "nome": "Instituto Nosso Rumo" },
-    { "nome": "Instituto Consulpam" },
-    { "nome": "Instituto Unifil" },
-    { "nome": "Fundação La Salle" },
-    { "nome": "FAURGS" },
-    { "nome": "FEPESE" },
-    { "nome": "FADESP" },
-    { "nome": "FAPEC" },
-    { "nome": "COPEVE" },
-    { "nome": "NC-UFPR" },
-    { "nome": "COPS-UEL" },
-    { "nome": "COPESE" },
-    { "nome": "FUNCERN" },
-    { "nome": "COMPERVE" },
-    { "nome": "UFG" },
-    { "nome": "UFMT" },
-    { "nome": "UFPR" },
-    { "nome": "UFRJ" },
-    { "nome": "UFSC" },
-    { "nome": "ESAF", "ativo": false },
-    { "nome": "Outras" }
+    {
+      "nome": "CEBRASPE",
+      "nome_anterior": "CESPE"
+    },
+    {
+      "nome": "FGV",
+      "nome_completo": "Fundação Getulio Vargas"
+    },
+    {
+      "nome": "FCC",
+      "nome_completo": "Fundação Carlos Chagas"
+    },
+    {
+      "nome": "VUNESP",
+      "nome_completo": "Fundação VUNESP"
+    },
+    {
+      "nome": "CESGRANRIO",
+      "nome_completo": "Fundação Cesgranrio"
+    },
+    {
+      "nome": "Instituto AOCP"
+    },
+    {
+      "nome": "IBFC",
+      "nome_completo": "Instituto Brasileiro de Formação e Capacitação"
+    },
+    {
+      "nome": "IDECAN",
+      "nome_completo": "Instituto de Desenvolvimento Educacional, Cultural e Assistencial Nacional"
+    },
+    {
+      "nome": "IADES",
+      "nome_completo": "Instituto Americano de Desenvolvimento"
+    },
+    {
+      "nome": "Instituto Consulplan"
+    },
+    {
+      "nome": "FUNDATEC"
+    },
+    {
+      "nome": "Quadrix"
+    },
+    {
+      "nome": "Instituto ACCESS"
+    },
+    {
+      "nome": "Instituto Verbena"
+    },
+    {
+      "nome": "Instituto Selecon"
+    },
+    {
+      "nome": "Instituto Avalia"
+    },
+    {
+      "nome": "Instituto Legatus"
+    },
+    {
+      "nome": "Instituto Mais"
+    },
+    {
+      "nome": "Instituto Nosso Rumo"
+    },
+    {
+      "nome": "Instituto Consulpam"
+    },
+    {
+      "nome": "Instituto Unifil"
+    },
+    {
+      "nome": "Fundação La Salle"
+    },
+    {
+      "nome": "FAURGS"
+    },
+    {
+      "nome": "FEPESE"
+    },
+    {
+      "nome": "FADESP"
+    },
+    {
+      "nome": "FAPEC"
+    },
+    {
+      "nome": "COPEVE"
+    },
+    {
+      "nome": "NC-UFPR"
+    },
+    {
+      "nome": "COPS-UEL"
+    },
+    {
+      "nome": "COPESE"
+    },
+    {
+      "nome": "FUNCERN"
+    },
+    {
+      "nome": "COMPERVE"
+    },
+    {
+      "nome": "UFG"
+    },
+    {
+      "nome": "UFMT"
+    },
+    {
+      "nome": "UFPR"
+    },
+    {
+      "nome": "UFRJ"
+    },
+    {
+      "nome": "UFSC"
+    },
+    {
+      "nome": "ESAF",
+      "ativo": false
+    },
+    {
+      "nome": "Outras"
+    },
+    {
+      "nome": "INEP",
+      "nome_completo": "Instituto Nacional de Estudos e Pesquisas Educacionais (ENEM)"
+    },
+    {
+      "nome": "FUVEST",
+      "nome_completo": "Fundação Universitária para o Vestibular (USP)"
+    },
+    {
+      "nome": "COMVEST",
+      "nome_completo": "Comissão Permanente para os Vestibulares (Unicamp)"
+    },
+    {
+      "nome": "COPEVE/UFAL",
+      "nome_completo": "Núcleo Executivo de Processos Seletivos (UFAL)"
+    }
   ]
 }

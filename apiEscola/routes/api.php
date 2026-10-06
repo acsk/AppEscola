@@ -356,6 +356,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         });
 
         Route::get('subjects',          [SubjectTopicController::class, 'subjects']);
+        Route::get('taxonomy',          [SubjectTopicController::class, 'taxonomy']);
+        Route::post('taxonomy/import-default', [SubjectTopicController::class, 'importDefault']);
         Route::get('topics',            [SubjectTopicController::class, 'index']);
         Route::post('topics',           [SubjectTopicController::class, 'store']);
         Route::put('topics/{id}',       [SubjectTopicController::class, 'update'])->whereNumber('id');

@@ -95,4 +95,19 @@ export type SubjectTopic = {
 
 export type SubjectSummary = { id: number; name: string };
 
+/** Disciplina ativa com seus assuntos (GET /question-bank/taxonomy). */
+export type TaxonomySubject = SubjectSummary & { topics: { id: number; name: string }[] };
+
+/** Assunto como opção de seleção (com a disciplina dona, para associar automaticamente). */
+export type TopicOption = { id: number; name: string; subject_id: number; subject_name?: string };
+
+export type TaxonomyImportReport = {
+  subjects_created: number;
+  subjects_existing: number;
+  topics_created: number;
+  topics_existing: number;
+  boards_created: number;
+  boards_existing: number;
+};
+
 export type ExamTypeSummary = { id: number; label: string };

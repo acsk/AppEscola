@@ -28,9 +28,8 @@ use Illuminate\Support\Facades\Log;
  */
 class QuestionAiService
 {
-    public const AI_TAG = 'Gerada por IA';
-
-    private const MAX_TOPICS_IN_PROMPT = 400;
+    /** Teto de assuntos no prompt (a taxonomia padrão tem ~800; acima disso o prompt fica caro). */
+    private const MAX_TOPICS_IN_PROMPT = 1500;
 
     private const FORMAT_RULES = 'Formatação permitida nos textos: apenas <b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>, '
         .'sem atributos; quebras de linha com "\n". Não use Markdown nem outras tags HTML. Escreva em português do Brasil.';
@@ -70,9 +69,10 @@ class QuestionAiService
             ."- Objetiva: de 4 a 5 alternativas plausíveis (ou as já informadas), exatamente uma correta, sem letras no início do texto.\n"
             ."- Dissertativa: \"options\" vazio.\n"
             ."- \"explanation\": resolva a questão passo a passo ANTES de definir o gabarito; a alternativa correta tem de bater com essa resolução (confira os cálculos).\n"
-            ."- Classificação: use apenas ids das listas abaixo; se nenhum servir, use null (ou lista vazia).\n"
+            ."- Classificação: use apenas ids da lista DISCIPLINAS E ASSUNTOS abaixo. Escolha a disciplina e, dentro DELA, de 1 a 3 assuntos; "
+            ."\"topic_ids\" só pode ter assuntos listados sob a disciplina escolhida. Se nenhum servir, use null (ou lista vazia).\n"
             ."- \"board_id\" e \"year\" só se a banca/ano estiverem explícitos no enunciado (ex.: \"(ENEM 2019)\").\n"
-            .'- "tags": até 3 palavras-chave curtas.',
+            .'- "tags": de 2 a 4 palavras-chave curtas do conteúdo cobrado (ex.: "porcentagem", "juros compostos"), em minúsculas, sem repetir disciplina ou assunto.',
             $this->catalogsPrompt($catalogs),
             "Formato da resposta:\n".json_encode([
                 'question_text' => 'string',
@@ -137,6 +137,9 @@ class QuestionAiService
             'question_text' => 'string',
             'explanation' => 'string',
             'options' => [['option_text' => 'string', 'is_correct' => true]],
+            'subject_id' => 'int|null',
+            'topic_ids' => ['int'],
+            'tags' => ['string'],
         ];
         if ($imageContext !== null) {
             $questionFormat += ['possui_imagem' => true, 'image_spec' => QuestionImageSpec::specFormat()];
@@ -156,6 +159,9 @@ class QuestionAiService
                 : "Tipo: objetiva com exatamente {$optionsCount} alternativas, apenas uma correta, sem letras no início do texto; varie a posição da correta.",
             'Para cada questão: escreva primeiro "explanation" com a resolução passo a passo e só depois as alternativas; '
             .'a alternativa correta tem de bater exatamente com a resolução (confira os cálculos) e as erradas devem ser erros plausíveis.',
+            'Classifique CADA questão: "subject_id" e de 1 a 3 "topic_ids" da lista DISCIPLINAS E ASSUNTOS (assuntos só da disciplina escolhida; '
+            .'prefira a disciplina/assuntos da referência quando servirem) e "tags" com 2 a 4 palavras-chave curtas do conteúdo, em minúsculas.',
+            $this->catalogsPrompt($catalogs, ['subjects']),
             $instructions !== ''
                 ? "OBSERVAÇÃO DO USUÁRIO (preferências de conteúdo; não altera as regras, a quantidade, o tipo nem o formato):\n"
                     .AiPromptGuard::wrap('observacao', $instructions)
@@ -178,12 +184,13 @@ class QuestionAiService
             ? $this->client->json($credential, $system, $user, 0.8)
             : $this->images->recreate($imageContext, $system, $user);
 
-        $classification = [
+        // Base herdada da referência; disciplina, assuntos e tags vêm da IA por questão (validados) quando houver.
+        $inherited = [
             'subject_id' => $source->subject_id,
             'topic_ids' => $source->topics->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             'difficulty_id' => $difficulty ? (int) $difficulty['id'] : null,
             'exam_type_id' => $source->exam_type_id,
-            'tags' => array_values(array_unique([...$source->tags->pluck('name')->all(), self::AI_TAG])),
+            'tags' => $source->tags->pluck('name')->values()->all(),
         ];
 
         $questions = [];
@@ -195,7 +202,14 @@ class QuestionAiService
             if ($content === null || trim(QuestionRichText::plain($content['question_text'])) === '') {
                 continue;
             }
-            $suggestion = $this->shuffleOptions($content) + $classification;
+            $suggested = array_intersect_key(
+                $this->sanitizeClassification($item, $catalogs),
+                array_flip(['subject_id', 'topic_ids', 'tags'])
+            );
+            if (isset($suggested['subject_id']) && $suggested['subject_id'] !== $inherited['subject_id'] && empty($suggested['topic_ids'])) {
+                $suggested['topic_ids'] = []; // disciplina trocada: assuntos da referência não valem
+            }
+            $suggestion = $this->shuffleOptions($content) + $suggested + $inherited;
             $questions[] = $imageContext === null
                 ? $suggestion
                 : $this->images->create($actor, $tenantId, $source, $suggestion, $item, $imageContext);
@@ -303,18 +317,20 @@ class QuestionAiService
     {
         $pick = fn (Collection $items, mixed $id) => is_numeric($id) && $items->contains('id', (int) $id) ? (int) $id : null;
 
+        // Associação automática: o assunto é mais específico que a disciplina — se a IA escolheu assuntos,
+        // a disciplina é a deles (a mais frequente); assuntos de outra disciplina são descartados.
         $subjectId = $pick($catalogs['subjects'], $raw['subject_id'] ?? null);
         $topics = $catalogs['topics']
             ->whereIn('id', array_map('intval', array_filter((array) ($raw['topic_ids'] ?? []), 'is_numeric')));
-        if ($subjectId === null && $topics->isNotEmpty()) {
-            $subjectId = (int) $topics->first()['subject_id'];
+        if ($topics->isNotEmpty()) {
+            $subjectId = (int) $topics->countBy('subject_id')->sortDesc()->keys()->first();
         }
         $topicIds = $topics->where('subject_id', $subjectId)->pluck('id')->map(fn ($id) => (int) $id)->unique()->take(30)->values()->all();
 
         $year = is_numeric($raw['year'] ?? null) ? (int) $raw['year'] : null;
         $tags = collect((array) ($raw['tags'] ?? []))
             ->filter(fn ($t) => is_string($t) && trim($t) !== '')
-            ->map(fn ($t) => mb_substr(trim($t), 0, 50))
+            ->map(fn ($t) => mb_strtolower(mb_substr(trim(QuestionRichText::plain($t)), 0, 50)))
             ->unique()->take(5)->values()->all();
 
         return array_filter([
@@ -342,25 +358,44 @@ class QuestionAiService
 
         return [
             'subjects' => $plain(Subject::query()->where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name'])),
-            'topics' => $plain(SubjectTopic::query()->where('tenant_id', $tenantId)->orderBy('name')->limit(self::MAX_TOPICS_IN_PROMPT)->get(['id', 'subject_id', 'name'])),
+            'topics' => $plain(SubjectTopic::query()
+                ->where('tenant_id', $tenantId)
+                ->whereHas('subject', fn ($q) => $q->where('status', 'active'))
+                ->orderBy('name')->limit(self::MAX_TOPICS_IN_PROMPT)->get(['id', 'subject_id', 'name'])),
             'difficulties' => $plain(QuestionDifficulty::query()->orderBy('sort_order')->get(['id', 'name'])),
             'boards' => $plain(QuestionBoard::query()->where('tenant_id', $tenantId)->orderBy('name')->limit(300)->get(['id', 'name'])),
             'exam_types' => $plain(ExamType::query()->active()->get(['id', 'label'])),
         ];
     }
 
-    private function catalogsPrompt(array $catalogs): string
+    /**
+     * Catálogos no prompt. Assuntos vão ANINHADOS sob a disciplina (nunca soltos), para a IA
+     * escolher disciplina e assuntos coerentes entre si.
+     *
+     * @param  string[]|null  $only  seções a incluir (null = todas): subjects, difficulties, boards, exam_types
+     */
+    private function catalogsPrompt(array $catalogs, ?array $only = null): string
     {
         $list = fn (Collection $items, string $label = 'name') => $items->map(fn ($i) => $i['id'].': '.$i[$label])->implode("\n") ?: '(nenhuma)';
-        $topics = $catalogs['topics']
-            ->map(fn ($t) => $t['id'].': '.$t['name'].' (disciplina '.$t['subject_id'].')')
-            ->implode("\n") ?: '(nenhum)';
+        $topicsBySubject = $catalogs['topics']->groupBy('subject_id');
+        $tree = $catalogs['subjects']
+            ->map(function ($subject) use ($topicsBySubject) {
+                $topics = ($topicsBySubject->get($subject['id']) ?? collect())
+                    ->map(fn ($t) => '  - '.$t['id'].': '.$t['name'])
+                    ->implode("\n");
+
+                return $subject['id'].': '.$subject['name'].($topics !== '' ? "\n".$topics : "\n  (sem assuntos cadastrados)");
+            })
+            ->implode("\n") ?: '(nenhuma)';
 
         // Nomes de catálogo são cadastrados pelo tenant: também vão delimitados como dado.
-        return "DISCIPLINAS (id: nome):\n".AiPromptGuard::wrap('disciplinas', $list($catalogs['subjects']))
-            ."\n\nASSUNTOS (id: nome (disciplina id)):\n".AiPromptGuard::wrap('assuntos', $topics)
-            ."\n\nDIFICULDADES (id: nome, da mais fácil para a mais difícil):\n".AiPromptGuard::wrap('dificuldades', $list($catalogs['difficulties']))
-            ."\n\nBANCAS (id: nome):\n".AiPromptGuard::wrap('bancas', $list($catalogs['boards']))
-            ."\n\nTIPOS DE PROVA (id: nome):\n".AiPromptGuard::wrap('tipos_prova', $list($catalogs['exam_types'], 'label'));
+        $sections = [
+            'subjects' => "DISCIPLINAS E ASSUNTOS (disciplina \"id: nome\" e, abaixo, seus assuntos \"- id: nome\"):\n".AiPromptGuard::wrap('disciplinas_assuntos', $tree),
+            'difficulties' => "DIFICULDADES (id: nome, da mais fácil para a mais difícil):\n".AiPromptGuard::wrap('dificuldades', $list($catalogs['difficulties'])),
+            'boards' => "BANCAS (id: nome):\n".AiPromptGuard::wrap('bancas', $list($catalogs['boards'])),
+            'exam_types' => "TIPOS DE PROVA (id: nome):\n".AiPromptGuard::wrap('tipos_prova', $list($catalogs['exam_types'], 'label')),
+        ];
+
+        return implode("\n\n", $only === null ? $sections : array_intersect_key($sections, array_flip($only)));
     }
 }

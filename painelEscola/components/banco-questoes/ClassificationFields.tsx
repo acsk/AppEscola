@@ -7,7 +7,6 @@ import SegmentedControl from "./SegmentedControl";
 import TopicMultiSelect from "./TopicMultiSelect";
 import TagChipsInput from "./TagChipsInput";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
-import { useSubjectTopics } from "../../hooks/useQuestionBankCatalogs";
 import { type ClassificationForm, withSubject } from "../../utils/questionClassification";
 
 type Props = {
@@ -18,11 +17,29 @@ type Props = {
 
 /** Campos de classificação de uma questão. */
 export default function ClassificationFields({ form, onChange, catalogs }: Props) {
-  const { topics, loading: topicsLoading } = useSubjectTopics(form.subject_id);
   const set = <K extends keyof ClassificationForm>(key: K, value: ClassificationForm[K]) =>
     onChange({ ...form, [key]: value });
 
-  const topicSubjectById = useMemo(() => new Map(topics.map((t) => [t.id, t.subject_id])), [topics]);
+  // Todos os assuntos, cada um com a disciplina dona (assunto nunca existe fora de uma disciplina).
+  const allTopics = useMemo(
+    () => catalogs.taxonomy.flatMap((s) => s.topics.map((t) => ({ ...t, subject_id: s.id, subject_name: s.name }))),
+    [catalogs.taxonomy]
+  );
+  const topicSubjectById = useMemo(() => new Map(allTopics.map((t) => [t.id, t.subject_id])), [allTopics]);
+  // Com disciplina: só os assuntos dela. Sem disciplina: busca em todos e a disciplina é preenchida ao escolher.
+  const topics = useMemo(
+    () => (form.subject_id ? allTopics.filter((t) => t.subject_id === form.subject_id).map(({ subject_name, ...t }) => t) : allTopics),
+    [allTopics, form.subject_id]
+  );
+
+  const onTopicsChange = (ids: number[]) => {
+    if (form.subject_id || ids.length === 0) {
+      set("topic_ids", ids);
+      return;
+    }
+    const subjectId = topicSubjectById.get(ids[0]) ?? null;
+    onChange({ ...form, subject_id: subjectId, topic_ids: ids.filter((id) => topicSubjectById.get(id) === subjectId) });
+  };
 
   const difficultyOptions = catalogs.difficulties.map((d) => ({ value: d.id, label: d.name }));
   const subjectOptions = [
@@ -64,13 +81,7 @@ export default function ClassificationFields({ form, onChange, catalogs }: Props
         onChange={(v) => onChange(withSubject(form, v ? Number(v) : null, topicSubjectById))}
       />
 
-      <TopicMultiSelect
-        topics={topics}
-        value={form.topic_ids}
-        onChange={(ids) => set("topic_ids", ids)}
-        disabled={!form.subject_id}
-        loading={topicsLoading}
-      />
+      <TopicMultiSelect topics={topics} value={form.topic_ids} onChange={onTopicsChange} />
 
       <SearchableSelect
         dense

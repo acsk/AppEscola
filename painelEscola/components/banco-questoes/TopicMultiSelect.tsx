@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { SubjectTopic } from "../../types/questionBank";
+import type { TopicOption } from "../../types/questionBank";
 import { foldText } from "../../utils/questionBankQuery";
 
 type Props = {
-  topics: SubjectTopic[];
+  /** Com `subject_name`, mostra a disciplina de cada assunto (busca em todas as disciplinas). */
+  topics: TopicOption[];
   value: number[];
   onChange: (ids: number[]) => void;
   disabled?: boolean;
@@ -13,14 +14,14 @@ type Props = {
   disabledHint?: string;
 };
 
-/** Seleção múltipla de assuntos (já filtrados pela disciplina), com busca sem acento. */
+/** Seleção múltipla de assuntos com busca sem acento (filtra por nome do assunto ou da disciplina). */
 export default function TopicMultiSelect({ topics, value, onChange, disabled, loading, disabledHint }: Props) {
   const [query, setQuery] = useState("");
   const selected = new Set(value);
 
   const visible = useMemo(() => {
     const q = foldText(query);
-    return q ? topics.filter((t) => foldText(t.name).includes(q)) : topics;
+    return q ? topics.filter((t) => foldText(t.name).includes(q) || foldText(t.subject_name ?? "").includes(q)) : topics;
   }, [query, topics]);
 
   const toggle = (id: number) =>
@@ -42,7 +43,7 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Filtrar assuntos..."
+              placeholder={topics.some((t) => t.subject_name) ? "Buscar assunto (a disciplina é preenchida sozinha)..." : "Filtrar assuntos..."}
               placeholderTextColor="var(--ds-ink-subtle)"
               aria-label="Filtrar assuntos"
               className="flex-1 ml-2 text-xs text-ink"
@@ -56,7 +57,7 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
             <ScrollView style={{ maxHeight: 180 }}>
               {visible.length === 0 ? (
                 <Text className="text-xs text-ink-subtle px-3 py-3">
-                  {topics.length === 0 ? "Esta disciplina ainda não tem assuntos." : "Nenhum assunto encontrado."}
+                  {topics.length === 0 ? "Nenhum assunto cadastrado. Cadastre em Banco de questões › Taxonomia." : "Nenhum assunto encontrado."}
                 </Text>
               ) : (
                 visible.map((topic) => {
@@ -75,7 +76,10 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
                         size={16}
                         color={checked ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
                       />
-                      <Text className="text-xs text-ink ml-2 flex-1">{topic.name}</Text>
+                      <View className="ml-2 flex-1">
+                        <Text className="text-xs text-ink">{topic.name}</Text>
+                        {topic.subject_name ? <Text className="text-xs text-ink-subtle">{topic.subject_name}</Text> : null}
+                      </View>
                     </TouchableOpacity>
                   );
                 })

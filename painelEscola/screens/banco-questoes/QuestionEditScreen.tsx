@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
-import { ImagePlus, Sparkles, Trash2 } from "lucide-react-native";
+import { ExternalLink, ImagePlus, Sparkles, Trash2 } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
 import RichTextInput from "../../components/ui/RichTextInput";
+import RichText from "../../components/ui/RichText";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import SegmentedControl from "../../components/banco-questoes/SegmentedControl";
@@ -16,6 +17,7 @@ import { useQuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import {
   createStandaloneQuestion,
   fetchQuestionBankQuestion,
+  patchQuestionClassification,
   updateStandaloneQuestion,
   uploadQuestionBankImage,
 } from "../../services/questionBank";
@@ -41,6 +43,7 @@ import {
 } from "../../utils/questionClassification";
 import { plainRichText } from "../../utils/richText";
 import { color } from "../../constants/theme";
+import type { QuestionBankQuestion } from "../../types/questionBank";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -56,7 +59,10 @@ const AI_MIN_CHARS = 15;
 /** A partir deste tamanho, a tela sugere o preenchimento automático. */
 const AI_HINT_CHARS = 40;
 
-/** Criação e edição do conteúdo de questões avulsas do banco de questões. */
+/**
+ * Criação e edição de questões do banco: único lugar para classificar e gerar semelhantes.
+ * Avulsa: conteúdo + classificação. De simulado: conteúdo só leitura (editado pelo simulado), classificação editável.
+ */
 export default function QuestionEditScreen({ navigate, questionId, listQuery = "" }: Props) {
   const isEdit = questionId !== null;
   const { isMobile, contentPadding } = useResponsiveLayout();
@@ -86,6 +92,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [aiHintDismissed, setAiHintDismissed] = useState(false);
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
   const [sourceDifficultyId, setSourceDifficultyId] = useState<number | null>(null);
+  /** Questão de simulado: conteúdo só leitura aqui. */
+  const [examQuestion, setExamQuestion] = useState<QuestionBankQuestion | null>(null);
+  const isFromExam = examQuestion !== null;
 
   const load = useCallback(async () => {
     if (!isEdit) return;
@@ -93,10 +102,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     setLoadError(null);
     try {
       const q = await fetchQuestionBankQuestion(questionId);
-      if (q.origin !== "avulsa") {
-        setLoadError("Esta questão pertence a um simulado. Edite o conteúdo pelo simulado.");
-        return;
-      }
+      setExamQuestion(q.origin === "avulsa" ? null : q);
       const form = contentFromQuestion(q);
       setSourceDifficultyId(q.difficulty_id);
       setInitialContent(form);
@@ -228,8 +234,33 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
   };
 
+  /** Questão de simulado: só a classificação é gravada (o conteúdo é do simulado). */
+  const saveExamClassification = async () => {
+    if (questionId === null) return;
+    const patch = diffClassification(initialClassification, classification);
+    if (!Object.keys(patch).length) {
+      navigate("questoes-classificar", { questionId, query: listQuery });
+      return;
+    }
+    setSaving("save");
+    try {
+      const response = await patchQuestionClassification(questionId, patch);
+      showApiToast(setToast, response, "Classificação salva com sucesso.");
+      setInitialClassification(classification);
+      navigate("questoes-classificar", { questionId, query: listQuery });
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível salvar a classificação.");
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const save = async (mode: "save" | "another") => {
     if (aiFilling || uploading || saving !== null) return;
+    if (isFromExam) {
+      await saveExamClassification();
+      return;
+    }
     const clientErrors = validateContent(content);
     if (Object.keys(clientErrors).length) {
       setErrors(clientErrors);
@@ -265,6 +296,40 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   };
 
   const title = isEdit ? `Editar questão #${questionId}` : "Nova questão";
+
+  const examContentPanel = examQuestion && (
+    <Panel
+      title="Conteúdo"
+      description={`Questão do simulado "${examQuestion.exam?.title ?? ""}". O conteúdo é editado pelo simulado; aqui você altera a classificação.`}
+      actions={
+        examQuestion.exam ? (
+          <Button
+            size="sm"
+            icon={ExternalLink}
+            label="Abrir simulado"
+            onPress={() => leave(() => navigate("simulados-form", { examId: examQuestion.exam!.id }))}
+          />
+        ) : undefined
+      }
+    >
+      <View style={{ gap: 12 }}>
+        {!!examQuestion.question_text?.trim() && <RichText className="text-sm text-ink leading-6" selectable value={examQuestion.question_text} />}
+        {!!examQuestion.image_url && (
+          <Image source={{ uri: examQuestion.image_url }} accessibilityLabel="Imagem do enunciado" style={{ width: "100%", height: isMobile ? 180 : 260 }} resizeMode="contain" />
+        )}
+        {(examQuestion.options ?? []).map((option, i) => (
+          <View
+            key={option.id}
+            className={`flex-row rounded-ds-md border px-3 py-2 ${option.is_correct ? "bg-success-tint border-success" : "bg-surface border-border"}`}
+            style={{ gap: 8 }}
+          >
+            <Text className={`text-sm font-semibold ${option.is_correct ? "text-success" : "text-ink-muted"}`}>{"ABCDEFGHIJ"[i]})</Text>
+            <RichText className="text-sm text-ink flex-1" value={option.option_text} />
+          </View>
+        ))}
+      </View>
+    </Panel>
+  );
 
   const contentPanel = (
     <Panel
@@ -379,9 +444,16 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           <PageHeader
             breadcrumb={[{ label: "Banco de questões", onPress: () => leave(goToList) }, { label: isEdit ? `Questão #${questionId}` : "Nova questão" }]}
             title={title}
-            description={isEdit ? "Conteúdo e classificação da questão avulsa." : "Questão avulsa, sem vínculo com simulado."}
+            description={
+              !isEdit
+                ? "Questão avulsa, sem vínculo com simulado."
+                : isFromExam
+                  ? "Classificação da questão de simulado."
+                  : "Conteúdo e classificação da questão avulsa."
+            }
             actions={
               <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                {!isFromExam && (
                 <Button
                   icon={Sparkles}
                   label="Autocompletar com IA"
@@ -389,6 +461,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
                   loading={aiFilling}
                   disabled={loading || !!loadError || saving !== null || uploading}
                 />
+                )}
                 {isEdit && (
                   <Button
                     icon={Sparkles}
@@ -414,7 +487,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         ) : (
           <>
             <View style={{ flexDirection: isMobile ? "column" : "row", gap: 24, alignItems: "flex-start" }}>
-              <View style={{ flex: 3, width: isMobile ? "100%" : undefined }}>{contentPanel}</View>
+              <View style={{ flex: 3, width: isMobile ? "100%" : undefined }}>{isFromExam ? examContentPanel : contentPanel}</View>
               <View style={{ flex: 2, width: isMobile ? "100%" : undefined, minWidth: isMobile ? undefined : 320 }}>
                 <Panel title="Classificação" description="Disciplina, assuntos, dificuldade, banca e tags.">
                   <ClassificationFields

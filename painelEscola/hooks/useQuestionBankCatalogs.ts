@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchActiveExamTypes,
-  fetchActiveSubjects,
   fetchCatalog,
+  fetchTaxonomy,
   fetchTopics,
 } from "../services/questionBank";
-import type { CatalogItem, ExamTypeSummary, SubjectSummary, SubjectTopic } from "../types/questionBank";
+import type { CatalogItem, ExamTypeSummary, SubjectSummary, SubjectTopic, TaxonomySubject } from "../types/questionBank";
 
 export type QuestionBankCatalogs = {
   difficulties: CatalogItem[];
   boards: CatalogItem[];
   tags: CatalogItem[];
   subjects: SubjectSummary[];
+  /** Disciplinas com assuntos aninhados (fonte dos selects de disciplina/assunto). */
+  taxonomy: TaxonomySubject[];
   examTypes: ExamTypeSummary[];
 };
 
-const EMPTY: QuestionBankCatalogs = { difficulties: [], boards: [], tags: [], subjects: [], examTypes: [] };
+const EMPTY: QuestionBankCatalogs = { difficulties: [], boards: [], tags: [], subjects: [], taxonomy: [], examTypes: [] };
 
 /** Cadastros usados nos filtros e na classificação. `reload` após cadastrar um item novo. */
 export function useQuestionBankCatalogs() {
@@ -25,14 +27,15 @@ export function useQuestionBankCatalogs() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [difficulties, boards, tags, subjects, examTypes] = await Promise.all([
+      const [difficulties, boards, tags, taxonomy, examTypes] = await Promise.all([
         fetchCatalog("difficulties"),
         fetchCatalog("boards"),
         fetchCatalog("tags"),
-        fetchActiveSubjects(),
+        fetchTaxonomy(),
         fetchActiveExamTypes(),
       ]);
-      setCatalogs({ difficulties, boards, tags, subjects, examTypes });
+      const subjects = taxonomy.map(({ id, name }) => ({ id, name }));
+      setCatalogs({ difficulties, boards, tags, subjects, taxonomy, examTypes });
     } catch {
       // Os selects ficam vazios; a tela principal mostra o próprio erro de carregamento.
     } finally {

@@ -11,7 +11,6 @@ use App\Models\Tenant;
 use App\Models\TenantAiCredential;
 use App\Models\User;
 use App\Services\Ai\AiCredentialResolver;
-use App\Services\Ai\QuestionAiService;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -256,6 +255,57 @@ class QuestionAiTest extends TestCase
             && str_contains($r->url(), 'openrouter.ai'));
     }
 
+    public function test_autofill_derives_subject_from_chosen_topic(): void
+    {
+        $this->tenantKey();
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $physics = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Física']);
+        $kinematics = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $physics->id, 'name' => 'Cinemática']);
+
+        // IA aponta a disciplina errada, mas um assunto de Física: vale a disciplina do assunto.
+        $this->fakeAi(['question_text' => 'Q', 'type' => 'essay', 'explanation' => 'E', 'subject_id' => $math->id, 'topic_ids' => [$kinematics->id]]);
+
+        $this->postJson('/api/question-bank/ai/autofill', ['question_text' => 'Um carro percorre 120 km em 1h30. Qual a velocidade média?'])
+            ->assertOk()
+            ->assertJsonPath('body.subject_id', $physics->id)
+            ->assertJsonPath('body.topic_ids', [$kinematics->id]);
+
+        Http::assertSent(fn (HttpRequest $r) => str_contains($r['messages'][1]['content'], "{$physics->id}: {$physics->name}\n  - {$kinematics->id}: Cinemática"));
+    }
+
+    public function test_taxonomy_lists_active_subjects_with_nested_topics(): void
+    {
+        $physics = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Física']);
+        Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Inativa', 'status' => 'inactive']);
+        Subject::factory()->count(25)->sequence(fn ($s) => ['name' => 'Disciplina '.str_pad((string) $s->index, 2, '0', STR_PAD_LEFT)])
+            ->create(['tenant_id' => $this->tenant->id]);
+        $topic = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $physics->id, 'name' => 'Cinemática']);
+
+        $this->getJson('/api/question-bank/taxonomy')
+            ->assertOk()
+            ->assertJsonCount(26, 'body')
+            ->assertJsonFragment(['id' => $physics->id, 'name' => $physics->name, 'topics' => [['id' => $topic->id, 'name' => 'Cinemática']]]);
+
+        // /subjects respeita per_page (antes era sempre 20).
+        $this->getJson('/api/subjects?status=active&per_page=200')->assertOk()->assertJsonCount(26, 'data');
+        $this->getJson('/api/subjects')->assertOk()->assertJsonCount(20, 'data');
+    }
+
+    public function test_import_default_taxonomy_is_idempotent_and_admin_only(): void
+    {
+        $first = $this->postJson('/api/question-bank/taxonomy/import-default')->assertOk();
+        $this->assertGreaterThan(0, $first->json('body.subjects_created'));
+        $this->assertTrue(Subject::where('tenant_id', $this->tenant->id)->where('name', 'Biologia')->exists());
+
+        $this->postJson('/api/question-bank/taxonomy/import-default')
+            ->assertOk()
+            ->assertJsonPath('body.subjects_created', 0)
+            ->assertJsonPath('body.topics_created', 0);
+
+        Sanctum::actingAs(User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'professor', 'status' => 'active']));
+        $this->postJson('/api/question-bank/taxonomy/import-default')->assertStatus(403);
+    }
+
     public function test_autofill_requires_meaningful_statement(): void
     {
         $this->tenantKey();
@@ -311,7 +361,11 @@ class QuestionAiTest extends TestCase
             ],
             'explanation' => 'Resolução.',
         ];
-        $this->fakeAi(['questions' => [$generated('Quanto é 1 + 1?'), $generated('Quanto é 3 - 1?'), $generated('Extra')]]);
+        $this->fakeAi(['questions' => [
+            $generated('Quanto é 1 + 1?') + ['tags' => ['Soma', 'adição'], 'topic_ids' => [$algebra->id]],
+            $generated('Quanto é 3 - 1?'),
+            $generated('Extra'),
+        ]]);
 
         $this->postJson("/api/question-bank/questions/{$source->id}/ai/similar", [
             'quantity' => 2, 'difficulty_id' => $hard->id, 'options_count' => 3,
@@ -323,7 +377,10 @@ class QuestionAiTest extends TestCase
             ->assertJsonPath('body.questions.0.subject_id', $math->id)
             ->assertJsonPath('body.questions.0.topic_ids', [$algebra->id])
             ->assertJsonPath('body.questions.0.difficulty_id', $hard->id)
-            ->assertJsonPath('body.questions.0.tags', [QuestionAiService::AI_TAG]);
+            ->assertJsonPath('body.questions.0.tags', ['soma', 'adição'])
+            // Sem tags da IA: herda as da referência (nenhuma) — nunca a marca "Gerada por IA".
+            ->assertJsonPath('body.questions.1.tags', [])
+            ->assertJsonPath('body.questions.1.topic_ids', [$algebra->id]);
     }
 
     public function test_similar_validates_params(): void

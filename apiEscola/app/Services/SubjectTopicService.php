@@ -26,6 +26,27 @@ class SubjectTopicService
             ->get();
     }
 
+    /**
+     * Disciplinas ativas com seus assuntos aninhados (sem paginação): fonte única para os selects
+     * de classificação e para a IA — assunto sempre aparece dentro da disciplina dele.
+     *
+     * @return SupportCollection<int, array{id: int, name: string, topics: array<int, array{id: int, name: string}>}>
+     */
+    public function taxonomy(int $tenantId): SupportCollection
+    {
+        return Subject::query()
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->with(['topics:id,subject_id,name'])
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Subject $s) => [
+                'id'     => $s->id,
+                'name'   => $s->name,
+                'topics' => $s->topics->map(fn (SubjectTopic $t) => ['id' => $t->id, 'name' => $t->name])->values()->all(),
+            ]);
+    }
+
     /** Disciplinas ativas do tenant com a contagem de questões (árvore da taxonomia). */
     public function subjectsWithCounts(int $tenantId): SupportCollection
     {

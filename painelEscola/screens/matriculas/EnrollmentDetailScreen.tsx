@@ -35,7 +35,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import ActionsMenu from "../../components/ui/ActionsMenu";
 import EnrollmentFacts from "../../components/matriculas/EnrollmentFacts";
 import EnrollmentInvoicesPanel from "../../components/matriculas/EnrollmentInvoicesPanel";
-import DefinitionRows from "../../components/matriculas/DefinitionRows";
+import DefinitionRows from "../../components/ui/DefinitionRows";
 import { FileText, Pencil, Receipt, Trash2, UserRound } from "lucide-react-native";
 import { color, type Tone } from "../../constants/theme";
 import { INVOICE_DISPLAY, invoiceDisplayStatus, monthsBetween, nextDueDate } from "../../utils/enrollmentInvoices";

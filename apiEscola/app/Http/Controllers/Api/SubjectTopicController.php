@@ -7,6 +7,7 @@ use App\Http\Requests\SubjectTopicRequest;
 use App\Models\SubjectTopic;
 use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
+use App\Services\QuestionTaxonomyImporter;
 use App\Services\SubjectTopicService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +35,34 @@ class SubjectTopicController extends Controller
     public function subjects(Request $request): JsonResponse
     {
         return $this->success($this->topics->subjectsWithCounts($this->authorizeStaff($request)));
+    }
+
+    /** GET /question-bank/taxonomy — disciplinas ativas com os assuntos aninhados. */
+    public function taxonomy(Request $request): JsonResponse
+    {
+        return $this->success($this->topics->taxonomy($this->authorizeStaff($request)));
+    }
+
+    /**
+     * POST /question-bank/taxonomy/import-default — importa a taxonomia padrão (disciplinas, assuntos e bancas).
+     * Idempotente: só cria o que falta. Restrito a admin/super admin.
+     */
+    public function importDefault(Request $request, QuestionTaxonomyImporter $importer): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        if (! in_array($request->user()->role, ['admin', 'super_admin'], true)) {
+            return $this->forbidden('Apenas administradores podem importar a taxonomia padrão.');
+        }
+
+        $data = json_decode((string) file_get_contents(database_path('seeders/data/question_taxonomy.json')), true);
+        $report = $importer->import($tenantId, (array) $data, $request->boolean('dry_run'));
+        $created = $report['subjects_created'] + $report['topics_created'] + $report['boards_created'];
+
+        return $this->success($report, $request->boolean('dry_run')
+            ? 'Simulação concluída.'
+            : ($created > 0
+                ? "Taxonomia importada: {$report['subjects_created']} disciplina(s), {$report['topics_created']} assunto(s) e {$report['boards_created']} banca(s) criados."
+                : 'A taxonomia padrão já estava completa. Nada foi criado.'));
     }
 
     public function store(SubjectTopicRequest $request): JsonResponse

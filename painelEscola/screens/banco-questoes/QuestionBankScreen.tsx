@@ -58,8 +58,6 @@ import Tabs from "../../components/ui/Tabs";
 import { Plus } from "lucide-react-native";
 import Button from "../../components/ui/Button";
 import ConfirmModal from "../../components/ui/ConfirmModal";
-import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
-import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import { plainRichText } from "../../utils/richText";
 
 type Props = {
@@ -91,8 +89,6 @@ const filtersKey = (s: QuestionBankListState) =>
 export default function QuestionBankScreen({ navigate }: Props) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const catalogs = useQuestionBankCatalogs();
-  const { ensureAvailable } = useQuestionAiStatus();
-  const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
 
   // ── Estado na URL ──────────────────────────────────────────────────────────
   const [state, setState] = useState<QuestionBankListState>(readStateFromHash);
@@ -274,21 +270,6 @@ export default function QuestionBankScreen({ navigate }: Props) {
 
   // ── Ações por linha ────────────────────────────────────────────────────────
   const [menuRow, setMenuRow] = useState<QuestionBankQuestion | null>(null);
-  const openSimilar = async (row: QuestionBankQuestion) => {
-    setMenuRow(null);
-    const unavailable = await ensureAvailable();
-    if (unavailable) {
-      setToast({ visible: true, type: "error", message: unavailable });
-      return;
-    }
-    setSimilarSource({
-      id: row.id,
-      type: row.type,
-      optionsCount: row.options?.length ?? 0,
-      difficultyId: row.difficulty_id,
-      imageUrl: row.image_url,
-    });
-  };
   const openClassify = (id: number) =>
     navigate("questoes-classificar", { questionId: id, query: serializeListState(state) });
 
@@ -310,16 +291,6 @@ export default function QuestionBankScreen({ navigate }: Props) {
     } finally {
       setDeleting(false);
       setDeleteRow(null);
-    }
-  };
-
-  const quickPatch = async (row: QuestionBankQuestion, patch: ClassificationPatch) => {
-    setMenuRow(null);
-    try {
-      showApiToast(setToast, await patchQuestionClassification(row.id, patch), "Classificação salva com sucesso.");
-      void load();
-    } catch (error) {
-      showApiErrorToast(setToast, error, "Não foi possível salvar.");
     }
   };
 
@@ -628,7 +599,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                       </Text>
                     </View>
                     <View style={{ flex: 1, minWidth: 280, paddingRight: 12 }}>
-                      <TouchableOpacity onPress={() => openClassify(row.id)} role="link" aria-label={`Classificar questão ${row.id}`}>
+                      <TouchableOpacity onPress={() => openClassify(row.id)} role="link" aria-label={`Visualizar questão ${row.id}`}>
                         <Text className="text-xs text-brand font-medium" numberOfLines={density === "compacta" ? 1 : 2}>
                           {plainRichText(row.question_text).trim() || (row.image_url ? "[Enunciado em imagem]" : "[Sem enunciado]")}
                         </Text>
@@ -702,24 +673,12 @@ export default function QuestionBankScreen({ navigate }: Props) {
           <View style={{ gap: 6 }}>
             {(
               [
-                ["create-outline", "Classificar", () => openClassify(menuRow.id)],
-                ["sparkles-outline", "Gerar similares com IA", () => void openSimilar(menuRow)],
-                [
-                  "ban-outline",
-                  menuRow.is_annulled ? "Desmarcar anulada" : "Marcar como anulada",
-                  () => quickPatch(menuRow, { is_annulled: !menuRow.is_annulled }),
-                ],
-                [
-                  "time-outline",
-                  menuRow.is_outdated ? "Desmarcar desatualizada" : "Marcar como desatualizada",
-                  () => quickPatch(menuRow, { is_outdated: !menuRow.is_outdated }),
-                ],
+                // Classificar e gerar semelhantes só na edição.
+                ["eye-outline", "Visualizar", () => openClassify(menuRow.id)],
+                ["pencil-outline", "Editar", () => navigate("questoes-editar", { questionId: menuRow.id, query: serializeListState(state) })],
                 ...(menuRow.exam
                   ? [["document-text-outline", `Abrir simulado "${menuRow.exam.title}"`, () => navigate("simulados-form", { examId: menuRow.exam!.id })]]
-                  : [
-                      ["pencil-outline", "Editar conteúdo", () => navigate("questoes-editar", { questionId: menuRow.id, query: serializeListState(state) })],
-                      ["trash-outline", "Excluir questão", () => { setDeleteRow(menuRow); setMenuRow(null); }],
-                    ]),
+                  : [["trash-outline", "Excluir questão", () => { setDeleteRow(menuRow); setMenuRow(null); }]]),
               ] as [keyof typeof Ionicons.glyphMap, string, () => void][]
             ).map(([icon, label, action]) => {
               const destructive = icon === "trash-outline";
@@ -739,18 +698,6 @@ export default function QuestionBankScreen({ navigate }: Props) {
           </View>
         )}
       </Modal>
-
-      <SimilarQuestionsModal
-        visible={similarSource !== null}
-        source={similarSource}
-        catalogs={catalogs}
-        onClose={() => setSimilarSource(null)}
-        onCreated={(count) => {
-          setToast({ visible: true, type: "success", message: `${count} questão(ões) semelhante(s) incluída(s) no banco.` });
-          void load();
-        }}
-        setToast={setToast}
-      />
 
       <ConfirmModal
         visible={!!deleteRow}
