@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -34,6 +35,17 @@ class AiException extends RuntimeException
     public static function invalidResponse(): self
     {
         return new self('A IA devolveu uma resposta inválida. Tente novamente.', 502, 'ai_invalid_response');
+    }
+
+    /**
+     * Recusas esperadas (4xx: IA não configurada, imagem ilegível…) não são erro do sistema:
+     * uma linha de aviso, sem stack trace. Falhas do provedor (5xx) já são logadas pelo AiChatClient.
+     */
+    public function report(): bool
+    {
+        Log::warning('IA: '.$this->getMessage(), ['code' => $this->errorCode, 'status' => $this->status, 'user_id' => auth()->id()]);
+
+        return true;
     }
 
     public function render(): JsonResponse

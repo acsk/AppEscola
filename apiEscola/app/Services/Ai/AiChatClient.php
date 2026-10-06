@@ -27,7 +27,8 @@ class AiChatClient
         if ($images !== []) {
             $content = [
                 ['type' => 'text', 'text' => $user],
-                ...array_map(fn (string $url) => ['type' => 'image_url', 'image_url' => ['url' => $url]], $images),
+                // detail=high: análise em alta resolução (texto pequeno em gráficos/tabelas); provedores sem suporte ignoram.
+                ...array_map(fn (string $url) => ['type' => 'image_url', 'image_url' => ['url' => $url, 'detail' => 'high']], $images),
             ];
         }
         $payload = [

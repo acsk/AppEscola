@@ -16,6 +16,8 @@ import type { AiImageReview } from "../../types/questionAi";
 import { imageContentSignature, imageQuestionContent, imageReviewIssue } from "../../utils/questionImageReview";
 import { createStandaloneQuestion } from "../../services/questionBank";
 import { getApiErrorMessage, getApiValidationErrors } from "../../utils/apiErrors";
+import { describeAiError } from "../../utils/aiErrors";
+import MessageModal from "../ui/MessageModal";
 import {
   type ContentForm,
   contentFromSuggestion,
@@ -82,7 +84,8 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  /** Falha da IA: exibida no modal de erro padrão do sistema. */
+  const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [instructions, setInstructions] = useState("");
   const [instructionsError, setInstructionsError] = useState<string | undefined>();
 
@@ -149,7 +152,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     } catch (err) {
       const fieldError = getApiValidationErrors(err).instructions;
       if (fieldError) setInstructionsError(fieldError);
-      else setError(getApiErrorMessage(err, "Não foi possível gerar as questões."));
+      else setError(describeAiError(err, "Não foi possível gerar as questões"));
     } finally {
       setGenerating(false);
     }
@@ -174,7 +177,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
       });
       setToast({ visible: true, type: response.body.image_generation.status === "READY" ? "success" : "error", message: response.message });
     } catch (err) {
-      updateDraft(draft.key, { errors: { image: getApiErrorMessage(err, "Não foi possível regenerar a imagem.") } });
+      setError(describeAiError(err, "Não foi possível regenerar a imagem"));
     } finally {
       setRegenerating(null);
     }
@@ -249,6 +252,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     );
 
   return (
+    <>
     <Modal
       visible={visible}
       title={step === "config" ? `Criar questões semelhantes à #${source?.id ?? ""}` : "Revisar questões geradas"}
@@ -303,11 +307,6 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
           {generating && (
             <Text className="text-xs text-ink-muted" aria-live="polite">
               Gerando questões… isso pode levar até um minuto.
-            </Text>
-          )}
-          {error && (
-            <Text className="text-xs font-medium text-danger" aria-live="polite">
-              {error}
             </Text>
           )}
         </View>
@@ -473,5 +472,14 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         </View>
       )}
     </Modal>
+
+    <MessageModal
+      visible={error !== null}
+      type="error"
+      title={error?.title ?? ""}
+      message={error?.message ?? ""}
+      onClose={() => setError(null)}
+    />
+    </>
   );
 }

@@ -8,6 +8,8 @@ import RichTextInput from "../../components/ui/RichTextInput";
 import RichText from "../../components/ui/RichText";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
+import MessageModal from "../../components/ui/MessageModal";
+import { describeAiError } from "../../utils/aiErrors";
 import SegmentedControl from "../../components/banco-questoes/SegmentedControl";
 import ClassificationFields from "../../components/banco-questoes/ClassificationFields";
 import OptionsEditor from "../../components/banco-questoes/OptionsEditor";
@@ -90,6 +92,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   } = useQuestionAiStatus();
   const [aiFilling, setAiFilling] = useState(false);
   const [aiHintDismissed, setAiHintDismissed] = useState(false);
+  /** Falha da IA: modal de erro padrão do sistema. */
+  const [aiError, setAiError] = useState<{ title: string; message: string } | null>(null);
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
   const [sourceDifficultyId, setSourceDifficultyId] = useState<number | null>(null);
   /** Questão de simulado: conteúdo só leitura aqui. */
@@ -190,8 +194,13 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setAiHintDismissed(true);
       showApiToast(setToast, response, "Campos sugeridos pela IA. Revise antes de salvar.");
     } catch (error) {
-      setErrors((prev) => ({ ...prev, ...getApiValidationErrors(error) }));
-      showApiErrorToast(setToast, error, "Não foi possível preencher com IA.");
+      const fieldErrors = getApiValidationErrors(error);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+        showApiErrorToast(setToast, error, "Não foi possível preencher com IA.");
+      } else {
+        setAiError(describeAiError(error, "Não foi possível preencher com IA"));
+      }
     } finally {
       setAiFilling(false);
     }
@@ -533,6 +542,14 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           action?.();
         }}
         onCancel={() => setPendingLeave(null)}
+      />
+
+      <MessageModal
+        visible={aiError !== null}
+        type="error"
+        title={aiError?.title ?? ""}
+        message={aiError?.message ?? ""}
+        onClose={() => setAiError(null)}
       />
 
       <ToastBanner
