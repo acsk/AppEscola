@@ -15,7 +15,9 @@ uma nova imagem via OpenRouter e, por padrao, verifica sua coerencia por visao.
 A aprovacao humana continua obrigatoria; a validacao por IA nao e garantia
 matematica ou pedagogica.
 
-- Credenciais: as mesmas chaves criptografadas do tenant; super admin usa o ambiente.
+- Credenciais: as mesmas chaves criptografadas do tenant; super admin prioriza o ambiente
+  e, sem chave global disponivel (do provedor exigido, quando houver), usa a chave ativa
+  da escola selecionada. Usuarios comuns nunca usam chaves globais ou de outra escola.
   O pipeline com imagem exige OpenRouter, mesmo se o provedor preferido de texto for OpenAI.
 - Configuracao central em [config/services.php](./config/services.php), variaveis
   de exemplo em [.env.example](./.env.example).

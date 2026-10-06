@@ -150,18 +150,19 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   /** Preenche alternativas, gabarito, explicação e (na criação) a classificação, sem apagar o que já foi digitado. */
   const autofill = async () => {
     if (aiFilling || saving !== null || uploading) return;
-    const unavailable = await ensureAvailable();
-    if (unavailable) {
-      setToast({ visible: true, type: "error", message: unavailable });
-      return;
-    }
-    if (statementChars < AI_MIN_CHARS) {
-      setErrors((prev) => ({ ...prev, question_text: `Escreva um enunciado com pelo menos ${AI_MIN_CHARS} caracteres para usar a IA.` }));
-      setToast({ visible: true, type: "error", message: `Escreva um enunciado com pelo menos ${AI_MIN_CHARS} caracteres para usar a IA.` });
-      return;
-    }
     setAiFilling(true);
     try {
+      const unavailable = await ensureAvailable();
+      if (unavailable) {
+        setToast({ visible: true, type: "error", message: unavailable });
+        return;
+      }
+      if (statementChars < AI_MIN_CHARS) {
+        const message = `Escreva um enunciado com pelo menos ${AI_MIN_CHARS} caracteres para usar a IA.`;
+        setErrors((prev) => ({ ...prev, question_text: message }));
+        setToast({ visible: true, type: "error", message });
+        return;
+      }
       const response = await aiAutofillQuestion({
         question_text: content.question_text,
         // "Objetiva" é o padrão da tela: só envia o tipo quando o usuário escolheu "Dissertativa".

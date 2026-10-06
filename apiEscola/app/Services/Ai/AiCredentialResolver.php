@@ -7,7 +7,7 @@ use App\Models\User;
 
 /**
  * Decide qual chave de IA usar na requisição:
- * - super admin: chaves do .env (config services.ai);
+ * - super admin: chaves do .env; na ausência, chave ativa do tenant selecionado;
  * - demais usuários: chave ativa do tenant em tenant_ai_credentials (nunca a do .env).
  * Com as duas chaves disponíveis, vale services.ai.preferred_provider.
  */
@@ -19,7 +19,10 @@ class AiCredentialResolver
     public function resolve(?User $user, ?int $tenantId, ?string $requiredProvider = null): ?array
     {
         if ($user?->isSuperAdmin()) {
-            return $this->fromEnv($requiredProvider);
+            $credential = $this->fromEnv($requiredProvider);
+            if ($credential !== null) {
+                return $credential;
+            }
         }
 
         return $tenantId ? $this->fromTenant($tenantId, $requiredProvider) : null;
