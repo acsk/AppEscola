@@ -23,6 +23,7 @@ import {
   addTag,
   diffClassification,
   withSubject,
+  applyClassificationSuggestion,
 } from "../utils/questionClassification";
 
 /** Testes de lógica pura (sem navegador): npx playwright test tests/questionBankQuery.spec.ts */
@@ -186,4 +187,12 @@ test.describe("formulário de classificação", () => {
     expect(addTag(["Funções"], "  funções ")).toEqual(["Funções"]);
     expect(addTag([], "  revisão   final ")).toEqual(["revisão final"]);
   });
+});
+
+test("autocompletar da importação sobrescreve disciplina/assuntos e mantém a modalidade", () => {
+  const form = { ...EMPTY_CLASSIFICATION_FORM, subject_id: 1, topic_ids: [10], difficulty_id: 2, exam_type_id: 15, tags: ["a"] };
+  const next = applyClassificationSuggestion(form, { subject_id: 3, topic_ids: [30, 31], difficulty_id: 4, exam_type_id: 2, tags: ["b"] });
+  expect(next).toMatchObject({ subject_id: 3, topic_ids: [30, 31], difficulty_id: 4, exam_type_id: 15, tags: ["a", "b"] });
+  // Sem disciplina sugerida, não apaga a classificação existente.
+  expect(applyClassificationSuggestion(form, { tags: [] })).toMatchObject({ subject_id: 1, topic_ids: [10] });
 });

@@ -49,7 +49,10 @@ class QuestionAiService
     public function autofill(?User $user, int $tenantId, array $input): array
     {
         $credential = $this->credential($user, $tenantId);
-        $catalogs = $this->catalogs($tenantId);
+        // Importação de PDF: classifica só dentro das disciplinas escolhidas para a prova.
+        $catalogs = $this->restrictSubjects($this->catalogs($tenantId), array_map('intval', $input['subject_ids'] ?? []));
+        $onlySubjectId = $catalogs['subjects']->count() === 1 && ! empty($input['subject_ids'])
+            ? (int) $catalogs['subjects']->first()['id'] : null;
 
         $filledOptions = array_values(array_filter(
             array_map(fn ($o) => trim((string) ($o['option_text'] ?? '')), $input['options'] ?? []),
@@ -101,7 +104,27 @@ class QuestionAiService
             $content['question_text'] = $input['question_text'];
         }
 
-        return $content + $this->sanitizeClassification($raw, $catalogs);
+        $classification = $this->sanitizeClassification($raw, $catalogs);
+        if ($onlySubjectId !== null) {
+            $classification['subject_id'] = $onlySubjectId;
+        }
+
+        return $content + $classification;
+    }
+
+    /** Restringe disciplinas e assuntos às escolhidas (ids de outro tenant/inativos somem aqui). */
+    private function restrictSubjects(array $catalogs, array $subjectIds): array
+    {
+        if ($subjectIds === []) {
+            return $catalogs;
+        }
+        $catalogs['subjects'] = $catalogs['subjects']->whereIn('id', $subjectIds)->values();
+        $catalogs['topics'] = $catalogs['topics']->whereIn('subject_id', $catalogs['subjects']->pluck('id')->all())->values();
+        if ($catalogs['subjects']->isEmpty()) {
+            throw new AiException('Nenhuma das disciplinas escolhidas está ativa nesta escola.', 422);
+        }
+
+        return $catalogs;
     }
 
     /**
@@ -375,15 +398,7 @@ class QuestionAiService
     public function separateText(?User $user, int $tenantId, string $text, string $sourceExamName, array $subjectIds = []): array
     {
         $credential = $this->credential($user, $tenantId);
-        $catalogs = $this->catalogs($tenantId);
-        if ($subjectIds !== []) {
-            // Restringe disciplinas e assuntos às escolhidas (ids de outro tenant/inativos somem aqui).
-            $catalogs['subjects'] = $catalogs['subjects']->whereIn('id', $subjectIds)->values();
-            $catalogs['topics'] = $catalogs['topics']->whereIn('subject_id', $catalogs['subjects']->pluck('id')->all())->values();
-            if ($catalogs['subjects']->isEmpty()) {
-                throw new AiException('Nenhuma das disciplinas escolhidas está ativa nesta escola.', 422);
-            }
-        }
+        $catalogs = $this->restrictSubjects($this->catalogs($tenantId), $subjectIds);
         $onlySubjectId = $catalogs['subjects']->count() === 1 ? (int) $catalogs['subjects']->first()['id'] : null;
         $this->logSuspicious($tenantId, 'pdf_separate_text', [$text]);
         $system = 'Você digitaliza provas brasileiras. Recebe SOMENTE o texto extraído do PDF, não as imagens. '

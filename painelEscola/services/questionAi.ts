@@ -13,6 +13,8 @@ export async function aiAutofillQuestion(payload: {
   question_text: string;
   type?: string;
   options?: { option_text: string }[];
+  /** Importação de PDF: a IA só classifica dentro destas disciplinas. */
+  subject_ids?: number[];
 }) {
   const { data } = await api.post("/question-bank/ai/autofill", payload, { timeout: 120000 });
   return data as { type: string; message: string; body: AiQuestionSuggestion };

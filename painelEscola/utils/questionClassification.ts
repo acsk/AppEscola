@@ -107,6 +107,27 @@ export function mergeClassificationSuggestion(
   return { form: next, changed: isDirty(form, next) };
 }
 
+/**
+ * Aplica a sugestão da IA sobrescrevendo o que ela trouxe (pedido explícito de "autocompletar" sobre
+ * uma questão já pré-classificada, ex.: importação de PDF). Disciplina e assuntos andam juntos; tags somam.
+ */
+export function applyClassificationSuggestion(
+  form: ClassificationForm,
+  s: Partial<Pick<ClassificationForm, "difficulty_id" | "subject_id" | "topic_ids" | "board_id" | "year" | "exam_type_id" | "tags">>
+): ClassificationForm {
+  const next = { ...form };
+  if (s.subject_id) {
+    next.subject_id = s.subject_id;
+    next.topic_ids = [...(s.topic_ids ?? [])];
+  }
+  if (s.difficulty_id) next.difficulty_id = s.difficulty_id;
+  if (s.board_id) next.board_id = s.board_id;
+  if (s.year) next.year = s.year;
+  if (s.exam_type_id && next.exam_type_id === null) next.exam_type_id = s.exam_type_id;
+  next.tags = (s.tags ?? []).reduce(addTag, next.tags);
+  return next;
+}
+
 /** Classificação completa a partir de uma sugestão da IA (questões semelhantes). */
 export function classificationFromSuggestion(
   s: Partial<Pick<ClassificationForm, "difficulty_id" | "subject_id" | "topic_ids" | "board_id" | "year" | "exam_type_id" | "tags">>

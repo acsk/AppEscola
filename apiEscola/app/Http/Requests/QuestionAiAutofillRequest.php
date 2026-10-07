@@ -18,6 +18,9 @@ class QuestionAiAutofillRequest extends FormRequest
             'type'                  => ['sometimes', 'nullable', 'in:multiple_choice,essay'],
             'options'               => ['sometimes', 'nullable', 'array', 'max:10'],
             'options.*.option_text' => ['nullable', 'string', 'max:5000'],
+            // Importação de PDF: disciplinas da prova (a IA só classifica dentro delas).
+            'subject_ids'           => ['sometimes', 'array', 'max:20'],
+            'subject_ids.*'         => ['integer', 'distinct'],
         ];
     }
 

@@ -27,7 +27,7 @@ import { type ApiToastState, getApiErrorMessage, showApiToast } from "../../util
 import { describeAiError } from "../../utils/aiErrors";
 import { contentFromSuggestion, contentPayload, mergeContentSuggestion, validateContent } from "../../utils/questionContent";
 import {
-  EMPTY_CLASSIFICATION_FORM, classificationFromSuggestion, diffClassification, mergeClassificationSuggestion,
+  EMPTY_CLASSIFICATION_FORM, applyClassificationSuggestion, classificationFromSuggestion, diffClassification,
 } from "../../utils/questionClassification";
 import { extractPdfPages, pdfDocumentText, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
 import { prepareImageForUpload } from "../../utils/imageCompression";
@@ -38,6 +38,17 @@ type Draft = ImportDraftQuestion & {
   imageLoadError: boolean;
   errors: Record<string, string>;
 };
+/** Nome da prova a partir do arquivo: "ifal_2024-1a-fase.pdf" → "IFAL 2024 1A FASE". */
+export function examNameFromFile(fileName: string): string {
+  return fileName
+    .replace(/\.pdf$/i, "")
+    .replace(/[_\-.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleUpperCase("pt-BR")
+    .slice(0, 255);
+}
+
 /** Dados mínimos que faltam para incluir a questão (sinalizados na aba e no topo da questão). */
 function pendingItems(draft: Draft): string[] {
   const items: string[] = [];
@@ -228,10 +239,11 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       const response = await aiAutofillQuestion({
         question_text: draft.content.question_text, type: draft.content.type,
         options: draft.content.options.map(({ option_text }) => ({ option_text })),
+        subject_ids: subjectIds.length ? subjectIds : undefined,
       });
       update(draft.key, {
         content: mergeContentSuggestion(draft.content, response.body).form,
-        classification: mergeClassificationSuggestion(draft.classification, response.body).form,
+        classification: applyClassificationSuggestion(draft.classification, response.body),
         answerFromPdf: false, errors: {},
       });
       showApiToast(setToast, response, "Campos sugeridos pela IA. Revise antes de incluir.");
@@ -517,7 +529,14 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
                 if (!selected.name.toLowerCase().endsWith(".pdf") || selected.size > MAX_PDF_BYTES) {
                   setError({ title: "Arquivo inválido", message: "Selecione um PDF de até 20 MB." });
                   setFile(null);
-                } else setFile(selected);
+                } else {
+                  setFile(selected);
+                  // Preenche o nome com o do arquivo; não sobrescreve um nome digitado pelo usuário.
+                  setSourceExamName((current) =>
+                    !current.trim() || current === (file ? examNameFromFile(file.name) : "")
+                      ? examNameFromFile(selected.name)
+                      : current);
+                }
                 event.target.value = "";
               }} />
           </View>

@@ -273,6 +273,27 @@ class QuestionAiTest extends TestCase
         Http::assertSent(fn (HttpRequest $r) => str_contains($r['messages'][1]['content'], "{$physics->id}: {$physics->name}\n  - {$kinematics->id}: Cinemática"));
     }
 
+    public function test_autofill_classifies_only_within_chosen_subjects(): void
+    {
+        $this->tenantKey();
+        $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português']);
+        $syntax = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $portuguese->id, 'name' => 'Sintaxe']);
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $algebra = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $math->id, 'name' => 'Álgebra']);
+
+        // IA insiste em Matemática; a prova só tem Português: disciplina forçada e assunto de fora descartado.
+        $this->fakeAi(['question_text' => 'Q', 'type' => 'essay', 'explanation' => 'E', 'subject_id' => $math->id, 'topic_ids' => [$algebra->id, $syntax->id]]);
+
+        $this->postJson('/api/question-bank/ai/autofill', [
+            'question_text' => 'Identifique o sujeito da oração "Choveram críticas ao projeto".',
+            'subject_ids' => [$portuguese->id],
+        ])->assertOk()
+            ->assertJsonPath('body.subject_id', $portuguese->id)
+            ->assertJsonPath('body.topic_ids', [$syntax->id]);
+
+        Http::assertSent(fn (HttpRequest $r) => ! str_contains($r['messages'][1]['content'], 'Álgebra'));
+    }
+
     public function test_taxonomy_lists_active_subjects_with_nested_topics(): void
     {
         $physics = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Física']);
