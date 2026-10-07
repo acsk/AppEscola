@@ -21,6 +21,8 @@ class QuestionAiAutofillRequest extends FormRequest
             // Importação de PDF: disciplinas da prova (a IA só classifica dentro delas).
             'subject_ids'           => ['sometimes', 'array', 'max:20'],
             'subject_ids.*'         => ['integer', 'distinct'],
+            // Disciplina já escolhida na questão: a IA mantém e só escolhe os assuntos dela.
+            'subject_id'            => ['sometimes', 'nullable', 'integer'],
         ];
     }
 

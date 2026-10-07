@@ -69,12 +69,17 @@ class QuestionAiService
     private const IMAGE_REFERENCE = '/\\b(gr[aá]fico|figura(?!s? de linguagem)|imagem|ilustra[çc][ãa]o|charge|tirinha|quadrinhos?|cartum|mapa|infogr[aá]fico|fotografia)s?\\b/iu';
 
     private const CLASSIFICATION_RULES = 'CRITÉRIO DE CLASSIFICAÇÃO: classifique pela HABILIDADE/CONTEÚDO que o comando da questão cobra, '
-        .'não pelo tema do texto de apoio. Interpretação e compreensão de texto ("de acordo com o texto", "o autor afirma", '
-        .'"infere-se do texto"), gramática, gêneros textuais, figuras de linguagem e semântica são Língua Portuguesa, mesmo que o texto '
-        .'trate de saúde, economia, ciência ou política; cálculos são Matemática mesmo em contexto do dia a dia. Use a disciplina do tema '
-        .'só quando a resposta exigir conhecimento específico dela que NÃO está no texto. Escolha os assuntos pelo mesmo critério '
-        .'(ex.: "Interpretação de texto"). Antes de responder, confira se o nome da disciplina e dos assuntos escolhidos combinam com '
-        .'o que a questão pede. Informe também "subject_name" e "topic_names" copiados exatamente da lista, junto com os ids.';
+        .'não pelo tema do texto de apoio. Leia também as alternativas: quando elas são sentidos, críticas ou conclusões possíveis do texto '
+        .'ou da imagem, a habilidade cobrada é leitura. Interpretação e compreensão de texto ("de acordo com o texto", "o autor afirma", '
+        .'"infere-se do texto", "a charge faz uma crítica", "o humor da tirinha"), gramática, gêneros textuais, figuras de linguagem e semântica '
+        .'são Língua Portuguesa, mesmo que o texto trate de saúde, economia, ciência, política, cidadania ou direitos. Charges, tirinhas, cartuns, '
+        .'propagandas, cartazes e infográficos também são textos (verbais ou não verbais): perguntar o que criticam, ironizam, sugerem ou qual '
+        .'a finalidade deles é interpretação de texto. Cálculos são Matemática mesmo em contexto do dia a dia. Use a disciplina do tema '
+        .'(História, Geografia, Sociologia...) só quando a resposta exigir conhecimento específico dela que NÃO está no texto nem na imagem. '
+        .'ASSUNTOS: escolha sempre de 1 a 3 assuntos listados sob a disciplina escolhida, pelo mesmo critério da habilidade (em questão de '
+        .'leitura, o assunto de interpretação/compreensão de textos da lista); se nenhum for exato, escolha o mais próximo. "topic_ids" vazio '
+        .'só quando a disciplina não tiver assuntos cadastrados. Antes de responder, confira se a disciplina e os assuntos combinam com o que '
+        .'a questão pede. Informe também "subject_name" e "topic_names" com o nome EXATO como aparece na lista (não use sinônimos), junto com os ids.';
 
     public function __construct(
         private readonly AiCredentialResolver $resolver,
@@ -92,7 +97,12 @@ class QuestionAiService
         $credential = $this->credential($user, $tenantId);
         // Importação de PDF: classifica só dentro das disciplinas escolhidas para a prova.
         $catalogs = $this->restrictSubjects($this->catalogs($tenantId), array_map('intval', $input['subject_ids'] ?? []));
-        $onlySubjectId = $catalogs['subjects']->count() === 1 && ! empty($input['subject_ids'])
+        // Disciplina já escolhida na questão manda: a IA só escolhe os assuntos dela.
+        $chosenSubjectId = isset($input['subject_id']) ? (int) $input['subject_id'] : null;
+        if ($chosenSubjectId !== null && $catalogs['subjects']->contains('id', $chosenSubjectId)) {
+            $catalogs = $this->restrictSubjects($catalogs, [$chosenSubjectId]);
+        }
+        $onlySubjectId = $catalogs['subjects']->count() === 1 && (! empty($input['subject_ids']) || $chosenSubjectId !== null)
             ? (int) $catalogs['subjects']->first()['id'] : null;
 
         $filledOptions = array_values(array_filter(
@@ -115,8 +125,11 @@ class QuestionAiService
             ."- Objetiva: de 4 a 5 alternativas plausíveis (ou as já informadas), exatamente uma correta, sem letras no início do texto.\n"
             ."- Dissertativa: \"options\" vazio.\n"
             ."- \"explanation\": resolva a questão passo a passo ANTES de definir o gabarito; a alternativa correta tem de bater com essa resolução (confira os cálculos).\n"
-            .'- Classificação: use apenas ids da lista DISCIPLINAS E ASSUNTOS abaixo. Escolha a disciplina e, dentro DELA, de 1 a 3 assuntos; '
-            ."\"topic_ids\" só pode ter assuntos listados sob a disciplina escolhida. Se nenhum servir, use null (ou lista vazia).\n"
+            ."- Se o enunciado citar charge, tirinha, figura ou gráfico que você não vê, resolva e classifique pelo comando e pelas alternativas, sem inventar o conteúdo da imagem.\n"
+            .($onlySubjectId !== null
+                ? "- Classificação: a disciplina JÁ ESTÁ DEFINIDA (subject_id={$onlySubjectId}, a única da lista abaixo); não a troque. Escolha de 1 a 3 assuntos listados sob ela.\n"
+                : '- Classificação: use apenas ids da lista DISCIPLINAS E ASSUNTOS abaixo. Escolha a disciplina e, dentro DELA, de 1 a 3 assuntos; '
+                    ."\"topic_ids\" só pode ter assuntos listados sob a disciplina escolhida.\n")
             .'- '.self::CLASSIFICATION_RULES."\n"
             ."- \"board_id\" e \"year\" só se a banca/ano estiverem explícitos no enunciado (ex.: \"(ENEM 2019)\").\n"
             .'- "tags": de 2 a 4 palavras-chave curtas do conteúdo cobrado (ex.: "porcentagem", "juros compostos"), em minúsculas, sem repetir disciplina ou assunto.',
@@ -148,12 +161,7 @@ class QuestionAiService
             $content['question_text'] = $input['question_text'];
         }
 
-        $classification = $this->sanitizeClassification($raw, $catalogs);
-        if ($onlySubjectId !== null) {
-            $classification['subject_id'] = $onlySubjectId;
-        }
-
-        return $content + $classification;
+        return $content + $this->sanitizeClassification($raw, $catalogs, $onlySubjectId);
     }
 
     /** Restringe disciplinas e assuntos às escolhidas (ids de outro tenant/inativos somem aqui). */
@@ -517,7 +525,7 @@ class QuestionAiService
             // Bloco de páginas: a IA marca complete=false por cautela com o contexto; a contagem conferida basta.
             $data['complete'] = true;
         }
-        $validated = $this->validateImportedQuestions($data, $catalogs, 'needs_image', $focusPages !== null);
+        $validated = $this->validateImportedQuestions($data, $catalogs, 'needs_image', $focusPages !== null, $onlySubjectId);
         if ($focusPages !== null) {
             // A IA às vezes também separa questões da página de contexto: fica só o que começa no bloco.
             $blockStart = (int) $focusPages['from'] > 1 ? self::positionIn($text, '[PÁGINA '.(int) $focusPages['from'].']') : 0;
@@ -529,7 +537,7 @@ class QuestionAiService
             }));
         }
 
-        return array_map(function (array $item) use ($sourceExamName, $supportTexts, $onlySubjectId, $text) {
+        return array_map(function (array $item) use ($sourceExamName, $supportTexts, $text) {
             $item['content']['question_text'] = self::withoutTrailingOptions($item['content']['question_text'], $item['content']['options'] ?? []);
             $content = $item['content'];
             // Texto de apoio vai no início do enunciado de CADA questão que o usa (a questão precisa ser autossuficiente).
@@ -542,9 +550,6 @@ class QuestionAiService
                 $header = $support['title'] !== '' ? '<b>'.$support['title']."</b>\n" : '';
                 $content['question_text'] = mb_substr($header.$support['text']."\n\n".$content['question_text'], 0, 20000);
             }
-            if ($onlySubjectId !== null) {
-                $content['subject_id'] = $onlySubjectId;
-            }
 
             // Comando que cita figura/gráfico/charge depende de imagem que o texto extraído não tem.
             $needsImage = $item['raw']['needs_image'] === true
@@ -554,7 +559,7 @@ class QuestionAiService
         }, $validated);
     }
 
-    private function validateImportedQuestions(array $raw, array $catalogs, string $imageField, bool $allowEmpty = false): array
+    private function validateImportedQuestions(array $raw, array $catalogs, string $imageField, bool $allowEmpty = false, ?int $forcedSubjectId = null): array
     {
         $limit = 50;
         $items = $raw['questions'] ?? null;
@@ -608,7 +613,7 @@ class QuestionAiService
                 QuestionImageSpec::spec(is_array($item['image_spec'] ?? null) ? $item['image_spec'] : []);
             }
             $validated[] = [
-                'content' => $content + $this->sanitizeClassification($item, $catalogs) + [
+                'content' => $content + $this->sanitizeClassification($item, $catalogs, $forcedSubjectId) + [
                     'source_number' => is_scalar($item['source_number'] ?? null) ? (string) $item['source_number'] : (string) ($index + 1),
                     'answer_from_pdf' => $item['answer_from_pdf'],
                 ],
@@ -800,33 +805,37 @@ class QuestionAiService
         return $content + ['options' => $options];
     }
 
-    /** Classificação sugerida, só com ids existentes no tenant (assuntos coerentes com a disciplina). */
-    private function sanitizeClassification(array $raw, array $catalogs): array
+    /**
+     * Classificação sugerida, só com ids existentes no tenant (assuntos coerentes com a disciplina).
+     * Com $forcedSubjectId (disciplina definida pela pessoa/prova), só os assuntos dela são aceitos.
+     */
+    private function sanitizeClassification(array $raw, array $catalogs, ?int $forcedSubjectId = null): array
     {
         $pick = fn (Collection $items, mixed $id) => is_numeric($id) && $items->contains('id', (int) $id) ? (int) $id : null;
 
         // Associação automática: o assunto é mais específico que a disciplina — se a IA escolheu assuntos,
         // a disciplina é a deles (a mais frequente); assuntos de outra disciplina são descartados.
-        $subjectId = $pick($catalogs['subjects'], $raw['subject_id'] ?? null);
+        $subjectId = $forcedSubjectId ?? $pick($catalogs['subjects'], $raw['subject_id'] ?? null);
         $topics = $catalogs['topics']
             ->whereIn('id', array_map('intval', array_filter((array) ($raw['topic_ids'] ?? []), 'is_numeric')));
 
         // Id copiado errado da lista longa: o nome devolvido junto prevalece quando aponta outro item existente.
         $byName = fn (Collection $items, mixed $name) => is_string($name) && trim($name) !== ''
             ? $items->first(fn ($i) => self::sameName($i['name'], $name)) : null;
-        $namedSubject = $byName($catalogs['subjects'], $raw['subject_name'] ?? null);
+        $namedSubject = $forcedSubjectId === null ? $byName($catalogs['subjects'], $raw['subject_name'] ?? null) : null;
         if ($namedSubject !== null) {
             $subjectId = (int) $namedSubject['id'];
         }
+        $topicByName = fn (Collection $items, mixed $name) => $byName($items, $name) ?? self::closestByName($items, $name);
         $namedTopics = collect((array) ($raw['topic_names'] ?? []))
-            ->map(fn ($name) => $byName($subjectId !== null ? $catalogs['topics']->where('subject_id', $subjectId) : $catalogs['topics'], $name)
-                ?? $byName($catalogs['topics'], $name))
+            ->map(fn ($name) => $topicByName($subjectId !== null ? $catalogs['topics']->where('subject_id', $subjectId) : $catalogs['topics'], $name)
+                ?? ($forcedSubjectId === null ? $topicByName($catalogs['topics'], $name) : null))
             ->filter();
         if ($namedTopics->isNotEmpty()) {
             $topics = $namedTopics->unique('id')->values();
         }
-        if ($namedSubject !== null) {
-            $topics = $topics->where('subject_id', $subjectId); // disciplina confirmada pelo nome manda
+        if ($namedSubject !== null || $forcedSubjectId !== null) {
+            $topics = $topics->where('subject_id', $subjectId); // disciplina confirmada pelo nome (ou definida) manda
         } elseif ($topics->isNotEmpty()) {
             $subjectId = (int) $topics->countBy('subject_id')->sortDesc()->keys()->first();
         }
@@ -981,6 +990,33 @@ class QuestionAiService
         $norm = fn (string $v) => preg_replace('/\s+/', ' ', mb_strtolower(trim(\Illuminate\Support\Str::ascii($v))));
 
         return $norm($a) === $norm($b);
+    }
+
+    /**
+     * Nome aproximado ("Interpretação de texto" → "Interpretação e Compreensão de Textos"): as palavras de um
+     * nome (sem conectivos, singular simples) contidas no outro. Vence o item com menos palavras sobrando.
+     */
+    private static function closestByName(Collection $items, mixed $name): ?array
+    {
+        if (! is_string($name)) {
+            return null;
+        }
+        $words = function (string $v): array {
+            $tokens = preg_split('/[^a-z0-9]+/', mb_strtolower(\Illuminate\Support\Str::ascii($v)), -1, PREG_SPLIT_NO_EMPTY);
+            $tokens = array_diff($tokens, ['a', 'o', 'as', 'os', 'e', 'de', 'da', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 'com']);
+
+            return array_values(array_unique(array_map(fn ($t) => strlen($t) > 3 ? preg_replace('/s$/', '', $t) : $t, $tokens)));
+        };
+        $wanted = $words($name);
+        if ($wanted === []) {
+            return null;
+        }
+
+        return $items
+            ->map(fn ($item) => ['item' => $item, 'words' => $words($item['name'])])
+            ->filter(fn ($c) => $c['words'] !== [] && (array_diff($wanted, $c['words']) === [] || array_diff($c['words'], $wanted) === []))
+            ->sortBy(fn ($c) => abs(count($c['words']) - count($wanted)))
+            ->first()['item'] ?? null;
     }
 
     private function text(mixed $value, int $max): string

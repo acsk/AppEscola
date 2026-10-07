@@ -189,6 +189,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         // "Objetiva" é o padrão da tela: só envia o tipo quando o usuário escolheu "Dissertativa".
         type: content.type === "essay" ? "essay" : undefined,
         options: content.options.map((o) => ({ option_text: o.option_text })),
+        subject_id: classification.subject_id ?? undefined,
       });
       const merged = mergeContentSuggestion(content, response.body);
       setContent(merged.form);

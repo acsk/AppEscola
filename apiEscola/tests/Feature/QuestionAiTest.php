@@ -318,6 +318,35 @@ class QuestionAiTest extends TestCase
         Http::assertSent(fn (HttpRequest $r) => str_contains($r['messages'][1]['content'], 'não pelo tema do texto de apoio'));
     }
 
+    public function test_autofill_keeps_chosen_subject_and_matches_approximate_topic_name(): void
+    {
+        $this->tenantKey();
+        $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Língua Portuguesa']);
+        $reading = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $portuguese->id, 'name' => 'Interpretação e Compreensão de Textos']);
+        SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $portuguese->id, 'name' => 'Tipologia e Gêneros Textuais']);
+        $sociology = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Sociologia']);
+        $rights = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $sociology->id, 'name' => 'Cidadania e Direitos']);
+
+        // Charge sobre direito à educação: IA puxa para Sociologia e devolve o assunto com nome aproximado.
+        $this->fakeAi([
+            'question_text' => 'Q', 'type' => 'essay', 'explanation' => 'E',
+            'subject_id' => $sociology->id, 'subject_name' => 'Sociologia',
+            'topic_ids' => [$rights->id], 'topic_names' => ['Interpretação de texto'],
+        ]);
+
+        $this->postJson('/api/question-bank/ai/autofill', [
+            'question_text' => 'A educação é um direito fundamental das crianças. A charge aborda esse direito e faz uma crítica ao(à)',
+            'subject_id' => $portuguese->id,
+        ])->assertOk()
+            ->assertJsonPath('body.subject_id', $portuguese->id)
+            ->assertJsonPath('body.topic_ids', [$reading->id]);
+
+        Http::assertSent(fn (HttpRequest $r) => str_contains($r['messages'][1]['content'], "JÁ ESTÁ DEFINIDA (subject_id={$portuguese->id}")
+            && str_contains($r['messages'][1]['content'], 'Charges, tirinhas')
+            && ! str_contains($r['messages'][1]['content'], 'Cidadania e Direitos')
+            && ! str_contains($r['messages'][1]['content'], 'Se nenhum servir'));
+    }
+
     public function test_taxonomy_lists_active_subjects_with_nested_topics(): void
     {
         $physics = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Física']);
