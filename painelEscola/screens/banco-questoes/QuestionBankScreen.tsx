@@ -95,13 +95,15 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const { ensureAvailable } = useQuestionAiStatus();
   const [importPdfOpen, setImportPdfOpen] = useState(false);
   const [importedExamsOpen, setImportedExamsOpen] = useState(false);
+  const [resumeImportId, setResumeImportId] = useState<string | null>(null);
   /** Importar PDF usa IA: confere a chave antes de abrir. */
-  const openImportPdf = async () => {
+  const openImportPdf = async (draftId: string | null = null) => {
     const unavailable = await ensureAvailable();
     if (unavailable) {
       setToast({ visible: true, type: "error", message: unavailable });
       return;
     }
+    setResumeImportId(draftId);
     setImportPdfOpen(true);
   };
 
@@ -720,6 +722,10 @@ export default function QuestionBankScreen({ navigate }: Props) {
         visible={importedExamsOpen}
         onClose={() => setImportedExamsOpen(false)}
         onOpenExam={(examId) => navigate("simulados-form", { examId })}
+        onResumeImport={(draftId) => {
+          setImportedExamsOpen(false);
+          void openImportPdf(draftId);
+        }}
         onChanged={() => void load()}
         setToast={setToast}
       />
@@ -727,7 +733,11 @@ export default function QuestionBankScreen({ navigate }: Props) {
       <ImportPdfModal
         visible={importPdfOpen}
         catalogs={catalogs}
-        onClose={() => setImportPdfOpen(false)}
+        resumeDraftId={resumeImportId}
+        onClose={() => {
+          setImportPdfOpen(false);
+          setResumeImportId(null);
+        }}
         onCreated={(count) => {
           setToast({ visible: true, type: "success", message: `${count} questão(ões) importada(s) do PDF.` });
           void load();

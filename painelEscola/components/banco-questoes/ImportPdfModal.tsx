@@ -34,6 +34,20 @@ import { prepareImageForUpload } from "../../utils/imageCompression";
 import { plainRichText } from "../../utils/richText";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 
+type FailedBlock = { from: number; to: number; pages: string; message: string };
+type SeparatedQuestion = Awaited<ReturnType<typeof aiSeparatePdfText>>["body"]["questions"][number];
+
+const blockLabel = ({ from, to }: { from: number; to: number }) => (from === to ? `página ${from}` : `páginas ${from}–${to}`);
+
+function toDraft(question: SeparatedQuestion, key: string, fallbackNumber: string): ImportDraftQuestion & { imageLoadError: boolean; errors: Record<string, string> } {
+  return {
+    key, include: true, sourceNumber: question.source_number ?? fallbackNumber,
+    content: contentFromSuggestion(question), classification: classificationFromSuggestion(question),
+    needsImage: question.needs_image === true, imageLoadError: false,
+    answerFromPdf: question.answer_from_pdf === true, errors: {},
+  };
+}
+
 type Draft = ImportDraftQuestion & {
   imageLoadError: boolean;
   errors: Record<string, string>;
@@ -67,8 +81,10 @@ type Props = {
   onClose: () => void;
   onCreated: (count: number) => void;
   setToast: React.Dispatch<React.SetStateAction<ApiToastState>>;
+  /** Abre já retomando este rascunho de importação (ex.: "Continuar revisão" em Simulados importados). */
+  resumeDraftId?: string | null;
 };
-export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, setToast }: Props) {
+export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, setToast, resumeDraftId = null }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const imageRef = useRef<HTMLInputElement | null>(null);
   const imageTarget = useRef<string | null>(null);
@@ -86,7 +102,10 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const lockedExamTypeId = createExam ? selectedExamType?.id ?? null : null;
   const [noTextPages, setNoTextPages] = useState<number[]>([]);
   /** Blocos de páginas que a IA não conseguiu separar (as demais questões seguem para revisão). */
-  const [failedBlocks, setFailedBlocks] = useState<{ pages: string; message: string }[]>([]);
+  const [failedBlocks, setFailedBlocks] = useState<FailedBlock[]>([]);
+  /** Texto do PDF desta sessão (reprocessar blocos com erro sem reenviar o arquivo) e página inicial de cada questão. */
+  const pdfText = useRef<string | null>(null);
+  const draftBlock = useRef(new Map<string, number>());
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeKey, setActiveKey] = useState("");
   const [savedDraft, setSavedDraft] = useState<{ id: string; revision: number } | null>(null);
@@ -114,6 +133,8 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     includedIds.current = [];
     setNoTextPages([]);
     setFailedBlocks([]);
+    pdfText.current = null;
+    draftBlock.current = new Map();
     setDrafts([]);
     setActiveKey("");
     setSavedDraft(null);
@@ -166,6 +187,11 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       setError({ title: "Não foi possível salvar o rascunho", message: getApiErrorMessage(cause, "Tente novamente.") });
     } finally { setProgress(null); }
   };
+
+  useEffect(() => {
+    if (visible && resumeDraftId) void resumeDraft(resumeDraftId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir com um rascunho escolhido
+  }, [visible, resumeDraftId]);
 
   const resumeDraft = async (id: string) => {
     if (busy) return;
@@ -290,6 +316,56 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     }
   };
 
+  /** Separa um bloco de páginas; uma nova tentativa automática antes de dar erro (a resposta da IA varia). */
+  const separateBlock = async (text: string, block: { from: number; to: number }, totalBlocks: number, counter = "") => {
+    const label = blockLabel(block);
+    for (let attempt = 1; ; attempt += 1) {
+      setProgress(`Separando e classificando as questões com IA: ${label} ${counter}${attempt > 1 ? " — nova tentativa" : ""}…`);
+      try {
+        const response = await aiSeparatePdfText(text, sourceExamName.trim(), subjectIds, totalBlocks > 1 ? block : undefined);
+        return response.body.questions;
+      } catch (cause) {
+        if (attempt >= 2) throw cause;
+      }
+    }
+  };
+
+  /** Reprocessa só o bloco que falhou e encaixa as questões novas na ordem do PDF, sem duplicar. */
+  const reprocessBlock = async (failedBlock: FailedBlock) => {
+    const text = pdfText.current;
+    if (busy || !text) return;
+    try {
+      const found = await separateBlock(text, failedBlock, Number.MAX_SAFE_INTEGER);
+      const existing = new Set(drafts.map((d) => questionFingerprint({ question_text: d.content.question_text, options: d.content.options })));
+      const stamp = Date.now();
+      const added: Draft[] = found
+        .filter((question) => !existing.has(questionFingerprint(question)))
+        .map((question, index) => toDraft(question, `pdf-p${failedBlock.from}-${stamp}-${index}`, String(index + 1)));
+      added.forEach((draft) => draftBlock.current.set(draft.key, failedBlock.from));
+      setDrafts((prev) => {
+        // Depois da última questão de páginas anteriores ao bloco (questões retomadas de rascunho vão ao fim).
+        let at = prev.length;
+        const firstAfter = prev.findIndex((d) => (draftBlock.current.get(d.key) ?? 0) > failedBlock.from);
+        if (firstAfter >= 0) at = firstAfter;
+        return [...prev.slice(0, at), ...added, ...prev.slice(at)];
+      });
+      setFailedBlocks((prev) => prev.filter((b) => b.from !== failedBlock.from));
+      if (added[0]) setActiveKey(added[0].key);
+      setToast({
+        visible: true, type: added.length ? "success" : "error",
+        message: added.length
+          ? `${added.length} questão(ões) de ${failedBlock.pages} adicionada(s). Revise antes de incluir.`
+          : `Nenhuma questão nova encontrada em ${failedBlock.pages}.`,
+      });
+    } catch (cause) {
+      const message = describeAiError(cause, "Falha na separação").message;
+      setFailedBlocks((prev) => prev.map((b) => (b.from === failedBlock.from ? { ...b, message } : b)));
+      setToast({ visible: true, type: "error", message: `Ainda não foi possível separar ${failedBlock.pages}. Tente de novo.` });
+    } finally {
+      setProgress(null);
+    }
+  };
+
   const extract = async () => {
     if (!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || busy) return;
     setProgress("Extraindo o texto do PDF no navegador…");
@@ -297,30 +373,31 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       const pages = await extractPdfPages(file);
       const text = pdfDocumentText(pages);
       setNoTextPages(pages.flatMap((page, index) => page.trim() ? [] : [index + 1]));
+      pdfText.current = text;
       // Em blocos de páginas, na ordem: cada bloco vê as páginas vizinhas como contexto.
       const blocks = pageBlocks(pages.length);
-      const questions: Awaited<ReturnType<typeof aiSeparatePdfText>>["body"]["questions"] = [];
+      const questions: SeparatedQuestion[] = [];
+      const fromPage: number[] = [];
       const seen = new Map<string, number>();
-      const failed: { pages: string; message: string }[] = [];
+      const failed: FailedBlock[] = [];
       let lastCause: unknown = null;
       for (const [index, block] of blocks.entries()) {
-        const label = block.from === block.to ? `página ${block.from}` : `páginas ${block.from}–${block.to}`;
-        setProgress(`Separando e classificando as questões com IA: ${label} (${index + 1} de ${blocks.length})…`);
         try {
-          const response = await aiSeparatePdfText(text, sourceExamName.trim(), subjectIds, blocks.length > 1 ? block : undefined);
-          for (const question of response.body.questions) {
+          const found = await separateBlock(text, block, blocks.length, `(${index + 1} de ${blocks.length})`);
+          for (const question of found) {
             const fingerprint = questionFingerprint(question);
             const previous = seen.get(fingerprint);
             if (previous === undefined) {
               seen.set(fingerprint, questions.length);
               questions.push(question);
+              fromPage.push(block.from);
             } else if ((question.question_text ?? "").length > (questions[previous].question_text ?? "").length) {
               questions[previous] = question; // repetida: fica a versão com texto de apoio
             }
           }
         } catch (cause) {
           lastCause = cause;
-          failed.push({ pages: label, message: describeAiError(cause, "Falha na separação").message });
+          failed.push({ ...block, pages: blockLabel(block), message: describeAiError(cause, "Falha na separação").message });
         }
       }
       if (!questions.length) throw lastCause ?? new Error("Nenhuma questão foi encontrada no PDF.");
@@ -332,15 +409,8 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           : `${questions.length} questão(ões) separada(s) pela IA. Revise e anexe as imagens necessárias antes de incluir.`,
         body: { questions },
       };
-      const converted: Draft[] = response.body.questions.map((question, index) => {
-        const content = contentFromSuggestion(question);
-        return {
-          key: `pdf-${index}`, include: true, sourceNumber: question.source_number ?? String(index + 1),
-          content, classification: classificationFromSuggestion(question),
-          needsImage: question.needs_image === true, imageLoadError: false,
-          answerFromPdf: question.answer_from_pdf === true, errors: {},
-        };
-      });
+      const converted: Draft[] = response.body.questions.map((question, index) => toDraft(question, `pdf-${index}`, String(index + 1)));
+      draftBlock.current = new Map(converted.map((draft, index) => [draft.key, fromPage[index]]));
       setDrafts(converted);
       setActiveKey(converted[0]?.key ?? "");
       showApiToast(setToast, response, "Questões separadas. Revise e anexe as imagens necessárias.");
@@ -597,7 +667,14 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
                 <Text className="text-xs font-semibold text-warning">
                   A IA não conseguiu separar {failedBlocks.map((f) => f.pages).join(", ")}. Confira o PDF: as questões dessas páginas não estão na lista.
                 </Text>
-                {failedBlocks.map((f) => <Text key={f.pages} className="text-xs text-warning">{f.pages}: {f.message}</Text>)}
+                {failedBlocks.map((f) => (
+                  <View key={f.pages} className="flex-row flex-wrap items-center" style={{ gap: 8 }}>
+                    <Text className="text-xs text-warning flex-1" style={{ minWidth: 200 }}>{f.pages}: {f.message}</Text>
+                    {pdfText.current ? (
+                      <Button icon={Sparkles} label={`Reprocessar ${f.pages}`} disabled={busy} onPress={() => void reprocessBlock(f)} />
+                    ) : null}
+                  </View>
+                ))}
               </View>
             )}
             {noTextPages.length > 0 && <Text className="text-xs text-warning">

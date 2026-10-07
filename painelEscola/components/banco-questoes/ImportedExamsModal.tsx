@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Switch, Text, View } from "react-native";
-import { ExternalLink, Trash2 } from "lucide-react-native";
+import { ExternalLink, FilePen, Trash2 } from "lucide-react-native";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
@@ -11,12 +11,13 @@ import ConfirmModal from "../ui/ConfirmModal";
 import ExamTypeLogo from "../ui/ExamTypeLogo";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { deleteImportedExam, fetchImportedExams, type ImportedExam } from "../../services/questionBank";
+import { deleteImportDraft, listImportDrafts, type ImportDraftSummary } from "../../services/questionImportDrafts";
 import { type ApiToastState, getApiErrorMessage, showApiToast } from "../../utils/apiErrors";
 
 type StatusTab = "" | "draft" | "published";
 const TABS: { id: StatusTab; label: string }[] = [
   { id: "", label: "Todos" },
-  { id: "draft", label: "Rascunho" },
+  { id: "draft", label: "Simulados em rascunho" },
   { id: "published", label: "Publicados" },
 ];
 const PER_PAGE = 10;
@@ -26,13 +27,15 @@ type Props = {
   onClose: () => void;
   /** Abre o simulado na tela de edição (Simulados). */
   onOpenExam: (examId: number) => void;
+  /** Continua a revisão de uma importação ainda não concluída (abre o Importar PDF). */
+  onResumeImport: (draftId: string) => void;
   /** Chamado após excluir: questões podem ter voltado ao banco ou saído dele. */
   onChanged: () => void;
   setToast: React.Dispatch<React.SetStateAction<ApiToastState>>;
 };
 
 /** Simulados criados a partir de provas em PDF importadas no banco de questões (rascunho ou não). */
-export default function ImportedExamsModal({ visible, onClose, onOpenExam, onChanged, setToast }: Props) {
+export default function ImportedExamsModal({ visible, onClose, onOpenExam, onResumeImport, onChanged, setToast }: Props) {
   const { isMobile } = useResponsiveLayout();
   const [status, setStatus] = useState<StatusTab>("");
   const [search, setSearch] = useState("");
@@ -45,6 +48,36 @@ export default function ImportedExamsModal({ visible, onClose, onOpenExam, onCha
   const [deleteExam, setDeleteExam] = useState<ImportedExam | null>(null);
   const [keepQuestions, setKeepQuestions] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  // Importações em revisão (rascunhos de importação, ainda sem simulado criado).
+  const [pending, setPending] = useState<ImportDraftSummary[]>([]);
+  const [deletePending, setDeletePending] = useState<ImportDraftSummary | null>(null);
+
+  const loadPending = useCallback(async () => {
+    try {
+      setPending((await listImportDrafts()).body.items);
+    } catch {
+      setPending([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (visible) void loadPending();
+  }, [visible, loadPending]);
+
+  const removePending = async () => {
+    if (!deletePending) return;
+    setDeleting(true);
+    try {
+      const response = await deleteImportDraft(deletePending.id);
+      showApiToast(setToast, response, "Rascunho excluído.");
+      setDeletePending(null);
+      void loadPending();
+    } catch (cause) {
+      setToast({ visible: true, type: "error", message: getApiErrorMessage(cause, "Não foi possível excluir o rascunho.") });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +136,32 @@ export default function ImportedExamsModal({ visible, onClose, onOpenExam, onCha
             Provas importadas pelo banco de questões que viraram simulado. Rascunhos ainda não aparecem para os alunos:
             abra o simulado para revisar, definir turmas e publicar.
           </Text>
+          {pending.length > 0 && (
+            <View style={{ gap: 8 }}>
+              <Text className="text-sm font-semibold text-ink">Importações em revisão ({pending.length})</Text>
+              <Text className="text-xs text-ink-subtle">Rascunhos de importação salvos por você: o simulado é criado ao concluir a revisão e incluir as questões.</Text>
+              <View className="border border-border rounded-ds-md">
+                {pending.map((item, i) => (
+                  <View key={item.id} className={`px-3 py-3 ${i > 0 ? "border-t border-border" : ""}`}
+                    style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", gap: 10 }}>
+                    <View className="flex-1" style={{ minWidth: 0 }}>
+                      <Text className="text-sm font-semibold text-ink" numberOfLines={2}>{item.source_exam_name}</Text>
+                      <Text className="text-xs text-ink-muted">
+                        {item.question_count} questão(ões) em revisão · salvo em {new Date(item.updated_at).toLocaleString("pt-BR")}
+                      </Text>
+                    </View>
+                    <Badge label="Importação em revisão" tone="warning" />
+                    <View className="flex-row justify-end" style={{ gap: 8 }}>
+                      <Button icon={FilePen} label="Continuar revisão" onPress={() => onResumeImport(item.id)} />
+                      <Button icon={Trash2} variant="danger" label="Excluir" accessibilityLabel={`Excluir rascunho ${item.source_exam_name}`}
+                        onPress={() => setDeletePending(item)} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+              <Text className="text-sm font-semibold text-ink mt-2">Simulados criados</Text>
+            </View>
+          )}
           <Tabs items={TABS} value={status} onChange={(id) => { setStatus(id); setPage(1); }} accessibilityLabel="Status do simulado" />
           <FormInput label="Buscar" value={search} onChangeText={setSearch} placeholder="Título do simulado" maxLength={255} />
 
@@ -150,6 +209,10 @@ export default function ImportedExamsModal({ visible, onClose, onOpenExam, onCha
           )}
         </View>
       </Modal>
+
+      <ConfirmModal visible={deletePending !== null} title="Excluir rascunho da importação?"
+        message={`"${deletePending?.source_exam_name ?? ""}" (${deletePending?.question_count ?? 0} questões em revisão) será excluído. Questões já incluídas no banco não são afetadas.`}
+        loading={deleting} onCancel={() => setDeletePending(null)} onConfirm={() => void removePending()} />
 
       <ConfirmModal visible={deleteExam !== null} title="Excluir simulado importado?"
         message={`"${deleteExam?.title ?? ""}" deixa de aparecer em Simulados e para os alunos.`}
