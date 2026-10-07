@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { Check, ChevronLeft, ChevronRight, CircleCheck, Crop, ImageIcon, Sparkles, Trash2, TriangleAlert, Upload } from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, CircleCheck, Crop, ImageIcon, ImageUpscale, Sparkles, Trash2, TriangleAlert, Upload } from "lucide-react-native";
 import Button from "../../ui/Button";
 import Badge from "../../ui/Badge";
 import RichTextInput from "../../ui/RichTextInput";
@@ -41,6 +41,10 @@ type Props = {
   onConfirm: () => void;
   onUploadImage: (file: File) => void;
   onStartCrop: () => void;
+  /** A imagem atual veio de um recorte do PDF aberto e pode ser recriada em alta resolução. */
+  canEnhanceImage?: boolean;
+  enhancingImage?: boolean;
+  onEnhanceImage?: () => void;
 };
 
 /** Card do editor: título à esquerda, ações à direita, conteúdo com respiro de 16px. */
@@ -60,6 +64,7 @@ function Card({ title, right, children }: { title: string; right?: React.ReactNo
 export default function ReviewQuestionEditor({
   draft, number, subjectName, issues, catalogs, preferredSubjectIds, busy, canPrev, canNext, hasPending, pdfAvailable,
   notice, listButton, compact = false, onChange, onPrev, onNext, onNextPending, onAutofill, onRemove, onConfirm, onUploadImage, onStartCrop,
+  canEnhanceImage = false, enhancingImage = false, onEnhanceImage,
 }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const blockers = issues.length > 0;
@@ -158,6 +163,12 @@ export default function ReviewQuestionEditor({
                     <Text className="text-[13px] font-medium text-danger">Remover</Text>
                   </TouchableOpacity>
                 </View>
+                {canEnhanceImage && onEnhanceImage && (
+                  <View className="flex-row mt-3">
+                    <Button size="sm" icon={ImageUpscale} label="Melhorar a qualidade da imagem" loading={enhancingImage}
+                      disabled={busy} onPress={onEnhanceImage} />
+                  </View>
+                )}
               </View>
             </View>
           ) : (

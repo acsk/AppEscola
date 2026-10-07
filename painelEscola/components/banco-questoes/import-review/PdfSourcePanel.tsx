@@ -4,6 +4,7 @@ import { Check, ChevronLeft, ChevronRight, FileUp, ZoomIn, ZoomOut } from "lucid
 import Button from "../../ui/Button";
 import { findSourcePage, questionTextRun } from "../../../utils/importReview";
 import { MAX_PDF_BYTES } from "../../../utils/pdfQuestionImport";
+import { loadPdf, type LoadedPdf, type PdfCropRegion } from "../../../utils/pdfRegionRender";
 
 type Box = { left: number; top: number; width: number; height: number };
 
@@ -20,21 +21,12 @@ type Props = {
   options: string[];
   cropping: boolean;
   onCancelCrop: () => void;
-  onCrop: (file: File) => void;
+  /** Imagem recortada do preview e a região na página, para recriar o recorte em alta resolução. */
+  onCrop: (file: File, region: PdfCropRegion) => void;
 };
 
 const PAGE_MARGIN = 16;
 const ZOOMS = [0.75, 1, 1.25, 1.5, 2];
-
-// pdf.js (via react-pdf) é carregado sob demanda: só quem abre a revisão baixa o leitor.
-async function loadPdf(file: File) {
-  const { pdfjs } = await import("react-pdf");
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
-  return { pdfjs, doc };
-}
-
-type Loaded = Awaited<ReturnType<typeof loadPdf>>;
 
 /**
  * PDF original na coluna da revisão: renderiza a página da questão, destaca o trecho dela (ocre)
@@ -47,7 +39,7 @@ export default function PdfSourcePanel({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const pageTexts = useRef<string[] | null>(null);
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [loaded, setLoaded] = useState<LoadedPdf | null>(null);
   const [loadError, setLoadError] = useState("");
   const [current, setCurrent] = useState(1);
   const [zoomIndex, setZoomIndex] = useState(1);
@@ -174,8 +166,15 @@ export default function PdfSourcePanel({
     out.width = Math.round(crop.width * ratio);
     out.height = Math.round(crop.height * ratio);
     out.getContext("2d")!.drawImage(canvas, crop.left * ratio, crop.top * ratio, out.width, out.height, 0, 0, out.width, out.height);
+    const region: PdfCropRegion = {
+      page: current,
+      x: crop.left / cssSize.width,
+      y: crop.top / cssSize.height,
+      width: crop.width / cssSize.width,
+      height: crop.height / cssSize.height,
+    };
     out.toBlob((blob) => {
-      if (blob) onCrop(new File([blob], `recorte-pagina-${current}.png`, { type: "image/png" }));
+      if (blob) onCrop(new File([blob], `recorte-pagina-${current}.png`, { type: "image/png" }), region);
     }, "image/png");
   };
 

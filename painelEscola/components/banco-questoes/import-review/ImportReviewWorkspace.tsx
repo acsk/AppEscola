@@ -11,6 +11,7 @@ import ConcludeImportDialog, { type ConcludeChoice } from "./ConcludeImportDialo
 import { color } from "../../../constants/theme";
 import type { QuestionBankCatalogs } from "../../../hooks/useQuestionBankCatalogs";
 import { reviewIssues, reviewStatus } from "../../../utils/importReview";
+import { renderPdfRegion, type PdfCropRegion } from "../../../utils/pdfRegionRender";
 
 export type SaveStatus = { state: "idle" | "saving" | "saved" | "error"; at: Date | null };
 
@@ -68,6 +69,9 @@ export default function ImportReviewWorkspace(props: Props) {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [cropping, setCropping] = useState(false);
+  // Região do último recorte de cada questão (só nesta sessão: o rascunho salvo não guarda recortes).
+  const [crops, setCrops] = useState<Record<string, PdfCropRegion>>({});
+  const [enhancing, setEnhancing] = useState(false);
   const [concludeOpen, setConcludeOpen] = useState(false);
   const [removeKey, setRemoveKey] = useState<string | null>(null);
   const [, tick] = useState(0);
@@ -77,6 +81,9 @@ export default function ImportReviewWorkspace(props: Props) {
     const id = setInterval(() => tick((n) => n + 1), 30000);
     return () => clearInterval(id);
   }, []);
+
+  // Recortes valem só para o PDF em que foram feitos.
+  useEffect(() => setCrops({}), [pdfFile]);
 
   const subjectHasTopics = useMemo(() => {
     const withTopics = new Set(catalogs.taxonomy.filter((s) => s.topics.length).map((s) => s.id));
@@ -123,6 +130,26 @@ export default function ImportReviewWorkspace(props: Props) {
     if (!wide) setPdfOpen(true);
     setCropping(true);
   };
+  const uploadCrop = (key: string, file: File, region: PdfCropRegion) => {
+    setCrops((current) => ({ ...current, [key]: region }));
+    onUploadImage(key, file);
+  };
+  const uploadFile = (key: string, file: File) => {
+    setCrops(({ [key]: _, ...rest }) => rest);
+    onUploadImage(key, file);
+  };
+  const enhanceImage = async () => {
+    const region = crops[draft.key];
+    if (!pdfFile || !region || enhancing || busy) return;
+    setEnhancing(true);
+    try {
+      onUploadImage(draft.key, await renderPdfRegion(pdfFile, region));
+    } catch {
+      onChangeDraft(draft.key, { errors: { ...draft.errors, image: "Não foi possível melhorar a imagem. Recorte de novo do PDF." } });
+    } finally {
+      setEnhancing(false);
+    }
+  };
 
   // Atalhos: J/K navegam (fora de campos de texto); ⌘/Ctrl+Enter confirma.
   useEffect(() => {
@@ -155,7 +182,7 @@ export default function ImportReviewWorkspace(props: Props) {
       questionLabel={`Questão ${index + 1}`} questionText={draft.content.question_text}
       options={draft.content.options.map((o) => o.option_text)}
       cropping={cropping} onCancelCrop={() => setCropping(false)}
-      onCrop={(file) => { setCropping(false); onUploadImage(draft.key, file); }} />
+      onCrop={(file, region) => { setCropping(false); uploadCrop(draft.key, file, region); }} />
   );
 
   const workspace = (
@@ -213,7 +240,8 @@ export default function ImportReviewWorkspace(props: Props) {
             onChange={(patch) => onChangeDraft(draft.key, patch)}
             onPrev={() => go(index - 1)} onNext={() => go(index + 1)} onNextPending={nextPending}
             onAutofill={() => onAutofill(draft)} onRemove={() => setRemoveKey(draft.key)} onConfirm={confirm}
-            onUploadImage={(file) => onUploadImage(draft.key, file)} onStartCrop={startCrop} />
+            onUploadImage={(file) => uploadFile(draft.key, file)} onStartCrop={startCrop}
+            canEnhanceImage={!!pdfFile && !!crops[draft.key]} enhancingImage={enhancing} onEnhanceImage={() => void enhanceImage()} />
         </View>
         {wide && <View style={{ width: 400, minHeight: 0 }}>{pdf}</View>}
       </View>
