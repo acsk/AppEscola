@@ -271,4 +271,55 @@ class QuestionTextImportTest extends TestCase
             ->assertJsonValidationErrors('options');
         $this->assertSame(0, ExamQuestion::count());
     }
+    public function test_shared_support_text_is_prepended_to_each_question_and_is_not_an_image(): void
+    {
+        $poem = "Minha terra tem palmeiras,\nOnde canta o Sabiá.\n(Gonçalves Dias, Canção do exílio)";
+        $q = fn (string $n, string $cmd) => [
+            'source_number' => $n, 'support_text_id' => 't1', 'type' => 'essay', 'question_text' => $cmd, 'explanation' => '',
+            'options' => [], 'needs_image' => false, 'answer_from_pdf' => false,
+            'subject_id' => null, 'topic_ids' => [], 'difficulty_id' => null, 'board_id' => null, 'year' => null, 'tags' => [],
+        ];
+        $this->fake([], content: json_encode([
+            'complete' => true, 'total_questions' => 2,
+            'support_texts' => [['id' => 't1', 'title' => 'Texto I', 'text' => $poem]],
+            'questions' => [$q('3', 'Qual é o tema central do poema?'), $q('4', 'Identifique uma figura de linguagem.')],
+        ]));
+
+        $response = $this->separate()->assertOk()->assertJsonCount(2, 'body.questions');
+        foreach ([0, 1] as $i) {
+            $this->assertStringStartsWith("<b>Texto I</b>\n".$poem."\n\n", $response->json("body.questions.{$i}.question_text"));
+            $response->assertJsonPath("body.questions.{$i}.needs_image", false);
+        }
+        $this->assertStringEndsWith('Qual é o tema central do poema?', $response->json('body.questions.0.question_text'));
+
+        // O prompt pede o texto de apoio estruturado e diz que ele nunca é imagem.
+        Http::assertSent(fn (Request $r) => str_contains((string) $r->body(), 'nunca imagem') && str_contains((string) $r->body(), 'support_text_id'));
+    }
+
+    public function test_classification_is_restricted_to_chosen_subjects(): void
+    {
+        $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português']);
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $grammar = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $portuguese->id, 'name' => 'Gramática']);
+        $algebra = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $math->id, 'name' => 'Álgebra']);
+        $questions = $this->questions();
+        $questions[1]['subject_id'] = $math->id;         // IA tenta outra disciplina
+        $questions[1]['topic_ids'] = [$algebra->id];
+        $questions[0]['topic_ids'] = [$grammar->id];
+        $this->fake($questions);
+
+        $response = $this->separate(['subject_ids' => [$portuguese->id]])->assertOk();
+        // Só Português foi escolhido: todas ficam em Português e assunto de outra disciplina é descartado.
+        $response->assertJsonPath('body.questions.0.subject_id', $portuguese->id)
+            ->assertJsonPath('body.questions.0.topic_ids', [$grammar->id])
+            ->assertJsonPath('body.questions.1.subject_id', $portuguese->id);
+        $this->assertNotContains($algebra->id, $response->json('body.questions.1.topic_ids') ?? []);
+
+        // O catálogo enviado à IA não lista disciplinas não escolhidas.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'chat/completions')
+            && str_contains((string) $r->body(), 'Gram') && ! str_contains((string) $r->body(), 'lgebra'));
+
+        $other = Subject::factory()->create();
+        $this->separate(['subject_ids' => [$other->id]])->assertStatus(422);
+    }
 }

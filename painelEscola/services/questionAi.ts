@@ -54,9 +54,10 @@ export async function aiExtractPdf(file: File) {
 }
 
 /** Recebe o texto integral do PDF; a IA separa as questões, sem gerar imagens. */
-export async function aiSeparatePdfText(text: string, sourceExamName: string) {
+/** subjectIds: disciplinas da prova — a IA só classifica dentro delas (e busca o assunto). */
+export async function aiSeparatePdfText(text: string, sourceExamName: string, subjectIds: number[] = []) {
   const { data } = await api.post("/question-bank/ai/separate-text", {
-    text, source_exam_name: sourceExamName,
+    text, source_exam_name: sourceExamName, ...(subjectIds.length ? { subject_ids: subjectIds } : {}),
   }, { timeout: 180000 });
   return data as { type: string; message: string; body: { questions: AiQuestionSuggestion[] } };
 }

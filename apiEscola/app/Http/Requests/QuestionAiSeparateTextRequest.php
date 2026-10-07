@@ -16,12 +16,15 @@ class QuestionAiSeparateTextRequest extends FormRequest
         return [
             'text' => ['required', 'string', 'min:15', 'max:120000'],
             'source_exam_name' => ['required', 'string', 'max:255'],
+            // Disciplinas da prova (opcional na API; o painel exige). A IA só classifica dentro delas.
+            'subject_ids' => ['sometimes', 'array', 'max:20'],
+            'subject_ids.*' => ['integer', 'distinct'],
         ];
     }
 
     public function attributes(): array
     {
-        return ['text' => 'texto do PDF', 'source_exam_name' => 'nome da prova/simulado de origem'];
+        return ['text' => 'texto do PDF', 'source_exam_name' => 'nome da prova/simulado de origem', 'subject_ids' => 'disciplinas'];
     }
 
     protected function prepareForValidation(): void

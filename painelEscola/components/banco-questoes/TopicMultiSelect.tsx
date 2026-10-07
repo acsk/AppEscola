@@ -12,10 +12,14 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   disabledHint?: string;
+  /** Rótulo do campo (padrão "Assuntos"; ex.: "Disciplinas da prova"). */
+  label?: string;
+  /** Texto de busca (padrão conforme houver disciplina por item). */
+  searchPlaceholder?: string;
 };
 
 /** Seleção múltipla de assuntos com busca sem acento (filtra por nome do assunto ou da disciplina). */
-export default function TopicMultiSelect({ topics, value, onChange, disabled, loading, disabledHint }: Props) {
+export default function TopicMultiSelect({ topics, value, onChange, disabled, loading, disabledHint, label = "Assuntos", searchPlaceholder }: Props) {
   const [query, setQuery] = useState("");
   const selected = new Set(value);
 
@@ -39,8 +43,8 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
 
   return (
     <View className="mb-3">
-      <Text className="text-xs font-medium text-ink-muted mb-1" nativeID="topics-label">
-        Assuntos {value.length > 0 ? `(${value.length})` : ""}
+      <Text className="text-xs font-medium text-ink-muted mb-1" nativeID={`multi-${label}`}>
+        {label} {value.length > 0 ? `(${value.length})` : ""}
       </Text>
       {!disabled && selectedTopics.length > 0 && (
         <View className="flex-row flex-wrap items-center gap-1.5 mb-1.5" aria-label="Assuntos selecionados">
@@ -67,13 +71,13 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
           <Text className="text-xs text-ink-subtle">{disabledHint ?? "Escolha a disciplina primeiro."}</Text>
         </View>
       ) : (
-        <View className="rounded-ds-md border border-border bg-surface" aria-labelledby="topics-label">
+        <View className="rounded-ds-md border border-border bg-surface" aria-labelledby={`multi-${label}`}>
           <View className="flex-row items-center px-3 border-b border-border" style={{ height: 38 }}>
             <Ionicons name="search-outline" size={14} color="var(--ds-ink-subtle)" />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder={topics.some((t) => t.subject_name) ? "Buscar assunto (a disciplina é preenchida sozinha)..." : "Filtrar assuntos..."}
+              placeholder={searchPlaceholder ?? (topics.some((t) => t.subject_name) ? "Buscar assunto (a disciplina é preenchida sozinha)..." : "Filtrar assuntos...")}
               placeholderTextColor="var(--ds-ink-subtle)"
               aria-label="Filtrar assuntos"
               className="flex-1 ml-2 text-xs text-ink"

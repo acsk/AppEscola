@@ -96,6 +96,7 @@ export type ExamListItem = {
   title: string;
   exam_type: string;
   exam_type_label: string;
+  exam_type_logo_url?: string | null;
   status: string;
   status_label: string;
   duration_minutes: number | null;

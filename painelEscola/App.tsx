@@ -115,6 +115,7 @@ const SCREEN_SLUGS = [
   "avaliacoes-oficiais-form",
   "provas-anteriores",
   "tenants",
+  "tipos-prova",
   "users",
   "matriculas-detail",
   "configuracoes-cobranca",

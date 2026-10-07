@@ -13,6 +13,7 @@ class ExamTypeResource extends JsonResource
             'id'           => $this->id,
             'slug'         => $this->slug,
             'label'        => $this->label,
+            'logo_url'     => $this->logo_url,
             'sort_order'   => (int) $this->sort_order,
             'is_active'    => (bool) $this->is_active,
             'exams_count'  => $this->whenCounted('exams'),

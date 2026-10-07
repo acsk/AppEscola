@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Services\TenantUploadSettingsService;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreExamTypeRequest;
 use App\Http\Requests\UpdateExamTypeRequest;
@@ -25,7 +27,7 @@ class ExamTypeController extends Controller
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('label')
-            ->get(['id', 'slug', 'label', 'sort_order']);
+            ->get(['id', 'slug', 'label', 'logo_url', 'sort_order']);
 
         return response()->json($types);
     }
@@ -88,6 +90,43 @@ class ExamTypeController extends Controller
         $examType->delete();
 
         return $this->deleted('Classificação removida com sucesso.');
+    }
+
+    /** POST /admin/exam-types/{examType}/logo — logo da modalidade (super admin). PNG/JPG/WEBP até 1 MB; SVG não (pode conter script). */
+    public function uploadLogo(Request $request, ExamType $examType, TenantUploadSettingsService $uploads): JsonResponse
+    {
+        $this->ensureSuperAdmin($request);
+        $request->validate(
+            ['logo' => ['required', 'file', 'image', 'mimes:png,jpg,jpeg,webp', 'max:1024', 'dimensions:max_width=2000,max_height=2000']],
+            [],
+            ['logo' => 'logo']
+        );
+
+        $this->deleteLogoFile($examType);
+        $path = $request->file('logo')->store('uploads/exam-types', 'public');
+        $examType->update(['logo_url' => $uploads->url('public', $path)]);
+
+        return $this->success(new ExamTypeResource($examType->fresh()), 'Logo da modalidade atualizado.');
+    }
+
+    /** DELETE /admin/exam-types/{examType}/logo */
+    public function destroyLogo(Request $request, ExamType $examType): JsonResponse
+    {
+        $this->ensureSuperAdmin($request);
+        $this->deleteLogoFile($examType);
+        $examType->update(['logo_url' => null]);
+
+        return $this->success(new ExamTypeResource($examType->fresh()), 'Logo removido.');
+    }
+
+    /** Remove o arquivo anterior do disco público (só se for um logo enviado por aqui). */
+    private function deleteLogoFile(ExamType $examType): void
+    {
+        $url = (string) $examType->logo_url;
+        $marker = '/storage/uploads/exam-types/';
+        if ($url !== '' && ($pos = strpos($url, $marker)) !== false) {
+            Storage::disk('public')->delete('uploads/exam-types/'.basename(substr($url, $pos + strlen($marker))));
+        }
     }
 
     private function ensureSuperAdmin(Request $request): void

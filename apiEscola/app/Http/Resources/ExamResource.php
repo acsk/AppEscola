@@ -37,6 +37,7 @@ class ExamResource extends JsonResource
             'exam_type_id'     => $this->exam_type_id,
             'exam_type'        => $this->examType?->slug,
             'exam_type_label'  => $this->examType?->label,
+            'exam_type_logo_url' => $this->examType?->logo_url, // ícone da modalidade (painel e app do aluno)
             'exam_status_id'   => $this->exam_status_id,
             'status'           => $this->examStatus?->slug,
             'status_label'     => $this->examStatus?->label,

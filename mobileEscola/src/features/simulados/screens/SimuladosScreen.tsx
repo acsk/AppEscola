@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -61,6 +62,17 @@ const STATUS_ICON: Record<AttemptStatus, React.ComponentProps<typeof Ionicons>['
   completed:        'checkmark-circle-outline',
   abandoned:        'timer-outline',
 };
+
+/** Sigla da modalidade quando não há logo: "IFAL", "CPM" ficam como estão; nomes longos viram iniciais. */
+function modalidadeSigla(label?: string | null): string {
+  const words = (label ?? '').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  if (!words.length) return '—';
+  // Sigla no início ("CPM (Colégio da Polícia Militar)", "ENEM", "IFAL") vale como está.
+  if (/^[A-Z0-9]{2,5}$/.test(words[0])) return words[0];
+  if (words.length === 1) return words[0].slice(0, 4).toUpperCase();
+  const initials = words.filter((w) => w.length > 2 || /^[A-Z0-9]+$/.test(w)).map((w) => w[0]).join('');
+  return (initials || words[0]).slice(0, 4).toUpperCase();
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('pt-BR', {
@@ -206,7 +218,18 @@ export function SimuladosScreen() {
             <Text style={styles.foraPeriodoTexto} numberOfLines={2}>{item.period_message}</Text>
           </View>
         ) : null}
-        <Text style={styles.cardTitulo} numberOfLines={2}>{item.title}</Text>
+        <View style={styles.tituloRow}>
+          <View style={styles.modalidadeIcone}>
+            {item.exam_type_logo_url ? (
+              <Image source={{ uri: item.exam_type_logo_url }} style={styles.modalidadeLogo} resizeMode="contain" />
+            ) : (
+              <Text style={styles.modalidadeSigla} numberOfLines={1}>
+                {modalidadeSigla(item.exam_type_label)}
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.cardTitulo, { flex: 1 }]} numberOfLines={2}>{item.title}</Text>
+        </View>
         <View style={styles.cardRodape}>
           <View style={styles.infoItem}>
             <Ionicons name="help-circle-outline" size={14} color={colors.muted} />
@@ -440,6 +463,20 @@ function createSimuladosStyles(colors: ThemeColors) {
   badgeTexto: { fontSize: 12, fontWeight: '800', color: colors.surface },
   foraPeriodo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   foraPeriodoTexto: { fontSize: 11, color: colors.muted },
+  tituloRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  modalidadeIcone: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  modalidadeLogo: { width: 34, height: 34 },
+  modalidadeSigla: { fontSize: 11, fontWeight: '800', color: colors.primary },
   cardTitulo: { fontSize: 16, fontWeight: '800', color: colors.ink, marginBottom: 12, lineHeight: 22 },
   cardRodape: { flexDirection: 'row', gap: 14, flexWrap: 'wrap' },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },

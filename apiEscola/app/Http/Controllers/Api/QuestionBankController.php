@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BatchQuestionClassificationRequest;
+use App\Http\Requests\CreateExamFromQuestionsRequest;
+use App\Http\Resources\ExamResource;
+use App\Services\ExamFromQuestionsService;
 use App\Http\Requests\SaveStandaloneQuestionRequest;
 use App\Http\Requests\UpdateQuestionClassificationRequest;
 use App\Http\Resources\QuestionBankQuestionResource;
@@ -115,6 +118,16 @@ class QuestionBankController extends Controller
         $this->content->deleteStandalone($this->findQuestion($request, $question));
 
         return $this->deleted('Questão removida com sucesso.');
+    }
+
+    /** Cria um simulado (rascunho) com questões avulsas do banco, movidas na ordem enviada (importação de prova em PDF). */
+    public function createExam(CreateExamFromQuestionsRequest $request, ExamFromQuestionsService $service): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validated();
+        $exam = $service->create($tenantId, $data['title'], $data['exam_type'], $data['question_ids'], $data['description'] ?? null);
+
+        return $this->created(new ExamResource($exam), "Simulado \"{$exam->title}\" criado como rascunho com {$exam->questions_count} questão(ões).");
     }
 
     /** Upload da imagem do enunciado de questão avulsa. */

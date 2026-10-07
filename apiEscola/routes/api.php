@@ -333,6 +333,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::post('admin/exam-types', [ExamTypeController::class, 'store']);
     Route::put('admin/exam-types/{examType}', [ExamTypeController::class, 'update']);
     Route::delete('admin/exam-types/{examType}', [ExamTypeController::class, 'destroy']);
+    Route::post('admin/exam-types/{examType}/logo', [ExamTypeController::class, 'uploadLogo']);
+    Route::delete('admin/exam-types/{examType}/logo', [ExamTypeController::class, 'destroyLogo']);
 
     // Banco de questões (avulsas e de simulados): listagem e classificação
     Route::prefix('question-bank')->group(function () {
@@ -345,6 +347,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::get('questions/ids',                      [QuestionBankController::class, 'ids']);
         Route::post('questions',                         [QuestionBankController::class, 'store']);
         Route::post('questions/upload-image',            [QuestionBankController::class, 'uploadImage']);
+        Route::post('exams-from-questions',              [QuestionBankController::class, 'createExam']);
         Route::put('questions/{question}',               [QuestionBankController::class, 'update'])->whereNumber('question');
         Route::delete('questions/{question}',            [QuestionBankController::class, 'destroy'])->whereNumber('question');
         Route::get('questions/years',                    [QuestionBankController::class, 'years']);

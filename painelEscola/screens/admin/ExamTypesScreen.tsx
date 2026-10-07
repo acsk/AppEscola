@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import Modal from "../../components/ui/Modal";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import Badge from "../../components/ui/Badge";
+import ExamTypeLogo from "../../components/ui/ExamTypeLogo";
 import DataTableRow from "../../components/ui/DataTableRow";
 import {
   TABLE_CONTAINER,
@@ -30,6 +31,7 @@ type ExamTypeRow = {
   id: number;
   slug: string;
   label: string;
+  logo_url?: string | null;
   sort_order: number;
   is_active: boolean;
   exams_count?: number;
@@ -57,6 +59,9 @@ export default function ExamTypesScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const editingRow = rows.find((r) => r.id === editingId) ?? null;
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
     type: "success",
@@ -136,6 +141,42 @@ export default function ExamTypesScreen() {
       });
     }
     setSaving(false);
+  };
+
+  /** Logo da modalidade (IFAL, CPM…), exibido como ícone do simulado no painel e no app do aluno. */
+  const uploadLogo = async (file: File) => {
+    if (!editingId) return;
+    if (!/^image\/(png|jpe?g|webp)$/.test(file.type) || file.size > 1024 * 1024) {
+      setToast({ visible: true, type: "error", message: "Envie PNG, JPG ou WEBP de até 1 MB." });
+      return;
+    }
+    setLogoBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const { data } = await api.post(`/admin/exam-types/${editingId}/logo`, formData);
+      setToast({ visible: true, type: "success", message: data?.message ?? "Logo atualizado." });
+      clearDomainCache("/exam-types");
+      await fetchRows();
+    } catch (e: any) {
+      const fieldError = parseApiErrors(e).logo;
+      setToast({ visible: true, type: "error", message: fieldError ?? e?.response?.data?.message ?? "Não foi possível enviar o logo." });
+    }
+    setLogoBusy(false);
+  };
+
+  const removeLogo = async () => {
+    if (!editingId) return;
+    setLogoBusy(true);
+    try {
+      const { data } = await api.delete(`/admin/exam-types/${editingId}/logo`);
+      setToast({ visible: true, type: "success", message: data?.message ?? "Logo removido." });
+      clearDomainCache("/exam-types");
+      await fetchRows();
+    } catch (e: any) {
+      setToast({ visible: true, type: "error", message: e?.response?.data?.message ?? "Não foi possível remover o logo." });
+    }
+    setLogoBusy(false);
   };
 
   const remove = async () => {
@@ -218,7 +259,10 @@ export default function ExamTypesScreen() {
             ) : (
               rows.map((row, i) => (
                 <DataTableRow key={row.id} index={i}>
-                  <Text className="text-sm font-medium text-ink flex-[2]">{row.label}</Text>
+                  <View className="flex-row items-center flex-[2]" style={{ gap: 10 }}>
+                    <ExamTypeLogo label={row.label} logoUrl={row.logo_url} size={30} />
+                    <Text className="text-sm font-medium text-ink flex-1">{row.label}</Text>
+                  </View>
                   <Text className="text-sm font-mono text-ink-muted flex-1">{row.slug}</Text>
                   <Text className="text-sm font-mono text-ink w-16 text-right">{row.sort_order}</Text>
                   <View className="w-24 items-center">
@@ -299,6 +343,46 @@ export default function ExamTypesScreen() {
               style={fieldStyle}
             />
           </View>
+          {editingRow ? (
+            <View>
+              <Text className="text-xs font-semibold text-ink-muted mb-1">Logo (ícone do simulado)</Text>
+              <View className="flex-row items-center" style={{ gap: 10 }}>
+                <ExamTypeLogo label={form.label || editingRow.label} logoUrl={editingRow.logo_url} size={48} />
+                <TouchableOpacity
+                  onPress={() => logoInputRef.current?.click()}
+                  disabled={logoBusy}
+                  className="flex-row items-center gap-1.5 border border-border bg-surface px-3 rounded-ds-md py-2 min-h-control-md"
+                >
+                  {logoBusy ? <ActivityIndicator size="small" color="var(--ds-brand)" /> : <Ionicons name="image-outline" size={16} color="var(--ds-ink)" />}
+                  <Text className="text-sm text-ink">{editingRow.logo_url ? "Trocar logo" : "Enviar logo"}</Text>
+                </TouchableOpacity>
+                {editingRow.logo_url ? (
+                  <TouchableOpacity
+                    onPress={removeLogo}
+                    disabled={logoBusy}
+                    accessibilityLabel="Remover logo"
+                    className="p-2 bg-danger rounded-ds-md"
+                  >
+                    <Ionicons name="trash-outline" size={16} color="var(--ds-on-danger)" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <Text className="text-[10px] text-ink-subtle mt-1">PNG, JPG ou WEBP, até 1 MB, quadrado de preferência. Sem logo, aparece a sigla.</Text>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: "none" }}
+                onChange={(e: any) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void uploadLogo(file);
+                }}
+              />
+            </View>
+          ) : (
+            <Text className="text-[10px] text-ink-subtle">Salve a classificação para enviar o logo.</Text>
+          )}
           <View className="flex-row items-center justify-between py-1">
             <Text className="text-sm text-ink">Ativo nos formulários</Text>
             <Switch value={form.is_active} onValueChange={(v) => setForm((p) => ({ ...p, is_active: v }))} />

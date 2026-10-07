@@ -111,4 +111,4 @@ export type TaxonomyImportReport = {
   boards_existing: number;
 };
 
-export type ExamTypeSummary = { id: number; label: string };
+export type ExamTypeSummary = { id: number; slug?: string; label: string; logo_url?: string | null };

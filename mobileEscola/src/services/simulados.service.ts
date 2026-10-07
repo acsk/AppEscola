@@ -47,6 +47,8 @@ export interface SimuladoListItem {
   description: string | null;
   exam_type: string;
   exam_type_label: string;
+  /** Logo da modalidade (IFAL, CPM…) enviado pelo super admin; null = mostra a sigla. */
+  exam_type_logo_url?: string | null;
   status: string;
   duration_minutes: number | null;
   passing_score: number;

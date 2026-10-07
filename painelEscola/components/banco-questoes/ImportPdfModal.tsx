@@ -13,13 +13,16 @@ import ConfirmModal from "../ui/ConfirmModal";
 import Tabs from "../ui/Tabs";
 import ClassificationFields from "./ClassificationFields";
 import OptionsEditor from "./OptionsEditor";
+import TopicMultiSelect from "./TopicMultiSelect";
+import SearchableSelect from "../ui/SearchableSelect";
+import ExamTypeLogo from "../ui/ExamTypeLogo";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import { aiAutofillQuestion, aiSeparatePdfText } from "../../services/questionAi";
 import {
   fetchImportDraft, includeImportDraftQuestion, listImportDrafts, saveImportDraft,
   type ImportDraftPayload, type ImportDraftSummary, type ImportDraftQuestion,
 } from "../../services/questionImportDrafts";
-import { createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
+import { createExamFromQuestions, createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
 import { type ApiToastState, getApiErrorMessage, showApiToast } from "../../utils/apiErrors";
 import { describeAiError } from "../../utils/aiErrors";
 import { contentFromSuggestion, contentPayload, mergeContentSuggestion, validateContent } from "../../utils/questionContent";
@@ -48,6 +51,13 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const imageTarget = useRef<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [sourceExamName, setSourceExamName] = useState("");
+  /** Disciplinas da prova: a IA classifica cada questão em uma delas e busca o assunto. */
+  const [subjectIds, setSubjectIds] = useState<number[]>([]);
+  /** Ao incluir tudo, agrupa as questões num simulado (rascunho) da modalidade escolhida — IFAL, CPM, ENEM… */
+  const [createExam, setCreateExam] = useState(true);
+  const [examTypeSlug, setExamTypeSlug] = useState("");
+  /** Ids das questões já incluídas nesta sessão (na ordem do PDF), inclusive de tentativas parciais. */
+  const includedIds = useRef<number[]>([]);
   const [noTextPages, setNoTextPages] = useState<number[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeKey, setActiveKey] = useState("");
@@ -69,6 +79,9 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     if (!visible) return;
     setFile(null);
     setSourceExamName("");
+    setCreateExam(true);
+    setExamTypeSlug("");
+    includedIds.current = [];
     setNoTextPages([]);
     setDrafts([]);
     setActiveKey("");
@@ -230,14 +243,14 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   };
 
   const extract = async () => {
-    if (!file || !sourceExamName.trim() || busy) return;
+    if (!file || !sourceExamName.trim() || !subjectIds.length || busy) return;
     setProgress("Extraindo o texto do PDF no navegador…");
     try {
       const pages = await extractPdfPages(file);
       const text = pdfDocumentText(pages);
       setNoTextPages(pages.flatMap((page, index) => page.trim() ? [] : [index + 1]));
       setProgress("Enviando o texto à IA para separar e classificar as questões…");
-      const response = await aiSeparatePdfText(text, sourceExamName.trim());
+      const response = await aiSeparatePdfText(text, sourceExamName.trim(), subjectIds);
       const converted: Draft[] = response.body.questions.map((question, index) => {
         const content = contentFromSuggestion(question);
         return {
@@ -273,6 +286,10 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     });
     setDrafts(checked);
     const invalid = checked.find((draft) => draft.include && Object.keys(draft.errors).length > 0);
+    if (createExam && !examTypeSlug) {
+      setToast({ visible: true, type: "error", message: "Escolha a modalidade do simulado ou desmarque \"Criar simulado\"." });
+      return;
+    }
     if (invalid) {
       setActiveKey(invalid.key);
       setToast({ visible: true, type: "error", message: "Corrija as questões e anexe as imagens destacadas antes de incluir." });
@@ -306,7 +323,12 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
             persisted = { id: response.body.draft.id, revision: response.body.draft.revision };
             setSavedDraft(persisted);
             lastResponse = response;
-          } else lastResponse = await createStandaloneQuestion(payload);
+            includedIds.current.push(response.body.question.id);
+          } else {
+            const response = await createStandaloneQuestion(payload);
+            lastResponse = response;
+            includedIds.current.push(response.body.id);
+          }
           saved++;
         } catch (cause) {
           remaining.push({ ...draft, errors: { form: getApiErrorMessage(cause, "Não foi possível salvar esta questão.") } });
@@ -327,6 +349,25 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       if (remaining.some((draft) => draft.include)) {
         setToast({ visible: true, type: "error", message: `${saved} questão(ões) incluída(s). Confira os erros nas restantes.` });
       } else {
+        if (createExam && examTypeSlug && includedIds.current.length) {
+          setProgress("Criando o simulado com as questões incluídas…");
+          try {
+            lastResponse = await createExamFromQuestions({
+              title: sourceExamName.trim(),
+              exam_type: examTypeSlug,
+              question_ids: includedIds.current,
+              description: "Importado de PDF pelo banco de questões.",
+            });
+            includedIds.current = [];
+          } catch (cause) {
+            // As questões já estão no banco; só o agrupamento falhou.
+            setError({
+              title: "Questões incluídas, mas o simulado não foi criado",
+              message: getApiErrorMessage(cause, "Crie o simulado manualmente em Simulados."),
+            });
+            return;
+          }
+        }
         if (lastResponse) showApiToast(setToast, lastResponse, `${saved} questão(ões) incluída(s).`);
         onClose();
       }
@@ -356,7 +397,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
               <Button variant="primary" icon={Check} label={`Incluir ${drafts.filter((draft) => draft.include).length} questões`}
                 onPress={() => void includeAll()} disabled={busy || draftNeedsReload || !sourceExamName.trim() || !drafts.some((draft) => draft.include)} />
             ) : (
-              <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || busy} />
+              <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || busy} />
             )}
           </View>
         }
@@ -365,6 +406,18 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           maxLength={255} required editable={!busy} />
         {!drafts.length ? (
           <View style={{ gap: 14 }}>
+            <TopicMultiSelect
+              label="Disciplinas da prova *"
+              searchPlaceholder="Buscar disciplina (ex.: Português, Matemática)..."
+              topics={catalogs.subjects.map((s) => ({ id: s.id, name: s.name, subject_id: s.id }))}
+              value={subjectIds}
+              onChange={setSubjectIds}
+              disabled={busy}
+              disabledHint="Aguarde…"
+            />
+            <Text className="text-xs text-ink-subtle">
+              Escolha as disciplinas cobradas no PDF. A IA classifica cada questão em uma delas e escolhe o assunto.
+            </Text>
             <Text className="text-sm font-medium text-ink">Rascunhos de importação salvos</Text>
             {listLoading && <Text className="text-sm text-ink-muted">Carregando rascunhos…</Text>}
             {!!draftListError && <Text className="text-sm text-danger">{draftListError}</Text>}
@@ -399,6 +452,31 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           </View>
         ) : (
           <View style={{ gap: 20 }}>
+            <View className="border border-border rounded-ds-md p-3 bg-surface-sunken" style={{ gap: 10 }}>
+              <View className="flex-row items-center" style={{ gap: 8 }}>
+                <Switch accessibilityLabel="Criar simulado com estas questões" value={createExam} disabled={busy}
+                  onValueChange={setCreateExam} />
+                <Text className="text-sm font-medium text-ink flex-1">Criar simulado com estas questões</Text>
+              </View>
+              {createExam && (
+                <View className="flex-row items-end" style={{ gap: 10 }}>
+                  <ExamTypeLogo size={38}
+                    label={catalogs.examTypes.find((t) => t.slug === examTypeSlug)?.label}
+                    logoUrl={catalogs.examTypes.find((t) => t.slug === examTypeSlug)?.logo_url} />
+                  <View className="flex-1">
+                    <SearchableSelect label="Modalidade" required modalTitle="Selecionar modalidade"
+                      placeholder="IFAL, CPM, ENEM…" value={examTypeSlug} disabled={busy} showSelectedPreview={false}
+                      options={catalogs.examTypes.filter((t) => t.slug).map((t) => ({ value: t.slug!, label: t.label }))}
+                      onChange={setExamTypeSlug} />
+                  </View>
+                </View>
+              )}
+              <Text className="text-xs text-ink-subtle">
+                {createExam
+                  ? `O simulado "${sourceExamName.trim() || "…"}" fica como rascunho em Simulados, com o ícone da modalidade, para publicar aos alunos depois.`
+                  : "As questões entram apenas no banco, como avulsas."}
+              </Text>
+            </View>
             <Text className="text-sm text-ink-muted">Confira a separação, classificação e gabarito. Anexe as imagens manualmente e confira as marcações no PDF original.</Text>
             {draftNeedsReload && savedDraft && <View style={{ gap: 8 }}>
               <Text className="text-sm text-danger">Confira a versão salva antes de continuar. Ao reabrir, alterações locais não salvas serão descartadas.</Text>

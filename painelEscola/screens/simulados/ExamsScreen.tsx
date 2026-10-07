@@ -44,6 +44,7 @@ import {
   type ExamDeliveryPdfKind,
 } from "../../utils/examDeliveryPdf";
 import ToastBanner from "../../components/ui/ToastBanner";
+import ExamTypeLogo from "../../components/ui/ExamTypeLogo";
 import { showApiErrorToast } from "../../utils/apiErrors";
 import { canManageExams } from "../../utils/permissions";
 import { useAuth } from "../../contexts/AuthContext";
@@ -466,11 +467,14 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         ) : (
           rows.map((exam, i) => (
             <DataTableRow key={exam.id} index={i} onPress={() => setMenuExam(exam)}>
-              <View style={{ flex: 3, minWidth: 260 }}>
-                <Text className={TABLE_CELL_SEMIBOLD}>{exam.title}</Text>
-                <Text className={TABLE_CELL_SUBLINE}>
-                  {exam.exam_type_label ?? exam.exam_type}
-                </Text>
+              <View className="flex-row items-center" style={{ flex: 3, minWidth: 260, gap: 10 }}>
+                <ExamTypeLogo label={exam.exam_type_label ?? exam.exam_type} logoUrl={exam.exam_type_logo_url} size={34} />
+                <View className="flex-1">
+                  <Text className={TABLE_CELL_SEMIBOLD}>{exam.title}</Text>
+                  <Text className={TABLE_CELL_SUBLINE}>
+                    {exam.exam_type_label ?? exam.exam_type}
+                  </Text>
+                </View>
               </View>
               <View style={{ flex: 2, minWidth: 220 }}>
                 <Text className={TABLE_CELL}>

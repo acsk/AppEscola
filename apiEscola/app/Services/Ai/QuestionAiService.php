@@ -369,31 +369,53 @@ class QuestionAiService
         ));
     }
 
-    public function separateText(?User $user, int $tenantId, string $text, string $sourceExamName): array
+    /**
+     * @param  int[]  $subjectIds  disciplinas escolhidas pelo usuário para a prova; a IA só classifica dentro delas
+     */
+    public function separateText(?User $user, int $tenantId, string $text, string $sourceExamName, array $subjectIds = []): array
     {
         $credential = $this->credential($user, $tenantId);
         $catalogs = $this->catalogs($tenantId);
+        if ($subjectIds !== []) {
+            // Restringe disciplinas e assuntos às escolhidas (ids de outro tenant/inativos somem aqui).
+            $catalogs['subjects'] = $catalogs['subjects']->whereIn('id', $subjectIds)->values();
+            $catalogs['topics'] = $catalogs['topics']->whereIn('subject_id', $catalogs['subjects']->pluck('id')->all())->values();
+            if ($catalogs['subjects']->isEmpty()) {
+                throw new AiException('Nenhuma das disciplinas escolhidas está ativa nesta escola.', 422);
+            }
+        }
+        $onlySubjectId = $catalogs['subjects']->count() === 1 ? (int) $catalogs['subjects']->first()['id'] : null;
         $this->logSuspicious($tenantId, 'pdf_separate_text', [$text]);
         $system = 'Você digitaliza provas brasileiras. Recebe SOMENTE o texto extraído do PDF, não as imagens. '
             .'Separe as questões fielmente; não invente enunciados, números, alternativas nem dados de figuras ausentes. '
             .self::FORMAT_RULES."\n".AiPromptGuard::SYSTEM_RULES;
         $prompt = 'Leia o documento inteiro e separe cada questão, na ordem original. A separação é sua responsabilidade: o texto não foi dividido em questões. '
-            .'Remova capas, cabeçalhos, instruções gerais e gabarito do documento. Preserve textos de apoio, fontes e tabelas textuais. '
+            .'Remova capas, cabeçalhos, instruções gerais e gabarito do documento. Preserve fontes e tabelas textuais. '
+            ."TEXTOS DE APOIO (texto-base): trechos de livros, poemas, letras de música, notícias, citações com fonte, 'Texto I/II', "
+            ."'Leia o texto a seguir', 'Texto para as questões 3 e 4' são TEXTO, nunca imagem. Transcreva cada um INTEGRALMENTE uma única vez em support_texts "
+            ."(id curto, title como aparece, ex.: 'Texto I', ou vazio, e text com a fonte/referência no final) e, em CADA questão que depende dele, informe support_text_id; "
+            ."o question_text da questão fica só com o comando/pergunta, sem repetir o texto de apoio. Questão sem texto de apoio: support_text_id=null. "
+            ."Um texto longo, reflexivo ou com referência bibliográfica NÃO é motivo para needs_image.\n"
             .'Não perca questões que cruzam páginas. Enunciado sem número e sem alternativas; alternativas na ordem original, sem letras. '
             .'Objetivas: 2 a 10 alternativas; discursivas: options=[]. Complete deve ser true somente se TODAS as questões estiverem em questions. '
             ."Se ilegível, impossível de separar ou acima de 50 questões, complete=false. total_questions é o total identificado no documento.\n"
-            .'needs_image deve ser booleano obrigatório: true quando o enunciado ou as alternativas dependem de figura, gráfico, mapa, charge ou imagem ausente no texto. '
+            .'needs_image deve ser booleano obrigatório: true SOMENTE quando o enunciado ou as alternativas dependem de figura, gráfico, mapa, charge, tirinha ou imagem cujo conteúdo NÃO está no texto extraído. '
             ."Não gere image_spec nem imagens. O usuário anexará as imagens manualmente. Não substitua figuras por descrições inventadas.\n"
             ."Se as alternativas forem imagens e só as letras estiverem no texto, preserve CADA alternativa como '[Imagem da alternativa A — anexar manualmente]', "
             ."usando a letra original em cada marcador e needs_image=true. Não devolva texto vazio e não descarte alternativas visuais.\n"
             .'Ignore o gabarito mesmo quando disponível no documento. Não resolva as questões nem marque respostas corretas: '
             .'deixe TODAS is_correct=false e answer_from_pdf=false. O usuário definirá o gabarito na revisão manual. '
-            ."Não inclua resolução ou indicação da resposta na explicação. Classifique com os IDs dos catálogos.\n"
+            ."Não inclua resolução ou indicação da resposta na explicação.\n"
+            .($onlySubjectId !== null
+                ? "Todas as questões são da disciplina informada abaixo (subject_id={$onlySubjectId}); escolha os assuntos (topic_ids) dela.\n"
+                : "Classifique cada questão em UMA das disciplinas listadas abaixo (escolhidas pelo usuário para esta prova) e escolha os assuntos dentro dela.\n")
             .$this->catalogsPrompt($catalogs)."\n"
             .AiPromptGuard::wrap('texto_pdf', $text)."\nFormato JSON:\n"
             .json_encode([
-                'complete' => true, 'total_questions' => 1, 'questions' => [[
-                    'source_number' => '1', 'type' => 'multiple_choice', 'question_text' => 'enunciado',
+                'complete' => true, 'total_questions' => 1,
+                'support_texts' => [['id' => 't1', 'title' => 'Texto I', 'text' => 'texto de apoio integral, com a fonte']],
+                'questions' => [[
+                    'source_number' => '1', 'support_text_id' => 't1', 'type' => 'multiple_choice', 'question_text' => 'comando da questão',
                     'explanation' => '',
                     'options' => [
                         ['option_text' => 'alternativa A', 'is_correct' => false],
@@ -408,11 +430,25 @@ class QuestionAiService
         if (($response['finish_reason'] ?? null) === 'length') {
             throw new AiException('A resposta da IA foi cortada. Divida o PDF e tente novamente.', 422, 'pdf_incomplete');
         }
-        $validated = $this->validateImportedQuestions($response['data'], $catalogs, 'needs_image');
+        $data = $response['data'];
+        $supportTexts = $this->supportTexts($data['support_texts'] ?? []);
+        $validated = $this->validateImportedQuestions($data, $catalogs, 'needs_image');
 
-        return array_map(fn (array $item) => $item['content'] + [
-            'needs_image' => $item['raw']['needs_image'], 'source_exam_name' => $sourceExamName,
-        ], $validated);
+        return array_map(function (array $item) use ($sourceExamName, $supportTexts, $onlySubjectId) {
+            $content = $item['content'];
+            // Texto de apoio vai no início do enunciado de CADA questão que o usa (a questão precisa ser autossuficiente).
+            $supportId = is_string($item['raw']['support_text_id'] ?? null) ? $item['raw']['support_text_id'] : null;
+            if ($supportId !== null && isset($supportTexts[$supportId])) {
+                $support = $supportTexts[$supportId];
+                $header = $support['title'] !== '' ? '<b>'.$support['title']."</b>\n" : '';
+                $content['question_text'] = mb_substr($header.$support['text']."\n\n".$content['question_text'], 0, 20000);
+            }
+            if ($onlySubjectId !== null) {
+                $content['subject_id'] = $onlySubjectId;
+            }
+
+            return $content + ['needs_image' => $item['raw']['needs_image'], 'source_exam_name' => $sourceExamName];
+        }, $validated);
     }
 
     private function validateImportedQuestions(array $raw, array $catalogs, string $imageField): array
@@ -488,11 +524,32 @@ class QuestionAiService
         throw new AiException('A IA devolveu a questão de posição '.($index + 1).' inválida: '.$reason.'. Nenhuma questão foi incluída.', 422, 'pdf_invalid_question');
     }
 
+    /**
+     * Textos de apoio devolvidos pela IA, indexados por id (texto limitado e normalizado; ids inválidos/duplicados ignorados).
+     *
+     * @return array<string, array{title: string, text: string}>
+     */
+    private function supportTexts(mixed $raw): array
+    {
+        $texts = [];
+        foreach (is_array($raw) ? $raw : [] as $item) {
+            $id = is_array($item) && is_scalar($item['id'] ?? null) ? trim((string) $item['id']) : '';
+            $text = is_array($item) ? $this->text($item['text'] ?? '', 15000) : '';
+            if ($id === '' || isset($texts[$id]) || trim(QuestionRichText::plain($text)) === '') {
+                continue;
+            }
+            $texts[$id] = ['title' => $this->text($item['title'] ?? '', 120), 'text' => $text];
+        }
+
+        return $texts;
+    }
+
     private function separationSchema(): array
     {
         $nullableId = ['type' => ['integer', 'null']];
         $fields = [
             'source_number' => ['type' => 'string'],
+            'support_text_id' => ['type' => ['string', 'null']],
             'type' => ['type' => 'string', 'enum' => ['multiple_choice', 'essay']],
             'question_text' => ['type' => 'string'],
             'explanation' => ['type' => 'string'],
@@ -511,9 +568,13 @@ class QuestionAiService
 
         return [
             'type' => 'object', 'additionalProperties' => false,
-            'required' => ['complete', 'total_questions', 'questions'],
+            'required' => ['complete', 'total_questions', 'support_texts', 'questions'],
             'properties' => [
                 'complete' => ['type' => 'boolean'], 'total_questions' => ['type' => 'integer'],
+                'support_texts' => ['type' => 'array', 'items' => [
+                    'type' => 'object', 'additionalProperties' => false, 'required' => ['id', 'title', 'text'],
+                    'properties' => ['id' => ['type' => 'string'], 'title' => ['type' => 'string'], 'text' => ['type' => 'string']],
+                ]],
                 'questions' => ['type' => 'array', 'items' => [
                     'type' => 'object', 'additionalProperties' => false,
                     'required' => array_keys($fields), 'properties' => $fields,

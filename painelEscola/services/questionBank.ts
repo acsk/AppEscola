@@ -63,6 +63,17 @@ export async function createStandaloneQuestion(payload: Record<string, unknown>)
   return data as { type: string; message: string; body: QuestionBankQuestion };
 }
 
+/** Cria um simulado (rascunho) com questões avulsas já incluídas — ex.: prova importada de PDF. */
+export async function createExamFromQuestions(payload: {
+  title: string;
+  exam_type: string;
+  question_ids: number[];
+  description?: string;
+}) {
+  const { data } = await api.post("/question-bank/exams-from-questions", payload);
+  return data as { type: string; message: string; body: { id: number; title: string } };
+}
+
 export async function updateStandaloneQuestion(id: number, payload: Record<string, unknown>) {
   const { data } = await api.put(`/question-bank/questions/${id}`, payload);
   return data as { type: string; message: string; body: QuestionBankQuestion };
@@ -178,5 +189,10 @@ export async function fetchActiveSubjects(): Promise<SubjectSummary[]> {
 
 export async function fetchActiveExamTypes(): Promise<ExamTypeSummary[]> {
   const { data } = await api.get("/exam-types");
-  return (Array.isArray(data) ? data : data.body ?? []).map((t: ExamTypeSummary) => ({ id: t.id, label: t.label }));
+  return (Array.isArray(data) ? data : data.body ?? []).map((t: ExamTypeSummary) => ({
+    id: t.id,
+    slug: t.slug,
+    label: t.label,
+    logo_url: t.logo_url ?? null,
+  }));
 }

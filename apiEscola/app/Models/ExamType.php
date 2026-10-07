@@ -11,6 +11,7 @@ class ExamType extends Model
     protected $fillable = [
         'slug',
         'label',
+        'logo_url',
         'sort_order',
         'is_active',
     ];

@@ -43,7 +43,7 @@ export async function saveImportDraft(payload: ImportDraftPayload, existing?: { 
 }
 
 export async function includeImportDraftQuestion(id: string, key: string, revision: number, payload: Record<string, unknown>) {
-  const { data } = await api.post<Envelope<{ draft: ImportDraft }>>(
+  const { data } = await api.post<Envelope<{ draft: ImportDraft; question: { id: number } }>>(
     `/question-bank/import-drafts/${id}/questions/${encodeURIComponent(key)}/include`, { ...payload, revision }
   );
   return data;
