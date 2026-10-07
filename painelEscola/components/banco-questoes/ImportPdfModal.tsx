@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { Image, Switch, Text, View } from "react-native";
-import { Check, ImagePlus, Save, Sparkles, Trash2 } from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, ImagePlus, Save, Sparkles, Trash2 } from "lucide-react-native";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
@@ -689,6 +689,28 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
                 alert: pending.length || failed ? `pendente: ${pending.join(", ") || "corrigir erros"}` : null,
               };
             })} value={activeKey} onChange={(key) => !busy && setActiveKey(key)} accessibilityLabel="Questões importadas" />
+            {(() => {
+              // Navegação sequencial: com muitas questões as abas passam da largura da tela.
+              const index = Math.max(0, drafts.findIndex((draft) => draft.key === activeKey));
+              const pendingCount = drafts.filter((draft) => draft.include && pendingItems(draft).length > 0).length;
+              const go = (to: number) => !busy && drafts[to] && setActiveKey(drafts[to].key);
+              return (
+                <View className="flex-row flex-wrap items-center" style={{ gap: 8 }}>
+                  <Button icon={ChevronLeft} label="Anterior" disabled={busy || index === 0} onPress={() => go(index - 1)} />
+                  <Text className="text-sm text-ink-muted" style={{ minWidth: 120, textAlign: "center" }} aria-live="polite">
+                    Questão {index + 1} de {drafts.length}
+                  </Text>
+                  <Button icon={ChevronRight} label="Próxima" disabled={busy || index >= drafts.length - 1} onPress={() => go(index + 1)} />
+                  {pendingCount > 0 && (
+                    <Button label={`Próxima pendente (${pendingCount})`} disabled={busy} onPress={() => {
+                      const order = [...drafts.slice(index + 1), ...drafts.slice(0, index + 1)];
+                      const next = order.find((draft) => draft.include && pendingItems(draft).length > 0);
+                      if (next) setActiveKey(next.key);
+                    }} />
+                  )}
+                </View>
+              );
+            })()}
             {drafts.filter((draft) => draft.key === activeKey).map((draft) => (
               <View key={draft.key} className="border border-border rounded-ds-md p-4" style={{ gap: 12 }}>
                 <View className="flex-row flex-wrap items-center" style={{ gap: 8 }}>

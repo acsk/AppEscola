@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { color } from "../../constants/theme";
 
@@ -20,10 +20,25 @@ type Props<K extends string> = {
 
 /** Abas sublinhadas (nunca pílulas): ativa com texto e sublinhado de 2px em `brand`. */
 export default function Tabs<K extends string>({ items, value, onChange, accessibilityLabel }: Props<K>) {
+  const listRef = useRef<View>(null);
+  const mounted = useRef(false);
+
+  // Aba ativa sempre visível quando a lista passa da largura (ex.: navegação Anterior/Próxima).
+  // Não roda na montagem, para não rolar a página ao abrir uma tela com abas.
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const node = listRef.current as unknown as HTMLElement | null;
+    const active = node?.querySelector?.('[aria-selected="true"]') as HTMLElement | null;
+    active?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [value]);
+
   return (
     <View className="border-b border-border">
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View role="tablist" aria-label={accessibilityLabel} className="flex-row" style={{ gap: 24 }}>
+        <View ref={listRef} role="tablist" aria-label={accessibilityLabel} className="flex-row" style={{ gap: 24 }}>
           {items.map((tab) => {
             const active = tab.id === value;
             return (
