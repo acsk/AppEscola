@@ -336,6 +336,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
 
     // Banco de questões (avulsas e de simulados): listagem e classificação
     Route::prefix('question-bank')->group(function () {
+        Route::get('import-drafts', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'index']);
+        Route::post('import-drafts', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'store']);
+        Route::get('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'show'])->whereUuid('draft');
+        Route::put('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'update'])->whereUuid('draft');
+        Route::post('import-drafts/{draft}/questions/{key}/include', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'includeQuestion'])->whereUuid('draft');
         Route::get('questions',                          [QuestionBankController::class, 'index']);
         Route::get('questions/ids',                      [QuestionBankController::class, 'ids']);
         Route::post('questions',                         [QuestionBankController::class, 'store']);

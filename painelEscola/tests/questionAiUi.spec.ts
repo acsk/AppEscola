@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { ImportDraft, ImportDraftPayload } from "../services/questionImportDrafts";
 
 const baseUrl = process.env.PANEL_TEST_URL;
 test.skip(!baseUrl, "Defina PANEL_TEST_URL com o servidor Expo web para validar a tela.");
@@ -33,6 +34,28 @@ async function pdfWorker(page: Page) {
     path: require.resolve("pdfjs-dist/build/pdf.worker.min.mjs", { paths: [require.resolve("react-pdf")] }),
     contentType: "text/javascript", headers: { "access-control-allow-origin": "*" },
   }));
+}
+
+async function startTwoQuestionImport(page: Page) {
+  await pdfWorker(page);
+  await page.route("**/api/question-bank/ai/separate-text*", (route) => route.fulfill({
+    headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+    json: { type: "success", message: "Questões separadas.", body: { questions: [
+      { type: "multiple_choice", source_number: "1", question_text: "Quanto é dois mais dois?", explanation: "",
+        needs_image: false, answer_from_pdf: false,
+        options: [{ option_text: "Quatro", is_correct: false }, { option_text: "Cinco", is_correct: false }] },
+      { type: "essay", source_number: "2", question_text: "Explique sua estratégia de cálculo.", explanation: "",
+        needs_image: false, answer_from_pdf: false, options: [] },
+    ] } },
+  }));
+  await page.goto(`${baseUrl}/#/questoes`);
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  await page.getByRole("textbox", { name: "Nome da prova/simulado de origem" }).fill("Prova revisável");
+  await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles({
+    name: "prova.pdf", mimeType: "application/pdf", buffer: textPdf(),
+  });
+  await page.getByRole("button", { name: "Separar questões com IA", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "01", exact: true })).toBeVisible();
 }
 const generated = {
   type: "essay",
@@ -87,7 +110,8 @@ async function setup(page: Page, available = true, statusCode = 200, questionOve
       });
       return;
     }
-    if (path.endsWith("/ai/status")) {
+    if (path === "/api/question-bank/import-drafts") body = { items: [], current_page: 1, last_page: 1 };
+    else if (path.endsWith("/ai/status")) {
       body = { available, provider: "openrouter", source: "tenant" };
       status = currentStatusCode;
     }
@@ -309,6 +333,147 @@ test("PDF permite corrigir marcação de imagem e exige revisão do gabarito des
   await page.getByRole("button", { name: "Incluir 1 questões", exact: true }).click();
   await expect.poll(state.saved).toBe(1);
   expect(state.saves[0]).toMatchObject({ needs_image: false, image_url: null, source_exam_name: "Prova sem figuras" });
+});
+
+test("PDF usa abas e autocompleta somente a questão individual sem salvar", async ({ page }) => {
+  const state = await setup(page, true, 200, {}, false, true);
+  await startTwoQuestionImport(page);
+  await expect(page.getByRole("textbox", { name: "Enunciado", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Autocompletar questão com IA", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Explicação", exact: true })).toHaveText("Dois mais dois é quatro.");
+  await expect(page.getByRole("radio", { name: "Alternativa A é a correta" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("combobox", { name: "Disciplina", exact: true }).last()).toContainText("Matemática");
+  expect(state.aiRequests()).toBe(1);
+  expect(state.saved()).toBe(0);
+  await page.getByRole("tab", { name: "02", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Enunciado", exact: true })).toHaveText("Explique sua estratégia de cálculo.");
+  await expect(page.getByRole("textbox", { name: "Explicação", exact: true })).toBeEmpty();
+  await page.getByRole("textbox", { name: "Enunciado", exact: true }).fill("Explique sua estratégia revisada.");
+  await page.getByRole("tab", { name: "01", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Explicação", exact: true })).toHaveText("Dois mais dois é quatro.");
+  await page.getByRole("tab", { name: "02", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Enunciado", exact: true })).toHaveText("Explique sua estratégia revisada.");
+});
+
+test("PDF aceita imagem colada e a mantém ao trocar de aba", async ({ page }) => {
+  await setup(page);
+  let uploads = 0;
+  await page.route("**/api/question-bank/questions/upload-image*", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ headers: {
+        "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "Authorization, Content-Type", "access-control-allow-methods": "POST, OPTIONS",
+      } });
+      return;
+    }
+    uploads++;
+    await route.fulfill({
+      headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+      json: { type: "success", message: "Imagem colada salva.", body: { image_url: imageUrl } },
+    });
+  });
+  await startTwoQuestionImport(page);
+  const pasteTarget = page.getByRole("textbox", { name: "Colar imagem da questão 1" });
+  await pasteTarget.evaluate((element) => {
+    const clipboard = new DataTransfer();
+    clipboard.items.add("texto, não uma imagem", "text/plain");
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: clipboard, bubbles: true }));
+  });
+  await expect(page.getByText("Copie uma imagem e cole aqui; textos e links não são imagens.", { exact: true })).toBeVisible();
+  expect(uploads).toBe(0);
+  await pasteTarget.evaluate((element) => {
+    const bytes = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="), (char) => char.charCodeAt(0));
+    const clipboard = new DataTransfer();
+    clipboard.items.add(new File([bytes], "colada.png", { type: "image/png" }));
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: clipboard, bubbles: true, cancelable: true }));
+  });
+  await expect(page.getByText("Imagem anexada manualmente", { exact: true })).toBeVisible();
+  expect(uploads).toBe(1);
+  await page.getByRole("tab", { name: "02", exact: true }).click();
+  await expect(page.getByText("Imagem anexada manualmente", { exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "01", exact: true }).click();
+  await expect(page.getByText("Imagem anexada manualmente", { exact: true })).toBeVisible();
+});
+
+test("PDF salva rascunho incompleto no servidor, retoma e retira apenas a questão incluída", async ({ page }) => {
+  const state = await setup(page);
+  const id = "00000000-0000-4000-8000-000000000002";
+  let stored: ImportDraft | null = null;
+  let saves = 0;
+  let inclusions = 0;
+  await page.route("**/api/question-bank/import-drafts**", async (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") {
+      await route.fulfill({ headers: {
+        "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "Authorization, Content-Type", "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
+      } });
+      return;
+    }
+    const path = new URL(request.url()).pathname;
+    let body: unknown;
+    if (path.endsWith("/include")) {
+      inclusions++;
+      const payload = request.postDataJSON();
+      expect(payload.revision).toBe(stored?.revision);
+      stored = { ...stored!, revision: stored!.revision + 1,
+        questions: stored!.questions.filter((question) => question.key !== "pdf-1"),
+        active_question_key: "pdf-0" };
+      body = { draft: stored };
+    } else if (request.method() === "POST" || request.method() === "PUT") {
+      const payload: ImportDraftPayload & { revision?: number } = request.postDataJSON();
+      if (request.method() === "PUT") expect(payload.revision).toBe(stored?.revision);
+      saves++;
+      stored = { ...payload, id, revision: saves, updated_at: "2026-10-07T03:00:00Z" };
+      body = stored;
+    } else if (path.endsWith(id)) body = stored;
+    else body = { items: stored ? [{ id, source_exam_name: stored.source_exam_name, question_count: stored.questions.length,
+      updated_at: stored.updated_at }] : [], current_page: 1, last_page: 1 };
+    await route.fulfill({
+      headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+      json: { type: "success", message: "Rascunho salvo no servidor.", body },
+    });
+  });
+  await startTwoQuestionImport(page);
+  await page.getByRole("button", { name: "Desmarcar questão 1" }).click();
+  await page.getByRole("tab", { name: "02", exact: true }).click();
+  await page.getByRole("textbox", { name: "Enunciado", exact: true }).fill("Explique a estratégia que você utilizou.");
+  await page.getByRole("button", { name: "Salvar rascunho", exact: true }).click();
+  await expect.poll(() => saves).toBe(1);
+  expect(stored!.questions[0].content.options.every((option) => !option.is_correct)).toBe(true);
+  expect(stored!.active_question_key).toBe("pdf-1");
+  expect(state.saved()).toBe(0);
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  await page.getByRole("button", { name: "Retomar Prova revisável (2 questões)", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "02", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("textbox", { name: "Enunciado", exact: true })).toHaveText("Explique a estratégia que você utilizou.");
+  await page.getByRole("button", { name: "Incluir 1 questões", exact: true }).click();
+  await expect.poll(() => inclusions).toBe(1);
+  await expect(page.getByRole("dialog", { name: "Revisar questões convertidas pela IA" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  await page.getByRole("button", { name: "Retomar Prova revisável (1 questões)", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "01", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "02", exact: true })).toHaveCount(0);
+  expect(stored!.questions[0].key).toBe("pdf-0");
+  expect(state.saved()).toBe(0);
+});
+
+test("PDF revisão em abas permanece responsiva no mobile e tablet e confirma alterações ao fechar", async ({ page }) => {
+  await setup(page);
+  await page.addInitScript(() => localStorage.setItem("ds_theme", "dark"));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startTwoQuestionImport(page);
+  for (const width of [390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.getByRole("tab", { name: "01", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.getByRole("button", { name: "Salvar rascunho", exact: true })).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
+  await expect(page.getByText("Fechar sem salvar as alterações?", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Continuar revisão", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "02", exact: true })).toBeVisible();
 });
 
 test("nome da prova de origem carrega na edição e é salvo sem vincular simulado", async ({ page }) => {
