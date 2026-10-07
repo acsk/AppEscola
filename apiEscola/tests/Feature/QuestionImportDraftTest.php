@@ -101,6 +101,24 @@ class QuestionImportDraftTest extends TestCase
         $this->getJson('/api/question-bank/import-drafts')->assertJsonCount(0, 'body.items');
     }
 
+    public function test_review_state_and_settings_are_saved_and_resumed(): void
+    {
+        $payload = $this->payload();
+        $payload['questions'][0]['reviewed'] = true;
+        $payload['questions'][0]['sourcePage'] = 7;
+        $payload['settings'] = ['create_exam' => true, 'exam_type_slug' => 'cpm', 'exam_title' => 'CPM 1', 'exam_id' => null, 'subject_ids' => [3, 4], 'pdf_file_name' => 'cpm.pdf'];
+        $id = $this->postJson('/api/question-bank/import-drafts', $payload)->assertCreated()->json('body.id');
+
+        $this->getJson('/api/question-bank/import-drafts/'.$id)->assertOk()
+            ->assertJsonPath('body.questions.0.reviewed', true)
+            ->assertJsonPath('body.questions.0.sourcePage', 7)
+            ->assertJsonPath('body.settings.exam_type_slug', 'cpm')
+            ->assertJsonPath('body.settings.subject_ids', [3, 4]);
+
+        $payload['settings'] = ['unknown' => 1];
+        $this->postJson('/api/question-bank/import-drafts', $payload)->assertUnprocessable();
+    }
+
     public function test_invalid_draft_shapes_are_rejected(): void
     {
         $payload = $this->payload();

@@ -138,6 +138,23 @@ class ImportedExamTest extends TestCase
         $this->deleteJson("/api/question-bank/imported-exams/{$foreign->id}")->assertNotFound();
     }
 
+    public function test_appends_questions_to_the_end_of_imported_exam_only(): void
+    {
+        $examId = $this->importExam('CPM parte 1', 2);
+        $c = $this->standalone('C');
+        $d = $this->standalone('D');
+
+        $this->postJson("/api/question-bank/imported-exams/{$examId}/questions", ['question_ids' => [$d->id, $c->id]])
+            ->assertOk()->assertJsonPath('body.questions_count', 4);
+        $this->assertSame([$examId, 3], [$d->fresh()->exam_id, $d->fresh()->order]);
+        $this->assertSame([$examId, 4], [$c->fresh()->exam_id, $c->fresh()->order]);
+
+        $manual = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Manual']);
+        $e = $this->standalone('E');
+        $this->postJson("/api/question-bank/imported-exams/{$manual->id}/questions", ['question_ids' => [$e->id]])->assertNotFound();
+        $this->postJson("/api/question-bank/imported-exams/{$examId}/questions", ['question_ids' => [$c->id]])->assertStatus(422);
+    }
+
     public function test_only_super_admin_uploads_modality_logo_and_it_reaches_exam_payload(): void
     {
         Storage::fake('public');

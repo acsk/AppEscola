@@ -62,6 +62,36 @@ class ExamFromQuestionsService
         });
     }
 
+    /**
+     * Acrescenta questões avulsas ao fim de um simulado importado (conclusão parcial da revisão:
+     * o restante da prova entra depois no mesmo simulado).
+     *
+     * @param  int[]  $questionIds  na ordem desejada
+     */
+    public function append(Exam $exam, array $questionIds): Exam
+    {
+        $ids = array_values(array_unique(array_map('intval', $questionIds)));
+
+        return DB::transaction(function () use ($exam, $ids) {
+            $questions = ExamQuestion::query()
+                ->where('tenant_id', $exam->tenant_id)
+                ->whereNull('exam_id')
+                ->whereIn('id', $ids)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            if ($questions->count() !== count($ids)) {
+                throw new QuestionBankException('Há questões que não existem, não são desta escola ou já pertencem a um simulado.');
+            }
+            $next = (int) ExamQuestion::where('exam_id', $exam->id)->max('order');
+            foreach ($ids as $position => $id) {
+                $questions[$id]->update(['exam_id' => $exam->id, 'order' => $next + $position + 1, 'exam_type_id' => $exam->exam_type_id]);
+            }
+
+            return $exam->load(['examStatus', 'examType'])->loadCount('questions');
+        });
+    }
+
     /** Simulados importados de PDF da escola; $status = slug (draft, published…) ou null para todos. */
     public function listImported(int $tenantId, ?string $status, ?string $search, int $perPage = 15): LengthAwarePaginator
     {

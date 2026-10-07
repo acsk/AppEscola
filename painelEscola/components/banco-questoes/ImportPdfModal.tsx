@@ -1,18 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
-import { Image, Switch, Text, View } from "react-native";
-import { Check, ChevronLeft, ChevronRight, ImagePlus, Save, Sparkles, Trash2 } from "lucide-react-native";
+import { Switch, Text, View } from "react-native";
+import { Sparkles, Trash2 } from "lucide-react-native";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
-import Badge from "../ui/Badge";
-import RichTextInput from "../ui/RichTextInput";
 import FormInput from "../ui/FormInput";
 import ProgressDialog from "../ui/ProgressDialog";
 import MessageModal from "../ui/MessageModal";
 import ConfirmModal from "../ui/ConfirmModal";
-import Tabs from "../ui/Tabs";
-import ClassificationFields from "./ClassificationFields";
-import OptionsEditor from "./OptionsEditor";
 import TopicMultiSelect from "./TopicMultiSelect";
 import SearchableSelect from "../ui/SearchableSelect";
 import ExamTypeLogo from "../ui/ExamTypeLogo";
@@ -20,12 +15,15 @@ import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import { aiAutofillQuestion, aiSeparatePdfText } from "../../services/questionAi";
 import {
   deleteImportDraft, fetchImportDraft, includeImportDraftQuestion, listImportDrafts, saveImportDraft,
-  type ImportDraftPayload, type ImportDraftSummary, type ImportDraftQuestion,
+  type ImportDraftPayload, type ImportDraftSettings, type ImportDraftSummary, type ImportDraftQuestion,
 } from "../../services/questionImportDrafts";
-import { createExamFromQuestions, createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
+import { appendToImportedExam, createExamFromQuestions, createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
+import ImportReviewWorkspace, { type SaveStatus } from "./import-review/ImportReviewWorkspace";
+import type { ConcludeChoice } from "./import-review/ConcludeImportDialog";
+import { findSourcePage } from "../../utils/importReview";
 import { type ApiToastState, getApiErrorMessage, showApiToast } from "../../utils/apiErrors";
 import { describeAiError } from "../../utils/aiErrors";
-import { contentFromSuggestion, contentPayload, mergeContentSuggestion, validateContent } from "../../utils/questionContent";
+import { contentFromSuggestion, contentPayload, mergeContentSuggestion } from "../../utils/questionContent";
 import {
   EMPTY_CLASSIFICATION_FORM, applyClassificationSuggestion, classificationFromSuggestion, diffClassification,
 } from "../../utils/questionClassification";
@@ -63,18 +61,6 @@ export function examNameFromFile(fileName: string): string {
     .slice(0, 255);
 }
 
-/** Dados mínimos que faltam para incluir a questão (sinalizados na aba e no topo da questão). */
-function pendingItems(draft: Draft): string[] {
-  const items: string[] = [];
-  const content = validateContent(draft.content);
-  if (content.question_text) items.push("enunciado");
-  if (content.options) items.push(content.options.includes("correta") ? "gabarito" : "alternativas");
-  if (draft.needsImage && !draft.content.image_url) items.push("imagem");
-  else if (draft.imageLoadError) items.push("imagem com erro");
-  if (!draft.classification.subject_id) items.push("disciplina");
-  return items;
-}
-
 type Props = {
   visible: boolean;
   catalogs: QuestionBankCatalogs;
@@ -86,8 +72,6 @@ type Props = {
 };
 export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, setToast, resumeDraftId = null }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const imageRef = useRef<HTMLInputElement | null>(null);
-  const imageTarget = useRef<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [sourceExamName, setSourceExamName] = useState("");
   /** Disciplinas da prova: a IA classifica cada questão em uma delas e busca o assunto. */
@@ -95,11 +79,16 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   /** Ao incluir tudo, agrupa as questões num simulado (rascunho) da modalidade escolhida — IFAL, CPM, ENEM… */
   const [createExam, setCreateExam] = useState(true);
   const [examTypeSlug, setExamTypeSlug] = useState("");
-  /** Ids das questões já incluídas nesta sessão (na ordem do PDF), inclusive de tentativas parciais. */
-  const includedIds = useRef<number[]>([]);
+  /** Nome do simulado (padrão: nome da prova) e simulado já criado numa conclusão parcial. */
+  const [examTitle, setExamTitle] = useState("");
+  const [exam, setExam] = useState<{ id: number; title: string } | null>(null);
+  /** Texto de cada página do PDF desta sessão (página de origem de cada questão). */
+  const pdfPages = useRef<string[]>([]);
+  const [pdfFileName, setPdfFileName] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "idle", at: null });
+  const autosave = useRef<Promise<void> | null>(null);
+  const [concluding, setConcluding] = useState(false);
   const selectedExamType = catalogs.examTypes.find((t) => t.slug === examTypeSlug) ?? null;
-  /** Com "Criar simulado", a modalidade escolhida vale para todas as questões (campo bloqueado na revisão). */
-  const lockedExamTypeId = createExam ? selectedExamType?.id ?? null : null;
   const [noTextPages, setNoTextPages] = useState<number[]>([]);
   /** Blocos de páginas que a IA não conseguiu separar (as demais questões seguem para revisão). */
   const [failedBlocks, setFailedBlocks] = useState<FailedBlock[]>([]);
@@ -109,6 +98,9 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeKey, setActiveKey] = useState("");
   const [savedDraft, setSavedDraft] = useState<{ id: string; revision: number } | null>(null);
+  /** Última revisão salva (o autossalvamento a atualiza durante a conclusão). */
+  const savedDraftRef = useRef<{ id: string; revision: number } | null>(null);
+  savedDraftRef.current = savedDraft;
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [draftNeedsReload, setDraftNeedsReload] = useState(false);
   const [savedImports, setSavedImports] = useState<ImportDraftSummary[]>([]);
@@ -130,7 +122,12 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     setSourceExamName("");
     setCreateExam(true);
     setExamTypeSlug("");
-    includedIds.current = [];
+    setExamTitle("");
+    setExam(null);
+    pdfPages.current = [];
+    setPdfFileName(null);
+    setSaveStatus({ state: "idle", at: null });
+    setSubjectIds([]);
     setNoTextPages([]);
     setFailedBlocks([]);
     pdfText.current = null;
@@ -158,10 +155,15 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     return () => { cancelled = true; };
   }, [visible]);
 
-  const snapshot = (items = drafts): ImportDraftPayload => ({
+  const settings: ImportDraftSettings = {
+    create_exam: createExam, exam_type_slug: examTypeSlug || null, exam_title: examTitle.trim() || null,
+    exam_id: exam?.id ?? null, subject_ids: subjectIds, pdf_file_name: file?.name ?? pdfFileName,
+  };
+  const snapshot = (items = drafts, overrides: Partial<ImportDraftSettings> = {}): ImportDraftPayload => ({
     source_exam_name: sourceExamName.trim(), no_text_pages: noTextPages,
     active_question_key: items.some((item) => item.key === activeKey) ? activeKey : items[0]?.key ?? null,
     questions: items.map(({ imageLoadError, errors, ...question }) => question),
+    settings: { ...settings, ...overrides },
   });
   const dirty = drafts.length > 0 && JSON.stringify(snapshot()) !== savedSnapshot;
   const close = () => {
@@ -170,22 +172,67 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     else onClose();
   };
 
+  // Editar uma questão revisada não desfaz a revisão; só "reviewed" muda pelo botão Confirmar.
   const update = (key: string, patch: Partial<Draft>) =>
     setDrafts((prev) => prev.map((draft) => draft.key === key ? { ...draft, ...patch } : draft));
 
-  const saveDraft = async () => {
-    if (busy || draftNeedsReload || !drafts.length || !sourceExamName.trim()) return;
-    setProgress("Salvando rascunho da importação…");
+  /** "Remover da importação": a questão sai da revisão (o autossalvamento grava a remoção). */
+  const removeQuestion = (key: string) => {
+    const index = drafts.findIndex((d) => d.key === key);
+    const remaining = drafts.filter((d) => d.key !== key);
+    if (!remaining.length) {
+      setToast({ visible: true, type: "error", message: "A importação precisa de ao menos uma questão. Feche e exclua o rascunho, se quiser descartá-la." });
+      return;
+    }
+    setDrafts(remaining);
+    if (key === activeKey) setActiveKey(remaining[Math.min(index, remaining.length - 1)].key);
+  };
+
+  // Autossalvamento da revisão (2 s depois da última alteração), sem bloquear a tela.
+  const snapshotJson = drafts.length && sourceExamName.trim() ? JSON.stringify(snapshot()) : "";
+  useEffect(() => {
+    if (!visible || !snapshotJson || busy || concluding || draftNeedsReload || snapshotJson === savedSnapshot) return;
+    const timer = setTimeout(() => {
+      if (autosave.current) return;
+      const payload = JSON.parse(snapshotJson) as ImportDraftPayload;
+      setSaveStatus((prev) => ({ ...prev, state: "saving" }));
+      autosave.current = saveImportDraft(payload, savedDraft)
+        .then((response) => {
+          savedDraftRef.current = { id: response.body.id, revision: response.body.revision };
+          setSavedDraft(savedDraftRef.current);
+          setSavedSnapshot(snapshotJson);
+          setSaveStatus({ state: "saved", at: new Date() });
+        })
+        .catch((cause) => {
+          if (isAxiosError(cause) && cause.response?.status === 409) setDraftNeedsReload(true);
+          setSaveStatus({ state: "error", at: null });
+        })
+        .finally(() => { autosave.current = null; });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [visible, snapshotJson, savedSnapshot, savedDraft, busy, concluding, draftNeedsReload]);
+
+  /** Salva agora (Salvar e sair / antes de concluir): espera um autossalvamento em curso. */
+  const flushSave = async (): Promise<boolean> => {
+    if (autosave.current) await autosave.current;
+    if (!drafts.length || !sourceExamName.trim()) return true;
+    const payload = snapshot();
+    const json = JSON.stringify(payload);
+    if (json === savedSnapshot && savedDraftRef.current) return true;
     try {
-      const payload = snapshot();
-      const response = await saveImportDraft(payload, savedDraft);
-      setSavedDraft({ id: response.body.id, revision: response.body.revision });
-      setSavedSnapshot(JSON.stringify(payload));
-      showApiToast(setToast, response, "Rascunho salvo.");
+      setSaveStatus((prev) => ({ ...prev, state: "saving" }));
+      const response = await saveImportDraft(payload, savedDraftRef.current);
+      savedDraftRef.current = { id: response.body.id, revision: response.body.revision };
+      setSavedDraft(savedDraftRef.current);
+      setSavedSnapshot(json);
+      setSaveStatus({ state: "saved", at: new Date() });
+      return true;
     } catch (cause) {
       if (isAxiosError(cause) && cause.response?.status === 409) setDraftNeedsReload(true);
+      setSaveStatus({ state: "error", at: null });
       setError({ title: "Não foi possível salvar o rascunho", message: getApiErrorMessage(cause, "Tente novamente.") });
-    } finally { setProgress(null); }
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -212,11 +259,25 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       setActiveKey(body.active_question_key ?? restored[0]?.key ?? "");
       setSavedDraft({ id: body.id, revision: body.revision });
       setDraftNeedsReload(false);
+      const saved = body.settings ?? {};
+      setCreateExam(saved.create_exam ?? true);
+      if (saved.exam_type_slug) setExamTypeSlug(saved.exam_type_slug);
+      setExamTitle(saved.exam_title ?? body.source_exam_name);
+      setExam(saved.exam_id ? { id: saved.exam_id, title: saved.exam_title ?? body.source_exam_name } : null);
+      if (saved.subject_ids?.length) setSubjectIds(saved.subject_ids);
+      setPdfFileName(saved.pdf_file_name ?? null);
+      // Igual ao snapshot() (mesma ordem de chaves) para o "há alterações" comparar certo.
       setSavedSnapshot(JSON.stringify({
         source_exam_name: body.source_exam_name, no_text_pages: body.no_text_pages,
         active_question_key: body.active_question_key ?? restored[0]?.key ?? null,
         questions: restored.map(({ imageLoadError, errors, ...question }) => question),
+        settings: {
+          create_exam: saved.create_exam ?? true, exam_type_slug: saved.exam_type_slug || null,
+          exam_title: (saved.exam_title ?? body.source_exam_name).trim() || null, exam_id: saved.exam_id ?? null,
+          subject_ids: saved.subject_ids?.length ? saved.subject_ids : subjectIds, pdf_file_name: saved.pdf_file_name ?? null,
+        },
       }));
+      setSaveStatus({ state: "saved", at: new Date(body.updated_at) });
     } catch (cause) {
       setError({ title: "Não foi possível retomar o rascunho", message: getApiErrorMessage(cause, "Tente novamente.") });
     } finally { setProgress(null); }
@@ -280,18 +341,6 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     finally { setProgress(null); }
   };
 
-  const pasteImage = (key: string, event: React.ClipboardEvent<HTMLDivElement>) => {
-    const image = Array.from(event.clipboardData.items).find((item) => item.kind === "file" && item.type.startsWith("image/"));
-    if (!image) {
-      update(key, { errors: { image: "Copie uma imagem e cole aqui; textos e links não são imagens." } });
-      return;
-    }
-    event.preventDefault();
-    const file = image.getAsFile();
-    if (file) void uploadImage(key, file);
-    else update(key, { errors: { image: "Não foi possível ler a imagem copiada. Copie novamente ou selecione o arquivo." } });
-  };
-
   const uploadImage = async (key: string, selected: File) => {
     const draft = drafts.find((item) => item.key === key);
     if (!draft || busy) return;
@@ -340,7 +389,10 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       const stamp = Date.now();
       const added: Draft[] = found
         .filter((question) => !existing.has(questionFingerprint(question)))
-        .map((question, index) => toDraft(question, `pdf-p${failedBlock.from}-${stamp}-${index}`, String(index + 1)));
+        .map((question, index) => ({
+          ...toDraft(question, `pdf-p${failedBlock.from}-${stamp}-${index}`, String(index + 1)),
+          sourcePage: findSourcePage(pdfPages.current, question.question_text ?? "") ?? failedBlock.from,
+        }));
       added.forEach((draft) => draftBlock.current.set(draft.key, failedBlock.from));
       setDrafts((prev) => {
         // Depois da última questão de páginas anteriores ao bloco (questões retomadas de rascunho vão ao fim).
@@ -409,7 +461,13 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           : `${questions.length} questão(ões) separada(s) pela IA. Revise e anexe as imagens necessárias antes de incluir.`,
         body: { questions },
       };
-      const converted: Draft[] = response.body.questions.map((question, index) => toDraft(question, `pdf-${index}`, String(index + 1)));
+      pdfPages.current = pages;
+      setPdfFileName(file.name);
+      setExamTitle((current) => current || sourceExamName.trim());
+      const converted: Draft[] = response.body.questions.map((question, index) => ({
+        ...toDraft(question, `pdf-${index}`, String(index + 1)),
+        sourcePage: findSourcePage(pages, question.question_text ?? ""),
+      }));
       draftBlock.current = new Map(converted.map((draft, index) => [draft.key, fromPage[index]]));
       setDrafts(converted);
       setActiveKey(converted[0]?.key ?? "");
@@ -423,52 +481,36 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     }
   };
 
-  const includeAll = async () => {
-    if (busy || draftNeedsReload || !sourceExamName.trim()) return;
-    const checked = drafts.map((draft) => {
-      if (!draft.include) return draft;
-      const errors = validateContent(draft.content);
-      if (draft.needsImage && !draft.content.image_url) {
-        errors.image = "Anexe manualmente a imagem necessária antes de incluir a questão.";
-      } else if (draft.imageLoadError || draft.errors.image) {
-        errors.image = draft.errors.image || "Não foi possível carregar a imagem. Envie novamente antes de incluir.";
-      }
-      return { ...draft, errors };
-    });
-    setDrafts(checked);
-    const invalid = checked.find((draft) => draft.include && Object.keys(draft.errors).length > 0);
-    if (createExam && !examTypeSlug) {
-      setToast({ visible: true, type: "error", message: "Escolha a modalidade do simulado ou desmarque \"Criar simulado\"." });
-      return;
-    }
-    if (invalid) {
-      setActiveKey(invalid.key);
-      setToast({ visible: true, type: "error", message: "Corrija as questões e anexe as imagens destacadas antes de incluir." });
-      return;
-    }
-    let saved = 0;
-    let lastResponse: { type: string; message: string; body: unknown } | undefined;
-    const remaining = checked.filter((draft) => !draft.include);
-    const selected = checked.filter((draft) => draft.include);
-    let inclusionFailed = false;
+  /**
+   * Conclusão (diálogo "Concluir importação"): inclui no banco só as questões escolhidas; as demais
+   * continuam no rascunho. Com "Criar simulado", as incluídas viram um simulado (rascunho) — ou entram no
+   * fim do simulado criado numa conclusão anterior desta importação.
+   */
+  const conclude = async (choice: ConcludeChoice, keys: string[]): Promise<boolean> => {
+    if (busy || concluding || draftNeedsReload || !sourceExamName.trim() || !keys.length) return false;
+    if (choice.createExam && !exam && (!choice.examTitle || !choice.examTypeSlug)) return false;
+    const chosen = new Set(keys);
+    setCreateExam(choice.createExam);
+    if (choice.examTypeSlug) setExamTypeSlug(choice.examTypeSlug);
+    if (choice.examTitle) setExamTitle(choice.examTitle);
+    const examTypeId = choice.createExam
+      ? catalogs.examTypes.find((t) => t.slug === (exam ? examTypeSlug : choice.examTypeSlug))?.id ?? null
+      : null;
+    setConcluding(true);
+    const selected = drafts.filter((draft) => chosen.has(draft.key));
+    let remaining = drafts.filter((draft) => !chosen.has(draft.key));
+    const ids: number[] = [];
+    let failed = false;
+    let examRef = exam;
     try {
-      let persisted = savedDraft;
-      if (persisted) {
-        setProgress("Atualizando o rascunho antes da inclusão…");
-        const response = await saveImportDraft(snapshot(checked), persisted);
-        persisted = { id: response.body.id, revision: response.body.revision };
-        setSavedDraft(persisted);
-        setSavedSnapshot(JSON.stringify(snapshot(checked)));
-      }
+      if (!(await flushSave())) return false;
+      let persisted = savedDraftRef.current;
       for (const [index, draft] of selected.entries()) {
-        setProgress(`Incluindo a questão ${draft.sourceNumber} no banco…`);
+        setProgress(`Incluindo a questão ${index + 1} de ${selected.length} no banco…`);
         try {
           const payload = {
             ...contentPayload(draft.content),
-            ...diffClassification(EMPTY_CLASSIFICATION_FORM, {
-              ...draft.classification,
-              exam_type_id: lockedExamTypeId ?? draft.classification.exam_type_id,
-            }),
+            ...diffClassification(EMPTY_CLASSIFICATION_FORM, { ...draft.classification, exam_type_id: examTypeId ?? draft.classification.exam_type_id }),
             source_exam_name: sourceExamName.trim(),
             needs_image: draft.needsImage,
           };
@@ -476,59 +518,66 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
             const response = await includeImportDraftQuestion(persisted.id, draft.key, persisted.revision, payload);
             persisted = { id: response.body.draft.id, revision: response.body.draft.revision };
             setSavedDraft(persisted);
-            lastResponse = response;
-            includedIds.current.push(response.body.question.id);
+            ids.push(response.body.question.id);
           } else {
             const response = await createStandaloneQuestion(payload);
-            lastResponse = response;
-            includedIds.current.push(response.body.id);
+            ids.push(response.body.id);
           }
-          saved++;
         } catch (cause) {
-          remaining.push({ ...draft, errors: { form: getApiErrorMessage(cause, "Não foi possível salvar esta questão.") } });
-          if (persisted) {
-            // Não prossiga com uma revisão possivelmente obsoleta após conflito ou falha de conexão.
-            inclusionFailed = true;
-            setDraftNeedsReload(true);
-            remaining.push(...selected.slice(index + 1));
-            break;
-          }
+          failed = true;
+          // Esta e as seguintes voltam para a revisão; não prossiga com uma revisão possivelmente obsoleta.
+          remaining = [...remaining, { ...draft, errors: { form: getApiErrorMessage(cause, "Não foi possível salvar esta questão.") } },
+            ...selected.slice(index + 1)];
+          if (persisted) setDraftNeedsReload(true);
+          break;
         }
       }
-      if (saved) onCreated(saved);
-      setDrafts(remaining);
-      const remainingSnapshot = snapshot(remaining);
-      setActiveKey(remainingSnapshot.active_question_key ?? "");
-      if (persisted && !inclusionFailed) setSavedSnapshot(JSON.stringify(remainingSnapshot));
-      if (remaining.some((draft) => draft.include)) {
-        setToast({ visible: true, type: "error", message: `${saved} questão(ões) incluída(s). Confira os erros nas restantes.` });
-      } else {
-        if (createExam && examTypeSlug && includedIds.current.length) {
-          setProgress("Criando o simulado com as questões incluídas…");
-          try {
-            lastResponse = await createExamFromQuestions({
-              title: sourceExamName.trim(),
-              exam_type: examTypeSlug,
-              question_ids: includedIds.current,
+      // A ordem do PDF vale também para o que volta à revisão.
+      const order = new Map(drafts.map((d, i) => [d.key, i]));
+      remaining.sort((a, b) => (order.get(a.key) ?? 0) - (order.get(b.key) ?? 0));
+
+      let examMessage = "";
+      if (choice.createExam && ids.length) {
+        setProgress(examRef ? "Adicionando as questões ao simulado…" : "Criando o simulado com as questões incluídas…");
+        try {
+          if (examRef) {
+            await appendToImportedExam(examRef.id, ids);
+          } else {
+            const response = await createExamFromQuestions({
+              title: choice.examTitle, exam_type: choice.examTypeSlug, question_ids: ids,
               description: "Importado de PDF pelo banco de questões.",
             });
-            includedIds.current = [];
-          } catch (cause) {
-            // As questões já estão no banco; só o agrupamento falhou.
-            setError({
-              title: "Questões incluídas, mas o simulado não foi criado",
-              message: getApiErrorMessage(cause, "Crie o simulado manualmente em Simulados."),
-            });
-            return;
+            examRef = { id: response.body.id, title: response.body.title };
+            setExam(examRef);
           }
+          examMessage = ` no simulado "${examRef.title}"`;
+        } catch (cause) {
+          setError({
+            title: "Questões incluídas, mas o simulado não foi atualizado",
+            message: getApiErrorMessage(cause, "Abra Simulados e adicione as questões manualmente."),
+          });
         }
-        if (lastResponse) showApiToast(setToast, lastResponse, `${saved} questão(ões) incluída(s).`);
-        onClose();
       }
+      if (ids.length) onCreated(ids.length);
+      setDrafts(remaining);
+      setActiveKey(remaining.find((d) => d.key === activeKey)?.key ?? remaining[0]?.key ?? "");
+      if (!remaining.length) {
+        setToast({ visible: true, type: "success", message: `${ids.length} questão(ões) incluída(s)${examMessage}. Importação concluída.` });
+        onClose();
+        return true;
+      }
+      setToast({
+        visible: true, type: failed ? "error" : "success",
+        message: failed
+          ? `${ids.length} questão(ões) incluída(s)${examMessage}. Houve erro numa questão: confira na revisão.`
+          : `${ids.length} questão(ões) incluída(s)${examMessage}. As outras ${remaining.length} continuam no rascunho.`,
+      });
+      return !failed;
     } catch (cause) {
-      setDraftNeedsReload(true);
-      setError({ title: "Não foi possível atualizar o rascunho", message: getApiErrorMessage(cause, "Nenhuma nova questão foi incluída. Tente novamente.") });
+      setError({ title: "Não foi possível concluir a importação", message: getApiErrorMessage(cause, "Nenhuma nova questão foi incluída. Tente novamente.") });
+      return false;
     } finally {
+      setConcluding(false);
       setProgress(null);
     }
   };
@@ -560,32 +609,50 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     </View>
   );
 
+  const listNotice = failedBlocks.length > 0 || noTextPages.length > 0 ? (
+    <View className="border-b border-border bg-warning-tint px-3 py-2" style={{ gap: 6 }}>
+      {failedBlocks.map((f) => (
+        <View key={f.pages} style={{ gap: 4 }}>
+          <Text className="text-xs font-semibold text-warning">A IA não separou {f.pages}: as questões dessas páginas não estão na lista.</Text>
+          <Text className="text-xs text-warning" numberOfLines={2}>{f.message}</Text>
+          {pdfText.current ? (
+            <View className="self-start"><Button size="sm" icon={Sparkles} label={`Reprocessar ${f.pages}`} disabled={busy} onPress={() => void reprocessBlock(f)} /></View>
+          ) : null}
+        </View>
+      ))}
+      {noTextPages.length > 0 && (
+        <Text className="text-xs text-warning">Páginas sem texto extraível: {noTextPages.join(", ")} (PDF escaneado precisa de OCR).</Text>
+      )}
+    </View>
+  ) : null;
+
+  const editorNotice = draftNeedsReload && savedDraft ? (
+    <View className="flex-row flex-wrap items-center border border-danger bg-danger-tint rounded-ds-md px-4 py-3 mb-4" style={{ gap: 12 }}>
+      <Text className="text-[13px] text-danger flex-1" style={{ minWidth: 220 }}>
+        Este rascunho foi alterado em outro lugar. Reabra a versão salva antes de continuar; alterações locais não salvas serão descartadas.
+      </Text>
+      <Button size="sm" label="Reabrir versão salva" disabled={busy} onPress={() => void resumeDraft(savedDraft.id)} />
+    </View>
+  ) : null;
+
   return (
     <>
       <Modal
-        visible={visible}
-        title={drafts.length ? "Revisar questões convertidas pela IA" : "Importar PDF com IA"}
+        visible={visible && !drafts.length}
+        title="Importar PDF com IA"
         onClose={close}
-        size={drafts.length ? "xl" : "md"}
+        size="md"
         compact
         maxHeight="94%"
         footer={
           <View className="flex-row flex-wrap justify-end" style={{ gap: 8 }}>
-            <Button label={drafts.length ? "Fechar" : "Cancelar"} onPress={close} disabled={busy} />
-            {drafts.length > 0 && <Button icon={Save} label="Salvar rascunho" onPress={() => void saveDraft()}
-              disabled={busy || draftNeedsReload || !sourceExamName.trim()} />}
-            {drafts.length ? (
-              <Button variant="primary" icon={Check} label={`Incluir ${drafts.filter((draft) => draft.include).length} questões`}
-                onPress={() => void includeAll()} disabled={busy || draftNeedsReload || !sourceExamName.trim() || !drafts.some((draft) => draft.include)} />
-            ) : (
-              <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || busy} />
-            )}
+            <Button label="Cancelar" onPress={close} disabled={busy} />
+            <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || busy} />
           </View>
         }
       >
         <FormInput label="Nome da prova/simulado de origem" value={sourceExamName} onChangeText={setSourceExamName}
           maxLength={255} required editable={!busy} />
-        {!drafts.length ? (
           <View style={{ gap: 14 }}>
             {examBlock}
             <TopicMultiSelect
@@ -646,143 +713,40 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
                 event.target.value = "";
               }} />
           </View>
-        ) : (
-          <View style={{ gap: 20 }}>
-            {createExam && selectedExamType ? (
-              <View className="flex-row items-center border border-border rounded-ds-md p-3 bg-surface-sunken" style={{ gap: 10 }}>
-                <ExamTypeLogo size={34} label={selectedExamType.label} logoUrl={selectedExamType.logo_url} />
-                <Text className="text-sm text-ink flex-1">
-                  Vai virar o simulado <Text className="font-semibold">{sourceExamName.trim() || "…"}</Text> · modalidade{" "}
-                  <Text className="font-semibold">{selectedExamType.label}</Text>, aplicada a todas as questões.
-                </Text>
-              </View>
-            ) : examBlock}
-            <Text className="text-sm text-ink-muted">Confira a separação, classificação e gabarito. Anexe as imagens manualmente e confira as marcações no PDF original.</Text>
-            {draftNeedsReload && savedDraft && <View style={{ gap: 8 }}>
-              <Text className="text-sm text-danger">Confira a versão salva antes de continuar. Ao reabrir, alterações locais não salvas serão descartadas.</Text>
-              <Button label="Reabrir versão salva" disabled={busy} onPress={() => void resumeDraft(savedDraft.id)} />
-            </View>}
-            {failedBlocks.length > 0 && (
-              <View className="rounded-ds-md border border-warning bg-warning-tint px-3 py-2" style={{ gap: 4 }}>
-                <Text className="text-xs font-semibold text-warning">
-                  A IA não conseguiu separar {failedBlocks.map((f) => f.pages).join(", ")}. Confira o PDF: as questões dessas páginas não estão na lista.
-                </Text>
-                {failedBlocks.map((f) => (
-                  <View key={f.pages} className="flex-row flex-wrap items-center" style={{ gap: 8 }}>
-                    <Text className="text-xs text-warning flex-1" style={{ minWidth: 200 }}>{f.pages}: {f.message}</Text>
-                    {pdfText.current ? (
-                      <Button icon={Sparkles} label={`Reprocessar ${f.pages}`} disabled={busy} onPress={() => void reprocessBlock(f)} />
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-            )}
-            {noTextPages.length > 0 && <Text className="text-xs text-warning">
-              Páginas sem texto extraível: {noTextPages.join(", ")}. Se contiverem questões escaneadas, elas não puderam ser lidas; aplique OCR e importe novamente.
-            </Text>}
-            <Tabs items={drafts.map((draft, index) => {
-              const pending = draft.include ? pendingItems(draft) : [];
-              const failed = Object.keys(draft.errors).length > 0;
-              return {
-                id: draft.key,
-                label: `${String(index + 1).padStart(2, "0")}${failed ? " · Erro" : ""}`,
-                alert: pending.length || failed ? `pendente: ${pending.join(", ") || "corrigir erros"}` : null,
-              };
-            })} value={activeKey} onChange={(key) => !busy && setActiveKey(key)} accessibilityLabel="Questões importadas" />
-            {(() => {
-              // Navegação sequencial: com muitas questões as abas passam da largura da tela.
-              const index = Math.max(0, drafts.findIndex((draft) => draft.key === activeKey));
-              const pendingCount = drafts.filter((draft) => draft.include && pendingItems(draft).length > 0).length;
-              const go = (to: number) => !busy && drafts[to] && setActiveKey(drafts[to].key);
-              return (
-                <View className="flex-row flex-wrap items-center" style={{ gap: 8 }}>
-                  <Button icon={ChevronLeft} label="Anterior" disabled={busy || index === 0} onPress={() => go(index - 1)} />
-                  <Text className="text-sm text-ink-muted" style={{ minWidth: 120, textAlign: "center" }} aria-live="polite">
-                    Questão {index + 1} de {drafts.length}
-                  </Text>
-                  <Button icon={ChevronRight} label="Próxima" disabled={busy || index >= drafts.length - 1} onPress={() => go(index + 1)} />
-                  {pendingCount > 0 && (
-                    <Button label={`Próxima pendente (${pendingCount})`} disabled={busy} onPress={() => {
-                      const order = [...drafts.slice(index + 1), ...drafts.slice(0, index + 1)];
-                      const next = order.find((draft) => draft.include && pendingItems(draft).length > 0);
-                      if (next) setActiveKey(next.key);
-                    }} />
-                  )}
-                </View>
-              );
-            })()}
-            {drafts.filter((draft) => draft.key === activeKey).map((draft) => (
-              <View key={draft.key} className="border border-border rounded-ds-md p-4" style={{ gap: 12 }}>
-                <View className="flex-row flex-wrap items-center" style={{ gap: 8 }}>
-                  <Button icon={Sparkles} label="Autocompletar questão com IA" disabled={busy}
-                    onPress={() => void autofill(draft)} />
-                  <Button label={`${draft.include ? "Desmarcar" : "Selecionar"} questão ${draft.sourceNumber}`}
-                    onPress={() => update(draft.key, { include: !draft.include })} disabled={busy} />
-                  <Badge tone={draft.answerFromPdf && !pendingItems(draft).includes("gabarito") ? "success" : "warning"} label={
-                    draft.content.type === "multiple_choice" && !draft.content.options.some((option) => option.is_correct)
-                      ? "Gabarito pendente — revisar"
-                      : draft.answerFromPdf ? "Gabarito do PDF" : "Gabarito sugerido pela IA"
-                  } />
-                </View>
-                {draft.include && pendingItems(draft).length > 0 && (
-                  <View className="rounded-ds-md border border-warning bg-warning-tint px-3 py-2">
-                    <Text className="text-xs font-semibold text-warning">
-                      Falta preencher: {pendingItems(draft).join(", ")}.
-                    </Text>
-                  </View>
-                )}
-                {Object.values(draft.errors).map((message, index) => <Text key={index} className="text-xs text-danger">{message}</Text>)}
-                <RichTextInput label="Enunciado" value={draft.content.question_text} minHeight={100} disabled={busy}
-                  onChange={(question_text) => update(draft.key, { content: { ...draft.content, question_text } })} />
-                <View style={{ gap: 8 }}>
-                  <div role="textbox" aria-label={`Colar imagem da questão ${draft.sourceNumber}`}
-                    aria-disabled={busy} tabIndex={busy ? -1 : 0}
-                    className="border border-border rounded-ds-md p-3 text-sm text-ink-muted"
-                    onPaste={(event) => { if (!busy) pasteImage(draft.key, event); }}>
-                    Clique aqui e cole uma imagem (Ctrl+V ou ⌘V).
-                  </div>
-                  <View className="flex-row flex-wrap items-center" style={{ gap: 8 }}>
-                    <Switch accessibilityLabel={`Questão ${draft.sourceNumber} precisa de imagem`} value={draft.needsImage}
-                      disabled={busy} onValueChange={(needsImage) => update(draft.key, { needsImage, errors: {} })} />
-                    <Text className="text-sm text-ink">Precisa de imagem</Text>
-                    {draft.needsImage && <Badge tone={draft.content.image_url ? "success" : "warning"}
-                      label={draft.content.image_url ? "Imagem anexada manualmente" : "Imagem pendente — anexar manualmente"} />}
-                  </View>
-                  {draft.content.image_url && <Image source={{ uri: draft.content.image_url }} accessibilityLabel={`Imagem da questão ${draft.sourceNumber}`}
-                    style={{ width: "100%", height: 240 }} resizeMode="contain" onError={() => update(draft.key, { imageLoadError: true })} />}
-                  <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-                    <Button icon={ImagePlus} label={draft.content.image_url ? "Trocar imagem" : "Anexar imagem manualmente"} disabled={busy}
-                      onPress={() => { imageTarget.current = draft.key; imageRef.current?.click(); }} />
-                    {draft.content.image_url && <Button icon={Trash2} variant="danger" label="Remover imagem" disabled={busy}
-                      onPress={() => update(draft.key, { content: { ...draft.content, image_url: "" }, imageLoadError: false, errors: {} })} />}
-                  </View>
-                  <Text className="text-xs text-ink-muted">JPG, PNG, WEBP ou GIF, até 5 MB. Para alternativas visuais, anexe uma imagem com todas as figuras identificadas.</Text>
-                </View>
-                {draft.content.type === "multiple_choice" && <OptionsEditor labelId={`${draft.key}-options`} options={draft.content.options}
-                  disabled={busy} onChange={(options) => update(draft.key, { content: { ...draft.content, options } })} />}
-                <RichTextInput label="Explicação" value={draft.content.explanation} minHeight={72} disabled={busy}
-                  onChange={(explanation) => update(draft.key, { content: { ...draft.content, explanation } })} />
-                <ClassificationFields form={draft.classification} catalogs={catalogs} lockedExamTypeId={lockedExamTypeId}
-                  onChange={(classification) => !busy && update(draft.key, { classification })} />
-              </View>
-            ))}
-          </View>
-        )}
-        <input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Arquivo de imagem da questão"
-          style={{ display: "none" }} onChange={(event) => {
-            const selected = event.target.files?.[0];
-            const key = imageTarget.current;
-            event.target.value = "";
-            if (selected && key) void uploadImage(key, selected);
-          }} />
       </Modal>
+      {visible && drafts.length > 0 && (
+        <ImportReviewWorkspace
+          sourceExamName={sourceExamName}
+          drafts={drafts}
+          activeKey={activeKey}
+          onActiveKey={setActiveKey}
+          onChangeDraft={update}
+          busy={busy || concluding}
+          catalogs={catalogs}
+          subjectIds={subjectIds}
+          pdfFile={file}
+          pdfFileName={pdfFileName}
+          onPickPdf={(picked) => { setFile(picked); setPdfFileName(picked.name); }}
+          saveStatus={saveStatus}
+          onClose={close}
+          onSaveAndExit={() => void flushSave().then((ok) => { if (ok) onClose(); })}
+          onAutofill={(draft) => void autofill(draft)}
+          onRemove={removeQuestion}
+          onUploadImage={(key, picked) => void uploadImage(key, picked)}
+          exam={{ createExam, examTitle: examTitle || sourceExamName, examTypeSlug, existingExamTitle: exam?.title ?? null }}
+          concluding={concluding}
+          onConclude={conclude}
+          listNotice={listNotice}
+          editorNotice={editorNotice}
+        />
+      )}
       <ProgressDialog visible={busy} title="Importação com IA" message={progress ?? ""} />
       <MessageModal visible={error !== null} type="error" title={error?.title ?? ""} message={error?.message ?? ""} onClose={() => setError(null)} />
       <ConfirmModal visible={deleteDraft !== null} title="Excluir rascunho da importação?"
         message={`O rascunho "${deleteDraft?.source_exam_name ?? ""}" (${deleteDraft?.question_count ?? 0} questões em revisão) será excluído. Questões já incluídas no banco não são afetadas.`}
         loading={deletingDraft} onCancel={() => setDeleteDraft(null)} onConfirm={() => void removeDraft()} />
       <ConfirmModal visible={confirmClose} title="Fechar sem salvar as alterações?"
-        message="Há alterações não salvas nesta importação. Cancele e use Salvar rascunho para retomar depois."
+        message="Há alterações ainda não salvas nesta importação. Cancele e use Salvar e sair para retomar depois."
         confirmLabel="Fechar sem salvar" cancelLabel="Continuar revisão"
         onCancel={() => setConfirmClose(false)} onConfirm={() => { setConfirmClose(false); onClose(); }} />
     </>

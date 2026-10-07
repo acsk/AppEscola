@@ -93,6 +93,12 @@ export async function fetchImportedExams(params: { status?: string; search?: str
   return data as { data: ImportedExam[]; meta: { current_page: number; last_page: number; total: number; per_page: number } };
 }
 
+/** Acrescenta questões avulsas ao fim de um simulado importado (conclusão parcial da revisão). */
+export async function appendToImportedExam(examId: number, questionIds: number[]) {
+  const { data } = await api.post(`/question-bank/imported-exams/${examId}/questions`, { question_ids: questionIds });
+  return data as { type: string; message: string; body: { id: number; title: string } };
+}
+
 /** Exclui o simulado importado; `keepQuestions` devolve as questões ao banco como avulsas. */
 export async function deleteImportedExam(id: number, keepQuestions: boolean) {
   const { data } = await api.delete(`/question-bank/imported-exams/${id}`, { params: keepQuestions ? { keep_questions: 1 } : {} });

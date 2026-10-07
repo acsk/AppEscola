@@ -351,6 +351,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::post('exams-from-questions',              [QuestionBankController::class, 'createExam']);
         Route::get('imported-exams',                     [QuestionBankController::class, 'importedExams']);
         Route::delete('imported-exams/{exam}',           [QuestionBankController::class, 'destroyImportedExam'])->whereNumber('exam');
+        Route::post('imported-exams/{exam}/questions',   [QuestionBankController::class, 'appendToImportedExam'])->whereNumber('exam');
         Route::put('questions/{question}',               [QuestionBankController::class, 'update'])->whereNumber('question');
         Route::delete('questions/{question}',            [QuestionBankController::class, 'destroy'])->whereNumber('question');
         Route::get('questions/years',                    [QuestionBankController::class, 'years']);

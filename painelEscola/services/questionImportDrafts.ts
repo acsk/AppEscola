@@ -10,6 +10,21 @@ export type ImportDraftQuestion = {
   classification: ClassificationForm;
   needsImage: boolean;
   answerFromPdf: boolean;
+  /** Conferida pela pessoa na revisão ("Confirmar questão"). */
+  reviewed?: boolean;
+  /** Página do PDF onde a questão começa. */
+  sourcePage?: number | null;
+};
+
+/** Configurações da importação guardadas com o rascunho. */
+export type ImportDraftSettings = {
+  create_exam?: boolean;
+  exam_type_slug?: string | null;
+  exam_title?: string | null;
+  /** Simulado já criado numa conclusão parcial: as próximas inclusões entram nele. */
+  exam_id?: number | null;
+  subject_ids?: number[];
+  pdf_file_name?: string | null;
 };
 
 export type ImportDraftPayload = {
@@ -17,6 +32,7 @@ export type ImportDraftPayload = {
   questions: ImportDraftQuestion[];
   no_text_pages: number[];
   active_question_key: string | null;
+  settings?: ImportDraftSettings | null;
 };
 
 export type ImportDraft = ImportDraftPayload & { id: string; revision: number; updated_at: string };

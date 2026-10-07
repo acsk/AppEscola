@@ -146,6 +146,21 @@ class QuestionBankController extends Controller
         ));
     }
 
+    /** POST question-bank/imported-exams/{exam}/questions — acrescenta questões avulsas ao fim do simulado importado. */
+    public function appendToImportedExam(Request $request, int $exam, ExamFromQuestionsService $service): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validate([
+            'question_ids'   => ['required', 'array', 'min:1', 'max:120'],
+            'question_ids.*' => ['integer', 'distinct'],
+        ], [], ['question_ids' => 'questões']);
+        $model = Exam::query()->where('tenant_id', $tenantId)
+            ->where('origin', ExamFromQuestionsService::ORIGIN_PDF_IMPORT)->findOrFail($exam);
+        $model = $service->append($model, $data['question_ids']);
+
+        return $this->success(new ExamResource($model), count($data['question_ids'])." questão(ões) adicionada(s) ao simulado \"{$model->title}\".");
+    }
+
     /** DELETE question-bank/imported-exams/{exam}?keep_questions=1 */
     public function destroyImportedExam(Request $request, int $exam, ExamFromQuestionsService $service): JsonResponse
     {
