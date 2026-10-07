@@ -128,6 +128,7 @@ class QuestionImageService
             if ($locked->question_id !== null) {
                 throw new AiException('Esta geração já foi aprovada. Recrie a questão pelo banco de questões.');
             }
+
             $locked->update(['status' => 'GENERATING', 'validation' => null, 'error' => null]);
 
             return $locked;
@@ -158,6 +159,22 @@ class QuestionImageService
         return $generation->reviewPayload();
     }
 
+    public function documentDraft(?User $user, int $tenantId, array $content, array $raw, string $documentHash): array
+    {
+        if (! $raw['possui_imagem']) {
+            return $content + ['possui_imagem' => false];
+        }
+        $spec = QuestionImageSpec::spec($raw['image_spec']);
+        $generation = QuestionImageGeneration::create([
+            'tenant_id' => $tenantId, 'created_by' => $user?->id,
+            'origin' => 'PDF_IMPORTED', 'content' => $content, 'image_spec' => $spec,
+            'status' => 'PENDING', 'attempts' => 0,
+            'metadata' => ['document_sha256' => $documentHash, 'history' => []],
+        ]);
+
+        return $content + ['possui_imagem' => true] + $generation->reviewPayload();
+    }
+
     public function assertApproval(QuestionImageGeneration $generation, int $tenantId, array $data): void
     {
         if ((int) $generation->tenant_id !== $tenantId || $generation->question_id !== null
@@ -179,6 +196,10 @@ class QuestionImageService
             for ($attempt = 0; $attempt <= config('services.ai.images.max_retries', 2); $attempt++) {
                 $attemptStarted = microtime(true);
                 $prompt = QuestionImageSpec::generationPrompt($generation->content, $generation->image_spec, $instruction);
+                if ($generation->origin === 'PDF_IMPORTED') {
+                    $prompt = 'IMPORTAÇÃO DE PDF: reproduza fielmente a figura descrita no Image Spec com os dados originais do documento. '
+                        ."Não recrie a questão, não troque números nem labels. Inclua todas as representações descritas.\n".$prompt;
+                }
                 $generation->update([
                     'prompt' => $prompt, 'attempts' => $generation->attempts + 1,
                     'model' => (string) config('services.ai.images.model'),

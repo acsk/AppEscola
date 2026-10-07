@@ -5,6 +5,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
 import RichTextInput from "../../components/ui/RichTextInput";
+import FormInput from "../../components/ui/FormInput";
 import RichText from "../../components/ui/RichText";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
@@ -74,6 +75,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [content, setContent] = useState<ContentForm>(initialContent);
   const [classification, setClassification] = useState<ClassificationForm>(EMPTY_CLASSIFICATION_FORM);
   const [initialClassification, setInitialClassification] = useState<ClassificationForm>(EMPTY_CLASSIFICATION_FORM);
+  const [sourceExamName, setSourceExamName] = useState("");
+  const [initialSourceExamName, setInitialSourceExamName] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(isEdit);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -114,6 +117,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       const classified = formFromQuestion(q);
       setInitialClassification(classified);
       setClassification(classified);
+      setSourceExamName(q.source_exam_name ?? "");
+      setInitialSourceExamName(q.source_exam_name ?? "");
     } catch (error) {
       setLoadError(getApiErrorMessage(error, "Não foi possível carregar a questão."));
     } finally {
@@ -128,8 +133,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const dirty = useMemo(
     () =>
       JSON.stringify(contentPayload(content)) !== JSON.stringify(contentPayload(initialContent)) ||
+      sourceExamName.trim() !== initialSourceExamName.trim() ||
       Object.keys(diffClassification(initialClassification, classification)).length > 0,
-    [classification, content, initialContent, initialClassification]
+    [classification, content, initialContent, initialClassification, sourceExamName, initialSourceExamName]
   );
 
   // Aviso ao fechar/recarregar a aba com alterações não salvas.
@@ -279,7 +285,10 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
     setSaving(mode);
     try {
-      const payload = { ...contentPayload(content), ...diffClassification(initialClassification, classification) };
+      const payload = {
+        ...contentPayload(content), ...diffClassification(initialClassification, classification),
+        source_exam_name: sourceExamName.trim() || null,
+      };
       const response = isEdit
         ? await updateStandaloneQuestion(questionId, payload)
         : await createStandaloneQuestion(payload);
@@ -290,11 +299,13 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         const blank = EMPTY_CONTENT_FORM();
         setInitialContent(blank);
         setContent(blank);
+        setInitialSourceExamName(sourceExamName);
         setErrors({});
         return;
       }
       setInitialContent(content);
       setInitialClassification(classification);
+      setInitialSourceExamName(sourceExamName);
       navigate("questoes-classificar", { questionId: response.body.id, query: listQuery });
     } catch (error) {
       setErrors(getApiValidationErrors(error));
@@ -345,6 +356,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       title="Conteúdo"
       description="Enunciado, alternativas e gabarito da questão avulsa."
     >
+      <FormInput label="Nome da prova/simulado de origem" value={sourceExamName} onChangeText={setSourceExamName}
+        maxLength={255} editable={!aiFilling && saving === null} error={errors.source_exam_name} />
       <SegmentedControl<QuestionType>
         label="Tipo"
         allowClear={false}

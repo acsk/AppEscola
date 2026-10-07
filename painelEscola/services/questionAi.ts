@@ -39,3 +39,24 @@ export async function aiRegenerateImage(
   );
   return data as { type: string; message: string; body: AiImageReview };
 }
+
+/** Importação de PDF: estrutura até 5 blocos de texto (um por questão). Não salva nada. */
+export async function aiExtractQuestions(blocks: { text: string; answer_hint?: string | null }[]) {
+  const { data } = await api.post("/question-bank/ai/extract", { blocks }, { timeout: 180000 });
+  return data as { type: string; message: string; body: { questions: AiQuestionSuggestion[] } };
+}
+
+export async function aiExtractPdf(file: File) {
+  const payload = new FormData();
+  payload.append("pdf", file);
+  const { data } = await api.post("/question-bank/ai/extract-pdf", payload, { timeout: 360000 });
+  return data as { type: string; message: string; body: { questions: AiQuestionSuggestion[] } };
+}
+
+/** Recebe o texto integral do PDF; a IA separa as questões, sem gerar imagens. */
+export async function aiSeparatePdfText(text: string, sourceExamName: string) {
+  const { data } = await api.post("/question-bank/ai/separate-text", {
+    text, source_exam_name: sourceExamName,
+  }, { timeout: 180000 });
+  return data as { type: string; message: string; body: { questions: AiQuestionSuggestion[] } };
+}

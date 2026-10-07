@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\AiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\QuestionAiAutofillRequest;
+use App\Http\Requests\QuestionAiExtractRequest;
+use App\Http\Requests\QuestionAiPdfRequest;
+use App\Http\Requests\QuestionAiSeparateTextRequest;
 use App\Http\Requests\QuestionAiSimilarRequest;
 use App\Http\Requests\RegenerateQuestionImageRequest;
 use App\Models\ExamQuestion;
@@ -48,6 +51,33 @@ class QuestionAiController extends Controller
         $suggestion = $this->ai->autofill($request->user(), $tenantId, $request->validated());
 
         return $this->success($suggestion, 'Campos sugeridos pela IA. Revise antes de salvar.');
+    }
+
+    /** POST /question-bank/ai/extract — estrutura questões a partir de blocos de texto de PDF (não salva). */
+    public function extract(QuestionAiExtractRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $questions = $this->ai->extract($request->user(), $tenantId, array_values($request->validated()['blocks']));
+
+        return $this->success(['questions' => $questions], count($questions).' questão(ões) extraída(s). Revise antes de incluir.');
+    }
+
+    public function extractPdf(QuestionAiPdfRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $questions = $this->ai->extractPdf($request->user(), $tenantId, $request->file('pdf')->getContent());
+
+        return $this->success(['questions' => $questions], count($questions).' questão(ões) convertida(s) pela IA. Revise antes de incluir.');
+    }
+
+    public function separateText(QuestionAiSeparateTextRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $questions = $this->ai->separateText(
+            $request->user(), $tenantId, $request->validated('text'), $request->validated('source_exam_name')
+        );
+
+        return $this->success(['questions' => $questions], count($questions).' questão(ões) separada(s) pela IA. Revise e anexe as imagens necessárias antes de incluir.');
     }
 
     /** POST /question-bank/questions/{question}/ai/similar — gera questões semelhantes (não salva). */

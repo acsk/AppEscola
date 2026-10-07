@@ -23,12 +23,12 @@ class QuestionBankQueryService
 
     /** Filtro da query string → coluna em exam_questions. */
     private const COLUMN_FILTERS = [
-        'subject_id'    => 'subject_id',
-        'board_id'      => 'board_id',
-        'year'          => 'year',
+        'subject_id' => 'subject_id',
+        'board_id' => 'board_id',
+        'year' => 'year',
         'difficulty_id' => 'difficulty_id',
-        'exam_type_id'  => 'exam_type_id',
-        'exam_id'       => 'exam_id',
+        'exam_type_id' => 'exam_type_id',
+        'exam_id' => 'exam_id',
     ];
 
     /** Limite do "selecionar todas as N". */
@@ -164,6 +164,7 @@ class QuestionBankQueryService
         $like = '%'.addcslashes($search, '%_\\').'%';
         $query->where(function (Builder $q) use ($like) {
             $q->where('exam_questions.question_text', 'like', $like)
+                ->orWhere('exam_questions.source_exam_name', 'like', $like)
                 ->orWhereExists(fn ($s) => $s->select(DB::raw(1))->from('exams')
                     ->whereColumn('exams.id', 'exam_questions.exam_id')
                     ->where('exams.title', 'like', $like))
@@ -197,11 +198,11 @@ class QuestionBankQueryService
     private function applyTab(Builder $query, string $tab): Builder
     {
         return match ($tab) {
-            'regulares'         => $query->where('exam_questions.is_annulled', false)->where('exam_questions.is_outdated', false),
-            'anuladas'          => $query->where('exam_questions.is_annulled', true),
-            'desatualizadas'    => $query->where('exam_questions.is_outdated', true),
+            'regulares' => $query->where('exam_questions.is_annulled', false)->where('exam_questions.is_outdated', false),
+            'anuladas' => $query->where('exam_questions.is_annulled', true),
+            'desatualizadas' => $query->where('exam_questions.is_outdated', true),
             'sem_classificacao' => $query->whereRaw($this->unclassifiedCondition()),
-            default             => $query,
+            default => $query,
         };
     }
 

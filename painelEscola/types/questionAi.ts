@@ -19,6 +19,14 @@ export type AiQuestionSuggestion = {
   image_url?: string | null;
   generation_id?: string;
   image_generation?: AiImageGeneration;
+  /** Importação de PDF: índice do bloco de origem no lote enviado. */
+  block_index?: number;
+  source_number?: string;
+  source_exam_name?: string;
+  /** Importação de PDF: a questão depende de figura/gráfico que não veio no texto. */
+  needs_image?: boolean;
+  /** Importação de PDF: o gabarito veio do próprio PDF (e não da IA). */
+  answer_from_pdf?: boolean;
 };
 
 export type AiImageGeneration = {

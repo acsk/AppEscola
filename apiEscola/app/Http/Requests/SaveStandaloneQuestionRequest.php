@@ -25,6 +25,8 @@ class SaveStandaloneQuestionRequest extends FormRequest
 
         return [
             'type' => [$req, 'in:multiple_choice,essay'],
+            'source_exam_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'needs_image' => ['sometimes', 'boolean'],
             'question_text' => ['sometimes', 'nullable', 'string', 'max:20000'],
             'image_url' => ['sometimes', 'nullable', 'url', 'max:500'],
             'video_url' => ['sometimes', 'nullable', 'url', 'max:500'],
@@ -44,6 +46,7 @@ class SaveStandaloneQuestionRequest extends FormRequest
     {
         return [
             'type' => 'tipo',
+            'source_exam_name' => 'nome da prova/simulado de origem',
             'question_text' => 'enunciado',
             'image_url' => 'imagem',
             'explanation' => 'explicação',
@@ -61,6 +64,9 @@ class SaveStandaloneQuestionRequest extends FormRequest
             $text = $this->has('question_text') ? $this->input('question_text') : $current?->question_text;
             $image = $this->has('image_url') ? $this->input('image_url') : $current?->image_url;
 
+            if ($this->boolean('needs_image') && trim((string) $image) === '') {
+                $validator->errors()->add('image_url', 'Anexe manualmente a imagem necessária antes de incluir a questão.');
+            }
             if (trim(QuestionRichText::plain($text)) === '' && trim((string) $image) === '') {
                 $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
             }

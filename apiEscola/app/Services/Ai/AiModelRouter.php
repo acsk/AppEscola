@@ -10,6 +10,8 @@ class AiModelRouter
 {
     public const TEXT = 'TEXT';
 
+    public const PDF = 'PDF';
+
     public const VISION = 'VISION';
 
     public const STRUCTURED_OUTPUT = 'STRUCTURED_OUTPUT';
@@ -23,6 +25,29 @@ class AiModelRouter
     public function vision(array $credential, string $system, string $prompt, array $images): array
     {
         return $this->execute($credential, self::VISION, fn (array $selected) => $this->client->jsonWithMetadata($selected, $system, $prompt, 0.2, $images));
+    }
+
+    public function pdf(array $credential, string $system, string $prompt, string $encoded): array
+    {
+        if ($credential['provider'] !== 'openrouter') {
+            throw new AiException('A importação de PDF exige uma chave ativa do OpenRouter.');
+        }
+        $model = trim((string) config('services.ai.pdf.model_openrouter'));
+        if ($model === '') {
+            throw new AiException('Configure OPENROUTER_PDF_MODEL para importar o PDF.');
+        }
+        $selected = $this->select($credential, $model, self::PDF, false);
+
+        return $this->client->jsonWithPdf($selected, $system, $prompt, $encoded, 'document.pdf');
+    }
+
+    public function structuredText(array $credential, string $system, string $prompt, array $schema): array
+    {
+        $selected = $credential['provider'] === 'openrouter'
+            ? $this->select($credential, $credential['model'], self::TEXT, false)
+            : $credential;
+
+        return $this->client->jsonWithMetadata($selected, $system, $prompt, 0.1, [], $schema);
     }
 
     public function image(array $credential, string $prompt, ?string $reference): array
@@ -92,6 +117,9 @@ class AiModelRouter
         } elseif (in_array('image', data_get($data, 'architecture.input_modalities', []), true)) {
             $capabilities[] = self::VISION;
         }
+        if (! $image && in_array('file', data_get($data, 'architecture.input_modalities', []), true)) {
+            $capabilities[] = self::PDF;
+        }
         if (! in_array($capability, $capabilities, true)) {
             throw new AiException("O modelo {$model} não suporta {$capability}.", 422, 'ai_model_capability');
         }
@@ -102,6 +130,9 @@ class AiModelRouter
             }
             $parameters = $endpointInfo['supported_parameters'] ?? [];
             if (! $image && ! in_array('response_format', $parameters, true)) {
+                continue;
+            }
+            if ($capability === self::TEXT && ! in_array('structured_outputs', $parameters, true)) {
                 continue;
             }
             $prices = $image
@@ -127,6 +158,7 @@ class AiModelRouter
                 'model' => $model,
                 'capabilities' => $capabilities,
                 'provider_routing' => ['only' => [$provider], 'allow_fallbacks' => false],
+                'max_output_tokens' => max(1, min(16000, (int) ($endpointInfo['max_completion_tokens'] ?? 16000))),
             ]);
         }
 

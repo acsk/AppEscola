@@ -78,6 +78,12 @@ return [
             'max_bytes' => 5 * 1024 * 1024,
             'max_dimension' => 4096,
         ],
+        /** Importação de PDF: o arquivo vai inteiro para um modelo multimodal (a IA lê texto e figuras). */
+        'pdf' => [
+            'model_openrouter' => env('OPENROUTER_PDF_MODEL', 'google/gemini-2.5-flash'),
+            'timeout' => max(60, min(300, (int) env('AI_PDF_TIMEOUT', 180))),
+            'max_questions' => 50,
+        ],
         'openrouter' => [
             'api_key' => env('OPENROUTER_API_KEY'),
             'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),

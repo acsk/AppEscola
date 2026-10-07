@@ -25,6 +25,7 @@ export type QuestionBankOption = {
 export type QuestionBankQuestion = {
   id: number;
   origin: "avulsa" | "simulado";
+  source_exam_name?: string | null;
   exam: { id: number; title: string } | null;
   type: "multiple_choice" | "essay";
   question_text: string | null;

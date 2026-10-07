@@ -106,6 +106,20 @@ cd ../painelEscola
 PANEL_TEST_URL=http://localhost:8081 npx playwright test tests/questionAiUi.spec.ts tests/questionImageReview.spec.ts --project=chromium
 ```
 
+## Importação de questões de PDF com IA
+
+- O painel extrai o texto integral com PDF.js no navegador, preservando os limites de páginas; não separa as questões localmente. `POST /api/question-bank/ai/separate-text` recebe JSON com `text` e `source_exam_name`, exige equipe autorizada e chave de IA disponível no escopo permitido.
+- A IA separa as questões, preserva alternativas e gabarito e sugere classificação. O nome da prova/simulado é informado pelo usuário e salvo como `source_exam_name` na questão avulsa; não cria nem vincula um simulado. O nome aparece na listagem, visualização e edição e participa da busca.
+- A separação usa JSON Schema estrito. No OpenRouter, o modelo configurado precisa de endpoint com `structured_outputs`; o provedor fica fixado, sem fallback. Resposta inválida informa a posição e motivo (`pdf_invalid_question`, 422), sem logar o documento nem incluir questões parcialmente.
+- Limites: PDF de 20 MB e 80 páginas no navegador, 120 mil caracteres no texto enviado e 50 questões na resposta. Respostas incompletas, cortadas ou inválidas são rejeitadas, sem salvar questões. Confira a contagem e fidelidade na revisão; a IA não garante identificação perfeita.
+- `needs_image` indica figura ausente no texto. Na revisão, o usuário pode corrigir a marcação e anexar JPG, PNG, WEBP ou GIF de até 5 MB pelo upload existente. Questões marcadas precisam de imagem antes da inclusão (validado também pela API). Nenhuma imagem é gerada automaticamente neste fluxo.
+- Se o texto não permitir resolver a questão, a IA deixa o gabarito sem marcação; o usuário deve revisá-lo e selecionar a correta antes de incluir. Gabarito conhecido do PDF tem prioridade.
+- Alternativas que são apenas imagens ficam identificadas como `[Imagem da alternativa A — anexar manualmente]`, preservando as posições. Anexe uma composição identificada de todas as figuras e revise as alternativas antes de incluir.
+- PDFs escaneados sem texto precisam de OCR antes da importação. Páginas sem texto são identificadas na revisão, para evitar confundir ausência de texto com extração completa.
+- Só o texto vai ao provedor externo; envie apenas conteúdo que possa ser compartilhado. Testes usam respostas simuladas, sem cobrança. Não há fallback pago automático.
+- Deploy: aplicar a migration `2026_10_07_000001_add_source_exam_name_to_exam_questions_table.php`, configurar Storage público para anexos e chave de IA. Nenhuma migration é executada automaticamente em produção.
+- Os endpoints anteriores `ai/extract` (blocos preparados) e `ai/extract-pdf` (arquivo nativo/OpenRouter) permanecem compatíveis, mas não são utilizados pelo modal atual.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

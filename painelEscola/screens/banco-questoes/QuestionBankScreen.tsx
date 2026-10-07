@@ -55,7 +55,9 @@ import {
 } from "../../utils/questionBankQuery";
 import type { BatchItem, ClassificationPatch, QuestionBankQuestion, QuestionBankSort } from "../../types/questionBank";
 import Tabs from "../../components/ui/Tabs";
-import { Plus } from "lucide-react-native";
+import { Plus, Sparkles } from "lucide-react-native";
+import ImportPdfModal from "../../components/banco-questoes/ImportPdfModal";
+import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import Button from "../../components/ui/Button";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { plainRichText } from "../../utils/richText";
@@ -89,6 +91,17 @@ const filtersKey = (s: QuestionBankListState) =>
 export default function QuestionBankScreen({ navigate }: Props) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const catalogs = useQuestionBankCatalogs();
+  const { ensureAvailable } = useQuestionAiStatus();
+  const [importPdfOpen, setImportPdfOpen] = useState(false);
+  /** Importar PDF usa IA: confere a chave antes de abrir. */
+  const openImportPdf = async () => {
+    const unavailable = await ensureAvailable();
+    if (unavailable) {
+      setToast({ visible: true, type: "error", message: unavailable });
+      return;
+    }
+    setImportPdfOpen(true);
+  };
 
   // ── Estado na URL ──────────────────────────────────────────────────────────
   const [state, setState] = useState<QuestionBankListState>(readStateFromHash);
@@ -356,6 +369,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
               <Text className="text-xs font-semibold text-ink-muted">{density === "padrao" ? "Padrão" : "Compacta"}</Text>
             </TouchableOpacity>
             <Button label="Taxonomia" onPress={() => navigate("questoes-taxonomia")} />
+            <Button icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
             <Button
               variant="primary"
               icon={Plus}
@@ -595,7 +609,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     <View style={{ width: COL.number }}>
                       <Text className={TABLE_CELL_SEMIBOLD}>#{row.id}</Text>
                       <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
-                        {row.exam ? row.exam.title : "Avulsa"}
+                        {row.exam ? row.exam.title : row.source_exam_name || "Avulsa"}
                       </Text>
                     </View>
                     <View style={{ flex: 1, minWidth: 280, paddingRight: 12 }}>
@@ -698,6 +712,17 @@ export default function QuestionBankScreen({ navigate }: Props) {
           </View>
         )}
       </Modal>
+
+      <ImportPdfModal
+        visible={importPdfOpen}
+        catalogs={catalogs}
+        onClose={() => setImportPdfOpen(false)}
+        onCreated={(count) => {
+          setToast({ visible: true, type: "success", message: `${count} questão(ões) importada(s) do PDF.` });
+          void load();
+        }}
+        setToast={setToast}
+      />
 
       <ConfirmModal
         visible={!!deleteRow}

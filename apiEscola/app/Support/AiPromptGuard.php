@@ -47,7 +47,8 @@ class AiPromptGuard
     /** Delimita um texto como dado. Delimitadores forjados dentro do conteúdo são neutralizados. */
     public static function wrap(string $label, ?string $content): string
     {
-        $label = strtoupper(preg_replace('/[^A-Za-z_]/', '', $label));
+        // Dígitos permitidos: vários blocos na mesma chamada precisam de rótulos distintos (BLOCO_0, BLOCO_1…).
+        $label = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', $label));
 
         return "<<<DADOS:{$label}>>>\n".self::neutralize((string) $content)."\n<<<FIM:{$label}>>>";
     }

@@ -78,7 +78,7 @@ export default function QuestionClassifyScreen({ navigate, questionId, listQuery
 
   const content = question && (
     <Panel
-      title={question.exam ? `Simulado: ${question.exam.title}` : "Questão avulsa"}
+      title={question.exam ? `Simulado: ${question.exam.title}` : question.source_exam_name ? `Origem: ${question.source_exam_name}` : "Questão avulsa"}
       actions={<QuestionStatusBadge isAnnulled={question.is_annulled} isOutdated={question.is_outdated} />}
     >
       <View style={{ gap: 14 }}>

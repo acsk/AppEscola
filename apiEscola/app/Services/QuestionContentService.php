@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 class QuestionContentService
 {
     /** Campos de conteúdo gravados direto em exam_questions. */
-    private const CONTENT_FIELDS = ['type', 'question_text', 'image_url', 'video_url', 'explanation', 'allow_text_answer'];
+    private const CONTENT_FIELDS = ['type', 'question_text', 'image_url', 'video_url', 'explanation', 'allow_text_answer', 'source_exam_name'];
 
     public function __construct(
         private readonly QuestionClassificationService $classification,
@@ -110,6 +110,9 @@ class QuestionContentService
     private function contentAttributes(array $data): array
     {
         $attributes = array_intersect_key($data, array_flip(self::CONTENT_FIELDS));
+        if (array_key_exists('source_exam_name', $attributes)) {
+            $attributes['source_exam_name'] = trim((string) $attributes['source_exam_name']) ?: null;
+        }
         foreach (['question_text', 'explanation'] as $field) {
             if (array_key_exists($field, $attributes)) {
                 $attributes[$field] = QuestionRichText::normalize($attributes[$field]);

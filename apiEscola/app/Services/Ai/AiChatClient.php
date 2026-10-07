@@ -21,7 +21,42 @@ class AiChatClient
         return $this->jsonWithMetadata($credential, $system, $user, $temperature, $images)['data'];
     }
 
-    public function jsonWithMetadata(array $credential, string $system, string $user, float $temperature = 0.4, array $images = []): array
+    /**
+     * Chat com um arquivo PDF anexado (OpenAI: content "file"; OpenRouter: idem + plugin file-parser).
+     * O PDF é dado não confiável: o chamador põe as regras de segurança no system prompt e valida a saída.
+     *
+     * @return array<string, mixed>
+     */
+    public function jsonWithPdf(array $credential, string $system, string $user, string $pdfBase64, string $filename, float $temperature = 0.1): array
+    {
+        $payload = [
+            'model' => $credential['model'],
+            'temperature' => $temperature,
+            'response_format' => ['type' => 'json_object'],
+            'messages' => [
+                ['role' => 'system', 'content' => $system],
+                ['role' => 'user', 'content' => [
+                    ['type' => 'text', 'text' => $user],
+                    ['type' => 'file', 'file' => ['filename' => $filename, 'file_data' => 'data:application/pdf;base64,'.$pdfBase64]],
+                ]],
+            ],
+        ];
+        if ($credential['provider'] === 'openrouter') {
+            $payload['plugins'] = [['id' => 'file-parser', 'pdf' => ['engine' => 'native']]];
+        }
+        if (isset($credential['provider_routing'])) {
+            $payload['provider'] = $credential['provider_routing'];
+        }
+        $payload['max_tokens'] = 32000;
+        $response = $this->request($credential + ['timeout' => (int) config('services.ai.pdf.timeout', 180)], 'chat/completions', $payload);
+        if (data_get($response, 'choices.0.finish_reason') === 'length') {
+            throw new AiException('A resposta da IA foi cortada. Divida o PDF e importe novamente.', 422, 'pdf_incomplete');
+        }
+
+        return $this->decode((string) data_get($response, 'choices.0.message.content', ''));
+    }
+
+    public function jsonWithMetadata(array $credential, string $system, string $user, float $temperature = 0.4, array $images = [], ?array $schema = null): array
     {
         $content = $user;
         if ($images !== []) {
@@ -34,7 +69,9 @@ class AiChatClient
         $payload = [
             'model' => $credential['model'],
             'temperature' => $temperature,
-            'response_format' => ['type' => 'json_object'],
+            'response_format' => $schema === null ? ['type' => 'json_object'] : [
+                'type' => 'json_schema', 'json_schema' => ['name' => 'question_text_import', 'strict' => true, 'schema' => $schema],
+            ],
             'messages' => [
                 ['role' => 'system', 'content' => $system],
                 ['role' => 'user', 'content' => $content],
@@ -43,10 +80,17 @@ class AiChatClient
         if (isset($credential['provider_routing'])) {
             $payload['provider'] = $credential['provider_routing'];
         }
+        if ($schema !== null) {
+            $payload['max_tokens'] = $credential['max_output_tokens'] ?? 16000;
+        }
         $response = $this->request($credential, 'chat/completions', $payload);
+        if ($schema !== null && data_get($response, 'choices.0.finish_reason') === 'length') {
+            throw new AiException('A resposta da IA foi cortada. Divida o PDF e tente novamente.', 422, 'pdf_incomplete');
+        }
 
         return [
             'data' => $this->decode((string) data_get($response, 'choices.0.message.content', '')),
+            'finish_reason' => data_get($response, 'choices.0.finish_reason'),
             'usage' => $response['usage'] ?? [],
             'id' => $response['id'] ?? null,
             'model' => $response['model'] ?? $credential['model'],
@@ -66,9 +110,9 @@ class AiChatClient
             $request = Http::withToken($credential['api_key'])
                 ->withHeaders($headers)
                 ->acceptJson()
-                ->timeout($endpoint === 'images'
+                ->timeout($credential['timeout'] ?? ($endpoint === 'images'
                     ? (int) config('services.ai.images.timeout', 120)
-                    : (int) config('services.ai.timeout', 90));
+                    : (int) config('services.ai.timeout', 90)));
             $url = $credential['base_url'].'/'.$endpoint;
             $response = $payload === null ? $request->get($url) : $request->post($url, $payload);
         } catch (ConnectionException $e) {

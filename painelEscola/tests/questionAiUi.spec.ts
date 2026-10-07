@@ -5,6 +5,35 @@ test.skip(!baseUrl, "Defina PANEL_TEST_URL com o servidor Expo web para validar 
 
 const imageUrl = `${baseUrl}/mock-question.png`;
 const generationId = "00000000-0000-4000-8000-000000000001";
+
+function textPdf(text = "7. Observe a figura.\nA) seis\nB) oito\nGABARITO 7-A"): Buffer {
+  const stream = "BT /F1 12 Tf 50 760 Td 16 TL\n" + text.split("\n")
+    .map((line) => `(${line.replace(/[\\()]/g, "\\$&")}) Tj T*`).join("\n") + "\nET";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 6\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("")}`;
+  pdf += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf);
+}
+
+async function pdfWorker(page: Page) {
+  await page.route("https://unpkg.com/pdfjs-dist@*/build/pdf.worker.min.mjs", (route) => route.fulfill({
+    path: require.resolve("pdfjs-dist/build/pdf.worker.min.mjs", { paths: [require.resolve("react-pdf")] }),
+    contentType: "text/javascript", headers: { "access-control-allow-origin": "*" },
+  }));
+}
 const generated = {
   type: "essay",
   question_text: "Triângulo com 6 cm, 8 cm e 10 cm.",
@@ -29,7 +58,8 @@ async function setup(page: Page, available = true, statusCode = 200, questionOve
   image_url?: string;
   subject_id?: number | null;
   is_annulled?: boolean;
-} = {}, paginatedSubjects = false) {
+  source_exam_name?: string;
+} = {}, paginatedSubjects = false, pdfCatalogs = false) {
   let saved = 0;
   let aiRequests = 0;
   let currentStatusCode = statusCode;
@@ -71,6 +101,10 @@ async function setup(page: Page, available = true, statusCode = 200, questionOve
       { id: 10, name: "Matemática" }, { id: 11, name: "Português" },
     ];
     else if (path.endsWith("/difficulties")) body = [{ id: 30, name: "Fácil" }];
+    else if (pdfCatalogs && path.endsWith("/taxonomy")) body = [
+      { id: 10, name: "Matemática", topics: [{ id: 20, subject_id: 10, name: paginatedSubjects ? "Equações" : "Aritmética" }] },
+      { id: 11, name: "Português", topics: [] },
+    ];
     else if (path.endsWith("/boards")) body = [{ id: 40, name: "ENEM" }];
     else if (path.endsWith("/topics")) body = [{ id: 20, subject_id: 10, name: paginatedSubjects ? "Equações" : "Aritmética" }];
     else if (path.endsWith("/questions/123")) {
@@ -126,6 +160,168 @@ async function setup(page: Page, available = true, statusCode = 200, questionOve
 
   return { saved: () => saved, saves, aiRequests: () => aiRequests, recoverStatus: () => { currentStatusCode = 200; }, regenerations };
 }
+
+test("PDF envia somente texto para IA separar, marca imagem e salva origem após anexo manual", async ({ page }) => {
+  const state = await setup(page, true, 200, {}, false, true);
+  await pdfWorker(page);
+  let sent: { text: string; source_exam_name: string } | undefined;
+  let uploads = 0;
+  await page.route("**/api/question-bank/questions/upload-image*", async (route) => {
+    uploads++;
+    expect(route.request().headers()["content-type"]).toContain("multipart/form-data");
+    await route.fulfill({
+      headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+      json: { type: "success", message: "Imagem enviada.", body: { image_url: imageUrl } },
+    });
+  });
+  await page.route("**/api/question-bank/ai/separate-text*", async (route) => {
+    sent = route.request().postDataJSON();
+    expect(route.request().headers()["content-type"]).toContain("application/json");
+    await route.fulfill({
+      headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+      json: {
+        type: "success", message: "Questões separadas pela IA.",
+        body: { questions: [{
+          question_text: "Observe a figura e informe a medida.", explanation: "Gabarito do documento.",
+          source_number: "7", answer_from_pdf: true, needs_image: true,
+          subject_id: 10, topic_ids: [20],
+          type: "multiple_choice", options: [
+            { option_text: "6 cm", is_correct: true }, { option_text: "8 cm", is_correct: false },
+          ],
+        }] },
+      },
+    });
+  });
+  await page.goto(`${baseUrl}/#/questoes`);
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  const name = page.getByRole("textbox", { name: "Nome da prova/simulado de origem" });
+  await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles({
+    name: "prova.pdf", mimeType: "application/pdf", buffer: textPdf(),
+  });
+  await expect(page.getByRole("button", { name: "Separar questões com IA", exact: true })).toBeDisabled();
+  await name.fill("Simulado outubro 2026");
+  await page.getByRole("button", { name: "Separar questões com IA", exact: true }).click();
+  await expect(page.getByText("Revisar questões convertidas pela IA", { exact: true })).toBeVisible();
+  await expect(page.getByText("Imagem pendente — anexar manualmente", { exact: true })).toBeVisible();
+  expect(sent?.text).toContain("[PÁGINA 1]");
+  expect(sent?.text).toContain("7. Observe a figura.");
+  expect(sent?.text).toContain("GABARITO 7-A");
+  expect(sent?.text).not.toContain("data:application/pdf");
+  expect(sent?.source_exam_name).toBe("Simulado outubro 2026");
+  expect(state.regenerations).toHaveLength(0);
+  expect(state.saved()).toBe(0);
+  await expect(page.getByRole("textbox", { name: "Texto da alternativa A" })).toHaveText("6 cm");
+  await expect(page.getByRole("radio", { name: "Alternativa A é a correta" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("Matemática", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Enunciado", exact: true }).fill("Triângulo editado com 12 cm.");
+  await page.getByRole("button", { name: "Incluir 1 questões", exact: true }).click();
+  await expect(page.getByText("Corrija as questões e anexe as imagens destacadas antes de incluir.", { exact: true }).first()).toBeVisible();
+  expect(state.saved()).toBe(0);
+  await page.getByRole("button", { name: "Anexar imagem manualmente", exact: true }).click();
+  await page.locator('input[aria-label="Arquivo de imagem da questão"]').setInputFiles({
+    name: "figura.png", mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
+  });
+  await expect(page.getByText("Imagem anexada manualmente", { exact: true })).toBeVisible();
+  expect(uploads).toBe(1);
+  expect(state.regenerations).toHaveLength(0);
+  await expect(page.getByRole("button", { name: "Incluir 1 questões", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Incluir 1 questões", exact: true }).click();
+  await expect.poll(state.saved).toBe(1);
+  expect(state.saves[0]).toMatchObject({
+    image_url: imageUrl, subject_id: 10, topic_ids: [20], source_exam_name: "Simulado outubro 2026", needs_image: true,
+    question_text: "Triângulo editado com 12 cm.",
+  });
+  expect(state.saves[0]).not.toHaveProperty("generation_id");
+});
+
+test("PDF incompleto mostra erro sem criar questões ou chamar geração", async ({ page }) => {
+  const state = await setup(page);
+  await pdfWorker(page);
+  await page.route("**/api/question-bank/ai/separate-text*", (route) => route.fulfill({
+    status: 422, headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+    json: { type: "error", message: "A IA não converteu o PDF completo.", body: { code: "pdf_incomplete" } },
+  }));
+  await page.goto(`${baseUrl}/#/questoes`);
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  await page.getByRole("textbox", { name: "Nome da prova/simulado de origem" }).fill("Prova de teste");
+  await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles({
+    name: "prova.pdf", mimeType: "application/pdf", buffer: textPdf(),
+  });
+  await page.getByRole("button", { name: "Separar questões com IA", exact: true }).click();
+  await expect(page.getByText("A IA não converteu o PDF completo.", { exact: true })).toBeVisible();
+  expect(state.saved()).toBe(0);
+  expect(state.regenerations).toHaveLength(0);
+});
+
+test("importação PDF se adapta ao mobile em tema escuro", async ({ page }) => {
+  await setup(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem("ds_theme", "dark"));
+  await page.goto(`${baseUrl}/#/questoes`);
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Separar questões com IA", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("PDF sem texto pede OCR e não chama a IA", async ({ page }) => {
+  const state = await setup(page);
+  await pdfWorker(page);
+  let calls = 0;
+  await page.route("**/api/question-bank/ai/separate-text*", () => { calls++; });
+  await page.goto(`${baseUrl}/#/questoes`);
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  await page.getByRole("textbox", { name: "Nome da prova/simulado de origem" }).fill("Prova escaneada");
+  await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles({
+    name: "scan.pdf", mimeType: "application/pdf", buffer: textPdf(""),
+  });
+  await page.getByRole("button", { name: "Separar questões com IA", exact: true }).click();
+  await expect(page.getByText("O PDF não possui texto extraível.", { exact: false })).toBeVisible();
+  expect(calls).toBe(0);
+  expect(state.saved()).toBe(0);
+});
+
+test("PDF permite corrigir marcação de imagem e exige revisão do gabarito desconhecido", async ({ page }) => {
+  const state = await setup(page);
+  await pdfWorker(page);
+  await page.route("**/api/question-bank/ai/separate-text*", (route) => route.fulfill({
+    headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
+    json: { type: "success", message: "Questão separada.", body: { questions: [{
+      type: "multiple_choice", source_number: "7", question_text: "Quanto é dois mais dois?", explanation: "Revisar gabarito.",
+      needs_image: true, answer_from_pdf: false,
+      options: [{ option_text: "Quatro", is_correct: false }, { option_text: "Cinco", is_correct: false }],
+    }] } },
+  }));
+  await page.goto(`${baseUrl}/#/questoes`);
+  await page.getByRole("button", { name: "Importar PDF com IA", exact: true }).click();
+  await page.getByRole("textbox", { name: "Nome da prova/simulado de origem" }).fill("Prova sem figuras");
+  await page.locator('input[accept="application/pdf,.pdf"]').setInputFiles({
+    name: "prova.pdf", mimeType: "application/pdf", buffer: textPdf("7. Quanto e dois mais dois?\nA) Quatro\nB) Cinco"),
+  });
+  await page.getByRole("button", { name: "Separar questões com IA", exact: true }).click();
+  await expect(page.getByText("Gabarito pendente — revisar", { exact: true })).toBeVisible();
+  await page.getByRole("switch", { name: "Questão 7 precisa de imagem", exact: true }).click();
+  await expect(page.getByText("Imagem pendente — anexar manualmente", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Incluir 1 questões", exact: true }).click();
+  await expect(page.getByText("Marque exatamente uma alternativa como correta.", { exact: true })).toBeVisible();
+  expect(state.saved()).toBe(0);
+  await page.getByRole("radio", { name: "Alternativa A é a correta" }).click();
+  await page.getByRole("button", { name: "Incluir 1 questões", exact: true }).click();
+  await expect.poll(state.saved).toBe(1);
+  expect(state.saves[0]).toMatchObject({ needs_image: false, image_url: null, source_exam_name: "Prova sem figuras" });
+});
+
+test("nome da prova de origem carrega na edição e é salvo sem vincular simulado", async ({ page }) => {
+  const state = await setup(page, true, 200, { source_exam_name: "Simulado outubro 2026" });
+  await page.goto(`${baseUrl}/#/questoes/123/editar`);
+  const input = page.getByRole("textbox", { name: "Nome da prova/simulado de origem" });
+  await expect(input).toHaveValue("Simulado outubro 2026");
+  await input.fill("Prova revisada");
+  await page.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+  await expect.poll(state.saved).toBe(1);
+  expect(state.saves[0]).toMatchObject({ source_exam_name: "Prova revisada" });
+  expect(state.saves[0]).not.toHaveProperty("exam_id");
+});
 
 test("Nova questão mostra autocompletar, preenche e aguarda revisão sem salvar", async ({ page }) => {
   const state = await setup(page);

@@ -18,6 +18,7 @@ class ExamQuestion extends Model
     protected $fillable = [
         'tenant_id',
         'exam_id',
+        'source_exam_name',
         'subject_id',
         'exam_type_id',
         'difficulty_id',
@@ -39,12 +40,12 @@ class ExamQuestion extends Model
     ];
 
     protected $casts = [
-        'points'            => 'decimal:2',
-        'order'             => 'integer',
+        'points' => 'decimal:2',
+        'order' => 'integer',
         'allow_text_answer' => 'boolean',
-        'year'              => 'integer',
-        'is_annulled'       => 'boolean',
-        'is_outdated'       => 'boolean',
+        'year' => 'integer',
+        'is_annulled' => 'boolean',
+        'is_outdated' => 'boolean',
     ];
 
     public function exam(): BelongsTo
