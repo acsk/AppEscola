@@ -342,12 +342,15 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::post('import-drafts', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'store']);
         Route::get('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'show'])->whereUuid('draft');
         Route::put('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'update'])->whereUuid('draft');
+        Route::delete('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'destroy'])->whereUuid('draft');
         Route::post('import-drafts/{draft}/questions/{key}/include', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'includeQuestion'])->whereUuid('draft');
         Route::get('questions',                          [QuestionBankController::class, 'index']);
         Route::get('questions/ids',                      [QuestionBankController::class, 'ids']);
         Route::post('questions',                         [QuestionBankController::class, 'store']);
         Route::post('questions/upload-image',            [QuestionBankController::class, 'uploadImage']);
         Route::post('exams-from-questions',              [QuestionBankController::class, 'createExam']);
+        Route::get('imported-exams',                     [QuestionBankController::class, 'importedExams']);
+        Route::delete('imported-exams/{exam}',           [QuestionBankController::class, 'destroyImportedExam'])->whereNumber('exam');
         Route::put('questions/{question}',               [QuestionBankController::class, 'update'])->whereNumber('question');
         Route::delete('questions/{question}',            [QuestionBankController::class, 'destroy'])->whereNumber('question');
         Route::get('questions/years',                    [QuestionBankController::class, 'years']);

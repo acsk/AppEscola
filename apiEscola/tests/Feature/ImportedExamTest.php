@@ -77,6 +77,67 @@ class ImportedExamTest extends TestCase
         $this->assertSame(1, Exam::where('tenant_id', $this->tenant->id)->count());
     }
 
+    private function importExam(string $title, int $questions = 2): int
+    {
+        $ids = [];
+        for ($i = 0; $i < $questions; $i++) {
+            $ids[] = $this->standalone("{$title} q{$i}")->id;
+        }
+
+        return $this->postJson('/api/question-bank/exams-from-questions', [
+            'title' => $title, 'exam_type' => 'enem', 'question_ids' => $ids,
+        ])->assertCreated()->assertJsonPath('body.origin', 'pdf_import')->json('body.id');
+    }
+
+    public function test_lists_only_imported_exams_of_tenant_filtered_by_status(): void
+    {
+        $draftId = $this->importExam('IFAL 2023');
+        $publishedId = $this->importExam('CPM 2024', 1);
+        Exam::whereKey($publishedId)->update(['exam_status_id' => \App\Models\ExamStatus::where('slug', 'published')->value('id')]);
+        Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Manual']); // não importado
+        Exam::create(['tenant_id' => Tenant::factory()->create()->id, 'title' => 'Outra escola', 'origin' => 'pdf_import']);
+
+        $all = $this->getJson('/api/question-bank/imported-exams')->assertOk();
+        $this->assertEqualsCanonicalizing([$draftId, $publishedId], array_column($all->json('data'), 'id'));
+        $this->assertSame(2, collect($all->json('data'))->firstWhere('id', $draftId)['questions_count']);
+
+        $drafts = $this->getJson('/api/question-bank/imported-exams?status=draft')->assertOk();
+        $this->assertSame([$draftId], array_column($drafts->json('data'), 'id'));
+        $this->assertSame([$publishedId], array_column($this->getJson('/api/question-bank/imported-exams?search=CPM')->json('data'), 'id'));
+    }
+
+    public function test_deletes_imported_exam_keeping_or_dropping_questions(): void
+    {
+        $keepId = $this->importExam('Manter', 2);
+        $dropId = $this->importExam('Descartar', 1);
+
+        $this->deleteJson("/api/question-bank/imported-exams/{$keepId}?keep_questions=1")->assertOk();
+        $this->assertSoftDeleted('exams', ['id' => $keepId]);
+        $this->assertSame(2, ExamQuestion::where('question_text', 'like', 'Manter%')->whereNull('exam_id')->count());
+
+        $this->deleteJson("/api/question-bank/imported-exams/{$dropId}")->assertOk();
+        $this->assertSoftDeleted('exams', ['id' => $dropId]);
+        $this->getJson('/api/question-bank/questions?search=Descartar')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_cannot_keep_questions_of_answered_exam_nor_delete_manual_or_foreign_exam(): void
+    {
+        $id = $this->importExam('Respondido', 1);
+        $student = \App\Models\Student::factory()->create(['tenant_id' => $this->tenant->id]);
+        \App\Models\ExamAttempt::create([
+            'tenant_id' => $this->tenant->id, 'exam_id' => $id, 'student_id' => $student->id, 'started_at' => now(),
+            'attempt_status_id' => \Illuminate\Support\Facades\DB::table('exam_attempt_statuses')->value('id'),
+        ]);
+
+        $this->deleteJson("/api/question-bank/imported-exams/{$id}?keep_questions=1")->assertStatus(422);
+        $this->assertNotSoftDeleted('exams', ['id' => $id]);
+
+        $manual = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Manual']);
+        $foreign = Exam::create(['tenant_id' => Tenant::factory()->create()->id, 'title' => 'X', 'origin' => 'pdf_import']);
+        $this->deleteJson("/api/question-bank/imported-exams/{$manual->id}")->assertNotFound();
+        $this->deleteJson("/api/question-bank/imported-exams/{$foreign->id}")->assertNotFound();
+    }
+
     public function test_only_super_admin_uploads_modality_logo_and_it_reaches_exam_payload(): void
     {
         Storage::fake('public');

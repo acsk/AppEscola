@@ -15,10 +15,12 @@ type Props = {
   catalogs: QuestionBankCatalogs;
   /** Esconde "Modalidade (tipo de prova)" quando a tela já tem esse campo (ex.: questão de simulado). */
   hideExamType?: boolean;
+  /** Modalidade imposta (ex.: questões que vão virar simulado): mostra o campo bloqueado com esse valor. */
+  lockedExamTypeId?: number | null;
 };
 
 /** Campos de classificação de uma questão. */
-export default function ClassificationFields({ form, onChange, catalogs, hideExamType = false }: Props) {
+export default function ClassificationFields({ form, onChange, catalogs, hideExamType = false, lockedExamTypeId = null }: Props) {
   const set = <K extends keyof ClassificationForm>(key: K, value: ClassificationForm[K]) =>
     onChange({ ...form, [key]: value });
 
@@ -107,11 +109,12 @@ export default function ClassificationFields({ form, onChange, catalogs, hideExa
       {!hideExamType && catalogs.examTypes.length > 0 && (
         <FormSelect
           dense
-          label="Modalidade (tipo de prova)"
-          value={form.exam_type_id ?? ""}
+          label={lockedExamTypeId ? "Modalidade (definida pelo simulado)" : "Modalidade (tipo de prova)"}
+          value={lockedExamTypeId ?? form.exam_type_id ?? ""}
           placeholder="Padrão (Personalizado)"
           options={catalogs.examTypes.map((t) => ({ value: t.id, label: t.label }))}
           onChange={(v) => v && set("exam_type_id", Number(v))}
+          disabled={!!lockedExamTypeId}
         />
       )}
 

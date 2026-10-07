@@ -10,6 +10,7 @@ use App\Services\ExamFromQuestionsService;
 use App\Http\Requests\SaveStandaloneQuestionRequest;
 use App\Http\Requests\UpdateQuestionClassificationRequest;
 use App\Http\Resources\QuestionBankQuestionResource;
+use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
@@ -128,6 +129,36 @@ class QuestionBankController extends Controller
         $exam = $service->create($tenantId, $data['title'], $data['exam_type'], $data['question_ids'], $data['description'] ?? null);
 
         return $this->created(new ExamResource($exam), "Simulado \"{$exam->title}\" criado como rascunho com {$exam->questions_count} questão(ões).");
+    }
+
+    /** GET question-bank/imported-exams — simulados criados a partir de PDF (rascunho ou não). */
+    public function importedExams(Request $request, ExamFromQuestionsService $service): AnonymousResourceCollection
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validate([
+            'status'   => ['nullable', 'string', 'exists:exam_statuses,slug'],
+            'search'   => ['nullable', 'string', 'max:255'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        return ExamResource::collection($service->listImported(
+            $tenantId, $data['status'] ?? null, $data['search'] ?? null, (int) ($data['per_page'] ?? 15)
+        ));
+    }
+
+    /** DELETE question-bank/imported-exams/{exam}?keep_questions=1 */
+    public function destroyImportedExam(Request $request, int $exam, ExamFromQuestionsService $service): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $keep = $request->validate(['keep_questions' => ['sometimes', 'boolean']])['keep_questions'] ?? false;
+        $model = Exam::query()->where('tenant_id', $tenantId)
+            ->where('origin', ExamFromQuestionsService::ORIGIN_PDF_IMPORT)->findOrFail($exam);
+
+        $detached = $service->delete($model, (bool) $keep);
+
+        return $this->success(null, $keep
+            ? "Simulado \"{$model->title}\" excluído. {$detached} questão(ões) voltaram ao banco como avulsas."
+            : "Simulado \"{$model->title}\" excluído junto com as questões.");
     }
 
     /** Upload da imagem do enunciado de questão avulsa. */

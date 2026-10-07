@@ -176,10 +176,14 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      await api.delete(`/exams/${deleteId}`);
+      const { data } = await api.delete(`/exams/${deleteId}`);
       setDeleteId(null);
+      setToast({ visible: true, type: "success", message: data?.message ?? "Simulado removido." });
       fetchExams();
-    } catch {}
+    } catch (error) {
+      setDeleteId(null);
+      showApiErrorToast(setToast, error, "Não foi possível excluir o simulado.");
+    }
     setDeleting(false);
   };
 

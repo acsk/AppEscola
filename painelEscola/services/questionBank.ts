@@ -74,6 +74,31 @@ export async function createExamFromQuestions(payload: {
   return data as { type: string; message: string; body: { id: number; title: string } };
 }
 
+export type ImportedExam = {
+  id: number;
+  title: string;
+  exam_type: string | null;
+  exam_type_label: string | null;
+  exam_type_logo_url: string | null;
+  status: string | null;
+  status_label: string | null;
+  questions_count?: number;
+  attempts_count?: number;
+  created_at: string;
+};
+
+/** Simulados criados a partir de PDF no banco de questões; `status` = slug (draft, published…) ou vazio para todos. */
+export async function fetchImportedExams(params: { status?: string; search?: string; page?: number; per_page?: number }) {
+  const { data } = await api.get("/question-bank/imported-exams", { params });
+  return data as { data: ImportedExam[]; meta: { current_page: number; last_page: number; total: number; per_page: number } };
+}
+
+/** Exclui o simulado importado; `keepQuestions` devolve as questões ao banco como avulsas. */
+export async function deleteImportedExam(id: number, keepQuestions: boolean) {
+  const { data } = await api.delete(`/question-bank/imported-exams/${id}`, { params: keepQuestions ? { keep_questions: 1 } : {} });
+  return data as { type: string; message: string; body: null };
+}
+
 export async function updateStandaloneQuestion(id: number, payload: Record<string, unknown>) {
   const { data } = await api.put(`/question-bank/questions/${id}`, payload);
   return data as { type: string; message: string; body: QuestionBankQuestion };

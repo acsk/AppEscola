@@ -89,6 +89,18 @@ class QuestionImportDraftTest extends TestCase
         $this->postJson('/api/question-bank/import-drafts', $this->payload())->assertForbidden();
     }
 
+    public function test_only_owner_deletes_draft(): void
+    {
+        $id = $this->postJson('/api/question-bank/import-drafts', $this->payload())->json('body.id');
+        Sanctum::actingAs(User::factory()->admin()->create(['tenant_id' => $this->owner->tenant_id, 'status' => 'active']));
+        $this->deleteJson('/api/question-bank/import-drafts/'.$id)->assertNotFound();
+
+        Sanctum::actingAs($this->owner);
+        $this->deleteJson('/api/question-bank/import-drafts/'.$id)->assertOk();
+        $this->assertSame(0, QuestionImportDraft::count());
+        $this->getJson('/api/question-bank/import-drafts')->assertJsonCount(0, 'body.items');
+    }
+
     public function test_invalid_draft_shapes_are_rejected(): void
     {
         $payload = $this->payload();

@@ -2,7 +2,13 @@ import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { color } from "../../constants/theme";
 
-export type TabItem<K extends string = string> = { id: K; label: string; count?: number | null };
+export type TabItem<K extends string = string> = {
+  id: K;
+  label: string;
+  count?: number | null;
+  /** Sinaliza pendência na aba (ponto de alerta + texto em leitores de tela). */
+  alert?: string | null;
+};
 
 type Props<K extends string> = {
   items: TabItem<K>[];
@@ -25,12 +31,19 @@ export default function Tabs<K extends string>({ items, value, onChange, accessi
                 key={tab.id}
                 role="tab"
                 aria-selected={active}
+                aria-label={tab.alert ? `${tab.label}: ${tab.alert}` : undefined}
                 onPress={() => onChange(tab.id)}
                 activeOpacity={0.7}
                 className="flex-row items-center"
                 style={{ height: 40, gap: 8 }}
               >
-                <Text className={`text-sm font-medium ${active ? "text-brand" : "text-ink-muted"}`}>{tab.label}</Text>
+                <Text className={`text-sm font-medium ${tab.alert ? "text-warning" : active ? "text-brand" : "text-ink-muted"}`}>{tab.label}</Text>
+                {!!tab.alert && (
+                  <View
+                    accessibilityElementsHidden
+                    style={{ position: "absolute", top: 6, right: -7, width: 7, height: 7, borderRadius: 4, backgroundColor: color.warning }}
+                  />
+                )}
                 {tab.count !== undefined && (
                   <Text className="font-mono text-ink-subtle" style={{ fontSize: 12, lineHeight: 16 }}>
                     {tab.count ?? "…"}

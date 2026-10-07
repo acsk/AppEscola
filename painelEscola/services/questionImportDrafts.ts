@@ -48,3 +48,9 @@ export async function includeImportDraftQuestion(id: string, key: string, revisi
   );
   return data;
 }
+
+/** Exclui o rascunho (só o autor). Questões já incluídas no banco permanecem. */
+export async function deleteImportDraft(id: string) {
+  const { data } = await api.delete<Envelope<null>>(`/question-bank/import-drafts/${id}`);
+  return data;
+}

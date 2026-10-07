@@ -6,6 +6,7 @@ use App\Exceptions\QuestionBankException;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\ExamStatus;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ExamFromQuestionsService
 {
+    public const ORIGIN_PDF_IMPORT = 'pdf_import';
+
     public function __construct(private readonly ExamTypeService $examTypes) {}
 
     /**
@@ -42,6 +45,7 @@ class ExamFromQuestionsService
                 'tenant_id'      => $tenantId,
                 'title'          => $title,
                 'description'    => $description,
+                'origin'         => self::ORIGIN_PDF_IMPORT,
                 'exam_type_id'   => $examType->id,
                 'exam_status_id' => ExamStatus::where('slug', 'draft')->value('id'),
             ]);
@@ -55,6 +59,41 @@ class ExamFromQuestionsService
             }
 
             return $exam->load(['examStatus', 'examType'])->loadCount('questions');
+        });
+    }
+
+    /** Simulados importados de PDF da escola; $status = slug (draft, published…) ou null para todos. */
+    public function listImported(int $tenantId, ?string $status, ?string $search, int $perPage = 15): LengthAwarePaginator
+    {
+        return Exam::query()
+            ->where('tenant_id', $tenantId)
+            ->where('origin', self::ORIGIN_PDF_IMPORT)
+            ->when($status, fn ($q) => $q->whereHas('examStatus', fn ($s) => $s->where('slug', $status)))
+            ->when($search, fn ($q) => $q->where('title', 'like', '%'.addcslashes($search, '%_\\').'%'))
+            ->with(['examStatus', 'examType'])
+            ->withCount(['questions', 'attempts'])
+            ->latest('id')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Exclui o simulado (soft delete, como na tela Simulados). Com $keepQuestions, as questões voltam ao
+     * banco como avulsas antes; sem isso, somem do banco junto com o simulado.
+     * Não devolve questões de simulado já respondido: as respostas dos alunos dependem delas.
+     */
+    public function delete(Exam $exam, bool $keepQuestions): int
+    {
+        return DB::transaction(function () use ($exam, $keepQuestions) {
+            $detached = 0;
+            if ($keepQuestions) {
+                if ($exam->attempts()->exists()) {
+                    throw new QuestionBankException('Este simulado já foi respondido por alunos; as questões não podem voltar ao banco como avulsas. Exclua sem manter as questões.');
+                }
+                $detached = $exam->questions()->update(['exam_id' => null]);
+            }
+            $exam->delete();
+
+            return $detached;
         });
     }
 }

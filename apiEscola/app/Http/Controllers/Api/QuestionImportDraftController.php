@@ -77,6 +77,14 @@ class QuestionImportDraftController extends Controller
         });
     }
 
+    /** DELETE question-bank/import-drafts/{draft} — só o autor, na escola atual. Questões já incluídas permanecem. */
+    public function destroy(Request $request, string $draft): JsonResponse
+    {
+        $this->scoped($request)->findOrFail($draft)->delete();
+
+        return $this->success(null, 'Rascunho da importação excluído.');
+    }
+
     public function includeQuestion(IncludeQuestionImportDraftRequest $request, string $draft, string $key): JsonResponse
     {
         return DB::transaction(function () use ($request, $draft, $key) {

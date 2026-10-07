@@ -38,6 +38,7 @@ class ExamResource extends JsonResource
             'exam_type'        => $this->examType?->slug,
             'exam_type_label'  => $this->examType?->label,
             'exam_type_logo_url' => $this->examType?->logo_url, // ícone da modalidade (painel e app do aluno)
+            'origin'           => $this->origin, // null = manual; 'pdf_import' = prova importada de PDF
             'exam_status_id'   => $this->exam_status_id,
             'status'           => $this->examStatus?->slug,
             'status_label'     => $this->examStatus?->label,
@@ -55,6 +56,8 @@ class ExamResource extends JsonResource
             'responded_students_count' => $this->when($hasAnsweredMetrics, fn () => (int) $this->responded_students_count),
             'responded_students_percentage' => $this->when($hasAnsweredMetrics, fn () => (float) $this->responded_students_percentage),
             'total_questions'  => $this->whenLoaded('questions', fn () => $this->questions->count()),
+            'questions_count'  => $this->whenCounted('questions'),
+            'attempts_count'   => $this->whenCounted('attempts'),
             'total_points'     => $this->whenLoaded('questions', fn () => (float) $this->questions->sum('points')),
             'questions'        => $this->whenLoaded('questions', fn () => ExamQuestionResource::collection($this->questions)),
             'created_by'       => $this->created_by,

@@ -19,7 +19,7 @@ import ExamTypeLogo from "../ui/ExamTypeLogo";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import { aiAutofillQuestion, aiSeparatePdfText } from "../../services/questionAi";
 import {
-  fetchImportDraft, includeImportDraftQuestion, listImportDrafts, saveImportDraft,
+  deleteImportDraft, fetchImportDraft, includeImportDraftQuestion, listImportDrafts, saveImportDraft,
   type ImportDraftPayload, type ImportDraftSummary, type ImportDraftQuestion,
 } from "../../services/questionImportDrafts";
 import { createExamFromQuestions, createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
@@ -38,6 +38,18 @@ type Draft = ImportDraftQuestion & {
   imageLoadError: boolean;
   errors: Record<string, string>;
 };
+/** Dados mínimos que faltam para incluir a questão (sinalizados na aba e no topo da questão). */
+function pendingItems(draft: Draft): string[] {
+  const items: string[] = [];
+  const content = validateContent(draft.content);
+  if (content.question_text) items.push("enunciado");
+  if (content.options) items.push(content.options.includes("correta") ? "gabarito" : "alternativas");
+  if (draft.needsImage && !draft.content.image_url) items.push("imagem");
+  else if (draft.imageLoadError) items.push("imagem com erro");
+  if (!draft.classification.subject_id) items.push("disciplina");
+  return items;
+}
+
 type Props = {
   visible: boolean;
   catalogs: QuestionBankCatalogs;
@@ -58,6 +70,9 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const [examTypeSlug, setExamTypeSlug] = useState("");
   /** Ids das questões já incluídas nesta sessão (na ordem do PDF), inclusive de tentativas parciais. */
   const includedIds = useRef<number[]>([]);
+  const selectedExamType = catalogs.examTypes.find((t) => t.slug === examTypeSlug) ?? null;
+  /** Com "Criar simulado", a modalidade escolhida vale para todas as questões (campo bloqueado na revisão). */
+  const lockedExamTypeId = createExam ? selectedExamType?.id ?? null : null;
   const [noTextPages, setNoTextPages] = useState<number[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeKey, setActiveKey] = useState("");
@@ -70,6 +85,8 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const [draftListError, setDraftListError] = useState("");
   const [listLoading, setListLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [deleteDraft, setDeleteDraft] = useState<ImportDraftSummary | null>(null);
+  const [deletingDraft, setDeletingDraft] = useState(false);
   const { ensureAvailable } = useQuestionAiStatus();
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
@@ -165,6 +182,22 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     } finally { setProgress(null); }
   };
 
+  const removeDraft = async () => {
+    if (!deleteDraft) return;
+    setDeletingDraft(true);
+    try {
+      const response = await deleteImportDraft(deleteDraft.id);
+      setSavedImports((prev) => prev.filter((item) => item.id !== deleteDraft.id));
+      showApiToast(setToast, response, "Rascunho excluído.");
+      setDeleteDraft(null);
+    } catch (cause) {
+      setDeleteDraft(null);
+      setError({ title: "Não foi possível excluir o rascunho", message: getApiErrorMessage(cause, "Tente novamente.") });
+    } finally {
+      setDeletingDraft(false);
+    }
+  };
+
   const loadMoreDrafts = async () => {
     if (listLoading) return;
     setListLoading(true);
@@ -243,7 +276,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   };
 
   const extract = async () => {
-    if (!file || !sourceExamName.trim() || !subjectIds.length || busy) return;
+    if (!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || busy) return;
     setProgress("Extraindo o texto do PDF no navegador…");
     try {
       const pages = await extractPdfPages(file);
@@ -314,7 +347,10 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         try {
           const payload = {
             ...contentPayload(draft.content),
-            ...diffClassification(EMPTY_CLASSIFICATION_FORM, draft.classification),
+            ...diffClassification(EMPTY_CLASSIFICATION_FORM, {
+              ...draft.classification,
+              exam_type_id: lockedExamTypeId ?? draft.classification.exam_type_id,
+            }),
             source_exam_name: sourceExamName.trim(),
             needs_image: draft.needsImage,
           };
@@ -379,6 +415,33 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     }
   };
 
+  // Etapa inicial: a prova vira simulado (padrão) e a modalidade é escolhida antes da separação.
+  const examBlock = (
+    <View className="border border-border rounded-ds-md p-3 bg-surface-sunken" style={{ gap: 10 }}>
+      <View className="flex-row items-center" style={{ gap: 8 }}>
+        <Switch accessibilityLabel="Criar simulado com estas questões" value={createExam} disabled={busy}
+          onValueChange={setCreateExam} />
+        <Text className="text-sm font-medium text-ink flex-1">Criar simulado com estas questões</Text>
+      </View>
+      {createExam && (
+        <View className="flex-row items-end" style={{ gap: 10 }}>
+          <ExamTypeLogo size={38} label={selectedExamType?.label} logoUrl={selectedExamType?.logo_url} />
+          <View className="flex-1">
+            <SearchableSelect label="Modalidade" required modalTitle="Selecionar modalidade"
+              placeholder="IFAL, CPM, ENEM…" value={examTypeSlug} disabled={busy} showSelectedPreview={false}
+              options={catalogs.examTypes.filter((t) => t.slug).map((t) => ({ value: t.slug!, label: t.label }))}
+              onChange={setExamTypeSlug} />
+          </View>
+        </View>
+      )}
+      <Text className="text-xs text-ink-subtle">
+        {createExam
+          ? `O simulado "${sourceExamName.trim() || "…"}" fica como rascunho em Simulados, com o ícone da modalidade. A modalidade vale para todas as questões e fica bloqueada na revisão.`
+          : "As questões entram apenas no banco, como avulsas."}
+      </Text>
+    </View>
+  );
+
   return (
     <>
       <Modal
@@ -397,7 +460,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
               <Button variant="primary" icon={Check} label={`Incluir ${drafts.filter((draft) => draft.include).length} questões`}
                 onPress={() => void includeAll()} disabled={busy || draftNeedsReload || !sourceExamName.trim() || !drafts.some((draft) => draft.include)} />
             ) : (
-              <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || busy} />
+              <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || busy} />
             )}
           </View>
         }
@@ -406,6 +469,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           maxLength={255} required editable={!busy} />
         {!drafts.length ? (
           <View style={{ gap: 14 }}>
+            {examBlock}
             <TopicMultiSelect
               label="Disciplinas da prova *"
               searchPlaceholder="Buscar disciplina (ex.: Português, Matemática)..."
@@ -421,9 +485,16 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
             <Text className="text-sm font-medium text-ink">Rascunhos de importação salvos</Text>
             {listLoading && <Text className="text-sm text-ink-muted">Carregando rascunhos…</Text>}
             {!!draftListError && <Text className="text-sm text-danger">{draftListError}</Text>}
-            {savedImports.map((item) => <Button key={item.id}
-              label={`Retomar ${item.source_exam_name} (${item.question_count} questões)`}
-              disabled={busy || listLoading} onPress={() => void resumeDraft(item.id)} />)}
+            {savedImports.map((item) => (
+              <View key={item.id} className="flex-row items-center" style={{ gap: 8 }}>
+                <View className="flex-1">
+                  <Button label={`Retomar ${item.source_exam_name} (${item.question_count} questões)`}
+                    disabled={busy || listLoading} onPress={() => void resumeDraft(item.id)} />
+                </View>
+                <Button icon={Trash2} variant="danger" label="Excluir" accessibilityLabel={`Excluir rascunho ${item.source_exam_name}`}
+                  disabled={busy || listLoading} onPress={() => setDeleteDraft(item)} />
+              </View>
+            ))}
             {!listLoading && !draftListError && !savedImports.length &&
               <Text className="text-sm text-ink-muted">Nenhum rascunho salvo para seu usuário nesta escola.</Text>}
             {draftPage < lastDraftPage && <Button label="Carregar mais rascunhos" disabled={busy || listLoading}
@@ -452,31 +523,15 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           </View>
         ) : (
           <View style={{ gap: 20 }}>
-            <View className="border border-border rounded-ds-md p-3 bg-surface-sunken" style={{ gap: 10 }}>
-              <View className="flex-row items-center" style={{ gap: 8 }}>
-                <Switch accessibilityLabel="Criar simulado com estas questões" value={createExam} disabled={busy}
-                  onValueChange={setCreateExam} />
-                <Text className="text-sm font-medium text-ink flex-1">Criar simulado com estas questões</Text>
+            {createExam && selectedExamType ? (
+              <View className="flex-row items-center border border-border rounded-ds-md p-3 bg-surface-sunken" style={{ gap: 10 }}>
+                <ExamTypeLogo size={34} label={selectedExamType.label} logoUrl={selectedExamType.logo_url} />
+                <Text className="text-sm text-ink flex-1">
+                  Vai virar o simulado <Text className="font-semibold">{sourceExamName.trim() || "…"}</Text> · modalidade{" "}
+                  <Text className="font-semibold">{selectedExamType.label}</Text>, aplicada a todas as questões.
+                </Text>
               </View>
-              {createExam && (
-                <View className="flex-row items-end" style={{ gap: 10 }}>
-                  <ExamTypeLogo size={38}
-                    label={catalogs.examTypes.find((t) => t.slug === examTypeSlug)?.label}
-                    logoUrl={catalogs.examTypes.find((t) => t.slug === examTypeSlug)?.logo_url} />
-                  <View className="flex-1">
-                    <SearchableSelect label="Modalidade" required modalTitle="Selecionar modalidade"
-                      placeholder="IFAL, CPM, ENEM…" value={examTypeSlug} disabled={busy} showSelectedPreview={false}
-                      options={catalogs.examTypes.filter((t) => t.slug).map((t) => ({ value: t.slug!, label: t.label }))}
-                      onChange={setExamTypeSlug} />
-                  </View>
-                </View>
-              )}
-              <Text className="text-xs text-ink-subtle">
-                {createExam
-                  ? `O simulado "${sourceExamName.trim() || "…"}" fica como rascunho em Simulados, com o ícone da modalidade, para publicar aos alunos depois.`
-                  : "As questões entram apenas no banco, como avulsas."}
-              </Text>
-            </View>
+            ) : examBlock}
             <Text className="text-sm text-ink-muted">Confira a separação, classificação e gabarito. Anexe as imagens manualmente e confira as marcações no PDF original.</Text>
             {draftNeedsReload && savedDraft && <View style={{ gap: 8 }}>
               <Text className="text-sm text-danger">Confira a versão salva antes de continuar. Ao reabrir, alterações locais não salvas serão descartadas.</Text>
@@ -485,9 +540,15 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
             {noTextPages.length > 0 && <Text className="text-xs text-warning">
               Páginas sem texto extraível: {noTextPages.join(", ")}. Se contiverem questões escaneadas, elas não puderam ser lidas; aplique OCR e importe novamente.
             </Text>}
-            <Tabs items={drafts.map((draft, index) => ({
-              id: draft.key, label: `${String(index + 1).padStart(2, "0")}${Object.keys(draft.errors).length ? " · Erro" : ""}`,
-            }))} value={activeKey} onChange={(key) => !busy && setActiveKey(key)} accessibilityLabel="Questões importadas" />
+            <Tabs items={drafts.map((draft, index) => {
+              const pending = draft.include ? pendingItems(draft) : [];
+              const failed = Object.keys(draft.errors).length > 0;
+              return {
+                id: draft.key,
+                label: `${String(index + 1).padStart(2, "0")}${failed ? " · Erro" : ""}`,
+                alert: pending.length || failed ? `pendente: ${pending.join(", ") || "corrigir erros"}` : null,
+              };
+            })} value={activeKey} onChange={(key) => !busy && setActiveKey(key)} accessibilityLabel="Questões importadas" />
             {drafts.filter((draft) => draft.key === activeKey).map((draft) => (
               <View key={draft.key} className="border border-border rounded-ds-md p-4" style={{ gap: 12 }}>
                 <View className="flex-row flex-wrap items-center" style={{ gap: 8 }}>
@@ -495,12 +556,19 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
                     onPress={() => void autofill(draft)} />
                   <Button label={`${draft.include ? "Desmarcar" : "Selecionar"} questão ${draft.sourceNumber}`}
                     onPress={() => update(draft.key, { include: !draft.include })} disabled={busy} />
-                  <Badge tone={draft.answerFromPdf ? "success" : "warning"} label={
+                  <Badge tone={draft.answerFromPdf && !pendingItems(draft).includes("gabarito") ? "success" : "warning"} label={
                     draft.content.type === "multiple_choice" && !draft.content.options.some((option) => option.is_correct)
                       ? "Gabarito pendente — revisar"
                       : draft.answerFromPdf ? "Gabarito do PDF" : "Gabarito sugerido pela IA"
                   } />
                 </View>
+                {draft.include && pendingItems(draft).length > 0 && (
+                  <View className="rounded-ds-md border border-warning bg-warning-tint px-3 py-2">
+                    <Text className="text-xs font-semibold text-warning">
+                      Falta preencher: {pendingItems(draft).join(", ")}.
+                    </Text>
+                  </View>
+                )}
                 {Object.values(draft.errors).map((message, index) => <Text key={index} className="text-xs text-danger">{message}</Text>)}
                 <RichTextInput label="Enunciado" value={draft.content.question_text} minHeight={100} disabled={busy}
                   onChange={(question_text) => update(draft.key, { content: { ...draft.content, question_text } })} />
@@ -532,7 +600,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
                   disabled={busy} onChange={(options) => update(draft.key, { content: { ...draft.content, options } })} />}
                 <RichTextInput label="Explicação" value={draft.content.explanation} minHeight={72} disabled={busy}
                   onChange={(explanation) => update(draft.key, { content: { ...draft.content, explanation } })} />
-                <ClassificationFields form={draft.classification} catalogs={catalogs}
+                <ClassificationFields form={draft.classification} catalogs={catalogs} lockedExamTypeId={lockedExamTypeId}
                   onChange={(classification) => !busy && update(draft.key, { classification })} />
               </View>
             ))}
@@ -548,6 +616,9 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       </Modal>
       <ProgressDialog visible={busy} title="Importação com IA" message={progress ?? ""} />
       <MessageModal visible={error !== null} type="error" title={error?.title ?? ""} message={error?.message ?? ""} onClose={() => setError(null)} />
+      <ConfirmModal visible={deleteDraft !== null} title="Excluir rascunho da importação?"
+        message={`O rascunho "${deleteDraft?.source_exam_name ?? ""}" (${deleteDraft?.question_count ?? 0} questões em revisão) será excluído. Questões já incluídas no banco não são afetadas.`}
+        loading={deletingDraft} onCancel={() => setDeleteDraft(null)} onConfirm={() => void removeDraft()} />
       <ConfirmModal visible={confirmClose} title="Fechar sem salvar as alterações?"
         message="Há alterações não salvas nesta importação. Cancele e use Salvar rascunho para retomar depois."
         confirmLabel="Fechar sem salvar" cancelLabel="Continuar revisão"

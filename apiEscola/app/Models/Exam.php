@@ -24,6 +24,7 @@ class Exam extends Model
         'exam_type_id',
         'title',
         'description',
+        'origin',
         'duration_minutes',
         'passing_score',
         'starts_at',

@@ -55,8 +55,9 @@ import {
 } from "../../utils/questionBankQuery";
 import type { BatchItem, ClassificationPatch, QuestionBankQuestion, QuestionBankSort } from "../../types/questionBank";
 import Tabs from "../../components/ui/Tabs";
-import { Plus, Sparkles } from "lucide-react-native";
+import { FileStack, Plus, Sparkles } from "lucide-react-native";
 import ImportPdfModal from "../../components/banco-questoes/ImportPdfModal";
+import ImportedExamsModal from "../../components/banco-questoes/ImportedExamsModal";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import Button from "../../components/ui/Button";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -93,6 +94,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const catalogs = useQuestionBankCatalogs();
   const { ensureAvailable } = useQuestionAiStatus();
   const [importPdfOpen, setImportPdfOpen] = useState(false);
+  const [importedExamsOpen, setImportedExamsOpen] = useState(false);
   /** Importar PDF usa IA: confere a chave antes de abrir. */
   const openImportPdf = async () => {
     const unavailable = await ensureAvailable();
@@ -353,13 +355,13 @@ export default function QuestionBankScreen({ navigate }: Props) {
       <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 120 }}>
         {/* Cabeçalho */}
         <View className="mb-5" style={{ flexDirection: isMobile ? "column" : "row", gap: 12, justifyContent: "space-between" }}>
-          <View>
+          <View style={{ flexShrink: 1, minWidth: 260 }}>
             <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Banco de questões</Text>
             <Text className="text-sm text-ink-muted mt-1">
               Questões avulsas e de simulados. Classifique para facilitar a busca e a montagem de simulados.
             </Text>
           </View>
-          <View className="flex-row gap-2 items-start">
+          <View className="flex-row flex-wrap gap-2 items-start" style={{ flexShrink: 1, justifyContent: isMobile ? "flex-start" : "flex-end" }}>
             <TouchableOpacity
               onPress={toggleDensity}
               className="flex-row items-center gap-1.5 px-3 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
@@ -369,6 +371,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
               <Text className="text-xs font-semibold text-ink-muted">{density === "padrao" ? "Padrão" : "Compacta"}</Text>
             </TouchableOpacity>
             <Button label="Taxonomia" onPress={() => navigate("questoes-taxonomia")} />
+            <Button icon={FileStack} label="Simulados importados" onPress={() => setImportedExamsOpen(true)} />
             <Button icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
             <Button
               variant="primary"
@@ -712,6 +715,14 @@ export default function QuestionBankScreen({ navigate }: Props) {
           </View>
         )}
       </Modal>
+
+      <ImportedExamsModal
+        visible={importedExamsOpen}
+        onClose={() => setImportedExamsOpen(false)}
+        onOpenExam={(examId) => navigate("simulados-form", { examId })}
+        onChanged={() => void load()}
+        setToast={setToast}
+      />
 
       <ImportPdfModal
         visible={importPdfOpen}
