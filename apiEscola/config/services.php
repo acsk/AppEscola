@@ -81,6 +81,9 @@ return [
         /** Importação de PDF: o arquivo vai inteiro para um modelo multimodal (a IA lê texto e figuras). */
         'pdf' => [
             'model_openrouter' => env('OPENROUTER_PDF_MODEL', 'google/gemini-2.5-flash'),
+            // Separação do texto extraído do PDF: saída estruturada longa (dezenas de questões) — modelo
+            // mais capaz que o de texto padrão. Só OpenRouter; chave OpenAI usa o modelo da credencial.
+            'text_model_openrouter' => env('OPENROUTER_PDF_TEXT_MODEL', 'google/gemini-2.5-flash'),
             'timeout' => max(60, min(300, (int) env('AI_PDF_TIMEOUT', 180))),
             'max_questions' => 50,
         ],

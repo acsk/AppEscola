@@ -41,10 +41,10 @@ class AiModelRouter
         return $this->client->jsonWithPdf($selected, $system, $prompt, $encoded, 'document.pdf');
     }
 
-    public function structuredText(array $credential, string $system, string $prompt, array $schema): array
+    public function structuredText(array $credential, string $system, string $prompt, array $schema, ?string $model = null): array
     {
         $selected = $credential['provider'] === 'openrouter'
-            ? $this->select($credential, $credential['model'], self::TEXT, false)
+            ? $this->select($credential, $model ?: $credential['model'], self::TEXT, false)
             : $credential;
 
         return $this->client->jsonWithMetadata($selected, $system, $prompt, 0.1, [], $schema);

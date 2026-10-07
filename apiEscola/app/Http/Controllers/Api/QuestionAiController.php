@@ -75,7 +75,8 @@ class QuestionAiController extends Controller
         $tenantId = $this->authorizeStaff($request);
         $questions = $this->ai->separateText(
             $request->user(), $tenantId, $request->validated('text'), $request->validated('source_exam_name'),
-            array_map('intval', $request->validated('subject_ids') ?? [])
+            array_map('intval', $request->validated('subject_ids') ?? []),
+            $request->validated('focus_pages')
         );
 
         return $this->success(['questions' => $questions], count($questions).' questão(ões) separada(s) pela IA. Revise e anexe as imagens necessárias antes de incluir.');

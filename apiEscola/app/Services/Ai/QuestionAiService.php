@@ -40,6 +40,34 @@ class QuestionAiService
      * com pergunta de interpretação virava Biologia/Economia); vale a habilidade que o comando cobra.
      * Nomes junto com os ids permitem corrigir id copiado errado (ver sanitizeClassification).
      */
+    /**
+     * A IA às vezes repete as alternativas no fim do enunciado ("a) ...", "A) ..."): corta a partir da
+     * primeira linha que começa com o texto de uma alternativa, se sobrar enunciado.
+     */
+    private static function withoutTrailingOptions(string $questionText, array $options): string
+    {
+        $starts = collect($options)
+            ->map(fn ($o) => mb_strtolower(mb_substr(trim(QuestionRichText::plain((string) ($o['option_text'] ?? ''))), 0, 25)))
+            ->filter(fn ($t) => mb_strlen($t) >= 4)->values();
+        if ($starts->isEmpty()) {
+            return $questionText;
+        }
+        $lines = explode("\n", $questionText);
+        foreach ($lines as $i => $line) {
+            $plain = mb_strtolower(trim(preg_replace('/^\s*[(\[]?[a-j][)\].-]\s*/iu', '', QuestionRichText::plain($line))));
+            if ($i > 0 && $plain !== '' && $starts->contains(fn ($s) => str_starts_with($plain, $s))) {
+                $stem = rtrim(implode("\n", array_slice($lines, 0, $i)));
+
+                return mb_strlen(trim(QuestionRichText::plain($stem))) >= 15 ? $stem : $questionText;
+            }
+        }
+
+        return $questionText;
+    }
+
+    /** Comando que remete a conteúdo visual ausente do texto extraído do PDF. */
+    private const IMAGE_REFERENCE = '/\\b(gr[aá]fico|figura(?!s? de linguagem)|imagem|ilustra[çc][ãa]o|charge|tirinha|quadrinhos?|cartum|mapa|infogr[aá]fico|fotografia)s?\\b/iu';
+
     private const CLASSIFICATION_RULES = 'CRITÉRIO DE CLASSIFICAÇÃO: classifique pela HABILIDADE/CONTEÚDO que o comando da questão cobra, '
         .'não pelo tema do texto de apoio. Interpretação e compreensão de texto ("de acordo com o texto", "o autor afirma", '
         .'"infere-se do texto"), gramática, gêneros textuais, figuras de linguagem e semântica são Língua Portuguesa, mesmo que o texto '
@@ -414,23 +442,35 @@ class QuestionAiService
     /**
      * @param  int[]  $subjectIds  disciplinas escolhidas pelo usuário para a prova; a IA só classifica dentro delas
      */
-    public function separateText(?User $user, int $tenantId, string $text, string $sourceExamName, array $subjectIds = []): array
+    public function separateText(?User $user, int $tenantId, string $text, string $sourceExamName, array $subjectIds = [], ?array $focusPages = null): array
     {
         $credential = $this->credential($user, $tenantId);
+        // Provas longas vão em blocos de páginas (o modelo encurta listas grandes): a IA vê o bloco
+        // e uma página de contexto de cada lado, mas só separa as questões que COMEÇAM no bloco.
+        [$promptText, $focusRule] = $focusPages === null
+            ? [$text, '']
+            : $this->focusedDocument($text, (int) $focusPages['from'], (int) $focusPages['to']);
         $catalogs = $this->restrictSubjects($this->catalogs($tenantId), $subjectIds);
         $onlySubjectId = $catalogs['subjects']->count() === 1 ? (int) $catalogs['subjects']->first()['id'] : null;
         $this->logSuspicious($tenantId, 'pdf_separate_text', [$text]);
         $system = 'Você digitaliza provas brasileiras. Recebe SOMENTE o texto extraído do PDF, não as imagens. '
             .'Separe as questões fielmente; não invente enunciados, números, alternativas nem dados de figuras ausentes. '
             .self::FORMAT_RULES."\n".AiPromptGuard::SYSTEM_RULES;
-        $prompt = 'Leia o documento inteiro e separe cada questão, na ordem original. A separação é sua responsabilidade: o texto não foi dividido em questões. '
+        $prompt = $focusRule.'Leia o documento inteiro e separe cada questão, na ordem original. A separação é sua responsabilidade: o texto não foi dividido em questões. '
             .'Remova capas, cabeçalhos, instruções gerais e gabarito do documento. Preserve fontes e tabelas textuais. '
             ."TEXTOS DE APOIO (texto-base): trechos de livros, poemas, letras de música, notícias, citações com fonte, 'Texto I/II', "
-            ."'Leia o texto a seguir', 'Texto para as questões 3 e 4' são TEXTO, nunca imagem. Transcreva cada um INTEGRALMENTE uma única vez em support_texts "
-            ."(id curto, title como aparece, ex.: 'Texto I', ou vazio, e text com a fonte/referência no final) e, em CADA questão que depende dele, informe support_text_id; "
+            ."'Leia o texto a seguir', 'Texto para as questões 3 e 4', ou um título seguido de parágrafos antes da pergunta são TEXTO, nunca imagem. "
+            ."Registre cada um UMA única vez em support_texts: id curto; title = a linha de título que aparece logo acima do corpo do texto (ex.: 'O conselho dos ratos'; com rótulo, 'Texto I — O conselho dos ratos'), vazio só se não houver título; "
+            ."start = as primeiras 8 a 15 palavras do CORPO do texto (logo depois do título) e end = as últimas 8 a 15 palavras do texto, imediatamente ANTES "
+            ."do número/comando da primeira questão (inclua a fonte/referência, se houver), copiadas EXATAMENTE como estão no texto extraído: "
+            ."o sistema recorta o texto integral do documento por essas âncoras; text = vazio (não transcreva o texto de apoio). "
+            ."Em CADA questão que depende dele, informe support_text_id; "
             ."o question_text da questão fica só com o comando/pergunta, sem repetir o texto de apoio. Questão sem texto de apoio: support_text_id=null. "
             ."Um texto longo, reflexivo ou com referência bibliográfica NÃO é motivo para needs_image.\n"
             .'Não perca questões que cruzam páginas. Enunciado sem número e sem alternativas; alternativas na ordem original, sem letras. '
+            .'A prova pode ter VÁRIAS seções/disciplinas (ex.: PORTUGUÊS e MATEMÁTICA) com a numeração reiniciada em cada uma: inclua TODAS as questões '
+            .'de TODAS as seções, na ordem do documento, e use source_number com o prefixo da seção quando a numeração reinicia (ex.: "1", ..., "20", "MAT 1", ..., "MAT 20"); '
+            .'total_questions conta todas as seções. '
             .'Objetivas: 2 a 10 alternativas; discursivas: options=[]. Complete deve ser true somente se TODAS as questões estiverem em questions. '
             ."Se ilegível, impossível de separar ou acima de 50 questões, complete=false. total_questions é o total identificado no documento.\n"
             .'needs_image deve ser booleano obrigatório: true SOMENTE quando o enunciado ou as alternativas dependem de figura, gráfico, mapa, charge, tirinha ou imagem cujo conteúdo NÃO está no texto extraído. '
@@ -445,10 +485,13 @@ class QuestionAiService
                 : "Classifique cada questão em UMA das disciplinas listadas abaixo (escolhidas pelo usuário para esta prova) e escolha os assuntos dentro dela.\n")
             .self::CLASSIFICATION_RULES."\n"
             .$this->catalogsPrompt($catalogs)."\n"
-            .AiPromptGuard::wrap('texto_pdf', $text)."\nFormato JSON:\n"
+            .AiPromptGuard::wrap('texto_pdf', $promptText)."\nFormato JSON:\n"
             .json_encode([
                 'complete' => true, 'total_questions' => 1,
-                'support_texts' => [['id' => 't1', 'title' => 'Texto I', 'text' => 'texto de apoio integral, com a fonte']],
+                'support_texts' => [[
+                    'id' => 't1', 'title' => 'Texto I', 'start' => 'primeiras palavras exatas do texto de apoio',
+                    'end' => 'últimas palavras exatas do texto de apoio', 'text' => '',
+                ]],
                 'questions' => [[
                     'source_number' => '1', 'support_text_id' => 't1', 'type' => 'multiple_choice', 'question_text' => 'comando da questão',
                     'explanation' => '',
@@ -461,19 +504,40 @@ class QuestionAiService
                     'board_id' => null, 'year' => null, 'tags' => [],
                 ]],
             ], JSON_UNESCAPED_UNICODE);
-        $response = $this->router->structuredText($credential, $system, $prompt, $this->separationSchema());
+        $response = $this->router->structuredText(
+            $credential, $system, $prompt, $this->separationSchema(),
+            trim((string) config('services.ai.pdf.text_model_openrouter')) ?: null
+        );
         if (($response['finish_reason'] ?? null) === 'length') {
             throw new AiException('A resposta da IA foi cortada. Divida o PDF e tente novamente.', 422, 'pdf_incomplete');
         }
         $data = $response['data'];
-        $supportTexts = $this->supportTexts($data['support_texts'] ?? []);
-        $validated = $this->validateImportedQuestions($data, $catalogs, 'needs_image');
+        $supportTexts = $this->supportTexts($data['support_texts'] ?? [], $text, $data['questions'] ?? []);
+        if ($focusPages !== null && is_array($data['questions'] ?? null) && ($data['total_questions'] ?? null) === count($data['questions'])) {
+            // Bloco de páginas: a IA marca complete=false por cautela com o contexto; a contagem conferida basta.
+            $data['complete'] = true;
+        }
+        $validated = $this->validateImportedQuestions($data, $catalogs, 'needs_image', $focusPages !== null);
+        if ($focusPages !== null) {
+            // A IA às vezes também separa questões da página de contexto: fica só o que começa no bloco.
+            $blockStart = (int) $focusPages['from'] > 1 ? self::positionIn($text, '[PÁGINA '.(int) $focusPages['from'].']') : 0;
+            $blockEnd = self::positionIn($text, '[PÁGINA '.((int) $focusPages['to'] + 1).']');
+            $validated = array_values(array_filter($validated, function (array $item) use ($text, $blockStart, $blockEnd) {
+                $at = self::positionIn($text, mb_substr(trim(QuestionRichText::plain($item['content']['question_text'])), 0, 40));
 
-        return array_map(function (array $item) use ($sourceExamName, $supportTexts, $onlySubjectId) {
+                return $at === null || (($blockStart === null || $at >= $blockStart) && ($blockEnd === null || $at < $blockEnd));
+            }));
+        }
+
+        return array_map(function (array $item) use ($sourceExamName, $supportTexts, $onlySubjectId, $text) {
+            $item['content']['question_text'] = self::withoutTrailingOptions($item['content']['question_text'], $item['content']['options'] ?? []);
             $content = $item['content'];
             // Texto de apoio vai no início do enunciado de CADA questão que o usa (a questão precisa ser autossuficiente).
+            // Só vale texto que aparece ANTES da questão no documento (a IA às vezes liga ao texto seguinte).
             $supportId = is_string($item['raw']['support_text_id'] ?? null) ? $item['raw']['support_text_id'] : null;
-            if ($supportId !== null && isset($supportTexts[$supportId])) {
+            $commandAt = self::positionIn($text, mb_substr(trim(QuestionRichText::plain($content['question_text'])), 0, 40));
+            if ($supportId !== null && isset($supportTexts[$supportId])
+                && ($commandAt === null || $supportTexts[$supportId]['at'] === null || $supportTexts[$supportId]['at'] < $commandAt)) {
                 $support = $supportTexts[$supportId];
                 $header = $support['title'] !== '' ? '<b>'.$support['title']."</b>\n" : '';
                 $content['question_text'] = mb_substr($header.$support['text']."\n\n".$content['question_text'], 0, 20000);
@@ -482,16 +546,20 @@ class QuestionAiService
                 $content['subject_id'] = $onlySubjectId;
             }
 
-            return $content + ['needs_image' => $item['raw']['needs_image'], 'source_exam_name' => $sourceExamName];
+            // Comando que cita figura/gráfico/charge depende de imagem que o texto extraído não tem.
+            $needsImage = $item['raw']['needs_image'] === true
+                || (bool) preg_match(self::IMAGE_REFERENCE, QuestionRichText::plain($item['content']['question_text']));
+
+            return $content + ['needs_image' => $needsImage, 'source_exam_name' => $sourceExamName];
         }, $validated);
     }
 
-    private function validateImportedQuestions(array $raw, array $catalogs, string $imageField): array
+    private function validateImportedQuestions(array $raw, array $catalogs, string $imageField, bool $allowEmpty = false): array
     {
         $limit = 50;
         $items = $raw['questions'] ?? null;
         if (($raw['complete'] ?? null) !== true || ! is_array($items) || ! array_is_list($items)
-            || count($items) < 1 || count($items) > $limit
+            || (count($items) < 1 && ! $allowEmpty) || count($items) > $limit
             || ! is_int($raw['total_questions'] ?? null) || $raw['total_questions'] !== count($items)) {
             throw new AiException('A IA não converteu o PDF completo com segurança. Divida o documento ou confira a legibilidade e tente novamente.', 422, 'pdf_incomplete');
         }
@@ -564,16 +632,35 @@ class QuestionAiService
      *
      * @return array<string, array{title: string, text: string}>
      */
-    private function supportTexts(mixed $raw): array
+    /**
+     * Textos de apoio: o recorte do documento entre as âncoras start/end vale mais que a transcrição da IA
+     * (o modelo tende a resumir ou devolver só o título de textos longos).
+     */
+    private function supportTexts(mixed $raw, string $document = '', mixed $questions = []): array
     {
         $texts = [];
         foreach (is_array($raw) ? $raw : [] as $item) {
             $id = is_array($item) && is_scalar($item['id'] ?? null) ? trim((string) $item['id']) : '';
             $text = is_array($item) ? $this->text($item['text'] ?? '', 15000) : '';
+            $start = is_array($item) ? (string) ($item['start'] ?? '') : '';
+            $excerpt = self::excerptBetween($document, $start, is_array($item) ? (string) ($item['end'] ?? '') : '');
+            if ($excerpt === null && $start !== '') {
+                // Âncora final não achada: o texto vai até o comando da primeira questão que o usa.
+                $first = collect(is_array($questions) ? $questions : [])->first(fn ($q) => is_array($q) && ($q['support_text_id'] ?? null) === $id);
+                $command = is_array($first) ? trim(QuestionRichText::plain((string) ($first['question_text'] ?? ''))) : '';
+                $excerpt = self::excerptBetween($document, $start, mb_substr($command, 0, 40), true);
+            }
+            // Transcrição bem menor que o trecho do documento = resumida/cortada: vale o trecho original.
+            if ($excerpt !== null && mb_strlen(QuestionRichText::plain($text)) < 0.8 * mb_strlen($excerpt)) {
+                $text = $this->text($excerpt, 15000);
+            }
             if ($id === '' || isset($texts[$id]) || trim(QuestionRichText::plain($text)) === '') {
                 continue;
             }
-            $texts[$id] = ['title' => $this->text($item['title'] ?? '', 120), 'text' => $text];
+            $texts[$id] = [
+                'title' => $this->text($item['title'] ?? '', 120), 'text' => $text,
+                'at' => self::positionIn($document, $start), // posição no documento (ordem texto → questão)
+            ];
         }
 
         return $texts;
@@ -609,8 +696,11 @@ class QuestionAiService
             'properties' => [
                 'complete' => ['type' => 'boolean'], 'total_questions' => ['type' => 'integer'],
                 'support_texts' => ['type' => 'array', 'items' => [
-                    'type' => 'object', 'additionalProperties' => false, 'required' => ['id', 'title', 'text'],
-                    'properties' => ['id' => ['type' => 'string'], 'title' => ['type' => 'string'], 'text' => ['type' => 'string']],
+                    'type' => 'object', 'additionalProperties' => false, 'required' => ['id', 'title', 'start', 'end', 'text'],
+                    'properties' => [
+                        'id' => ['type' => 'string'], 'title' => ['type' => 'string'],
+                        'start' => ['type' => 'string'], 'end' => ['type' => 'string'], 'text' => ['type' => 'string'],
+                    ],
                 ]],
                 'questions' => ['type' => 'array', 'items' => [
                     'type' => 'object', 'additionalProperties' => false,
@@ -757,6 +847,133 @@ class QuestionAiService
             'exam_type_id' => $pick($catalogs['exam_types'], $raw['exam_type_id'] ?? null),
             'tags' => $tags,
         ], fn ($v) => $v !== null && $v !== []);
+    }
+
+    /**
+     * Trecho ORIGINAL do documento entre a âncora inicial e a final. A comparação ignora maiúsculas, aspas,
+     * travessões e TODO espaço (o pdf.js parte palavras: "Qu ando", "202 6"). Null se as âncoras não forem achadas.
+     */
+    /**
+     * Bloco de páginas [from..to] com uma página de contexto de cada lado e a regra de foco do prompt.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function focusedDocument(string $text, int $from, int $to): array
+    {
+        $parts = preg_split('/(?=\[PÁGINA \d+\])/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $pages = [];
+        foreach ($parts as $part) {
+            if (preg_match('/^\[PÁGINA (\d+)\]/u', $part, $m)) {
+                $pages[(int) $m[1]] = $part;
+            }
+        }
+        if ($pages === []) {
+            return [$text, ''];
+        }
+        $context = array_filter($pages, fn ($n) => $n >= $from - 1 && $n <= $to + 1, ARRAY_FILTER_USE_KEY);
+        $rule = "FOCO: separe SOMENTE as questões cujo número/comando começa nas páginas {$from} a {$to}. "
+            .'As páginas '.($from - 1).' e '.($to + 1).' (quando presentes) são apenas CONTEXTO: use-as para textos de apoio que começam antes '
+            .'e para completar questões que continuam depois, mas não separe questões que começam nelas. Se uma questão em foco depende de um '
+            .'texto de apoio que começa na página de contexto anterior, registre esse texto normalmente em support_texts e ligue-o pela support_text_id. '
+            .'Se nenhuma questão começa nessas páginas (capa, instruções, gabarito), devolva questions=[] com complete=true e total_questions=0. '
+            .'total_questions conta só as questões das páginas em foco. Numeração reiniciada por seção: use o prefixo da seção em source_number quando ela aparecer no contexto.'."\n";
+
+        return [implode("\n\n", $context), $rule];
+    }
+
+    /** Posição (no texto normalizado) da primeira ocorrência de $needle, com a mesma tolerância das âncoras. */
+    private static function positionIn(string $document, string $needle): ?int
+    {
+        if (mb_strlen(trim($needle)) < 10) {
+            return null;
+        }
+        [, , , $haystack] = self::searchIndex($document);
+        $at = mb_strpos($haystack, self::foldForSearch($needle));
+
+        return $at === false ? null : $at;
+    }
+
+    private static function foldChar(string $c): string
+    {
+        return match ($c) {
+            '“', '”', '„', '«', '»' => '"', '‘', '’', '´', '`' => "'", '–', '—', '‐' => '-',
+            default => mb_strtolower($c),
+        };
+    }
+
+    private static function foldForSearch(string $value): string
+    {
+        return implode('', array_map(self::foldChar(...), mb_str_split(preg_replace('/\s+/u', '', $value))));
+    }
+
+    /**
+     * Índice de busca do documento: caracteres originais, normalizados (sem espaços), mapa normalizado→original
+     * e o texto normalizado. Memorizado por documento (várias buscas no mesmo PDF).
+     *
+     * @return array{0: string[], 1: string[], 2: int[], 3: string}
+     */
+    private static function searchIndex(string $document): array
+    {
+        static $cache = [];
+        $key = md5($document);
+        if (isset($cache[$key])) {
+            return $cache[$key];
+        }
+        $chars = mb_str_split($document);
+        $norm = [];
+        $map = [];
+        foreach ($chars as $i => $c) {
+            if (preg_match('/\s/u', $c)) {
+                continue;
+            }
+            $norm[] = self::foldChar($c);
+            $map[] = $i;
+        }
+        $cache = [$key => [$chars, $norm, $map, implode('', $norm)]];
+
+        return $cache[$key];
+    }
+
+    private static function excerptBetween(string $document, string $start, string $end, bool $endExclusive = false): ?string
+    {
+        $start = trim($start);
+        $end = trim($end);
+        if ($document === '' || mb_strlen($start) < 10 || mb_strlen($end) < 10) {
+            return null;
+        }
+        [$chars, $norm, $map, $haystack] = self::searchIndex($document);
+        $needle = self::foldForSearch(...);
+
+        $from = mb_strpos($haystack, $needle($start));
+        if ($from === false) {
+            return null;
+        }
+        $endNeedle = $needle($end);
+        $to = mb_strpos($haystack, $endNeedle, $from);
+        if ($to === false) {
+            return null;
+        }
+        if ($endExclusive) {
+            // Corta antes do comando e do número da questão ("1." / "1)") que o precede.
+            $to = max($from, $to - 1);
+            $before = implode('', array_slice($norm, $from, $to - $from + 1));
+            $to = $from + mb_strlen(preg_replace('/(\d{1,3}[.)\-–]?|quest(ã|a)o\d{1,3}[.:)\-–]?)$/u', '', $before)) - 1;
+            if ($to <= $from) {
+                return null;
+            }
+        } else {
+            $to += mb_strlen($endNeedle) - 1;
+        }
+        if ($to - $from > 15000) {
+            return null;
+        }
+        $excerpt = implode('', array_slice($chars, $map[$from], $map[$to] - $map[$from] + 1));
+        $excerpt = preg_replace('/\[PÁGINA \d+\]|\[SEM TEXTO EXTRAÍVEL\]/u', ' ', $excerpt);
+
+        // Quebras de linha do PDF são de diagramação: junta linhas, preserva parágrafos (linha em branco).
+        $paragraphs = preg_split('/\n\s*\n/u', trim($excerpt));
+
+        return implode("\n\n", array_map(fn ($p) => trim(preg_replace('/\s+/u', ' ', $p)), $paragraphs));
     }
 
     private static function sameName(string $a, string $b): bool

@@ -178,6 +178,26 @@ export function chunkBlocks<T>(items: T[], size = BLOCKS_PER_REQUEST): T[][] {
 }
 
 /** Lê o texto de cada página do PDF no navegador (pdf.js do react-pdf, worker do CDN). */
+/** Páginas por chamada à IA: provas longas numa chamada só fazem o modelo encurtar a lista de questões. */
+export const PAGES_PER_AI_BLOCK = 2;
+
+/** Blocos [from, to] (1-based) cobrindo todas as páginas. */
+export function pageBlocks(pageCount: number, size = PAGES_PER_AI_BLOCK): { from: number; to: number }[] {
+  const blocks: { from: number; to: number }[] = [];
+  for (let from = 1; from <= pageCount; from += size) blocks.push({ from, to: Math.min(pageCount, from + size - 1) });
+  return blocks;
+}
+
+/**
+ * Mesma questão devolvida por dois blocos (página de contexto): compara o comando (último parágrafo,
+ * sem o texto de apoio que um bloco pode ter anexado e o outro não) + alternativas.
+ */
+export function questionFingerprint(q: { question_text?: string | null; options?: { option_text?: string | null }[] }): string {
+  const norm = (v?: string | null) => (v ?? "").replace(/<[^>]+>/g, "").replace(/\s+/g, "").toLowerCase();
+  const command = norm((q.question_text ?? "").split(/\n\s*\n/).pop()).slice(-120);
+  return `${command}|${(q.options ?? []).map((o) => norm(o.option_text).slice(0, 40)).join("|")}`;
+}
+
 export async function extractPdfPages(file: File): Promise<string[]> {
   const { pdfjs } = await import("react-pdf");
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;

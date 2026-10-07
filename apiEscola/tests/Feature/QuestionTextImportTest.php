@@ -296,6 +296,111 @@ class QuestionTextImportTest extends TestCase
         Http::assertSent(fn (Request $r) => str_contains((string) $r->body(), 'nunca imagem') && str_contains((string) $r->body(), 'support_text_id'));
     }
 
+    public function test_support_text_is_cut_from_the_pdf_by_anchors_when_ai_returns_only_the_title(): void
+    {
+        $pdf = "[PÁGINA 2]\n1º SIMULADO DE 2026\nComo opera a máfia que transformou o Brasil num dos\ncampeões da fraude de medicamentos\n"
+            ."É um dos piores crimes que se podem cometer. As\nvítimas são homens, mulheres e crianças doentes –\npresas fáceis.\n\n"
+            ."Para o doente, o remédio é compulsório. Nunca como hoje os brasileiros\nentraram numa farmácia com tanta reserva.\n"
+            ."1. Segundo a autora, “um dos piores crimes que se pode\ncometer” é\na) a venda de narcóticos.\nb) a falsificação dos remédios.";
+        $this->fake([], content: json_encode([
+            'complete' => true, 'total_questions' => 1,
+            'support_texts' => [[
+                'id' => 't1', 'title' => 'Como opera a máfia que transformou o Brasil num dos campeões da fraude de medicamentos',
+                // Âncoras com diferenças de quebra de linha e caixa: ainda casam.
+                'start' => 'é um dos piores crimes que se podem cometer. As vítimas',
+                'end' => 'os brasileiros entraram numa farmácia com tanta reserva.',
+                'text' => 'Como opera a máfia que transformou o Brasil num dos campeões da fraude de medicamentos', // só o título
+            ]],
+            'questions' => [[
+                'source_number' => '1', 'support_text_id' => 't1', 'type' => 'multiple_choice',
+                'question_text' => 'Segundo a autora, “um dos piores crimes que se pode cometer” é', 'explanation' => '',
+                'options' => [['option_text' => 'a venda de narcóticos.', 'is_correct' => false], ['option_text' => 'a falsificação dos remédios.', 'is_correct' => false]],
+                'needs_image' => false, 'answer_from_pdf' => false,
+                'subject_id' => null, 'topic_ids' => [], 'difficulty_id' => null, 'board_id' => null, 'year' => null, 'tags' => [],
+            ]],
+        ]));
+
+        $text = $this->separate(['text' => $pdf])->assertOk()->json('body.questions.0.question_text');
+        $this->assertStringStartsWith('<b>Como opera a máfia que transformou o Brasil num dos campeões da fraude de medicamentos</b>'."\n".'É um dos piores crimes que se podem cometer. As vítimas são homens, mulheres e crianças doentes – presas fáceis.', $text);
+        $this->assertStringContainsString("presas fáceis.\n\nPara o doente, o remédio é compulsório.", $text);
+        $this->assertStringContainsString('com tanta reserva.'."\n\n".'Segundo a autora', $text);
+        $this->assertStringNotContainsString('a venda de narcóticos', $text);
+    }
+
+    public function test_focus_pages_send_only_block_with_context_and_accept_empty_block(): void
+    {
+        $pdf = "[PÁGINA 1]\nCapa e instruções\n\n[PÁGINA 2]\nTexto da página dois\n\n[PÁGINA 3]\nTexto da página três\n\n[PÁGINA 4]\nTexto da página quatro\n\n[PÁGINA 5]\nGabarito";
+        $this->fake([], content: json_encode(['complete' => true, 'total_questions' => 0, 'support_texts' => [], 'questions' => []]));
+
+        $this->separate(['text' => $pdf, 'focus_pages' => ['from' => 3, 'to' => 3]])
+            ->assertOk()->assertJsonCount(0, 'body.questions');
+
+        Http::assertSent(function (Request $r) {
+            $prompt = (string) $r->body();
+
+            // Corpo em JSON (acentos escapados): compara trechos sem acento.
+            return str_contains($prompt, 'ginas 3 a 3') && str_contains($prompt, 'gina dois')
+                && str_contains($prompt, 'gina quatro') && ! str_contains($prompt, 'Capa e instru') && ! str_contains($prompt, 'Gabarito');
+        });
+        $this->separate(['text' => $pdf, 'focus_pages' => ['from' => 3, 'to' => 2]])->assertStatus(422);
+    }
+
+    public function test_support_text_after_the_question_is_not_attached_and_figure_reference_needs_image(): void
+    {
+        $pdf = "[PÁGINA 1]\n6. No primeiro quadrinho desse texto, a expressão destacada foi usada para\nA) x\nB) y\n"
+            ."Hierarquia\nDiz que um leão enorme ia andando chateado, não muito rei dos animais.\n7. Diz que um leão andava chateado porque\na) x\nb) y";
+        $q = fn (string $n, string $cmd) => [
+            'source_number' => $n, 'support_text_id' => 't1', 'type' => 'multiple_choice', 'question_text' => $cmd, 'explanation' => '',
+            'options' => [['option_text' => 'x', 'is_correct' => false], ['option_text' => 'y', 'is_correct' => false]],
+            'needs_image' => false, 'answer_from_pdf' => false,
+            'subject_id' => null, 'topic_ids' => [], 'difficulty_id' => null, 'board_id' => null, 'year' => null, 'tags' => [],
+        ];
+        $this->fake([], content: json_encode([
+            'complete' => true, 'total_questions' => 2,
+            'support_texts' => [['id' => 't1', 'title' => 'Hierarquia', 'start' => 'Diz que um leão enorme ia andando chateado',
+                'end' => 'não muito rei dos animais.', 'text' => '']],
+            'questions' => [$q('6', 'No primeiro quadrinho desse texto, a expressão destacada foi usada para'), $q('7', 'Diz que um leão andava chateado porque')],
+        ]));
+
+        $response = $this->separate(['text' => $pdf])->assertOk();
+        $this->assertSame('No primeiro quadrinho desse texto, a expressão destacada foi usada para', $response->json('body.questions.0.question_text'));
+        $response->assertJsonPath('body.questions.0.needs_image', true);
+        $this->assertStringStartsWith('<b>Hierarquia</b>', $response->json('body.questions.1.question_text'));
+        $response->assertJsonPath('body.questions.1.needs_image', false);
+    }
+
+    public function test_focus_block_drops_questions_that_start_on_context_pages(): void
+    {
+        $pdf = "[PÁGINA 1]\nCapa\n\n[PÁGINA 2]\n1. Primeira questão da página dois, qual é a resposta?\na) x\nb) y\n\n"
+            ."[PÁGINA 3]\n2. Segunda questão já na página três, qual é a resposta?\na) x\nb) y";
+        $q = fn (string $n, string $cmd) => [
+            'source_number' => $n, 'support_text_id' => null, 'type' => 'multiple_choice', 'question_text' => $cmd, 'explanation' => '',
+            'options' => [['option_text' => 'x', 'is_correct' => false], ['option_text' => 'y', 'is_correct' => false]],
+            'needs_image' => false, 'answer_from_pdf' => false,
+            'subject_id' => null, 'topic_ids' => [], 'difficulty_id' => null, 'board_id' => null, 'year' => null, 'tags' => [],
+        ];
+        $this->fake([$q('1', 'Primeira questão da página dois, qual é a resposta?'), $q('2', 'Segunda questão já na página três, qual é a resposta?')]);
+
+        $this->separate(['text' => $pdf, 'focus_pages' => ['from' => 1, 'to' => 2]])->assertOk()
+            ->assertJsonCount(1, 'body.questions')
+            ->assertJsonPath('body.questions.0.question_text', 'Primeira questão da página dois, qual é a resposta?');
+    }
+
+    public function test_options_repeated_at_the_end_of_statement_are_removed(): void
+    {
+        $this->fake([[
+            'source_number' => '13', 'support_text_id' => null, 'type' => 'multiple_choice',
+            'question_text' => "Cerca de 120 milhões de pessoas se vacinaram. Assinale a correta.\na) O número pode ser escrito como 12.000.000\nb) 120 milhões tem 9 ordens",
+            'explanation' => '',
+            'options' => [['option_text' => 'O número pode ser escrito como 12.000.000', 'is_correct' => false], ['option_text' => '120 milhões tem 9 ordens', 'is_correct' => false]],
+            'needs_image' => false, 'answer_from_pdf' => false,
+            'subject_id' => null, 'topic_ids' => [], 'difficulty_id' => null, 'board_id' => null, 'year' => null, 'tags' => [],
+        ]]);
+
+        $this->separate()->assertOk()
+            ->assertJsonPath('body.questions.0.question_text', 'Cerca de 120 milhões de pessoas se vacinaram. Assinale a correta.');
+    }
+
     public function test_classification_is_restricted_to_chosen_subjects(): void
     {
         $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português']);

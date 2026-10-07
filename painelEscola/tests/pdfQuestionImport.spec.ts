@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { chunkBlocks, mergeWithNext, pdfDocumentText, prepareQuestionBlocks } from "../utils/pdfQuestionImport";
+import { chunkBlocks, mergeWithNext, pageBlocks, pdfDocumentText, prepareQuestionBlocks, questionFingerprint } from "../utils/pdfQuestionImport";
 
 test("texto integral preserva páginas, numeração e gabarito para a IA separar", () => {
   const pages = ["Cabeçalho\n7. Observe a figura.\nA) seis\nB) oito", "continuação da questão\nGABARITO 7-A", ""];
@@ -54,4 +54,16 @@ test.describe("preparação de questões de PDF", () => {
     expect(merged[0].text).toContain("continuação errada");
     expect(chunkBlocks([1, 2, 3, 4, 5, 6, 7]).map((c) => c.length)).toEqual([5, 2]);
   });
+});
+
+test("blocos de 2 páginas e questões repetidas entre blocos", () => {
+  expect(pageBlocks(10)).toEqual([{ from: 1, to: 2 }, { from: 3, to: 4 }, { from: 5, to: 6 }, { from: 7, to: 8 }, { from: 9, to: 10 }]);
+  expect(pageBlocks(3)).toEqual([{ from: 1, to: 2 }, { from: 3, to: 3 }]);
+  const a = { question_text: "<b>Texto</b>\nDe acordo com o texto, estamos", options: [{ option_text: "hidratados." }] };
+  const b = { question_text: "Texto\nDe acordo com o  texto,\nestamos", options: [{ option_text: "Hidratados." }] };
+  expect(questionFingerprint(a)).toBe(questionFingerprint(b));
+  // Um bloco anexou o texto de apoio e o outro não: ainda é a mesma questão.
+  expect(questionFingerprint({ ...b, question_text: "Texto longo de apoio.\n\nDe acordo com o texto, estamos" }))
+    .toBe(questionFingerprint({ ...b, question_text: "De acordo com o texto, estamos" }));
+  expect(questionFingerprint(a)).not.toBe(questionFingerprint({ ...b, options: [{ option_text: "infectados" }] }));
 });

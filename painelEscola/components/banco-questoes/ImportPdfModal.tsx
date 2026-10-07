@@ -29,7 +29,7 @@ import { contentFromSuggestion, contentPayload, mergeContentSuggestion, validate
 import {
   EMPTY_CLASSIFICATION_FORM, applyClassificationSuggestion, classificationFromSuggestion, diffClassification,
 } from "../../utils/questionClassification";
-import { extractPdfPages, pdfDocumentText, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
+import { extractPdfPages, pageBlocks, pdfDocumentText, questionFingerprint, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { plainRichText } from "../../utils/richText";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
@@ -85,6 +85,8 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   /** Com "Criar simulado", a modalidade escolhida vale para todas as questões (campo bloqueado na revisão). */
   const lockedExamTypeId = createExam ? selectedExamType?.id ?? null : null;
   const [noTextPages, setNoTextPages] = useState<number[]>([]);
+  /** Blocos de páginas que a IA não conseguiu separar (as demais questões seguem para revisão). */
+  const [failedBlocks, setFailedBlocks] = useState<{ pages: string; message: string }[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeKey, setActiveKey] = useState("");
   const [savedDraft, setSavedDraft] = useState<{ id: string; revision: number } | null>(null);
@@ -111,6 +113,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     setExamTypeSlug("");
     includedIds.current = [];
     setNoTextPages([]);
+    setFailedBlocks([]);
     setDrafts([]);
     setActiveKey("");
     setSavedDraft(null);
@@ -294,8 +297,41 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       const pages = await extractPdfPages(file);
       const text = pdfDocumentText(pages);
       setNoTextPages(pages.flatMap((page, index) => page.trim() ? [] : [index + 1]));
-      setProgress("Enviando o texto à IA para separar e classificar as questões…");
-      const response = await aiSeparatePdfText(text, sourceExamName.trim(), subjectIds);
+      // Em blocos de páginas, na ordem: cada bloco vê as páginas vizinhas como contexto.
+      const blocks = pageBlocks(pages.length);
+      const questions: Awaited<ReturnType<typeof aiSeparatePdfText>>["body"]["questions"] = [];
+      const seen = new Map<string, number>();
+      const failed: { pages: string; message: string }[] = [];
+      let lastCause: unknown = null;
+      for (const [index, block] of blocks.entries()) {
+        const label = block.from === block.to ? `página ${block.from}` : `páginas ${block.from}–${block.to}`;
+        setProgress(`Separando e classificando as questões com IA: ${label} (${index + 1} de ${blocks.length})…`);
+        try {
+          const response = await aiSeparatePdfText(text, sourceExamName.trim(), subjectIds, blocks.length > 1 ? block : undefined);
+          for (const question of response.body.questions) {
+            const fingerprint = questionFingerprint(question);
+            const previous = seen.get(fingerprint);
+            if (previous === undefined) {
+              seen.set(fingerprint, questions.length);
+              questions.push(question);
+            } else if ((question.question_text ?? "").length > (questions[previous].question_text ?? "").length) {
+              questions[previous] = question; // repetida: fica a versão com texto de apoio
+            }
+          }
+        } catch (cause) {
+          lastCause = cause;
+          failed.push({ pages: label, message: describeAiError(cause, "Falha na separação").message });
+        }
+      }
+      if (!questions.length) throw lastCause ?? new Error("Nenhuma questão foi encontrada no PDF.");
+      setFailedBlocks(failed);
+      const response = {
+        type: failed.length ? "warning" : "success",
+        message: failed.length
+          ? `${questions.length} questão(ões) separada(s). Não foi possível ler: ${failed.map((f) => f.pages).join(", ")}.`
+          : `${questions.length} questão(ões) separada(s) pela IA. Revise e anexe as imagens necessárias antes de incluir.`,
+        body: { questions },
+      };
       const converted: Draft[] = response.body.questions.map((question, index) => {
         const content = contentFromSuggestion(question);
         return {
@@ -556,6 +592,14 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
               <Text className="text-sm text-danger">Confira a versão salva antes de continuar. Ao reabrir, alterações locais não salvas serão descartadas.</Text>
               <Button label="Reabrir versão salva" disabled={busy} onPress={() => void resumeDraft(savedDraft.id)} />
             </View>}
+            {failedBlocks.length > 0 && (
+              <View className="rounded-ds-md border border-warning bg-warning-tint px-3 py-2" style={{ gap: 4 }}>
+                <Text className="text-xs font-semibold text-warning">
+                  A IA não conseguiu separar {failedBlocks.map((f) => f.pages).join(", ")}. Confira o PDF: as questões dessas páginas não estão na lista.
+                </Text>
+                {failedBlocks.map((f) => <Text key={f.pages} className="text-xs text-warning">{f.pages}: {f.message}</Text>)}
+              </View>
+            )}
             {noTextPages.length > 0 && <Text className="text-xs text-warning">
               Páginas sem texto extraível: {noTextPages.join(", ")}. Se contiverem questões escaneadas, elas não puderam ser lidas; aplique OCR e importe novamente.
             </Text>}
