@@ -202,6 +202,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     event.preventDefault();
     const file = image.getAsFile();
     if (file) void uploadImage(key, file);
+    else update(key, { errors: { image: "Não foi possível ler a imagem copiada. Copie novamente ou selecione o arquivo." } });
   };
 
   const uploadImage = async (key: string, selected: File) => {

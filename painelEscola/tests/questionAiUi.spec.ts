@@ -36,7 +36,7 @@ async function pdfWorker(page: Page) {
   }));
 }
 
-async function startTwoQuestionImport(page: Page) {
+async function startQuestionImport(page: Page, count = 2) {
   await pdfWorker(page);
   await page.route("**/api/question-bank/ai/separate-text*", (route) => route.fulfill({
     headers: { "access-control-allow-origin": new URL(baseUrl!).origin, "access-control-allow-credentials": "true" },
@@ -46,6 +46,10 @@ async function startTwoQuestionImport(page: Page) {
         options: [{ option_text: "Quatro", is_correct: false }, { option_text: "Cinco", is_correct: false }] },
       { type: "essay", source_number: "2", question_text: "Explique sua estratégia de cálculo.", explanation: "",
         needs_image: false, answer_from_pdf: false, options: [] },
+      ...Array.from({ length: count - 2 }, (_, index) => ({
+        type: "essay", source_number: String(index + 3), question_text: `Explique a estratégia da questão ${index + 3}.`,
+        explanation: "", needs_image: false, answer_from_pdf: false, options: [],
+      })),
     ] } },
   }));
   await page.goto(`${baseUrl}/#/questoes`);
@@ -337,7 +341,7 @@ test("PDF permite corrigir marcação de imagem e exige revisão do gabarito des
 
 test("PDF usa abas e autocompleta somente a questão individual sem salvar", async ({ page }) => {
   const state = await setup(page, true, 200, {}, false, true);
-  await startTwoQuestionImport(page);
+  await startQuestionImport(page);
   await expect(page.getByRole("textbox", { name: "Enunciado", exact: true })).toHaveCount(1);
   await page.getByRole("button", { name: "Autocompletar questão com IA", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Explicação", exact: true })).toHaveText("Dois mais dois é quatro.");
@@ -372,7 +376,7 @@ test("PDF aceita imagem colada e a mantém ao trocar de aba", async ({ page }) =
       json: { type: "success", message: "Imagem colada salva.", body: { image_url: imageUrl } },
     });
   });
-  await startTwoQuestionImport(page);
+  await startQuestionImport(page);
   const pasteTarget = page.getByRole("textbox", { name: "Colar imagem da questão 1" });
   await pasteTarget.evaluate((element) => {
     const clipboard = new DataTransfer();
@@ -434,7 +438,7 @@ test("PDF salva rascunho incompleto no servidor, retoma e retira apenas a quest�
       json: { type: "success", message: "Rascunho salvo no servidor.", body },
     });
   });
-  await startTwoQuestionImport(page);
+  await startQuestionImport(page);
   await page.getByRole("button", { name: "Desmarcar questão 1" }).click();
   await page.getByRole("tab", { name: "02", exact: true }).click();
   await page.getByRole("textbox", { name: "Enunciado", exact: true }).fill("Explique a estratégia que você utilizou.");
@@ -463,7 +467,8 @@ test("PDF revisão em abas permanece responsiva no mobile e tablet e confirma al
   await setup(page);
   await page.addInitScript(() => localStorage.setItem("ds_theme", "dark"));
   await page.setViewportSize({ width: 390, height: 844 });
-  await startTwoQuestionImport(page);
+  await startQuestionImport(page, 50);
+  await expect(page.getByRole("tablist", { name: "Questões importadas" }).getByRole("tab")).toHaveCount(50);
   for (const width of [390, 768, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(page.getByRole("tab", { name: "01", exact: true })).toBeVisible();
