@@ -29,7 +29,7 @@ class UpdateExamQuestionRequest extends FormRequest
             'options.*.is_correct'          => ['required_with:options', 'boolean'],
             'options.*.triggers_text_input' => ['nullable', 'boolean'],
             'options.*.order'               => ['nullable', 'integer', 'min:1'],
-        ];
+        ] + UpdateQuestionClassificationRequest::examQuestionRules();
     }
 
     public function withValidator(Validator $validator): void
@@ -41,7 +41,7 @@ class UpdateExamQuestionRequest extends FormRequest
             $currentImageUrl = is_object($question) ? (string) ($question->image_url ?? '') : '';
 
             $questionText = $this->has('question_text')
-                ? trim((string) $this->input('question_text', ''))
+                ? trim(\App\Support\QuestionRichText::plain((string) $this->input('question_text', '')))
                 : trim($currentQuestionText);
 
             $imageUrl = $this->has('image_url')

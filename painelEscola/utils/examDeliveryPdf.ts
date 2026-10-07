@@ -7,6 +7,16 @@ import type {
   ExamDeliveryStudentRow,
 } from "../services/examDeliveryReport";
 import { drawTenantPdfHeader } from "./pdfTenantLetterhead";
+import {
+  PDF_COLOR,
+  PDF_MARGIN,
+  PDF_TYPE,
+  drawDocumentTitle,
+  drawFactsStrip,
+  drawPageFooters,
+  pdfTableStyles,
+  setText,
+} from "./pdfTheme";
 
 export type ExamDeliveryPdfKind =
   | "pending"
@@ -20,31 +30,31 @@ const KIND_META: Record<
   { title: string; section: string; filename: string; empty: string }
 > = {
   pending: {
-    title: "Relatório — alunos que não entregaram",
+    title: "Alunos que não entregaram",
     section: "Alunos pendentes (não entregaram)",
     filename: "nao-entregaram",
     empty: "Todos os alunos elegíveis já entregaram",
   },
   delivered: {
-    title: "Relatório — alunos que entregaram",
+    title: "Alunos que entregaram",
     section: "Alunos que entregaram",
     filename: "entregaram",
     empty: "Nenhum aluno entregou até o momento",
   },
   completed: {
-    title: "Relatório — entrega com resultado completo",
+    title: "Entregas com resultado completo",
     section: "Alunos com resultado completo (liberado)",
     filename: "resultado-completo",
     empty: "Nenhum aluno com resultado completo",
   },
   pending_review: {
-    title: "Relatório — resultado parcial (aguardando correção)",
+    title: "Resultado parcial: aguardando correção",
     section: "Alunos aguardando correção manual",
     filename: "parcial-aguardando-correcao",
     empty: "Nenhum aluno aguardando correção",
   },
   awaiting_release: {
-    title: "Relatório — resultado parcial (aguardando liberação)",
+    title: "Resultado parcial: aguardando liberação",
     section: "Alunos com resultado aguardando liberação",
     filename: "parcial-aguardando-liberacao",
     empty: "Nenhum aluno aguardando liberação de resultado",
@@ -113,103 +123,62 @@ export async function exportExamDeliveryPdf(
 
   const meta = KIND_META[kind];
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  let cursorY = await drawTenantPdfHeader(doc);
-
-  doc.setFontSize(14);
-  doc.setTextColor(17, 24, 39);
-  doc.text(meta.title, 14, cursorY);
-  cursorY += 6;
+  let cursorY = await drawTenantPdfHeader(doc, { marginLeft: PDF_MARGIN, marginRight: PDF_MARGIN, showGeneratedAt: false });
 
   const exam = report.exam;
   const coursesLabel = exam.courses?.length ? exam.courses.join(", ") : "—";
   const statusCounts = countByStatus(report.delivered);
   const filteredDelivered = filterDelivered(report.delivered, kind);
-  const listCount =
-    kind === "pending" ? report.pending.length : filteredDelivered.length;
+  const listCount = kind === "pending" ? report.pending.length : filteredDelivered.length;
 
-  autoTable(doc, {
-    startY: cursorY,
-    head: [[
-      "Simulado",
-      "Tipo",
-      "Status",
-      "Curso(s)",
-      "Matéria",
-      "Elegíveis",
-      "Entregaram",
-      "Pendentes",
-      "Neste relatório",
-    ]],
-    body: [[
-      exam.title,
-      exam.exam_type_label ?? exam.exam_type ?? "—",
-      exam.status_label ?? exam.status ?? "—",
-      coursesLabel,
-      exam.subject?.name ?? "—",
-      String(report.summary.eligible_students_count),
-      String(report.summary.delivered_students_count),
-      String(report.summary.pending_students_count),
-      String(listCount),
-    ]],
-    theme: "grid",
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [249, 250, 251], textColor: [55, 65, 81], fontStyle: "bold" },
-    bodyStyles: { textColor: [17, 24, 39], fontStyle: "bold" },
-    margin: { left: 14, right: 14 },
+  cursorY = drawDocumentTitle(doc, cursorY, {
+    overline: `Relatório de entregas · ${exam.title}`,
+    title: meta.title,
+    description: [
+      exam.exam_type_label ?? exam.exam_type,
+      exam.subject?.name,
+      exam.courses?.length ? `Curso(s): ${coursesLabel}` : null,
+      exam.status_label ?? exam.status,
+    ].filter(Boolean).join(" · "),
   });
 
-  cursorY = (doc as any).lastAutoTable.finalY + 3;
+  // Resumo do simulado (faixa única, como no painel)
+  cursorY = drawFactsStrip(doc, cursorY, [
+    { label: "Elegíveis", value: String(report.summary.eligible_students_count) },
+    { label: "Entregaram", value: String(report.summary.delivered_students_count) },
+    { label: "Pendentes", value: String(report.summary.pending_students_count) },
+    { label: "Resultado completo", value: String(statusCounts.completed) },
+    { label: "Aguard. correção", value: String(statusCounts.pending_review) },
+    { label: "Aguard. liberação", value: String(statusCounts.awaiting_release) },
+    { label: "Abandonados", value: String(statusCounts.abandoned) },
+  ]);
 
-  autoTable(doc, {
-    startY: cursorY,
-    head: [["Completo", "Aguard. correção", "Aguard. liberação", "Abandonados"]],
-    body: [[
-      String(statusCounts.completed),
-      String(statusCounts.pending_review),
-      String(statusCounts.awaiting_release),
-      String(statusCounts.abandoned),
-    ]],
-    theme: "grid",
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [249, 250, 251], textColor: [55, 65, 81], fontStyle: "bold" },
-    bodyStyles: { textColor: [17, 24, 39] },
-    margin: { left: 14, right: 14 },
-  });
+  cursorY += 2;
+  setText(doc, PDF_COLOR.ink, PDF_TYPE.subtitle, "bold");
+  doc.text("Lista de alunos", PDF_MARGIN, cursorY);
+  setText(doc, PDF_COLOR.inkSubtle, PDF_TYPE.caption);
+  doc.text(`${listCount} aluno${listCount === 1 ? "" : "s"} neste relatório`, doc.internal.pageSize.getWidth() - PDF_MARGIN, cursorY, { align: "right" });
+  cursorY += 3;
 
-  cursorY = (doc as any).lastAutoTable.finalY + 4;
-
-  autoTable(doc, {
-    startY: cursorY,
-    head: [[meta.section, "", "", ""]],
-    body: [],
-    theme: "plain",
-    styles: { fontSize: 9, cellPadding: 1 },
-    headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81], fontStyle: "bold" },
-    margin: { left: 14, right: 14 },
-  });
-
-  cursorY = (doc as any).lastAutoTable.finalY + 1;
+  const emptyRow = (cols: number) => [{ content: meta.empty, colSpan: cols, styles: { textColor: PDF_COLOR.inkSubtle, halign: "center" as const } }];
 
   if (kind === "pending") {
     const pending: ExamDeliveryStudentRow[] = report.pending;
     autoTable(doc, {
+      ...pdfTableStyles(),
       startY: cursorY,
+      margin: { left: PDF_MARGIN, right: PDF_MARGIN, bottom: 16 },
       head: [["#", "Aluno", "Matrícula"]],
       body: pending.length > 0
-        ? pending.map((row, index) => [
-            String(index + 1),
-            row.name,
-            row.enrollment_number ?? "—",
-          ])
-        : [["—", meta.empty, ""]],
-      theme: "grid",
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81], fontStyle: "bold" },
-      margin: { left: 14, right: 14 },
+        ? pending.map((row, index) => [String(index + 1), row.name, row.enrollment_number ?? "—"])
+        : [emptyRow(3)],
+      columnStyles: { 0: { cellWidth: 10, textColor: PDF_COLOR.inkSubtle } },
     });
   } else {
     autoTable(doc, {
+      ...pdfTableStyles(),
       startY: cursorY,
+      margin: { left: PDF_MARGIN, right: PDF_MARGIN, bottom: 16 },
       head: [["#", "Aluno", "Matrícula", "Entregue em", "Situação"]],
       body: filteredDelivered.length > 0
         ? filteredDelivered.map((row, index) => [
@@ -219,13 +188,11 @@ export async function exportExamDeliveryPdf(
             fmtDateTime(row.finished_at),
             row.attempt_status_label ?? row.attempt_status,
           ])
-        : [["—", meta.empty, "", "", ""]],
-      theme: "grid",
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81], fontStyle: "bold" },
-      margin: { left: 14, right: 14 },
+        : [emptyRow(5)],
+      columnStyles: { 0: { cellWidth: 10, textColor: PDF_COLOR.inkSubtle } },
     });
   }
 
+  drawPageFooters(doc, `${meta.title} · ${exam.title}`);
   doc.save(`entregas-${meta.filename}-${safeTitleSlug(exam.title)}.pdf`);
 }

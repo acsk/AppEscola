@@ -1,3 +1,4 @@
+import { plainRichText } from "./richText";
 import { Alert, Platform } from "react-native";
 import jsPDF from "jspdf";
 import type { ExamPreviewPlayerQuestion } from "../types/simulados";
@@ -5,6 +6,16 @@ import {
   drawTenantPdfHeader,
   imageUrlToDataUrl,
 } from "./pdfTenantLetterhead";
+import {
+  PDF_COLOR,
+  PDF_MARGIN,
+  PDF_TYPE,
+  drawDocumentTitle,
+  drawFactsStrip,
+  drawPageFooters,
+  drawRule,
+  setText,
+} from "./pdfTheme";
 
 export type ExamContentPdfMeta = {
   title: string;
@@ -32,6 +43,13 @@ function safeTitleSlug(title: string): string {
   );
 }
 
+/** Rótulo legível: se vier só o código ("vestibular"), capitaliza. */
+function humanize(value: string | null | undefined): string {
+  const text = (value ?? "").trim();
+  if (!text) return "—";
+  return text === text.toLowerCase() ? text.charAt(0).toUpperCase() + text.slice(1).replace(/[_-]+/g, " ") : text;
+}
+
 function optionLetter(index: number): string {
   return String.fromCharCode(65 + index);
 }
@@ -43,16 +61,21 @@ function formatDuration(minutes: number | null | undefined): string {
   return `${minutes} min`;
 }
 
-function ensureSpace(
-  doc: jsPDF,
-  cursorY: number,
-  needed: number,
-  marginBottom: number,
-): number {
+function ensureSpace(doc: jsPDF, cursorY: number, needed: number, marginBottom: number): number {
   const pageHeight = doc.internal.pageSize.getHeight();
   if (cursorY + needed <= pageHeight - marginBottom) return cursorY;
   doc.addPage();
-  return 16;
+  return PDF_MARGIN + 4;
+}
+
+/** Linha de preenchimento ("Nome: ______") em `border-strong`. */
+function drawFillLine(doc: jsPDF, label: string, x: number, y: number, width: number) {
+  setText(doc, PDF_COLOR.inkMuted, PDF_TYPE.label);
+  doc.text(label, x, y);
+  const labelWidth = doc.getTextWidth(label) + 2;
+  doc.setDrawColor(...PDF_COLOR.borderStrong);
+  doc.setLineWidth(0.2);
+  doc.line(x + labelWidth, y + 0.8, x + width, y + 0.8);
 }
 
 export async function exportExamContentPdf(
@@ -66,189 +89,137 @@ export async function exportExamContentPdf(
 
   const sorted = [...questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const marginLeft = 16;
-  const marginRight = 16;
-  const marginBottom = 16;
+  const marginLeft = PDF_MARGIN;
+  const marginRight = PDF_MARGIN;
+  const marginBottom = 18; // espaço do rodapé
   const pageWidth = doc.internal.pageSize.getWidth();
   const contentWidth = pageWidth - marginLeft - marginRight;
 
-  let cursorY = await drawTenantPdfHeader(doc, {
-    marginLeft,
-    marginRight,
-    showGeneratedAt: false,
+  let cursorY = await drawTenantPdfHeader(doc, { marginLeft, marginRight, showGeneratedAt: false });
+  cursorY = drawDocumentTitle(doc, cursorY, {
+    overline: "Simulado",
+    title: meta.title || "Simulado",
+    description: meta.courses?.length ? `Curso${meta.courses.length > 1 ? "s" : ""}: ${meta.courses.join(", ")}` : null,
   });
 
-  // Título compacto
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
-  const titleLines = doc.splitTextToSize(meta.title || "Simulado", contentWidth);
-  doc.text(titleLines, marginLeft, cursorY);
-  cursorY += titleLines.length * 4.2 + 1.5;
-
-  // Metadados em uma linha compacta
-  const metaParts = [
-    meta.courses?.length ? `Curso: ${meta.courses.join(", ")}` : null,
-    meta.subject ? `Disciplina: ${meta.subject}` : null,
-    meta.exam_type_label || meta.exam_type
-      ? `Tipo: ${meta.exam_type_label ?? meta.exam_type}`
-      : null,
-    `Duração: ${formatDuration(meta.duration_minutes)}`,
-    `Questões: ${sorted.length}`,
-    meta.total_points != null ? `Pontuação: ${meta.total_points}` : null,
-  ].filter(Boolean) as string[];
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
-  const metaText = metaParts.join("  ·  ");
-  const metaLines = doc.splitTextToSize(metaText, contentWidth);
-  doc.text(metaLines, marginLeft, cursorY);
-  cursorY += metaLines.length * 3.4 + 1;
+  // Faixa de resumo
+  cursorY = drawFactsStrip(doc, cursorY, [
+    { label: "Modalidade", value: humanize(meta.exam_type_label ?? meta.exam_type) },
+    { label: "Disciplina", value: meta.subject ?? "Geral" },
+    { label: "Questões", value: String(sorted.length) },
+    { label: "Pontuação", value: meta.total_points != null ? String(meta.total_points) : "—" },
+    { label: "Duração", value: formatDuration(meta.duration_minutes) },
+  ]);
 
   if (meta.description?.trim()) {
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
+    setText(doc, PDF_COLOR.inkMuted, PDF_TYPE.label);
     const descLines = doc.splitTextToSize(meta.description.trim(), contentWidth);
     doc.text(descLines, marginLeft, cursorY);
-    cursorY += descLines.length * 3.4 + 1;
+    cursorY += descLines.length * 3.8 + 2;
   }
 
-  // Separação antes das questões
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.4);
-  doc.line(marginLeft, cursorY, pageWidth - marginRight, cursorY);
+  // Identificação do aluno (prova impressa)
+  cursorY += 2;
+  drawFillLine(doc, "Aluno(a):", marginLeft, cursorY, contentWidth * 0.62);
+  drawFillLine(doc, "Turma:", marginLeft + contentWidth * 0.66, cursorY, contentWidth * 0.34);
+  cursorY += 7;
+  drawFillLine(doc, "Data:", marginLeft, cursorY, contentWidth * 0.3);
+  drawFillLine(doc, "Nota:", marginLeft + contentWidth * 0.66, cursorY, contentWidth * 0.34);
   cursorY += 5;
+  drawRule(doc, cursorY);
+  cursorY += 7;
 
   // Questões
   for (let index = 0; index < sorted.length; index += 1) {
     const q = sorted[index];
     const number = index + 1;
-    const enunciado = (q.question_text || "").trim() || "[Sem enunciado]";
+    const enunciado = plainRichText(q.question_text).trim() || (q.image_url ? "" : "[Sem enunciado]");
     const options = [...(q.options ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    const headerLabel = `${number}.`;
-    const pointsLabel = `${q.points ?? 0} pt${Number(q.points) === 1 ? "" : "s"}`;
-    const typeLabel = q.type === "essay" ? "Discursiva" : "Objetiva";
+    setText(doc, PDF_COLOR.ink, PDF_TYPE.body);
+    const enunciadoLines: string[] = enunciado ? doc.splitTextToSize(enunciado, contentWidth) : [];
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10.5);
-    const enunciadoLines = doc.splitTextToSize(enunciado, contentWidth - 8);
-
-    let optionsBlockHeight = 0;
-    const optionBlocks: string[][] = [];
-    if (q.type === "multiple_choice") {
-      options.forEach((op, opIdx) => {
-        const line = `${optionLetter(opIdx)})  ${op.option_text}`;
-        const lines = doc.splitTextToSize(line, contentWidth - 10);
-        optionBlocks.push(lines);
-        optionsBlockHeight += lines.length * 4.4 + 1.5;
-      });
-    } else {
-      optionsBlockHeight = 4 + 5 * 7; // label + 5 linhas
-    }
-
-    let imageHeight = 0;
-    let imageDataUrl: string | null = null;
+    // Imagem na proporção original (largura máx. 70% da página, altura máx. 80 mm)
+    let image: { dataUrl: string; w: number; h: number; format: string } | null = null;
     if (q.image_url?.trim()) {
-      imageDataUrl = await imageUrlToDataUrl(q.image_url.trim());
-      if (imageDataUrl) imageHeight = 42;
-    }
-
-    const blockHeight =
-      6 + // header
-      enunciadoLines.length * 4.8 +
-      3 +
-      imageHeight +
-      optionsBlockHeight +
-      6;
-
-    cursorY = ensureSpace(doc, cursorY, Math.min(blockHeight, 60), marginBottom);
-
-    // Cabeçalho da questão
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(15, 23, 42);
-    doc.text(headerLabel, marginLeft, cursorY);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text(typeLabel, marginLeft + 10, cursorY);
-    doc.text(pointsLabel, pageWidth - marginRight, cursorY, { align: "right" });
-    cursorY += 5;
-
-    // Enunciado
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10.5);
-    doc.setTextColor(17, 24, 39);
-    for (const line of enunciadoLines) {
-      cursorY = ensureSpace(doc, cursorY, 6, marginBottom);
-      doc.text(line, marginLeft + 2, cursorY);
-      cursorY += 4.8;
-    }
-    cursorY += 2;
-
-    if (imageDataUrl) {
-      cursorY = ensureSpace(doc, cursorY, imageHeight + 4, marginBottom);
-      try {
-        const imgW = Math.min(contentWidth * 0.7, 120);
-        const imgH = 38;
-        doc.addImage(imageDataUrl, "JPEG", marginLeft + 2, cursorY, imgW, imgH);
-        cursorY += imgH + 3;
-      } catch {
+      const dataUrl = await imageUrlToDataUrl(q.image_url.trim());
+      if (dataUrl) {
         try {
-          const imgW = Math.min(contentWidth * 0.7, 120);
-          const imgH = 38;
-          doc.addImage(imageDataUrl, "PNG", marginLeft + 2, cursorY, imgW, imgH);
-          cursorY += imgH + 3;
+          const props = doc.getImageProperties(dataUrl);
+          const maxW = contentWidth * 0.7;
+          const maxH = 80;
+          const ratio = Math.min(maxW / props.width, maxH / props.height);
+          image = { dataUrl, w: props.width * ratio, h: props.height * ratio, format: props.fileType || "PNG" };
         } catch {
-          // ignora imagem inválida
+          image = null;
         }
       }
     }
 
+    // Cabeçalho + enunciado + início das alternativas juntos (evita "Questão N" sozinho no fim da página)
+    cursorY = ensureSpace(doc, cursorY, 8 + Math.min(enunciadoLines.length, 4) * 4.8 + (image ? Math.min(image.h, 40) : 0), marginBottom);
+
+    setText(doc, PDF_COLOR.brand, PDF_TYPE.subtitle, "bold");
+    doc.text(`Questão ${number}`, marginLeft, cursorY);
+    setText(doc, PDF_COLOR.inkSubtle, PDF_TYPE.caption);
+    const pointsLabel = `${q.type === "essay" ? "Discursiva" : "Objetiva"} · ${q.points ?? 0} pt${Number(q.points) === 1 ? "" : "s"}`;
+    doc.text(pointsLabel, pageWidth - marginRight, cursorY, { align: "right" });
+    cursorY += 6;
+
+    setText(doc, PDF_COLOR.ink, PDF_TYPE.body);
+    for (const line of enunciadoLines) {
+      cursorY = ensureSpace(doc, cursorY, 6, marginBottom);
+      doc.text(line, marginLeft, cursorY);
+      cursorY += 4.8;
+    }
+    if (enunciadoLines.length) cursorY += 2;
+
+    if (image) {
+      cursorY = ensureSpace(doc, cursorY, image.h + 4, marginBottom);
+      try {
+        doc.addImage(image.dataUrl, image.format, marginLeft, cursorY, image.w, image.h);
+        cursorY += image.h + 4;
+      } catch {
+        // imagem inválida: segue sem ela
+      }
+    }
+
     if (q.type === "multiple_choice") {
-      doc.setFontSize(10);
-      optionBlocks.forEach((lines) => {
+      options.forEach((op, opIdx) => {
+        setText(doc, PDF_COLOR.ink, PDF_TYPE.body);
+        const lines: string[] = doc.splitTextToSize(plainRichText(op.option_text), contentWidth - 9);
         lines.forEach((line, lineIdx) => {
           cursorY = ensureSpace(doc, cursorY, 6, marginBottom);
-          doc.setFont("helvetica", lineIdx === 0 ? "bold" : "normal");
           if (lineIdx === 0) {
-            // Marca A) em negrito e resto normal — simplificado: linha inteira normal
-            doc.setFont("helvetica", "normal");
+            setText(doc, PDF_COLOR.inkMuted, PDF_TYPE.body, "bold");
+            doc.text(`${optionLetter(opIdx)})`, marginLeft + 1, cursorY);
           }
-          doc.setTextColor(17, 24, 39);
-          doc.text(line, marginLeft + 4, cursorY);
-          cursorY += 4.4;
+          setText(doc, PDF_COLOR.ink, PDF_TYPE.body);
+          doc.text(line, marginLeft + 8, cursorY);
+          cursorY += 4.6;
         });
-        cursorY += 1.2;
+        cursorY += 1.4;
       });
     } else {
-      cursorY = ensureSpace(doc, cursorY, 8, marginBottom);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(71, 85, 105);
-      doc.text("Resposta:", marginLeft + 2, cursorY);
-      cursorY += 4;
-      doc.setDrawColor(148, 163, 184);
-      for (let i = 0; i < 5; i += 1) {
+      cursorY = ensureSpace(doc, cursorY, 10, marginBottom);
+      setText(doc, PDF_COLOR.inkMuted, PDF_TYPE.label);
+      doc.text("Resposta", marginLeft, cursorY);
+      cursorY += 5;
+      for (let i = 0; i < 6; i += 1) {
         cursorY = ensureSpace(doc, cursorY, 8, marginBottom);
-        doc.line(marginLeft + 2, cursorY, pageWidth - marginRight, cursorY);
+        drawRule(doc, cursorY, { color: PDF_COLOR.border });
         cursorY += 7;
       }
     }
 
-    // Separador
     cursorY += 2;
-    cursorY = ensureSpace(doc, cursorY, 4, marginBottom);
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.3);
-    doc.line(marginLeft, cursorY, pageWidth - marginRight, cursorY);
-    cursorY += 6;
+    if (index < sorted.length - 1) {
+      cursorY = ensureSpace(doc, cursorY, 4, marginBottom);
+      drawRule(doc, cursorY);
+      cursorY += 7;
+    }
   }
 
+  drawPageFooters(doc, meta.title || "Simulado");
   doc.save(`prova-${safeTitleSlug(meta.title)}.pdf`);
 }

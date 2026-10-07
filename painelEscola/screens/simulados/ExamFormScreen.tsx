@@ -6,7 +6,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
+  Image,
 } from "react-native";
+import { ImagePlus, Trash2 } from "lucide-react-native";
+import Button from "../../components/ui/Button";
+import SegmentedControl from "../../components/banco-questoes/SegmentedControl";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import {
@@ -15,7 +19,7 @@ import {
   showApiToast,
 } from "../../utils/apiErrors";
 import FormInput from "../../components/ui/FormInput";
-import FormSelect, { type SelectOption } from "../../components/ui/FormSelect";
+import { type SelectOption } from "../../components/ui/FormSelect";
 import SearchableSelect, { SearchableOption } from "../../components/ui/SearchableSelect";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -43,6 +47,11 @@ import type {
   ExamSupportMaterial,
   ExamSupportMaterialForm,
 } from "../../types/simulados";
+import RichTextInput from "../../components/ui/RichTextInput";
+import ClassificationFields from "../../components/banco-questoes/ClassificationFields";
+import { useQuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
+import { type ClassificationForm, EMPTY_CLASSIFICATION_FORM } from "../../utils/questionClassification";
+import { plainRichText } from "../../utils/richText";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -93,7 +102,7 @@ const EMPTY_SUPPORT_MATERIAL: ExamSupportMaterialForm = {
 function validateExam(form: ExamForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.title.trim()) errs.title = "Título é obrigatório.";
-  if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
+  if (!form.exam_type) errs.exam_type = "Selecione a modalidade do simulado.";
   if (form.duration_minutes) {
     const dur = Number(form.duration_minutes);
     if (!Number.isInteger(dur) || dur < 1)
@@ -142,8 +151,8 @@ function validateExam(form: ExamForm): Record<string, string> {
 
 function validateQuestionEnunciado(form: ExamQuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
-  if (!form.exam_type) errs.exam_type = "Selecione a classificação da prova.";
-  if (!form.question_text.trim() && !form.image_url.trim()) {
+  if (!form.exam_type) errs.exam_type = "Defina a modalidade do simulado em Dados gerais.";
+  if (!plainRichText(form.question_text).trim() && !form.image_url.trim()) {
     errs.enunciado = "Informe o enunciado em texto, imagem, ou ambos.";
   }
   if (form.points) {
@@ -163,9 +172,9 @@ function validateQuestionEnunciado(form: ExamQuestionForm): Record<string, strin
 function validateQuestionAlternatives(form: ExamQuestionForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (form.type !== "multiple_choice") return errs;
-  const filled = form.options.filter((o) => o.option_text.trim());
+  const filled = form.options.filter((o) => plainRichText(o.option_text).trim());
   if (filled.length < 2) errs.options = "Informe pelo menos 2 opções.";
-  const hasCorrect = form.options.some((o) => o.is_correct && o.option_text.trim());
+  const hasCorrect = form.options.some((o) => o.is_correct && plainRichText(o.option_text).trim());
   if (!hasCorrect) errs.options = "Marque pelo menos uma opção como correta.";
   return errs;
 }
@@ -197,13 +206,15 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   // Domain hooks
   const examStatuses = useExamStatuses();
   const examTypes = useExamTypes();
-  const examTypeOptions = [{ value: "", label: "Selecione" }, ...domainToOptions(examTypes)];
-  const examStatusOptions = domainToOptions(examStatuses);
-  const retakeOptions: SelectOption[] = [
+  // Listas com busca (SearchableSelect): valores em string.
+  const toSearchable = (items: SelectOption[]): SearchableOption[] => items.map((o) => ({ value: String(o.value), label: o.label }));
+  const examTypeOptions = toSearchable(domainToOptions(examTypes));
+  const examStatusOptions = toSearchable(domainToOptions(examStatuses));
+  const retakeOptions: SearchableOption[] = [
     { value: "false", label: "Não" },
     { value: "true", label: "Sim" },
   ];
-  const releaseOptions: SelectOption[] = [
+  const releaseOptions: SearchableOption[] = [
     { value: "false", label: "Liberar assim que corrigir" },
     { value: "true", label: "Liberar só após o fim do período" },
   ];
@@ -229,6 +240,9 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   const [questionModalStep, setQuestionModalStep] = useState<1 | 2>(1);
   const [editQuestionId, setEditQuestionId] = useState<number | null>(null);
   const [qForm, setQForm] = useState<ExamQuestionForm>(EMPTY_QUESTION);
+  /** Classificação completa da questão (mesmo detalhamento do banco de questões). */
+  const [qClass, setQClass] = useState<ClassificationForm>(EMPTY_CLASSIFICATION_FORM);
+  const questionCatalogs = useQuestionBankCatalogs();
   const [qErrors, setQErrors] = useState<Record<string, string>>({});
   const [savingQuestion, setSavingQuestion] = useState(false);
   const [uploadingQuestionImage, setUploadingQuestionImage] = useState(false);
@@ -458,6 +472,8 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       exam_type: form.exam_type || "",
       options: EMPTY_QUESTION.options.map((o) => ({ ...o })),
     });
+    // Nova questão herda a disciplina do simulado (pode trocar na classificação).
+    setQClass({ ...EMPTY_CLASSIFICATION_FORM, subject_id: form.subject_id ? Number(form.subject_id) : null });
     setQErrors({});
     setQuestionModalStep(1);
     setQuestionModal(true);
@@ -465,9 +481,20 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
   const openEditQuestion = (q: ExamQuestion) => {
     setEditQuestionId(q.id);
+    setQClass({
+      subject_id: q.subject?.id ?? null,
+      topic_ids: [...(q.topic_ids ?? [])],
+      difficulty_id: q.difficulty_id ?? null,
+      board_id: q.board_id ?? null,
+      year: q.year ?? null,
+      exam_type_id: null,
+      is_annulled: !!q.is_annulled,
+      is_outdated: !!q.is_outdated,
+      tags: [...(q.tags ?? [])],
+    });
     setQForm({
       type: q.type,
-      exam_type: q.exam_type ?? form.exam_type ?? "",
+      exam_type: form.exam_type || q.exam_type || "", // segue a modalidade do simulado
       question_text: q.question_text ?? "",
       subject_id: q.subject?.id ? String(q.subject.id) : "",
       points: String(q.points),
@@ -491,7 +518,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
   };
 
   const goToQuestionStep2 = () => {
-    const errs = validateQuestionEnunciado(qForm);
+    const errs = validateQuestionEnunciado({ ...qForm, exam_type: form.exam_type || qForm.exam_type });
     setQErrors(errs);
     if (Object.keys(errs).length > 0) return;
     setQuestionModalStep(2);
@@ -551,7 +578,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
   const saveQuestion = async () => {
     if (!effectiveExamId) return;
-    const enunciadoErrs = validateQuestionEnunciado(qForm);
+    const enunciadoErrs = validateQuestionEnunciado({ ...qForm, exam_type: form.exam_type || qForm.exam_type });
     const altErrs = validateQuestionAlternatives(qForm);
     const errs = { ...enunciadoErrs, ...altErrs };
     setQErrors(errs);
@@ -564,9 +591,17 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     try {
       const payload: Record<string, any> = {
         type: qForm.type,
-        exam_type: qForm.exam_type,
+        exam_type: form.exam_type || qForm.exam_type, // modalidade do simulado
         question_text: qForm.question_text.trim() || null,
-        subject_id: qForm.subject_id ? Number(qForm.subject_id) : null,
+        // Classificação completa (a API valida tenant e coerência disciplina/assuntos).
+        subject_id: qClass.subject_id,
+        topic_ids: qClass.topic_ids,
+        difficulty_id: qClass.difficulty_id,
+        board_id: qClass.board_id,
+        year: qClass.year,
+        is_annulled: qClass.is_annulled,
+        is_outdated: qClass.is_outdated,
+        tags: qClass.tags,
         points: qForm.points ? Number(qForm.points) : 1.0,
         order: qForm.order ? Number(qForm.order) : undefined,
         image_url: qForm.image_url.trim() || null,
@@ -575,7 +610,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       };
       if (qForm.type === "multiple_choice") {
         payload.options = qForm.options
-          .filter((o) => o.option_text.trim())
+          .filter((o) => plainRichText(o.option_text).trim())
           .map((o, i) => ({
             option_text: o.option_text.trim(),
             is_correct: o.is_correct,
@@ -976,9 +1011,12 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             />
           </View>
           <View style={{ flex: 1, minWidth: 180 }}>
-            <FormSelect
-              label="Classificação"
+            <SearchableSelect
+              label="Modalidade"
               required
+              modalTitle="Selecionar modalidade"
+              placeholder="Selecione a modalidade"
+              showSelectedPreview={false}
               value={form.exam_type}
               options={examTypeOptions}
               onChange={(v) => setField("exam_type", v)}
@@ -986,8 +1024,10 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
             />
           </View>
           <View style={{ flex: 1, minWidth: 180 }}>
-            <FormSelect
+            <SearchableSelect
               label="Status"
+              modalTitle="Selecionar status"
+              showSelectedPreview={false}
               value={form.status}
               options={examStatusOptions}
               onChange={(v) => setField("status", v)}
@@ -1097,16 +1137,20 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
         <View className="flex-row gap-4 flex-wrap">
           <View style={{ flex: 1, minWidth: 220 }}>
-            <FormSelect
+            <SearchableSelect
               label="Liberação do resultado"
+              modalTitle="Liberação do resultado"
+              showSelectedPreview={false}
               value={form.release_results_after_end}
               options={releaseOptions}
               onChange={(v) => setField("release_results_after_end", v)}
             />
           </View>
           <View style={{ flex: 1, minWidth: 220 }}>
-            <FormSelect
+            <SearchableSelect
               label="Permitir retentativa"
+              modalTitle="Permitir retentativa"
+              showSelectedPreview={false}
               value={form.allow_retake}
               options={retakeOptions}
               onChange={(v) =>
@@ -1278,7 +1322,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                   </View>
                   <View className="flex-1">
                     <Text className="text-sm text-ink font-medium" numberOfLines={2}>
-                      {q.question_text || "Questão sem texto"}
+                      {plainRichText(q.question_text).trim() || (q.image_url ? "[Enunciado em imagem]" : "Questão sem texto")}
                     </Text>
                     <View className="flex-row gap-3 mt-1.5 flex-wrap">
                       <View className="flex-row items-center gap-1">
@@ -1301,9 +1345,14 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                             : "Objetiva"}
                         </Text>
                       </View>
-                      {q.subject && (
-                        <Text className="text-xs text-ink-subtle">· {q.subject.name}</Text>
+                      {q.subject ? (
+                        <Text className="text-xs text-ink-subtle" numberOfLines={1}>
+                          · {[q.subject.name, (q.topics ?? []).map((t) => t.name).join(", ")].filter(Boolean).join(" › ")}
+                        </Text>
+                      ) : (
+                        <Text className="text-xs text-warning">· Sem classificação</Text>
                       )}
+                      {q.difficulty && <Text className="text-xs text-ink-subtle">· {q.difficulty.name}</Text>}
                       <Text className="text-xs text-ink-subtle">· {q.points} pts</Text>
                       {q.type === "multiple_choice" && (
                         <Text className="text-xs text-ink-subtle">· {q.options.length} opções</Text>
@@ -1578,7 +1627,8 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         visible={questionModal}
         title={editQuestionId ? "Editar questão" : "Nova questão"}
         onClose={closeQuestionModal}
-        size="md"
+        size="xl"
+        maxHeight="94%"
         showScrollIndicator
         footer={
           <>
@@ -1679,52 +1729,25 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
         }
       >
         {questionModalStep === 1 ? (
-          <View className="gap-4">
-            {qErrors.enunciado && (
-              <View className="rounded-ds-md bg-danger-tint border border-danger px-3 py-2">
-                <Text className="text-xs text-danger">{qErrors.enunciado}</Text>
-              </View>
-            )}
+          // Layout da questão avulsa: conteúdo à esquerda, configuração à direita.
+          <View style={{ flexDirection: isMobile ? "column" : "row", gap: 20, alignItems: "flex-start" }}>
+            <View style={{ flex: 3, width: isMobile ? "100%" : undefined, minWidth: 0 }}>
+              <SegmentedControl<"multiple_choice" | "essay">
+                label="Tipo"
+                allowClear={false}
+                options={[
+                  { value: "multiple_choice", label: "Objetiva" },
+                  { value: "essay", label: "Discursiva" },
+                ]}
+                value={qForm.type}
+                onChange={(v) => v && setQField("type", v)}
+              />
 
-            <View className="rounded-ds-md border border-border p-3 bg-surface-sunken">
-              <Text className="text-xs font-semibold text-ink-muted mb-2">Formato</Text>
-              <View className="flex-row bg-surface rounded-ds-md p-1 border border-border">
-                {(["multiple_choice", "essay"] as const).map((t) => {
-                  const selected = qForm.type === t;
-                  return (
-                    <TouchableOpacity
-                      key={t}
-                      onPress={() => setQField("type", t)}
-                      className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-ds-md"
-                      style={{
-                        backgroundColor: selected ? "var(--ds-brand)" : "transparent",
-                        borderWidth: 1,
-                        borderColor: selected ? "var(--ds-brand)" : "transparent",
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name={t === "multiple_choice" ? "list-outline" : "create-outline"}
-                        size={15}
-                        color={selected ? "var(--ds-on-brand)" : "var(--ds-ink-muted)"}
-                      />
-                      <Text
-                        className={`text-sm font-semibold ${selected ? "text-on-brand" : "text-ink-muted"}`}
-                      >
-                        {t === "multiple_choice" ? "Objetiva" : "Discursiva"}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View>
-              <Text className="text-sm font-semibold text-ink mb-1.5">Enunciado</Text>
-              <textarea
+              <RichTextInput
+                label="Enunciado"
                 value={qForm.question_text}
-                onChange={(e: any) => {
-                  setQField("question_text", e.target.value);
+                onChange={(v) => {
+                  setQField("question_text", v);
                   if (qErrors.enunciado) {
                     setQErrors((prev) => {
                       const next = { ...prev };
@@ -1733,152 +1756,127 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                     });
                   }
                 }}
-                placeholder="Digite o texto da questão..."
-                style={{
-                  ...inputStyle,
-                  minHeight: 88,
-                  borderColor: qErrors.enunciado ? "var(--ds-danger)" : "var(--ds-border)",
-                }}
-                rows={3}
+                error={qErrors.enunciado}
+                minHeight={140}
+                placeholder="Texto do enunciado (opcional se houver imagem)."
               />
-              {!qErrors.enunciado && (
-                <Text className="text-xs text-ink-subtle mt-1">
-                  Informe texto, imagem, ou ambos.
-                </Text>
-              )}
-            </View>
 
-            <View className={`gap-3 ${isMobile ? "" : "flex-row items-start flex-wrap"}`}>
-              <View className={isMobile ? "" : "flex-1"} style={{ minWidth: 180 }}>
-                <FormSelect
-                  label="Classificação"
-                  required
-                  value={qForm.exam_type}
-                  options={examTypeOptions}
-                  onChange={(v) => setQField("exam_type", v)}
-                  error={qErrors.exam_type}
-                />
-              </View>
-              <View className={isMobile ? "" : "flex-1"} style={{ minWidth: 0 }}>
-                <FormSelect
-                  label="Matéria"
-                  value={qForm.subject_id}
-                  options={subjectOptions.filter((o) => o.value !== "")}
-                  onChange={(v) => setQField("subject_id", v)}
-                  placeholder="Nenhuma"
-                />
-              </View>
-              <View style={{ width: isMobile ? undefined : 96 }}>
-                <FormInput
-                  label="Pontos"
-                  value={qForm.points}
-                  onChangeText={(v) => setQField("points", v)}
-                  valueFormat="decimal"
-                  decimalPlaces={2}
-                  placeholder="1"
-                  error={qErrors.points}
-                  style={{ height: 42, textAlign: "center" }}
-                />
-              </View>
-              <View style={{ width: isMobile ? undefined : 88 }}>
-                <FormInput
-                  label="Ordem"
-                  value={qForm.order}
-                  onChangeText={(v) => setQField("order", v)}
-                  valueFormat="integer"
-                  maxDigits={4}
-                  placeholder="1"
-                  error={qErrors.order}
-                  style={{ height: 42, textAlign: "center" }}
+              {/* Imagem do enunciado */}
+              <View className="mb-4">
+                <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
+                  Imagem do enunciado
+                </Text>
+                {qForm.image_url ? (
+                  <View className="border border-border rounded-ds-md p-2" style={{ gap: 8 }}>
+                    <Image
+                      source={{ uri: qForm.image_url }}
+                      accessibilityLabel="Imagem do enunciado"
+                      style={{ width: "100%", height: isMobile ? 180 : 240 }}
+                      resizeMode="contain"
+                    />
+                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                      <Button
+                        size="sm"
+                        icon={ImagePlus}
+                        label="Trocar imagem"
+                        onPress={() => questionImageInputRef.current?.click()}
+                        loading={uploadingQuestionImage}
+                        disabled={!effectiveExamId}
+                      />
+                      <Button size="sm" variant="danger" icon={Trash2} label="Remover imagem" onPress={() => setQField("image_url", "")} />
+                    </View>
+                  </View>
+                ) : (
+                  <View className="flex-row">
+                    <Button
+                      icon={ImagePlus}
+                      label="Enviar imagem"
+                      onPress={() => questionImageInputRef.current?.click()}
+                      loading={uploadingQuestionImage}
+                      disabled={!effectiveExamId}
+                    />
+                  </View>
+                )}
+                <Text className="text-xs text-ink-subtle" style={{ marginTop: 6 }}>
+                  JPG, PNG, WEBP ou GIF, até 5MB.
+                </Text>
+                {qErrors.image_url ? (
+                  <Text className="text-xs font-medium text-danger" style={{ marginTop: 6 }}>{qErrors.image_url}</Text>
+                ) : null}
+                <input
+                  ref={questionImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                  style={{ display: "none" }}
+                  aria-hidden
+                  onChange={(e: any) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadQuestionImage(file);
+                    e.target.value = "";
+                  }}
                 />
               </View>
             </View>
 
             <View
-              className="rounded-ds-md border p-3"
-              style={{
-                borderColor: qErrors.enunciado ? "var(--ds-danger)" : "var(--ds-border)",
-                backgroundColor: "var(--ds-surface-sunken)",
-              }}
+              className="bg-surface border border-border rounded-ds-md"
+              style={{ flex: 2, width: isMobile ? "100%" : undefined, minWidth: isMobile ? undefined : 300, padding: 16 }}
             >
-              <Text className="text-sm font-semibold text-ink mb-2">Mídia (opcional)</Text>
-              <View className="flex-row items-center gap-3 flex-wrap">
-                <TouchableOpacity
-                  onPress={() => questionImageInputRef.current?.click()}
-                  disabled={uploadingQuestionImage || !effectiveExamId}
-                  className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
-                  activeOpacity={0.85}
-                  style={{ opacity: uploadingQuestionImage || !effectiveExamId ? 0.7 : 1 }}
-                >
-                  {uploadingQuestionImage ? (
-                    <ActivityIndicator size="small" color="var(--ds-on-brand)" />
-                  ) : (
-                    <Text className="text-sm font-medium text-on-brand">
-                      {qForm.image_url ? "Trocar imagem" : "Enviar imagem"}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-                {qForm.image_url ? (
-                  <TouchableOpacity
-                    onPress={() => setQField("image_url", "")}
-                    className="flex-row items-center gap-1.5 px-3 rounded-ds-md border border-danger bg-danger py-2 min-h-control-md justify-center"
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="trash-outline" size={14} color="var(--ds-on-danger)" />
-                    <Text className="text-xs font-semibold text-on-danger">Remover imagem</Text>
-                  </TouchableOpacity>
-                ) : null}
-                {qForm.image_url ? (
-                  <Text className="text-xs text-success" numberOfLines={1}>
-                    Imagem pronta para uso no enunciado.
-                  </Text>
-                ) : (
-                  <Text className="text-xs text-ink-subtle">Nenhuma imagem enviada</Text>
-                )}
-              </View>
-              <Text className="text-xs text-ink-subtle mt-2">
-                Tipos aceitos: JPG, JPEG, PNG, WEBP e GIF. Máximo: 5 MB.
+              <Text className="font-semibold text-ink" style={{ fontSize: 15, marginBottom: 12 }}>
+                Configuração
               </Text>
-              <input
-                ref={questionImageInputRef}
-                type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                style={{ display: "none" }}
-                onChange={(e: any) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadQuestionImage(file);
-                  e.target.value = "";
-                }}
+              {/* Modalidade herdada do simulado: bloqueada (a API também força a do simulado). */}
+              <SearchableSelect
+                label="Modalidade"
+                required
+                disabled
+                showSelectedPreview={false}
+                placeholder="Defina em Dados gerais"
+                value={form.exam_type}
+                options={examTypeOptions}
+                onChange={() => {}}
+                error={qErrors.exam_type}
               />
-              {qErrors.image_url && (
-                <Text className="text-xs text-danger mt-1">{qErrors.image_url}</Text>
-              )}
-
-              {qForm.image_url ? (
-                <View className="mt-3">
+              <Text className="text-xs text-ink-subtle" style={{ marginTop: 4, marginBottom: 12 }}>
+                Definida pela modalidade do simulado (Dados gerais).
+              </Text>
+              <View className="flex-row" style={{ gap: 12 }}>
+                <View style={{ flex: 1 }}>
                   <FormInput
-                    label="URL da imagem"
-                    value={qForm.image_url}
-                    onChangeText={(v) => setQField("image_url", v)}
-                    placeholder="https://..."
+                    label="Pontos"
+                    value={qForm.points}
+                    onChangeText={(v) => setQField("points", v)}
+                    valueFormat="decimal"
+                    decimalPlaces={2}
+                    placeholder="1"
+                    error={qErrors.points}
                   />
                 </View>
-              ) : null}
-
-              <View className="mt-3">
-                <FormInput
-                  label="URL do vídeo"
-                  value={qForm.video_url}
-                  onChangeText={(v) => setQField("video_url", v)}
-                  placeholder="https://..."
-                  keyboardType="url"
-                  error={qErrors.video_url}
-                />
+                <View style={{ flex: 1 }}>
+                  <FormInput
+                    label="Ordem"
+                    value={qForm.order}
+                    onChangeText={(v) => setQField("order", v)}
+                    valueFormat="integer"
+                    maxDigits={4}
+                    placeholder="1"
+                    error={qErrors.order}
+                  />
+                </View>
               </View>
+              <FormInput
+                label="URL do vídeo (opcional)"
+                value={qForm.video_url}
+                onChangeText={(v) => setQField("video_url", v)}
+                placeholder="https://..."
+                keyboardType="url"
+                error={qErrors.video_url}
+              />
             </View>
           </View>
         ) : (
-          <View className="gap-4">
+          <View style={{ flexDirection: isMobile ? "column" : "row", gap: 20, alignItems: "flex-start" }}>
+          <View className="gap-4" style={{ flex: 3, width: isMobile ? "100%" : undefined, minWidth: 0 }}>
             {qForm.type === "multiple_choice" ? (
               <View>
                 <Text className="text-sm font-semibold text-ink mb-1">
@@ -1935,17 +1933,19 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                         />
                       </TouchableOpacity>
                       <View style={{ flex: 1 }}>
-                        <TextInput
-                          value={opt.option_text}
-                          onChangeText={(v) => setOptionField(idx, "option_text", v)}
-                          placeholder={`Opção ${idx + 1}`}
-                          placeholderTextColor="var(--ds-ink-subtle)"
-                          className={`border rounded-ds-md px-3 py-2 text-sm text-ink ${
-                            opt.is_correct
-                              ? "border-success bg-surface"
-                              : "border-border bg-surface-sunken"
+                        <View
+                          className={`flex-row border rounded-ds-md px-3 ${
+                            opt.is_correct ? "border-success bg-surface" : "border-border bg-surface-sunken"
                           }`}
-                        />
+                        >
+                          <RichTextInput
+                            compact
+                            value={opt.option_text}
+                            onChange={(v) => setOptionField(idx, "option_text", v)}
+                            placeholder={`Opção ${idx + 1}`}
+                            aria-label={`Texto da opção ${idx + 1}`}
+                          />
+                        </View>
                       </View>
                       <TouchableOpacity
                         onPress={() => markTriggerText(idx)}
@@ -1978,13 +1978,25 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <Text className="text-sm font-semibold text-ink mb-1.5">
                 Gabarito / explicação (opcional)
               </Text>
-              <textarea
+              <RichTextInput
                 value={qForm.explanation}
-                onChange={(e: any) => setQField("explanation", e.target.value)}
+                onChange={(v) => setQField("explanation", v)}
                 placeholder="Texto exibido após a correção..."
-                style={{ ...inputStyle, minHeight: 72, backgroundColor: "var(--ds-surface)" }}
-                rows={3}
+                minHeight={72}
               />
+            </View>
+          </View>
+
+            {/* Classificação ao lado das alternativas */}
+            <View
+              className="bg-surface border border-border rounded-ds-md"
+              style={{ flex: 2, width: isMobile ? "100%" : undefined, minWidth: isMobile ? undefined : 320, padding: 16 }}
+            >
+              <Text className="font-semibold text-ink" style={{ fontSize: 15 }}>Classificação da questão</Text>
+              <Text className="text-xs text-ink-subtle" style={{ marginTop: 2, marginBottom: 12 }}>
+                Disciplina, assuntos, dificuldade, banca, ano e tags. Quanto mais detalhada, melhores os relatórios e a busca no banco.
+              </Text>
+              <ClassificationFields form={qClass} onChange={setQClass} catalogs={questionCatalogs} hideExamType />
             </View>
           </View>
         )}

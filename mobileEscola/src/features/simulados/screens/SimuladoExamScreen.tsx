@@ -10,6 +10,7 @@ import {
   Image,
   useWindowDimensions,
 } from 'react-native';
+import RichText from '../../../components/RichText';
 import { Ionicons } from '@expo/vector-icons';
 import ConfirmModal from '../../../components/ConfirmModal';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -105,7 +106,7 @@ function ItemQuestao({
         </View>
       </View>
 
-      <Text style={styles.enunciado}>{questao.question_text}</Text>
+      <Text style={styles.enunciado}><RichText value={questao.question_text} /></Text>
 
       {questao.image_url && !imagemErro ? (
         <Image
@@ -137,7 +138,7 @@ function ItemQuestao({
               {selecionada && <View style={styles.radioPonto} />}
             </View>
             <Text style={[styles.opcaoTexto, selecionada && styles.opcaoTextoSelecionado]}>
-              {op.option_text}
+              <RichText value={op.option_text} />
             </Text>
           </TouchableOpacity>
         );

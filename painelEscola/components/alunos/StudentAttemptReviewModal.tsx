@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import RichText from "../ui/RichText";
 import { Ionicons } from "@expo/vector-icons";
 import Modal from "../ui/Modal";
 import Badge from "../ui/Badge";
@@ -73,7 +74,7 @@ function QuestionBlock({
     <View className={`rounded-ds-md border px-3 py-3 ${borderTone}`}>
       <View className="flex-row items-start gap-2 mb-2">
         <Text className="text-sm font-semibold text-ink">{index + 1}.</Text>
-        <Text className="flex-1 text-sm text-ink">{question.question_text || "—"}</Text>
+        <Text className="flex-1 text-sm text-ink"><RichText value={question.question_text || "—"} /></Text>
         <View
           className={`px-2 py-0.5 rounded-full ${
             isCorrect
@@ -159,7 +160,7 @@ function QuestionBlock({
                             : "text-ink"
                     }`}
                   >
-                    {optionLetter(opIdx)}) {op.option_text}
+                    {optionLetter(opIdx)}) <RichText value={op.option_text} />
                   </Text>
                   {correct || selected ? (
                     <Text className="text-[11px] text-ink-muted mt-0.5">

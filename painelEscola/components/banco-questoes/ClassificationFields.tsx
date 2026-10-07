@@ -13,10 +13,12 @@ type Props = {
   form: ClassificationForm;
   onChange: (form: ClassificationForm) => void;
   catalogs: QuestionBankCatalogs;
+  /** Esconde "Modalidade (tipo de prova)" quando a tela já tem esse campo (ex.: questão de simulado). */
+  hideExamType?: boolean;
 };
 
 /** Campos de classificação de uma questão. */
-export default function ClassificationFields({ form, onChange, catalogs }: Props) {
+export default function ClassificationFields({ form, onChange, catalogs, hideExamType = false }: Props) {
   const set = <K extends keyof ClassificationForm>(key: K, value: ClassificationForm[K]) =>
     onChange({ ...form, [key]: value });
 
@@ -102,7 +104,7 @@ export default function ClassificationFields({ form, onChange, catalogs }: Props
         maxYear={new Date().getFullYear()}
       />
 
-      {catalogs.examTypes.length > 0 && (
+      {!hideExamType && catalogs.examTypes.length > 0 && (
         <FormSelect
           dense
           label="Modalidade (tipo de prova)"

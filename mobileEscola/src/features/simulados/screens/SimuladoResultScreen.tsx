@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import RichText from '../../../components/RichText';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
@@ -259,7 +260,7 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
                 <View style={styles.questaoTopo}>
                   <Text style={styles.questaoNumero}>{index + 1}.</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.questaoTexto}>{q.question_text}</Text>
+                    <Text style={styles.questaoTexto}><RichText value={q.question_text} /></Text>
                     {q.points && (
                       <Text style={styles.questaoPoints}>Pontos: {q.points}</Text>
                     )}
@@ -320,7 +321,7 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
                                 errada && styles.opcaoTextoErrada,
                               ]}
                             >
-                              {op.option_text}
+                              <RichText value={op.option_text} />
                             </Text>
                           </View>
                         );

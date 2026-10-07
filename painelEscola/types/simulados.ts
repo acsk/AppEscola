@@ -30,6 +30,17 @@ export type ExamQuestion = {
   explanation: string | null;
   subject: { id: number; name: string } | null;
   options: ExamQuestionOption[];
+  /** Classificação (mesmo detalhamento do banco de questões). */
+  difficulty_id?: number | null;
+  difficulty?: { id: number; name: string } | null;
+  topic_ids?: number[];
+  topics?: { id: number; name: string }[];
+  board_id?: number | null;
+  board?: { id: number; name: string } | null;
+  year?: number | null;
+  is_annulled?: boolean;
+  is_outdated?: boolean;
+  tags?: string[];
 };
 
 export type ExamQuestionOption = {

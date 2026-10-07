@@ -11,6 +11,7 @@ import {
   Image,
   Platform,
 } from 'react-native';
+import RichText from '../../../components/RichText';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -711,7 +712,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                 ]}>
                   <View style={styles.previewQuestaoTopo}>
                     <Text style={styles.previewNumero}>{index + 1}.</Text>
-                    <Text style={styles.previewEnunciado}>{q.question_text}</Text>
+                    <Text style={styles.previewEnunciado}><RichText value={q.question_text} /></Text>
                     {questionStatus ? (
                       <View style={[styles.questionStatusBadge, { backgroundColor: questionStatus.bg }]}>
                         <Ionicons name={questionStatus.icon as any} size={13} color={questionStatus.color} />
@@ -782,7 +783,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
                                 errada   && styles.previewOpcaoTextoErrada,
                                 emCorrecao && selecionada && styles.previewOpcaoTextoSelecionadaPendente,
                               ]}>
-                                {op.option_text}
+                                <RichText value={op.option_text} />
                               </Text>
                             </View>
                           );

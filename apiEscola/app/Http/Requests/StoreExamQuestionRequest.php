@@ -30,7 +30,7 @@ class StoreExamQuestionRequest extends FormRequest
             'options.*.is_correct'          => ['required', 'boolean'],
             'options.*.triggers_text_input' => ['nullable', 'boolean'],
             'options.*.order'               => ['nullable', 'integer', 'min:1'],
-        ];
+        ] + UpdateQuestionClassificationRequest::examQuestionRules();
     }
 
     public function messages(): array
@@ -43,7 +43,7 @@ class StoreExamQuestionRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            $questionText = trim((string) $this->input('question_text', ''));
+            $questionText = trim(\App\Support\QuestionRichText::plain((string) $this->input('question_text', '')));
             $imageUrl = trim((string) $this->input('image_url', ''));
 
             if ($questionText === '' && $imageUrl === '') {

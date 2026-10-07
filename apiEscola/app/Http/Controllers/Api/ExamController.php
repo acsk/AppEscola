@@ -86,7 +86,8 @@ class ExamController extends Controller
         $this->examAccess->assertCanManageExams($request->user());
         $this->authorizeTenant($request, $exam->tenant_id);
 
-        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject', 'questions.examType']);
+        $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType', 'questions.options', 'questions.subject', 'questions.examType',
+            'questions.topics:id,name,subject_id', 'questions.board:id,name', 'questions.difficulty:id,name,sort_order', 'questions.tags:id,name']);
 
         return $this->success(new ExamResource($exam));
     }

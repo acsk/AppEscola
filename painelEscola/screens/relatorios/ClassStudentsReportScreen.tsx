@@ -7,6 +7,13 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { domainToOptions, usePeriods, useWeekdays } from "../../hooks/useDomains";
 import GridPdfExportButton, { PdfGroup } from "../../components/ui/GridPdfExportButton";
 import DataTableRow from "../../components/ui/DataTableRow";
+import PageHeader from "../../components/ui/PageHeader";
+import Panel from "../../components/ui/Panel";
+import Button from "../../components/ui/Button";
+import Badge from "../../components/ui/Badge";
+import SearchableSelect from "../../components/ui/SearchableSelect";
+import { LayoutGrid, X } from "lucide-react-native";
+import type { Tone } from "../../constants/theme";
 import {
   TABLE_CELL,
   TABLE_CELL_SEMIBOLD,
@@ -123,9 +130,11 @@ const TABLE_COLUMNS = [
   { key: "dias", label: "Dia(s) da semana", flex: 1.2, minWidth: 120, variant: "body" as const },
   { key: "curso", label: "Curso", flex: 1.2, minWidth: 120, variant: "body" as const },
   { key: "aluno", label: "Aluno", flex: 2.5, minWidth: 200, variant: "body" as const },
-  { key: "matricula", label: "Matrícula", flex: 1.1, minWidth: 130, variant: "body" as const },
-  { key: "status", label: "Status", flex: 0.9, minWidth: 88, variant: "body" as const },
+  { key: "matricula", label: "Matrícula", flex: 1.1, minWidth: 130, variant: "mono" as const },
+  { key: "status", label: "Status", flex: 0.9, minWidth: 100, variant: "badge" as const },
 ];
+
+const STATUS_TONE: Record<string, Tone> = { active: "success", pending: "warning", cancelled: "danger", completed: "neutral" };
 
 export default function ClassStudentsReportScreen({ navigate }: Props) {
   const { contentPadding, isMobile, tableMinWidth } = useResponsiveLayout();
@@ -155,7 +164,8 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
     flex: number,
     minWidth: number,
     value: string,
-    variant: "header" | "body" | "bodyBold" = "body"
+    variant: "header" | "body" | "bodyBold" | "mono" | "badge" = "body",
+    tone?: Tone
   ) => (
     <View
       style={{
@@ -165,18 +175,26 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
         justifyContent: "center",
       }}
     >
-      <Text
-        numberOfLines={1}
-        className={
-          variant === "header"
-            ? TABLE_HEADER_CELL
-            : variant === "bodyBold"
-              ? TABLE_CELL_SEMIBOLD
-              : TABLE_CELL
-        }
-      >
-        {value}
-      </Text>
+      {variant === "badge" ? (
+        <View style={{ alignItems: "flex-start" }}>
+          <Badge tone={tone ?? "neutral"} dot label={value} />
+        </View>
+      ) : (
+        <Text
+          numberOfLines={1}
+          className={
+            variant === "header"
+              ? TABLE_HEADER_CELL
+              : variant === "bodyBold"
+                ? TABLE_CELL_SEMIBOLD
+                : variant === "mono"
+                  ? `${TABLE_CELL} font-mono`
+                  : TABLE_CELL
+          }
+        >
+          {value}
+        </Text>
+      )}
     </View>
   );
 
@@ -350,48 +368,44 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
     return buildPdfGroups(allRows);
   }, [buildPdfGroups, fetchAllRowsForExport]);
 
+  const hasFilters = !!(search || courseId || schoolClassId || period || weekday);
+  const filterWidth = isMobile ? "100%" : 200;
+
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
-      <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", gap: 12 }}>
-        <View>
-          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Relatórios</Text>
-          <Text className="text-sm text-ink-muted">Relação de alunos por turma</Text>
-        </View>
-        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" as any }}>
-          <GridPdfExportButton
-            filename="relatorio-turmas-alunos"
-            title="Relatório de turmas"
-            subtitle="Relação de alunos por turma"
-            groups={buildPdfGroups(rows)}
-            onBeforeExport={handleExportPdf}
-          />
-          <TouchableOpacity
-            onPress={() => navigate("turmas")}
-            className="flex-row items-center bg-brand px-4 rounded-ds-md py-2 min-h-control-md justify-center"
-            activeOpacity={0.85}
-          >
-            <Ionicons name="grid-outline" size={16} color="var(--ds-on-brand)" />
-            <Text className="text-on-brand font-medium text-sm ml-2">Ir para turmas</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={{ marginBottom: 24 }}>
+        <PageHeader
+          title="Alunos por turma"
+          description="Relação de alunos matriculados em cada turma, com período, dias e curso."
+          actions={
+            <>
+              <Button icon={LayoutGrid} label="Ir para turmas" onPress={() => navigate("turmas")} />
+              <GridPdfExportButton
+                filename="relatorio-turmas-alunos"
+                title="Alunos por turma"
+                subtitle="Relação de alunos matriculados em cada turma."
+                groups={buildPdfGroups(rows)}
+                onBeforeExport={handleExportPdf}
+              />
+            </>
+          }
+        />
       </View>
 
-      <View className="bg-surface border border-border rounded-ds-md p-3 mb-4">
-        <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Filtros</Text>
-          <TouchableOpacity onPress={clearFilters} className="px-2 py-1 rounded-ds-md bg-surface-sunken" activeOpacity={0.8}>
-            <Text className="text-xs font-semibold text-ink-muted">Limpar</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View className="flex-row gap-2" style={{ flexWrap: "wrap" as any }}>
+      {/* Filtros: busca + selects com pesquisa, numa linha (quebra no mobile) */}
+      <View className="flex-row flex-wrap items-end" style={{ gap: 12, marginBottom: 16 }}>
+        <View style={{ flexGrow: 1, minWidth: isMobile ? "100%" : 260, flexBasis: isMobile ? "100%" : 260 }}>
+          <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
+            Buscar
+          </Text>
           <View
-            className="flex-row items-center bg-surface-sunken border border-border rounded-ds-md px-3"
-            style={{ height: 44, minWidth: isMobile ? "100%" : 280, flexGrow: 1 }}
+            className="flex-row items-center bg-surface border border-border-strong rounded-ds-md px-3"
+            style={{ height: 38 }}
           >
             <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
             <input
-              placeholder="Buscar aluno, matrícula ou turma"
+              aria-label="Buscar aluno, matrícula ou turma"
+              placeholder="Aluno, matrícula ou turma"
               value={search}
               onChange={(e: any) => {
                 setSearch(e.target.value);
@@ -405,115 +419,81 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
                 color: "var(--ds-ink)",
                 marginLeft: 8,
                 backgroundColor: "transparent",
+                fontFamily: "inherit",
               }}
             />
           </View>
-
-          <select
-            value={courseId}
-            onChange={(e: any) => {
-              setCourseId(e.target.value);
-              // Quando o curso muda, a turma precisa ser recomputada
-              setSchoolClassId("");
-              setPage(1);
-            }}
-            style={{
-              border: "1px solid #D9DDE3",
-              borderRadius: 4,
-              padding: "0 14px",
-              fontSize: 14,
-              color: "var(--ds-ink)",
-              backgroundColor: "var(--ds-surface-sunken)",
-              height: 44,
-              minWidth: isMobile ? "100%" : 220,
-            }}
-          >
-            <option value="">Todos os cursos</option>
-            {courseOptions.map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={schoolClassId}
-            onChange={(e: any) => {
-              setSchoolClassId(e.target.value);
-              setPage(1);
-            }}
-            style={{
-              border: "1px solid #D9DDE3",
-              borderRadius: 4,
-              padding: "0 14px",
-              fontSize: 14,
-              color: "var(--ds-ink)",
-              backgroundColor: "var(--ds-surface-sunken)",
-              height: 44,
-              minWidth: isMobile ? "100%" : 260,
-            }}
-          >
-            <option value="">Todas as turmas</option>
-            {classOptions.map((klass) => (
-              <option key={klass.id} value={String(klass.id)}>
-                {klass.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={period}
-            onChange={(e: any) => {
-              setPeriod(e.target.value);
-              setPage(1);
-            }}
-            style={{
-              border: "1px solid #D9DDE3",
-              borderRadius: 4,
-              padding: "0 14px",
-              fontSize: 14,
-              color: "var(--ds-ink)",
-              backgroundColor: "var(--ds-surface-sunken)",
-              height: 44,
-              minWidth: isMobile ? "100%" : 180,
-            }}
-          >
-            <option value="">Período</option>
-            {periodOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={weekday}
-            onChange={(e: any) => {
-              setWeekday(e.target.value);
-              setPage(1);
-            }}
-            style={{
-              border: "1px solid #D9DDE3",
-              borderRadius: 4,
-              padding: "0 14px",
-              fontSize: 14,
-              color: "var(--ds-ink)",
-              backgroundColor: "var(--ds-surface-sunken)",
-              height: 44,
-              minWidth: isMobile ? "100%" : 180,
-            }}
-          >
-            <option value="">Dia da semana</option>
-            {weekdayOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
         </View>
+        <View style={{ width: filterWidth }}>
+          <SearchableSelect
+            dense
+            label="Curso"
+            modalTitle="Filtrar por curso"
+            placeholder="Todos os cursos"
+            showSelectedPreview={false}
+            value={courseId}
+            options={courseOptions.map((c) => ({ value: String(c.id), label: c.name }))}
+            onChange={(v) => {
+              setCourseId(v);
+              setSchoolClassId(""); // a turma depende do curso
+              setPage(1);
+            }}
+          />
+        </View>
+        <View style={{ width: filterWidth }}>
+          <SearchableSelect
+            dense
+            label="Turma"
+            modalTitle="Filtrar por turma"
+            placeholder="Todas as turmas"
+            showSelectedPreview={false}
+            value={schoolClassId}
+            options={classOptions.map((c) => ({ value: String(c.id), label: c.name }))}
+            onChange={(v) => {
+              setSchoolClassId(v);
+              setPage(1);
+            }}
+          />
+        </View>
+        <View style={{ width: isMobile ? "100%" : 160 }}>
+          <SearchableSelect
+            dense
+            label="Período"
+            modalTitle="Filtrar por período"
+            placeholder="Todos"
+            showSelectedPreview={false}
+            value={period}
+            options={periodOptions.map((o) => ({ value: String(o.value), label: o.label }))}
+            onChange={(v) => {
+              setPeriod(v);
+              setPage(1);
+            }}
+          />
+        </View>
+        <View style={{ width: isMobile ? "100%" : 170 }}>
+          <SearchableSelect
+            dense
+            label="Dia da semana"
+            modalTitle="Filtrar por dia da semana"
+            placeholder="Todos"
+            showSelectedPreview={false}
+            value={weekday}
+            options={weekdayOptions.map((o) => ({ value: String(o.value), label: o.label }))}
+            onChange={(v) => {
+              setWeekday(v);
+              setPage(1);
+            }}
+          />
+        </View>
+        {hasFilters && <Button variant="ghost" icon={X} label="Limpar filtros" onPress={clearFilters} />}
       </View>
 
-      <View className="bg-surface border border-border rounded-ds-md overflow-hidden">
+      <Panel
+        title="Alunos"
+        description={loading ? "Carregando…" : `${meta.total} registro${meta.total === 1 ? "" : "s"}${hasFilters ? " com os filtros aplicados" : ""}.`}
+        flush
+      >
+      <View>
         {loading ? (
           <View className="py-14 items-center">
             <ActivityIndicator color="var(--ds-brand)" />
@@ -521,8 +501,10 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
           </View>
         ) : rows.length === 0 ? (
           <View className="py-14 items-center">
-            <Ionicons name="document-text-outline" size={26} color="var(--ds-ink-subtle)" />
-            <Text className="text-sm font-semibold text-ink-muted mt-2">Nenhum registro encontrado</Text>
+            <Text className="text-sm font-medium text-ink">Nenhum aluno encontrado</Text>
+            <Text className="text-sm text-ink-muted mt-1">
+              {hasFilters ? "Ajuste ou limpe os filtros para ver mais resultados." : "Ainda não há alunos matriculados em turmas."}
+            </Text>
           </View>
         ) : (
           <ScrollView
@@ -551,7 +533,8 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
                       col.flex,
                       col.minWidth,
                       cellValueForRow(row, col.key),
-                      col.key === "turma" ? "bodyBold" : col.variant
+                      col.key === "turma" ? "bodyBold" : col.variant,
+                      col.key === "status" ? STATUS_TONE[row.enrollment_status] ?? "neutral" : undefined
                     )
                   )}
                 </DataTableRow>
@@ -560,7 +543,9 @@ export default function ClassStudentsReportScreen({ navigate }: Props) {
           </ScrollView>
         )}
       </View>
+      </Panel>
 
+      <View style={{ marginTop: 16 }} />
       <Pagination
         currentPage={meta.current_page}
         lastPage={meta.last_page}

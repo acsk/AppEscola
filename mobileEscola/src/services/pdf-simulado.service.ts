@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { BASE_URL } from './api';
 import { storage, STORAGE_KEYS } from './storage';
 import { formatExamDuration, type SimuladoDetail, type Question } from './simulados.service';
+import { plainRichText, richTextToSafeHtml } from '../lib/richText';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,16 @@ function textBlocksHtml(value: string | number | null | undefined): string {
   return paragraphs
     .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br/>')}</p>`)
     .join('');
+}
+
+/** Como textBlocksHtml, mas preservando negrito/itálico/sublinhado do texto da questão (HTML seguro). */
+function richBlocksHtml(value: string | null | undefined): string {
+  const paragraphs = (value ?? '')
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  return paragraphs.map((paragraph) => `<p>${richTextToSafeHtml(paragraph).replace(/\n/g, '<br/>')}</p>`).join('');
 }
 
 function letraOpcao(index: number): string {
@@ -127,7 +138,7 @@ function questaoHtml(q: Question, numero: number): string {
               (op, idx) => `
             <li>
               <span class="opt-marker">${letraOpcao(idx)})</span>
-              <div class="opt-text">${textBlocksHtml(op.option_text)}</div>
+              <div class="opt-text">${richBlocksHtml(op.option_text)}</div>
             </li>`,
             )
             .join('')}
@@ -157,7 +168,7 @@ function questaoHtml(q: Question, numero: number): string {
         <span class="q-type">${q.type === 'essay' ? 'Discursiva' : 'Objetiva'}</span>
         <span class="q-points">${q.points} pt${q.points !== 1 ? 's' : ''}</span>
       </header>
-      <div class="question-text">${textBlocksHtml(q.question_text)}</div>
+      <div class="question-text">${richBlocksHtml(q.question_text)}</div>
       ${imagem}
       ${corpo}
     </article>
@@ -611,7 +622,7 @@ async function gerarPdfNaWeb(detalhe: SimuladoDetail): Promise<void> {
     writeWrapped(`${numero}. ${badges}`, { size: 10.5, style: 'bold', color: [15, 23, 42], lineHeight: 15 });
     y += 4;
 
-    const paragraphs = textParagraphs(q.question_text);
+    const paragraphs = textParagraphs(plainRichText(q.question_text));
     if (paragraphs.length) {
       paragraphs.forEach((paragraph) => {
         writeWrapped(paragraph, { size: 11, lineHeight: 16 });
@@ -637,7 +648,7 @@ async function gerarPdfNaWeb(detalhe: SimuladoDetail): Promise<void> {
 
       opcoes.forEach((op, optionIndex) => {
         const marker = `${letraOpcao(optionIndex)})`;
-        const optionText = plainText(op.option_text).trim();
+        const optionText = plainRichText(plainText(op.option_text)).trim();
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10.5);
         addPageIfNeeded(18);

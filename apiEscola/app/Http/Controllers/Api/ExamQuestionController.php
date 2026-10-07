@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\QuestionRichText;
 use App\Http\Controllers\Controller;
 use OpenApi\Attributes as OA;
 use App\Http\Requests\StoreExamQuestionRequest;
 use App\Http\Requests\UpdateExamQuestionRequest;
+use App\Http\Requests\UpdateQuestionClassificationRequest;
 use App\Http\Resources\ExamQuestionResource;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Services\ExamAccessService;
 use App\Services\ExamPublishValidator;
+use App\Services\QuestionClassificationService;
 use App\Services\QuestionContentService;
 use App\Services\ExamTypeService;
 use App\Services\TenantUploadSettingsService;
@@ -25,6 +28,9 @@ class ExamQuestionController extends Controller
 {
     use ScopedByTenant;
 
+    /** Relações da questão com classificação completa (mesmo detalhamento do banco de questões). */
+    private const DETAIL_RELATIONS = ['subject', 'options', 'examType', 'topics:id,name,subject_id', 'board:id,name', 'difficulty:id,name,sort_order', 'tags:id,name'];
+
     public function __construct(
         private readonly ExamTypeService $examTypeService,
         private readonly ExamPublishValidator $publishValidator,
@@ -36,7 +42,7 @@ class ExamQuestionController extends Controller
         $this->authorizeTenant($request, $exam->tenant_id);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
-        $questions = $exam->questions()->with(['subject', 'options', 'examType'])->get();
+        $questions = $exam->questions()->with(self::DETAIL_RELATIONS)->get();
 
         return $this->success(ExamQuestionResource::collection($questions));
     }
@@ -147,7 +153,10 @@ class ExamQuestionController extends Controller
 
         $question = DB::transaction(function () use ($request, $exam, $tenantId) {
             $nextOrder = $exam->questions()->max('order') + 1;
-            $examType = $this->examTypeService->resolveActive($request->exam_type);
+            // A modalidade da questão é a do simulado (quando definida); o campo vem bloqueado no painel.
+            $examType = $exam->exam_type_id
+                ? $exam->examType
+                : $this->examTypeService->resolveActive($request->exam_type);
 
             $question = ExamQuestion::create([
                 'tenant_id'         => $tenantId,
@@ -155,12 +164,12 @@ class ExamQuestionController extends Controller
                 'subject_id'        => $request->subject_id,
                 'exam_type_id'      => $examType->id,
                 'type'              => $request->type,
-                'question_text'     => $request->question_text,
+                'question_text'     => QuestionRichText::normalize($request->question_text),
                 'image_url'         => $request->image_url,
                 'video_url'         => $request->video_url,
                 'points'            => $request->points ?? 1.00,
                 'order'             => $request->order ?? $nextOrder,
-                'explanation'       => $request->explanation,
+                'explanation'       => QuestionRichText::normalize($request->explanation),
                 'allow_text_answer' => $request->allow_text_answer ?? false,
             ]);
 
@@ -168,10 +177,12 @@ class ExamQuestionController extends Controller
                 app(QuestionContentService::class)->syncOptions($question, $request->options);
             }
 
+            $this->applyClassification($question, $request->validated(), $tenantId);
+
             return $question;
         });
 
-        $question->load(['subject', 'options', 'examType']);
+        $question->load(self::DETAIL_RELATIONS);
 
         return $this->created(new ExamQuestionResource($question));
     }
@@ -182,7 +193,7 @@ class ExamQuestionController extends Controller
         $this->assertQuestionBelongsToExam($exam, $question);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
-        $question->load(['subject', 'options', 'examType']);
+        $question->load(self::DETAIL_RELATIONS);
 
         return $this->success(new ExamQuestionResource($question));
     }
@@ -225,8 +236,10 @@ class ExamQuestionController extends Controller
         $this->assertQuestionBelongsToExam($exam, $question);
         app(ExamAccessService::class)->assertCanManageExams($request->user());
 
-        DB::transaction(function () use ($request, $question) {
-            $data = $request->except('options');
+        DB::transaction(function () use ($request, $question, $exam) {
+            // Só dados validados (antes: todo o input ia para o model). Disciplina e classificação vão pelo serviço,
+            // que valida o tenant e a coerência disciplina/assuntos.
+            $data = $request->safe()->except(['options', 'subject_id', ...UpdateQuestionClassificationRequest::EXAM_QUESTION_FIELDS]);
             if (isset($data['exam_type'])) {
                 $requestedExamType = null;
 
@@ -245,15 +258,20 @@ class ExamQuestionController extends Controller
                 $data['exam_type_id'] = $requestedExamType->id;
                 unset($data['exam_type']);
             }
+            // A modalidade da questão segue a do simulado (quando definida), seja qual for a enviada.
+            if ($exam->exam_type_id) {
+                unset($data['exam_type']);
+                $data['exam_type_id'] = (int) $exam->exam_type_id;
+            }
+            foreach (['question_text', 'explanation'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    $data[$field] = QuestionRichText::normalize($data[$field]); // formato canônico <b>/<i>/<u>
+                }
+            }
             $question->update($data);
 
-            // Disciplina trocada: descarta assuntos de outra disciplina (classificação do banco de questões).
-            if ($question->wasChanged('subject_id')) {
-                $staleTopicIds = $question->topics()
-                    ->when($question->subject_id, fn ($q, $subjectId) => $q->where('subject_topics.subject_id', '!=', $subjectId))
-                    ->pluck('subject_topics.id');
-                $question->topics()->detach($staleTopicIds);
-            }
+            // Disciplina trocada sem assuntos informados: o serviço descarta os assuntos de outra disciplina.
+            $this->applyClassification($question, $request->validated(), (int) $question->tenant_id);
 
             if ($request->has('options') && $request->options !== null) {
                 // Remove as antigas e recria
@@ -261,7 +279,7 @@ class ExamQuestionController extends Controller
             }
         });
 
-        $question->load(['subject', 'options', 'examType']);
+        $question->load(self::DETAIL_RELATIONS);
         $exam->load('examStatus');
         $this->publishValidator->assertCanRemainPublished($exam);
 
@@ -296,6 +314,15 @@ class ExamQuestionController extends Controller
         $tenantId = $this->getTenantId($request);
         if ($tenantId !== null && $tenantId !== $resourceTenantId) {
             abort(403, 'Acesso negado.');
+        }
+    }
+
+    /** Aplica disciplina, assuntos, dificuldade, banca, ano, situação e tags (só os campos enviados). */
+    private function applyClassification(ExamQuestion $question, array $validated, int $tenantId): void
+    {
+        $fields = array_intersect_key($validated, array_flip(['subject_id', ...UpdateQuestionClassificationRequest::EXAM_QUESTION_FIELDS]));
+        if ($fields !== []) {
+            app(QuestionClassificationService::class)->apply($question, $fields, $tenantId);
         }
     }
 }

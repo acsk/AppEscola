@@ -1,9 +1,20 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, Platform, Text, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Alert, Platform } from "react-native";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { drawTenantPdfHeader } from "../../utils/pdfTenantLetterhead";
+import {
+  PDF_COLOR,
+  PDF_MARGIN,
+  PDF_TYPE,
+  drawDocumentTitle,
+  drawFactsStrip,
+  drawPageFooters,
+  pdfTableStyles,
+  setText,
+} from "../../utils/pdfTheme";
+import Button, { type ButtonVariant } from "./Button";
+import { FileDown } from "lucide-react-native";
 
 type Column<T> = {
   key: keyof T | string;
@@ -25,7 +36,9 @@ type Props<T extends Record<string, any>> = {
   rows?: T[];
   groups?: Array<PdfGroup<any>>;
   onBeforeExport?: () => Promise<Array<PdfGroup<any>> | void>;
-  className?: string;
+  /** Estilo do botão (padrão `primary`: costuma ser a ação principal do relatório). */
+  variant?: ButtonVariant;
+  label?: string;
 };
 
 const getCellValue = (row: Record<string, any>, key: string) => String(row[key] ?? "-");
@@ -38,7 +51,8 @@ export default function GridPdfExportButton<T extends Record<string, any>>({
   rows = [],
   groups,
   onBeforeExport,
-  className = "flex-row items-center bg-brand px-4 py-2.5 rounded-ds-md",
+  variant = "primary",
+  label = "Exportar PDF",
 }: Props<T>) {
   const [exporting, setExporting] = useState(false);
 
@@ -59,71 +73,59 @@ export default function GridPdfExportButton<T extends Record<string, any>>({
       }
 
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      let cursorY = await drawTenantPdfHeader(doc);
-
-      doc.setFontSize(14);
-      doc.setTextColor(17, 24, 39);
-      doc.text(title, 14, cursorY);
-      cursorY += 6;
-
-      if (subtitle) {
-        doc.setFontSize(10);
-        doc.setTextColor(107, 114, 128);
-        doc.text(subtitle, 14, cursorY);
-        cursorY += 5;
-      }
-      cursorY += 1;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let cursorY = await drawTenantPdfHeader(doc, { marginLeft: PDF_MARGIN, marginRight: PDF_MARGIN, showGeneratedAt: false });
+      cursorY = drawDocumentTitle(doc, cursorY, { overline: "Relatório", title, description: subtitle });
 
       const flatRows = rows ?? [];
+      const bottomLimit = pageHeight - 16; // espaço do rodapé
 
       if (groupedSections.length > 0) {
-        groupedSections.forEach((group, index) => {
-          if (index > 0) {
-            cursorY += 2;
+        groupedSections.forEach((group) => {
+          // Cabeçalho do grupo + início da tabela não podem ficar órfãos no fim da página.
+          if (cursorY + 34 > bottomLimit) {
+            doc.addPage();
+            cursorY = PDF_MARGIN + 4;
           }
+          cursorY = drawFactsStrip(
+            doc,
+            cursorY,
+            group.headerColumns.map((col) => ({ label: col.label, value: getCellValue(group.header, String(col.key)) }))
+          );
+
+          setText(doc, PDF_COLOR.inkSubtle, PDF_TYPE.caption);
+          const count = group.students.length;
+          doc.text(`${count} aluno${count === 1 ? "" : "s"}`, PDF_MARGIN, cursorY);
+          cursorY += 2;
 
           autoTable(doc, {
+            ...pdfTableStyles(),
             startY: cursorY,
-            head: [group.headerColumns.map((col) => col.label)],
-            body: [group.headerColumns.map((col) => getCellValue(group.header, String(col.key)))],
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [249, 250, 251], textColor: [55, 65, 81], fontStyle: "bold" },
-            bodyStyles: { textColor: [17, 24, 39], fontStyle: "bold" },
-            margin: { left: 14, right: 14 },
+            margin: { left: PDF_MARGIN, right: PDF_MARGIN, bottom: 16 },
+            head: [["#", ...group.studentColumns.map((col) => col.label)]],
+            body: group.students.map((student, i) => [
+              String(i + 1),
+              ...group.studentColumns.map((col) => getCellValue(student, String(col.key))),
+            ]),
+            columnStyles: { 0: { cellWidth: 10, textColor: PDF_COLOR.inkSubtle } },
           });
 
-          cursorY = (doc as any).lastAutoTable.finalY + 2;
-
-          autoTable(doc, {
-            startY: cursorY,
-            head: [group.studentColumns.map((col) => col.label)],
-            body: group.students.map((student) =>
-              group.studentColumns.map((col) => getCellValue(student, String(col.key)))
-            ),
-            theme: "grid",
-            styles: { fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81], fontStyle: "bold" },
-            margin: { left: 14, right: 14 },
-          });
-
-          cursorY = (doc as any).lastAutoTable.finalY + 4;
+          cursorY = (doc as any).lastAutoTable.finalY + 8;
         });
       } else if (flatRows.length > 0 && columns.length > 0) {
         autoTable(doc, {
-          startY: cursorY + 2,
+          ...pdfTableStyles(),
+          startY: cursorY,
+          margin: { left: PDF_MARGIN, right: PDF_MARGIN, bottom: 16 },
           head: [columns.map((col) => col.label)],
           body: flatRows.map((row) => columns.map((col) => getCellValue(row, String(col.key)))),
-          theme: "grid",
-          styles: { fontSize: 8, cellPadding: 2 },
-          headStyles: { fillColor: [249, 250, 251], textColor: [55, 65, 81], fontStyle: "bold" },
-          margin: { left: 14, right: 14 },
         });
       } else {
         Alert.alert("Nenhum dado disponível para exportação.");
         return;
       }
 
+      drawPageFooters(doc, title);
       doc.save(`${filename}.pdf`);
     } catch {
       Alert.alert("Não foi possível gerar o PDF.");
@@ -132,22 +134,5 @@ export default function GridPdfExportButton<T extends Record<string, any>>({
     }
   };
 
-  return (
-    <TouchableOpacity
-      onPress={handleExport}
-      className={className}
-      activeOpacity={0.85}
-      disabled={exporting}
-      style={{ opacity: exporting ? 0.7 : 1 }}
-    >
-      {exporting ? (
-        <ActivityIndicator size="small" color="var(--ds-on-brand)" />
-      ) : (
-        <Ionicons name="document-attach-outline" size={16} color="var(--ds-on-brand)" />
-      )}
-      <Text className="text-on-brand font-medium text-sm ml-2">
-        {exporting ? "Gerando PDF..." : "Exportar PDF"}
-      </Text>
-    </TouchableOpacity>
-  );
+  return <Button variant={variant} icon={FileDown} label={exporting ? "Gerando PDF..." : label} onPress={() => void handleExport()} loading={exporting} />;
 }

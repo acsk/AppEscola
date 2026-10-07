@@ -1,4 +1,5 @@
 import type { jsPDF } from "jspdf";
+import { PDF_COLOR, setText } from "./pdfTheme";
 import api from "../services/api";
 import { getApiResponseBody } from "./apiErrors";
 
@@ -355,25 +356,19 @@ export async function drawTenantPdfHeader(
   const textMaxWidth = pageWidth - textStartX - marginRight;
   const displayName = letterhead?.displayName ?? "Escola";
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(15, 23, 42);
+  setText(doc, PDF_COLOR.ink, 13, "bold");
   doc.text(displayName, textStartX, cursorY + 5);
 
   let lineY = cursorY + 10;
 
   if (letterhead?.corporateName) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
+    setText(doc, PDF_COLOR.inkMuted, 8);
     const corpLines = doc.splitTextToSize(letterhead.corporateName, textMaxWidth);
     doc.text(corpLines, textStartX, lineY);
     lineY += corpLines.length * 3.4 + 0.5;
   }
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(107, 114, 128);
+  setText(doc, PDF_COLOR.inkSubtle, 7.5);
 
   const contactParts = [
     letterhead?.cnpj ? `CNPJ ${letterhead.cnpj}` : null,
@@ -395,8 +390,7 @@ export async function drawTenantPdfHeader(
   }
 
   if (showGeneratedAt) {
-    doc.setFontSize(7);
-    doc.setTextColor(148, 163, 184);
+    setText(doc, PDF_COLOR.inkSubtle, 7);
     doc.text(`Gerado em: ${generatedAt}`, textStartX, lineY);
     lineY += 3.2;
   }
@@ -404,13 +398,10 @@ export async function drawTenantPdfHeader(
   const contentBottom = Math.max(lineY, logoDrawn ? cursorY + logoSize : lineY);
   const dividerY = contentBottom + 3;
 
-  // Separação reforçada do cabeçalho
-  doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(0.7);
+  // Filete institucional em `brand` (identidade do timbrado) — único uso de cor no cabeçalho.
+  doc.setDrawColor(...PDF_COLOR.brand);
+  doc.setLineWidth(0.6);
   doc.line(marginLeft, dividerY, pageWidth - marginRight, dividerY);
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.3);
-  doc.line(marginLeft, dividerY + 1.2, pageWidth - marginRight, dividerY + 1.2);
 
-  return dividerY + 5;
+  return dividerY + 7;
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\QuestionRichText;
 use App\Models\Exam;
 use App\Models\ExamAnswer;
 use Illuminate\Support\Collection;
@@ -49,8 +50,9 @@ class ExamQuestionErrorsReportService
                 $errorRate = $total > 0 ? round(($wrong / $total) * 100, 1) : null;
 
                 $text = (string) ($question->question_text ?? '');
-                $preview = $text !== ''
-                    ? mb_substr($text, 0, 120).(mb_strlen($text) > 120 ? '…' : '')
+                $plain = trim(QuestionRichText::plain($text)); // prévia é texto puro (sem <b>/<i>/<u>)
+                $preview = $plain !== ''
+                    ? mb_substr($plain, 0, 120).(mb_strlen($plain) > 120 ? '…' : '')
                     : ($question->image_url ? '[Enunciado em imagem]' : '[Sem enunciado]');
 
                 return [

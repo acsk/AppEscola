@@ -1,3 +1,4 @@
+import { plainRichText } from "./richText";
 import { Alert, Platform } from "react-native";
 import jsPDF from "jspdf";
 import type {
@@ -165,7 +166,7 @@ export async function exportStudentAttemptReviewPdf(params: {
   for (let index = 0; index < questions.length; index += 1) {
     const q = questions[index];
     const options = [...(q.options ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const enunciado = (q.question_text || "").trim() || "[Sem enunciado]";
+    const enunciado = plainRichText(q.question_text).trim() || "[Sem enunciado]";
     const correction = q.correction;
     const isCorrect = correction?.is_correct === true;
     const isWrong = correction?.is_correct === false;
@@ -192,7 +193,7 @@ export async function exportStudentAttemptReviewPdf(params: {
               : selected
                 ? " [marcada]"
                 : "";
-      const line = `${optionLetter(opIdx)})  ${op.option_text}${mark}`;
+      const line = `${optionLetter(opIdx)})  ${plainRichText(op.option_text)}${mark}`;
       const lines = doc.splitTextToSize(line, contentWidth - 10);
       optionBlocks.push({ lines, selected, correct, wrong });
       optionsHeight += lines.length * 4.2 + 1.2;

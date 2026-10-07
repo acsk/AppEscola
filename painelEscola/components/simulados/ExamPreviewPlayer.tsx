@@ -10,6 +10,7 @@ import {
   Linking,
   Alert,
 } from "react-native";
+import RichText from "../ui/RichText";
 import { Ionicons } from "@expo/vector-icons";
 import type { ExamPreviewPlayerQuestion } from "../../types/simulados";
 import { hasAnswerKey } from "./examPreviewUtils";
@@ -309,7 +310,7 @@ export default function ExamPreviewPlayer({
 
             <View className="px-5 py-4">
               <Text className="text-sm font-medium text-ink mb-4 leading-relaxed">
-                {q.question_text || "[Enunciado em imagem]"}
+                <RichText value={q.question_text || "[Enunciado em imagem]"} />
               </Text>
 
               {q.image_url ? (
@@ -412,7 +413,7 @@ export default function ExamPreviewPlayer({
                                 : "text-ink"
                         }`}
                       >
-                        {opt.option_text}
+                        <RichText value={opt.option_text} />
                       </Text>
                       {showGabarito && isCorrect && (
                         <Text className="text-[10px] font-semibold text-success">Gabarito</Text>
@@ -465,7 +466,7 @@ export default function ExamPreviewPlayer({
                   <Text className="text-[10px] font-semibold text-brand uppercase mb-1">
                     Explicação / gabarito
                   </Text>
-                  <Text className="text-xs text-brand leading-relaxed">{q.explanation}</Text>
+                  <Text className="text-xs text-brand leading-relaxed"><RichText value={q.explanation} /></Text>
                 </View>
               ) : null}
 
