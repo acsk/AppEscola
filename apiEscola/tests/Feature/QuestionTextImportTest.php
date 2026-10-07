@@ -96,6 +96,8 @@ class QuestionTextImportTest extends TestCase
             ->assertJsonPath('body.questions.0.source_exam_name', 'Simulado de outubro 2026')
             ->assertJsonPath('body.questions.0.subject_id', $subject->id)
             ->assertJsonPath('body.questions.0.topic_ids.0', $topic->id)
+            ->assertJsonPath('body.questions.0.answer_from_pdf', false)
+            ->assertJsonPath('body.questions.0.options.0.is_correct', false)
             ->assertJsonMissingPath('body.questions.0.generation_id');
         Http::assertSent(function (Request $request) {
             if (! str_ends_with($request->url(), '/chat/completions')) {
@@ -105,6 +107,7 @@ class QuestionTextImportTest extends TestCase
 
             return is_string($prompt) && str_contains($prompt, self::TEXT)
                 && str_contains($prompt, 'A separação é sua responsabilidade')
+                && str_contains($prompt, 'Ignore o gabarito mesmo quando disponível')
                 && ! isset($request['plugins'])
                 && $request['response_format']['type'] === 'json_schema'
                 && $request['response_format']['json_schema']['strict'] === true
@@ -125,6 +128,29 @@ class QuestionTextImportTest extends TestCase
         $this->fake($questions);
         $this->separate()->assertOk()->assertJsonPath('body.questions.0.options.0.is_correct', false)
             ->assertJsonPath('body.questions.0.options.1.is_correct', false);
+    }
+
+    public function test_answer_keys_are_discarded_even_when_inconsistent_or_malformed(): void
+    {
+        foreach (['multiple', 'none', 'malformed', 'missing'] as $answerCase) {
+            $questions = $this->questions();
+            $questions[0]['options'][0]['is_correct'] = $answerCase !== 'none';
+            $questions[0]['options'][1]['is_correct'] = $answerCase === 'multiple';
+            if ($answerCase === 'malformed') {
+                $questions[0]['answer_from_pdf'] = 'yes';
+                $questions[0]['options'][0]['is_correct'] = 'yes';
+            } elseif ($answerCase === 'missing') {
+                unset($questions[0]['answer_from_pdf'], $questions[0]['options'][0]['is_correct']);
+            }
+            $this->fake($questions);
+            $this->separate()->assertOk()
+                ->assertJsonPath('body.questions.0.answer_from_pdf', false)
+                ->assertJsonPath('body.questions.0.options.0.is_correct', false)
+                ->assertJsonPath('body.questions.0.options.1.is_correct', false)
+                ->assertJsonPath('body.questions.0.options.0.option_text', '6 cm')
+                ->assertJsonPath('body.questions.0.options.1.option_text', '8 cm');
+        }
+        $this->assertSame(0, ExamQuestion::count());
     }
 
     public function test_incomplete_truncated_and_invalid_visual_decisions_are_rejected(): void

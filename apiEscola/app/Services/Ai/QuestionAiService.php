@@ -378,7 +378,7 @@ class QuestionAiService
             .'Separe as questões fielmente; não invente enunciados, números, alternativas nem dados de figuras ausentes. '
             .self::FORMAT_RULES."\n".AiPromptGuard::SYSTEM_RULES;
         $prompt = 'Leia o documento inteiro e separe cada questão, na ordem original. A separação é sua responsabilidade: o texto não foi dividido em questões. '
-            .'Remova capas, cabeçalhos e instruções gerais. Preserve textos de apoio, fontes, tabelas textuais e gabarito do documento. '
+            .'Remova capas, cabeçalhos, instruções gerais e gabarito do documento. Preserve textos de apoio, fontes e tabelas textuais. '
             .'Não perca questões que cruzam páginas. Enunciado sem número e sem alternativas; alternativas na ordem original, sem letras. '
             .'Objetivas: 2 a 10 alternativas; discursivas: options=[]. Complete deve ser true somente se TODAS as questões estiverem em questions. '
             ."Se ilegível, impossível de separar ou acima de 50 questões, complete=false. total_questions é o total identificado no documento.\n"
@@ -386,17 +386,17 @@ class QuestionAiService
             ."Não gere image_spec nem imagens. O usuário anexará as imagens manualmente. Não substitua figuras por descrições inventadas.\n"
             ."Se as alternativas forem imagens e só as letras estiverem no texto, preserve CADA alternativa como '[Imagem da alternativa A — anexar manualmente]', "
             ."usando a letra original em cada marcador e needs_image=true. Não devolva texto vazio e não descarte alternativas visuais.\n"
-            .'Gabarito: use o do documento se disponível e answer_from_pdf=true. Caso contrário resolva apenas se os dados forem suficientes. '
-            .'Se não conseguir determinar a resposta, deixe TODAS is_correct=false e explique que o gabarito precisa de revisão; nunca invente a correta por falta de figura. '
-            ."Quando houver resposta conhecida, marque exatamente uma correta. Classifique com os IDs dos catálogos.\n"
+            .'Ignore o gabarito mesmo quando disponível no documento. Não resolva as questões nem marque respostas corretas: '
+            .'deixe TODAS is_correct=false e answer_from_pdf=false. O usuário definirá o gabarito na revisão manual. '
+            ."Não inclua resolução ou indicação da resposta na explicação. Classifique com os IDs dos catálogos.\n"
             .$this->catalogsPrompt($catalogs)."\n"
             .AiPromptGuard::wrap('texto_pdf', $text)."\nFormato JSON:\n"
             .json_encode([
                 'complete' => true, 'total_questions' => 1, 'questions' => [[
                     'source_number' => '1', 'type' => 'multiple_choice', 'question_text' => 'enunciado',
-                    'explanation' => 'resolução ou motivo para revisar o gabarito',
+                    'explanation' => '',
                     'options' => [
-                        ['option_text' => 'alternativa A', 'is_correct' => true],
+                        ['option_text' => 'alternativa A', 'is_correct' => false],
                         ['option_text' => 'alternativa B', 'is_correct' => false],
                     ],
                     'needs_image' => false, 'answer_from_pdf' => false,
@@ -429,6 +429,9 @@ class QuestionAiService
             if (! is_array($item) || ! in_array($item['type'] ?? null, ['essay', 'multiple_choice'], true)) {
                 $this->invalidImportedQuestion($index, 'o tipo deve ser multiple_choice ou essay', $imageField);
             }
+            if ($imageField === 'needs_image') {
+                $item['answer_from_pdf'] = false;
+            }
             if (! is_bool($item[$imageField] ?? null) || ! is_bool($item['answer_from_pdf'] ?? null)) {
                 $this->invalidImportedQuestion($index, "{$imageField} e answer_from_pdf devem ser booleanos", $imageField);
             }
@@ -442,13 +445,17 @@ class QuestionAiService
                 if (! is_array($options) || ! array_is_list($options) || count($options) < 2 || count($options) > 10) {
                     $this->invalidImportedQuestion($index, 'uma questão objetiva deve ter de 2 a 10 alternativas', $imageField);
                 }
-                foreach ($options as $option) {
-                    if (! is_array($option) || ! is_bool($option['is_correct'] ?? null)
+                foreach ($options as $optionIndex => $option) {
+                    if (! is_array($option) || ($imageField !== 'needs_image' && ! is_bool($option['is_correct'] ?? null))
                         || ! is_string($option['option_text'] ?? null) || mb_strlen($option['option_text']) > 5000
                         || trim(QuestionRichText::plain($option['option_text'])) === '') {
                         $this->invalidImportedQuestion($index, 'cada alternativa deve conter texto não vazio e is_correct booleano; alternativas visuais precisam de marcador para anexo manual', $imageField);
                     }
+                    if ($imageField === 'needs_image') {
+                        $options[$optionIndex]['is_correct'] = false;
+                    }
                 }
+                $item['options'] = $options;
                 $correctCount = count(array_filter($options, fn (array $option) => $option['is_correct']));
                 if ($correctCount > 1 || ($correctCount === 0 && ($imageField === 'possui_imagem' || $item['answer_from_pdf']))) {
                     $this->invalidImportedQuestion($index, 'o gabarito deve conter uma única correta quando conhecido; se desconhecido, nenhuma alternativa deve ser marcada', $imageField);
