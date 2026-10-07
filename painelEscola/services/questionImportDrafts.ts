@@ -21,8 +21,10 @@ export type ImportDraftSettings = {
   create_exam?: boolean;
   exam_type_slug?: string | null;
   exam_title?: string | null;
-  /** Simulado já criado numa conclusão parcial: as próximas inclusões entram nele. */
+  /** Rascunhos antigos: simulado oficial criado numa conclusão parcial (as próximas inclusões entram nele). */
   exam_id?: number | null;
+  /** Simulado do banco criado numa conclusão parcial: as próximas inclusões entram nele. */
+  question_set_id?: number | null;
   subject_ids?: number[];
   pdf_file_name?: string | null;
 };

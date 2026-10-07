@@ -17,7 +17,8 @@ import {
   deleteImportDraft, fetchImportDraft, includeImportDraftQuestion, listImportDrafts, saveImportDraft,
   type ImportDraftPayload, type ImportDraftSettings, type ImportDraftSummary, type ImportDraftQuestion,
 } from "../../services/questionImportDrafts";
-import { appendToImportedExam, createExamFromQuestions, createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
+import { appendToImportedExam, createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
+import { addQuestionsToSet, createQuestionSet } from "../../services/questionSets";
 import ImportReviewWorkspace, { type SaveStatus } from "./import-review/ImportReviewWorkspace";
 import type { ConcludeChoice } from "./import-review/ConcludeImportDialog";
 import { findSourcePage } from "../../utils/importReview";
@@ -79,9 +80,12 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   /** Ao incluir tudo, agrupa as questões num simulado (rascunho) da modalidade escolhida — IFAL, CPM, ENEM… */
   const [createExam, setCreateExam] = useState(true);
   const [examTypeSlug, setExamTypeSlug] = useState("");
-  /** Nome do simulado (padrão: nome da prova) e simulado já criado numa conclusão parcial. */
+  /** Nome do simulado (padrão: nome da prova) e simulado do banco já criado numa conclusão parcial. */
   const [examTitle, setExamTitle] = useState("");
+  const [questionSet, setQuestionSet] = useState<{ id: number; title: string } | null>(null);
+  /** Rascunhos de antes dos simulados do banco: continuam completando o simulado oficial já criado. */
   const [exam, setExam] = useState<{ id: number; title: string } | null>(null);
+  const target = exam ?? questionSet;
   /** Texto de cada página do PDF desta sessão (página de origem de cada questão). */
   const pdfPages = useRef<string[]>([]);
   const [pdfFileName, setPdfFileName] = useState<string | null>(null);
@@ -124,6 +128,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     setExamTypeSlug("");
     setExamTitle("");
     setExam(null);
+    setQuestionSet(null);
     pdfPages.current = [];
     setPdfFileName(null);
     setSaveStatus({ state: "idle", at: null });
@@ -157,7 +162,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
 
   const settings: ImportDraftSettings = {
     create_exam: createExam, exam_type_slug: examTypeSlug || null, exam_title: examTitle.trim() || null,
-    exam_id: exam?.id ?? null, subject_ids: subjectIds, pdf_file_name: file?.name ?? pdfFileName,
+    exam_id: exam?.id ?? null, question_set_id: questionSet?.id ?? null, subject_ids: subjectIds, pdf_file_name: file?.name ?? pdfFileName,
   };
   const snapshot = (items = drafts, overrides: Partial<ImportDraftSettings> = {}): ImportDraftPayload => ({
     source_exam_name: sourceExamName.trim(), no_text_pages: noTextPages,
@@ -264,6 +269,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       if (saved.exam_type_slug) setExamTypeSlug(saved.exam_type_slug);
       setExamTitle(saved.exam_title ?? body.source_exam_name);
       setExam(saved.exam_id ? { id: saved.exam_id, title: saved.exam_title ?? body.source_exam_name } : null);
+      setQuestionSet(saved.question_set_id ? { id: saved.question_set_id, title: saved.exam_title ?? body.source_exam_name } : null);
       if (saved.subject_ids?.length) setSubjectIds(saved.subject_ids);
       setPdfFileName(saved.pdf_file_name ?? null);
       // Igual ao snapshot() (mesma ordem de chaves) para o "há alterações" comparar certo.
@@ -274,6 +280,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         settings: {
           create_exam: saved.create_exam ?? true, exam_type_slug: saved.exam_type_slug || null,
           exam_title: (saved.exam_title ?? body.source_exam_name).trim() || null, exam_id: saved.exam_id ?? null,
+          question_set_id: saved.question_set_id ?? null,
           subject_ids: saved.subject_ids?.length ? saved.subject_ids : subjectIds, pdf_file_name: saved.pdf_file_name ?? null,
         },
       }));
@@ -484,25 +491,24 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
 
   /**
    * Conclusão (diálogo "Concluir importação"): inclui no banco só as questões escolhidas; as demais
-   * continuam no rascunho. Com "Criar simulado", as incluídas viram um simulado (rascunho) — ou entram no
-   * fim do simulado criado numa conclusão anterior desta importação.
+   * continuam no rascunho. Com "Criar simulado", as incluídas viram um simulado do banco (rascunho) — ou entram
+   * no fim do simulado criado numa conclusão anterior desta importação.
    */
   const conclude = async (choice: ConcludeChoice, keys: string[]): Promise<boolean> => {
     if (busy || concluding || draftNeedsReload || !sourceExamName.trim() || !keys.length) return false;
-    if (choice.createExam && !exam && (!choice.examTitle || !choice.examTypeSlug)) return false;
+    if (choice.createExam && !target && (!choice.examTitle || !choice.examTypeSlug)) return false;
     const chosen = new Set(keys);
     setCreateExam(choice.createExam);
     if (choice.examTypeSlug) setExamTypeSlug(choice.examTypeSlug);
     if (choice.examTitle) setExamTitle(choice.examTitle);
     const examTypeId = choice.createExam
-      ? catalogs.examTypes.find((t) => t.slug === (exam ? examTypeSlug : choice.examTypeSlug))?.id ?? null
+      ? catalogs.examTypes.find((t) => t.slug === (target ? examTypeSlug : choice.examTypeSlug))?.id ?? null
       : null;
     setConcluding(true);
     const selected = drafts.filter((draft) => chosen.has(draft.key));
     let remaining = drafts.filter((draft) => !chosen.has(draft.key));
     const ids: number[] = [];
     let failed = false;
-    let examRef = exam;
     try {
       if (!(await flushSave())) return false;
       let persisted = savedDraftRef.current;
@@ -539,23 +545,29 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
 
       let examMessage = "";
       if (choice.createExam && ids.length) {
-        setProgress(examRef ? "Adicionando as questões ao simulado…" : "Criando o simulado com as questões incluídas…");
+        setProgress(target ? "Adicionando as questões ao simulado…" : "Criando o simulado com as questões incluídas…");
         try {
-          if (examRef) {
-            await appendToImportedExam(examRef.id, ids);
+          let title: string;
+          if (exam) {
+            await appendToImportedExam(exam.id, ids);
+            title = exam.title;
+          } else if (questionSet) {
+            title = (await addQuestionsToSet(questionSet.id, ids)).body.title;
           } else {
-            const response = await createExamFromQuestions({
-              title: choice.examTitle, exam_type: choice.examTypeSlug, question_ids: ids,
-              description: "Importado de PDF pelo banco de questões.",
+            const response = await createQuestionSet({
+              title: choice.examTitle, origin: "pdf_import", exam_type: choice.examTypeSlug, question_ids: ids,
+              source_exam_name: sourceExamName.trim(), description: "Importado de PDF pelo banco de questões.",
             });
-            examRef = { id: response.body.id, title: response.body.title };
-            setExam(examRef);
+            title = response.body.title;
+            setQuestionSet({ id: response.body.id, title });
           }
-          examMessage = ` no simulado "${examRef.title}"`;
+          examMessage = ` no simulado "${title}"`;
         } catch (cause) {
           setError({
             title: "Questões incluídas, mas o simulado não foi atualizado",
-            message: getApiErrorMessage(cause, "Abra Simulados e adicione as questões manualmente."),
+            message: getApiErrorMessage(cause, exam
+              ? "Abra Simulados e adicione as questões manualmente."
+              : "Abra Simulados do banco e adicione as questões manualmente."),
           });
         }
       }
@@ -604,7 +616,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       )}
       <Text className="text-xs text-ink-subtle">
         {createExam
-          ? `O simulado "${sourceExamName.trim() || "…"}" fica como rascunho em Simulados, com o ícone da modalidade. A modalidade vale para todas as questões e fica bloqueada na revisão.`
+          ? `O simulado "${sourceExamName.trim() || "…"}" fica como rascunho em Simulados do banco, com o ícone da modalidade; publique para os alunos responderem no app. A modalidade vale para todas as questões e fica bloqueada na revisão.`
           : "As questões entram apenas no banco, como avulsas."}
       </Text>
     </View>
@@ -734,7 +746,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           onAutofill={(draft) => void autofill(draft)}
           onRemove={removeQuestion}
           onUploadImage={(key, picked) => void uploadImage(key, picked)}
-          exam={{ createExam, examTitle: examTitle || sourceExamName, examTypeSlug, existingExamTitle: exam?.title ?? null }}
+          exam={{ createExam, examTitle: examTitle || sourceExamName, examTypeSlug, existingExamTitle: target?.title ?? null }}
           concluding={concluding}
           onConclude={conclude}
           listNotice={listNotice}

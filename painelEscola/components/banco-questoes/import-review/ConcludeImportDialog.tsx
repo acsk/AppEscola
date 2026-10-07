@@ -122,6 +122,11 @@ export default function ConcludeImportDialog({ visible, counts, examTypes, initi
                 </View>
               </View>
             ))}
+            {createExam && !existingExamTitle && (
+              <Text className="text-xs text-ink-subtle">
+                O simulado fica como rascunho em Simulados do banco; publique para os alunos responderem no app.
+              </Text>
+            )}
           </View>
         </View>
       </DialogPanel>

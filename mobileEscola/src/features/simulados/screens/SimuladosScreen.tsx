@@ -337,6 +337,21 @@ export function SimuladosScreen() {
         }
         ListHeaderComponent={
           <View style={styles.listHeader}>
+            <TouchableOpacity
+              style={styles.bancoCard}
+              onPress={() => navigation.navigate('BancoQuestoes')}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+            >
+              <View style={styles.bancoIcone}>
+                <Ionicons name="library-outline" size={22} color={colors.surface} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bancoTitulo}>Banco de questões</Text>
+                <Text style={styles.bancoSub}>Pratique, faça simulados do banco e veja o que estudar</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.surface} />
+            </TouchableOpacity>
             <Text style={styles.cabecalho}>
               {simulados.length} de {todosSimulados.length} simulado{todosSimulados.length !== 1 ? 's' : ''}
             </Text>
@@ -433,6 +448,14 @@ function createSimuladosStyles(colors: ThemeColors) {
   lista: { padding: 16, paddingTop: 12 },
   listaComVazio: { flexGrow: 1 },
   listHeader: { marginBottom: 12, gap: 10 },
+  bancoCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary, borderRadius: 16, padding: 14,
+  },
+  bancoIcone: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center',
+  },
+  bancoTitulo: { fontSize: 15, fontWeight: '800', color: colors.surface },
+  bancoSub: { fontSize: 12, color: colors.surface, opacity: 0.9, marginTop: 2 },
   cabecalho:  { fontSize: 13, color: colors.muted },
   periodoEncerrado: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   periodoEncerradoTexto: { fontSize: 11, color: '#64748B', fontWeight: '600' },

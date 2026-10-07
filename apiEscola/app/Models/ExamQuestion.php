@@ -103,6 +103,35 @@ class ExamQuestion extends Model
                 ->orWhereHas('exam'));
     }
 
+    /**
+     * Questões que o aluno pode praticar: avulsas (questões de simulado oficial nunca vazam), objetivas,
+     * com enunciado, ao menos 2 alternativas preenchidas e exatamente uma correta; sem anuladas/desatualizadas.
+     */
+    public function scopePracticable(Builder $query, int $tenantId): Builder
+    {
+        return $query->where('exam_questions.tenant_id', $tenantId)
+            ->whereNull('exam_questions.exam_id')
+            ->where('exam_questions.type', 'multiple_choice')
+            ->where('exam_questions.is_annulled', false)
+            ->where('exam_questions.is_outdated', false)
+            ->where(fn (Builder $q) => $q->where(fn (Builder $t) => $t->whereNotNull('exam_questions.question_text')->where('exam_questions.question_text', '!=', ''))
+                ->orWhere(fn (Builder $i) => $i->whereNotNull('exam_questions.image_url')->where('exam_questions.image_url', '!=', '')))
+            ->whereHas('options', fn (Builder $o) => $o->where('is_correct', true), '=', 1)
+            ->whereHas('options', fn (Builder $o) => $o->whereNotNull('option_text')->where('option_text', '!=', ''), '>=', 2);
+    }
+
+    /** Mesma regra de scopePracticable, para questões já carregadas (com alternativas). */
+    public function isPracticable(): bool
+    {
+        if ($this->exam_id !== null || ! $this->isMultipleChoice() || $this->is_annulled || $this->is_outdated || ! $this->hasEnunciado()) {
+            return false;
+        }
+        $options = $this->relationLoaded('options') ? $this->options : $this->options()->get();
+
+        return $options->filter(fn ($o) => trim((string) $o->option_text) !== '')->count() >= 2
+            && $options->where('is_correct', true)->count() === 1;
+    }
+
     public function isMultipleChoice(): bool
     {
         return $this->type === 'multiple_choice';

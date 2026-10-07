@@ -8,6 +8,11 @@ import { ProvasAnterioresScreen } from '../../features/provas-anteriores/screens
 import { ExerciciosScreen } from '../../features/provas-anteriores/screens/ExerciciosScreen';
 import { MateriaisScreen } from '../../features/provas-anteriores/screens/MateriaisScreen';
 import { ProvaAnteriorDetalheScreen } from '../../features/provas-anteriores/screens/ProvaAnteriorDetalheScreen';
+import { BancoQuestoesScreen } from '../../features/banco-questoes/screens/BancoQuestoesScreen';
+import { BancoPraticarScreen } from '../../features/banco-questoes/screens/BancoPraticarScreen';
+import { BancoSimuladoScreen } from '../../features/banco-questoes/screens/BancoSimuladoScreen';
+import { BancoDesempenhoScreen } from '../../features/banco-questoes/screens/BancoDesempenhoScreen';
+import { BancoRankingScreen } from '../../features/banco-questoes/screens/BancoRankingScreen';
 import type { PastExamMaterialKind } from '../../services/past-exams.service';
 import { useThemeColors } from '../../context/TenantThemeContext';
 
@@ -24,6 +29,12 @@ export type SimuladosStackParamList = {
   SimuladoDetalhe: { examId: number };
   SimuladoExam: { examId: number; attemptId: number };
   SimuladoResult: { attemptId: number };
+  BancoQuestoes: undefined;
+  BancoPraticar: { subjectId?: number; topicId?: number } | undefined;
+  /** `setId` inicia (ou retoma) o simulado do banco; `attemptId` abre uma tentativa já existente. */
+  BancoSimulado: { setId?: number; attemptId?: number; title?: string };
+  BancoDesempenho: undefined;
+  BancoRanking: undefined;
 };
 
 const Stack = createNativeStackNavigator<SimuladosStackParamList>();
@@ -92,6 +103,20 @@ export function SimuladosNavigator() {
           headerTitleStyle: { fontWeight: '600' },
         }}
       />
+      <Stack.Group
+        screenOptions={{
+          headerBackTitle: 'Voltar',
+          headerStyle: { backgroundColor: colors.primary },
+          headerTintColor: colors.surface,
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      >
+        <Stack.Screen name="BancoQuestoes" component={BancoQuestoesScreen} options={{ title: 'Banco de questões' }} />
+        <Stack.Screen name="BancoPraticar" component={BancoPraticarScreen} options={{ title: 'Praticar questões' }} />
+        <Stack.Screen name="BancoSimulado" component={BancoSimuladoScreen} options={{ title: 'Simulado do banco' }} />
+        <Stack.Screen name="BancoDesempenho" component={BancoDesempenhoScreen} options={{ title: 'O que estudar' }} />
+        <Stack.Screen name="BancoRanking" component={BancoRankingScreen} options={{ title: 'Ranking' }} />
+      </Stack.Group>
     </Stack.Navigator>
   );
 }

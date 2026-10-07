@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Switch, Text, View } from "react-native";
-import { ExternalLink, FilePen, Trash2 } from "lucide-react-native";
+import { ExternalLink, Trash2 } from "lucide-react-native";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
@@ -11,8 +11,8 @@ import ConfirmModal from "../ui/ConfirmModal";
 import ExamTypeLogo from "../ui/ExamTypeLogo";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { deleteImportedExam, fetchImportedExams, type ImportedExam } from "../../services/questionBank";
-import { deleteImportDraft, listImportDrafts, type ImportDraftSummary } from "../../services/questionImportDrafts";
 import { type ApiToastState, getApiErrorMessage, showApiToast } from "../../utils/apiErrors";
+import PendingImportsSection from "./PendingImportsSection";
 
 type StatusTab = "" | "draft" | "published";
 const TABS: { id: StatusTab; label: string }[] = [
@@ -48,36 +48,6 @@ export default function ImportedExamsModal({ visible, onClose, onOpenExam, onRes
   const [deleteExam, setDeleteExam] = useState<ImportedExam | null>(null);
   const [keepQuestions, setKeepQuestions] = useState(true);
   const [deleting, setDeleting] = useState(false);
-  // Importações em revisão (rascunhos de importação, ainda sem simulado criado).
-  const [pending, setPending] = useState<ImportDraftSummary[]>([]);
-  const [deletePending, setDeletePending] = useState<ImportDraftSummary | null>(null);
-
-  const loadPending = useCallback(async () => {
-    try {
-      setPending((await listImportDrafts()).body.items);
-    } catch {
-      setPending([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (visible) void loadPending();
-  }, [visible, loadPending]);
-
-  const removePending = async () => {
-    if (!deletePending) return;
-    setDeleting(true);
-    try {
-      const response = await deleteImportDraft(deletePending.id);
-      showApiToast(setToast, response, "Rascunho excluído.");
-      setDeletePending(null);
-      void loadPending();
-    } catch (cause) {
-      setToast({ visible: true, type: "error", message: getApiErrorMessage(cause, "Não foi possível excluir o rascunho.") });
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,39 +99,14 @@ export default function ImportedExamsModal({ visible, onClose, onOpenExam, onRes
 
   return (
     <>
-      <Modal visible={visible} title="Simulados importados de PDF" onClose={onClose} size="lg" maxHeight="90%"
+      <Modal visible={visible} title="Simulados oficiais importados (formato antigo)" onClose={onClose} size="lg" maxHeight="90%"
         footer={<Button label="Fechar" onPress={onClose} />}>
         <View style={{ gap: 14 }}>
           <Text className="text-sm text-ink-muted">
-            Provas importadas pelo banco de questões que viraram simulado. Rascunhos ainda não aparecem para os alunos:
-            abra o simulado para revisar, definir turmas e publicar.
+            Provas importadas antes dos simulados do banco, que viraram simulados oficiais. Rascunhos ainda não aparecem
+            para os alunos: abra o simulado para revisar, definir turmas e publicar. As novas importações ficam em Simulados do banco.
           </Text>
-          {pending.length > 0 && (
-            <View style={{ gap: 8 }}>
-              <Text className="text-sm font-semibold text-ink">Importações em revisão ({pending.length})</Text>
-              <Text className="text-xs text-ink-subtle">Rascunhos de importação salvos por você: o simulado é criado ao concluir a revisão e incluir as questões.</Text>
-              <View className="border border-border rounded-ds-md">
-                {pending.map((item, i) => (
-                  <View key={item.id} className={`px-3 py-3 ${i > 0 ? "border-t border-border" : ""}`}
-                    style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", gap: 10 }}>
-                    <View className="flex-1" style={{ minWidth: 0 }}>
-                      <Text className="text-sm font-semibold text-ink" numberOfLines={2}>{item.source_exam_name}</Text>
-                      <Text className="text-xs text-ink-muted">
-                        {item.question_count} questão(ões) em revisão · salvo em {new Date(item.updated_at).toLocaleString("pt-BR")}
-                      </Text>
-                    </View>
-                    <Badge label="Importação em revisão" tone="warning" />
-                    <View className="flex-row justify-end" style={{ gap: 8 }}>
-                      <Button icon={FilePen} label="Continuar revisão" onPress={() => onResumeImport(item.id)} />
-                      <Button icon={Trash2} variant="danger" label="Excluir" accessibilityLabel={`Excluir rascunho ${item.source_exam_name}`}
-                        onPress={() => setDeletePending(item)} />
-                    </View>
-                  </View>
-                ))}
-              </View>
-              <Text className="text-sm font-semibold text-ink mt-2">Simulados criados</Text>
-            </View>
-          )}
+          <PendingImportsSection visible={visible} onResumeImport={onResumeImport} setToast={setToast} nextSectionTitle="Simulados criados" />
           <Tabs items={TABS} value={status} onChange={(id) => { setStatus(id); setPage(1); }} accessibilityLabel="Status do simulado" />
           <FormInput label="Buscar" value={search} onChangeText={setSearch} placeholder="Título do simulado" maxLength={255} />
 
@@ -209,10 +154,6 @@ export default function ImportedExamsModal({ visible, onClose, onOpenExam, onRes
           )}
         </View>
       </Modal>
-
-      <ConfirmModal visible={deletePending !== null} title="Excluir rascunho da importação?"
-        message={`"${deletePending?.source_exam_name ?? ""}" (${deletePending?.question_count ?? 0} questões em revisão) será excluído. Questões já incluídas no banco não são afetadas.`}
-        loading={deleting} onCancel={() => setDeletePending(null)} onConfirm={() => void removePending()} />
 
       <ConfirmModal visible={deleteExam !== null} title="Excluir simulado importado?"
         message={`"${deleteExam?.title ?? ""}" deixa de aparecer em Simulados e para os alunos.`}

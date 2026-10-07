@@ -10,7 +10,10 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { AlunoTabParamList } from '../../../navigation/stacks/AlunoStack';
+import { usePracticeSummary } from '../../banco-questoes/hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   fetchStudentPerformance,
@@ -167,6 +170,9 @@ export function PerformanceScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const navigation = useNavigation<BottomTabNavigationProp<AlunoTabParamList, 'Desempenho'>>();
+  const practice = usePracticeSummary();
+
   const load = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
     else setLoading(true);
@@ -186,6 +192,8 @@ export function PerformanceScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
+      practice.refetch();
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch do React Query é estável
     }, [load])
   );
 
@@ -220,6 +228,36 @@ export function PerformanceScreen() {
         {data?.student?.active_enrollments?.length ? (
           <StudentEnrollmentContextCard enrollments={data.student.active_enrollments} />
         ) : null}
+
+        <View style={[styles.card, styles.practiceCard, platformShadow({ color: '#111827', opacity: 0.05, radius: 10, elevation: 2 })]}>
+          <View style={styles.practiceHeader}>
+            <Ionicons name="library-outline" size={20} color={colors.primary} />
+            <Text style={styles.practiceTitle}>Banco de questões</Text>
+          </View>
+          <Text style={styles.practiceText}>
+            {practice.data?.answered
+              ? `${practice.data.answered} respostas · ${formatPct(practice.data.accuracy, 0)} de acerto (não entra na média dos simulados)`
+              : 'Pratique questões e descubra os assuntos que você mais precisa estudar.'}
+          </Text>
+          <View style={styles.practiceActions}>
+            <TouchableOpacity
+              style={styles.practiceButton}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('Simulados', { screen: 'BancoDesempenho', initial: false })}
+            >
+              <Ionicons name="analytics-outline" size={16} color={colors.surface} />
+              <Text style={styles.practiceButtonText}>O que estudar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.practiceButton, styles.practiceButtonOutline]}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('Simulados', { screen: 'BancoRanking', initial: false })}
+            >
+              <Ionicons name="trophy-outline" size={16} color={colors.primary} />
+              <Text style={[styles.practiceButtonText, { color: colors.primary }]}>Ranking</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.periodRow}>
           {MONTH_OPTIONS.map((option) => (
@@ -444,6 +482,17 @@ function createPerformanceStyles(colors: ThemeColors) {
     borderColor: '#F3F4F6',
   },
   emptyText: { fontSize: 13, color: colors.muted, textAlign: 'center', paddingVertical: 8 },
+  practiceCard: { gap: 8 },
+  practiceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  practiceTitle: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  practiceText: { fontSize: 13, color: colors.muted, lineHeight: 18 },
+  practiceActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  practiceButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: colors.primary,
+  },
+  practiceButtonOutline: { backgroundColor: colors.surface },
+  practiceButtonText: { color: colors.surface, fontWeight: '800', fontSize: 13 },
   chartRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 },
   chartCol: { flex: 1, alignItems: 'center', minWidth: 36 },
   chartValue: { fontSize: 10, fontWeight: '700', color: colors.muted, marginBottom: 6 },

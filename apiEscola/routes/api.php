@@ -48,6 +48,9 @@ use App\Http\Controllers\Api\PastExamController;
 use App\Http\Controllers\Api\OfficialAssessmentController;
 use App\Http\Controllers\Api\StudentPastExamController;
 use App\Http\Controllers\Api\ExamTypeController;
+use App\Http\Controllers\Api\QuestionSetController;
+use App\Http\Controllers\Api\QuestionBankPracticeController;
+use App\Http\Controllers\Api\StudentPracticeController;
 use App\Http\Controllers\Api\QuestionBankController;
 use App\Http\Controllers\Api\QuestionCatalogController;
 use App\Http\Controllers\Api\SubjectTopicController;
@@ -304,6 +307,19 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('aluno/attempts/{attempt}',       [StudentExamController::class, 'reviewAttempt']);
     Route::get('aluno/attempts/{attempt}/review',[StudentExamController::class, 'reviewAttempt']);
 
+    // Banco de questões do aluno: prática avulsa e simulados do banco (sem nota oficial)
+    Route::get('aluno/practice/filters',                       [StudentPracticeController::class, 'filters']);
+    Route::get('aluno/practice/performance',                   [StudentPracticeController::class, 'performance']);
+    Route::get('aluno/practice/ranking',                       [StudentPracticeController::class, 'ranking']);
+    Route::get('aluno/practice/next-question',                 [StudentPracticeController::class, 'nextQuestion']);
+    Route::post('aluno/practice/questions/{question}/answer',  [StudentPracticeController::class, 'answerQuestion'])->whereNumber('question');
+    Route::get('aluno/practice/summary',                       [StudentPracticeController::class, 'summary']);
+    Route::get('aluno/question-sets',                          [StudentPracticeController::class, 'sets']);
+    Route::post('aluno/question-sets/{set}/start',             [StudentPracticeController::class, 'startSet'])->whereNumber('set');
+    Route::get('aluno/practice-attempts/{attempt}',            [StudentPracticeController::class, 'showAttempt'])->whereNumber('attempt');
+    Route::post('aluno/practice-attempts/{attempt}/answer',    [StudentPracticeController::class, 'answerInAttempt'])->whereNumber('attempt');
+    Route::post('aluno/practice-attempts/{attempt}/finish',    [StudentPracticeController::class, 'finishAttempt'])->whereNumber('attempt');
+
     Route::get('aluno/past-exams', [StudentPastExamController::class, 'index']);
     Route::get('aluno/past-exams/{pastExam}', [StudentPastExamController::class, 'show']);
 
@@ -352,6 +368,18 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::get('imported-exams',                     [QuestionBankController::class, 'importedExams']);
         Route::delete('imported-exams/{exam}',           [QuestionBankController::class, 'destroyImportedExam'])->whereNumber('exam');
         Route::post('imported-exams/{exam}/questions',   [QuestionBankController::class, 'appendToImportedExam'])->whereNumber('exam');
+
+        // Simulados do banco de questões (importados de PDF ou montados pelo admin; separados dos oficiais)
+        Route::get('practice-ranking',                           [QuestionBankPracticeController::class, 'ranking']);
+        Route::get('question-sets',                              [QuestionSetController::class, 'index']);
+        Route::post('question-sets',                             [QuestionSetController::class, 'store']);
+        Route::post('question-sets/generate',                    [QuestionSetController::class, 'generate']);
+        Route::get('question-sets/{set}',                        [QuestionSetController::class, 'show'])->whereNumber('set');
+        Route::put('question-sets/{set}',                        [QuestionSetController::class, 'update'])->whereNumber('set');
+        Route::delete('question-sets/{set}',                     [QuestionSetController::class, 'destroy'])->whereNumber('set');
+        Route::post('question-sets/{set}/questions',             [QuestionSetController::class, 'addQuestions'])->whereNumber('set');
+        Route::put('question-sets/{set}/questions/order',        [QuestionSetController::class, 'reorder'])->whereNumber('set');
+        Route::delete('question-sets/{set}/questions/{question}', [QuestionSetController::class, 'removeQuestion'])->whereNumber(['set', 'question']);
         Route::put('questions/{question}',               [QuestionBankController::class, 'update'])->whereNumber('question');
         Route::delete('questions/{question}',            [QuestionBankController::class, 'destroy'])->whereNumber('question');
         Route::get('questions/years',                    [QuestionBankController::class, 'years']);

@@ -55,9 +55,13 @@ import {
 } from "../../utils/questionBankQuery";
 import type { BatchItem, ClassificationPatch, QuestionBankQuestion, QuestionBankSort } from "../../types/questionBank";
 import Tabs from "../../components/ui/Tabs";
-import { FileStack, Plus, Sparkles } from "lucide-react-native";
+import { Archive, FileStack, Plus, Sparkles, Trophy } from "lucide-react-native";
 import ImportPdfModal from "../../components/banco-questoes/ImportPdfModal";
 import ImportedExamsModal from "../../components/banco-questoes/ImportedExamsModal";
+import QuestionSetsModal from "../../components/banco-questoes/question-sets/QuestionSetsModal";
+import QuestionSetDetailModal from "../../components/banco-questoes/question-sets/QuestionSetDetailModal";
+import AddToQuestionSetDialog from "../../components/banco-questoes/question-sets/AddToQuestionSetDialog";
+import PracticeRankingModal from "../../components/banco-questoes/question-sets/PracticeRankingModal";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import Button from "../../components/ui/Button";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -95,6 +99,10 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const { ensureAvailable } = useQuestionAiStatus();
   const [importPdfOpen, setImportPdfOpen] = useState(false);
   const [importedExamsOpen, setImportedExamsOpen] = useState(false);
+  const [questionSetsOpen, setQuestionSetsOpen] = useState(false);
+  const [addToSetOpen, setAddToSetOpen] = useState(false);
+  const [addedSetId, setAddedSetId] = useState<number | null>(null);
+  const [rankingOpen, setRankingOpen] = useState(false);
   const [resumeImportId, setResumeImportId] = useState<string | null>(null);
   /** Importar PDF usa IA: confere a chave antes de abrir. */
   const openImportPdf = async (draftId: string | null = null) => {
@@ -373,7 +381,9 @@ export default function QuestionBankScreen({ navigate }: Props) {
               <Text className="text-xs font-semibold text-ink-muted">{density === "padrao" ? "Padrão" : "Compacta"}</Text>
             </TouchableOpacity>
             <Button label="Taxonomia" onPress={() => navigate("questoes-taxonomia")} />
-            <Button icon={FileStack} label="Simulados importados" onPress={() => setImportedExamsOpen(true)} />
+            <Button icon={FileStack} label="Simulados do banco" onPress={() => setQuestionSetsOpen(true)} />
+            <Button icon={Trophy} label="Ranking" onPress={() => setRankingOpen(true)} />
+            <Button icon={Archive} variant="ghost" label="Importados (formato antigo)" onPress={() => setImportedExamsOpen(true)} />
             <Button icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
             <Button
               variant="primary"
@@ -520,6 +530,13 @@ export default function QuestionBankScreen({ navigate }: Props) {
                   <Text className="text-xs font-semibold text-brand">{label}</Text>
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity
+                onPress={() => setAddToSetOpen(true)}
+                aria-label="Em massa: adicionar a simulado do banco"
+                className="px-3 py-1.5 rounded-ds-md bg-brand border border-brand"
+              >
+                <Text className="text-xs font-semibold text-on-brand">Adicionar a simulado</Text>
+              </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={() => setSelected(new Set())}>
               <Text className="text-xs font-semibold text-ink-muted">Limpar seleção</Text>
@@ -729,6 +746,33 @@ export default function QuestionBankScreen({ navigate }: Props) {
         onChanged={() => void load()}
         setToast={setToast}
       />
+
+      <QuestionSetsModal
+        visible={questionSetsOpen}
+        catalogs={catalogs}
+        onClose={() => setQuestionSetsOpen(false)}
+        onResumeImport={(draftId) => {
+          setQuestionSetsOpen(false);
+          void openImportPdf(draftId);
+        }}
+        setToast={setToast}
+      />
+
+      <AddToQuestionSetDialog
+        visible={addToSetOpen}
+        questionIds={Array.from(selected)}
+        onCancel={() => setAddToSetOpen(false)}
+        onDone={(set) => {
+          setAddToSetOpen(false);
+          setSelected(new Set());
+          setAddedSetId(set.id);
+        }}
+        setToast={setToast}
+      />
+
+      <QuestionSetDetailModal setId={addedSetId} onClose={() => setAddedSetId(null)} onChanged={() => {}} setToast={setToast} />
+
+      <PracticeRankingModal visible={rankingOpen} onClose={() => setRankingOpen(false)} />
 
       <ImportPdfModal
         visible={importPdfOpen}
