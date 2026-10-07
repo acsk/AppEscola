@@ -294,6 +294,30 @@ class QuestionAiTest extends TestCase
         Http::assertSent(fn (HttpRequest $r) => ! str_contains($r['messages'][1]['content'], 'Álgebra'));
     }
 
+    public function test_autofill_name_fixes_miscopied_ids_and_prompt_classifies_by_skill(): void
+    {
+        $this->tenantKey();
+        $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Língua Portuguesa']);
+        $reading = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $portuguese->id, 'name' => 'Interpretação de texto']);
+        $economy = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Economia']);
+        $market = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $economy->id, 'name' => 'Mercado']);
+
+        // Ids de Economia copiados por engano, nomes certos: valem os nomes (sem acento/caixa também casa).
+        $this->fakeAi([
+            'question_text' => 'Q', 'type' => 'essay', 'explanation' => 'E',
+            'subject_id' => $economy->id, 'subject_name' => 'lingua portuguesa',
+            'topic_ids' => [$market->id], 'topic_names' => ['Interpretação de Texto'],
+        ]);
+
+        $this->postJson('/api/question-bank/ai/autofill', [
+            'question_text' => 'Por que o xixi muda de cor? (...) De acordo com o texto, a urina clara quase sempre sinaliza que estamos:',
+        ])->assertOk()
+            ->assertJsonPath('body.subject_id', $portuguese->id)
+            ->assertJsonPath('body.topic_ids', [$reading->id]);
+
+        Http::assertSent(fn (HttpRequest $r) => str_contains($r['messages'][1]['content'], 'não pelo tema do texto de apoio'));
+    }
+
     public function test_taxonomy_lists_active_subjects_with_nested_topics(): void
     {
         $physics = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Física']);

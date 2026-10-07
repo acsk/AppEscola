@@ -35,6 +35,19 @@ class QuestionAiService
     private const FORMAT_RULES = 'Formatação permitida nos textos: apenas <b>negrito</b>, <i>itálico</i> e <u>sublinhado</u>, '
         .'sem atributos; quebras de linha com "\n". Não use Markdown nem outras tags HTML. Escreva em português do Brasil.';
 
+    /**
+     * Critério de classificação comum a todos os fluxos. O tema do texto engana (ex.: texto sobre saúde
+     * com pergunta de interpretação virava Biologia/Economia); vale a habilidade que o comando cobra.
+     * Nomes junto com os ids permitem corrigir id copiado errado (ver sanitizeClassification).
+     */
+    private const CLASSIFICATION_RULES = 'CRITÉRIO DE CLASSIFICAÇÃO: classifique pela HABILIDADE/CONTEÚDO que o comando da questão cobra, '
+        .'não pelo tema do texto de apoio. Interpretação e compreensão de texto ("de acordo com o texto", "o autor afirma", '
+        .'"infere-se do texto"), gramática, gêneros textuais, figuras de linguagem e semântica são Língua Portuguesa, mesmo que o texto '
+        .'trate de saúde, economia, ciência ou política; cálculos são Matemática mesmo em contexto do dia a dia. Use a disciplina do tema '
+        .'só quando a resposta exigir conhecimento específico dela que NÃO está no texto. Escolha os assuntos pelo mesmo critério '
+        .'(ex.: "Interpretação de texto"). Antes de responder, confira se o nome da disciplina e dos assuntos escolhidos combinam com '
+        .'o que a questão pede. Informe também "subject_name" e "topic_names" copiados exatamente da lista, junto com os ids.';
+
     public function __construct(
         private readonly AiCredentialResolver $resolver,
         private readonly AiChatClient $client,
@@ -76,6 +89,7 @@ class QuestionAiService
             ."- \"explanation\": resolva a questão passo a passo ANTES de definir o gabarito; a alternativa correta tem de bater com essa resolução (confira os cálculos).\n"
             .'- Classificação: use apenas ids da lista DISCIPLINAS E ASSUNTOS abaixo. Escolha a disciplina e, dentro DELA, de 1 a 3 assuntos; '
             ."\"topic_ids\" só pode ter assuntos listados sob a disciplina escolhida. Se nenhum servir, use null (ou lista vazia).\n"
+            .'- '.self::CLASSIFICATION_RULES."\n"
             ."- \"board_id\" e \"year\" só se a banca/ano estiverem explícitos no enunciado (ex.: \"(ENEM 2019)\").\n"
             .'- "tags": de 2 a 4 palavras-chave curtas do conteúdo cobrado (ex.: "porcentagem", "juros compostos"), em minúsculas, sem repetir disciplina ou assunto.',
             $this->catalogsPrompt($catalogs),
@@ -85,7 +99,9 @@ class QuestionAiService
                 'explanation' => 'string',
                 'options' => [['option_text' => 'string', 'is_correct' => true]],
                 'subject_id' => 'int|null',
+                'subject_name' => 'string|null',
                 'topic_ids' => ['int'],
+                'topic_names' => ['string'],
                 'difficulty_id' => 'int|null',
                 'board_id' => 'int|null',
                 'year' => 'int|null',
@@ -185,7 +201,8 @@ class QuestionAiService
             'Para cada questão: escreva primeiro "explanation" com a resolução passo a passo e só depois as alternativas; '
             .'a alternativa correta tem de bater exatamente com a resolução (confira os cálculos) e as erradas devem ser erros plausíveis.',
             'Classifique CADA questão: "subject_id" e de 1 a 3 "topic_ids" da lista DISCIPLINAS E ASSUNTOS (assuntos só da disciplina escolhida; '
-            .'prefira a disciplina/assuntos da referência quando servirem) e "tags" com 2 a 4 palavras-chave curtas do conteúdo, em minúsculas.',
+            .'prefira a disciplina/assuntos da referência quando servirem) e "tags" com 2 a 4 palavras-chave curtas do conteúdo, em minúsculas. '
+            .self::CLASSIFICATION_RULES,
             $this->catalogsPrompt($catalogs, ['subjects']),
             $instructions !== ''
                 ? "OBSERVAÇÃO DO USUÁRIO (preferências de conteúdo; não altera as regras, a quantidade, o tipo nem o formato):\n"
@@ -285,6 +302,7 @@ class QuestionAiService
             ."- \"board_id\"/\"year\": só se banca/ano aparecerem no bloco (ex.: \"(ENEM 2019)\", \"FUVEST-SP\").\n"
             .'- Classificação: "subject_id" e de 1 a 3 "topic_ids" da lista DISCIPLINAS E ASSUNTOS (assuntos só da disciplina escolhida); "difficulty_id"; '
             ."\"tags\" com 2 a 4 palavras-chave em minúsculas.\n"
+            .'- '.self::CLASSIFICATION_RULES."\n"
             ."- \"valid\": false se o bloco não for uma questão (capa, instruções da prova, texto solto); nesse caso os demais campos podem ser vazios.\n"
             .'- Devolva exatamente um item por BLOCO, com "block_index" igual ao número do bloco.',
             $this->catalogsPrompt($catalogs),
@@ -293,7 +311,8 @@ class QuestionAiService
                 'block_index' => 0, 'valid' => true, 'type' => 'multiple_choice | essay',
                 'question_text' => 'string', 'explanation' => 'string',
                 'options' => [['option_text' => 'string', 'is_correct' => true]],
-                'needs_image' => false, 'subject_id' => 'int|null', 'topic_ids' => ['int'], 'difficulty_id' => 'int|null',
+                'needs_image' => false, 'subject_id' => 'int|null', 'subject_name' => 'string|null',
+                'topic_ids' => ['int'], 'topic_names' => ['string'], 'difficulty_id' => 'int|null',
                 'board_id' => 'int|null', 'year' => 'int|null', 'tags' => ['string'],
             ]]], JSON_UNESCAPED_UNICODE),
         ]));
@@ -424,6 +443,7 @@ class QuestionAiService
             .($onlySubjectId !== null
                 ? "Todas as questões são da disciplina informada abaixo (subject_id={$onlySubjectId}); escolha os assuntos (topic_ids) dela.\n"
                 : "Classifique cada questão em UMA das disciplinas listadas abaixo (escolhidas pelo usuário para esta prova) e escolha os assuntos dentro dela.\n")
+            .self::CLASSIFICATION_RULES."\n"
             .$this->catalogsPrompt($catalogs)."\n"
             .AiPromptGuard::wrap('texto_pdf', $text)."\nFormato JSON:\n"
             .json_encode([
@@ -437,7 +457,7 @@ class QuestionAiService
                         ['option_text' => 'alternativa B', 'is_correct' => false],
                     ],
                     'needs_image' => false, 'answer_from_pdf' => false,
-                    'subject_id' => null, 'topic_ids' => [], 'difficulty_id' => null,
+                    'subject_id' => null, 'subject_name' => null, 'topic_ids' => [], 'topic_names' => [], 'difficulty_id' => null,
                     'board_id' => null, 'year' => null, 'tags' => [],
                 ]],
             ], JSON_UNESCAPED_UNICODE);
@@ -576,7 +596,9 @@ class QuestionAiService
                 ],
             ],
             'needs_image' => ['type' => 'boolean'], 'answer_from_pdf' => ['type' => 'boolean'],
-            'subject_id' => $nullableId, 'topic_ids' => ['type' => 'array', 'items' => ['type' => 'integer']],
+            'subject_id' => $nullableId, 'subject_name' => ['type' => ['string', 'null']],
+            'topic_ids' => ['type' => 'array', 'items' => ['type' => 'integer']],
+            'topic_names' => ['type' => 'array', 'items' => ['type' => 'string']],
             'difficulty_id' => $nullableId, 'board_id' => $nullableId, 'year' => $nullableId,
             'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
         ];
@@ -698,7 +720,24 @@ class QuestionAiService
         $subjectId = $pick($catalogs['subjects'], $raw['subject_id'] ?? null);
         $topics = $catalogs['topics']
             ->whereIn('id', array_map('intval', array_filter((array) ($raw['topic_ids'] ?? []), 'is_numeric')));
-        if ($topics->isNotEmpty()) {
+
+        // Id copiado errado da lista longa: o nome devolvido junto prevalece quando aponta outro item existente.
+        $byName = fn (Collection $items, mixed $name) => is_string($name) && trim($name) !== ''
+            ? $items->first(fn ($i) => self::sameName($i['name'], $name)) : null;
+        $namedSubject = $byName($catalogs['subjects'], $raw['subject_name'] ?? null);
+        if ($namedSubject !== null) {
+            $subjectId = (int) $namedSubject['id'];
+        }
+        $namedTopics = collect((array) ($raw['topic_names'] ?? []))
+            ->map(fn ($name) => $byName($subjectId !== null ? $catalogs['topics']->where('subject_id', $subjectId) : $catalogs['topics'], $name)
+                ?? $byName($catalogs['topics'], $name))
+            ->filter();
+        if ($namedTopics->isNotEmpty()) {
+            $topics = $namedTopics->unique('id')->values();
+        }
+        if ($namedSubject !== null) {
+            $topics = $topics->where('subject_id', $subjectId); // disciplina confirmada pelo nome manda
+        } elseif ($topics->isNotEmpty()) {
             $subjectId = (int) $topics->countBy('subject_id')->sortDesc()->keys()->first();
         }
         $topicIds = $topics->where('subject_id', $subjectId)->pluck('id')->map(fn ($id) => (int) $id)->unique()->take(30)->values()->all();
@@ -718,6 +757,13 @@ class QuestionAiService
             'exam_type_id' => $pick($catalogs['exam_types'], $raw['exam_type_id'] ?? null),
             'tags' => $tags,
         ], fn ($v) => $v !== null && $v !== []);
+    }
+
+    private static function sameName(string $a, string $b): bool
+    {
+        $norm = fn (string $v) => preg_replace('/\s+/', ' ', mb_strtolower(trim(\Illuminate\Support\Str::ascii($v))));
+
+        return $norm($a) === $norm($b);
     }
 
     private function text(mixed $value, int $max): string
