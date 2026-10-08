@@ -35,8 +35,8 @@ class UpdateQuestionClassificationRequest extends FormRequest
         return [
             $prefix.'difficulty_id' => ['sometimes', 'nullable', 'integer'],
             $prefix.'subject_id'    => ['sometimes', 'nullable', 'integer'],
-            $prefix.'topic_ids'     => ['sometimes', 'nullable', 'array', 'max:30'],
-            $prefix.'topic_ids.*'   => ['integer', 'distinct'],
+            $prefix.'topic_ids'     => ['sometimes', 'nullable', 'array', 'max:30', self::uniqueWithinList()],
+            $prefix.'topic_ids.*'   => ['integer'],
             $prefix.'board_id'      => ['sometimes', 'nullable', 'integer'],
             $prefix.'year'          => ['sometimes', 'nullable', 'integer', 'between:1900,2100'],
             $prefix.'exam_type_id'  => ['sometimes', 'required', 'integer'],
@@ -49,6 +49,16 @@ class UpdateQuestionClassificationRequest extends FormRequest
             $prefix.'remove_tags'   => ['sometimes', 'array', 'max:20'],
             $prefix.'remove_tags.*' => ['string', 'max:50'],
         ];
+    }
+
+    /** "distinct" com "items.*.topic_ids.*" compara entre TODAS as questões do lote; aqui vale só dentro da lista. */
+    private static function uniqueWithinList(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) {
+            if (is_array($value) && count($value) !== count(array_unique($value, SORT_REGULAR))) {
+                $fail('Não repita o mesmo assunto na questão.');
+            }
+        };
     }
 
     /**

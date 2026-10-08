@@ -375,6 +375,24 @@ class QuestionBankTest extends TestCase
         $this->assertNull($otherTenant->fresh()->year);
     }
 
+    public function test_batch_accepts_same_topic_for_many_questions_but_not_repeated_in_one(): void
+    {
+        [, $algebra] = $this->subjectWithTopics('Matemática', ['Álgebra']);
+        $first = $this->question();
+        $second = $this->question();
+
+        $this->patchJson('/api/question-bank/questions/classification', ['items' => [
+            ['id' => $first->id, 'topic_ids' => [$algebra->id]],
+            ['id' => $second->id, 'topic_ids' => [$algebra->id]],
+        ]])->assertOk()->assertJsonPath('body.updated', 2);
+
+        $this->assertSame([$algebra->id], $second->fresh()->topics->pluck('id')->all());
+
+        $this->patchJson('/api/question-bank/questions/classification', ['items' => [
+            ['id' => $first->id, 'topic_ids' => [$algebra->id, $algebra->id]],
+        ]])->assertStatus(422)->assertJsonValidationErrors('items.0.topic_ids');
+    }
+
     public function test_undo_restores_inactive_exam_type_kept_by_question(): void
     {
         $inactive = ExamType::create(['slug' => 'antigo', 'label' => 'Antigo', 'is_active' => false]);
