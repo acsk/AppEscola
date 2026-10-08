@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Rules\ActiveExamTypeSlug;
+use App\Support\QuestionClassificationRequirement;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -13,7 +14,7 @@ class StoreExamQuestionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'subject_id'    => ['nullable', 'exists:subjects,id'],
+            'subject_id'    => ['nullable', 'integer', 'exists:subjects,id'],
             'exam_type'     => ['required', new ActiveExamTypeSlug()],
             'type'          => ['required', 'in:multiple_choice,essay'],
             'question_text' => ['nullable', 'string'],
@@ -40,6 +41,11 @@ class StoreExamQuestionRequest extends FormRequest
         ];
     }
 
+    public function attributes(): array
+    {
+        return (new UpdateQuestionClassificationRequest)->attributes();
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
@@ -49,6 +55,8 @@ class StoreExamQuestionRequest extends FormRequest
             if ($questionText === '' && $imageUrl === '') {
                 $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
             }
+
+            QuestionClassificationRequirement::validate($validator, $this->all());
         });
     }
 }

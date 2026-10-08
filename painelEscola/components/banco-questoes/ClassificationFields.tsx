@@ -17,10 +17,12 @@ type Props = {
   hideExamType?: boolean;
   /** Modalidade imposta (ex.: questões que vão virar simulado): mostra o campo bloqueado com esse valor. */
   lockedExamTypeId?: number | null;
+  /** Erros de disciplina/assuntos (`subject_id`, `topic_ids`), do cliente ou da API. */
+  errors?: Record<string, string | undefined>;
 };
 
-/** Campos de classificação de uma questão. */
-export default function ClassificationFields({ form, onChange, catalogs, hideExamType = false, lockedExamTypeId = null }: Props) {
+/** Campos de classificação de uma questão. Disciplina e assunto são obrigatórios. */
+export default function ClassificationFields({ form, onChange, catalogs, hideExamType = false, lockedExamTypeId = null, errors = {} }: Props) {
   const set = <K extends keyof ClassificationForm>(key: K, value: ClassificationForm[K]) =>
     onChange({ ...form, [key]: value });
 
@@ -46,10 +48,8 @@ export default function ClassificationFields({ form, onChange, catalogs, hideExa
   };
 
   const difficultyOptions = catalogs.difficulties.map((d) => ({ value: d.id, label: d.name }));
-  const subjectOptions = [
-    { value: "", label: "Nenhuma" },
-    ...catalogs.subjects.map((s) => ({ value: String(s.id), label: s.name })),
-  ];
+  const subjectOptions = catalogs.subjects.map((s) => ({ value: String(s.id), label: s.name }));
+  const subjectWithoutTopics = !!form.subject_id && topics.length === 0;
   const boardOptions = [
     { value: "", label: "Nenhuma" },
     ...catalogs.boards.map((b) => ({ value: String(b.id), label: b.name })),
@@ -79,13 +79,24 @@ export default function ClassificationFields({ form, onChange, catalogs, hideExa
         dense
         showSelectedPreview={false}
         label="Disciplina"
+        required
+        placeholder="Selecione a disciplina"
         modalTitle="Selecionar disciplina"
         options={subjectOptions}
         value={form.subject_id ? String(form.subject_id) : ""}
         onChange={(v) => onChange(withSubject(form, v ? Number(v) : null, topicSubjectById))}
+        error={errors.subject_id}
       />
 
-      <TopicMultiSelect topics={topics} value={form.topic_ids} onChange={onTopicsChange} />
+      <TopicMultiSelect
+        topics={topics}
+        value={form.topic_ids}
+        onChange={onTopicsChange}
+        required={!subjectWithoutTopics}
+        error={errors.topic_ids}
+        disabled={subjectWithoutTopics}
+        disabledHint="Esta disciplina não tem assuntos cadastrados. Cadastre em Banco de questões › Taxonomia."
+      />
 
       <SearchableSelect
         dense

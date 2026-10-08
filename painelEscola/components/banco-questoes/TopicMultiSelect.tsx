@@ -16,10 +16,14 @@ type Props = {
   label?: string;
   /** Texto de busca (padrão conforme houver disciplina por item). */
   searchPlaceholder?: string;
+  required?: boolean;
+  error?: string;
 };
 
 /** Seleção múltipla de assuntos com busca sem acento (filtra por nome do assunto ou da disciplina). */
-export default function TopicMultiSelect({ topics, value, onChange, disabled, loading, disabledHint, label = "Assuntos", searchPlaceholder }: Props) {
+export default function TopicMultiSelect({
+  topics, value, onChange, disabled, loading, disabledHint, label = "Assuntos", searchPlaceholder, required, error,
+}: Props) {
   const [query, setQuery] = useState("");
   const selected = new Set(value);
 
@@ -44,7 +48,8 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
   return (
     <View className="mb-3">
       <Text className="text-xs font-medium text-ink-muted mb-1" nativeID={`multi-${label}`}>
-        {label} {value.length > 0 ? `(${value.length})` : ""}
+        {label}
+        {required && <Text className="text-danger"> *</Text>} {value.length > 0 ? `(${value.length})` : ""}
       </Text>
       {!disabled && selectedTopics.length > 0 && (
         <View className="flex-row flex-wrap items-center gap-1.5 mb-1.5" aria-label="Assuntos selecionados">
@@ -71,7 +76,10 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
           <Text className="text-xs text-ink-subtle">{disabledHint ?? "Escolha a disciplina primeiro."}</Text>
         </View>
       ) : (
-        <View className="rounded-ds-md border border-border bg-surface" aria-labelledby={`multi-${label}`}>
+        <View
+          className={`rounded-ds-md border bg-surface ${error ? "border-danger" : "border-border"}`}
+          aria-labelledby={`multi-${label}`}
+        >
           <View className="flex-row items-center px-3 border-b border-border" style={{ height: 38 }}>
             <Ionicons name="search-outline" size={14} color="var(--ds-ink-subtle)" />
             <TextInput
@@ -122,6 +130,7 @@ export default function TopicMultiSelect({ topics, value, onChange, disabled, lo
           )}
         </View>
       )}
+      {error ? <Text className="text-xs font-medium text-danger mt-1">{error}</Text> : null}
     </View>
   );
 }

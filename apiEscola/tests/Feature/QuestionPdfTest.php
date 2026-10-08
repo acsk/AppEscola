@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ExamQuestion;
 use App\Models\QuestionImageGeneration;
+use App\Models\Subject;
 use App\Models\Tenant;
 use App\Models\TenantAiCredential;
 use App\Models\User;
@@ -162,7 +163,7 @@ class QuestionPdfTest extends TestCase
             && str_contains($request['prompt'], 'dados originais')
             && str_contains($request['prompt'], '6 cm')
             && ! isset($request['input_references']));
-        $this->postJson('/api/question-bank/questions', array_replace($draft, ['image_url' => $image['image_url']]))
+        $this->postJson('/api/question-bank/questions', array_replace($draft, ['image_url' => $image['image_url'], 'subject_id' => Subject::factory()->create(['tenant_id' => $this->tenant->id])->id]))
             ->assertCreated();
         $this->assertNotNull($generation->fresh()->question_id);
     }

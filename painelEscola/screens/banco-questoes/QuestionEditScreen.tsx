@@ -44,6 +44,7 @@ import {
   diffClassification,
   formFromQuestion,
   mergeClassificationSuggestion,
+  validateClassification,
 } from "../../utils/questionClassification";
 import { imageQuestionContent } from "../../utils/questionImageReview";
 import RedrawImageModal from "../../components/banco-questoes/RedrawImageModal";
@@ -290,9 +291,29 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
   };
 
+  const showClientErrors = (clientErrors: Record<string, string>) => {
+    setErrors(clientErrors);
+    setToast({ visible: true, type: "error", message: Object.values(clientErrors)[0] });
+  };
+
+  const changeClassification = (form: ClassificationForm) => {
+    if (aiFilling || saving !== null) return;
+    setClassification(form);
+    setErrors((prev) => {
+      if (!prev.subject_id && !prev.topic_ids) return prev;
+      const { subject_id, topic_ids, ...rest } = prev;
+      return rest;
+    });
+  };
+
   /** Questão de simulado: só a classificação é gravada (o conteúdo é do simulado). */
   const saveExamClassification = async () => {
     if (questionId === null) return;
+    const clientErrors = validateClassification(classification, catalogs.taxonomy);
+    if (Object.keys(clientErrors).length) {
+      showClientErrors(clientErrors);
+      return;
+    }
     const patch = diffClassification(initialClassification, classification);
     if (!Object.keys(patch).length) {
       navigate("questoes-classificar", { questionId, query: listQuery });
@@ -305,6 +326,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setInitialClassification(classification);
       navigate("questoes-classificar", { questionId, query: listQuery });
     } catch (error) {
+      setErrors(getApiValidationErrors(error));
       showApiErrorToast(setToast, error, "Não foi possível salvar a classificação.");
     } finally {
       setSaving(null);
@@ -317,10 +339,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       await saveExamClassification();
       return;
     }
-    const clientErrors = validateContent(content);
+    const clientErrors = { ...validateContent(content), ...validateClassification(classification, catalogs.taxonomy) };
     if (Object.keys(clientErrors).length) {
-      setErrors(clientErrors);
-      setToast({ visible: true, type: "error", message: Object.values(clientErrors)[0] });
+      showClientErrors(clientErrors);
       return;
     }
 
@@ -412,12 +433,13 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
       <RichTextInput
         label="Enunciado"
+        required
         value={content.question_text}
         onChange={(v) => setField("question_text", v)}
         error={errors.question_text}
         minHeight={140}
         disabled={aiFilling}
-        placeholder="Texto do enunciado (opcional se houver imagem). Pode colar a questão inteira, com as alternativas."
+        placeholder="Texto do enunciado (ou envie a imagem abaixo). Pode colar a questão inteira, com as alternativas."
       />
 
         <View style={{ gap: 8, marginBottom: 16 }}>
@@ -562,8 +584,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
                 <Panel title="Classificação" description="Disciplina, assuntos, dificuldade, banca e tags.">
                   <ClassificationFields
                     form={classification}
-                    onChange={(form) => !aiFilling && saving === null && setClassification(form)}
+                    onChange={changeClassification}
                     catalogs={catalogs}
+                    errors={errors}
                   />
                 </Panel>
               </View>

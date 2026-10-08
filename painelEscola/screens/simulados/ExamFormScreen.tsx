@@ -50,7 +50,7 @@ import type {
 import RichTextInput from "../../components/ui/RichTextInput";
 import ClassificationFields from "../../components/banco-questoes/ClassificationFields";
 import { useQuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
-import { type ClassificationForm, EMPTY_CLASSIFICATION_FORM } from "../../utils/questionClassification";
+import { type ClassificationForm, EMPTY_CLASSIFICATION_FORM, validateClassification } from "../../utils/questionClassification";
 import { plainRichText } from "../../utils/richText";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -103,6 +103,7 @@ function validateExam(form: ExamForm): Record<string, string> {
   const errs: Record<string, string> = {};
   if (!form.title.trim()) errs.title = "Título é obrigatório.";
   if (!form.exam_type) errs.exam_type = "Selecione a modalidade do simulado.";
+  if (!form.status) errs.status = "Selecione o status do simulado.";
   if (form.duration_minutes) {
     const dur = Number(form.duration_minutes);
     if (!Number.isInteger(dur) || dur < 1)
@@ -580,10 +581,13 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     if (!effectiveExamId) return;
     const enunciadoErrs = validateQuestionEnunciado({ ...qForm, exam_type: form.exam_type || qForm.exam_type });
     const altErrs = validateQuestionAlternatives(qForm);
-    const errs = { ...enunciadoErrs, ...altErrs };
+    const classErrs = validateClassification(qClass, questionCatalogs.taxonomy);
+    const errs = { ...enunciadoErrs, ...altErrs, ...classErrs };
     setQErrors(errs);
     if (Object.keys(errs).length > 0) {
       setQuestionModalStep(Object.keys(enunciadoErrs).length > 0 ? 1 : 2);
+      const first = Object.values(errs).find(Boolean);
+      if (first) setToast({ visible: true, type: "error", message: first });
       return;
     }
 
@@ -1026,6 +1030,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           <View style={{ flex: 1, minWidth: 180 }}>
             <SearchableSelect
               label="Status"
+              required
               modalTitle="Selecionar status"
               showSelectedPreview={false}
               value={form.status}
@@ -1745,6 +1750,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
               <RichTextInput
                 label="Enunciado"
+                required
                 value={qForm.question_text}
                 onChange={(v) => {
                   setQField("question_text", v);
@@ -1758,7 +1764,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
                 }}
                 error={qErrors.enunciado}
                 minHeight={140}
-                placeholder="Texto do enunciado (opcional se houver imagem)."
+                placeholder="Texto do enunciado (ou envie a imagem abaixo)."
               />
 
               {/* Imagem do enunciado */}
@@ -1881,6 +1887,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <View>
                 <Text className="text-sm font-semibold text-ink mb-1">
                   Alternativas de resposta
+                  <Text className="text-danger"> *</Text>
                 </Text>
                 <Text className="text-xs text-ink-subtle mb-3">
                   Marque a opção correta e preencha pelo menos duas alternativas.
@@ -1996,7 +2003,18 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <Text className="text-xs text-ink-subtle" style={{ marginTop: 2, marginBottom: 12 }}>
                 Disciplina, assuntos, dificuldade, banca, ano e tags. Quanto mais detalhada, melhores os relatórios e a busca no banco.
               </Text>
-              <ClassificationFields form={qClass} onChange={setQClass} catalogs={questionCatalogs} hideExamType />
+              <ClassificationFields
+                form={qClass}
+                onChange={(next) => {
+                  setQClass(next);
+                  if (qErrors.subject_id || qErrors.topic_ids) {
+                    setQErrors(({ subject_id, topic_ids, ...rest }) => rest);
+                  }
+                }}
+                catalogs={questionCatalogs}
+                hideExamType
+                errors={qErrors}
+              />
             </View>
           </View>
         )}

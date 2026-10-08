@@ -81,6 +81,20 @@ export function isDirty(initial: ClassificationForm, current: ClassificationForm
   return Object.keys(diffClassification(initial, current)).length > 0;
 }
 
+/**
+ * Disciplina e assunto obrigatórios (espelha App\Support\QuestionClassificationRequirement).
+ * O assunto só é exigido quando a disciplina tem assuntos cadastrados na taxonomia.
+ */
+export function validateClassification(
+  form: Pick<ClassificationForm, "subject_id" | "topic_ids">,
+  taxonomy: { id: number; topics: unknown[] }[]
+): Record<string, string> {
+  if (!form.subject_id) return { subject_id: "Selecione a disciplina da questão." };
+  const hasTopics = taxonomy.some((s) => s.id === form.subject_id && s.topics.length > 0);
+  if (hasTopics && form.topic_ids.length === 0) return { topic_ids: "Selecione pelo menos um assunto da disciplina." };
+  return {};
+}
+
 /** Normaliza o texto digitado de uma tag e evita duplicadas (sem diferenciar maiúsculas). */
 export function addTag(tags: string[], raw: string): string[] {
   const name = raw.replace(/\s+/g, " ").trim().slice(0, 50);

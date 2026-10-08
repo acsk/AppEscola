@@ -6,12 +6,9 @@ import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
 import { compressImageToMaxSize } from '../../../services/image-compression.service';
 import { useSimuladosList } from '../../simulados/hooks';
-import { useProvasAnterioresList } from '../../provas-anteriores/hooks';
-import { formatDataProva, type PastExamListItem } from '../../../services/past-exams.service';
 import { uploadStudentPhoto } from '../../../services/student-photo.service';
 import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import { useUnreadNotificationsCount } from '../../notifications/hooks';
-import { WeeklyCalendarWidget } from '../../calendar/components/WeeklyCalendarWidget';
 import { enrollmentHeadline, primaryActiveEnrollment, type StudentActiveEnrollment } from '../../../types/student-enrollment';
 import { examCardProps, isClosed, isDone, isUpcoming, daysLeft } from '../../simulados/lib/examCard';
 import type { SimuladoListItem } from '../../../services/simulados.service';
@@ -61,24 +58,6 @@ function nextExam(list: SimuladoListItem[]): SimuladoListItem | null {
   })[0] ?? null;
 }
 
-function PastExamCard({ item, onPress }: { item: PastExamListItem; onPress: () => void }) {
-  const p = usePalette();
-  const meta = [formatDataProva(item.exam_date, item.exam_year), item.exam_type_label].filter(Boolean).join(' · ');
-  return (
-    <Card onPress={onPress} accessibilityLabel={`Abrir ${item.title}`} style={{ width: 240, gap: space[2] }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ width: 36, height: 36, borderRadius: radius.sm, backgroundColor: p.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={item.type === 'link' ? 'arrow-right' : 'download'} size={18} color={p.inkMuted} />
-        </View>
-        <Tag tone="outline" label={item.type === 'link' ? 'Link' : 'PDF'} />
-      </View>
-      {item.subject ? <Overline>{item.subject.name}</Overline> : null}
-      <Txt variant="titleSm" numberOfLines={2}>{item.title}</Txt>
-      {meta ? <Txt variant="bodySm" tone="subtle" numberOfLines={1}>{meta}</Txt> : null}
-    </Card>
-  );
-}
-
 /** Início (protótipo "TelaInicio"): resumo do dia, um CTA vivo (accent) para o próximo simulado. */
 export function HomeScreen() {
   const p = usePalette();
@@ -89,7 +68,6 @@ export function HomeScreen() {
   const isAluno = user?.role === 'aluno';
 
   const { data: simulados = [], refetch: refetchSimulados, isRefetching } = useSimuladosList();
-  const { data: provas = [] } = useProvasAnterioresList({ material_kind: 'prova' });
   const { data: unread = 0, refetch: refetchUnread } = useUnreadNotificationsCount(isAluno);
 
   useFocusEffect(React.useCallback(() => {
@@ -240,8 +218,6 @@ export function HomeScreen() {
             </Card>
           ) : null}
 
-          {isAluno ? <WeeklyCalendarWidget /> : null}
-
           {/* Turmas das matrículas ativas (pacote mostra todas as incluídas) */}
           {isAluno && classes.length > 0 ? (
             <Section title={classes.length === 1 ? 'Minha turma' : 'Minhas turmas'}>
@@ -305,23 +281,6 @@ export function HomeScreen() {
                   contentContainerStyle={{ gap: space[3], paddingHorizontal: space[4], paddingVertical: 2 }}>
                   {simulados.slice(0, 8).map((s) => (
                     <ExamCard key={s.id} {...examCardProps(s, p)} style={{ width: 288 }} onPress={() => openExam(s.id)} />
-                  ))}
-                </ScrollView>
-              )}
-            </Section>
-          ) : null}
-
-          {/* Provas anteriores */}
-          {isAluno ? (
-            <Section title="Provas anteriores" action={provas.length ? <LinkButton label="Ver todas" onPress={() => navigation.navigate('Simulados', { screen: 'ProvasAnteriores' })} /> : undefined}>
-              {provas.length === 0 ? (
-                <EmptyState icon="archive" title="Nenhuma prova anterior" text="Quando a escola publicar provas antigas, elas aparecem aqui." />
-              ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[4] }}
-                  contentContainerStyle={{ gap: space[3], paddingHorizontal: space[4], paddingVertical: 2 }}>
-                  {provas.slice(0, 5).map((item) => (
-                    <PastExamCard key={item.id} item={item}
-                      onPress={() => navigation.navigate('Simulados', { screen: 'ProvaAnteriorDetalhe', params: { pastExamId: item.id, listScreen: 'ProvasAnteriores', materialKind: 'prova' } })} />
                   ))}
                 </ScrollView>
               )}

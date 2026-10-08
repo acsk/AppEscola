@@ -2,16 +2,31 @@
 
 namespace App\Http\Requests;
 
+use App\Models\ExamQuestion;
+use App\Support\QuestionClassificationRequirement;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 /** PATCH da classificação de uma questão: campo ausente não altera; null remove o valor. */
 class UpdateQuestionClassificationRequest extends FormRequest
 {
     public function authorize(): bool { return true; }
 
+    /** Individual: disciplina e assunto não podem ser removidos (o lote continua livre para o "Desfazer"). */
     public function rules(): array
     {
         return self::classificationRules();
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if (! $this->has('subject_id') && ! $this->has('topic_ids')) {
+                return;
+            }
+            $current = ExamQuestion::find((int) $this->route('question'));
+            QuestionClassificationRequirement::validate($validator, $this->all(), $current);
+        });
     }
 
     /** Regras compartilhadas com o lote (prefixo "items.*."). */

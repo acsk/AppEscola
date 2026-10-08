@@ -48,6 +48,8 @@ class ExamQuestionClassificationTest extends TestCase
     private function payload(array $extra = []): array
     {
         return array_merge([
+            'subject_id'    => $this->math->id,
+            'topic_ids'     => [$this->algebra->id],
             'type'          => 'multiple_choice',
             'exam_type'     => 'enem',
             'question_text' => 'Quanto é 2 + 2?',
@@ -61,6 +63,7 @@ class ExamQuestionClassificationTest extends TestCase
         $board = QuestionBoard::create(['tenant_id' => $this->tenant->id, 'name' => 'FUVEST']);
 
         $response = $this->postJson("/api/exams/{$this->exam->id}/questions", $this->payload([
+            'subject_id'    => null,
             'topic_ids'     => [$this->algebra->id], // disciplina deduzida do assunto
             'difficulty_id' => $difficulty->id,
             'board_id'      => $board->id,
@@ -143,6 +146,19 @@ class ExamQuestionClassificationTest extends TestCase
         $this->putJson("/api/exams/{$this->exam->id}/questions/{$id}", ['exam_type' => 'custom'])
             ->assertOk()
             ->assertJsonPath('body.exam_type', 'enem');
+    }
+
+    public function test_subject_and_topic_are_required(): void
+    {
+        $this->postJson("/api/exams/{$this->exam->id}/questions", $this->payload(['subject_id' => null, 'topic_ids' => []]))
+            ->assertStatus(422)->assertJsonPath('errors.subject_id.0', 'Selecione a disciplina da questão.');
+        $this->postJson("/api/exams/{$this->exam->id}/questions", $this->payload(['topic_ids' => []]))
+            ->assertStatus(422)->assertJsonPath('errors.topic_ids.0', 'Selecione pelo menos um assunto da disciplina.');
+
+        $id = $this->postJson("/api/exams/{$this->exam->id}/questions", $this->payload())->assertCreated()->json('body.id');
+        $this->putJson("/api/exams/{$this->exam->id}/questions/{$id}", ['subject_id' => null])->assertStatus(422)->assertJsonValidationErrors('subject_id');
+        $this->putJson("/api/exams/{$this->exam->id}/questions/{$id}", ['topic_ids' => []])->assertStatus(422)->assertJsonValidationErrors('topic_ids');
+        $this->assertSame(0, ExamQuestion::whereNull('subject_id')->count());
     }
 
     public function test_update_ignores_unvalidated_input(): void

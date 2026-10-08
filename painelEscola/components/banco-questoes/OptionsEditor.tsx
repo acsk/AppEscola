@@ -27,6 +27,7 @@ export default function OptionsEditor({ options, onChange, error, labelId = "alt
     <View className="mb-4">
       <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 2 }} nativeID={labelId}>
         Alternativas
+        <Text className="text-danger"> *</Text>
       </Text>
       <Text className="text-xs text-ink-subtle" style={{ marginBottom: 8 }}>
         Marque a alternativa correta. Alternativas em branco são ignoradas.

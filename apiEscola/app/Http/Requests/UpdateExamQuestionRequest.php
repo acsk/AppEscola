@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Models\ExamQuestion;
+use App\Support\QuestionClassificationRequirement;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -12,7 +14,7 @@ class UpdateExamQuestionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'subject_id'    => ['sometimes', 'nullable', 'exists:subjects,id'],
+            'subject_id'    => ['sometimes', 'nullable', 'integer', 'exists:subjects,id'],
             'exam_type'     => ['sometimes', 'required'],
             'type'          => ['sometimes', 'in:multiple_choice,essay'],
             'question_text' => ['sometimes', 'nullable', 'string'],
@@ -51,6 +53,13 @@ class UpdateExamQuestionRequest extends FormRequest
             if ($questionText === '' && $imageUrl === '') {
                 $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
             }
+
+            QuestionClassificationRequirement::validate($validator, $this->all(), $question instanceof ExamQuestion ? $question : null);
         });
+    }
+
+    public function attributes(): array
+    {
+        return (new UpdateQuestionClassificationRequest)->attributes();
     }
 }

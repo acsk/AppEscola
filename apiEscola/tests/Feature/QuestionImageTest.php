@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Exceptions\AiException;
 use App\Models\ExamQuestion;
 use App\Models\QuestionImageGeneration;
+use App\Models\Subject;
 use App\Models\Tenant;
 use App\Models\TenantAiCredential;
 use App\Models\User;
@@ -287,7 +288,7 @@ class QuestionImageTest extends TestCase
         $draft = $this->similar($this->source())->assertOk()->json('body.questions.0');
         $payload = [
             'type' => $draft['type'], 'question_text' => $draft['question_text'],
-            'image_url' => $draft['image_url'], 'generation_id' => $draft['generation_id'],
+            'image_url' => $draft['image_url'], 'generation_id' => $draft['generation_id'], 'subject_id' => $this->subjectId(),
         ];
         $response = $this->postJson('/api/question-bank/questions', $payload)
             ->assertCreated()->assertJsonPath('body.image_url', $draft['image_url']);
@@ -303,10 +304,10 @@ class QuestionImageTest extends TestCase
         $draft = $this->similar($this->source())->assertOk()->json('body.questions.0');
         $this->postJson('/api/question-bank/questions', [
             'type' => 'essay', 'question_text' => 'Troquei 8 cm por 4 cm.',
-            'image_url' => $draft['image_url'], 'generation_id' => $draft['generation_id'],
+            'image_url' => $draft['image_url'], 'generation_id' => $draft['generation_id'], 'subject_id' => $this->subjectId(),
         ])->assertStatus(422)->assertJsonValidationErrors('generation_id');
         $this->postJson('/api/question-bank/questions', [
-            'type' => 'essay', 'question_text' => $draft['question_text'], 'image_url' => $draft['image_url'],
+            'type' => 'essay', 'question_text' => $draft['question_text'], 'image_url' => $draft['image_url'], 'subject_id' => $this->subjectId(),
         ])->assertStatus(422)->assertJsonValidationErrors('generation_id');
         $this->assertDatabaseCount('exam_questions', 1);
     }
@@ -338,7 +339,7 @@ class QuestionImageTest extends TestCase
 
         // A imagem redesenhada foi conferida no editor: salvar não exige o fluxo de aprovação de similares.
         $created = $this->postJson('/api/question-bank/questions', [
-            'type' => 'essay', 'question_text' => 'Nova questão com a figura.', 'image_url' => $generation->image_url,
+            'type' => 'essay', 'question_text' => 'Nova questão com a figura.', 'image_url' => $generation->image_url, 'subject_id' => $this->subjectId(),
         ])->assertCreated();
         $this->assertSame($created->json('body.id'), $generation->fresh()->question_id);
         $this->assertSame('APPROVED', $generation->fresh()->status);
@@ -361,7 +362,7 @@ class QuestionImageTest extends TestCase
         Storage::disk($generation->disk)->delete($generation->path);
         $this->postJson('/api/question-bank/questions', [
             'type' => 'essay', 'question_text' => $draft['question_text'],
-            'image_url' => $draft['image_url'], 'generation_id' => $draft['generation_id'],
+            'image_url' => $draft['image_url'], 'generation_id' => $draft['generation_id'], 'subject_id' => $this->subjectId(),
         ])->assertStatus(422)->assertJsonValidationErrors('generation_id');
     }
 
@@ -408,6 +409,11 @@ class QuestionImageTest extends TestCase
         $this->expectException(AiException::class);
         $bytes = substr_replace(base64_decode(self::PNG), pack('N', 4097), 16, 4);
         app(QuestionImageStorage::class)->store($this->tenant->id, 'test', base64_encode($bytes));
+    }
+
+    private function subjectId(): int
+    {
+        return Subject::factory()->create(['tenant_id' => $this->tenant->id])->id;
     }
 
     private function source(array $attributes = []): ExamQuestion

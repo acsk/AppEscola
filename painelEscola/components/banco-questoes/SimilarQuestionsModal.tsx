@@ -30,6 +30,7 @@ import {
   EMPTY_CLASSIFICATION_FORM,
   classificationFromSuggestion,
   diffClassification,
+  validateClassification,
 } from "../../utils/questionClassification";
 import { color } from "../../constants/theme";
 
@@ -192,11 +193,12 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     let hasClientErrors = false;
     const checked = drafts.map((d) => {
       if (!d.include) return d;
-      const errors = validateContent(d.content);
+      const classificationErrors = validateClassification(d.classification, catalogs.taxonomy);
+      const errors = { ...validateContent(d.content), ...classificationErrors };
       const imageIssue = imageReviewIssue(d.content, d.image, d.imageSignature);
       if (imageIssue || d.imageLoadError) errors.image = imageIssue || "Não foi possível visualizar a imagem. Regenere antes de aprovar.";
       if (Object.keys(errors).length) hasClientErrors = true;
-      return { ...d, errors };
+      return { ...d, errors, showClassification: d.showClassification || Object.keys(classificationErrors).length > 0 };
     });
     setDrafts(checked);
     if (hasClientErrors) {
@@ -454,8 +456,12 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                     <View style={{ marginTop: 12 }}>
                       <ClassificationFields
                         form={draft.classification}
-                        onChange={(classification) => updateDraft(draft.key, { classification })}
+                        onChange={(classification) => {
+                          const { subject_id, topic_ids, ...errors } = draft.errors;
+                          updateDraft(draft.key, { classification, errors });
+                        }}
                         catalogs={catalogs}
+                        errors={draft.errors}
                       />
                     </View>
                   )}

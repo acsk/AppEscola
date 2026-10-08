@@ -717,6 +717,7 @@ class QuestionAiTest extends TestCase
     public function test_standalone_question_formatting_is_normalized(): void
     {
         $this->postJson('/api/question-bank/questions', [
+            'subject_id' => Subject::factory()->create(['tenant_id' => $this->tenant->id])->id,
             'type' => 'multiple_choice',
             'question_text' => 'Se x < 3, <strong class="a">calcule</strong> <em>x</em><br>e <u>y</u>.',
             'options' => [

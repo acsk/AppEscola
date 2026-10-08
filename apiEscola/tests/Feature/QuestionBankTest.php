@@ -419,6 +419,7 @@ class QuestionBankTest extends TestCase
     private function mcPayload(array $extra = []): array
     {
         return array_merge([
+            'subject_id'    => $this->plainSubject()->id,
             'type'          => 'multiple_choice',
             'question_text' => 'Quanto é 2 + 2?',
             'explanation'   => 'Soma simples.',
@@ -430,11 +431,17 @@ class QuestionBankTest extends TestCase
         ], $extra);
     }
 
+    /** Disciplina sem assuntos cadastrados: só a disciplina é exigida. */
+    private function plainSubject(): Subject
+    {
+        return Subject::factory()->create(['tenant_id' => $this->tenant->id]);
+    }
+
     public function test_creates_standalone_question_with_options_and_classification(): void
     {
         [$math, $algebra] = $this->subjectWithTopics('Matemática', ['Álgebra']);
 
-        $response = $this->postJson('/api/question-bank/questions', $this->mcPayload(['topic_ids' => [$algebra->id], 'year' => 2024]))
+        $response = $this->postJson('/api/question-bank/questions', $this->mcPayload(['subject_id' => null, 'topic_ids' => [$algebra->id], 'year' => 2024]))
             ->assertCreated()
             ->assertJsonPath('body.origin', 'avulsa')
             ->assertJsonPath('body.subject_id', $math->id)
@@ -461,7 +468,33 @@ class QuestionBankTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('errors.question_text.0', 'Informe o texto do enunciado, a imagem, ou ambos.');
 
-        $this->postJson('/api/question-bank/questions', ['type' => 'essay', 'question_text' => 'Disserte.'])->assertCreated();
+        $this->postJson('/api/question-bank/questions', ['type' => 'essay', 'question_text' => 'Disserte.', 'subject_id' => $this->plainSubject()->id])->assertCreated();
+    }
+
+    public function test_subject_and_topic_are_required_when_saving(): void
+    {
+        [$math, $algebra] = $this->subjectWithTopics('Matemática', ['Álgebra']);
+
+        $this->postJson('/api/question-bank/questions', $this->mcPayload(['subject_id' => null]))
+            ->assertStatus(422)->assertJsonPath('errors.subject_id.0', 'Selecione a disciplina da questão.');
+        $this->postJson('/api/question-bank/questions', $this->mcPayload(['subject_id' => $math->id]))
+            ->assertStatus(422)->assertJsonPath('errors.topic_ids.0', 'Selecione pelo menos um assunto da disciplina.');
+        $id = $this->postJson('/api/question-bank/questions', $this->mcPayload(['subject_id' => $math->id, 'topic_ids' => [$algebra->id]]))
+            ->assertCreated()->json('body.id');
+
+        $this->putJson("/api/question-bank/questions/{$id}", ['topic_ids' => []])->assertStatus(422)->assertJsonValidationErrors('topic_ids');
+        $this->putJson("/api/question-bank/questions/{$id}", ['subject_id' => null])->assertStatus(422)->assertJsonValidationErrors('subject_id');
+        $this->putJson("/api/question-bank/questions/{$id}", ['question_text' => 'Quanto é 1 + 1?'])->assertOk();
+
+        $question = ExamQuestion::findOrFail($id);
+        $this->patchClassification($question, ['subject_id' => null])->assertStatus(422)->assertJsonValidationErrors('subject_id');
+        $this->patchClassification($question, ['topic_ids' => []])->assertStatus(422)->assertJsonValidationErrors('topic_ids');
+        $this->patchClassification($question, ['year' => 2020])->assertOk();
+
+        // Questão antiga sem disciplina: editar o conteúdo exige classificá-la.
+        $legacy = $this->question();
+        $this->putJson("/api/question-bank/questions/{$legacy->id}", ['question_text' => 'Novo texto'])
+            ->assertStatus(422)->assertJsonValidationErrors('subject_id');
     }
 
     public function test_updates_and_deletes_standalone_but_not_exam_question(): void
@@ -492,7 +525,7 @@ class QuestionBankTest extends TestCase
         $question = $this->question(['exam_id' => $exam->id]);
         $question->options()->create(['option_text' => 'antiga', 'is_correct' => true, 'order' => 1]);
 
-        $this->putJson("/api/exams/{$exam->id}/questions/{$question->id}", ['options' => [
+        $this->putJson("/api/exams/{$exam->id}/questions/{$question->id}", ['subject_id' => $this->plainSubject()->id, 'options' => [
             ['option_text' => 'nova A', 'is_correct' => false],
             ['option_text' => 'nova B', 'is_correct' => true],
         ]])->assertOk();

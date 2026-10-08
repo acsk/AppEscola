@@ -7,6 +7,7 @@ import { domToRichText, richTextToHtml, type RichMark } from "../../utils/richTe
 
 type Props = {
   label?: string;
+  required?: boolean;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -34,6 +35,7 @@ const COMMANDS: { mark: RichMark; command: string; icon: LucideIcon; label: stri
  */
 export default function RichTextInput({
   label,
+  required,
   value,
   onChange,
   placeholder,
@@ -143,6 +145,7 @@ export default function RichTextInput({
       {label ? (
         <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
           {label}
+          {required && <Text className="text-danger"> *</Text>}
         </Text>
       ) : null}
       <View

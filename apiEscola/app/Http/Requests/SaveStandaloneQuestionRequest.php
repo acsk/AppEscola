@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\ExamQuestion;
+use App\Support\QuestionClassificationRequirement;
 use App\Support\QuestionRichText;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -69,6 +70,10 @@ class SaveStandaloneQuestionRequest extends FormRequest
             }
             if (trim(QuestionRichText::plain($text)) === '' && trim((string) $image) === '') {
                 $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
+            }
+            // Questão de simulado nesta rota recebe o 409 do serviço, não erro de validação.
+            if ($current === null || $current->exam_id === null) {
+                QuestionClassificationRequirement::validate($validator, $this->all(), $current);
             }
 
             // Objetiva: valida as alternativas enviadas (na criação, ou na edição quando vierem ou o tipo mudar).

@@ -243,7 +243,8 @@ class QuestionTextImportTest extends TestCase
 
     public function test_source_name_persists_without_exam_link_and_is_searchable_editable_and_tenant_scoped(): void
     {
-        $payload = $this->questions()[0] + ['source_exam_name' => 'Simulado de outubro 2026', 'image_url' => 'https://example.test/storage/manual.png'];
+        $payload = $this->questions()[0] + ['source_exam_name' => 'Simulado de outubro 2026', 'image_url' => 'https://example.test/storage/manual.png',
+            'subject_id' => Subject::factory()->create(['tenant_id' => $this->tenant->id])->id];
         $created = $this->postJson('/api/question-bank/questions', $payload)->assertCreated()
             ->assertJsonPath('body.source_exam_name', 'Simulado de outubro 2026')->assertJsonPath('body.exam', null);
         $id = $created->json('body.id');

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\QuestionImportDraft;
+use App\Models\Subject;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\DomainSeeder;
@@ -26,6 +27,11 @@ class QuestionImportDraftTest extends TestCase
         $this->seed(DomainSeeder::class);
         $this->owner = User::factory()->admin()->create(['tenant_id' => Tenant::factory()->create()->id, 'status' => 'active']);
         Sanctum::actingAs($this->owner);
+    }
+
+    private function subjectId(): int
+    {
+        return Subject::factory()->create(['tenant_id' => $this->owner->tenant_id])->id;
     }
 
     private function payload(): array
@@ -139,7 +145,7 @@ class QuestionImportDraftTest extends TestCase
         $payload['questions'][] = array_replace($payload['questions'][0], ['key' => 'pdf-1', 'include' => false]);
         $id = $this->postJson('/api/question-bank/import-drafts', $payload)->json('body.id');
         $url = "/api/question-bank/import-drafts/{$id}/questions/pdf-0/include";
-        $content = $payload['questions'][0]['content'] + ['needs_image' => true, 'revision' => 1];
+        $content = $payload['questions'][0]['content'] + ['needs_image' => true, 'revision' => 1, 'subject_id' => $this->subjectId()];
         $this->postJson($url, $content)->assertStatus(422)->assertJsonValidationErrors(['options', 'image_url']);
         $this->assertSame(2, count(QuestionImportDraft::findOrFail($id)->questions));
         $content['options'][0] = ['option_text' => 'Seis', 'is_correct' => true];
@@ -160,7 +166,7 @@ class QuestionImportDraftTest extends TestCase
         $payload['questions'][0]['needsImage'] = false;
         $id = $this->postJson('/api/question-bank/import-drafts', $payload)->json('body.id');
         $this->postJson("/api/question-bank/import-drafts/{$id}/questions/pdf-0/include", [
-            'type' => 'essay', 'question_text' => 'Explique a resposta em suas palavras.', 'revision' => 1,
+            'type' => 'essay', 'question_text' => 'Explique a resposta em suas palavras.', 'revision' => 1, 'subject_id' => $this->subjectId(),
         ])->assertCreated()->assertJsonCount(0, 'body.draft.questions');
         $this->getJson('/api/question-bank/import-drafts')->assertOk()->assertJsonCount(0, 'body.items');
     }
@@ -169,7 +175,7 @@ class QuestionImportDraftTest extends TestCase
     {
         $id = $this->postJson('/api/question-bank/import-drafts', $this->payload())->json('body.id');
         $this->postJson("/api/question-bank/import-drafts/{$id}/questions/pdf-0/include", [
-            'type' => 'essay', 'question_text' => 'Observe a figura e explique a resposta.', 'revision' => 1,
+            'type' => 'essay', 'question_text' => 'Observe a figura e explique a resposta.', 'revision' => 1, 'subject_id' => $this->subjectId(),
         ])->assertStatus(422)->assertJsonValidationErrors('image_url');
         $this->assertSame(0, ExamQuestion::count());
         $this->assertSame(1, QuestionImportDraft::findOrFail($id)->revision);
