@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import SearchableSelect from "../../components/ui/SearchableSelect";
+import SearchableSelect, { type SearchableOption } from "../../components/ui/SearchableSelect";
 import FormSelect from "../../components/ui/FormSelect";
 import Pagination from "../../components/ui/Pagination";
 import Modal from "../../components/ui/Modal";
@@ -22,7 +22,9 @@ import BulkClassifyModal, { type BulkAction } from "../../components/banco-quest
 import UndoToast from "../../components/banco-questoes/UndoToast";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useQuestionBankCatalogs, useSubjectTopics } from "../../hooks/useQuestionBankCatalogs";
+import { QUESTION_SET_ORIGIN_LABEL, fetchQuestionSet, fetchQuestionSets } from "../../services/questionSets";
 import {
+  fetchExamOptions,
   fetchQuestionBankIds,
   fetchQuestionBankPage,
   fetchQuestionBankYears,
@@ -34,7 +36,9 @@ import {
 import { getApiErrorMessage, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import {
   PER_PAGE_OPTIONS,
+  QUESTION_BANK_ORIGINS,
   type PerPage,
+  type QuestionBankOrigin,
   type QuestionBankListState,
   ariaSort,
   batchSummaryMessage,
@@ -91,7 +95,10 @@ function readDensity(): "padrao" | "compacta" {
 
 /** Chave dos filtros (sem página/ordem): mudou → limpa a seleção. */
 const filtersKey = (s: QuestionBankListState) =>
-  JSON.stringify([s.search, s.subjectIds, s.topicIds, s.boardIds, s.years, s.difficultyIds, s.tab]);
+  JSON.stringify([
+    s.search, s.subjectIds, s.topicIds, s.boardIds, s.years, s.difficultyIds,
+    s.origin, s.examTypeIds, s.examIds, s.questionSetIds, s.tab,
+  ]);
 
 export default function QuestionBankScreen({ navigate }: Props) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
@@ -202,6 +209,62 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const filterBox = (minWidth: number) => (isMobile ? { width: "100%" as const } : { flex: 1, minWidth });
   const single = (ids: number[]) => (ids.length === 1 ? String(ids[0]) : "");
   const toIds = (v: string) => (v ? [Number(v)] : []);
+
+  const examFilterId = single(state.examIds);
+  const setFilterId = single(state.questionSetIds);
+  /** Nome do simulado escolhido quando o filtro vem da URL (as opções são buscadas sob demanda). */
+  const [examFilterOption, setExamFilterOption] = useState<SearchableOption | undefined>();
+  const [setFilterOption, setSetFilterOption] = useState<SearchableOption | undefined>();
+
+  useEffect(() => {
+    if (!examFilterId || examFilterOption?.value === examFilterId) return;
+    let cancelled = false;
+    fetchExamOptions({ ids: examFilterId })
+      .then(([exam]) => {
+        if (!cancelled && exam) setExamFilterOption({ value: String(exam.id), label: exam.title });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [examFilterId, examFilterOption?.value]);
+
+  useEffect(() => {
+    if (!setFilterId || setFilterOption?.value === setFilterId) return;
+    let cancelled = false;
+    fetchQuestionSet(Number(setFilterId))
+      .then(({ question_set }) => {
+        if (!cancelled) setSetFilterOption({ value: String(question_set.id), label: question_set.title });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [setFilterId, setFilterOption?.value]);
+
+  const searchExamOptions = useCallback(
+    async (query: string): Promise<SearchableOption[]> => [
+      { value: "", label: "Todos" },
+      ...(await fetchExamOptions({ search: query.trim() || undefined })).map((exam) => ({
+        value: String(exam.id),
+        label: exam.title,
+        sublabel: `${exam.questions_count} ${exam.questions_count === 1 ? "questão" : "questões"}`,
+      })),
+    ],
+    []
+  );
+
+  const searchSetOptions = useCallback(
+    async (query: string): Promise<SearchableOption[]> => [
+      { value: "", label: "Todos" },
+      ...(await fetchQuestionSets({ search: query.trim() || undefined, per_page: 50 })).data.map((set) => ({
+        value: String(set.id),
+        label: set.title,
+        sublabel: `${QUESTION_SET_ORIGIN_LABEL[set.origin]} · ${set.questions_count} ${set.questions_count === 1 ? "questão" : "questões"}`,
+      })),
+    ],
+    []
+  );
 
   // ── Densidade ──────────────────────────────────────────────────────────────
   const [density, setDensity] = useState<"padrao" | "compacta">(readDensity);
@@ -453,7 +516,63 @@ export default function QuestionBankScreen({ navigate }: Props) {
           )}
         </View>
 
-        {/* Filtros */}
+        {/* Filtros: origem e simulados */}
+        <View className="mb-3" style={{ flexDirection: isMobile ? "column" : "row", flexWrap: "wrap", gap: 12, alignItems: isMobile ? "stretch" : "flex-end" }}>
+          <View style={filterBox(200)}>
+            <SearchableSelect
+              dense
+              showSelectedPreview={false}
+              label="Origem"
+              placeholder="Todas"
+              modalTitle="Filtrar por origem"
+              options={[{ value: "", label: "Todas" }, ...QUESTION_BANK_ORIGINS.map((o) => ({ value: o.key, label: o.label }))]}
+              value={state.origin}
+              onChange={(v) => updateState({ ...state, origin: v as QuestionBankOrigin | "", page: 1 })}
+            />
+          </View>
+          <View style={filterBox(170)}>
+            <SearchableSelect
+              dense
+              showSelectedPreview={false}
+              label="Modalidade"
+              placeholder="Todas"
+              modalTitle="Filtrar por modalidade"
+              options={[{ value: "", label: "Todas" }, ...catalogs.examTypes.map((t) => ({ value: String(t.id), label: t.label }))]}
+              value={single(state.examTypeIds)}
+              onChange={(v) => updateState({ ...state, examTypeIds: toIds(v), page: 1 })}
+            />
+          </View>
+          <View style={filterBox(220)}>
+            <SearchableSelect
+              dense
+              showSelectedPreview={false}
+              label="Simulado oficial"
+              placeholder="Todos"
+              modalTitle="Filtrar por simulado oficial"
+              options={[{ value: "", label: "Todos" }]}
+              onSearch={searchExamOptions}
+              selectedOption={examFilterOption}
+              value={examFilterId}
+              onChange={(v) => updateState({ ...state, examIds: toIds(v), page: 1 })}
+            />
+          </View>
+          <View style={filterBox(220)}>
+            <SearchableSelect
+              dense
+              showSelectedPreview={false}
+              label="Simulado do banco"
+              placeholder="Todos"
+              modalTitle="Filtrar por simulado do banco"
+              options={[{ value: "", label: "Todos" }]}
+              onSearch={searchSetOptions}
+              selectedOption={setFilterOption}
+              value={setFilterId}
+              onChange={(v) => updateState({ ...state, questionSetIds: toIds(v), page: 1 })}
+            />
+          </View>
+        </View>
+
+        {/* Filtros: classificação */}
         <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", flexWrap: "wrap", gap: 12, alignItems: isMobile ? "stretch" : "flex-end" }}>
           <View style={filterBox(170)}>
             <SearchableSelect

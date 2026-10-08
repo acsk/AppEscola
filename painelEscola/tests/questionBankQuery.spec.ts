@@ -4,7 +4,9 @@ import {
   ariaSort,
   batchSummaryMessage,
   chunk,
+  clearFilters,
   foldText,
+  hasActiveFilters,
   hashQuery,
   nextSort,
   pageSelectionState,
@@ -82,6 +84,17 @@ test.describe("estado da listagem na URL", () => {
   test("trocar a disciplina limpa o assunto e volta para a página 1", () => {
     const state = { ...DEFAULT_LIST_STATE, subjectIds: [1], topicIds: [9], page: 4 };
     expect(withSubjectFilter(state, [2])).toMatchObject({ subjectIds: [2], topicIds: [], page: 1 });
+  });
+
+  test("origem, modalidade e simulados vão para a URL, voltam e viram parâmetros da API", () => {
+    const state = { ...DEFAULT_LIST_STATE, origin: "simulado_banco" as const, examTypeIds: [2], examIds: [5], questionSetIds: [9] };
+    const query = serializeListState(state);
+    expect(query).toBe("modalidade=2&simulado=5&simuladoBanco=9&origem=simulado_banco");
+    expect(parseListState(query)).toEqual(state);
+    expect(parseListState("origem=xyz").origin).toBe("");
+    expect(toApiParams(state)).toMatchObject({ origin: "simulado_banco", exam_type_id: "2", exam_id: "5", question_set_id: "9" });
+    expect(hasActiveFilters({ ...DEFAULT_LIST_STATE, origin: "avulsa" })).toBe(true);
+    expect(clearFilters(state)).toMatchObject({ origin: "", examTypeIds: [], examIds: [], questionSetIds: [] });
   });
 
   test("parâmetros da API usam vírgula e omitem filtros vazios", () => {

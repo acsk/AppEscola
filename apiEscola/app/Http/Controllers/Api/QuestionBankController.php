@@ -61,6 +61,22 @@ class QuestionBankController extends Controller
         return $this->success($this->queries->years($this->authorizeStaff($request)));
     }
 
+    /** GET question-bank/exam-options?search=&ids=1,2 — simulados oficiais com questões no banco (filtro). */
+    public function examOptions(Request $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'ids'    => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return $this->success($this->queries->examOptions(
+            $tenantId,
+            trim((string) ($data['search'] ?? '')),
+            QuestionBankQueryService::idList($data['ids'] ?? [])
+        ));
+    }
+
     public function show(Request $request, int $question): JsonResponse
     {
         $model = $this->findQuestion($request, $question);

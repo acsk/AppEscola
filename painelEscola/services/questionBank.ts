@@ -44,6 +44,14 @@ export async function fetchQuestionBankYears(): Promise<number[]> {
   return data.body ?? [];
 }
 
+export type ExamOption = { id: number; title: string; questions_count: number };
+
+/** Simulados oficiais com questões no banco (filtro); `ids` resolve o nome dos já escolhidos. */
+export async function fetchExamOptions(params: { search?: string; ids?: string }): Promise<ExamOption[]> {
+  const { data } = await api.get("/question-bank/exam-options", { params });
+  return data.body ?? [];
+}
+
 export async function fetchQuestionBankQuestion(id: number): Promise<QuestionBankQuestion> {
   const { data } = await api.get(`/question-bank/questions/${id}`);
   return data.body;

@@ -7,6 +7,7 @@ use App\Models\ExamQuestion;
 use App\Models\ExamType;
 use App\Models\QuestionBoard;
 use App\Models\QuestionDifficulty;
+use App\Models\QuestionSet;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
 use App\Models\Tenant;
@@ -308,6 +309,37 @@ class QuestionBankTest extends TestCase
             ->assertJsonPath('data.0.id', $standalone->id);
         $this->getJson("/api/question-bank/questions/{$fromDeletedExam->id}")->assertNotFound();
         $this->getJson('/api/question-bank/questions/years')->assertJsonPath('body', []);
+    }
+
+    public function test_origin_exam_type_exam_and_question_set_filters(): void
+    {
+        $enem = ExamType::create(['slug' => 'enem-filtro', 'label' => 'ENEM filtro', 'is_active' => true]);
+        $oab = ExamType::create(['slug' => 'oab-filtro', 'label' => 'OAB filtro', 'is_active' => true]);
+        $exam = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Simulado ENEM 2024', 'exam_type_id' => $enem->id]);
+        $fromExam = $this->question(['exam_id' => $exam->id]);
+        $inSet = $this->question(['exam_type_id' => $oab->id]);
+        $free = $this->question(['exam_type_id' => $enem->id]);
+        $set = QuestionSet::create(['tenant_id' => $this->tenant->id, 'title' => 'Treino', 'origin' => QuestionSet::ORIGIN_ADMIN]);
+        $set->items()->create(['exam_question_id' => $inSet->id, 'position' => 1]);
+
+        $ids = fn (string $query) => collect($this->getJson("/api/question-bank/questions?{$query}")->assertOk()->json('data'))
+            ->pluck('id')->sort()->values()->all();
+
+        $this->assertSame([$inSet->id, $free->id], $ids('origin=avulsa'));
+        $this->assertSame([$fromExam->id], $ids('origin=simulado'));
+        $this->assertSame([$inSet->id], $ids('origin=simulado_banco'));
+        $this->assertSame([$free->id], $ids('origin=avulsa_livre'));
+        $this->assertCount(3, $ids('origin=qualquer'));
+        // Sem modalidade própria, a questão herda a do simulado oficial.
+        $this->assertSame([$fromExam->id, $free->id], $ids("exam_type_id={$enem->id}"));
+        $this->assertSame([$fromExam->id], $ids("exam_id={$exam->id}"));
+        $this->assertSame([$inSet->id], $ids("question_set_id={$set->id}"));
+
+        $this->getJson('/api/question-bank/exam-options?search=enem')
+            ->assertOk()
+            ->assertJsonPath('body', [['id' => $exam->id, 'title' => 'Simulado ENEM 2024', 'questions_count' => 1]]);
+        $this->getJson("/api/question-bank/exam-options?ids={$exam->id}")->assertJsonCount(1, 'body');
+        $this->getJson('/api/question-bank/exam-options?search=inexistente')->assertJsonPath('body', []);
     }
 
     public function test_years_are_distinct_and_descending(): void

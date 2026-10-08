@@ -21,6 +21,16 @@ export const QUESTION_BANK_TABS: { key: QuestionBankTab; label: string }[] = [
   { key: "sem_classificacao", label: "Sem classificação" },
 ];
 
+/** Origem da questão (param `origin` da API). */
+export const QUESTION_BANK_ORIGINS = [
+  { key: "avulsa", label: "Avulsas" },
+  { key: "avulsa_livre", label: "Avulsas fora de simulados do banco" },
+  { key: "simulado_banco", label: "Em simulados do banco" },
+  { key: "simulado", label: "De simulados oficiais (bloqueadas)" },
+] as const;
+
+export type QuestionBankOrigin = (typeof QUESTION_BANK_ORIGINS)[number]["key"];
+
 export const PER_PAGE_OPTIONS = [20, 50, 100] as const;
 
 export type PerPage = (typeof PER_PAGE_OPTIONS)[number];
@@ -32,6 +42,12 @@ export type QuestionBankListState = {
   boardIds: number[];
   years: number[];
   difficultyIds: number[];
+  origin: QuestionBankOrigin | "";
+  examTypeIds: number[];
+  /** Simulados oficiais. */
+  examIds: number[];
+  /** Simulados do banco. */
+  questionSetIds: number[];
   tab: QuestionBankTab;
   sort: QuestionBankSort;
   direction: SortDirection;
@@ -46,6 +62,10 @@ export const DEFAULT_LIST_STATE: QuestionBankListState = {
   boardIds: [],
   years: [],
   difficultyIds: [],
+  origin: "",
+  examTypeIds: [],
+  examIds: [],
+  questionSetIds: [],
   tab: "todas",
   sort: "id",
   direction: "desc",
@@ -61,6 +81,10 @@ const URL_KEYS = {
   boardIds: "banca",
   years: "ano",
   difficultyIds: "dificuldade",
+  origin: "origem",
+  examTypeIds: "modalidade",
+  examIds: "simulado",
+  questionSetIds: "simuladoBanco",
   tab: "aba",
   sort: "ordem",
   direction: "dir",
@@ -70,7 +94,9 @@ const URL_KEYS = {
 
 const SORT_URL: Record<QuestionBankSort, string> = { id: "numero", board: "banca", difficulty: "dificuldade" };
 
-const ID_LIST_FIELDS = ["subjectIds", "topicIds", "boardIds", "years", "difficultyIds"] as const;
+const ID_LIST_FIELDS = [
+  "subjectIds", "topicIds", "boardIds", "years", "difficultyIds", "examTypeIds", "examIds", "questionSetIds",
+] as const;
 
 function parseIdList(values: string[], isValid: (n: number) => boolean = (n) => n > 0): number[] {
   const ids = values
@@ -101,6 +127,9 @@ export function parseListState(query: string): QuestionBankListState {
   // Assunto sem disciplina não faz sentido no filtro (o select fica desabilitado).
   if (state.subjectIds.length === 0) state.topicIds = [];
 
+  const origin = params.get(URL_KEYS.origin);
+  if (QUESTION_BANK_ORIGINS.some((o) => o.key === origin)) state.origin = origin as QuestionBankOrigin;
+
   const tab = params.get(URL_KEYS.tab);
   if (QUESTION_BANK_TABS.some((t) => t.key === tab)) state.tab = tab as QuestionBankTab;
 
@@ -129,6 +158,7 @@ export function serializeListState(state: QuestionBankListState): string {
   for (const field of ID_LIST_FIELDS) {
     if (state[field].length) params.set(URL_KEYS[field], state[field].join(","));
   }
+  if (state.origin) params.set(URL_KEYS.origin, state.origin);
   if (state.tab !== DEFAULT_LIST_STATE.tab) params.set(URL_KEYS.tab, state.tab);
   if (state.sort !== DEFAULT_LIST_STATE.sort) params.set(URL_KEYS.sort, SORT_URL[state.sort]);
   if (state.direction !== defaultDirection(state.sort)) params.set(URL_KEYS.direction, state.direction);
@@ -152,6 +182,10 @@ export function toApiParams(state: QuestionBankListState, options: { paginate?: 
   if (state.boardIds.length) params.board_id = state.boardIds.join(",");
   if (state.years.length) params.year = state.years.join(",");
   if (state.difficultyIds.length) params.difficulty_id = state.difficultyIds.join(",");
+  if (state.origin) params.origin = state.origin;
+  if (state.examTypeIds.length) params.exam_type_id = state.examTypeIds.join(",");
+  if (state.examIds.length) params.exam_id = state.examIds.join(",");
+  if (state.questionSetIds.length) params.question_set_id = state.questionSetIds.join(",");
   if (options.paginate !== false) {
     params.page = state.page;
     params.per_page = state.perPage;
@@ -176,11 +210,16 @@ export function foldText(text: string): string {
 }
 
 export function hasActiveFilters(state: QuestionBankListState): boolean {
-  return ID_LIST_FIELDS.some((field) => state[field].length > 0);
+  return state.origin !== "" || ID_LIST_FIELDS.some((field) => state[field].length > 0);
 }
 
 export function clearFilters(state: QuestionBankListState): QuestionBankListState {
-  return { ...state, subjectIds: [], topicIds: [], boardIds: [], years: [], difficultyIds: [], page: 1 };
+  return {
+    ...state,
+    subjectIds: [], topicIds: [], boardIds: [], years: [], difficultyIds: [],
+    origin: "", examTypeIds: [], examIds: [], questionSetIds: [],
+    page: 1,
+  };
 }
 
 /** Troca de disciplina limpa o assunto. */

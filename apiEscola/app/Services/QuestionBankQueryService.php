@@ -27,9 +27,17 @@ class QuestionBankQueryService
         'board_id' => 'board_id',
         'year' => 'year',
         'difficulty_id' => 'difficulty_id',
-        'exam_type_id' => 'exam_type_id',
         'exam_id' => 'exam_id',
     ];
+
+    /**
+     * avulsa = sem simulado oficial; simulado = de simulado oficial;
+     * simulado_banco = avulsa já usada em simulado do banco; avulsa_livre = avulsa fora de qualquer simulado.
+     */
+    public const ORIGINS = ['avulsa', 'simulado', 'simulado_banco', 'avulsa_livre'];
+
+    /** Opções do filtro "Simulado oficial". */
+    public const EXAM_OPTIONS_LIMIT = 30;
 
     /** Limite do "selecionar todas as N". */
     public const MAX_IDS = 5000;
@@ -108,11 +116,23 @@ class QuestionBankQueryService
             }
         }
 
-        $origin = $params['origin'] ?? null;
-        if ($origin === 'avulsa') {
-            $query->whereNull('exam_questions.exam_id');
-        } elseif ($origin === 'simulado') {
-            $query->whereNotNull('exam_questions.exam_id');
+        $this->applyOrigin($query, (string) ($params['origin'] ?? ''));
+
+        // Questão de simulado oficial sem modalidade própria herda a do simulado.
+        $examTypeIds = self::idList($params['exam_type_id'] ?? []);
+        if ($examTypeIds !== []) {
+            $query->where(fn (Builder $q) => $q->whereIn('exam_questions.exam_type_id', $examTypeIds)
+                ->orWhere(fn (Builder $inherited) => $inherited->whereNull('exam_questions.exam_type_id')
+                    ->whereExists(fn ($s) => $s->select(DB::raw(1))->from('exams')
+                        ->whereColumn('exams.id', 'exam_questions.exam_id')
+                        ->whereIn('exams.exam_type_id', $examTypeIds))));
+        }
+
+        $setIds = self::idList($params['question_set_id'] ?? []);
+        if ($setIds !== []) {
+            $query->whereExists(fn ($q) => $q->select(DB::raw(1))->from('question_set_items as qsi')
+                ->whereColumn('qsi.exam_question_id', 'exam_questions.id')
+                ->whereIn('qsi.question_set_id', $setIds));
         }
 
         $topicIds = self::idList($params['topic_id'] ?? []);
@@ -143,6 +163,54 @@ class QuestionBankQueryService
         $this->applySearch($query, trim((string) ($params['search'] ?? '')));
 
         return $query;
+    }
+
+    private function applyOrigin(Builder $query, string $origin): void
+    {
+        if (! in_array($origin, self::ORIGINS, true)) {
+            return;
+        }
+        if ($origin === 'simulado') {
+            $query->whereNotNull('exam_questions.exam_id');
+
+            return;
+        }
+
+        $query->whereNull('exam_questions.exam_id');
+        $inSet = fn ($q) => $q->select(DB::raw(1))->from('question_set_items as qsi_origin')
+            ->whereColumn('qsi_origin.exam_question_id', 'exam_questions.id');
+        if ($origin === 'simulado_banco') {
+            $query->whereExists($inSet);
+        } elseif ($origin === 'avulsa_livre') {
+            $query->whereNotExists($inSet);
+        }
+    }
+
+    /**
+     * Simulados oficiais com questões no banco (filtro "Simulado oficial"); `ids` resolve os já escolhidos.
+     *
+     * @return array<int, array{id: int, title: string, questions_count: int}>
+     */
+    public function examOptions(int $tenantId, string $search = '', array $ids = []): array
+    {
+        $query = DB::table('exams')
+            ->join('exam_questions', 'exam_questions.exam_id', '=', 'exams.id')
+            ->where('exams.tenant_id', $tenantId)
+            ->where('exam_questions.tenant_id', $tenantId)
+            ->whereNull('exams.deleted_at')
+            ->whereNull('exam_questions.deleted_at')
+            ->groupBy('exams.id', 'exams.title')
+            ->select('exams.id', 'exams.title', DB::raw('COUNT(exam_questions.id) AS questions_count'));
+
+        if ($ids !== []) {
+            $query->whereIn('exams.id', $ids);
+        } elseif ($search !== '') {
+            $query->where('exams.title', 'like', '%'.addcslashes($search, '%_\\').'%');
+        }
+
+        return $query->orderBy('exams.title')->limit(self::EXAM_OPTIONS_LIMIT)->get()
+            ->map(fn ($row) => ['id' => (int) $row->id, 'title' => (string) $row->title, 'questions_count' => (int) $row->questions_count])
+            ->all();
     }
 
     /**
