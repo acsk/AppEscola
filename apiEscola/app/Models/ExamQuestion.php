@@ -109,8 +109,23 @@ class ExamQuestion extends Model
      */
     public function scopePracticable(Builder $query, int $tenantId): Builder
     {
+        return $query->answerable($tenantId)->whereNull('exam_questions.exam_id');
+    }
+
+    /**
+     * Prática avulsa do aluno: questões do banco e as de simulados oficiais já encerrados
+     * (o gabarito de simulado em andamento ou ainda não aplicado continua protegido).
+     */
+    public function scopePracticeAvailable(Builder $query, int $tenantId): Builder
+    {
+        return $query->answerable($tenantId)->where(fn (Builder $q) => $q->whereNull('exam_questions.exam_id')
+            ->orWhereHas('exam', fn (Builder $e) => $e->closed()));
+    }
+
+    /** Objetiva, válida, com enunciado (texto ou imagem), exatamente uma correta e ao menos duas alternativas. */
+    public function scopeAnswerable(Builder $query, int $tenantId): Builder
+    {
         return $query->where('exam_questions.tenant_id', $tenantId)
-            ->whereNull('exam_questions.exam_id')
             ->where('exam_questions.type', 'multiple_choice')
             ->where('exam_questions.is_annulled', false)
             ->where('exam_questions.is_outdated', false)

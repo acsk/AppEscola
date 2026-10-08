@@ -72,14 +72,14 @@ class PracticeService
     }
 
     /**
-     * Questões avulsas que o aluno pode praticar: só das disciplinas da grade das suas turmas.
-     * Sem grade cadastrada nas turmas, vale o banco inteiro da escola (o app não fica vazio).
+     * Questões avulsas que o aluno pode praticar (banco + simulados oficiais encerrados), só das disciplinas
+     * da grade das suas turmas. Sem grade cadastrada nas turmas, vale o banco inteiro da escola (o app não fica vazio).
      */
     private function practicableFor(Student $student): Builder
     {
         $subjectIds = $this->enrollments->activeSubjectIdsForStudent($student);
 
-        return ExamQuestion::query()->practicable((int) $student->tenant_id)
+        return ExamQuestion::query()->practiceAvailable((int) $student->tenant_id)
             ->when($subjectIds->isNotEmpty(), fn (Builder $q) => $q->whereIn('exam_questions.subject_id', $subjectIds));
     }
 

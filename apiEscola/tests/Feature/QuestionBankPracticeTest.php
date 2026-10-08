@@ -16,6 +16,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -183,6 +184,41 @@ class QuestionBankPracticeTest extends TestCase
         $official = ExamQuestion::where('question_text', 'Oficial')->first();
         $this->postJson("/api/aluno/practice/questions/{$official->id}/answer", ['option_id' => $official->options()->value('id')])
             ->assertNotFound();
+    }
+
+    public function test_questions_from_closed_official_exams_become_available_for_practice(): void
+    {
+        $status = fn (string $slug) => DB::table('exam_statuses')->where('slug', $slug)->value('id');
+        $exam = fn (string $slug, ?string $endsAt) => Exam::create([
+            'tenant_id' => $this->tenant->id, 'title' => "Oficial {$slug}", 'exam_status_id' => $status($slug), 'ends_at' => $endsAt,
+        ]);
+        $inExam = function (string $text, Exam $exam) {
+            $q = $this->practicable($text);
+            $q->update(['exam_id' => $exam->id]);
+
+            return $q;
+        };
+        $ended = $inExam('Encerrado', $exam('published', now()->subDay()->toDateTimeString()));
+        $archived = $inExam('Arquivado', $exam('archived', null));
+        $running = $inExam('Em andamento', $exam('published', now()->addDay()->toDateTimeString()));
+        $draft = $inExam('Rascunho', $exam('draft', now()->subDay()->toDateTimeString()));
+
+        $this->actingAsStudent($this->student());
+        $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 2);
+        $seen = [];
+        for ($i = 0; $i < 12; $i++) {
+            $seen[] = $this->getJson('/api/aluno/practice/next-question')->assertOk()->json('body.id');
+        }
+        $this->assertEqualsCanonicalizing([$ended->id, $archived->id], array_values(array_unique($seen)));
+        $this->postJson("/api/aluno/practice/questions/{$ended->id}/answer", ['option_id' => $this->correct($ended)])
+            ->assertOk()->assertJsonPath('body.is_correct', true);
+        foreach ([$running, $draft] as $hidden) {
+            $this->postJson("/api/aluno/practice/questions/{$hidden->id}/answer", ['option_id' => $this->correct($hidden)])->assertNotFound();
+        }
+
+        // Simulados do banco continuam aceitando só questões avulsas.
+        Sanctum::actingAs($this->admin);
+        $this->postJson('/api/question-bank/question-sets', ['title' => 'X', 'question_ids' => [$ended->id]])->assertStatus(422);
     }
 
     public function test_student_practices_only_subjects_from_their_class_schedule(): void

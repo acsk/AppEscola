@@ -78,6 +78,16 @@ class Exam extends Model
         return $this->course_id ? collect([(int) $this->course_id]) : collect();
     }
 
+    /** Encerrados: arquivados, ou publicados com o prazo (ends_at) já vencido. Rascunhos e em andamento não entram. */
+    public function scopeClosed(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereHas('examStatus', fn (Builder $s) => $s->where('slug', 'archived'))
+                ->orWhere(fn (Builder $p) => $p->whereHas('examStatus', fn (Builder $s) => $s->where('slug', 'published'))
+                    ->whereNotNull('ends_at')->where('ends_at', '<', now()));
+        });
+    }
+
     /** Simulados visíveis para alunos matriculados em pelo menos um dos cursos informados. */
     public function scopeForStudentCourses(Builder $query, Collection $courseIds): Builder
     {
