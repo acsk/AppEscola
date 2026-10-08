@@ -40,10 +40,13 @@ import {
 import {
   type ClassificationForm,
   EMPTY_CLASSIFICATION_FORM,
+  detectQuestionYear,
   diffClassification,
   formFromQuestion,
   mergeClassificationSuggestion,
 } from "../../utils/questionClassification";
+import { imageQuestionContent } from "../../utils/questionImageReview";
+import RedrawImageModal from "../../components/banco-questoes/RedrawImageModal";
 import { plainRichText } from "../../utils/richText";
 import { color } from "../../constants/theme";
 import type { QuestionBankQuestion } from "../../types/questionBank";
@@ -98,6 +101,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   /** Falha da IA: modal de erro padrão do sistema. */
   const [aiError, setAiError] = useState<{ title: string; message: string } | null>(null);
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
+  const [redrawOpen, setRedrawOpen] = useState(false);
   const [sourceDifficultyId, setSourceDifficultyId] = useState<number | null>(null);
   /** Questão de simulado: conteúdo só leitura aqui. */
   const [examQuestion, setExamQuestion] = useState<QuestionBankQuestion | null>(null);
@@ -190,6 +194,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         type: content.type === "essay" ? "essay" : undefined,
         options: content.options.map((o) => ({ option_text: o.option_text })),
         subject_id: classification.subject_id ?? undefined,
+        source_exam_name: sourceExamName.trim() || undefined,
       });
       const merged = mergeContentSuggestion(content, response.body);
       setContent(merged.form);
@@ -213,6 +218,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
   };
 
+  /** A IA usa o que está no formulário agora (inclusive edições ainda não salvas), não a versão gravada. */
   const openSimilar = async () => {
     if (questionId === null || loading || loadError || aiFilling || saving !== null || uploading) return;
     const unavailable = await ensureAvailable();
@@ -220,13 +226,47 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setToast({ visible: true, type: "error", message: unavailable });
       return;
     }
+    const { type, question_text, explanation, options } = imageQuestionContent(content);
     setSimilarSource({
       id: questionId,
-      type: initialContent.type,
-      optionsCount: initialContent.options.filter((o) => plainRichText(o.option_text).trim()).length,
-      difficultyId: sourceDifficultyId,
-      imageUrl: initialContent.image_url,
+      type,
+      optionsCount: options.length,
+      difficultyId: classification.difficulty_id ?? sourceDifficultyId,
+      imageUrl: content.image_url || null,
+      context: {
+        type,
+        question_text,
+        explanation,
+        image_url: content.image_url || null,
+        options,
+        subject_id: classification.subject_id,
+        topic_ids: classification.topic_ids,
+        board_id: classification.board_id,
+        year: classification.year,
+        exam_type_id: classification.exam_type_id,
+        tags: classification.tags,
+        source_exam_name: sourceExamName.trim() || null,
+      },
     });
+  };
+
+  // Questão que vem com o ano (cabeçalho do enunciado ou nome da prova): preenche o ano vazio da classificação.
+  const detectedYear = useMemo(() => detectQuestionYear(content.question_text, sourceExamName), [content.question_text, sourceExamName]);
+  const lastDetectedYear = useRef<number | null>(null);
+  useEffect(() => {
+    if (loading || detectedYear === null || detectedYear === lastDetectedYear.current) return;
+    lastDetectedYear.current = detectedYear;
+    setClassification((prev) => (prev.year === null ? { ...prev, year: detectedYear } : prev));
+  }, [detectedYear, loading]);
+
+  const openRedraw = async () => {
+    if (!content.image_url || aiFilling || saving !== null || uploading) return;
+    const unavailable = await ensureAvailable();
+    if (unavailable) {
+      setToast({ visible: true, type: "error", message: unavailable });
+      return;
+    }
+    setRedrawOpen(true);
   };
 
   const onPickImage = async (file: File | undefined) => {
@@ -421,8 +461,15 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
               style={{ width: "100%", height: isMobile ? 180 : 260 }}
               resizeMode="contain"
             />
-            <View className="flex-row" style={{ gap: 8 }}>
+            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
               <Button size="sm" icon={ImagePlus} label="Trocar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
+              <Button
+                size="sm"
+                icon={Sparkles}
+                label="Gerar nova imagem com IA"
+                onPress={() => void openRedraw()}
+                disabled={aiFilling || saving !== null || uploading}
+              />
               <Button size="sm" variant="danger" icon={Trash2} label="Remover imagem" onPress={() => setField("image_url", "")} disabled={aiFilling || saving !== null} />
             </View>
           </View>
@@ -542,6 +589,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           setToast({ visible: true, type: "success", message: `${count} questão(ões) semelhante(s) incluída(s) no banco.` })
         }
         setToast={setToast}
+      />
+
+      <RedrawImageModal
+        visible={redrawOpen}
+        questionId={questionId}
+        content={content}
+        onClose={() => setRedrawOpen(false)}
+        onUse={(imageUrl) => {
+          setRedrawOpen(false);
+          setField("image_url", imageUrl);
+          setToast({ visible: true, type: "success", message: "Nova imagem aplicada. Salve a questão para manter a alteração." });
+        }}
       />
 
       <ConfirmModal

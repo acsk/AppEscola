@@ -23,6 +23,8 @@ class QuestionAiAutofillRequest extends FormRequest
             'subject_ids.*'         => ['integer', 'distinct'],
             // Disciplina já escolhida na questão: a IA mantém e só escolhe os assuntos dela.
             'subject_id'            => ['sometimes', 'nullable', 'integer'],
+            // Nome da prova de origem: só para deduzir o ano ("ENEM 2023"); não vai para o prompt.
+            'source_exam_name'      => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Services\Ai;
 
 use App\Exceptions\AiException;
 use App\Models\ExamQuestion;
+use App\Models\ExamQuestionOption;
 use App\Models\QuestionImageGeneration;
 use App\Models\User;
 use App\Support\AiPromptGuard;
@@ -119,6 +120,60 @@ class QuestionImageService
         return $content + ['possui_imagem' => true] + $generation->reviewPayload();
     }
 
+    /**
+     * Editor: nova versão da imagem da questão. A IA analisa a imagem atual junto com o enunciado e as
+     * alternativas, descreve a figura (Image Spec com os MESMOS dados) e a redesenha nítida e legível.
+     * Usa o estado do editor (`$data`), que pode ainda não estar salvo; $saved só dá id, disciplina e assuntos.
+     *
+     * @param  array{image_url: string, type?: string, question_text?: string|null, options?: array, instructions?: string|null}  $data
+     */
+    public function redraw(?User $user, int $tenantId, array $data, ?ExamQuestion $saved = null): array
+    {
+        $question = (new ExamQuestion)->forceFill([
+            'id' => $saved?->id,
+            'tenant_id' => $tenantId,
+            'type' => ($data['type'] ?? 'multiple_choice') === 'essay' ? 'essay' : 'multiple_choice',
+            'question_text' => (string) ($data['question_text'] ?? ''),
+            'image_url' => $data['image_url'],
+        ]);
+        $question->setRelation('options', collect($question->type === 'essay' ? [] : ($data['options'] ?? []))
+            ->filter(fn ($o) => is_array($o) && trim(QuestionRichText::plain((string) ($o['option_text'] ?? ''))) !== '')
+            ->values()
+            ->map(fn (array $o) => (new ExamQuestionOption)->forceFill([
+                'option_text' => (string) $o['option_text'], 'is_correct' => (bool) ($o['is_correct'] ?? false),
+            ])));
+        $question->setRelation('subject', $saved?->subject);
+        $question->setRelation('topics', $saved?->topics ?? collect());
+        $instruction = trim((string) ($data['instructions'] ?? ''));
+
+        $context = $this->prepare($user, $tenantId, $question);
+        $content = [
+            'type' => $question->type === 'essay' ? 'essay' : 'multiple_choice',
+            'question_text' => (string) $question->question_text,
+            'options' => $question->options->values()->map(fn ($option, $i) => [
+                'option_text' => (string) $option->option_text, 'is_correct' => (bool) $option->is_correct, 'order' => $i + 1,
+            ])->all(),
+        ];
+        $json = fn (array $data) => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $result = $this->router->vision($context['credential'], $this->system(),
+            "Retorne somente o Image Spec para REDESENHAR a imagem desta questão: a mesma representação, com os mesmos números, textos e labels "
+            ."da imagem original, coerentes com o enunciado e as alternativas. Não invente nem altere dados; o que estiver ilegível deve ser "
+            ."deduzido do enunciado e das alternativas ou omitido. Não revele o gabarito.\n"
+            .AiPromptGuard::wrap('questao', $json($content))."\n"
+            .AiPromptGuard::wrap('analise_visual', $json($context['analysis']))
+            ."\nFormato: ".json_encode(QuestionImageSpec::specFormat(), JSON_UNESCAPED_UNICODE),
+            [$context['image']]);
+        $generation = QuestionImageGeneration::create([
+            'tenant_id' => $tenantId, 'source_question_id' => $question->id, 'created_by' => $user?->id,
+            'origin' => QuestionImageGeneration::ORIGIN_EDITOR_REDRAW,
+            'content' => $content, 'analysis' => $context['analysis'], 'image_spec' => QuestionImageSpec::spec($result['data']),
+            'metadata' => ['analysis_id' => $context['analysis_id'], 'spec' => $this->metadata($result), 'history' => []],
+        ]);
+        $this->generate($generation, $context['credential'], $context['image'], $instruction);
+
+        return $generation->reviewPayload();
+    }
+
     public function regenerate(?User $user, QuestionImageGeneration $generation, array $content, string $instruction): array
     {
         $credential = $this->credential($user, (int) $generation->tenant_id);
@@ -199,6 +254,10 @@ class QuestionImageService
                 if ($generation->origin === 'PDF_IMPORTED') {
                     $prompt = 'IMPORTAÇÃO DE PDF: reproduza fielmente a figura descrita no Image Spec com os dados originais do documento. '
                         ."Não recrie a questão, não troque números nem labels. Inclua todas as representações descritas.\n".$prompt;
+                } elseif ($generation->origin === QuestionImageGeneration::ORIGIN_EDITOR_REDRAW) {
+                    $prompt = 'REDESENHO DA MESMA QUESTÃO: a imagem de referência é a figura original desta questão. Reproduza a mesma representação, '
+                        .'com os mesmos números, textos e labels, em versão limpa, nítida e legível. Não troque dados nem invente elementos; '
+                        ."isto prevalece sobre a orientação de não copiar a referência.\n".$prompt;
                 }
                 $generation->update([
                     'prompt' => $prompt, 'attempts' => $generation->attempts + 1,

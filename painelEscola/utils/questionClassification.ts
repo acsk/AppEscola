@@ -1,4 +1,5 @@
 import type { ClassificationPatch, QuestionBankQuestion } from "../types/questionBank";
+import { plainRichText } from "./richText";
 
 /** Formulário de classificação de uma questão (somente classificação; conteúdo é só leitura). */
 export type ClassificationForm = {
@@ -126,6 +127,30 @@ export function applyClassificationSuggestion(
   if (s.exam_type_id && next.exam_type_id === null) next.exam_type_id = s.exam_type_id;
   next.tags = (s.tags ?? []).reduce(addTag, next.tags);
   return next;
+}
+
+/** Mesma regra da API (App\Support\QuestionYear): só o começo do enunciado traz banca e ano. */
+const YEAR_HEADER_CHARS = 160;
+const YEAR_CITATION_WORDS = /adaptad|dispon[ií]vel|acesso|fonte|lei\b|decreto|art\.|p\.\s*\d/iu;
+
+function validYear(year: number): number | null {
+  return year >= 1900 && year <= new Date().getFullYear() + 1 ? year : null;
+}
+
+/**
+ * Ano da prova citado na questão: cabeçalho do enunciado ("(ENEM 2019)", "UFRGS/2018 –") ou, sem ele,
+ * o nome da prova de origem ("ENEM 2023 - 1º dia"). Anos soltos no texto ("Em 1945, ...") não contam.
+ */
+export function detectQuestionYear(statementHtml: string, sourceExamName = ""): number | null {
+  const head = plainRichText(statementHtml).trim().slice(0, YEAR_HEADER_CHARS);
+  const bracketed = /[([]\s*(\p{L}[^()[\]\n]{0,40}?)\b((?:19|20)\d{2})\b[^()[\]\n]{0,25}[)\]]/gu;
+  for (const match of head.matchAll(bracketed)) {
+    if (!YEAR_CITATION_WORDS.test(match[0])) return validYear(Number(match[2]));
+  }
+  const acronym = head.match(/^\s*(?:\d{1,3}\s*[.)\-–]\s*)?(?:QUEST[ÃA]O\s*\d+\s*[.)\-–:]?\s*)?\p{Lu}[\p{Lu}\d\-/ ]{1,30}?[\s/\-–]+((?:19|20)\d{2})\b/u);
+  if (acronym) return validYear(Number(acronym[1]));
+  const fromName = sourceExamName.match(/\b((?:19|20)\d{2})\b/);
+  return fromName ? validYear(Number(fromName[1])) : null;
 }
 
 /** Classificação completa a partir de uma sugestão da IA (questões semelhantes). */

@@ -23,6 +23,7 @@ import {
 import {
   EMPTY_CLASSIFICATION_FORM,
   addTag,
+  detectQuestionYear,
   diffClassification,
   withSubject,
   applyClassificationSuggestion,
@@ -200,6 +201,16 @@ test.describe("formulário de classificação", () => {
     expect(addTag(["Funções"], "  funções ")).toEqual(["Funções"]);
     expect(addTag([], "  revisão   final ")).toEqual(["revisão final"]);
   });
+});
+
+test("ano vem do cabeçalho do enunciado ou do nome da prova, nunca de ano solto no texto", () => {
+  expect(detectQuestionYear("(ENEM 2019) Leia o texto.")).toBe(2019);
+  expect(detectQuestionYear("<b>(Enem/2018)</b> Considere a função.")).toBe(2018);
+  expect(detectQuestionYear("UFRGS/2015 – Assinale a correta.")).toBe(2015);
+  expect(detectQuestionYear("Em 1945, terminou a guerra. O que mudou?")).toBeNull();
+  expect(detectQuestionYear("(Adaptado de SILVA, 2010) Leia o texto.")).toBeNull();
+  expect(detectQuestionYear("Questão sem ano", "ENEM 2023 - 1º dia")).toBe(2023);
+  expect(detectQuestionYear("(ENEM 2999) Questão.")).toBeNull();
 });
 
 test("autocompletar da importação sobrescreve disciplina/assuntos e mantém a modalidade", () => {

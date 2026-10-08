@@ -397,6 +397,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
             Route::post('ai/separate-text', [QuestionAiController::class, 'separateText']);
             Route::post('questions/{question}/ai/similar',   [QuestionAiController::class, 'similar'])->whereNumber('question');
             Route::post('ai/image-generations/{generation}/regenerate', [QuestionAiController::class, 'regenerateImage'])->whereUuid('generation');
+            Route::post('ai/redraw-image', [QuestionAiController::class, 'redrawImage']);
         });
 
         Route::get('subjects',          [SubjectTopicController::class, 'subjects']);

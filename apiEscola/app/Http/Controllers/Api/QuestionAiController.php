@@ -9,6 +9,7 @@ use App\Http\Requests\QuestionAiExtractRequest;
 use App\Http\Requests\QuestionAiPdfRequest;
 use App\Http\Requests\QuestionAiSeparateTextRequest;
 use App\Http\Requests\QuestionAiSimilarRequest;
+use App\Http\Requests\RedrawQuestionImageRequest;
 use App\Http\Requests\RegenerateQuestionImageRequest;
 use App\Models\ExamQuestion;
 use App\Models\QuestionImageGeneration;
@@ -94,6 +95,30 @@ class QuestionAiController extends Controller
             ['questions' => $questions],
             count($questions).' questão(ões) gerada(s). Revise antes de incluir.'
         );
+    }
+
+    /** POST /question-bank/ai/redraw-image — nova versão da imagem do editor (não altera a questão; o painel decide se usa). */
+    public function redrawImage(RedrawQuestionImageRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validated();
+        $saved = isset($data['question_id'])
+            ? ExamQuestion::query()->inQuestionBank($tenantId)->with(['subject:id,name', 'topics:id,name'])->findOrFail($data['question_id'])
+            : null;
+
+        $lock = Cache::lock('question-image-redraw:'.$tenantId.':'.sha1($data['image_url']), 1800);
+        if (! $lock->get()) {
+            throw new AiException('Esta imagem já está sendo gerada. Aguarde a conclusão.', 409, 'image_busy');
+        }
+        try {
+            $payload = $this->images->redraw($request->user(), $tenantId, $data, $saved);
+        } finally {
+            $lock->release();
+        }
+
+        return $this->success($payload, $payload['image_generation']['status'] === 'READY'
+            ? 'Nova imagem gerada. Confira antes de usar.'
+            : 'A nova imagem precisa de revisão. Confira o motivo antes de usar ou tente novamente.');
     }
 
     public function regenerateImage(RegenerateQuestionImageRequest $request, string $generation): JsonResponse

@@ -4,15 +4,18 @@ namespace App\Services\Ai;
 
 use App\Exceptions\AiException;
 use App\Models\ExamQuestion;
+use App\Models\ExamQuestionOption;
 use App\Models\ExamType;
 use App\Models\QuestionBoard;
 use App\Models\QuestionDifficulty;
+use App\Models\QuestionTag;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
 use App\Models\User;
 use App\Support\AiPromptGuard;
 use App\Support\QuestionImageSpec;
 use App\Support\QuestionRichText;
+use App\Support\QuestionYear;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -161,7 +164,9 @@ class QuestionAiService
             $content['question_text'] = $input['question_text'];
         }
 
-        return $content + $this->sanitizeClassification($raw, $catalogs, $onlySubjectId);
+        $fallbackYear = QuestionYear::detect([$input['question_text']], [$input['source_exam_name'] ?? null]);
+
+        return $content + $this->sanitizeClassification($raw, $catalogs, $onlySubjectId, $fallbackYear);
     }
 
     /** Restringe disciplinas e assuntos às escolhidas (ids de outro tenant/inativos somem aqui). */
@@ -180,6 +185,80 @@ class QuestionAiService
     }
 
     /**
+     * Cópia em memória da referência com o estado atual do formulário (edições ainda não salvas).
+     * Nunca é gravada; ids fora dos catálogos do tenant são descartados.
+     */
+    private function withFormContext(ExamQuestion $source, array $context, array $catalogs): ExamQuestion
+    {
+        if ($context === []) {
+            return $source;
+        }
+        $reference = clone $source;
+        foreach (['type', 'question_text', 'explanation', 'image_url', 'year', 'source_exam_name'] as $field) {
+            if (array_key_exists($field, $context)) {
+                $reference->setAttribute($field, $context[$field]);
+            }
+        }
+        $inCatalog = fn (string $catalog, mixed $id) => is_numeric($id) && $catalogs[$catalog]->contains('id', (int) $id) ? (int) $id : null;
+        if (array_key_exists('board_id', $context)) {
+            $reference->setAttribute('board_id', $inCatalog('boards', $context['board_id']));
+        }
+        if (array_key_exists('exam_type_id', $context)) {
+            $reference->setAttribute('exam_type_id', $inCatalog('exam_types', $context['exam_type_id']));
+        }
+        if (array_key_exists('options', $context)) {
+            $reference->setRelation('options', collect($context['options'])
+                ->filter(fn ($o) => is_array($o) && trim(QuestionRichText::plain((string) ($o['option_text'] ?? ''))) !== '')
+                ->values()
+                ->map(fn (array $o, int $i) => (new ExamQuestionOption)->forceFill([
+                    'option_text' => (string) $o['option_text'],
+                    'is_correct' => (bool) ($o['is_correct'] ?? false),
+                    'order' => $i + 1,
+                ])));
+        }
+        if (array_key_exists('subject_id', $context)) {
+            $subject = $catalogs['subjects']->firstWhere('id', $inCatalog('subjects', $context['subject_id']));
+            $reference->setAttribute('subject_id', $subject['id'] ?? null);
+            $reference->setRelation('subject', $subject ? new Subject(['name' => $subject['name']]) : null);
+        }
+        if (array_key_exists('topic_ids', $context)) {
+            $topicIds = array_map('intval', (array) $context['topic_ids']);
+            $reference->setRelation('topics', $catalogs['topics']
+                ->filter(fn ($t) => in_array((int) $t['id'], $topicIds, true)
+                    && ($reference->subject_id === null || (int) $t['subject_id'] === (int) $reference->subject_id))
+                ->values()
+                ->map(fn ($t) => (new SubjectTopic(['name' => $t['name'], 'subject_id' => $t['subject_id']]))->forceFill(['id' => $t['id']])));
+        }
+        if (array_key_exists('tags', $context)) {
+            $reference->setRelation('tags', collect((array) $context['tags'])
+                ->filter(fn ($tag) => is_string($tag) && trim($tag) !== '')
+                ->map(fn ($tag) => new QuestionTag(['name' => trim($tag)]))
+                ->values());
+        }
+
+        return $reference;
+    }
+
+    /** Banca, ano, modalidade e prova de origem da referência: orientam o estilo das novas questões. */
+    private function referenceOriginPrompt(ExamQuestion $source, array $catalogs): ?string
+    {
+        $board = $source->board_id ? $catalogs['boards']->firstWhere('id', (int) $source->board_id) : null;
+        $examType = $source->exam_type_id ? $catalogs['exam_types']->firstWhere('id', (int) $source->exam_type_id) : null;
+        $lines = array_filter([
+            $board ? 'Banca: '.$board['name'] : null,
+            $source->year ? 'Ano: '.$source->year : null,
+            $examType ? 'Modalidade: '.$examType['label'] : null,
+            trim((string) $source->source_exam_name) !== '' ? 'Prova de origem: '.trim((string) $source->source_exam_name) : null,
+        ]);
+        if ($lines === []) {
+            return null;
+        }
+
+        return "ORIGEM DA REFERÊNCIA (siga o estilo, o nível e o formato de cobrança dessa prova; não copie nomes de banca nem o ano no enunciado):\n"
+            .AiPromptGuard::wrap('origem', implode("\n", $lines));
+    }
+
+    /**
      * @param  array{quantity: int, difficulty_id?: int|null, options_count?: int|null, instructions?: string|null}  $params
      * @return array<int, array<string, mixed>> questões no formato do payload de criação
      */
@@ -189,6 +268,7 @@ class QuestionAiService
         $credential = $this->credential($user, $tenantId);
         $catalogs = $this->catalogs($tenantId);
         $source->loadMissing(['options', 'subject:id,name', 'topics:id,name', 'difficulty:id,name', 'tags:id,name']);
+        $source = $this->withFormContext($source, (array) ($params['context'] ?? []), $catalogs);
         $imageContext = trim((string) $source->image_url) !== ''
             ? $this->images->prepare($user, $tenantId, $source)
             : null;
@@ -230,6 +310,7 @@ class QuestionAiService
             $source->explanation ? "EXPLICAÇÃO DA REFERÊNCIA:\n".AiPromptGuard::wrap('explicacao', $source->explanation) : null,
             $source->subject ? "Disciplina:\n".AiPromptGuard::wrap('disciplina', $source->subject->name) : null,
             $source->topics->isNotEmpty() ? "Assuntos:\n".AiPromptGuard::wrap('assuntos', $source->topics->pluck('name')->implode(', ')) : null,
+            $this->referenceOriginPrompt($source, $catalogs),
             "Dificuldade desejada:\n".AiPromptGuard::wrap('dificuldade', $difficulty['name'] ?? 'a mesma da referência'),
             $type === 'essay'
                 ? 'Tipo: dissertativa ("options" vazio; em "explanation" traga a resposta esperada).'
@@ -384,7 +465,7 @@ class QuestionAiService
 
             $result[$index] = ['block_index' => $index]
                 + $content
-                + $this->sanitizeClassification($item, $catalogs)
+                + $this->sanitizeClassification($item, $catalogs, null, QuestionYear::fromHeader($blocks[$index]['text'] ?? null))
                 + ['needs_image' => ($item['needs_image'] ?? false) === true, 'answer_from_pdf' => $hint !== ''];
         }
 
@@ -525,7 +606,9 @@ class QuestionAiService
             // Bloco de páginas: a IA marca complete=false por cautela com o contexto; a contagem conferida basta.
             $data['complete'] = true;
         }
-        $validated = $this->validateImportedQuestions($data, $catalogs, 'needs_image', $focusPages !== null, $onlySubjectId);
+        $validated = $this->validateImportedQuestions(
+            $data, $catalogs, 'needs_image', $focusPages !== null, $onlySubjectId, QuestionYear::fromExamName($sourceExamName)
+        );
         if ($focusPages !== null) {
             // A IA às vezes também separa questões da página de contexto: fica só o que começa no bloco.
             $blockStart = (int) $focusPages['from'] > 1 ? self::positionIn($text, '[PÁGINA '.(int) $focusPages['from'].']') : 0;
@@ -559,7 +642,9 @@ class QuestionAiService
         }, $validated);
     }
 
-    private function validateImportedQuestions(array $raw, array $catalogs, string $imageField, bool $allowEmpty = false, ?int $forcedSubjectId = null): array
+    private function validateImportedQuestions(
+        array $raw, array $catalogs, string $imageField, bool $allowEmpty = false, ?int $forcedSubjectId = null, ?int $fallbackYear = null
+    ): array
     {
         $limit = 50;
         $items = $raw['questions'] ?? null;
@@ -613,7 +698,7 @@ class QuestionAiService
                 QuestionImageSpec::spec(is_array($item['image_spec'] ?? null) ? $item['image_spec'] : []);
             }
             $validated[] = [
-                'content' => $content + $this->sanitizeClassification($item, $catalogs, $forcedSubjectId) + [
+                'content' => $content + $this->sanitizeClassification($item, $catalogs, $forcedSubjectId, $fallbackYear) + [
                     'source_number' => is_scalar($item['source_number'] ?? null) ? (string) $item['source_number'] : (string) ($index + 1),
                     'answer_from_pdf' => $item['answer_from_pdf'],
                 ],
@@ -808,8 +893,9 @@ class QuestionAiService
     /**
      * Classificação sugerida, só com ids existentes no tenant (assuntos coerentes com a disciplina).
      * Com $forcedSubjectId (disciplina definida pela pessoa/prova), só os assuntos dela são aceitos.
+     * Ano: o da IA; senão o do cabeçalho do enunciado; senão $fallbackYear (texto original/nome da prova).
      */
-    private function sanitizeClassification(array $raw, array $catalogs, ?int $forcedSubjectId = null): array
+    private function sanitizeClassification(array $raw, array $catalogs, ?int $forcedSubjectId = null, ?int $fallbackYear = null): array
     {
         $pick = fn (Collection $items, mixed $id) => is_numeric($id) && $items->contains('id', (int) $id) ? (int) $id : null;
 
@@ -842,6 +928,9 @@ class QuestionAiService
         $topicIds = $topics->where('subject_id', $subjectId)->pluck('id')->map(fn ($id) => (int) $id)->unique()->take(30)->values()->all();
 
         $year = is_numeric($raw['year'] ?? null) ? (int) $raw['year'] : null;
+        if ($year === null || $year < 1900 || $year > 2100) {
+            $year = QuestionYear::fromHeader(is_string($raw['question_text'] ?? null) ? $raw['question_text'] : null) ?? $fallbackYear;
+        }
         $tags = collect((array) ($raw['tags'] ?? []))
             ->filter(fn ($t) => is_string($t) && trim($t) !== '')
             ->map(fn ($t) => mb_strtolower(mb_substr(trim(QuestionRichText::plain($t)), 0, 50)))

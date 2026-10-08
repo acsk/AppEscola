@@ -11,7 +11,7 @@ import DeleteIconButton from "../ui/DeleteIconButton";
 import ClassificationFields from "./ClassificationFields";
 import OptionsEditor from "./OptionsEditor";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
-import { aiSimilarQuestions, aiRegenerateImage } from "../../services/questionAi";
+import { aiSimilarQuestions, aiRegenerateImage, type SimilarFormContext } from "../../services/questionAi";
 import type { AiImageReview } from "../../types/questionAi";
 import { imageContentSignature, imageQuestionContent, imageReviewIssue } from "../../utils/questionImageReview";
 import { createStandaloneQuestion } from "../../services/questionBank";
@@ -40,6 +40,8 @@ export type SimilarSource = {
   optionsCount: number;
   difficultyId: number | null;
   imageUrl?: string | null;
+  /** Estado atual do formulário: a IA usa ele, não a versão salva. */
+  context?: SimilarFormContext;
 };
 
 type Draft = {
@@ -132,6 +134,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         difficulty_id: difficulty === SAME_DIFFICULTY ? undefined : Number(difficulty),
         options_count: isEssay ? undefined : optionsCount,
         instructions: instructions.trim() || undefined,
+        context: source.context,
       }, Boolean(source.imageUrl));
       setDrafts(
         response.body.questions.map((q) => ({

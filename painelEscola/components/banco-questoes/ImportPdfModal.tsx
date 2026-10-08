@@ -338,6 +338,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         options: draft.content.options.map(({ option_text }) => ({ option_text })),
         subject_ids: subjectIds.length ? subjectIds : undefined,
         subject_id: draft.classification.subject_id ?? undefined,
+        source_exam_name: sourceExamName.trim() || undefined,
       });
       update(draft.key, {
         content: mergeContentSuggestion(draft.content, response.body).form,

@@ -12,6 +12,7 @@ use App\Services\Ai\QuestionImageStorage;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\ResponseSequence;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -259,6 +260,48 @@ class QuestionImageTest extends TestCase
         $this->assertDatabaseCount('exam_questions', 1);
     }
 
+    public function test_editor_redraw_uses_form_state_and_saving_the_image_links_the_generation(): void
+    {
+        $source = $this->source();
+        $sameData = $this->spec();
+        $sameData['labels'] = [['elemento' => 'AB', 'texto' => '3 cm'], ['elemento' => 'BC', 'texto' => '4 cm'], ['elemento' => 'AC', 'texto' => '5 cm']];
+        $this->fakeProvider(Http::sequence()
+            ->push($this->chat($this->analysis()))
+            ->push($this->chat($sameData))
+            ->push($this->chat($this->valid())));
+
+        $response = $this->postJson('/api/question-bank/ai/redraw-image', [
+            'question_id' => $source->id, 'image_url' => $source->image_url, 'type' => 'essay',
+            'question_text' => 'Triângulo retângulo (editado) com 3 cm, 4 cm e 5 cm.', 'instructions' => 'Labels maiores.',
+        ])->assertOk()->assertJsonPath('body.image_generation.status', 'READY');
+
+        $generation = QuestionImageGeneration::findOrFail($response->json('body.generation_id'));
+        $this->assertSame(QuestionImageGeneration::ORIGIN_EDITOR_REDRAW, $generation->origin);
+        $this->assertSame($source->id, $generation->source_question_id);
+        $this->assertStringContainsString('REDESENHO DA MESMA QUESTÃO', $generation->prompt);
+        $this->assertStringContainsString('3 cm', $generation->prompt);
+        $this->assertStringContainsString('Labels maiores.', $generation->prompt);
+        Storage::disk('public')->assertExists($generation->path);
+        Http::assertSent(fn (Request $request) => str_contains((string) json_encode($request->data()), '(editado)'));
+        $this->assertSame('Triângulo com 3 cm, 4 cm e 5 cm.', $source->fresh()->question_text);
+
+        // A imagem redesenhada foi conferida no editor: salvar não exige o fluxo de aprovação de similares.
+        $created = $this->postJson('/api/question-bank/questions', [
+            'type' => 'essay', 'question_text' => 'Nova questão com a figura.', 'image_url' => $generation->image_url,
+        ])->assertCreated();
+        $this->assertSame($created->json('body.id'), $generation->fresh()->question_id);
+        $this->assertSame('APPROVED', $generation->fresh()->status);
+    }
+
+    public function test_editor_redraw_rejects_image_outside_school_storage_without_calling_ai(): void
+    {
+        $this->postJson('/api/question-bank/ai/redraw-image', ['image_url' => 'http://127.0.0.1/private.png', 'question_text' => 'Figura'])
+            ->assertStatus(422)->assertJsonPath('body.status', 'NEEDS_REVIEW');
+        $this->postJson('/api/question-bank/ai/redraw-image', ['question_text' => 'Sem imagem'])
+            ->assertStatus(422)->assertJsonValidationErrors('image_url');
+        Http::assertNothingSent();
+    }
+
     public function test_approval_rejects_missing_generated_file(): void
     {
         $this->fakePipeline();
@@ -344,6 +387,11 @@ class QuestionImageTest extends TestCase
         foreach ($validations ?? [$this->valid()] as $validation) {
             $sequence->push($this->chat($validation));
         }
+        $this->fakeProvider($sequence, $imageStatus, $image);
+    }
+
+    private function fakeProvider(ResponseSequence $sequence, int $imageStatus = 200, string $image = self::PNG): void
+    {
         Http::fake([
             '*/models/test/vision/endpoints' => Http::response(['data' => [
                 'architecture' => ['input_modalities' => ['text', 'image']],

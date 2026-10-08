@@ -39,7 +39,8 @@ class QuestionContentService
                 }
                 $this->images->assertApproval($generation, $tenantId, $data);
             } elseif (! empty($data['image_url']) && QuestionImageGeneration::query()
-                ->whereNull('question_id')->where('image_url', $data['image_url'])->exists()) {
+                ->whereNull('question_id')->where('image_url', $data['image_url'])
+                ->where('origin', '!=', QuestionImageGeneration::ORIGIN_EDITOR_REDRAW)->exists()) {
                 throw ValidationException::withMessages(['generation_id' => 'Informe a geração da imagem para aprovar esta questão.']);
             }
             $question = ExamQuestion::create(array_merge(
@@ -59,6 +60,7 @@ class QuestionContentService
             if ($generation !== null) {
                 $generation->update(['question_id' => $question->id, 'status' => 'APPROVED']);
             }
+            $this->linkRedrawnImage($question);
 
             return $this->applyClassification($question, $data, $tenantId);
         });
@@ -70,6 +72,7 @@ class QuestionContentService
 
         return DB::transaction(function () use ($question, $data) {
             $question->fill($this->contentAttributes($data))->save();
+            $this->linkRedrawnImage($question);
 
             if ($question->type === 'essay') {
                 $question->options()->delete();
@@ -79,6 +82,20 @@ class QuestionContentService
 
             return $this->applyClassification($question, $data, (int) $question->tenant_id);
         });
+    }
+
+    /** Imagem redesenhada no editor e salva na questão: a geração passa a ser dela (auditoria). */
+    private function linkRedrawnImage(ExamQuestion $question): void
+    {
+        if (trim((string) $question->image_url) === '') {
+            return;
+        }
+        QuestionImageGeneration::query()
+            ->where('tenant_id', $question->tenant_id)
+            ->where('origin', QuestionImageGeneration::ORIGIN_EDITOR_REDRAW)
+            ->whereNull('question_id')
+            ->where('image_url', $question->image_url)
+            ->update(['question_id' => $question->id, 'status' => 'APPROVED']);
     }
 
     public function deleteStandalone(ExamQuestion $question): void

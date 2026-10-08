@@ -9,6 +9,9 @@ class QuestionImageGeneration extends Model
 {
     use HasUuids;
 
+    /** Imagem redesenhada no editor a partir da imagem atual da questão (mesmos dados). */
+    public const ORIGIN_EDITOR_REDRAW = 'EDITOR_REDRAW';
+
     protected $guarded = ['id'];
 
     protected $casts = [

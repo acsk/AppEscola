@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
+use App\Models\QuestionBoard;
 use App\Models\QuestionDifficulty;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
@@ -455,6 +456,70 @@ class QuestionAiTest extends TestCase
             // Sem tags da IA: herda as da referência (nenhuma) — nunca a marca "Gerada por IA".
             ->assertJsonPath('body.questions.1.tags', [])
             ->assertJsonPath('body.questions.1.topic_ids', [$algebra->id]);
+    }
+
+    public function test_similar_uses_unsaved_form_context_without_changing_the_question(): void
+    {
+        $this->tenantKey();
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $physics = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Física']);
+        $kinematics = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $physics->id, 'name' => 'Cinemática']);
+        $board = QuestionBoard::create(['tenant_id' => $this->tenant->id, 'name' => 'CESPE']);
+        $source = $this->sourceQuestion();
+        $source->update(['subject_id' => $math->id]);
+        $this->fakeSimilarResponse();
+
+        $this->postJson("/api/question-bank/questions/{$source->id}/ai/similar", [
+            'quantity' => 1, 'options_count' => 2,
+            'context' => [
+                'type' => 'multiple_choice',
+                'question_text' => 'Um carro anda a 20 m/s por 5 s. Qual a distância?',
+                'options' => [['option_text' => '100 m', 'is_correct' => true], ['option_text' => '25 m', 'is_correct' => false], ['option_text' => '']],
+                'explanation' => 'd = v·t',
+                'subject_id' => $physics->id,
+                'topic_ids' => [$kinematics->id],
+                'board_id' => $board->id,
+                'year' => 2019,
+                'source_exam_name' => 'Simulado CESPE 2019',
+                'tags' => ['velocidade'],
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('body.questions.0.subject_id', $physics->id)
+            ->assertJsonPath('body.questions.0.topic_ids', [$kinematics->id]);
+
+        $physicsName = $physics->fresh()->name;
+        Http::assertSent(function (HttpRequest $r) use ($physicsName) {
+            $user = $r['messages'][1]['content'];
+
+            return str_contains($user, 'Um carro anda a 20 m/s por 5 s.')
+                && ! str_contains($user, 'Quanto é 2 + 2?')
+                && str_contains($user, "100 m  [CORRETA]")
+                && str_contains($user, "<<<DADOS:DISCIPLINA>>>\n{$physicsName}\n")
+                && str_contains($user, 'Cinemática')
+                && str_contains($user, 'Banca: CESPE')
+                && str_contains($user, 'Ano: 2019')
+                && str_contains($user, 'Prova de origem: Simulado CESPE 2019');
+        });
+        $this->assertSame('Quanto é 2 + 2?', $source->fresh()->question_text);
+        $this->assertSame($math->id, $source->fresh()->subject_id);
+        $this->assertSame(2, $source->options()->count());
+    }
+
+    public function test_autofill_fills_year_from_statement_header_or_source_exam_name(): void
+    {
+        $this->tenantKey();
+        $this->fakeAi([
+            'question_text' => 'Quanto é 2 + 2?', 'type' => 'multiple_choice', 'explanation' => '4',
+            'options' => [['option_text' => '4', 'is_correct' => true], ['option_text' => '5', 'is_correct' => false]],
+        ]);
+
+        $this->postJson('/api/question-bank/ai/autofill', ['question_text' => '(ENEM 2019) Quanto é 2 + 2?'])
+            ->assertOk()->assertJsonPath('body.year', 2019);
+        $this->postJson('/api/question-bank/ai/autofill', ['question_text' => 'Quanto é 2 + 2 na base dez?', 'source_exam_name' => 'Vestibular UFRGS 2018'])
+            ->assertOk()->assertJsonPath('body.year', 2018);
+        $this->postJson('/api/question-bank/ai/autofill', ['question_text' => 'Em 1945, quanto era 2 + 2?'])
+            ->assertOk()->assertJsonMissingPath('body.year');
     }
 
     public function test_similar_validates_params(): void

@@ -17,14 +17,38 @@ export async function aiAutofillQuestion(payload: {
   subject_ids?: number[];
   /** Disciplina já escolhida na questão: a IA mantém e só escolhe os assuntos dela. */
   subject_id?: number;
+  /** Nome da prova de origem: a API deduz o ano dele ("ENEM 2023") quando o enunciado não traz. */
+  source_exam_name?: string;
 }) {
   const { data } = await api.post("/question-bank/ai/autofill", payload, { timeout: 120000 });
   return data as { type: string; message: string; body: AiQuestionSuggestion };
 }
 
+/** Estado atual do formulário (inclui edições não salvas); substitui a questão gravada no prompt. */
+export type SimilarFormContext = {
+  type: "multiple_choice" | "essay";
+  question_text: string;
+  explanation: string;
+  image_url: string | null;
+  options: { option_text: string; is_correct: boolean }[];
+  subject_id: number | null;
+  topic_ids: number[];
+  board_id: number | null;
+  year: number | null;
+  exam_type_id: number | null;
+  tags: string[];
+  source_exam_name: string | null;
+};
+
 export async function aiSimilarQuestions(
   questionId: number,
-  params: { quantity: number; difficulty_id?: number | null; options_count?: number | null; instructions?: string },
+  params: {
+    quantity: number;
+    difficulty_id?: number | null;
+    options_count?: number | null;
+    instructions?: string;
+    context?: SimilarFormContext;
+  },
   withImage = false
 ) {
   const { data } = await api.post(`/question-bank/questions/${questionId}/ai/similar`, params, { timeout: withImage ? 900000 : 180000 });
@@ -41,6 +65,22 @@ export async function aiRegenerateImage(
     { content, instructions },
     { timeout: 900000 }
   );
+  return data as { type: string; message: string; body: AiImageReview };
+}
+
+/**
+ * Editor: nova versão da imagem do enunciado. A IA analisa a imagem atual com o enunciado e as alternativas
+ * do formulário e redesenha a figura com os mesmos dados. Não altera a questão; o editor decide se usa.
+ */
+export async function aiRedrawQuestionImage(payload: {
+  question_id?: number;
+  image_url: string;
+  type: "multiple_choice" | "essay";
+  question_text: string;
+  options: { option_text: string; is_correct: boolean }[];
+  instructions?: string;
+}) {
+  const { data } = await api.post("/question-bank/ai/redraw-image", payload, { timeout: 900000 });
   return data as { type: string; message: string; body: AiImageReview };
 }
 
