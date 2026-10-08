@@ -408,6 +408,8 @@ class QuestionBankPracticeTest extends TestCase
         $answer($joao, $qs[0]);
         $answer($joao, $qs[1]);
         $answer($maria, $qs[0]);
+        DB::table('practice_answers')->whereIn('student_id', [$maria->id, $joao->id])
+            ->update(['answered_at' => now()->subHours(26)]);
 
         $this->artisan('ranking:snapshot')->assertSuccessful();
         $snapshot = DB::table('vw_practice_ranking')

@@ -121,7 +121,7 @@ export function TopicRow({
   );
 }
 
-/** Seta da foto horária: positivo sobe, negativo desce. Sem foto ou sem mudança, não mostra nada. */
+/** Seta contra a foto de cerca de 24h atrás: positivo sobe, negativo desce. */
 export function RankMovement({ movement }: { movement?: number | null }) {
   const p = usePalette();
   if (movement == null || movement === 0) return null;

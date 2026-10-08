@@ -84,7 +84,7 @@ export function BancoRankingScreen() {
         ) : <Txt tone="subtle">{closed ? 'Ninguém respondeu questões na semana anterior.' : 'Ninguém respondeu questões neste período ainda.'}</Txt>}
         <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 19 }}>
           Conta quantas questões diferentes cada aluno respondeu no banco (prática e simulados do banco). Repetir a mesma questão não sobe posição.
-          A seta compara com a última atualização, feita de hora em hora.
+          A seta compara com a posição de cerca de 24 horas atrás e a foto é atualizada de hora em hora.
         </Txt>
       </>
     );
