@@ -17,7 +17,7 @@ import { examCardProps, isClosed, isDone, isUpcoming, daysLeft } from '../../sim
 import type { SimuladoListItem } from '../../../services/simulados.service';
 import {
   AppBar, Button, Card, EmptyState, ExamCard, Icon, IconButton, LinkButton, Overline, ScreenBody, Section, SegmentedControl,
-  StatTile, Tag, Txt, radius, space, type, usePalette,
+  StatTile, Tag, Txt, radius, space, type, usePalette, useLayoutMode,
 } from '../../../ui';
 
 type DashboardPeriod = 'month' | 'all';
@@ -38,6 +38,18 @@ function getInitials(name: string): string {
 }
 
 const fmt = (v: number, digits = 1) => v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: digits });
+
+/** Turmas de todas as matrículas ativas, sem repetir (pacote traz várias; plano, a turma da matrícula). */
+function enrollmentClasses(enrollments: StudentActiveEnrollment[] | undefined): { id: number; name: string; course: string | null }[] {
+  const seen = new Map<number, { id: number; name: string; course: string | null }>();
+  for (const e of enrollments ?? []) {
+    const list = e.school_classes.length > 0
+      ? e.school_classes.map((c) => ({ id: c.id, name: c.name, course: c.course?.name ?? null }))
+      : e.school_class ? [{ id: e.school_class.id, name: e.school_class.name, course: e.course?.name ?? null }] : [];
+    list.forEach((c) => { if (!seen.has(c.id)) seen.set(c.id, c); });
+  }
+  return [...seen.values()];
+}
 
 /** Próximo simulado a fazer: em andamento primeiro, depois o de prazo mais curto. */
 function nextExam(list: SimuladoListItem[]): SimuladoListItem | null {
@@ -73,6 +85,7 @@ export function HomeScreen() {
   const { user, refreshUserProfile } = useAuth();
   const navigation = useNavigation<any>();
   const drawer = useOptionalAlunoDrawer();
+  const { isMobile } = useLayoutMode();
   const isAluno = user?.role === 'aluno';
 
   const { data: simulados = [], refetch: refetchSimulados, isRefetching } = useSimuladosList();
@@ -150,6 +163,7 @@ export function HomeScreen() {
   const avatarUrl = avatarOverrideUrl ?? (user as any)?.photo_url ?? (user as any)?.avatar_url ?? null;
   const enrollment = primaryActiveEnrollment(dashboard?.active_enrollments);
   const matricula = user?.student?.enrollment_number ?? enrollment?.enrollment_number ?? null;
+  const classes = enrollmentClasses(dashboard?.active_enrollments);
   const rawFirst = (user?.name ?? '').trim().split(/\s+/)[0] ?? '';
   // Cadastros em CAIXA ALTA: a saudação usa só a inicial maiúscula.
   const firstName = rawFirst ? rawFirst.charAt(0).toLocaleUpperCase('pt-BR') + rawFirst.slice(1).toLocaleLowerCase('pt-BR') : 'aluno';
@@ -165,7 +179,7 @@ export function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <AppBar
-        leading={drawer ? <IconButton icon="menu" label="Abrir menu" variant="outline" onPress={drawer.open} /> : undefined}
+        leading={drawer && isMobile ? <IconButton icon="menu" label="Abrir menu" variant="outline" onPress={drawer.open} /> : undefined}
         trailing={isAluno ? <IconButton icon="bell" label={unread ? `Notificações, ${unread} não lidas` : 'Notificações'} badge={unread > 0} onPress={() => navigation.navigate('Notificacoes')} /> : null}
       />
       <ScrollView
@@ -176,10 +190,17 @@ export function HomeScreen() {
           {/* Olá */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], marginTop: space[1] }}>
             <Pressable accessibilityRole="button" accessibilityLabel="Alterar foto de perfil" disabled={avatarUploading || !isAluno} onPress={pickPhoto}
-              style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {avatarUploading ? <ActivityIndicator color={p.brand} />
-                : avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 52, height: 52 }} />
-                : <Text style={{ fontFamily: type.display.fontFamily, fontSize: 16, color: p.inkMuted }}>{getInitials(user?.name ?? 'U')}</Text>}
+              style={{ width: 52, height: 52 }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {avatarUploading ? <ActivityIndicator color={p.brand} />
+                  : avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 52, height: 52 }} />
+                  : <Text style={{ fontFamily: type.display.fontFamily, fontSize: 16, color: p.inkMuted }}>{getInitials(user?.name ?? 'U')}</Text>}
+              </View>
+              {isAluno && !avatarUploading ? (
+                <View style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: p.surface, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="camera" size={12} color={p.inkMuted} />
+                </View>
+              ) : null}
               {Platform.OS === 'web' ? (
                 // @ts-ignore — input HTML só existe no react-native-web
                 <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
@@ -220,6 +241,34 @@ export function HomeScreen() {
           ) : null}
 
           {isAluno ? <WeeklyCalendarWidget /> : null}
+
+          {/* Turmas das matrículas ativas (pacote mostra todas as incluídas) */}
+          {isAluno && classes.length > 0 ? (
+            <Section title={classes.length === 1 ? 'Minha turma' : 'Minhas turmas'}>
+              <Card style={{ gap: space[3] }}>
+                {enrollment?.bundle ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], flexWrap: 'wrap' }}>
+                    <Tag tone="neutral" icon="grid" label="Pacote" />
+                    <Txt variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>{enrollment.bundle.name}</Txt>
+                    {enrollment.bundle.cycle_label ? (
+                      <Txt variant="bodySm" tone="subtle">· Cobrança {enrollment.bundle.cycle_label.toLowerCase()}</Txt>
+                    ) : null}
+                  </View>
+                ) : null}
+                {classes.map((c) => (
+                  <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+                    <View style={{ width: 32, height: 32, borderRadius: radius.sm, backgroundColor: p.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="graduation" size={16} color={p.inkMuted} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Txt variant="label" numberOfLines={2}>{c.name}</Txt>
+                      {c.course ? <Txt variant="bodySm" tone="subtle" numberOfLines={1}>{c.course}</Txt> : null}
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            </Section>
+          ) : null}
 
           {/* Desempenho */}
           {isAluno ? (

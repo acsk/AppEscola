@@ -16,7 +16,9 @@ import { AlunoDrawerProvider } from '../../context/AlunoDrawerContext';
 import { TenantThemeProvider } from '../../context/TenantThemeContext';
 import { AlunoDrawer } from '../../components/navigation/AlunoDrawer';
 import { StatusBar } from 'expo-status-bar';
-import { TabBar, usePalette, type TabItem } from '../../ui';
+import { TabBar, useLayoutMode, usePalette, type TabItem } from '../../ui';
+import { AlunoShell } from '../aluno/AlunoShell';
+import { FOCUS_SCREENS } from '../aluno/menu';
 
 export type AlunoTabParamList = {
   Home: undefined;
@@ -48,12 +50,22 @@ const TAB_ROOT: Record<string, string | undefined> = { Questoes: 'BancoQuestoes'
 const Tab = createBottomTabNavigator<AlunoTabParamList>();
 const Stack = createNativeStackNavigator<AlunoStackParamList>();
 
+type TabSnapshot = { index: number; routes: Array<{ state?: { index?: number; routes?: Array<{ name?: string }> } }> };
+function isFocusTabState(state: TabSnapshot) {
+  const inner = state.routes[state.index]?.state;
+  const name = inner?.routes?.[inner.index ?? 0]?.name;
+  return !!name && FOCUS_SCREENS.has(name);
+}
+
 function AlunoTabs() {
   const palette = usePalette();
+  const { isMobile } = useLayoutMode();
   return (
     <Tab.Navigator
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: palette.bg } }}
-      tabBar={({ state, navigation }) => (
+      // Tab bar só no celular; do tablet em diante a navegação é a SideNav (AlunoShell).
+      // Telas de foco (responder simulado/sessão) também escondem a tab bar.
+      tabBar={({ state, navigation }) => !isMobile || isFocusTabState(state) ? null : (
         <TabBar
           items={TABS}
           activeKey={state.routes[state.index]?.name ?? 'Home'}
@@ -79,19 +91,21 @@ export function AlunoStack() {
     <TenantThemeProvider>
       <AlunoDrawerProvider>
         <StatusBar style="dark" />
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            animation: 'slide_from_right',
-            animationTypeForReplace: 'push',
-          }}
-        >
-          <Stack.Screen name="AlunoTabs" component={AlunoTabs} />
-          <Stack.Screen name="AlterarSenha" component={AlterarSenhaScreen} />
-          <Stack.Screen name="Notificacoes" component={NotificationsListScreen} />
-          <Stack.Screen name="NotificacaoDetalhe" component={NotificationDetailScreen} />
-          <Stack.Screen name="Calendario" component={CalendarScreen} />
-        </Stack.Navigator>
+        <AlunoShell>
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              animationTypeForReplace: 'push',
+            }}
+          >
+            <Stack.Screen name="AlunoTabs" component={AlunoTabs} />
+            <Stack.Screen name="AlterarSenha" component={AlterarSenhaScreen} />
+            <Stack.Screen name="Notificacoes" component={NotificationsListScreen} />
+            <Stack.Screen name="NotificacaoDetalhe" component={NotificationDetailScreen} />
+            <Stack.Screen name="Calendario" component={CalendarScreen} />
+          </Stack.Navigator>
+        </AlunoShell>
         <AlunoDrawer />
       </AlunoDrawerProvider>
     </TenantThemeProvider>

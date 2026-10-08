@@ -20,7 +20,7 @@ import { invalidateSimuladosQueries } from '../hooks';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import {
   AnswerOption, BottomBar, Button, Card, IconButton, Notice, ProgressBar, QuestionNavigator, ScreenBody, Sheet, Tag, Txt,
-  layout, radius, space, subjectColor, type, usePalette,
+  layout, radius, space, subjectColor, type, usePalette, useLayoutMode, Kbd, Overline, Icon,
 } from '../../../ui';
 
 type Props = NativeStackScreenProps<SimuladosStackParamList, 'SimuladoExam'>;
@@ -68,6 +68,10 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [atual, setAtual] = useState(0);
   const [mapaAberto, setMapaAberto] = useState(false);
+  /** "Revisar depois": marcação local (não vai para a API). */
+  const [marcadas, setMarcadas] = useState<number[]>([]);
+  const { isDesktop } = useLayoutMode();
+  const alternarMarcada = (index: number) => setMarcadas((prev) => (prev.includes(index) ? prev.filter((n) => n !== index) : [...prev, index]));
   const scrollRef = useRef<ScrollView>(null);
   const bypassRemoveRef = useRef(false);
   const tempoEsgotadoRef = useRef(false);
@@ -258,6 +262,8 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
       if (!q) return;
       if (event.key === 'ArrowRight') irPara(atual + 1);
       else if (event.key === 'ArrowLeft') irPara(atual - 1);
+      else if (event.key === 'Enter') { if (atual >= questoes.length - 1) handleFinalizar(); else irPara(atual + 1); }
+      else if (event.key === 'r' || event.key === 'R') alternarMarcada(atual + 1);
       else if (q.type === 'multiple_choice') {
         const idx = LETTERS.indexOf(event.key.toUpperCase());
         const op = q.options[idx];
@@ -371,6 +377,114 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   const exigeTexto = q.type === 'essay' || opcaoSelecionada?.triggers_text_input || (q.allow_text_answer && resposta.optionId !== undefined);
   const finalizando = fase === 'finalizando';
   const urgente = secondsLeft !== null && secondsLeft <= 60;
+  const respondidasIdx = questoes.map((x, i) => (isQuestaoRespondida(x, respostas[x.id]) ? i + 1 : 0)).filter(Boolean);
+  const lastLetter = LETTERS[Math.max(0, q.options.length - 1)] ?? 'D';
+
+  const alternativas = (
+    <>
+      {q.type === 'multiple_choice' ? (
+        <View accessibilityRole="radiogroup" style={{ gap: 10 }}>
+          {q.options.map((op, i) => (
+            <AnswerOption key={op.id} letter={LETTERS[i] ?? String(i + 1)} state={resposta.optionId === op.id ? 'selected' : 'default'}
+              onPress={() => setResposta(q.id, { ...resposta, optionId: op.id, textAnswer: op.triggers_text_input || q.allow_text_answer ? resposta.textAnswer : undefined })}>
+              <Txt><RichText value={op.option_text} /></Txt>
+            </AnswerOption>
+          ))}
+        </View>
+      ) : null}
+      {exigeTexto ? (
+        <TextInput
+          multiline
+          textAlignVertical="top"
+          value={resposta.textAnswer ?? ''}
+          onChangeText={(v) => setResposta(q.id, { ...resposta, textAnswer: v })}
+          placeholder={q.type === 'essay' ? 'Digite sua resposta…' : opcaoSelecionada?.triggers_text_input ? 'Especifique sua resposta…' : 'Justifique sua resposta…'}
+          placeholderTextColor={p.inkSubtle}
+          accessibilityLabel="Sua resposta"
+          style={[type.body, { minHeight: 140, padding: space[3], borderRadius: radius.md, borderWidth: 1, borderColor: p.lineStrong, backgroundColor: p.surface, color: p.ink }]}
+        />
+      ) : null}
+    </>
+  );
+
+  // Desktop (protótipo "DesktopResponder"): modo foco, questão no centro e mapa à direita.
+  if (isDesktop) {
+    return (
+      <View style={{ flex: 1, backgroundColor: p.bg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[6], paddingVertical: space[3], paddingHorizontal: space[6], backgroundColor: p.surface, borderBottomWidth: 1, borderBottomColor: p.line }}>
+          <View style={{ flex: 1, alignItems: 'flex-start' }}>
+            <Button variant="ghost" size="sm" icon="x" label="Pausar e sair" onPress={sair} />
+          </View>
+          <View style={{ width: 560, maxWidth: '50%', gap: 6 }}>
+            <Txt variant="label" numberOfLines={1} style={{ textAlign: 'center', fontFamily: type.button.fontFamily }}>{detalhe.title}</Txt>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+              <View style={{ flex: 1 }}><ProgressBar value={respondidas} max={questoes.length} size="sm" label="Progresso" /></View>
+              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{respondidas} de {questoes.length}</Txt>
+            </View>
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: space[4] }}>
+            {secondsLeft !== null ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="clock" size={18} color={urgente ? p.dangerInk : p.inkMuted} />
+                <Txt variant="titleSm" style={{ fontSize: 15, color: urgente ? p.dangerInk : p.inkMuted, fontVariant: ['tabular-nums'] }}>{formatTimerSeconds(secondsLeft)}</Txt>
+              </View>
+            ) : null}
+            <Button variant="secondary" size="sm" label="Finalizar" loading={finalizando} onPress={handleFinalizar} />
+          </View>
+        </View>
+        <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 48, paddingTop: space[8], paddingHorizontal: space[8], paddingBottom: 48 }}>
+            <View style={{ flex: 1, maxWidth: layout.readingMax, gap: 18 }}>
+              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontFamily: type.button.fontFamily, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {atual + 1}</Txt>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -6 }}>
+                {q.subject ? <Tag tone="outline" dot={subjectColor(p, q.subject.id)} label={q.subject.name} /> : null}
+                <Tag label={q.type === 'essay' ? 'Discursiva' : 'Objetiva'} />
+                <Tag label={`${q.points} ${q.points === 1 ? 'ponto' : 'pontos'}`} />
+              </View>
+              <Txt variant="reading" style={{ fontSize: 18, lineHeight: 29 }}><RichText value={q.question_text} /></Txt>
+              {q.image_url ? <QuestionImage uri={q.image_url} /> : null}
+              {alternativas}
+              {erroMsg ? <Notice tone="danger" title="Confira antes de entregar" text={erroMsg} /> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: 6 }}>
+                <Button variant="ghost" icon="arrow-left" label="Anterior" disabled={atual === 0} onPress={() => irPara(atual - 1)} />
+                <Button variant="ghost" icon="flag" label={marcadas.includes(atual + 1) ? 'Desmarcar revisão' : 'Revisar depois'} onPress={() => alternarMarcada(atual + 1)} />
+                <View style={{ flex: 1 }} />
+                {!ultima ? <Button variant="ghost" label="Pular" onPress={() => irPara(atual + 1)} /> : null}
+                {ultima
+                  ? <Button size="lg" icon="check" label="Entregar simulado" loading={finalizando} onPress={handleFinalizar} />
+                  : <Button size="lg" iconRight="arrow-right" label="Confirmar resposta" disabled={!isQuestaoRespondida(q, respostas[q.id])} onPress={() => irPara(atual + 1)} />}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Kbd>A</Kbd><Txt variant="bodySm" tone="subtle">–</Txt><Kbd>{lastLetter}</Kbd><Txt variant="bodySm" tone="subtle"> marcar   </Txt>
+                <Kbd>Enter</Kbd><Txt variant="bodySm" tone="subtle"> confirmar   </Txt>
+                <Kbd>R</Kbd><Txt variant="bodySm" tone="subtle"> revisar depois   </Txt>
+                <Kbd>←</Kbd><Kbd>→</Kbd><Txt variant="bodySm" tone="subtle"> navegar</Txt>
+              </View>
+            </View>
+            <View style={{ width: layout.asideW, gap: space[4] }}>
+              <Card style={{ gap: 14 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <Txt variant="titleSm">Questões</Txt>
+                  <Txt variant="caption" tone="subtle">{respondidas} respondidas · {questoes.length - respondidas} em branco</Txt>
+                </View>
+                <QuestionNavigator total={questoes.length} current={atual + 1} answered={respondidasIdx} flagged={marcadas} onSelect={(n) => irPara(n - 1)} />
+              </Card>
+              <Card style={{ gap: 10 }}>
+                <Overline>Sobre esta questão</Overline>
+                {[['Disciplina', q.subject?.name ?? '—'], ['Tipo', q.type === 'essay' ? 'Discursiva' : 'Objetiva'], ['Vale', `${q.points} ${q.points === 1 ? 'ponto' : 'pontos'}`]].map(([l, v]) => (
+                  <View key={l} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Txt tone="muted" style={{ fontSize: 14 }}>{l}</Txt>
+                    <Txt variant="label">{v}</Txt>
+                  </View>
+                ))}
+              </Card>
+            </View>
+          </View>
+        </ScrollView>
+        {confirmModal}
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
@@ -383,6 +497,8 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
           </Text>
           <ProgressBar value={respondidas} max={questoes.length} size="sm" label="Questões respondidas" />
         </View>
+        <IconButton icon="flag" label={marcadas.includes(atual + 1) ? 'Desmarcar revisão' : 'Revisar depois'} color={marcadas.includes(atual + 1) ? p.accent : undefined}
+          onPress={() => alternarMarcada(atual + 1)} />
         <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapaAberto(true)} />
       </View>
 
@@ -396,29 +512,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
           <Txt variant="reading"><RichText value={q.question_text} /></Txt>
           {q.image_url ? <QuestionImage uri={q.image_url} /> : null}
 
-          {q.type === 'multiple_choice' ? (
-            <View accessibilityRole="radiogroup" style={{ gap: 10 }}>
-              {q.options.map((op, i) => (
-                <AnswerOption key={op.id} letter={LETTERS[i] ?? String(i + 1)} state={resposta.optionId === op.id ? 'selected' : 'default'}
-                  onPress={() => setResposta(q.id, { ...resposta, optionId: op.id, textAnswer: op.triggers_text_input || q.allow_text_answer ? resposta.textAnswer : undefined })}>
-                  <Txt><RichText value={op.option_text} /></Txt>
-                </AnswerOption>
-              ))}
-            </View>
-          ) : null}
-
-          {exigeTexto ? (
-            <TextInput
-              multiline
-              textAlignVertical="top"
-              value={resposta.textAnswer ?? ''}
-              onChangeText={(v) => setResposta(q.id, { ...resposta, textAnswer: v })}
-              placeholder={q.type === 'essay' ? 'Digite sua resposta…' : opcaoSelecionada?.triggers_text_input ? 'Especifique sua resposta…' : 'Justifique sua resposta…'}
-              placeholderTextColor={p.inkSubtle}
-              accessibilityLabel="Sua resposta"
-              style={[type.body, { minHeight: 140, padding: space[3], borderRadius: radius.md, borderWidth: 1, borderColor: p.lineStrong, backgroundColor: p.surface, color: p.ink }]}
-            />
-          ) : null}
+          {alternativas}
 
           {Platform.OS === 'web' ? <Txt variant="bodySm" tone="subtle">Atalhos: A–E marca a alternativa · ← → navega entre as questões</Txt> : null}
           {erroMsg ? <Notice tone="danger" title="Confira antes de entregar" text={erroMsg} /> : null}
@@ -437,8 +531,8 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
 
       <Sheet visible={mapaAberto} title="Mapa das questões" onClose={() => setMapaAberto(false)}
         footer={<Button block size="lg" icon="check" label="Entregar simulado" loading={finalizando} onPress={handleFinalizar} />}>
-        <QuestionNavigator total={questoes.length} current={atual + 1}
-          answered={questoes.map((x, i) => (isQuestaoRespondida(x, respostas[x.id]) ? i + 1 : 0)).filter(Boolean)}
+        <QuestionNavigator total={questoes.length} current={atual + 1} flagged={marcadas}
+          answered={respondidasIdx}
           onSelect={(n) => { irPara(n - 1); setMapaAberto(false); }} />
       </Sheet>
       {confirmModal}

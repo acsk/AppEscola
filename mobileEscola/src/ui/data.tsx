@@ -246,31 +246,37 @@ export function QuickAction({ icon = 'play', title, subtitle, progress, onPress 
 const Q_STATUS = { new: { t: 'Nova', tone: 'outline' as TagTone, icon: undefined }, right: { t: 'Acertou', tone: 'success' as TagTone, icon: 'check' as IconName }, wrong: { t: 'Errou', tone: 'danger' as TagTone, icon: 'x' as IconName } };
 
 export function QuestionRow({
-  id, subject, subjectColor, topic, text, difficulty, source, rate, status = 'new', saved, onToggleSave, onPress,
+  id, subject, subjectColor, topic, text, difficulty, source, rate, status = 'new', saved, onToggleSave, onPress, compact,
 }: {
   id?: number | string; subject: string; subjectColor?: string; topic?: string | null; text: string; difficulty?: string | null; source?: string | null;
   rate?: number | null; status?: 'new' | 'right' | 'wrong'; saved?: boolean; onToggleSave?: () => void; onPress?: () => void;
+  /** Lista do celular: padding menor e sem o assunto na linha de cima. */
+  compact?: boolean;
 }) {
   const p = usePalette();
   const s = Q_STATUS[status];
+  // O botão de salvar fica fora do Pressable da linha (na web, botão dentro de botão é inválido).
   return (
+    <View style={{ position: 'relative' }}>
     <Pressable accessibilityRole="button" onPress={onPress}
-      style={({ pressed }) => ({ gap: space[2], padding: space[4], borderRadius: radius.lg, borderWidth: 1, borderColor: p.line, backgroundColor: pressed ? p.surfaceSunken : p.surface })}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+      style={({ pressed }) => ({ gap: space[2], paddingVertical: compact ? space[3] : space[4], paddingHorizontal: space[4], borderRadius: radius.lg, borderWidth: 1, borderColor: p.line, backgroundColor: pressed ? p.surfaceSunken : p.surface })}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingRight: onToggleSave ? 26 : 0 }}>
         <Dot color={subjectColor ?? p.inkSubtle} />
         <Text numberOfLines={1} style={[type.caption, { fontFamily: type.button.fontFamily, textTransform: 'uppercase', letterSpacing: 0.48, color: p.inkMuted, flexShrink: 1 }]}>{subject}</Text>
-        {topic ? <Txt variant="bodySm" tone="subtle" numberOfLines={1} style={{ flexShrink: 1 }}>{topic}</Txt> : null}
+        {topic && !compact ? <Txt variant="bodySm" tone="muted" numberOfLines={1} style={{ flexShrink: 1, fontFamily: type.label.fontFamily }}>·  {topic}</Txt> : null}
         <View style={{ flex: 1 }} />
         <Tag tone={s.tone} icon={s.icon} label={s.t} />
-        {onToggleSave ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={saved ? 'Remover dos salvos' : 'Salvar questão'} accessibilityState={{ selected: !!saved }} hitSlop={8} onPress={onToggleSave}>
-            <Icon name="bookmark" size={18} color={saved ? p.brandInk : p.inkSubtle} />
-          </Pressable>
-        ) : null}
       </View>
       <Txt numberOfLines={2}>{text}</Txt>
       <Txt variant="bodySm" tone="subtle">{[id != null ? `#${id}` : null, difficulty, source, rate != null ? `${rate}% acertam` : null].filter(Boolean).join('  ·  ')}</Txt>
     </Pressable>
+    {onToggleSave ? (
+      <Pressable accessibilityRole="button" accessibilityLabel={saved ? 'Remover dos salvos' : 'Salvar questão'} accessibilityState={{ selected: !!saved }} hitSlop={8} onPress={onToggleSave}
+        style={{ position: 'absolute', right: space[4] - 4, top: (compact ? space[3] : space[4]) - 1, width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="bookmark" size={18} color={saved ? p.brandInk : p.inkSubtle} />
+      </Pressable>
+    ) : null}
+    </View>
   );
 }
 
@@ -304,7 +310,9 @@ export function QuestionNavigator({
       </View>
       {legend ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[4] }}>
-          {[['Respondida', p.brandSoft, p.brand], ['Atual', p.surfaceInverse, p.surfaceInverse], ['Em branco', p.surface, p.lineStrong]].map(([l, bg, b]) => (
+          {(right.length || wrong.length
+            ? [['Certa', p.successSoft, p.success], ['Errada', p.dangerSoft, p.danger], ['Atual', p.surfaceInverse, p.surfaceInverse], ['Sem resposta', p.surface, p.lineStrong]]
+            : [['Respondida', p.brandSoft, p.brand], ['Atual', p.surfaceInverse, p.surfaceInverse], ['Em branco', p.surface, p.lineStrong]]).map(([l, bg, b]) => (
             <View key={l} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: bg, borderWidth: 1.5, borderColor: b }} />
               <Txt variant="bodySm" tone="subtle">{l}</Txt>

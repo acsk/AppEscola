@@ -314,6 +314,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('aluno/practice/next-question',                 [StudentPracticeController::class, 'nextQuestion']);
     Route::post('aluno/practice/questions/{question}/answer',  [StudentPracticeController::class, 'answerQuestion'])->whereNumber('question');
     Route::get('aluno/practice/summary',                       [StudentPracticeController::class, 'summary']);
+    Route::get('aluno/practice/questions',                     [StudentPracticeController::class, 'questions']);
+    Route::get('aluno/practice/facets',                        [StudentPracticeController::class, 'facets']);
+    Route::post('aluno/practice/questions/{question}/save',    [StudentPracticeController::class, 'saveQuestion'])->whereNumber('question');
+    Route::delete('aluno/practice/questions/{question}/save',  [StudentPracticeController::class, 'unsaveQuestion'])->whereNumber('question');
+    Route::post('aluno/practice/sessions',                     [StudentPracticeController::class, 'startSession']);
     Route::get('aluno/question-sets',                          [StudentPracticeController::class, 'sets']);
     Route::post('aluno/question-sets/{set}/start',             [StudentPracticeController::class, 'startSet'])->whereNumber('set');
     Route::get('aluno/practice-attempts/{attempt}',            [StudentPracticeController::class, 'showAttempt'])->whereNumber('attempt');

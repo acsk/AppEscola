@@ -101,7 +101,7 @@ export function WeeklyCalendarWidget({ enabled = true }: Props) {
                 <Icon name={EVENT_ICON[event.type] ?? 'calendar'} size={18} color={p.inkMuted} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt variant="label" numberOfLines={1}>{event.type === 'exam' ? `Simulado: ${event.title}` : event.title}</Txt>
+                <Txt variant="label" numberOfLines={1}>{event.type === 'exam' && !/^simulado\b/i.test(event.title) ? `Simulado: ${event.title}` : event.title}</Txt>
                 <Txt variant="bodySm" tone="subtle" numberOfLines={1}>
                   {dayLabel} · {formatEventTime(event)}{event.location ? ` · ${event.location}` : ''}
                 </Txt>

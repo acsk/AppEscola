@@ -4,3 +4,6 @@ export * from './theme';
 export * from './primitives';
 export * from './navigation';
 export * from './data';
+export * from './layout';
+export * from './SideNav';
+export * from './desktop';

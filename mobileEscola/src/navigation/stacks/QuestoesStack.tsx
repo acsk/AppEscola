@@ -39,7 +39,7 @@ export function QuestoesNavigator() {
     >
       <Stack.Screen name="BancoQuestoes" component={BancoQuestoesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BancoPraticar" component={BancoPraticarScreen} options={{ title: 'Praticar questões' }} />
-      <Stack.Screen name="BancoSimulado" component={BancoSimuladoScreen} options={{ title: 'Simulado do banco' }} />
+      <Stack.Screen name="BancoSimulado" component={BancoSimuladoScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BancoDesempenho" component={BancoDesempenhoScreen} options={{ title: 'O que estudar' }} />
       <Stack.Screen name="BancoRanking" component={BancoRankingScreen} options={{ title: 'Ranking' }} />
     </Stack.Navigator>

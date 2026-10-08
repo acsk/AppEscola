@@ -6,6 +6,7 @@ use App\Exceptions\QuestionBankException;
 use App\Models\ExamQuestion;
 use App\Models\PracticeAnswer;
 use App\Models\PracticeAttempt;
+use App\Models\PracticeSavedQuestion;
 use App\Models\QuestionSet;
 use App\Models\Student;
 use App\Models\Subject;
@@ -75,7 +76,7 @@ class PracticeService
      * Questões avulsas que o aluno pode praticar (banco + simulados oficiais encerrados), só das disciplinas
      * da grade das suas turmas. Sem grade cadastrada nas turmas, vale o banco inteiro da escola (o app não fica vazio).
      */
-    private function practicableFor(Student $student): Builder
+    public function practicableFor(Student $student): Builder
     {
         $subjectIds = $this->enrollments->activeSubjectIdsForStudent($student);
 
@@ -165,25 +166,86 @@ class PracticeService
         ]);
     }
 
-    /** Questões da tentativa (sem gabarito enquanto aberta) e as respostas já marcadas. */
+    /** Questões de uma sessão montada pelo aluno, na ordem sorteada (só as que seguem praticáveis). */
+    private function sessionQuestions(PracticeAttempt $attempt): Builder
+    {
+        $ids = array_map('intval', $attempt->question_ids ?? []);
+
+        return ExamQuestion::query()->practiceAvailable((int) $attempt->tenant_id)
+            ->whereIn('exam_questions.id', $ids ?: [0])
+            ->when($ids, fn (Builder $q) => $q->orderByRaw('FIELD(exam_questions.id, '.implode(',', $ids).')'))
+            ->select('exam_questions.*');
+    }
+
+    /** Questões da tentativa: simulado do banco ou sessão. */
+    private function attemptQuestions(PracticeAttempt $attempt): ?Builder
+    {
+        if ($attempt->isSession()) {
+            return $this->sessionQuestions($attempt);
+        }
+
+        return $attempt->questionSet ? $this->sets->practicableQuery($attempt->questionSet) : null;
+    }
+
+    /** Questões da tentativa (sem gabarito enquanto aberta, salvo correção a cada questão) e as respostas marcadas. */
     public function attemptPayload(PracticeAttempt $attempt): array
     {
         $set = $attempt->questionSet;
-        $questions = $set ? $this->sets->practicableQuery($set)->with(self::QUESTION_RELATIONS)->get() : collect();
+        $query = $this->attemptQuestions($attempt);
+        $questions = $query ? $query->with(self::QUESTION_RELATIONS)->get() : collect();
         $answers = $attempt->answers()->get()->keyBy('exam_question_id');
         $finished = $attempt->isFinished();
+        $each = $attempt->correctsEachQuestion();
+        $saved = PracticeSavedQuestion::query()->where('student_id', $attempt->student_id)
+            ->whereIn('exam_question_id', $questions->pluck('id'))->pluck('exam_question_id')->flip();
 
         return [
             'attempt' => $this->attemptSummary($attempt),
             'question_set' => $set ? ['id' => $set->id, 'title' => $set->title, 'description' => $set->description] : null,
-            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished) {
+            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished, $each, $saved) {
                 $answer = $answers->get($question->id);
+                $reveal = $finished || ($each && $answer);
 
                 return $this->questionPayload($question) + [
                     'selected_option_id' => $answer?->option_id,
-                ] + ($finished ? $this->feedback($question, $answer?->option_id, (bool) $answer?->is_correct) : []);
+                    'saved'              => $saved->has($question->id),
+                ] + ($reveal ? $this->feedback($question, $answer?->option_id, (bool) $answer?->is_correct) : []);
             })->values(),
         ];
+    }
+
+    /**
+     * Sessão montada pelo aluno (protótipo "Montar sessão"): sorteia `quantity` questões do filtro
+     * (null = todas, até 100) e guarda a ordem. Correção a cada questão ou no final; cronômetro opcional.
+     */
+    public function startSession(Student $student, array $filters, ?int $quantity, string $correctionMode, ?int $secondsPerQuestion, string $title, PracticeCatalogService $catalog): PracticeAttempt
+    {
+        $ids = $catalog->drawIds($student, $filters, min($quantity ?? 100, 100));
+        if (! $ids) {
+            throw new QuestionBankException('Nenhuma questão encontrada com esses filtros.');
+        }
+
+        return PracticeAttempt::create([
+            'tenant_id'            => $student->tenant_id,
+            'student_id'           => $student->id,
+            'kind'                 => PracticeAttempt::KIND_SESSION,
+            'title'                => mb_substr($title, 0, 255),
+            'question_ids'         => $ids,
+            'filters'              => $filters,
+            'correction_mode'      => $correctionMode,
+            'seconds_per_question' => $secondsPerQuestion,
+            'question_count'       => count($ids),
+            'started_at'           => now(),
+        ]);
+    }
+
+    /** Sessão aberta mais recente (atalho "Continuar sessão"). */
+    public function openSession(Student $student): ?array
+    {
+        $attempt = PracticeAttempt::query()->where('student_id', $student->id)->where('kind', PracticeAttempt::KIND_SESSION)
+            ->whereNull('finished_at')->latest('id')->first();
+
+        return $attempt ? $this->attemptSummary($attempt) : null;
     }
 
     /** Marca (ou troca) a resposta de uma questão do simulado; a correção só aparece ao finalizar. */
@@ -192,11 +254,13 @@ class PracticeService
         if ($attempt->isFinished()) {
             throw QuestionBankException::conflict('Este simulado já foi finalizado.');
         }
-        $question = $attempt->questionSet
-            ? $this->sets->practicableQuery($attempt->questionSet)->with('options')->find($questionId)
-            : null;
+        $query = $this->attemptQuestions($attempt);
+        $question = $query?->with('options')->find($questionId);
         if (! $question) {
             throw new QuestionBankException('Esta questão não faz parte do simulado.', 404);
+        }
+        if ($attempt->correctsEachQuestion() && $attempt->answers()->where('exam_question_id', $question->id)->exists()) {
+            throw QuestionBankException::conflict('Esta questão já foi respondida e corrigida.');
         }
         PracticeAnswer::updateOrCreate(
             ['practice_attempt_id' => $attempt->id, 'exam_question_id' => $question->id],
@@ -210,14 +274,24 @@ class PracticeService
         );
     }
 
+    /** Correção de uma questão já respondida (sessão com correção a cada questão). */
+    public function feedbackInAttempt(PracticeAttempt $attempt, int $questionId): ?array
+    {
+        if (! $attempt->correctsEachQuestion()) {
+            return null;
+        }
+        $question = $this->attemptQuestions($attempt)?->with('options')->find($questionId);
+        $answer = $attempt->answers()->where('exam_question_id', $questionId)->first();
+
+        return $question && $answer ? $this->feedback($question, $answer->option_id, (bool) $answer->is_correct) : null;
+    }
+
     public function finishAttempt(PracticeAttempt $attempt): PracticeAttempt
     {
         if ($attempt->isFinished()) {
             return $attempt;
         }
-        $questionIds = $attempt->questionSet
-            ? $this->sets->practicableQuery($attempt->questionSet)->pluck('exam_questions.id')
-            : collect();
+        $questionIds = $this->attemptQuestions($attempt)?->pluck('exam_questions.id') ?? collect();
         $answers = $attempt->answers()->whereIn('exam_question_id', $questionIds)->get();
         $attempt->update([
             'question_count' => $questionIds->count(),
@@ -237,6 +311,7 @@ class PracticeService
         $correct = (clone $answers)->where('practice_answers.is_correct', true)->count();
 
         return [
+            'open_session' => $this->openSession($student),
             'answered'    => $answered,
             'correct'     => $correct,
             'accuracy'    => $answered > 0 ? round($correct / $answered * 100, 1) : null,
@@ -244,7 +319,7 @@ class PracticeService
                 ->with('questionSet:id,title')->latest('finished_at')->limit(10)->get()
                 ->map(fn (PracticeAttempt $a) => [
                     'attempt_id'  => $a->id,
-                    'title'       => $a->questionSet?->title ?? 'Simulado excluído',
+                    'title'       => $a->title ?? $a->questionSet?->title ?? 'Simulado excluído',
                     'correct'     => $a->correct_count,
                     'total'       => $a->question_count,
                     'finished_at' => $a->finished_at?->toIso8601String(),
@@ -275,6 +350,10 @@ class PracticeService
         return [
             'id'              => $attempt->id,
             'question_set_id' => $attempt->question_set_id,
+            'kind'            => $attempt->kind ?? PracticeAttempt::KIND_SET,
+            'title'           => $attempt->title ?? $attempt->questionSet?->title,
+            'correction_mode' => $attempt->correction_mode ?? 'end',
+            'seconds_per_question' => $attempt->seconds_per_question,
             'question_count'  => $attempt->question_count,
             'answered_count'  => $attempt->isFinished() ? $attempt->answered_count : $attempt->answers()->count(),
             'correct_count'   => $attempt->isFinished() ? $attempt->correct_count : null,

@@ -59,6 +59,13 @@ export interface QuestionSetSummary {
 export interface PracticeAttemptSummary {
   id: number;
   question_set_id: number | null;
+  /** 'set' = simulado do banco; 'session' = sessão montada pelo aluno. */
+  kind?: 'set' | 'session';
+  title?: string | null;
+  /** 'each' = correção a cada questão; 'end' = no final. */
+  correction_mode?: 'each' | 'end';
+  /** Cronômetro opcional (segundos por questão). */
+  seconds_per_question?: number | null;
   question_count: number;
   answered_count: number;
   correct_count: number | null;
@@ -66,7 +73,7 @@ export interface PracticeAttemptSummary {
   finished_at: string | null;
 }
 
-export type AttemptQuestion = PracticeQuestion & { selected_option_id: number | null } & Partial<PracticeFeedback>;
+export type AttemptQuestion = PracticeQuestion & { selected_option_id: number | null; saved?: boolean } & Partial<PracticeFeedback>;
 
 export interface PracticeAttemptPayload {
   attempt: PracticeAttemptSummary;
@@ -75,6 +82,8 @@ export interface PracticeAttemptPayload {
 }
 
 export interface PracticeSummary {
+  /** Sessão em andamento (atalho "Continuar sessão"). */
+  open_session?: PracticeAttemptSummary | null;
   answered: number;
   correct: number;
   accuracy: number | null;
@@ -175,8 +184,8 @@ export async function fetchPracticeAttempt(attemptId: number): Promise<PracticeA
   return data.body;
 }
 
-export async function answerInPracticeAttempt(attemptId: number, questionId: number, optionId: number): Promise<PracticeAttemptSummary> {
-  const { data } = await api.post<Envelope<PracticeAttemptSummary>>(`/api/aluno/practice-attempts/${attemptId}/answer`, {
+export async function answerInPracticeAttempt(attemptId: number, questionId: number, optionId: number): Promise<PracticeAttemptSummary & { feedback?: PracticeFeedback }> {
+  const { data } = await api.post<Envelope<PracticeAttemptSummary & { feedback?: PracticeFeedback }>>(`/api/aluno/practice-attempts/${attemptId}/answer`, {
     question_id: questionId,
     option_id: optionId,
   });
@@ -203,3 +212,84 @@ export const LEVEL_COLOR: Record<PerformanceLevel, string> = {
   attention: '#F59E0B',
   good: '#22C55E',
 };
+
+
+// ── Catálogo do banco (lista, filtros com contagem, salvas, sessões) ─────────
+
+export type PracticeSituation = 'all' | 'unanswered' | 'wrong' | 'saved';
+
+export interface CatalogFilters {
+  search?: string;
+  subject_ids?: number[];
+  topic_ids?: number[];
+  situation?: PracticeSituation;
+  difficulty_id?: number | null;
+  years?: number[];
+  year_before?: number | null;
+}
+
+export interface CatalogQuestion {
+  id: number;
+  text: string;
+  has_image: boolean;
+  subject: { id: number; name: string } | null;
+  topic: string | null;
+  difficulty: string | null;
+  source: string | null;
+  year: number | null;
+  /** % da turma que acerta (null com poucas respostas). */
+  rate: number | null;
+  status: 'new' | 'right' | 'wrong';
+  saved: boolean;
+}
+
+export interface CatalogFacets {
+  total: number;
+  subjects: Array<{ id: number; name: string; color: string | null; total: number }>;
+  topics: Array<{ id: number; name: string; subject_id: number; total: number }>;
+  situations: Record<PracticeSituation, number>;
+  difficulties: Array<{ id: number; name: string; total: number }>;
+  years: Array<{ year: number; total: number }>;
+}
+
+export interface CatalogPage {
+  total: number;
+  page: number;
+  last_page: number;
+  items: CatalogQuestion[];
+  facets?: CatalogFacets;
+}
+
+/** Parâmetros sem vazios (axios serializa arrays como subject_ids[]=…). */
+export function catalogParams(filters: CatalogFilters): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(filters).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0) && v !== 'all'));
+}
+
+export async function fetchPracticeQuestions(filters: CatalogFilters, page = 1, sort: 'recent' | 'oldest' = 'recent', withFacets = false): Promise<CatalogPage> {
+  const { data } = await api.get<Envelope<CatalogPage>>('/api/aluno/practice/questions', {
+    params: { ...catalogParams(filters), page, sort, ...(withFacets ? { facets: 1 } : {}) },
+  });
+  return data.body;
+}
+
+export async function fetchPracticeFacets(filters: CatalogFilters): Promise<CatalogFacets> {
+  const { data } = await api.get<Envelope<CatalogFacets>>('/api/aluno/practice/facets', { params: catalogParams(filters) });
+  return data.body;
+}
+
+export async function setQuestionSaved(questionId: number, saved: boolean): Promise<void> {
+  if (saved) await api.post(`/api/aluno/practice/questions/${questionId}/save`);
+  else await api.delete(`/api/aluno/practice/questions/${questionId}/save`);
+}
+
+export interface SessionOptions {
+  quantity: 10 | 20 | 30 | null;
+  correction_mode: 'each' | 'end';
+  timed: boolean;
+  title?: string;
+}
+
+export async function startPracticeSession(filters: CatalogFilters, options: SessionOptions): Promise<PracticeAttemptPayload> {
+  const { data } = await api.post<Envelope<PracticeAttemptPayload>>('/api/aluno/practice/sessions', { ...catalogParams(filters), ...options });
+  return data.body;
+}

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   answerInPracticeAttempt,
   answerPracticeQuestion,
@@ -11,6 +11,12 @@ import {
   finishPracticeAttempt,
   startQuestionSet,
   type RankingPeriod,
+  type CatalogFilters,
+  type SessionOptions,
+  fetchPracticeQuestions,
+  fetchPracticeFacets,
+  setQuestionSaved,
+  startPracticeSession,
 } from '../../../services/practice.service';
 import { bancoKeys } from '../queryKeys';
 
@@ -84,6 +90,45 @@ export function useFinishAttempt(attemptId: number) {
       queryClient.invalidateQueries({ queryKey: bancoKeys.summary() });
       queryClient.invalidateQueries({ queryKey: bancoKeys.performance() });
       queryClient.invalidateQueries({ queryKey: [...bancoKeys.all, 'ranking'] });
+    },
+  });
+}
+
+
+/** Lista do catálogo, 20 por página ("Ver mais questões"). */
+export function usePracticeCatalog(filters: CatalogFilters, sort: 'recent' | 'oldest' = 'recent') {
+  return useInfiniteQuery({
+    queryKey: bancoKeys.catalog(filters, sort),
+    queryFn: ({ pageParam }) => fetchPracticeQuestions(filters, pageParam, sort),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page < last.last_page ? last.page + 1 : undefined),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Quantas questões cada opção de filtro traz com os demais aplicados. */
+export function usePracticeFacets(filters: CatalogFilters) {
+  return useQuery({ queryKey: bancoKeys.facets(filters), queryFn: () => fetchPracticeFacets(filters), placeholderData: keepPreviousData });
+}
+
+export function useToggleSavedQuestion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ questionId, saved }: { questionId: number; saved: boolean }) => setQuestionSaved(questionId, saved),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...bancoKeys.all, 'catalog'] });
+      queryClient.invalidateQueries({ queryKey: [...bancoKeys.all, 'facets'] });
+    },
+  });
+}
+
+export function useStartPracticeSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ filters, options }: { filters: CatalogFilters; options: SessionOptions }) => startPracticeSession(filters, options),
+    onSuccess: (payload) => {
+      queryClient.setQueryData(bancoKeys.attempt(payload.attempt.id), payload);
+      queryClient.invalidateQueries({ queryKey: bancoKeys.summary() });
     },
   });
 }
