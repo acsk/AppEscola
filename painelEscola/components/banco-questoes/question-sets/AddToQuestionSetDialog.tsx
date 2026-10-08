@@ -14,7 +14,9 @@ const MAX_QUESTIONS = 200;
 
 type Props = {
   visible: boolean;
+  /** Só avulsas: as de simulado oficial já foram separadas (`blockedCount`). */
   questionIds: number[];
+  blockedCount?: number;
   onCancel: () => void;
   /** Questões adicionadas: abre o simulado para revisar/publicar. */
   onDone: (set: QuestionSet) => void;
@@ -41,7 +43,7 @@ function Choice({ on, title, onPress }: { on: boolean; title: string; onPress: (
 }
 
 /** Monta um simulado do banco com as questões selecionadas (novo ou acrescentando a um existente). */
-export default function AddToQuestionSetDialog({ visible, questionIds, onCancel, onDone, setToast }: Props) {
+export default function AddToQuestionSetDialog({ visible, questionIds, blockedCount = 0, onCancel, onDone, setToast }: Props) {
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [title, setTitle] = useState("");
   const [setId, setSetId] = useState("");
@@ -89,9 +91,15 @@ export default function AddToQuestionSetDialog({ visible, questionIds, onCancel,
           </>
         }>
         <Text className="text-[13px] text-ink-muted">
-          {questionIds.length} questão(ões) selecionada(s). Só entram questões avulsas desta escola; as questões continuam no
-          banco e o simulado fica em rascunho até você publicar.
+          {questionIds.length} questão(ões) avulsa(s) selecionada(s). As questões continuam no banco e o simulado fica em
+          rascunho até você publicar.
         </Text>
+        {blockedCount > 0 && (
+          <Text className="text-xs text-warning mt-2">
+            {blockedCount} questão(ões) selecionada(s) pertence(m) a simulado oficial e ficou(aram) de fora: só questões avulsas
+            entram em simulados do banco.
+          </Text>
+        )}
         {tooMany && (
           <Text className="text-xs text-danger mt-2">Selecione no máximo {MAX_QUESTIONS} questões por vez.</Text>
         )}

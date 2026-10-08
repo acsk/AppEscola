@@ -271,7 +271,12 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createSimuladoDetalheStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { examId } = route.params;
+  const examIdValido = Number.isInteger(examId) && examId > 0;
   const { width } = useWindowDimensions();
+
+  useEffect(() => {
+    if (!examIdValido) navigation.replace('SimuladosList');
+  }, [examIdValido, navigation]);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [erroPdf, setErroPdf] = useState<string | null>(null);

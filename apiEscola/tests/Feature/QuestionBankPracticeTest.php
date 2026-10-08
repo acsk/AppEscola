@@ -95,10 +95,11 @@ class QuestionBankPracticeTest extends TestCase
         $official->update(['exam_id' => $exam->id]);
         $foreign = $this->practicable('Outra escola', tenantId: Tenant::factory()->create()->id);
 
-        foreach ([$official->id, $foreign->id] as $badId) {
-            $this->postJson('/api/question-bank/question-sets', ['title' => 'X', 'question_ids' => [$a->id, $badId]])
-                ->assertStatus(422);
-        }
+        $message = fn (int $badId) => $this->postJson('/api/question-bank/question-sets', ['title' => 'X', 'question_ids' => [$a->id, $badId]])
+            ->assertStatus(422)->json('message');
+        $this->assertStringContainsString("#{$official->id} já pertence(m) a simulado oficial (\"Oficial\")", $message($official->id));
+        $this->assertStringContainsString("#{$foreign->id} não existe(m) ou não é(são) desta escola", $message($foreign->id));
+        $this->assertSame(0, \App\Models\QuestionSet::count());
 
         $id = $this->postJson('/api/question-bank/question-sets', ['title' => 'Revisão', 'question_ids' => [$a->id, $b->id]])
             ->assertCreated()

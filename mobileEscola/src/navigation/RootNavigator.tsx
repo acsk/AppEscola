@@ -41,6 +41,24 @@ const linking: LinkingOptions<any> = {
                 parse: { pastExamId: (id: string) => Number(id) },
                 stringify: { pastExamId: (id: number) => String(id) },
               },
+              // Toda tela da pilha precisa de caminho próprio: sem ele, a URL usa o nome da tela
+              // (ex.: simulados/BancoQuestoes) e, ao recarregar, cai em ':examId' com examId = NaN.
+              SimuladoResult: {
+                path: 'resultado/:attemptId',
+                parse:     { attemptId: (id: string) => Number(id) },
+                stringify: { attemptId: (id: number) => String(id) },
+              },
+              BancoQuestoes: 'banco',
+              BancoPraticar: {
+                path: 'banco/praticar',
+                parse: { subjectId: (id: string) => Number(id), topicId: (id: string) => Number(id) },
+              },
+              BancoSimulado: {
+                path: 'banco/simulado',
+                parse: { setId: (id: string) => Number(id), attemptId: (id: string) => Number(id) },
+              },
+              BancoDesempenho: 'banco/desempenho',
+              BancoRanking: 'banco/ranking',
               SimuladoDetalhe: {
                 path: ':examId',
                 parse:     { examId: (id: string) => Number(id) },

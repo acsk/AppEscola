@@ -8,6 +8,7 @@ use App\Models\QuestionSet;
 use App\Models\QuestionSetItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -154,6 +155,33 @@ class QuestionSetService
             ->select('exam_questions.*');
     }
 
+    /**
+     * Simulado do banco só referencia questões avulsas: as de simulado oficial já pertencem a ele
+     * (e o aluno não pode ver o gabarito delas fora do simulado).
+     */
+    private function assertStandalone(array $ids, Collection $rows): void
+    {
+        $label = fn (array $list) => implode(', ', array_map(fn ($id) => "#{$id}", array_slice($list, 0, 10)))
+            .(count($list) > 10 ? ' e outras '.(count($list) - 10) : '');
+        $problems = [];
+
+        $inExam = $rows->whereNotNull('exam_id');
+        if ($inExam->isNotEmpty()) {
+            $titles = $inExam->map(fn (ExamQuestion $q) => $q->exam?->title)->filter()->unique()->take(3)->implode('", "');
+            $problems[] = "{$label($inExam->pluck('id')->all())} já pertence(m) a simulado oficial"
+                .($titles !== '' ? " (\"{$titles}\")" : '')
+                .'. Só questões avulsas entram em simulados do banco';
+        }
+        $missing = array_values(array_diff($ids, $rows->pluck('id')->map(fn ($id) => (int) $id)->all()));
+        if ($missing !== []) {
+            $problems[] = "{$label($missing)} não existe(m) ou não é(são) desta escola";
+        }
+
+        if ($problems !== []) {
+            throw new QuestionBankException('Não foi possível adicionar ao simulado do banco: '.implode('; ', $problems).'.');
+        }
+    }
+
     private function appendItems(QuestionSet $set, array $questionIds, ?int $examTypeId): void
     {
         $ids = array_values(array_unique(array_map('intval', $questionIds)));
@@ -166,15 +194,12 @@ class QuestionSetService
             throw new QuestionBankException('Um simulado do banco pode ter no máximo '.self::MAX_QUESTIONS.' questões.');
         }
 
-        $found = ExamQuestion::query()
+        $rows = ExamQuestion::query()
             ->where('tenant_id', $set->tenant_id)
-            ->whereNull('exam_id')
             ->whereIn('id', $ids)
-            ->pluck('id')
-            ->all();
-        if (count($found) !== count($ids)) {
-            throw new QuestionBankException('Há questões que não existem, não são desta escola ou pertencem a um simulado oficial.');
-        }
+            ->with('exam:id,title')
+            ->get(['id', 'exam_id']);
+        $this->assertStandalone($ids, $rows);
 
         $next = (int) QuestionSetItem::where('question_set_id', $set->id)->max('position');
         $now = now();

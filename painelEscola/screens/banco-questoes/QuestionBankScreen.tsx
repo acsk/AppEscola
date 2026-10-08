@@ -75,7 +75,7 @@ const LIST_HASH = "#/questoes";
 const DENSITY_KEY = "questoes_densidade";
 const SEARCH_DEBOUNCE_MS = 300;
 
-const COL = { select: 40, number: 110, board: 150, difficulty: 150, status: 130, actions: 44 };
+const COL = { select: 40, number: 150, board: 150, difficulty: 150, status: 130, actions: 44 };
 
 function readStateFromHash(): QuestionBankListState {
   return parseListState(typeof window === "undefined" ? "" : hashQuery(window.location.hash));
@@ -100,7 +100,8 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const [importPdfOpen, setImportPdfOpen] = useState(false);
   const [importedExamsOpen, setImportedExamsOpen] = useState(false);
   const [questionSetsOpen, setQuestionSetsOpen] = useState(false);
-  const [addToSetOpen, setAddToSetOpen] = useState(false);
+  const [addToSet, setAddToSet] = useState<{ ids: number[]; blocked: number } | null>(null);
+  const [checkingAddToSet, setCheckingAddToSet] = useState(false);
   const [addedSetId, setAddedSetId] = useState<number | null>(null);
   const [rankingOpen, setRankingOpen] = useState(false);
   const [resumeImportId, setResumeImportId] = useState<string | null>(null);
@@ -234,6 +235,33 @@ export default function QuestionBankScreen({ navigate }: Props) {
       showApiErrorToast(setToast, error, "Não foi possível selecionar todas as questões.");
     } finally {
       setSelectingAll(false);
+    }
+  };
+
+  /**
+   * Simulado do banco só aceita avulsas: separa as selecionadas que estão em simulado oficial.
+   * A seleção sempre está dentro dos filtros atuais (é limpa quando eles mudam).
+   */
+  const openAddToSet = async () => {
+    setCheckingAddToSet(true);
+    try {
+      const { ids } = await fetchQuestionBankIds({ ...toApiParams(state, { paginate: false }), origin: "simulado" });
+      const official = new Set(ids);
+      const allowed = Array.from(selected).filter((id) => !official.has(id));
+      const blocked = selected.size - allowed.length;
+      if (allowed.length === 0) {
+        setToast({
+          visible: true,
+          type: "error",
+          message: `${blocked === 1 ? "A questão selecionada pertence" : `As ${blocked} questões selecionadas pertencem`} a simulado oficial. Só questões avulsas entram em simulados do banco.`,
+        });
+        return;
+      }
+      setAddToSet({ ids: allowed, blocked });
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível verificar as questões selecionadas.");
+    } finally {
+      setCheckingAddToSet(false);
     }
   };
 
@@ -531,11 +559,14 @@ export default function QuestionBankScreen({ navigate }: Props) {
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
-                onPress={() => setAddToSetOpen(true)}
-                aria-label="Em massa: adicionar a simulado do banco"
+                onPress={() => void openAddToSet()}
+                disabled={checkingAddToSet}
+                aria-label="Em massa: adicionar a simulado do banco (só questões avulsas)"
                 className="px-3 py-1.5 rounded-ds-md bg-brand border border-brand"
               >
-                <Text className="text-xs font-semibold text-on-brand">Adicionar a simulado</Text>
+                <Text className="text-xs font-semibold text-on-brand">
+                  {checkingAddToSet ? "Verificando..." : "Adicionar a simulado"}
+                </Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={() => setSelected(new Set())}>
@@ -628,11 +659,21 @@ export default function QuestionBankScreen({ navigate }: Props) {
                       }}
                       label={`Selecionar questão ${row.id}`}
                     />
-                    <View style={{ width: COL.number }}>
-                      <Text className={TABLE_CELL_SEMIBOLD}>#{row.id}</Text>
-                      <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
-                        {row.exam ? row.exam.title : row.source_exam_name || "Avulsa"}
-                      </Text>
+                    <View style={{ width: COL.number, flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8 }}>
+                      {row.exam && (
+                        <View
+                          role="img"
+                          aria-label={`Bloqueada: questão do simulado oficial "${row.exam.title}". Conteúdo não editável e não entra em simulados do banco.`}
+                        >
+                          <Ionicons name="lock-closed" size={24} color="var(--ds-warning)" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text className={TABLE_CELL_SEMIBOLD}>#{row.id}</Text>
+                        <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
+                          {row.exam ? row.exam.title : row.source_exam_name || "Avulsa"}
+                        </Text>
+                      </View>
                     </View>
                     <View style={{ flex: 1, minWidth: 280, paddingRight: 12 }}>
                       <TouchableOpacity onPress={() => openClassify(row.id)} role="link" aria-label={`Visualizar questão ${row.id}`}>
@@ -707,6 +748,15 @@ export default function QuestionBankScreen({ navigate }: Props) {
       <Modal visible={!!menuRow} title={menuRow ? `Questão #${menuRow.id}` : ""} onClose={() => setMenuRow(null)} size="sm" compact>
         {menuRow && (
           <View style={{ gap: 6 }}>
+            {menuRow.exam && (
+              <View className="flex-row items-start gap-3 px-3 py-2 rounded-ds-md bg-warning-tint mb-1">
+                <Ionicons name="lock-closed" size={28} color="var(--ds-warning)" />
+                <Text className="text-xs text-ink flex-1">
+                  Questão do simulado oficial "{menuRow.exam.title}". O conteúdo não pode ser editado aqui (só a classificação) e
+                  ela não pode ser incluída em simulados do banco.
+                </Text>
+              </View>
+            )}
             {(
               [
                 // Classificar e gerar semelhantes só na edição.
@@ -759,11 +809,12 @@ export default function QuestionBankScreen({ navigate }: Props) {
       />
 
       <AddToQuestionSetDialog
-        visible={addToSetOpen}
-        questionIds={Array.from(selected)}
-        onCancel={() => setAddToSetOpen(false)}
+        visible={addToSet !== null}
+        questionIds={addToSet?.ids ?? []}
+        blockedCount={addToSet?.blocked ?? 0}
+        onCancel={() => setAddToSet(null)}
         onDone={(set) => {
-          setAddToSetOpen(false);
+          setAddToSet(null);
           setSelected(new Set());
           setAddedSetId(set.id);
         }}
