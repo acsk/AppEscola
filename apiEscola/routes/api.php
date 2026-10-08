@@ -397,6 +397,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::get('ai/status', [QuestionAiController::class, 'status']);
         Route::middleware('throttle:30,1')->group(function () {
             Route::post('ai/autofill',                       [QuestionAiController::class, 'autofill']);
+            Route::post('ai/classify',                       [QuestionAiController::class, 'classify']);
             Route::post('ai/extract',                        [QuestionAiController::class, 'extract']);
             Route::post('ai/extract-pdf', [QuestionAiController::class, 'extractPdf']);
             Route::post('ai/separate-text', [QuestionAiController::class, 'separateText']);

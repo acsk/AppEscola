@@ -256,6 +256,46 @@ class QuestionAiTest extends TestCase
             && str_contains($r->url(), 'openrouter.ai'));
     }
 
+    // ── Classificação em lote ──────────────────────────────────────────────
+
+    public function test_bulk_classify_suggests_only_requested_fields_without_saving(): void
+    {
+        $this->tenantKey();
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $algebra = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $math->id, 'name' => 'Álgebra']);
+        $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português']);
+        $reading = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $portuguese->id, 'name' => 'Interpretação de texto']);
+        $difficulty = QuestionDifficulty::where('name', 'Média')->firstOrFail();
+        $base = ['tenant_id' => $this->tenant->id, 'exam_id' => null, 'type' => 'essay', 'points' => 1, 'order' => 1];
+        $withSubject = ExamQuestion::create($base + ['question_text' => 'Resolva 2x + 1 = 5.', 'subject_id' => $math->id]);
+        $withoutSubject = ExamQuestion::create($base + ['question_text' => 'Segundo o texto, o autor defende...']);
+        $foreign = ExamQuestion::create(['tenant_id' => Tenant::factory()->create()->id] + array_diff_key($base, ['tenant_id' => 1]) + ['question_text' => 'Outra escola']);
+
+        $this->fakeAi(['questions' => [
+            // Disciplina mantida: a IA tenta trocar para Português, mas só vale assunto da disciplina atual.
+            ['id' => $withSubject->id, 'subject_id' => $portuguese->id, 'topic_ids' => [$algebra->id, $reading->id], 'difficulty_id' => $difficulty->id],
+            ['id' => $withoutSubject->id, 'subject_id' => $portuguese->id, 'topic_ids' => [$reading->id]],
+        ]]);
+
+        $response = $this->postJson('/api/question-bank/ai/classify', [
+            'question_ids' => [$withSubject->id, $withoutSubject->id, $foreign->id], 'fields' => ['topics'],
+        ])->assertOk();
+
+        $response->assertJsonCount(2, 'body.items')
+            ->assertJsonPath('body.items.0.id', $withSubject->id)
+            ->assertJsonPath('body.items.0.suggestion', ['subject_id' => $math->id, 'topic_ids' => [$algebra->id]])
+            ->assertJsonPath('body.items.0.current.subject_id', $math->id)
+            ->assertJsonPath('body.items.1.suggestion', ['subject_id' => $portuguese->id, 'topic_ids' => [$reading->id]])
+            ->assertJsonMissingPath('body.items.0.suggestion.difficulty_id');
+        $this->assertNull($withoutSubject->fresh()->subject_id);
+        $this->assertSame(0, $withSubject->topics()->count());
+        Http::assertSent(fn (HttpRequest $r) => str_contains((string) json_encode($r->data(), JSON_UNESCAPED_UNICODE), 'Disciplina definida (não troque)'));
+
+        $this->postJson('/api/question-bank/ai/classify', ['question_ids' => [$withSubject->id], 'fields' => ['cor']])
+            ->assertStatus(422)->assertJsonValidationErrors('fields.0');
+        $this->postJson('/api/question-bank/ai/classify', ['question_ids' => [$foreign->id], 'fields' => ['topics']])->assertNotFound();
+    }
+
     public function test_autofill_derives_subject_from_chosen_topic(): void
     {
         $this->tenantKey();

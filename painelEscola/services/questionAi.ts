@@ -24,6 +24,27 @@ export async function aiAutofillQuestion(payload: {
   return data as { type: string; message: string; body: AiQuestionSuggestion };
 }
 
+export type AiClassifyField = "subject" | "topics" | "difficulty" | "board" | "year" | "tags";
+
+/** Classificação atual e sugerida de uma questão (a sugestão traz só os campos pedidos). */
+export type AiClassifyItem = {
+  id: number;
+  snippet: string;
+  note: string | null;
+  suggestion: Partial<{ subject_id: number; topic_ids: number[]; difficulty_id: number; board_id: number; year: number; tags: string[] }>;
+  current: { subject_id: number | null; topic_ids: number[]; difficulty_id: number | null; board_id: number | null; year: number | null; tags: string[] };
+};
+
+/** Até 10 questões por chamada (o modal envia a seleção em blocos). Não salva nada. */
+export async function aiClassifyQuestions(questionIds: number[], fields: AiClassifyField[], subjectId?: number | null) {
+  const { data } = await api.post(
+    "/question-bank/ai/classify",
+    { question_ids: questionIds, fields, subject_id: subjectId ?? undefined },
+    { timeout: 180000 }
+  );
+  return data.body.items as AiClassifyItem[];
+}
+
 /** Estado atual do formulário (inclui edições não salvas); substitui a questão gravada no prompt. */
 export type SimilarFormContext = {
   type: "multiple_choice" | "essay";

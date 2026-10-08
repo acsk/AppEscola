@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\AiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\QuestionAiAutofillRequest;
+use App\Http\Requests\QuestionAiClassifyRequest;
 use App\Http\Requests\QuestionAiExtractRequest;
 use App\Http\Requests\QuestionAiPdfRequest;
 use App\Http\Requests\QuestionAiSeparateTextRequest;
@@ -17,6 +18,7 @@ use App\Services\Ai\AiCredentialResolver;
 use App\Services\Ai\QuestionAiService;
 use App\Services\Ai\QuestionImageService;
 use App\Services\ExamAccessService;
+use App\Support\QuestionRichText;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,6 +54,44 @@ class QuestionAiController extends Controller
         $suggestion = $this->ai->autofill($request->user(), $tenantId, $request->validated());
 
         return $this->success($suggestion, 'Campos sugeridos pela IA. Revise antes de salvar.');
+    }
+
+    /** POST /question-bank/ai/classify — sugere só os campos pedidos para várias questões (não salva; o painel confirma). */
+    public function classify(QuestionAiClassifyRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validated();
+        $ids = array_map('intval', $data['question_ids']);
+        $questions = ExamQuestion::query()->inQuestionBank($tenantId)->whereIn('exam_questions.id', $ids)
+            ->with(['options', 'topics:id,subject_id', 'tags:id,name'])->get()
+            ->sortBy(fn ($q) => array_search((int) $q->id, $ids, true))->values();
+        if ($questions->isEmpty()) {
+            abort(404, 'Questões não encontradas.');
+        }
+
+        $items = $this->ai->classify(
+            $request->user(), $tenantId, $questions, $data['fields'],
+            isset($data['subject_id']) ? (int) $data['subject_id'] : null
+        );
+        $current = $questions->keyBy('id');
+        $items = array_map(function (array $item) use ($current) {
+            $q = $current->get($item['id']);
+
+            return $item + [
+                'snippet' => mb_substr(trim(preg_replace('/\s+/u', ' ', QuestionRichText::plain($q->question_text))), 0, 140),
+                'current' => [
+                    'subject_id' => $q->subject_id,
+                    'topic_ids' => $q->topics->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+                    'difficulty_id' => $q->difficulty_id,
+                    'board_id' => $q->board_id,
+                    'year' => $q->year,
+                    'tags' => $q->tags->pluck('name')->values()->all(),
+                ],
+            ];
+        }, $items);
+        $suggested = count(array_filter($items, fn ($i) => $i['suggestion'] !== []));
+
+        return $this->success(['items' => $items], "{$suggested} de ".count($items).' questão(ões) com sugestão. Revise antes de aplicar.');
     }
 
     /** POST /question-bank/ai/extract — estrutura questões a partir de blocos de texto de PDF (não salva). */

@@ -19,6 +19,7 @@ import {
 import DifficultyMeter from "../../components/banco-questoes/DifficultyMeter";
 import QuestionStatusBadge from "../../components/banco-questoes/QuestionStatusBadge";
 import BulkClassifyModal, { type BulkAction } from "../../components/banco-questoes/BulkClassifyModal";
+import AiBulkClassifyModal from "../../components/banco-questoes/AiBulkClassifyModal";
 import UndoToast from "../../components/banco-questoes/UndoToast";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useQuestionBankCatalogs, useSubjectTopics } from "../../hooks/useQuestionBankCatalogs";
@@ -343,16 +344,21 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
-  const applyBulk = async (patch: ClassificationPatch) => {
-    const ids = Array.from(selected);
+  const [aiBulkOpen, setAiBulkOpen] = useState(false);
+
+  const applyBulk = (patch: ClassificationPatch) => applyItems(buildBatchItems(Array.from(selected), patch));
+
+  /** Aplica no lote (manual: mesmo valor; IA: valor por questão) e oferece "Desfazer". */
+  const applyItems = async (items: BatchItem[]) => {
     setApplying(true);
-    setProgress({ done: 0, total: ids.length });
+    setProgress({ done: 0, total: items.length });
     try {
-      const results = await patchClassificationBatch(buildBatchItems(ids, patch), (done, all) =>
+      const results = await patchClassificationBatch(items, (done, all) =>
         setProgress({ done, total: all })
       );
       const summary = summarizeBatch(results);
       setBulkAction(null);
+      setAiBulkOpen(false);
       // Falhas continuam selecionadas para nova tentativa.
       setSelected(new Set(summary.failedIds));
       setUndo({
@@ -678,6 +684,14 @@ export default function QuestionBankScreen({ navigate }: Props) {
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
+                onPress={() => setAiBulkOpen(true)}
+                aria-label="Em massa: atualizar com IA"
+                className="flex-row items-center gap-1 px-3 py-1.5 rounded-ds-md bg-surface border border-brand"
+              >
+                <Sparkles size={13} color="var(--ds-brand)" strokeWidth={1.5} />
+                <Text className="text-xs font-semibold text-brand">Atualizar com IA</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => void openAddToSet()}
                 disabled={checkingAddToSet}
                 aria-label="Em massa: adicionar a simulado do banco (só questões avulsas)"
@@ -978,6 +992,17 @@ export default function QuestionBankScreen({ navigate }: Props) {
         progress={progress}
         onClose={() => setBulkAction(null)}
         onApply={(patch) => void applyBulk(patch)}
+      />
+
+      <AiBulkClassifyModal
+        visible={aiBulkOpen}
+        ids={Array.from(selected)}
+        catalogs={catalogs}
+        applying={applying}
+        progress={progress}
+        ensureAvailable={ensureAvailable}
+        onClose={() => setAiBulkOpen(false)}
+        onConfirm={(items) => void applyItems(items)}
       />
 
       <UndoToast

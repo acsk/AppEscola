@@ -169,6 +169,119 @@ class QuestionAiService
         return $content + $this->sanitizeClassification($raw, $catalogs, $onlySubjectId, $fallbackYear);
     }
 
+    /** Campos que a classificação em lote pode sugerir → chaves da sugestão. */
+    public const CLASSIFY_FIELDS = [
+        'subject' => 'subject_id',
+        'topics' => 'topic_ids',
+        'difficulty' => 'difficulty_id',
+        'board' => 'board_id',
+        'year' => 'year',
+        'tags' => 'tags',
+    ];
+
+    /**
+     * Classificação em lote: uma chamada para várias questões, só com os campos pedidos (não salva).
+     * Sem "subject" nos campos, a disciplina atual de cada questão é mantida e a IA só escolhe dentro dela;
+     * questão sem disciplina recebe também a disciplina (assunto não existe fora dela).
+     *
+     * @param  Collection<int, ExamQuestion>  $questions  com options, topics e tags carregados
+     * @param  string[]  $fields  chaves de CLASSIFY_FIELDS
+     * @return array<int, array{id: int, suggestion: array<string, mixed>, note: ?string}>
+     */
+    public function classify(?User $user, int $tenantId, Collection $questions, array $fields, ?int $subjectId = null): array
+    {
+        $credential = $this->credential($user, $tenantId);
+        $catalogs = $this->catalogs($tenantId);
+        if ($subjectId !== null) {
+            $catalogs = $this->restrictSubjects($catalogs, [$subjectId]);
+        }
+        $wantsSubject = in_array('subject', $fields, true);
+        $wantsTopics = in_array('topics', $fields, true);
+        $lockedSubject = fn (ExamQuestion $q) => $subjectId
+            ?? ($wantsSubject || ! $catalogs['subjects']->contains('id', (int) $q->subject_id) ? null : (int) $q->subject_id);
+        if ($subjectId === null && ! $wantsSubject && $questions->every(fn ($q) => $lockedSubject($q) !== null)) {
+            $catalogs = $this->restrictSubjects($catalogs, $questions->map($lockedSubject)->unique()->values()->all());
+        }
+
+        $blocks = $questions->map(function (ExamQuestion $q) use ($lockedSubject, $catalogs) {
+            $options = $q->options->map(fn ($o, $i) => chr(65 + $i).') '.mb_substr(trim(QuestionRichText::plain($o->option_text)), 0, 300))->implode("\n");
+            $locked = $lockedSubject($q);
+            $subjectName = $locked !== null ? $catalogs['subjects']->firstWhere('id', $locked)['name'] ?? '' : null;
+
+            return implode("\n", array_filter([
+                "QUESTÃO id={$q->id}",
+                $locked !== null ? "Disciplina definida (não troque): {$locked}: {$subjectName}" : null,
+                $q->image_url ? '(a questão tem imagem que você não vê)' : null,
+                AiPromptGuard::wrap('enunciado_'.$q->id, mb_substr(trim(QuestionRichText::plain($q->question_text)), 0, 2500)),
+                $options !== '' ? AiPromptGuard::wrap('alternativas_'.$q->id, $options) : null,
+            ]));
+        })->implode("\n\n");
+
+        $this->logSuspicious($tenantId, 'classify', $questions->map(fn ($q) => (string) $q->question_text)->all());
+
+        $asked = array_values(array_intersect_key(self::CLASSIFY_FIELDS, array_flip($fields)));
+        $rules = array_filter([
+            $wantsSubject || $wantsTopics
+                ? '- Disciplina/assuntos: use apenas ids da lista DISCIPLINAS E ASSUNTOS; os assuntos têm de ser da disciplina da questão '
+                    .'(a definida, quando houver). '.self::CLASSIFICATION_RULES
+                : null,
+            in_array('difficulty', $fields, true) ? '- "difficulty_id": dificuldade para um aluno de ensino médio/vestibular, da lista DIFICULDADES.' : null,
+            in_array('board', $fields, true) ? '- "board_id": só se a banca estiver explícita no enunciado (ex.: "(ENEM 2019)"); senão null.' : null,
+            in_array('year', $fields, true) ? '- "year": só se o ano da prova estiver explícito no enunciado; senão null.' : null,
+            in_array('tags', $fields, true) ? '- "tags": de 2 a 4 palavras-chave curtas do conteúdo cobrado, em minúsculas, sem repetir disciplina ou assunto.' : null,
+        ]);
+
+        $system = 'Você é um professor especialista em classificar questões de provas e vestibulares brasileiros. '
+            .'Responda somente com um objeto JSON válido.'."\n\n".AiPromptGuard::SYSTEM_RULES;
+        $prompt = implode("\n\n", array_filter([
+            'Classifique cada questão abaixo. Preencha SOMENTE os campos: '.implode(', ', $asked).'.',
+            "Regras:\n".implode("\n", $rules),
+            $this->catalogsPrompt($catalogs, array_values(array_filter([
+                ($wantsSubject || $wantsTopics) ? 'subjects' : null,
+                in_array('difficulty', $fields, true) ? 'difficulties' : null,
+                in_array('board', $fields, true) ? 'boards' : null,
+            ]))),
+            "QUESTÕES:\n".$blocks,
+            "Formato da resposta (um item por questão, com o mesmo id):\n".json_encode(['questions' => [[
+                'id' => 'int', 'subject_id' => 'int|null', 'subject_name' => 'string|null', 'topic_ids' => ['int'], 'topic_names' => ['string'],
+                'difficulty_id' => 'int|null', 'board_id' => 'int|null', 'year' => 'int|null', 'tags' => ['string'],
+            ]]], JSON_UNESCAPED_UNICODE),
+        ]));
+
+        $raw = $this->client->json($credential, $system, $prompt, 0.2);
+        $byId = collect((array) ($raw['questions'] ?? []))->filter(fn ($item) => is_array($item) && is_numeric($item['id'] ?? null))
+            ->keyBy(fn ($item) => (int) $item['id']);
+
+        return $questions->map(function (ExamQuestion $q) use ($byId, $catalogs, $fields, $lockedSubject, $wantsSubject, $wantsTopics) {
+            $item = $byId->get($q->id);
+            if ($item === null) {
+                return ['id' => $q->id, 'suggestion' => [], 'note' => 'A IA não devolveu sugestão para esta questão.'];
+            }
+            $fallbackYear = QuestionYear::detect([$q->question_text], [$q->source_exam_name]);
+            $sanitized = $this->sanitizeClassification($item, $catalogs, $lockedSubject($q), $fallbackYear);
+
+            $suggestion = [];
+            foreach (array_diff($fields, ['subject', 'topics']) as $field) {
+                $key = self::CLASSIFY_FIELDS[$field];
+                if (array_key_exists($key, $sanitized)) {
+                    $suggestion[$key] = $sanitized[$key];
+                }
+            }
+            // Assunto anda com a disciplina: o lote grava os dois juntos (o serviço valida a coerência).
+            $newSubject = $sanitized['subject_id'] ?? null;
+            $topicIds = $sanitized['topic_ids'] ?? [];
+            $subjectChanged = $newSubject !== null && (int) $newSubject !== (int) $q->subject_id;
+            if (($wantsSubject || $wantsTopics) && $newSubject !== null && ($subjectChanged || ($wantsTopics && $topicIds !== []))) {
+                $suggestion['subject_id'] = $newSubject;
+                if ($wantsTopics || $subjectChanged) {
+                    $suggestion['topic_ids'] = $topicIds; // disciplina trocada: os assuntos antigos deixam de valer
+                }
+            }
+
+            return ['id' => $q->id, 'suggestion' => $suggestion, 'note' => $suggestion === [] ? 'A IA não encontrou uma sugestão válida.' : null];
+        })->values()->all();
+    }
+
     /** Restringe disciplinas e assuntos às escolhidas (ids de outro tenant/inativos somem aqui). */
     private function restrictSubjects(array $catalogs, array $subjectIds): array
     {
