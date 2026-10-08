@@ -19,9 +19,11 @@ import { formatPercent } from '../lib/format';
 
 type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoDesempenho'>;
 
+const questions = (n: number) => `${n.toLocaleString('pt-BR')} ${n === 1 ? 'questão' : 'questões'}`;
+
 function scoreLine(score: PerformanceScore & { available: number }): string {
-  if (score.answered === 0) return `${score.available} questão${score.available !== 1 ? 'ões' : ''} para praticar`;
-  return `${score.correct} de ${score.answered} certas`;
+  if (score.answered === 0) return `${questions(score.available)} para praticar`;
+  return `${score.correct} de ${score.answered} ${score.answered === 1 ? 'certa' : 'certas'}`;
 }
 
 /** Desempenho na prática do banco por disciplina → assunto, com os assuntos que mais precisam de estudo. */
@@ -51,8 +53,8 @@ export function BancoDesempenhoScreen() {
 
   const focusReason = (item: StudyFocusItem) =>
     item.reason === 'low_accuracy'
-      ? `${formatPercent(item.accuracy)} de acerto em ${item.answered} questões`
-      : `Ainda não praticado · ${item.available} questão${item.available !== 1 ? 'ões' : ''}`;
+      ? `${formatPercent(item.accuracy)} de acerto em ${questions(item.answered)}`
+      : `Ainda não praticado · ${questions(item.available)}`;
 
   const renderSubject = (subject: PerformanceSubject) => {
     const key = String(subject.id ?? 'none');

@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
+import { bancoKeys } from '../../banco-questoes/queryKeys';
+import { HomeRankingCard } from '../components/HomeRankingCard';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
 import { compressImageToMaxSize } from '../../../services/image-compression.service';
@@ -67,6 +70,7 @@ export function HomeScreen() {
   const { isMobile } = useLayoutMode();
   const isAluno = user?.role === 'aluno';
 
+  const queryClient = useQueryClient();
   const { data: simulados = [], refetch: refetchSimulados, isRefetching } = useSimuladosList();
   const { data: unread = 0, refetch: refetchUnread } = useUnreadNotificationsCount(isAluno);
 
@@ -162,7 +166,11 @@ export function HomeScreen() {
       />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetchSimulados(); setReloadKey((k) => k + 1); }} tintColor={p.brand} colors={[p.brand]} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => {
+          void refetchSimulados();
+          void queryClient.invalidateQueries({ queryKey: [...bancoKeys.all, 'ranking'] });
+          setReloadKey((k) => k + 1);
+        }} tintColor={p.brand} colors={[p.brand]} />}
       >
         <ScreenBody>
           {/* Olá */}
@@ -269,6 +277,13 @@ export function HomeScreen() {
                   onPress={() => navigation.navigate('Desempenho')} />
               </Card>
             </Section>
+          ) : null}
+
+          {isAluno ? (
+            <HomeRankingCard
+              onOpen={() => navigation.navigate('Questoes', { screen: 'BancoRanking', initial: false })}
+              onPractice={() => navigation.navigate('Questoes', { screen: 'BancoQuestoes' })}
+            />
           ) : null}
 
           {/* Meus simulados */}
