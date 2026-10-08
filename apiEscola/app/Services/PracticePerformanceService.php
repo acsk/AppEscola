@@ -171,30 +171,45 @@ class PracticePerformanceService
     /** @return array<int, int> student_id => posição na foto usada pela seta (cerca de 24h atrás) */
     private function previousPositions(int $tenantId, string $period): array
     {
+        $baseline = $this->baselineCapturedAt($tenantId, $period);
+        if ($baseline !== null) {
+            return DB::table('practice_ranking_snapshots')
+                ->where('tenant_id', $tenantId)
+                ->where('period', $period)
+                ->where('captured_at', $baseline)
+                ->pluck('position', 'student_id')
+                ->mapWithKeys(fn ($position, $studentId) => [(int) $studentId => (int) $position])
+                ->all();
+        }
+
+        // As fotos recém-gravadas repetem o ranking de agora. Sem uma foto antiga, a posição de 24h atrás
+        // sai das respostas daquele momento — senão a seta compara o ranking com ele mesmo e some.
+        $positions = [];
+        foreach ($this->captureRows($tenantId, $period, now()->subDay()) as $row) {
+            $positions[$row['student_id']] = $row['position'];
+        }
+
+        return $positions;
+    }
+
+    private function baselineCapturedAt(int $tenantId, string $period): mixed
+    {
         $times = DB::table('practice_ranking_snapshots')
             ->where('tenant_id', $tenantId)
             ->where('period', $period)
             ->distinct()
             ->orderByDesc('captured_at')
             ->pluck('captured_at');
-        if ($times->isEmpty()) {
-            return [];
+        $hourAgo = now()->subHour()->getTimestamp();
+        $target = now()->subDay()->getTimestamp();
+        $older = $times->filter(fn ($capturedAt) => Carbon::parse($capturedAt)->getTimestamp() <= $hourAgo);
+        if ($older->isEmpty()) {
+            return null;
         }
 
-        $target = now()->subDay()->getTimestamp();
-        $hourAgo = now()->subHour()->getTimestamp();
-        $older = $times->filter(fn ($capturedAt) => Carbon::parse($capturedAt)->getTimestamp() <= $hourAgo);
-        $baseline = $older->isEmpty()
-            ? $times->first()
-            : $older->sortBy(fn ($capturedAt) => abs(Carbon::parse($capturedAt)->getTimestamp() - $target))->first();
+        $chosen = $older->sortBy(fn ($capturedAt) => abs(Carbon::parse($capturedAt)->getTimestamp() - $target))->first();
 
-        return DB::table('practice_ranking_snapshots')
-            ->where('tenant_id', $tenantId)
-            ->where('period', $period)
-            ->where('captured_at', $baseline)
-            ->pluck('position', 'student_id')
-            ->mapWithKeys(fn ($position, $studentId) => [(int) $studentId => (int) $position])
-            ->all();
+        return $chosen;
     }
 
     private function rankingRows(int $tenantId, ?Carbon $since, ?Carbon $until): Collection

@@ -30,7 +30,7 @@ class SnapshotPracticeRankingCommand extends Command
             ->where('captured_at', '<', now()->subHours(48))
             ->delete();
 
-        $this->info(($count + $backfill)." posição(ões) gravada(s). {$removed} antiga(s) removida(s).");
+        $this->info("Foto de agora: {$count}. Foto de 24h atrás: {$backfill}. Antigas removidas: {$removed}.");
 
         return self::SUCCESS;
     }
