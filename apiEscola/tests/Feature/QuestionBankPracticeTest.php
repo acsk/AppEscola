@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\ClassSchedule;
+use App\Models\Course;
+use App\Models\Enrollment;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Models\ExamType;
 use App\Models\Student;
+use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
 use App\Models\Tenant;
@@ -179,6 +183,44 @@ class QuestionBankPracticeTest extends TestCase
         $official = ExamQuestion::where('question_text', 'Oficial')->first();
         $this->postJson("/api/aluno/practice/questions/{$official->id}/answer", ['option_id' => $official->options()->value('id')])
             ->assertNotFound();
+    }
+
+    public function test_student_practices_only_subjects_from_their_class_schedule(): void
+    {
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática CPM']);
+        $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português CPM']);
+        $history = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'História']);
+        $m = $this->practicable('Mat', $math->id);
+        $this->practicable('Port', $portuguese->id);
+        $h = $this->practicable('Hist', $history->id);
+
+        $class = SchoolClass::factory()->create(['tenant_id' => $this->tenant->id, 'course_id' => Course::factory()->create(['tenant_id' => $this->tenant->id])->id]);
+        foreach ([$math, $portuguese] as $subject) {
+            ClassSchedule::factory()->create(['tenant_id' => $this->tenant->id, 'school_class_id' => $class->id, 'subject_id' => $subject->id]);
+        }
+        $other = SchoolClass::factory()->create(['tenant_id' => $this->tenant->id, 'course_id' => $class->course_id]);
+        ClassSchedule::factory()->create(['tenant_id' => $this->tenant->id, 'school_class_id' => $other->id, 'subject_id' => $history->id]);
+
+        $enrolled = $this->student();
+        Enrollment::factory()->create([
+            'tenant_id' => $this->tenant->id, 'student_id' => $enrolled->id, 'school_class_id' => $class->id,
+            'start_date' => now()->subMonth()->toDateString(), 'status' => 'active',
+        ]);
+        $this->actingAsStudent($enrolled);
+
+        $filters = $this->getJson('/api/aluno/practice/filters')->assertOk()->json('body');
+        $this->assertSame(2, $filters['total']);
+        $this->assertEqualsCanonicalizing([$math->id, $portuguese->id], array_column($filters['subjects'], 'id'));
+        for ($i = 0; $i < 5; $i++) {
+            $this->assertNotSame($h->id, $this->getJson('/api/aluno/practice/next-question')->assertOk()->json('body.id'));
+        }
+        $this->getJson("/api/aluno/practice/next-question?subject_id={$history->id}")->assertOk()->assertJsonPath('body', null);
+        $this->postJson("/api/aluno/practice/questions/{$h->id}/answer", ['option_id' => $this->correct($h)])->assertNotFound();
+        $this->postJson("/api/aluno/practice/questions/{$m->id}/answer", ['option_id' => $this->correct($m)])->assertOk();
+
+        // Sem turma com grade: o banco inteiro da escola continua disponível.
+        $this->actingAsStudent($this->student('JOÃO SEM TURMA'));
+        $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 3);
     }
 
     public function test_student_answers_published_set_and_gets_correction_only_after_finishing(): void

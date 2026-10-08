@@ -359,6 +359,15 @@ class QuestionAiService
             }
             $content = $this->sanitizeContent(['type' => $type] + $item, $type, $optionsCount ?: null);
             if ($content === null || trim(QuestionRichText::plain($content['question_text'])) === '') {
+                Log::warning('IA: questão semelhante descartada', [
+                    'tenant_id' => $tenantId,
+                    'source_id' => $source->id,
+                    'options' => is_array($item['options'] ?? null) ? count($item['options']) : null,
+                    'has_correct' => collect((array) ($item['options'] ?? []))
+                        ->contains(fn ($o) => is_array($o) && filter_var($o['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN)),
+                    'has_text' => $content !== null,
+                ]);
+
                 continue;
             }
             $suggested = array_intersect_key(
@@ -375,7 +384,7 @@ class QuestionAiService
         }
 
         if ($questions === []) {
-            throw AiException::invalidResponse();
+            throw AiException::invalidResponse('questões sem enunciado, alternativas ou gabarito');
         }
 
         return $questions;

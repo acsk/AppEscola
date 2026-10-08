@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\TenantAiCredential;
 use App\Models\User;
 use App\Services\Ai\QuestionImageStorage;
+use App\Support\QuestionImageSpec;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -94,6 +95,56 @@ class QuestionImageTest extends TestCase
             return isset($request['input_references'][0]['image_url']['url'])
                 && $request['provider']['allow_fallbacks'] === false;
         });
+    }
+
+    public function test_loose_visual_structures_from_the_model_are_normalized_instead_of_failing(): void
+    {
+        $analysis = array_replace($this->analysis(), [
+            'tipo' => 'Gráfico de barras', 'elementos_que_podem_mudar' => null, 'restricoes' => 'não revelar resposta',
+        ]);
+        $spec = [
+            'tipo' => 'GRAFICO_DE_BARRAS', 'descricao' => 'Barras com votos por candidato', 'objetivo' => '',
+            'elementos' => ['eixo x', ['tipo' => 'barra']],
+            'labels' => [['id' => 'barra1', 'text' => 'Candidato A: 6 cm'], '8 cm', ['valor' => 10]],
+        ];
+        $this->fakeProvider(Http::sequence()
+            ->push(['choices' => [['message' => ['content' => 'Segue a análise: '.json_encode($analysis).' Fim.']]]])
+            ->push($this->chat(['questions' => [[
+                'question_text' => 'Triângulo com 6 cm, 8 cm e 10 cm.', 'explanation' => 'Resposta secreta',
+                'possui_imagem' => true, 'image_spec' => $spec,
+            ]]]))
+            ->push($this->chat($this->valid())));
+
+        $response = $this->similar($this->source())->assertOk()
+            ->assertJsonPath('body.questions.0.image_generation.status', 'READY')
+            ->assertJsonPath('body.questions.0.image_generation.validation.confidence', 0.94);
+
+        $stored = QuestionImageGeneration::findOrFail($response->json('body.questions.0.generation_id'))->image_spec;
+        $this->assertSame('GRAFICO', $stored['tipo']);
+        $this->assertSame(['eixo x', 'e2'], array_column($stored['elementos'], 'id'));
+        $this->assertSame(['Candidato A: 6 cm', '8 cm', '10'], array_column($stored['labels'], 'texto'));
+        $this->assertSame('barra1', $stored['labels'][0]['elemento']);
+        $this->assertSame([], $stored['dados_visuais']);
+        $this->assertNotEmpty($stored['objetivo']);
+    }
+
+    public function test_unreadable_image_analysis_asks_for_a_better_image_instead_of_failing(): void
+    {
+        $this->fakePipeline(analysisOverrides: ['status' => 'needs_review', 'motivo' => null, 'descricao' => null]);
+
+        $this->similar($this->source())->assertStatus(422)
+            ->assertJsonPath('body.code', 'image_needs_review')
+            ->assertJsonPath('message', QuestionImageSpec::UNREADABLE);
+        Http::assertNotSent(fn (Request $request) => str_ends_with($request->url(), '/images'));
+    }
+
+    public function test_invalid_visual_structure_reports_the_failing_stage(): void
+    {
+        $this->fakePipeline(questionOverrides: ['image_spec' => ['tipo' => 'GRAFICO']]);
+
+        $this->similar($this->source())->assertStatus(502)
+            ->assertJsonPath('body.code', 'ai_invalid_response')
+            ->assertJsonPath('message', 'A IA devolveu a descrição da imagem fora do formato esperado. Tente novamente.');
     }
 
     public function test_question_without_image_keeps_original_flow(): void

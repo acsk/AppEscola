@@ -21,13 +21,15 @@ class PracticeService
 {
     private const QUESTION_RELATIONS = ['options', 'subject:id,name', 'topics:id,name', 'difficulty:id,name', 'examType:id,label'];
 
-    public function __construct(private readonly QuestionSetService $sets) {}
+    public function __construct(
+        private readonly QuestionSetService $sets,
+        private readonly StudentEnrollmentService $enrollments,
+    ) {}
 
     /** Disciplinas (e assuntos) com questões para praticar, com a quantidade de cada. */
     public function filters(Student $student): array
     {
-        $tenantId = (int) $student->tenant_id;
-        $base = fn () => ExamQuestion::query()->practicable($tenantId);
+        $base = fn () => $this->practicableFor($student);
 
         $subjects = $base()->whereNotNull('exam_questions.subject_id')
             ->select('exam_questions.subject_id', DB::raw('count(*) as total'))
@@ -56,7 +58,7 @@ class PracticeService
     /** Próxima questão avulsa pelos filtros, priorizando as que o aluno ainda não respondeu. */
     public function nextQuestion(Student $student, array $filters): ?ExamQuestion
     {
-        $query = ExamQuestion::query()->practicable((int) $student->tenant_id)
+        $query = $this->practicableFor($student)
             ->when($filters['subject_id'] ?? null, fn (Builder $q, $id) => $q->where('exam_questions.subject_id', $id))
             ->when($filters['difficulty_id'] ?? null, fn (Builder $q, $id) => $q->where('exam_questions.difficulty_id', $id))
             ->when($filters['topic_id'] ?? null, fn (Builder $q, $id) => $q->whereHas('topics', fn (Builder $t) => $t->where('subject_topics.id', $id)))
@@ -69,10 +71,22 @@ class PracticeService
         return $unseen ?? $query->inRandomOrder()->with(self::QUESTION_RELATIONS)->first();
     }
 
+    /**
+     * Questões avulsas que o aluno pode praticar: só das disciplinas da grade das suas turmas.
+     * Sem grade cadastrada nas turmas, vale o banco inteiro da escola (o app não fica vazio).
+     */
+    private function practicableFor(Student $student): Builder
+    {
+        $subjectIds = $this->enrollments->activeSubjectIdsForStudent($student);
+
+        return ExamQuestion::query()->practicable((int) $student->tenant_id)
+            ->when($subjectIds->isNotEmpty(), fn (Builder $q) => $q->whereIn('exam_questions.subject_id', $subjectIds));
+    }
+
     /** Responde uma questão avulsa: correção imediata. */
     public function answerQuestion(Student $student, int $questionId, int $optionId): array
     {
-        $question = ExamQuestion::query()->practicable((int) $student->tenant_id)->with('options')->find($questionId);
+        $question = $this->practicableFor($student)->with('options')->find($questionId);
         if (! $question) {
             throw new QuestionBankException('Questão indisponível para prática.', 404);
         }

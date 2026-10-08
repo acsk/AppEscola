@@ -89,7 +89,7 @@ class AiChatClient
         }
 
         return [
-            'data' => $this->decode((string) data_get($response, 'choices.0.message.content', '')),
+            'data' => $this->decode((string) data_get($response, 'choices.0.message.content', ''), data_get($response, 'choices.0.finish_reason')),
             'finish_reason' => data_get($response, 'choices.0.finish_reason'),
             'usage' => $response['usage'] ?? [],
             'id' => $response['id'] ?? null,
@@ -143,8 +143,8 @@ class AiChatClient
         return $data;
     }
 
-    /** Aceita JSON puro ou dentro de bloco ```json```. */
-    private function decode(string $content): array
+    /** Aceita JSON puro, dentro de bloco ```json``` ou cercado de texto. */
+    private function decode(string $content, ?string $finishReason = null): array
     {
         $content = trim($content);
         if (preg_match('/```(?:json)?\s*(.+?)\s*```/s', $content, $m)) {
@@ -153,8 +153,17 @@ class AiChatClient
 
         $decoded = json_decode($content, true);
         if (! is_array($decoded)) {
-            Log::warning('IA: resposta não é JSON');
-            throw AiException::invalidResponse();
+            $start = strpos($content, '{');
+            $end = strrpos($content, '}');
+            if ($start !== false && $end > $start) {
+                $decoded = json_decode(substr($content, $start, $end - $start + 1), true);
+            }
+        }
+        if (! is_array($decoded)) {
+            Log::warning('IA: resposta não é JSON', ['finish_reason' => $finishReason, 'length' => strlen($content)]);
+            throw $finishReason === 'length'
+                ? new AiException('A resposta da IA foi cortada. Tente novamente.', 502, 'ai_invalid_response')
+                : AiException::invalidResponse();
         }
 
         return $decoded;

@@ -32,9 +32,14 @@ class AiException extends RuntimeException
         return new self($message, 502, 'ai_provider_error');
     }
 
-    public static function invalidResponse(): self
+    /** $detail diz em que etapa a resposta veio fora do formato (ex.: "a descrição da imagem"). */
+    public static function invalidResponse(?string $detail = null): self
     {
-        return new self('A IA devolveu uma resposta inválida. Tente novamente.', 502, 'ai_invalid_response');
+        $message = $detail === null
+            ? 'A IA devolveu uma resposta inválida. Tente novamente.'
+            : "A IA devolveu {$detail} fora do formato esperado. Tente novamente.";
+
+        return new self($message, 502, 'ai_invalid_response');
     }
 
     /**
