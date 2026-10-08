@@ -256,6 +256,39 @@ class QuestionAiTest extends TestCase
             && str_contains($r->url(), 'openrouter.ai'));
     }
 
+    public function test_autofill_converts_essay_into_objective_using_expected_answer(): void
+    {
+        $this->tenantKey();
+        $this->fakeAi([
+            'question_text' => 'Assinale a alternativa que explica a fotossíntese.',
+            'type' => 'essay',
+            'options' => [
+                ['option_text' => 'Produção de glicose a partir de luz, água e CO₂.', 'is_correct' => true],
+                ['option_text' => 'Quebra de glicose para liberar energia.', 'is_correct' => false],
+            ],
+            'explanation' => 'A fotossíntese produz glicose.',
+        ]);
+
+        $this->postJson('/api/question-bank/ai/autofill', [
+            'question_text' => 'Explique o processo de fotossíntese.',
+            'type' => 'essay',
+            'options' => [['option_text' => 'sobra de quando era objetiva']],
+            'convert_to_objective' => true,
+            'explanation' => 'Produção de glicose usando luz.',
+        ])->assertOk()
+            ->assertJsonPath('body.type', 'multiple_choice')
+            ->assertJsonCount(2, 'body.options')
+            ->assertJsonPath('body.options.0.is_correct', true);
+
+        Http::assertSent(function (HttpRequest $r) {
+            $prompt = json_encode($r->data(), JSON_UNESCAPED_UNICODE);
+
+            return str_contains($prompt, 'DISSERTATIVA. Transforme-a')
+                && str_contains($prompt, 'Produção de glicose usando luz.')
+                && ! str_contains($prompt, 'sobra de quando era objetiva');
+        });
+    }
+
     // ── Classificação em lote ──────────────────────────────────────────────
 
     public function test_bulk_classify_suggests_only_requested_fields_without_saving(): void

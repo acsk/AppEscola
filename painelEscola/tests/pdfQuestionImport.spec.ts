@@ -1,5 +1,30 @@
 import { expect, test } from "@playwright/test";
-import { chunkBlocks, mergeWithNext, pageBlocks, pdfDocumentText, prepareQuestionBlocks, questionFingerprint } from "../utils/pdfQuestionImport";
+import {
+  chunkBlocks, joinStackedFractions, mergeWithNext, pageBlocks, pdfDocumentText, prepareQuestionBlocks, questionFingerprint,
+  type PdfTextItem,
+} from "../utils/pdfQuestionImport";
+
+const item = (str: string, x: number, y: number, extra: Partial<PdfTextItem> = {}): PdfTextItem =>
+  ({ str, x, y, width: str.length * 5, height: 10, hasEOL: false, ...extra });
+const pageText = (items: PdfTextItem[]) => joinStackedFractions(items).map((i) => i.str + (i.hasEOL ? "\n" : " ")).join("");
+
+test("frações empilhadas viram a/b, com o numerador de cima mesmo quando vem depois no arquivo", () => {
+  // "Calcule 1/100 de 3/5." — numerador 6 acima e denominador 6 abaixo da linha da frase (y = 100).
+  const inSentence = [
+    item("Calcule", 0, 100), item("1", 52, 106, { hasEOL: true }), item("100", 45, 94), item("de", 70, 100),
+    item("5", 92, 94, { hasEOL: true }), item("3", 92, 106), item(".", 100, 100),
+  ];
+  expect(pageText(inSentence)).toBe("Calcule 1/100 de 3/5 . ");
+
+  // Alternativa "a) 3/5" com o traço da fração extraído como texto.
+  expect(pageText([item("a)", 0, 100), item("3", 20, 106, { hasEOL: true }), item("—", 19, 100), item("5", 20, 94)])).toBe("a) 3/5 ");
+});
+
+test("números de uma coluna de tabela e expoentes não viram fração", () => {
+  const table = [item("Ano", 0, 120, { hasEOL: true }), item("10", 0, 108, { hasEOL: true }), item("20", 0, 96, { hasEOL: true })];
+  expect(pageText(table)).toBe("Ano\n10\n20\n");
+  expect(pageText([item("x", 0, 100), item("2", 6, 104, { height: 7 }), item("+ 1", 14, 100)])).toBe("x 2 + 1 ");
+});
 
 test("texto integral preserva páginas, numeração e gabarito para a IA separar", () => {
   const pages = ["Cabeçalho\n7. Observe a figura.\nA) seis\nB) oito", "continuação da questão\nGABARITO 7-A", ""];

@@ -198,6 +198,75 @@ export function questionFingerprint(q: { question_text?: string | null; options?
   return `${command}|${(q.options ?? []).map((o) => norm(o.option_text).slice(0, 40)).join("|")}`;
 }
 
+/** Trecho de texto do pdf.js com posição (x/y da linha de base, em unidades do PDF; y cresce para cima). */
+export type PdfTextItem = { str: string; x: number; y: number; width: number; height: number; hasEOL: boolean };
+
+const FRACTION_PART = /^[\p{N}\p{L}.,()+\-−√π²³]{1,10}$/u;
+const FRACTION_BAR = /^[\s\-–—_─]*$/;
+
+const isFractionPart = (item: PdfTextItem) => {
+  const s = item.str.trim();
+  return item.height > 0 && FRACTION_PART.test(s) && (/\d/.test(s) || s.length <= 2);
+};
+
+/** Numerador e denominador centralizados um sobre o outro, a cerca de uma altura de letra de distância. */
+function stacked(a: PdfTextItem, b: PdfTextItem): boolean {
+  const h = Math.max(a.height, b.height);
+  const ratio = a.height / b.height;
+  const dy = Math.abs(a.y - b.y);
+  const centerGap = Math.abs(a.x + a.width / 2 - (b.x + b.width / 2));
+  return ratio >= 0.6 && ratio <= 1.67 && dy >= 0.4 * h && dy <= 1.6 * h && centerGap <= Math.max(a.width, b.width) / 2 + 0.3 * h;
+}
+
+/** Texto da frase na altura do traço da fração, ao lado dela: distingue fração de uma coluna de tabela. */
+function hasMiddleNeighbor(items: PdfTextItem[], a: PdfTextItem, b: PdfTextItem): boolean {
+  const top = Math.max(a.y, b.y);
+  const bottom = Math.min(a.y, b.y);
+  const band = top - bottom;
+  const h = Math.max(a.height, b.height);
+  const left = Math.min(a.x, b.x) - 4 * h;
+  const right = Math.max(a.x + a.width, b.x + b.width) + 4 * h;
+  return items.some((k) => k !== a && k !== b && k.str.trim() !== "" && !FRACTION_BAR.test(k.str)
+    && k.y > bottom + 0.15 * band && k.y < top - 0.15 * band
+    && k.x + k.width >= left && k.x <= right);
+}
+
+/**
+ * Frações empilhadas viram "1/100": o pdf.js entrega numerador e denominador como trechos separados
+ * (com quebra de linha entre eles e, conforme o gerador do PDF, o denominador primeiro).
+ * O numerador é o de cima, pela posição, não pela ordem no arquivo.
+ */
+export function joinStackedFractions(items: PdfTextItem[]): PdfTextItem[] {
+  const removed = new Set<number>();
+  const result = items.map((item) => ({ ...item }));
+  for (let i = 0; i < items.length; i += 1) {
+    if (removed.has(i) || !isFractionPart(items[i])) continue;
+    const between: number[] = [];
+    for (let j = i + 1; j < Math.min(items.length, i + 6); j += 1) {
+      const b = items[j];
+      if (FRACTION_BAR.test(b.str)) {
+        between.push(j);
+        continue;
+      }
+      if (isFractionPart(b) && stacked(items[i], b) && hasMiddleNeighbor(items, items[i], b)) {
+        const [top, bottom] = items[i].y > b.y ? [items[i], b] : [b, items[i]];
+        const left = Math.min(top.x, bottom.x);
+        result[i] = {
+          str: `${top.str.trim()}/${bottom.str.trim()}`,
+          x: left,
+          y: (top.y + bottom.y) / 2,
+          width: Math.max(top.x + top.width, bottom.x + bottom.width) - left,
+          height: Math.max(top.height, bottom.height),
+          hasEOL: b.hasEOL,
+        };
+        [...between, j].forEach((k) => removed.add(k));
+      }
+      break;
+    }
+  }
+  return result.filter((_, index) => !removed.has(index));
+}
+
 export async function extractPdfPages(file: File): Promise<string[]> {
   const { pdfjs } = await import("react-pdf");
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -212,12 +281,10 @@ export async function extractPdfPages(file: File): Promise<string[]> {
       const page = await pdf.getPage(n);
       try {
         const content = await page.getTextContent();
-        let text = "";
-        for (const item of content.items) {
-          if (!("str" in item)) continue;
-          text += item.str + (item.hasEOL ? "\n" : " ");
-        }
-        pages.push(text);
+        const items: PdfTextItem[] = content.items.flatMap((item) => ("str" in item
+          ? [{ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height, hasEOL: item.hasEOL }]
+          : []));
+        pages.push(joinStackedFractions(items).map((item) => item.str + (item.hasEOL ? "\n" : " ")).join(""));
       } finally {
         page.cleanup();
       }

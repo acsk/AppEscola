@@ -19,6 +19,10 @@ export async function aiAutofillQuestion(payload: {
   subject_id?: number;
   /** Nome da prova de origem: a API deduz o ano dele ("ENEM 2023") quando o enunciado não traz. */
   source_exam_name?: string;
+  /** Dissertativa → objetiva: a IA reescreve o comando e cria as alternativas. */
+  convert_to_objective?: boolean;
+  /** Na conversão: resposta esperada da dissertativa (define a alternativa correta). */
+  explanation?: string;
 }) {
   const { data } = await api.post("/question-bank/ai/autofill", payload, { timeout: 120000 });
   return data as { type: string; message: string; body: AiQuestionSuggestion };

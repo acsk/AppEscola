@@ -17,16 +17,18 @@ import {
   deleteImportDraft, fetchImportDraft, includeImportDraftQuestion, listImportDrafts, saveImportDraft,
   type ImportDraftPayload, type ImportDraftSettings, type ImportDraftSummary, type ImportDraftQuestion,
 } from "../../services/questionImportDrafts";
-import { appendToImportedExam, createStandaloneQuestion, uploadQuestionBankImage } from "../../services/questionBank";
+import { appendToImportedExam, createStandaloneQuestion, fetchTopics, uploadQuestionBankImage } from "../../services/questionBank";
+import type { SubjectTopic } from "../../types/questionBank";
 import { addQuestionsToSet, createQuestionSet } from "../../services/questionSets";
 import ImportReviewWorkspace, { type SaveStatus } from "./import-review/ImportReviewWorkspace";
 import type { ConcludeChoice } from "./import-review/ConcludeImportDialog";
 import { findSourcePage } from "../../utils/importReview";
 import { type ApiToastState, getApiErrorMessage, showApiToast } from "../../utils/apiErrors";
 import { describeAiError } from "../../utils/aiErrors";
-import { contentFromSuggestion, contentPayload, mergeContentSuggestion } from "../../utils/questionContent";
+import { contentFromSuggestion, contentPayload, mergeContentSuggestion, objectiveFromSuggestion } from "../../utils/questionContent";
 import {
   EMPTY_CLASSIFICATION_FORM, applyClassificationSuggestion, classificationFromSuggestion, diffClassification,
+  type ClassificationForm,
 } from "../../utils/questionClassification";
 import { extractPdfPages, pageBlocks, pdfDocumentText, questionFingerprint, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
 import { prepareImageForUpload } from "../../utils/imageCompression";
@@ -77,6 +79,11 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const [sourceExamName, setSourceExamName] = useState("");
   /** Disciplinas da prova: a IA classifica cada questão em uma delas e busca o assunto. */
   const [subjectIds, setSubjectIds] = useState<number[]>([]);
+  /** Assuntos escolhidos no formulário: valem para as questões da disciplina de cada um (no lugar da sugestão da IA). */
+  const [topicIds, setTopicIds] = useState<number[]>([]);
+  const [subjectTopics, setSubjectTopics] = useState<SubjectTopic[]>([]);
+  const [topicsLoading, setTopicsLoading] = useState(false);
+  const [convertDraft, setConvertDraft] = useState<Draft | null>(null);
   /** Ao incluir tudo, agrupa as questões num simulado (rascunho) da modalidade escolhida — IFAL, CPM, ENEM… */
   const [createExam, setCreateExam] = useState(true);
   const [examTypeSlug, setExamTypeSlug] = useState("");
@@ -133,6 +140,8 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     setPdfFileName(null);
     setSaveStatus({ state: "idle", at: null });
     setSubjectIds([]);
+    setTopicIds([]);
+    setConvertDraft(null);
     setNoTextPages([]);
     setFailedBlocks([]);
     pdfText.current = null;
@@ -160,9 +169,43 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     return () => { cancelled = true; };
   }, [visible]);
 
+  // Assuntos das disciplinas da prova; ao tirar uma disciplina, os assuntos dela saem da escolha.
+  const subjectKey = subjectIds.join(",");
+  useEffect(() => {
+    if (!visible || !subjectIds.length) {
+      setSubjectTopics([]);
+      return;
+    }
+    let cancelled = false;
+    setTopicsLoading(true);
+    void fetchTopics(subjectIds)
+      .then((items) => {
+        if (cancelled) return;
+        setSubjectTopics(items);
+        const valid = new Set(items.map((t) => t.id));
+        setTopicIds((prev) => prev.filter((id) => valid.has(id)));
+      })
+      .catch(() => { if (!cancelled) setSubjectTopics([]); })
+      .finally(() => { if (!cancelled) setTopicsLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarrega só quando as disciplinas mudam
+  }, [visible, subjectKey]);
+
+  /**
+   * Disciplina e assuntos do formulário nas questões extraídas: uma única disciplina vale para todas;
+   * os assuntos escolhidos substituem os da IA nas questões da disciplina deles.
+   */
+  const withChosenClassification = (c: ClassificationForm): ClassificationForm => {
+    const subjectId = subjectIds.length === 1 ? subjectIds[0] : c.subject_id;
+    const chosen = subjectTopics.filter((t) => topicIds.includes(t.id) && t.subject_id === subjectId).map((t) => t.id);
+    if (chosen.length) return { ...c, subject_id: subjectId, topic_ids: chosen };
+    return subjectId === c.subject_id ? c : { ...c, subject_id: subjectId, topic_ids: [] };
+  };
+
   const settings: ImportDraftSettings = {
     create_exam: createExam, exam_type_slug: examTypeSlug || null, exam_title: examTitle.trim() || null,
-    exam_id: exam?.id ?? null, question_set_id: questionSet?.id ?? null, subject_ids: subjectIds, pdf_file_name: file?.name ?? pdfFileName,
+    exam_id: exam?.id ?? null, question_set_id: questionSet?.id ?? null, subject_ids: subjectIds, topic_ids: topicIds,
+    pdf_file_name: file?.name ?? pdfFileName,
   };
   const snapshot = (items = drafts, overrides: Partial<ImportDraftSettings> = {}): ImportDraftPayload => ({
     source_exam_name: sourceExamName.trim(), no_text_pages: noTextPages,
@@ -271,6 +314,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       setExam(saved.exam_id ? { id: saved.exam_id, title: saved.exam_title ?? body.source_exam_name } : null);
       setQuestionSet(saved.question_set_id ? { id: saved.question_set_id, title: saved.exam_title ?? body.source_exam_name } : null);
       if (saved.subject_ids?.length) setSubjectIds(saved.subject_ids);
+      setTopicIds(saved.topic_ids ?? []);
       setPdfFileName(saved.pdf_file_name ?? null);
       // Igual ao snapshot() (mesma ordem de chaves) para o "há alterações" comparar certo.
       setSavedSnapshot(JSON.stringify({
@@ -281,7 +325,8 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           create_exam: saved.create_exam ?? true, exam_type_slug: saved.exam_type_slug || null,
           exam_title: (saved.exam_title ?? body.source_exam_name).trim() || null, exam_id: saved.exam_id ?? null,
           question_set_id: saved.question_set_id ?? null,
-          subject_ids: saved.subject_ids?.length ? saved.subject_ids : subjectIds, pdf_file_name: saved.pdf_file_name ?? null,
+          subject_ids: saved.subject_ids?.length ? saved.subject_ids : subjectIds, topic_ids: saved.topic_ids ?? [],
+          pdf_file_name: saved.pdf_file_name ?? null,
         },
       }));
       setSaveStatus({ state: "saved", at: new Date(body.updated_at) });
@@ -350,6 +395,39 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     finally { setProgress(null); }
   };
 
+  /** Dissertativa → objetiva: a IA reescreve o comando e cria as alternativas (a resolução vira a resposta esperada). */
+  const convertToObjective = async (draft: Draft) => {
+    setConvertDraft(null);
+    if (busy) return;
+    if (plainRichText(draft.content.question_text).trim().length < 15) {
+      update(draft.key, { errors: { question_text: "Escreva um enunciado com pelo menos 15 caracteres para usar a IA." } });
+      return;
+    }
+    setProgress(`Transformando a questão ${draft.sourceNumber} em objetiva com IA…`);
+    try {
+      const unavailable = await ensureAvailable();
+      if (unavailable) {
+        setError({ title: "IA indisponível", message: unavailable });
+        return;
+      }
+      const response = await aiAutofillQuestion({
+        question_text: draft.content.question_text,
+        convert_to_objective: true,
+        explanation: draft.content.explanation.trim() || undefined,
+        subject_ids: subjectIds.length ? subjectIds : undefined,
+        subject_id: draft.classification.subject_id ?? undefined,
+        source_exam_name: sourceExamName.trim() || undefined,
+      });
+      update(draft.key, {
+        content: objectiveFromSuggestion(draft.content, response.body),
+        classification: applyClassificationSuggestion(draft.classification, response.body),
+        answerFromPdf: false, errors: {},
+      });
+      setToast({ visible: true, type: "success", message: "Questão transformada em objetiva. Revise o enunciado e as alternativas antes de confirmar." });
+    } catch (cause) { setError(describeAiError(cause, "Não foi possível transformar em objetiva")); }
+    finally { setProgress(null); }
+  };
+
   const uploadImage = async (key: string, selected: File) => {
     const draft = drafts.find((item) => item.key === key);
     if (!draft || busy) return;
@@ -398,10 +476,13 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       const stamp = Date.now();
       const added: Draft[] = found
         .filter((question) => !existing.has(questionFingerprint(question)))
-        .map((question, index) => ({
-          ...toDraft(question, `pdf-p${failedBlock.from}-${stamp}-${index}`, String(index + 1)),
-          sourcePage: findSourcePage(pdfPages.current, question.question_text ?? "") ?? failedBlock.from,
-        }));
+        .map((question, index) => {
+          const draft = toDraft(question, `pdf-p${failedBlock.from}-${stamp}-${index}`, String(index + 1));
+          return {
+            ...draft, classification: withChosenClassification(draft.classification),
+            sourcePage: findSourcePage(pdfPages.current, question.question_text ?? "") ?? failedBlock.from,
+          };
+        });
       added.forEach((draft) => draftBlock.current.set(draft.key, failedBlock.from));
       setDrafts((prev) => {
         // Depois da última questão de páginas anteriores ao bloco (questões retomadas de rascunho vão ao fim).
@@ -428,7 +509,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   };
 
   const extract = async () => {
-    if (!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || busy) return;
+    if (!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || topicsLoading || busy) return;
     setProgress("Extraindo o texto do PDF no navegador…");
     try {
       const pages = await extractPdfPages(file);
@@ -473,10 +554,13 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       pdfPages.current = pages;
       setPdfFileName(file.name);
       setExamTitle((current) => current || sourceExamName.trim());
-      const converted: Draft[] = response.body.questions.map((question, index) => ({
-        ...toDraft(question, `pdf-${index}`, String(index + 1)),
-        sourcePage: findSourcePage(pages, question.question_text ?? ""),
-      }));
+      const converted: Draft[] = response.body.questions.map((question, index) => {
+        const draft = toDraft(question, `pdf-${index}`, String(index + 1));
+        return {
+          ...draft, classification: withChosenClassification(draft.classification),
+          sourcePage: findSourcePage(pages, question.question_text ?? ""),
+        };
+      });
       draftBlock.current = new Map(converted.map((draft, index) => [draft.key, fromPage[index]]));
       setDrafts(converted);
       setActiveKey(converted[0]?.key ?? "");
@@ -661,7 +745,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         footer={
           <View className="flex-row flex-wrap justify-end" style={{ gap: 8 }}>
             <Button label="Cancelar" onPress={close} disabled={busy} />
-            <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || busy} />
+            <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || topicsLoading || busy} />
           </View>
         }
       >
@@ -680,6 +764,24 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
             />
             <Text className="text-xs text-ink-subtle">
               Escolha as disciplinas cobradas no PDF. A IA classifica cada questão em uma delas e escolhe o assunto.
+            </Text>
+            <TopicMultiSelect
+              label="Assuntos (opcional)"
+              searchPlaceholder="Buscar assunto…"
+              topics={subjectTopics.map((t) => ({
+                id: t.id, name: t.name, subject_id: t.subject_id,
+                subject_name: subjectIds.length > 1 ? catalogs.subjects.find((s) => s.id === t.subject_id)?.name : undefined,
+              }))}
+              value={topicIds}
+              onChange={setTopicIds}
+              loading={topicsLoading}
+              disabled={busy || !subjectIds.length || (!topicsLoading && !subjectTopics.length)}
+              disabledHint={!subjectIds.length ? "Escolha as disciplinas primeiro." : "As disciplinas escolhidas não têm assuntos cadastrados."}
+            />
+            <Text className="text-xs text-ink-subtle">
+              {subjectIds.length === 1
+                ? "Todas as questões ficam nesta disciplina. Os assuntos escolhidos são aplicados a todas; sem escolha, a IA sugere o assunto de cada uma."
+                : "Os assuntos escolhidos são aplicados às questões da disciplina de cada um; nas demais, a IA sugere. Você pode ajustar cada questão na revisão."}
             </Text>
             <Text className="text-sm font-medium text-ink">Rascunhos de importação salvos</Text>
             {listLoading && <Text className="text-sm text-ink-muted">Carregando rascunhos…</Text>}
@@ -745,6 +847,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           onClose={close}
           onSaveAndExit={() => void flushSave().then((ok) => { if (ok) onClose(); })}
           onAutofill={(draft) => void autofill(draft)}
+          onConvertToObjective={(draft) => setConvertDraft(drafts.find((d) => d.key === draft.key) ?? null)}
           onRemove={removeQuestion}
           onUploadImage={(key, picked) => void uploadImage(key, picked)}
           exam={{ createExam, examTitle: examTitle || sourceExamName, examTypeSlug, existingExamTitle: target?.title ?? null }}
@@ -759,6 +862,10 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       <ConfirmModal visible={deleteDraft !== null} title="Excluir rascunho da importação?"
         message={`O rascunho "${deleteDraft?.source_exam_name ?? ""}" (${deleteDraft?.question_count ?? 0} questões em revisão) será excluído. Questões já incluídas no banco não são afetadas.`}
         loading={deletingDraft} onCancel={() => setDeleteDraft(null)} onConfirm={() => void removeDraft()} />
+      <ConfirmModal visible={convertDraft !== null} title="Transformar em objetiva com IA?"
+        message={`A IA reescreve o comando da questão ${convertDraft?.sourceNumber ?? ""}, cria as alternativas com o gabarito e atualiza a resolução. Revise antes de confirmar a questão.`}
+        confirmLabel="Transformar" cancelLabel="Cancelar"
+        onCancel={() => setConvertDraft(null)} onConfirm={() => { if (convertDraft) void convertToObjective(convertDraft); }} />
       <ConfirmModal visible={confirmClose} title="Fechar sem salvar as alterações?"
         message="Há alterações ainda não salvas nesta importação. Cancele e use Salvar e sair para retomar depois."
         confirmLabel="Fechar sem salvar" cancelLabel="Continuar revisão"

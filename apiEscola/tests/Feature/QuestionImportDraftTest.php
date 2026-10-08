@@ -112,14 +112,15 @@ class QuestionImportDraftTest extends TestCase
         $payload = $this->payload();
         $payload['questions'][0]['reviewed'] = true;
         $payload['questions'][0]['sourcePage'] = 7;
-        $payload['settings'] = ['create_exam' => true, 'exam_type_slug' => 'cpm', 'exam_title' => 'CPM 1', 'exam_id' => null, 'subject_ids' => [3, 4], 'pdf_file_name' => 'cpm.pdf'];
+        $payload['settings'] = ['create_exam' => true, 'exam_type_slug' => 'cpm', 'exam_title' => 'CPM 1', 'exam_id' => null, 'subject_ids' => [3, 4], 'topic_ids' => [9], 'pdf_file_name' => 'cpm.pdf'];
         $id = $this->postJson('/api/question-bank/import-drafts', $payload)->assertCreated()->json('body.id');
 
         $this->getJson('/api/question-bank/import-drafts/'.$id)->assertOk()
             ->assertJsonPath('body.questions.0.reviewed', true)
             ->assertJsonPath('body.questions.0.sourcePage', 7)
             ->assertJsonPath('body.settings.exam_type_slug', 'cpm')
-            ->assertJsonPath('body.settings.subject_ids', [3, 4]);
+            ->assertJsonPath('body.settings.subject_ids', [3, 4])
+            ->assertJsonPath('body.settings.topic_ids', [9]);
 
         $payload['settings'] = ['unknown' => 1];
         $this->postJson('/api/question-bank/import-drafts', $payload)->assertUnprocessable();

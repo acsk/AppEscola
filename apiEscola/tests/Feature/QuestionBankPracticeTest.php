@@ -16,6 +16,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -356,5 +357,41 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertSame([$maria->id, $joao->id], array_column($staff, 'student_id'));
         $this->assertSame('MARIA DA SILVA', $staff[0]['name']);
         $this->assertNotContains($other->id, array_column($staff, 'student_id'));
+    }
+
+    public function test_weekly_ranking_resets_on_monday_brasilia_and_last_week_is_closed(): void
+    {
+        $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
+        $maria = $this->student('MARIA DA SILVA');
+        $joao = $this->student('JOAO PEREIRA');
+        $answer = function (Student $student, ExamQuestion $q, string $atBrasilia) {
+            $this->travelTo(Carbon::parse($atBrasilia, 'America/Sao_Paulo'));
+            $this->actingAsStudent($student);
+            $this->postJson("/api/aluno/practice/questions/{$q->id}/answer", ['option_id' => $this->correct($q)])->assertOk();
+        };
+
+        // Domingo 23:30 em Brasília já é segunda em UTC, mas ainda conta na semana anterior.
+        $answer($maria, $qs[0], '2026-10-04 23:30');
+        $answer($maria, $qs[1], '2026-10-01 10:00');
+        $answer($joao, $qs[0], '2026-10-05 00:10');
+        $answer($joao, $qs[1], '2026-10-06 09:00');
+        $answer($joao, $qs[2], '2026-10-07 18:00');
+
+        $this->travelTo(Carbon::parse('2026-10-08 14:00', 'America/Sao_Paulo'));
+        $this->actingAsStudent($maria);
+
+        $week = $this->getJson('/api/aluno/practice/ranking?period=week')->assertOk()->json('body');
+        $this->assertSame(['JOAO P.'], array_column($week['ranking'], 'name'));
+        $this->assertSame([3], array_column($week['ranking'], 'questions'));
+        $this->assertSame('2026-10-05T03:00:00+00:00', $week['since']);
+        $this->assertNull($week['until']);
+        $this->assertNull($week['me']);
+
+        $lastWeek = $this->getJson('/api/aluno/practice/ranking?period=last_week')->assertOk()->json('body');
+        $this->assertSame(['MARIA S.'], array_column($lastWeek['ranking'], 'name'));
+        $this->assertSame([2], array_column($lastWeek['ranking'], 'questions'));
+        $this->assertSame('2026-09-28T03:00:00+00:00', $lastWeek['since']);
+        $this->assertSame('2026-10-05T03:00:00+00:00', $lastWeek['until']);
+        $this->assertSame(1, $lastWeek['me']['position']);
     }
 }

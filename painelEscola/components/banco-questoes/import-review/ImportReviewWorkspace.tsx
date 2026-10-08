@@ -31,6 +31,7 @@ type Props = {
   onClose: () => void;
   onSaveAndExit: () => void;
   onAutofill: (draft: EditorDraft) => void;
+  onConvertToObjective: (draft: EditorDraft) => void;
   onRemove: (key: string) => void;
   onUploadImage: (key: string, file: File) => void;
   exam: { createExam: boolean; examTitle: string; examTypeSlug: string; existingExamTitle: string | null };
@@ -58,7 +59,7 @@ function savedLabel(status: SaveStatus) {
 export default function ImportReviewWorkspace(props: Props) {
   const {
     sourceExamName, drafts, activeKey, onActiveKey, onChangeDraft, busy, catalogs, subjectIds, pdfFile, pdfFileName, onPickPdf,
-    saveStatus, onClose, onSaveAndExit, onAutofill, onRemove, onUploadImage, exam, concluding, onConclude, listNotice, editorNotice,
+    saveStatus, onClose, onSaveAndExit, onAutofill, onConvertToObjective, onRemove, onUploadImage, exam, concluding, onConclude, listNotice, editorNotice,
   } = props;
   const { width } = useWindowDimensions();
   const wide = width >= 1280; // três colunas
@@ -239,7 +240,7 @@ export default function ImportReviewWorkspace(props: Props) {
             listButton={medium ? undefined : <Button size="sm" icon={List} label={`Questões (${drafts.length})`} onPress={() => setListOpen(true)} />}
             onChange={(patch) => onChangeDraft(draft.key, patch)}
             onPrev={() => go(index - 1)} onNext={() => go(index + 1)} onNextPending={nextPending}
-            onAutofill={() => onAutofill(draft)} onRemove={() => setRemoveKey(draft.key)} onConfirm={confirm}
+            onAutofill={() => onAutofill(draft)} onConvertToObjective={() => onConvertToObjective(draft)} onRemove={() => setRemoveKey(draft.key)} onConfirm={confirm}
             onUploadImage={(file) => uploadFile(draft.key, file)} onStartCrop={startCrop}
             canEnhanceImage={!!pdfFile && !!crops[draft.key]} enhancingImage={enhancing} onEnhanceImage={() => void enhanceImage()} />
         </View>

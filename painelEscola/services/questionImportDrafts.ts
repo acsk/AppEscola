@@ -26,6 +26,8 @@ export type ImportDraftSettings = {
   /** Simulado do banco criado numa conclusão parcial: as próximas inclusões entram nele. */
   question_set_id?: number | null;
   subject_ids?: number[];
+  /** Assuntos escolhidos no formulário (aplicados às questões da disciplina de cada um). */
+  topic_ids?: number[];
   pdf_file_name?: string | null;
 };
 

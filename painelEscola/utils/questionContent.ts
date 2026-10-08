@@ -94,6 +94,17 @@ export function contentFromSuggestion(s: AiQuestionSuggestion): ContentForm {
   };
 }
 
+/** Dissertativa convertida pela IA: enunciado reescrito, alternativas novas e resolução (a imagem fica). */
+export function objectiveFromSuggestion(form: ContentForm, s: AiQuestionSuggestion): ContentForm {
+  return {
+    ...form,
+    type: "multiple_choice",
+    question_text: plainRichText(s.question_text).trim() ? s.question_text : form.question_text,
+    explanation: plainRichText(s.explanation).trim() ? s.explanation : form.explanation,
+    options: (s.options ?? []).map((o) => ({ key: newOptionKey(), option_text: o.option_text, is_correct: o.is_correct })),
+  };
+}
+
 /**
  * Aplica a sugestão da IA sem apagar o que o usuário já preencheu:
  * - sem alternativas digitadas: usa as da IA (e o enunciado da IA, que vem sem as alternativas embutidas);

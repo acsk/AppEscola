@@ -35,6 +35,7 @@ import {
   contentFromQuestion,
   contentPayload,
   mergeContentSuggestion,
+  objectiveFromSuggestion,
   validateContent,
 } from "../../utils/questionContent";
 import {
@@ -99,6 +100,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   } = useQuestionAiStatus();
   const [aiFilling, setAiFilling] = useState(false);
   const [aiHintDismissed, setAiHintDismissed] = useState(false);
+  const [confirmConvert, setConfirmConvert] = useState(false);
   /** Falha da IA: modal de erro padrão do sistema. */
   const [aiError, setAiError] = useState<{ title: string; message: string } | null>(null);
   const [similarSource, setSimilarSource] = useState<SimilarSource | null>(null);
@@ -213,6 +215,48 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         showApiErrorToast(setToast, error, "Não foi possível preencher com IA.");
       } else {
         setAiError(describeAiError(error, "Não foi possível preencher com IA"));
+      }
+    } finally {
+      setAiFilling(false);
+    }
+  };
+
+  /** Dissertativa → objetiva: a IA reescreve o comando e cria as alternativas; nada é salvo até "Salvar". */
+  const convertToObjective = async () => {
+    setConfirmConvert(false);
+    if (aiFilling || saving !== null || uploading) return;
+    setAiFilling(true);
+    try {
+      const unavailable = await ensureAvailable();
+      if (unavailable) {
+        setToast({ visible: true, type: "error", message: unavailable });
+        return;
+      }
+      if (statementChars < AI_MIN_CHARS) {
+        const message = `Escreva um enunciado com pelo menos ${AI_MIN_CHARS} caracteres para usar a IA.`;
+        setErrors((prev) => ({ ...prev, question_text: message }));
+        setToast({ visible: true, type: "error", message });
+        return;
+      }
+      const response = await aiAutofillQuestion({
+        question_text: content.question_text,
+        convert_to_objective: true,
+        explanation: content.explanation.trim() || undefined,
+        subject_id: classification.subject_id ?? undefined,
+        source_exam_name: sourceExamName.trim() || undefined,
+      });
+      setContent(objectiveFromSuggestion(content, response.body));
+      const classified = mergeClassificationSuggestion(classification, response.body);
+      if (classified.changed) setClassification(classified.form);
+      setErrors({});
+      setToast({ visible: true, type: "success", message: "Questão transformada em objetiva. Revise o enunciado e as alternativas antes de salvar." });
+    } catch (error) {
+      const fieldErrors = getApiValidationErrors(error);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+        showApiErrorToast(setToast, error, "Não foi possível transformar a questão.");
+      } else {
+        setAiError(describeAiError(error, "Não foi possível transformar em objetiva"));
       }
     } finally {
       setAiFilling(false);
@@ -430,6 +474,15 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         value={content.type}
         onChange={(v) => v && setField("type", v)}
       />
+      {content.type === "essay" && (
+        <View className="flex-row flex-wrap items-center border border-border rounded-ds-md bg-surface-sunken" style={{ gap: 10, padding: 12, marginBottom: 16 }}>
+          <Text className="text-sm text-ink-muted" style={{ flex: 1, minWidth: 220 }}>
+            A IA pode reescrever o comando e criar 5 alternativas, usando a explicação como resposta esperada.
+          </Text>
+          <Button size="sm" icon={Sparkles} label="Transformar em objetiva com IA" loading={aiFilling}
+            disabled={loading || saving !== null || uploading} onPress={() => setConfirmConvert(true)} />
+        </View>
+      )}
 
       <RichTextInput
         label="Enunciado"
@@ -638,6 +691,16 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           action?.();
         }}
         onCancel={() => setPendingLeave(null)}
+      />
+
+      <ConfirmModal
+        visible={confirmConvert}
+        title="Transformar em objetiva com IA?"
+        message="A IA reescreve o comando do enunciado, cria as alternativas com o gabarito e atualiza a explicação. Nada é salvo até você clicar em Salvar."
+        confirmLabel="Transformar"
+        cancelLabel="Cancelar"
+        onConfirm={() => void convertToObjective()}
+        onCancel={() => setConfirmConvert(false)}
       />
 
       <MessageModal

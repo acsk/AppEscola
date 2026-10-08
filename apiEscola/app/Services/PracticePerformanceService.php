@@ -26,7 +26,11 @@ class PracticePerformanceService
     public const LEVEL_ATTENTION = 'attention';
     public const LEVEL_GOOD = 'good';
 
-    public const PERIODS = ['week', 'month', 'all'];
+    /** week = semana corrente (segunda 00:00 até agora); last_week = semana anterior fechada (consolidada). */
+    public const PERIODS = ['week', 'last_week', 'month', 'all'];
+
+    /** A semana do ranking vira na segunda 00:00 do horário escolar, não em UTC. */
+    private const RANKING_TIMEZONE = 'America/Sao_Paulo';
 
     private const FOCUS_LIMIT = 5;
 
@@ -96,10 +100,11 @@ class PracticePerformanceService
      */
     public function ranking(int $tenantId, string $period, int $limit, ?int $viewerStudentId = null, bool $fullNames = false): array
     {
-        $since = $this->periodStart($period);
+        [$since, $until] = $this->periodRange($period);
         $rows = PracticeAnswer::query()->counted()
             ->where('practice_answers.tenant_id', $tenantId)
             ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
+            ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
             ->join('students as s', 's.id', '=', 'practice_answers.student_id')
             ->where('s.status', 'active')
             ->whereNull('s.deleted_at')
@@ -136,18 +141,23 @@ class PracticePerformanceService
         return [
             'period'       => $period,
             'since'        => $since?->toIso8601String(),
+            'until'        => $until?->toIso8601String(),
             'participants' => $ranked->count(),
             'ranking'      => $ranked->take($limit)->values(),
             'me'           => $viewerStudentId !== null ? $ranked->firstWhere('is_me', true) : null,
         ];
     }
 
-    private function periodStart(string $period): ?Carbon
+    /** @return array{0: ?Carbon, 1: ?Carbon} início (inclusivo) e fim (exclusivo), em UTC; null = sem limite. */
+    private function periodRange(string $period): array
     {
+        $weekStart = now(self::RANKING_TIMEZONE)->startOfWeek(Carbon::MONDAY)->utc();
+
         return match ($period) {
-            'week'  => now()->subDays(7),
-            'month' => now()->subDays(30),
-            default => null,
+            'week'      => [$weekStart, null],
+            'last_week' => [$weekStart->copy()->subWeek(), $weekStart],
+            'month'     => [now()->subDays(30), null],
+            default     => [null, null],
         };
     }
 

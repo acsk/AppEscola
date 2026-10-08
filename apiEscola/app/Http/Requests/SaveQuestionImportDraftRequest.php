@@ -34,7 +34,7 @@ class SaveQuestionImportDraftRequest extends FormRequest
             'questions.*.sourcePage' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:80'],
             // Configurações da importação (opcionais): simulado, modalidade, disciplinas da prova.
             // exam_id: simulado oficial de importações antigas; question_set_id: simulado do banco (formato atual).
-            'settings' => ['sometimes', 'nullable', 'array:create_exam,exam_type_slug,exam_title,exam_id,question_set_id,subject_ids,pdf_file_name'],
+            'settings' => ['sometimes', 'nullable', 'array:create_exam,exam_type_slug,exam_title,exam_id,question_set_id,subject_ids,topic_ids,pdf_file_name'],
             'settings.question_set_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'settings.create_exam' => ['sometimes', 'boolean'],
             'settings.exam_type_slug' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -42,6 +42,8 @@ class SaveQuestionImportDraftRequest extends FormRequest
             'settings.exam_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'settings.subject_ids' => ['sometimes', 'array', 'max:20'],
             'settings.subject_ids.*' => ['integer', 'min:1'],
+            'settings.topic_ids' => ['sometimes', 'array', 'max:60'],
+            'settings.topic_ids.*' => ['integer', 'min:1'],
             'settings.pdf_file_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'questions.*.key' => ['required', 'string', 'max:100', 'distinct', 'regex:/^[a-zA-Z0-9_-]+$/'],
             'questions.*.include' => ['required', 'boolean'],

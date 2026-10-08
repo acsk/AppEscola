@@ -25,6 +25,9 @@ class QuestionAiAutofillRequest extends FormRequest
             'subject_id'            => ['sometimes', 'nullable', 'integer'],
             // Nome da prova de origem: só para deduzir o ano ("ENEM 2023"); não vai para o prompt.
             'source_exam_name'      => ['sometimes', 'nullable', 'string', 'max:255'],
+            // Dissertativa → objetiva: reescreve o comando e cria as alternativas (a resolução guia o gabarito).
+            'convert_to_objective'  => ['sometimes', 'boolean'],
+            'explanation'           => ['sometimes', 'nullable', 'string', 'max:20000'],
         ];
     }
 

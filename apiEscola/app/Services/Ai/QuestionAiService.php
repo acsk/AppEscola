@@ -108,25 +108,33 @@ class QuestionAiService
         $onlySubjectId = $catalogs['subjects']->count() === 1 && (! empty($input['subject_ids']) || $chosenSubjectId !== null)
             ? (int) $catalogs['subjects']->first()['id'] : null;
 
-        $filledOptions = array_values(array_filter(
+        $convert = filter_var($input['convert_to_objective'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $filledOptions = $convert ? [] : array_values(array_filter(
             array_map(fn ($o) => trim((string) ($o['option_text'] ?? '')), $input['options'] ?? []),
             fn ($t) => $t !== ''
         ));
+        $expectedAnswer = $convert ? trim((string) ($input['explanation'] ?? '')) : '';
 
-        $this->logSuspicious($tenantId, 'autofill', [$input['question_text'], ...$filledOptions]);
+        $this->logSuspicious($tenantId, 'autofill', [$input['question_text'], ...$filledOptions, $expectedAnswer]);
 
         $system = 'Você é um professor especialista em elaborar e classificar questões de provas e vestibulares brasileiros. '
             .'Responda somente com um objeto JSON válido. '.self::FORMAT_RULES."\n\n".AiPromptGuard::SYSTEM_RULES;
 
         $user = implode("\n\n", array_filter([
-            'Analise o enunciado abaixo e preencha os campos da questão.',
+            $convert
+                ? 'A questão abaixo é DISSERTATIVA. Transforme-a em uma questão OBJETIVA de múltipla escolha que cobre o mesmo conteúdo e preencha os campos.'
+                : 'Analise o enunciado abaixo e preencha os campos da questão.',
             "ENUNCIADO:\n".AiPromptGuard::wrap('enunciado', $input['question_text']),
+            $expectedAnswer !== '' ? "RESPOSTA ESPERADA DA DISSERTATIVA (a alternativa correta deve corresponder a ela):\n".AiPromptGuard::wrap('resposta_esperada', $expectedAnswer) : null,
             $filledOptions ? "ALTERNATIVAS JÁ INFORMADAS (mantenha o texto e só indique a correta):\n".AiPromptGuard::wrap('alternativas', implode("\n", $filledOptions)) : null,
-            ! empty($input['type']) ? 'TIPO ESCOLHIDO: '.($input['type'] === 'essay' ? 'dissertativa' : 'objetiva') : null,
+            ! $convert && ! empty($input['type']) ? 'TIPO ESCOLHIDO: '.($input['type'] === 'essay' ? 'dissertativa' : 'objetiva') : null,
             "Regras:\n"
-            ."- Se o enunciado trouxer as alternativas no próprio texto (ex.: \"a) ... b) ...\"), separe-as em \"options\" e devolva em \"question_text\" o enunciado sem elas; senão devolva o enunciado como veio, mantendo a formatação.\n"
-            ."- Objetiva: de 4 a 5 alternativas plausíveis (ou as já informadas), exatamente uma correta, sem letras no início do texto.\n"
-            ."- Dissertativa: \"options\" vazio.\n"
+            .($convert
+                ? "- Mantenha o texto de apoio e os dados do enunciado; reescreva só o comando para pedir a escolha de uma alternativa (ex.: \"Explique por que...\" → \"Assinale a alternativa que explica corretamente por que...\"). Com vários itens (a, b, c...), cobre o item principal num único comando.\n"
+                    ."- \"type\": \"multiple_choice\". Exatamente 5 alternativas plausíveis, uma correta; os distratores devem refletir erros comuns de quem estuda o conteúdo. Sem letras no início, sem \"todas/nenhuma das anteriores\".\n"
+                : "- Se o enunciado trouxer as alternativas no próprio texto (ex.: \"a) ... b) ...\"), separe-as em \"options\" e devolva em \"question_text\" o enunciado sem elas; senão devolva o enunciado como veio, mantendo a formatação.\n"
+                    ."- Objetiva: de 4 a 5 alternativas plausíveis (ou as já informadas), exatamente uma correta, sem letras no início do texto.\n"
+                    ."- Dissertativa: \"options\" vazio.\n")
             ."- \"explanation\": resolva a questão passo a passo ANTES de definir o gabarito; a alternativa correta tem de bater com essa resolução (confira os cálculos).\n"
             ."- Se o enunciado citar charge, tirinha, figura ou gráfico que você não vê, resolva e classifique pelo comando e pelas alternativas, sem inventar o conteúdo da imagem.\n"
             .($onlySubjectId !== null
@@ -156,7 +164,7 @@ class QuestionAiService
 
         $raw = $this->client->json($credential, $system, $user, 0.3);
 
-        $content = $this->sanitizeContent($raw, $input['type'] ?? null, $filledOptions === [] ? null : count($filledOptions));
+        $content = $this->sanitizeContent($raw, $convert ? 'multiple_choice' : ($input['type'] ?? null), $filledOptions === [] ? null : count($filledOptions));
         if ($content === null) {
             throw AiException::invalidResponse();
         }
@@ -682,6 +690,7 @@ class QuestionAiService
             .'A prova pode ter VÁRIAS seções/disciplinas (ex.: PORTUGUÊS e MATEMÁTICA) com a numeração reiniciada em cada uma: inclua TODAS as questões '
             .'de TODAS as seções, na ordem do documento, e use source_number com o prefixo da seção quando a numeração reinicia (ex.: "1", ..., "20", "MAT 1", ..., "MAT 20"); '
             .'total_questions conta todas as seções. '
+            .'FRAÇÕES: copie no formato numerador/denominador como vierem (ex.: 1/100, 3/5); nunca junte numerador e denominador num número só nem inverta a ordem. '
             .'Objetivas: 2 a 10 alternativas; discursivas: options=[]. Complete deve ser true somente se TODAS as questões estiverem em questions. '
             ."Se ilegível, impossível de separar ou acima de 50 questões, complete=false. total_questions é o total identificado no documento.\n"
             .'needs_image deve ser booleano obrigatório: true SOMENTE quando o enunciado ou as alternativas dependem de figura, gráfico, mapa, charge, tirinha ou imagem cujo conteúdo NÃO está no texto extraído. '

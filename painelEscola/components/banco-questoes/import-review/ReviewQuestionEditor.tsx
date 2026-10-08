@@ -37,6 +37,8 @@ type Props = {
   onNext: () => void;
   onNextPending: () => void;
   onAutofill: () => void;
+  /** Dissertativa → objetiva com IA. */
+  onConvertToObjective: () => void;
   onRemove: () => void;
   onConfirm: () => void;
   onUploadImage: (file: File) => void;
@@ -63,8 +65,8 @@ function Card({ title, right, children }: { title: string; right?: React.ReactNo
 /** Editor da questão em revisão: pendências, enunciado, imagem, alternativas, resolução e classificação. */
 export default function ReviewQuestionEditor({
   draft, number, subjectName, issues, catalogs, preferredSubjectIds, busy, canPrev, canNext, hasPending, pdfAvailable,
-  notice, listButton, compact = false, onChange, onPrev, onNext, onNextPending, onAutofill, onRemove, onConfirm, onUploadImage, onStartCrop,
-  canEnhanceImage = false, enhancingImage = false, onEnhanceImage,
+  notice, listButton, compact = false, onChange, onPrev, onNext, onNextPending, onAutofill, onConvertToObjective, onRemove, onConfirm, onUploadImage,
+  onStartCrop, canEnhanceImage = false, enhancingImage = false, onEnhanceImage,
 }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const blockers = issues.length > 0;
@@ -220,8 +222,11 @@ export default function ReviewQuestionEditor({
               onChange={(options) => onChange({ content: { ...content, options }, answerFromPdf: draft.answerFromPdf })} />
           </Card>
         ) : (
-          <Card title="Alternativas">
-            <Text className="text-sm text-ink-muted">Questão dissertativa: sem alternativas. A resposta esperada fica na resolução.</Text>
+          <Card title="Alternativas" right={<Button size="sm" variant="ghost" icon={Sparkles} label="Transformar em objetiva com IA"
+            disabled={busy} onPress={onConvertToObjective} />}>
+            <Text className="text-sm text-ink-muted">
+              Questão dissertativa: sem alternativas. A resposta esperada fica na resolução; a IA a usa para definir a alternativa correta.
+            </Text>
           </Card>
         )}
 
