@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { Image, Pressable, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Button, Card, Icon, IconButton, Tag, Txt, type IconName, type TagTone } from './primitives';
 import { ProgressBar } from './data';
 import { usePalette } from './theme';
@@ -122,7 +122,7 @@ export function TopicRow({
 }
 
 /** Linha do ranking. A sua linha tem contorno ink e o selo "você". */
-export function RankRow({ pos, initials, name, rate, count, me, photoUrl: _photo }: { pos: number; initials: string; name: string; rate: number | null; count: number; me?: boolean; photoUrl?: string | null }) {
+export function RankRow({ pos, initials, name, rate, count, me, photoUrl }: { pos: number; initials: string; name: string; rate: number | null; count: number; me?: boolean; photoUrl?: string | null }) {
   const p = usePalette();
   const top = pos <= 3;
   return (
@@ -134,9 +134,13 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl: _photo
         {pos === 1 ? <Icon name="trophy" size={18} color={p.onInverse} />
           : <Text style={{ ...font.extrabold, fontSize: 15, color: top ? p.ink : p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>}
       </View>
-      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ ...font.extrabold, fontSize: 13, color: p.inkMuted }}>{initials}</Text>
-      </View>
+      {photoUrl ? (
+        <Image source={{ uri: photoUrl }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: p.surfaceSunken }} />
+      ) : (
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ ...font.extrabold, fontSize: 13, color: p.inkMuted }}>{initials}</Text>
+        </View>
+      )}
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, flexShrink: 1 }}>{name}</Txt>

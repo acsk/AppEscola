@@ -53,7 +53,7 @@ export function BancoRankingScreen() {
 
   const row = (r: RankingRow) => (
     <RankRow key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} initials={initials(r.name)} name={r.name.replace(/\s*\(você\)\s*/i, '')}
-      rate={r.accuracy} count={r.questions} me={r.is_me} />
+      photoUrl={r.photo_url} rate={r.accuracy} count={r.questions} me={r.is_me} />
   );
 
   const body = isLoading ? <ActivityIndicator color={p.brand} style={{ marginTop: space[6] }} />
@@ -94,7 +94,7 @@ export function BancoRankingScreen() {
       <ScrollView style={{ flex: 1, backgroundColor: p.bg }} refreshControl={refresh}>
         <PageBody maxWidth="none">
           <PageHeader title="Ranking" subtitle="Quem mais respondeu questões diferentes no banco" actions={<View style={{ width: 360 }}>{periodPicker}</View>} />
-          <View style={{ maxWidth: 760, gap: 20 }}>{body}</View>
+          <View style={{ gap: 20 }}>{body}</View>
         </PageBody>
       </ScrollView>
     );
@@ -103,7 +103,7 @@ export function BancoRankingScreen() {
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <AppBar large title="Ranking" subtitle="Quem mais respondeu questões" leading={<IconButton icon="arrow-left" label="Voltar" onPress={() => navigation.goBack()} />} />
       <ScrollView refreshControl={refresh}>
-        <ScreenBody gap={22} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
+        <ScreenBody gap={22} style={{ paddingTop: space[2], width: '100%' }}>
           {periodPicker}
           {body}
         </ScreenBody>
