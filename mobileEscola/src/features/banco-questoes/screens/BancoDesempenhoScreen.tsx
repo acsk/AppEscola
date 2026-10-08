@@ -33,6 +33,7 @@ export function BancoDesempenhoScreen() {
 
   const newByTopic = useMemo(() => new Map((facets.data?.topics ?? []).map((t) => [t.id, t.new])), [facets.data]);
   const newBySubject = useMemo(() => new Map((facets.data?.subjects ?? []).map((s) => [s.id, s.new])), [facets.data]);
+  const colorBySubject = useMemo(() => new Map((facets.data?.subjects ?? []).map((s) => [s.id, s.color])), [facets.data]);
 
   const practice = (subject: { id: number | null; name: string }, topic?: { id: number | null; name: string }) => {
     setStartError(null);
@@ -70,7 +71,7 @@ export function BancoDesempenhoScreen() {
 
   const motivation = (
     <Card padding="lg" style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'flex-start', gap: 14 }}>
-      <Text style={{ ...font.extrabold, fontSize: 40, lineHeight: 44, color: p.ink, fontVariant: ['tabular-nums'] }}>{formatPercent(overall.accuracy)}</Text>
+      {overall.answered ? <Text style={{ ...font.extrabold, fontSize: 40, lineHeight: 44, color: p.ink, fontVariant: ['tabular-nums'] }}>{formatPercent(overall.accuracy)}</Text> : null}
       <View style={{ flex: isDesktop ? 1 : undefined, alignSelf: 'stretch', gap: 2 }}>
         <Txt variant="titleSm">
           {overall.answered ? `Você acertou ${overall.correct} de ${overall.answered} ${overall.answered === 1 ? 'questão' : 'questões'}` : 'Você ainda não respondeu questões do banco'}
@@ -95,7 +96,7 @@ export function BancoDesempenhoScreen() {
     <Card key={String(subject.id ?? 'none')} padding="lg" style={{ gap: 0 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 6 }}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectColor(p, subject.id) }} />
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectColor(p, subject.id, subject.id != null ? colorBySubject.get(subject.id) : null) }} />
           <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 17, flexShrink: 1 }}>{subject.name}</Txt>
         </View>
         {subject.answered ? <Text style={{ ...font.extrabold, fontSize: 20, color: p.ink, fontVariant: ['tabular-nums'] }}>{formatPercent(subject.accuracy)}</Text>

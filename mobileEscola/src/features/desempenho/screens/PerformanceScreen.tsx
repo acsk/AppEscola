@@ -1,558 +1,236 @@
-import React, { useMemo, useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  TouchableOpacity,
-  RefreshControl,
-  useWindowDimensions,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { AlunoTabParamList } from '../../../navigation/stacks/AlunoStack';
-import { usePracticeSummary } from '../../banco-questoes/hooks';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
+import { getApiErrorMessage } from '../../../lib/apiError';
+import { fetchStudentPerformance, type PerformanceMonthlyEvolution } from '../../../services/performance.service';
+import { usePracticePerformance, usePracticeRanking, usePracticeSummary, useStartPracticeSession } from '../../banco-questoes/hooks';
+import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import {
-  fetchStudentPerformance,
-  PerformanceBySubject,
-  StudentPerformance,
-} from '../../../services/performance.service';
-import { subjectIconName } from '../../../services/simulados.service';
-import { MenuButton } from '../../../components/navigation/MenuButton';
-import { StudentEnrollmentContextCard } from '../../../components/student/StudentEnrollmentContextCard';
-import { platformShadow } from '../../../lib/shadow';
-import { useThemeColors } from '../../../context/TenantThemeContext';
-import type { ThemeColors } from '../../../theme';
+  AppBar, Button, Card, EmptyState, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, QuickAction, ScreenBody,
+  SegmentedControl, StatTile, SubjectScore, Tag, Txt, font, space, subjectColor, useLayoutMode, usePalette, type MonthBar,
+} from '../../../ui';
 
-const MONTH_OPTIONS = [6, 12] as const;
-const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
+const PERIODS = [6, 12] as const;
+const pct = (v: number | null | undefined, d = 1) => (v == null ? '—' : `${v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })}%`);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function formatPct(value: number | null | undefined, fractionDigits = 1): string {
-  if (value == null) return '—';
-  return `${value.toLocaleString('pt-BR', {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  })}%`;
+/** "Set/2026" a partir de "2026-09". */
+function monthName(m: PerformanceMonthlyEvolution) {
+  const [y, mm] = m.month.split('-').map(Number);
+  if (!y || !mm) return m.label;
+  return `${cap(new Date(y, mm - 1, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''))}/${y}`;
 }
 
-function trendColor(change: number | null | undefined, colors: ThemeColors): string {
-  if (change == null || change === 0) return colors.muted;
-  return change > 0 ? '#22C55E' : '#EF4444';
-}
-
-function BarChart({
-  values,
-  labels,
-  colors,
-  styles,
-  maxHeight = 120,
-}: {
-  values: Array<number | null>;
-  labels: string[];
-  colors: ThemeColors;
-  styles: ReturnType<typeof createPerformanceStyles>;
-  maxHeight?: number;
-}) {
-  const max = Math.max(100, ...values.filter((v): v is number => v != null));
-
-  return (
-    <View style={styles.chartRow}>
-      {values.map((value, index) => {
-        const height = value != null ? Math.max(8, (value / max) * maxHeight) : 4;
-        const hasValue = value != null;
-        return (
-          <View key={`${labels[index]}-${index}`} style={styles.chartCol}>
-            <Text style={styles.chartValue}>{hasValue ? formatPct(value, 0) : '—'}</Text>
-            <View style={[styles.chartBarTrack, { height: maxHeight }]}>
-              <View
-                style={[
-                  styles.chartBarFill,
-                  {
-                    height,
-                    backgroundColor: hasValue ? colors.primary : '#E5E7EB',
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.chartLabel} numberOfLines={1}>
-              {labels[index]}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function SubjectCard({
-  item,
-  colors,
-  styles,
-}: {
-  item: PerformanceBySubject;
-  colors: ThemeColors;
-  styles: ReturnType<typeof createPerformanceStyles>;
-}) {
-  const subjectColor = item.subject.color || colors.primary;
-  const approved =
-    item.avg_percentage != null && item.passing_score_avg != null
-      ? item.avg_percentage >= item.passing_score_avg
-      : null;
-
-  return (
-    <View style={[styles.subjectCard, platformShadow({ color: '#111827', opacity: 0.06, radius: 12, elevation: 2 })]}>
-      <View style={styles.subjectHeader}>
-        <View style={[styles.subjectIcon, { backgroundColor: `${subjectColor}22` }]}>
-          <Ionicons
-            name={subjectIconName(item.subject.icon ?? '') as any}
-            size={20}
-            color={subjectColor}
-          />
-        </View>
-        <View style={styles.subjectInfo}>
-          <Text style={styles.subjectName}>{item.subject.name}</Text>
-          <Text style={styles.subjectMeta}>
-            {item.attempts_count} simulado{item.attempts_count !== 1 ? 's' : ''}
-            {item.passing_score_avg != null ? ` · mín. ${formatPct(item.passing_score_avg, 0)}` : ''}
-          </Text>
-        </View>
-        <Text style={[styles.subjectAvg, { color: approved === false ? '#EF4444' : approved === true ? '#22C55E' : colors.ink }]}>
-          {formatPct(item.avg_percentage)}
-        </Text>
-      </View>
-
-      <View style={styles.progressTrack}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${Math.min(100, item.avg_percentage ?? 0)}%`,
-              backgroundColor: subjectColor,
-            },
-          ]}
-        />
-      </View>
-
-      <View style={styles.subjectFooter}>
-        <Text style={styles.subjectFooterText}>
-          Último: {formatPct(item.latest_percentage)}
-        </Text>
-        {item.month_change != null && (
-          <View style={styles.trendPill}>
-            <Ionicons
-              name={item.month_change >= 0 ? 'arrow-up' : 'arrow-down'}
-              size={12}
-              color={trendColor(item.month_change, colors)}
-            />
-            <Text style={[styles.trendText, { color: trendColor(item.month_change, colors) }]}>
-              {item.month_change > 0 ? '+' : ''}
-              {item.month_change.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pp vs mês ant.
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
+/**
+ * Desempenho (protótipos "TelaDesempenho" e "DesktopDesempenho"): números primeiro (média contra o mínimo),
+ * depois o porquê (evolução e disciplinas) e o que fazer ("Treinar estes assuntos"). O pacote sai desta tela.
+ */
 export function PerformanceScreen() {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createPerformanceStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isCompact = width < 390;
-  const [months, setMonths] = useState<(typeof MONTH_OPTIONS)[number]>(6);
-  const [data, setData] = useState<StudentPerformance | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const navigation = useNavigation<BottomTabNavigationProp<AlunoTabParamList, 'Desempenho'>>();
+  const p = usePalette();
+  const navigation = useNavigation<any>();
+  const drawer = useOptionalAlunoDrawer();
+  const { isMobile, isDesktop } = useLayoutMode();
+  const [months, setMonths] = useState<(typeof PERIODS)[number]>(6);
+  const query = useQuery({ queryKey: ['aluno', 'performance', months], queryFn: () => fetchStudentPerformance(months) });
   const practice = usePracticeSummary();
+  const practicePerf = usePracticePerformance();
+  const ranking = usePracticeRanking('month');
+  const start = useStartPracticeSession();
+  const [startError, setStartError] = useState<string | null>(null);
 
-  const load = useCallback(async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
-    try {
-      const result = await fetchStudentPerformance(months);
-      setData(result);
-    } catch {
-      setError('Não foi possível carregar seu desempenho.');
-      setData(null);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [months]);
+  const { refetch } = query;
+  const refetchPractice = practice.refetch;
+  useFocusEffect(useCallback(() => { refetch(); refetchPractice(); }, [refetch, refetchPractice]));
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-      practice.refetch();
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch do React Query é estável
-    }, [load])
-  );
-
+  const data = query.data;
   const overview = data?.overview;
-  const chartLabels = data?.monthly_evolution.map((m) => m.label) ?? [];
-  const chartValues = data?.monthly_evolution.map((m) => m.avg_percentage) ?? [];
+  const subjects = [...(data?.by_subject ?? [])].filter((s) => s.avg_percentage != null).sort((a, b) => (b.avg_percentage ?? 0) - (a.avg_percentage ?? 0));
+  const passing = subjects.filter((s) => s.passing_score_avg != null);
+  const minimum = passing.length ? Math.round(passing.reduce((acc, s) => acc + (s.passing_score_avg ?? 0), 0) / passing.length) : 50;
+  const avg = overview?.avg_percentage ?? null;
+  const evolution = data?.monthly_evolution ?? [];
+  const bars: MonthBar[] = evolution.map((m, i) => ({ label: cap(m.label.replace('.', '')).slice(0, 3), value: m.avg_percentage, count: m.attempts_count, current: i === evolution.length - 1 }));
+  const focus = (practicePerf.data?.study_focus ?? []).slice(0, 3);
+  const me = ranking.data?.me ?? null;
 
-  const header = (
-    <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-      <View style={styles.headerGlowPrimary} />
-      <View style={styles.headerGlowSecondary} />
-      <View style={styles.headerTituloRow}>
-        <MenuButton />
-        <View style={styles.headerTextWrap}>
-          <Text style={styles.headerTitulo}>Aproveitamento</Text>
-          <Text style={styles.headerSubtitulo}>Evolução por disciplina e por mês</Text>
-        </View>
+  const train = () => {
+    setStartError(null);
+    const title = focus.length === 1 ? `Reforçar ${focus[0].topic.name}` : 'Treinar meus pontos fracos';
+    start.mutate({
+      filters: { topic_ids: focus.map((f) => f.topic.id), situation: 'all' },
+      options: { quantity: 10, correction_mode: 'each', timed: false, title },
+    }, {
+      onSuccess: (payload) => navigation.navigate('Questoes', { screen: 'BancoSimulado', params: { attemptId: payload.attempt.id, title }, initial: false }),
+      onError: (cause) => setStartError(getApiErrorMessage(cause, 'Não foi possível começar. Tente de novo.')),
+    });
+  };
+  const openBank = () => navigation.navigate('Questoes', { screen: 'BancoQuestoes' });
+  const openRanking = () => navigation.navigate('Questoes', { screen: 'BancoRanking', initial: false });
+
+  const period = <SegmentedControl label="Período" options={PERIODS.map((m) => `${m} meses`)} value={PERIODS.indexOf(months)} onChange={(i) => setMonths(PERIODS[i])} />;
+  const bankValue = practice.data?.answered ? pct(practice.data.accuracy, 0) : '—';
+  const bankHint = practice.data?.answered ? `${practice.data.answered} ${practice.data.answered === 1 ? 'resposta' : 'respostas'}` : 'Nenhuma resposta ainda';
+
+  const evolutionCard = (
+    <Card padding="lg" style={{ gap: space[3] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
+        <Txt variant="titleSm">Evolução mensal</Txt>
+        {isDesktop ? <Txt variant="bodySm" tone="subtle">Média dos simulados feitos em cada mês</Txt> : null}
       </View>
-    </View>
+      {bars.some((b) => b.value != null) ? <MonthBars data={bars} minimum={minimum} height={isDesktop ? 180 : 140} />
+        : <Txt tone="subtle">Faça simulados para ver sua evolução aqui.</Txt>}
+    </Card>
   );
 
-  return (
-    <View style={styles.container}>
-      {header}
+  const subjectsCard = (
+    <Card padding="lg" style={{ paddingBottom: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
+        <Txt variant="titleSm">Por disciplina</Txt>
+        {isDesktop ? <Txt variant="bodySm" tone="subtle">Ordenado pela média</Txt> : null}
+      </View>
+      {subjects.length ? subjects.map((s, i) => (
+        <SubjectScore key={String(s.subject_id ?? s.subject.name)} first={i === 0} subject={s.subject.name} dot={s.subject_id ? subjectColor(p, s.subject_id, s.subject.color) : p.inkSubtle}
+          count={s.attempts_count} average={s.avg_percentage ?? 0} last={s.latest_percentage} minimum={s.passing_score_avg ?? minimum} />
+      )) : <Txt tone="subtle" style={{ paddingVertical: space[3] }}>Nenhum simulado concluído no período.</Txt>}
+    </Card>
+  );
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, isCompact && styles.contentCompact]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
-        showsVerticalScrollIndicator={false}
-      >
-        {data?.student?.active_enrollments?.length ? (
-          <StudentEnrollmentContextCard enrollments={data.student.active_enrollments} />
-        ) : null}
-
-        <View style={[styles.card, styles.practiceCard, platformShadow({ color: '#111827', opacity: 0.05, radius: 10, elevation: 2 })]}>
-          <View style={styles.practiceHeader}>
-            <Ionicons name="library-outline" size={20} color={colors.primary} />
-            <Text style={styles.practiceTitle}>Banco de questões</Text>
-          </View>
-          <Text style={styles.practiceText}>
-            {practice.data?.answered
-              ? `${practice.data.answered} respostas · ${formatPct(practice.data.accuracy, 0)} de acerto (não entra na média dos simulados)`
-              : 'Pratique questões e descubra os assuntos que você mais precisa estudar.'}
-          </Text>
-          <View style={styles.practiceActions}>
-            <TouchableOpacity
-              style={styles.practiceButton}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('Questoes', { screen: 'BancoDesempenho', initial: false })}
-            >
-              <Ionicons name="analytics-outline" size={16} color={colors.surface} />
-              <Text style={styles.practiceButtonText}>O que estudar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.practiceButton, styles.practiceButtonOutline]}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('Questoes', { screen: 'BancoRanking', initial: false })}
-            >
-              <Ionicons name="trophy-outline" size={16} color={colors.primary} />
-              <Text style={[styles.practiceButtonText, { color: colors.primary }]}>Ranking</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.periodRow}>
-          {MONTH_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option}
-              onPress={() => setMonths(option)}
-              style={[styles.periodChip, months === option && styles.periodChipActive]}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.periodChipText, months === option && styles.periodChipTextActive]}>
-                {option} meses
-              </Text>
-            </TouchableOpacity>
+  const studyCard = (
+    <Card padding="lg" style={{ gap: 14 }}>
+      <Txt variant="titleSm">O que estudar agora</Txt>
+      {isDesktop ? <Txt tone="muted" style={{ fontSize: 14, lineHeight: 20 }}>Assuntos em que você mais errou no banco de questões.</Txt> : null}
+      {focus.length ? (
+        <View>
+          {focus.map((f, i) => (
+            <View key={`${f.subject.id}-${f.topic.id}`} style={{ flexDirection: 'row', gap: 12, alignItems: 'baseline', paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.line }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectColor(p, f.subject.id) }} />
+              <View style={{ flex: 1 }}>
+                <Txt variant="titleSm" style={{ fontSize: 15 }}>{f.topic.name}</Txt>
+                <Txt variant="bodySm" tone="subtle">{f.reason === 'low_accuracy' ? `${pct(f.accuracy, 0)} de acerto no banco` : 'Ainda não praticado'}</Txt>
+              </View>
+            </View>
           ))}
         </View>
+      ) : <Txt tone="subtle">Responda questões no banco para a gente apontar o que estudar.</Txt>}
+      {startError ? <Notice tone="danger" title="Não foi possível começar" text={startError} /> : null}
+      {focus.length ? <Button block size={isDesktop ? 'lg' : 'md'} cta={isDesktop} iconRight="arrow-right" label="Treinar estes assuntos" loading={start.isPending} onPress={train} />
+        : <Button block variant="secondary" iconRight="arrow-right" label="Ir para o banco de questões" onPress={openBank} />}
+    </Card>
+  );
 
-        {loading && !data ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={() => load()} style={styles.retryButton}>
-              <Text style={styles.retryText}>Tentar novamente</Text>
-            </TouchableOpacity>
-          </View>
-        ) : data ? (
-          <>
-            <View style={styles.overviewGrid}>
-              <View style={[styles.overviewCard, styles.overviewCardPrimary]}>
-                <Text style={styles.overviewLabel}>Média geral</Text>
-                <Text style={styles.overviewValue}>{formatPct(overview?.avg_percentage)}</Text>
-              </View>
-              <View style={styles.overviewCard}>
-                <Text style={styles.overviewLabel}>Este mês</Text>
-                <Text style={styles.overviewValue}>{formatPct(overview?.month_avg_percentage)}</Text>
-                {overview?.month_change != null && (
-                  <Text style={[styles.overviewChange, { color: trendColor(overview.month_change, colors) }]}>
-                    {overview.month_change > 0 ? '+' : ''}
-                    {overview.month_change} pp
-                  </Text>
-                )}
-              </View>
-              <View style={styles.overviewCard}>
-                <Text style={styles.overviewLabel}>Simulados</Text>
-                <Text style={styles.overviewValue}>{overview?.total_attempts ?? 0}</Text>
-              </View>
-              <View style={styles.overviewCard}>
-                <Text style={styles.overviewLabel}>Disciplinas</Text>
-                <Text style={styles.overviewValue}>{overview?.subjects_count ?? 0}</Text>
-              </View>
-            </View>
+  const refresh = <RefreshControl refreshing={query.isRefetching} onRefresh={() => { refetch(); refetchPractice(); }} tintColor={p.brand} colors={[p.brand]} />;
+  const state = query.isLoading ? <ActivityIndicator color={p.brand} style={{ marginTop: space[6] }} />
+    : query.isError ? (
+      <View style={{ gap: space[3] }}>
+        <Notice tone="danger" title="Não foi possível carregar seu desempenho" text={getApiErrorMessage(query.error, 'Tente de novo.')} />
+        <Button variant="secondary" icon="refresh" label="Tentar de novo" onPress={() => refetch()} />
+      </View>
+    ) : null;
 
-            {overview?.best_subject && (
-              <View style={styles.insightBox}>
-                <Ionicons name="trophy-outline" size={18} color="#A16207" />
-                <Text style={styles.insightText}>
-                  Melhor média em{' '}
-                  <Text style={styles.insightStrong}>{overview.best_subject.name}</Text>
-                  {' '}({formatPct(overview.best_subject.avg_percentage)})
-                </Text>
+  if (isDesktop) {
+    // Mês a mês: meses com simulado em linhas; os vazios agrupados numa só.
+    const filled = [...evolution].reverse().filter((m) => m.attempts_count > 0);
+    const empty = [...evolution].reverse().filter((m) => !m.attempts_count).map((m) => cap(m.label.replace('.', '')).slice(0, 3));
+    const th = { ...font.bold, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const, color: p.inkSubtle };
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: p.bg }} refreshControl={refresh}>
+        <PageBody maxWidth="none">
+          <PageHeader title="Desempenho" subtitle="Sua média nos simulados, por mês e por disciplina" actions={<View style={{ width: 260 }}>{period}</View>} />
+          {state ?? (
+            <>
+              <View style={{ flexDirection: 'row', gap: space[3] }}>
+                <StatTile style={{ backgroundColor: p.surface, borderWidth: 1, borderColor: p.line }} label="Média nos simulados" value={pct(avg)}
+                  hint={`Mínimo exigido ${minimum}%`} tone={avg == null ? undefined : avg >= minimum ? 'success' : 'danger'} />
+                <StatTile style={{ backgroundColor: p.surface, borderWidth: 1, borderColor: p.line }} label="Simulados feitos" value={String(overview?.total_attempts ?? 0)} hint={`nos últimos ${months} meses`} />
+                <StatTile style={{ backgroundColor: p.surface, borderWidth: 1, borderColor: p.line }} label="Melhor disciplina" value={overview?.best_subject?.name ?? '—'}
+                  hint={overview?.best_subject ? `${pct(overview.best_subject.avg_percentage)} de média` : undefined} />
+                <StatTile style={{ backgroundColor: p.surface, borderWidth: 1, borderColor: p.line }} label="Banco de questões" value={bankValue} hint={`${bankHint} · fora da média`} />
               </View>
-            )}
-
-            <Text style={styles.sectionTitle}>Evolução mensal</Text>
-            <View style={[styles.card, platformShadow({ color: '#111827', opacity: 0.05, radius: 10, elevation: 2 })]}>
-              {chartValues.some((v) => v != null) ? (
-                <BarChart values={chartValues} labels={chartLabels} colors={colors} styles={styles} />
-              ) : (
-                <Text style={styles.emptyText}>Sem simulados concluídos no período.</Text>
-              )}
-            </View>
-
-            <Text style={styles.sectionTitle}>Por disciplina</Text>
-            {data.by_subject.length === 0 ? (
-              <View style={styles.card}>
-                <Text style={styles.emptyText}>Conclua simulados para ver o desempenho por disciplina.</Text>
-              </View>
-            ) : (
-              data.by_subject.map((item) => (
-                <SubjectCard
-                  key={String(item.subject_id ?? 'general')}
-                  item={item}
-                  colors={colors}
-                  styles={styles}
-                />
-              ))
-            )}
-
-            <Text style={styles.sectionTitle}>Detalhe mês a mês</Text>
-            {data.monthly_evolution.map((month) => (
-              <View key={month.month} style={[styles.monthCard, platformShadow({ color: '#111827', opacity: 0.04, radius: 8, elevation: 1 })]}>
-                <View style={styles.monthHeader}>
-                  <Text style={styles.monthTitle}>{month.label}</Text>
-                  <Text style={styles.monthAvg}>{formatPct(month.avg_percentage)}</Text>
-                </View>
-                {month.by_subject.length === 0 ? (
-                  <Text style={styles.monthEmpty}>Nenhum simulado neste mês</Text>
-                ) : (
-                  month.by_subject.map((subject) => (
-                    <View key={`${month.month}-${subject.subject_id ?? 'g'}`} style={styles.monthSubjectRow}>
-                      <Text style={styles.monthSubjectName} numberOfLines={1}>
-                        {subject.subject_name}
-                      </Text>
-                      <Text style={styles.monthSubjectMeta}>
-                        {subject.attempts_count} · {formatPct(subject.avg_percentage, 0)}
-                      </Text>
+              <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, minWidth: 0, gap: 20 }}>
+                  {evolutionCard}
+                  {subjectsCard}
+                  <Card padding="none">
+                    <Txt variant="titleSm" style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 }}>Mês a mês</Txt>
+                    <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: p.line }}>
+                      <Text style={[th, { width: 110 }]}>Mês</Text><Text style={[th, { flex: 1 }]}>Disciplinas</Text>
+                      <Text style={[th, { width: 90, textAlign: 'right' }]}>Simulados</Text><Text style={[th, { width: 90, textAlign: 'right' }]}>Média</Text>
                     </View>
-                  ))
-                )}
+                    {filled.map((m) => (
+                      <View key={m.month} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: p.line }}>
+                        <Txt variant="label" style={{ width: 110 }}>{monthName(m)}</Txt>
+                        <Txt tone="muted" style={{ flex: 1, fontSize: 14 }}>{m.by_subject.map((s) => `${s.subject_name} ${Math.round(s.avg_percentage)}%`).join(' · ')}</Txt>
+                        <Txt tone="muted" style={{ width: 90, textAlign: 'right', fontSize: 14 }}>{m.attempts_count}</Txt>
+                        <Txt variant="label" style={{ width: 90, textAlign: 'right', fontVariant: ['tabular-nums'] }}>{pct(m.avg_percentage)}</Txt>
+                      </View>
+                    ))}
+                    {empty.length ? (
+                      <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 14 }}>
+                        <Txt variant="bodySm" tone="subtle" style={{ width: 110 }}>{empty.join(', ')}</Txt>
+                        <Txt variant="bodySm" tone="subtle">Nenhum simulado {empty.length === 1 ? 'neste mês' : 'nesses meses'}</Txt>
+                      </View>
+                    ) : null}
+                  </Card>
+                </View>
+                <View style={{ width: 360, gap: space[4] }}>
+                  {studyCard}
+                  <Card style={{ gap: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Txt variant="titleSm">Ranking do banco</Txt>
+                      <Icon name="trophy" size={20} color={p.ink} />
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space[2] }}>
+                      <Text style={{ ...font.extrabold, fontSize: 32, lineHeight: 40, color: p.ink }}>{me ? `${me.position}º` : '—'}</Text>
+                      <Txt tone="muted" style={{ fontSize: 14 }}>{me ? `de ${ranking.data?.participants ?? 0} alunos nos últimos 30 dias` : 'Responda questões para entrar'}</Txt>
+                    </View>
+                    <View style={{ alignSelf: 'flex-start', marginLeft: -12 }}><Button variant="ghost" size="sm" iconRight="arrow-right" label="Ver ranking" onPress={openRanking} /></View>
+                  </Card>
+                </View>
               </View>
-            ))}
-          </>
-        ) : null}
-        <View style={{ height: 28 }} />
+            </>
+          )}
+        </PageBody>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: p.bg }}>
+      <AppBar large title="Desempenho" subtitle={`Seus simulados nos últimos ${months} meses`}
+        leading={drawer && isMobile ? <IconButton icon="menu" label="Abrir menu" variant="outline" onPress={drawer.open} /> : undefined} />
+      <ScrollView refreshControl={refresh}>
+        <ScreenBody gap={20} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
+          {period}
+          {state ?? (overview && !overview.total_attempts && !practice.data?.answered ? (
+            <EmptyState icon="chart" title="Ainda não há resultados" text="Quando você concluir simulados, sua média e a evolução aparecem aqui." />
+          ) : (
+            <>
+              <Card padding="lg" style={{ gap: 6 }}>
+                <Overline>Média nos simulados</Overline>
+                <Text style={{ ...font.extrabold, fontSize: 48, lineHeight: 52, letterSpacing: -0.96, color: p.ink, fontVariant: ['tabular-nums'] }}>
+                  {avg == null ? '—' : avg.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                  {avg != null ? <Text style={{ fontSize: 24, ...font.bold }}>%</Text> : null}
+                </Text>
+                {avg != null ? (
+                  <View style={{ marginBottom: 10 }}>
+                    <Tag tone={avg >= minimum ? 'success' : 'danger'} icon={avg >= minimum ? 'check' : 'alert'} label={`${avg >= minimum ? 'Acima' : 'Abaixo'} do mínimo de ${minimum}%`} />
+                  </View>
+                ) : null}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <StatTile label="Simulados feitos" value={String(overview?.total_attempts ?? 0)} />
+                  <StatTile label="Banco de questões" value={bankValue} hint={bankHint} />
+                </View>
+              </Card>
+              {evolutionCard}
+              {subjectsCard}
+              {studyCard}
+              <QuickAction icon="trophy" title="Ranking do banco"
+                subtitle={me ? `Você está em ${me.position}º de ${ranking.data?.participants ?? 0}` : 'Veja quem mais respondeu questões'} onPress={openRanking} />
+            </>
+          ))}
+        </ScreenBody>
       </ScrollView>
     </View>
   );
-}
-
-function createPerformanceStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F6F7FB' },
-  scroll: { flex: 1 },
-  headerWrap: {
-    backgroundColor: '#FBFAFF',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
-    ...(headerShadow as object),
-  },
-  headerGlowPrimary: {
-    position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    right: -104,
-    top: -150,
-    backgroundColor: '#F0E9FF',
-    opacity: 0.92,
-  },
-  headerGlowSecondary: {
-    position: 'absolute',
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    left: -76,
-    top: 58,
-    backgroundColor: '#F7F2FF',
-    opacity: 0.98,
-  },
-  headerTituloRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 18,
-    paddingBottom: 6,
-  },
-  headerTextWrap: { flex: 1 },
-  headerTitulo: { fontSize: 22, fontWeight: '800', color: '#111827' },
-  headerSubtitulo: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  content: { padding: 16, gap: 12 },
-  contentCompact: { padding: 12 },
-  periodRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  periodChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  periodChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  periodChipText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  periodChipTextActive: { color: colors.surface },
-  centered: { paddingVertical: 48, alignItems: 'center' },
-  errorBox: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  errorText: { color: '#B91C1C', fontSize: 14 },
-  retryButton: { marginTop: 12, alignSelf: 'flex-start' },
-  retryText: { color: colors.primary, fontWeight: '700' },
-  overviewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  overviewCard: {
-    width: '48%',
-    flexGrow: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#EDE9FE',
-  },
-  overviewCardPrimary: { backgroundColor: '#F5F0FF' },
-  overviewLabel: { fontSize: 12, color: colors.muted, fontWeight: '600' },
-  overviewValue: { fontSize: 24, fontWeight: '800', color: colors.ink, marginTop: 4 },
-  overviewChange: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  insightBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  insightText: { flex: 1, fontSize: 13, color: '#92400E', lineHeight: 18 },
-  insightStrong: { fontWeight: '800', color: '#78350F' },
-  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.ink, marginTop: 8 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  emptyText: { fontSize: 13, color: colors.muted, textAlign: 'center', paddingVertical: 8 },
-  practiceCard: { gap: 8 },
-  practiceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  practiceTitle: { fontSize: 15, fontWeight: '800', color: colors.ink },
-  practiceText: { fontSize: 13, color: colors.muted, lineHeight: 18 },
-  practiceActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  practiceButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, borderRadius: 999,
-    paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: colors.primary,
-  },
-  practiceButtonOutline: { backgroundColor: colors.surface },
-  practiceButtonText: { color: colors.surface, fontWeight: '800', fontSize: 13 },
-  chartRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 },
-  chartCol: { flex: 1, alignItems: 'center', minWidth: 36 },
-  chartValue: { fontSize: 10, fontWeight: '700', color: colors.muted, marginBottom: 6 },
-  chartBarTrack: { width: '72%', justifyContent: 'flex-end', backgroundColor: '#F3F4F6', borderRadius: 8, overflow: 'hidden' },
-  chartBarFill: { width: '100%', borderRadius: 8 },
-  chartLabel: { fontSize: 10, color: colors.muted, marginTop: 6, textAlign: 'center' },
-  subjectCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 10,
-  },
-  subjectHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  subjectIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  subjectInfo: { flex: 1 },
-  subjectName: { fontSize: 15, fontWeight: '700', color: colors.ink },
-  subjectMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  subjectAvg: { fontSize: 18, fontWeight: '800' },
-  progressTrack: {
-    height: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 999,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', borderRadius: 999 },
-  subjectFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  subjectFooterText: { fontSize: 12, color: colors.muted },
-  trendPill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  trendText: { fontSize: 11, fontWeight: '600' },
-  monthCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    marginBottom: 8,
-  },
-  monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  monthTitle: { fontSize: 14, fontWeight: '700', color: colors.ink },
-  monthAvg: { fontSize: 14, fontWeight: '800', color: colors.primary },
-  monthEmpty: { fontSize: 12, color: colors.muted },
-  monthSubjectRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#F9FAFB',
-    gap: 8,
-  },
-  monthSubjectName: { flex: 1, fontSize: 13, color: colors.ink },
-  monthSubjectMeta: { fontSize: 12, fontWeight: '600', color: colors.muted },
-});
 }

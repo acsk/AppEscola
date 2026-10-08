@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import { getApiErrorMessage } from '../../../lib/apiError';
@@ -22,7 +22,8 @@ export function BancoRankingScreen() {
   const p = usePalette();
   const navigation = useNavigation<Nav>();
   const { isDesktop } = useLayoutMode();
-  const [period, setPeriod] = useState<RankingPeriod>('month');
+  const route = useRoute<RouteProp<QuestoesStackParamList, 'BancoRanking'>>();
+  const [period, setPeriod] = useState<RankingPeriod>(route.params?.period ?? 'month');
   const { data, isLoading, isError, error, refetch, isRefetching } = usePracticeRanking(period);
 
   const me = data?.me ?? null;

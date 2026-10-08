@@ -1,293 +1,212 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  TextInput,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator, Linking, RefreshControl, ScrollView, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
-import {
-  anoDaProva,
-  extrairAnosDasProvas,
-  extrairDisciplinasDasProvas,
-  type PastExamListItem,
-  type PastExamMaterialKind,
-} from '../../../services/past-exams.service';
+import { anoDaProva, type PastExamListItem, type PastExamMaterialKind } from '../../../services/past-exams.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { useProvasAnterioresList } from '../hooks';
-import { ProvasAnterioresHeader } from '../components/ProvasAnterioresHeader';
-import { PastMaterialCard } from '../components/PastMaterialCard';
-import { useThemeColors } from '../../../context/TenantThemeContext';
-import type { ThemeColors } from '../../../theme';
+import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
+import {
+  AppBar, Button, Chip, EmptyState, FileRow, IconButton, LinkButton, Notice, PageBody, PageHeader, ScreenBody, SearchField, SelectButton,
+  Txt, font, space, subjectColor, useLayoutMode, usePalette,
+} from '../../../ui';
 
 type ListScreenName = 'ProvasAnteriores' | 'Exercicios' | 'Materiais';
-
 type Nav = NativeStackNavigationProp<SimuladosStackParamList>;
 
-export type PastMaterialListScreenProps = {
-  materialKind: PastExamMaterialKind;
-  listScreen: ListScreenName;
-};
+export type PastMaterialListScreenProps = { materialKind: PastExamMaterialKind; listScreen: ListScreenName };
 
-const COPY = {
+const COPY: Record<PastExamMaterialKind, { title: string; sub: (n: number) => string; search: string; emptyTitle: string; emptyText: string; noun: [string, string] }> = {
   prova: {
-    title: 'Provas anteriores',
-    searchPlaceholder: 'Buscar prova...',
-    loading: 'Carregando provas anteriores…',
-    error: 'Não foi possível carregar as provas anteriores.',
-    counter: (n: number) =>
-      n === 1 ? '1 prova encontrada' : `${n} provas encontradas`,
-    emptyTitle: 'Nenhuma prova anterior disponível',
-    emptySub: 'Quando sua escola publicar provas, elas aparecerão aqui.',
-    dateLabel: 'Data da prova',
+    title: 'Provas anteriores', sub: () => 'Provas oficiais de anos anteriores, com gabarito', search: 'Buscar prova por nome ou ano',
+    emptyTitle: 'Nenhuma prova anterior ainda', emptyText: 'Quando a escola publicar provas de anos anteriores, elas aparecem aqui, separadas por ano.', noun: ['prova', 'provas'],
   },
   exercicio: {
-    title: 'Exercícios',
-    searchPlaceholder: 'Buscar exercício...',
-    loading: 'Carregando exercícios…',
-    error: 'Não foi possível carregar os exercícios.',
-    counter: (n: number) =>
-      n === 1 ? '1 exercício encontrado' : `${n} exercícios encontrados`,
-    emptyTitle: 'Nenhum exercício disponível',
-    emptySub: 'Quando sua escola publicar exercícios, eles aparecerão aqui.',
-    dateLabel: 'Data',
+    title: 'Exercícios', sub: (n) => `Listas para praticar em casa. ${n} ${n === 1 ? 'disponível' : 'disponíveis'}`, search: 'Buscar exercício',
+    emptyTitle: 'Nenhum exercício ainda', emptyText: 'Quando a escola publicar listas de exercícios, elas aparecem aqui.', noun: ['lista', 'listas'],
   },
   material: {
-    title: 'Materiais',
-    searchPlaceholder: 'Buscar material...',
-    loading: 'Carregando materiais…',
-    error: 'Não foi possível carregar os materiais.',
-    counter: (n: number) =>
-      n === 1 ? '1 material encontrado' : `${n} materiais encontrados`,
-    emptyTitle: 'Nenhum material disponível',
-    emptySub: 'Quando sua escola publicar materiais, eles aparecerão aqui.',
-    dateLabel: 'Data',
+    title: 'Materiais', sub: () => 'Apostilas e simulados para estudar e imprimir', search: 'Buscar material',
+    emptyTitle: 'Nenhum material ainda', emptyText: 'Quando a escola publicar apostilas e materiais, eles aparecem aqui.', noun: ['material', 'materiais'],
   },
-} as const;
+};
 
+const NEW_DAYS = 7;
+const isNew = (item: PastExamListItem) => !!item.created_at && Date.now() - new Date(item.created_at).getTime() < NEW_DAYS * 86400000;
+const fileTypeLabel = (item: PastExamListItem) => (item.type === 'link' ? 'LINK' : item.file_type === 'image' ? 'IMG' : item.file_type === 'document' ? 'DOC' : 'PDF');
+/** Turmas: até duas e "+N". */
+function classes(item: PastExamListItem): string | null {
+  const names = (item.courses?.length ? item.courses : item.course ? [item.course] : []).map((c) => c.name);
+  if (!names.length) return null;
+  return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ');
+}
+const addedOn = (item: PastExamListItem) => (item.created_at ? `Adicionado ${new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : null);
+
+/**
+ * Biblioteca (protótipos "TelaExercicios", "DesktopExercicios", "DesktopMateriais", "DesktopProvasAnteriores"):
+ * o mesmo FileRow, agrupado por disciplina (Exercícios), coleção (Materiais) ou ano (Provas). "Abrir" mostra no app; o ícone baixa.
+ */
 export function PastMaterialListScreen({ materialKind, listScreen }: PastMaterialListScreenProps) {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const p = usePalette();
   const navigation = useNavigation<Nav>();
+  const drawer = useOptionalAlunoDrawer();
+  const { isMobile, isDesktop } = useLayoutMode();
   const copy = COPY[materialKind];
-  const [busca, setBusca] = useState('');
-  const [anoFiltro, setAnoFiltro] = useState<number | null>(null);
-  const [disciplinaFiltro, setDisciplinaFiltro] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [subjectId, setSubjectId] = useState<number | 0>(0);
+  const [year, setYear] = useState<number | 0>(0);
+  const [course, setCourse] = useState<number | 0>(0);
+  const [sort, setSort] = useState<'recent' | 'oldest'>('recent');
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const {
-    data: todas = [],
-    isLoading,
-    isRefetching,
-    isError,
-    error,
-    refetch,
-  } = useProvasAnterioresList({ material_kind: materialKind });
+  const { data: all = [], isLoading, isRefetching, isError, error, refetch } = useProvasAnterioresList({ material_kind: materialKind });
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
-  const disciplinas = useMemo(() => extrairDisciplinasDasProvas(todas), [todas]);
-  const anos = useMemo(() => extrairAnosDasProvas(todas), [todas]);
+  const yearOf = (i: PastExamListItem) => anoDaProva(i.exam_date, i.exam_year);
+  const subjects = useMemo(() => {
+    const map = new Map<number, { id: number; name: string; color?: string | null; count: number }>();
+    all.forEach((i) => { if (i.subject) { const cur = map.get(i.subject.id); map.set(i.subject.id, { id: i.subject.id, name: i.subject.name, color: (i.subject as { color?: string | null }).color, count: (cur?.count ?? 0) + 1 }); } });
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [all]);
+  const years = useMemo(() => [...new Set(all.map(yearOf).filter((y): y is number => y != null))].sort((a, b) => b - a), [all]);
+  const courses = useMemo(() => {
+    const map = new Map<number, string>();
+    all.forEach((i) => (i.courses ?? (i.course ? [i.course] : [])).forEach((c) => map.set(c.id, c.name)));
+    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [all]);
 
-  const itens = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    return todas.filter((item) => {
-      if (anoFiltro != null && anoDaProva(item.exam_date, item.exam_year) !== anoFiltro) return false;
-      if (disciplinaFiltro != null && item.subject?.id !== disciplinaFiltro) return false;
-      if (!termo) return true;
-      return (
-        item.title.toLowerCase().includes(termo) ||
-        (item.description ?? '').toLowerCase().includes(termo) ||
-        (item.exam_type_label ?? '').toLowerCase().includes(termo)
-      );
+  const items = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return all.filter((i) => {
+      if (subjectId && i.subject?.id !== subjectId) return false;
+      if (year && yearOf(i) !== year) return false;
+      if (course && !(i.courses ?? (i.course ? [i.course] : [])).some((c) => c.id === course)) return false;
+      if (!term) return true;
+      return [i.title, i.description, i.exam_type_label, i.subject?.name, String(yearOf(i) ?? '')].some((v) => (v ?? '').toLowerCase().includes(term));
+    }).sort((a, b) => {
+      const da = new Date(a.exam_date ?? a.created_at ?? 0).getTime();
+      const db = new Date(b.exam_date ?? b.created_at ?? 0).getTime();
+      return sort === 'recent' ? db - da : da - db;
     });
-  }, [todas, busca, anoFiltro, disciplinaFiltro]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yearOf é puro
+  }, [all, search, subjectId, year, course, sort]);
 
-  const erro = isError ? getApiErrorMessage(error, copy.error) : null;
+  // Agrupamento: disciplina (Exercícios), coleção (Materiais) ou ano (Provas).
+  const groups = useMemo(() => {
+    const keyOf = (i: PastExamListItem) => materialKind === 'prova' ? String(yearOf(i) ?? 'Sem ano')
+      : materialKind === 'exercicio' ? i.subject?.name ?? 'Outros'
+      : i.exam_type_label ?? i.material_kind_label ?? 'Materiais';
+    const map = new Map<string, PastExamListItem[]>();
+    items.forEach((i) => map.set(keyOf(i), [...(map.get(keyOf(i)) ?? []), i]));
+    return [...map.entries()];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yearOf é puro
+  }, [items, materialKind]);
 
-  useFocusEffect(
-    useCallback(() => {
-      refetch();
-    }, [refetch]),
-  );
+  const open = (item: PastExamListItem) => navigation.navigate('ProvaAnteriorDetalhe', { pastExamId: item.id, listScreen, materialKind });
+  const download = (item: PastExamListItem) => { if (item.content) void Linking.openURL(item.content); };
 
-  const renderItem = ({ item }: { item: PastExamListItem }) => (
-    <PastMaterialCard
-      item={item}
-      dateLabel={copy.dateLabel}
-      onPress={() =>
-        navigation.navigate('ProvaAnteriorDetalhe', {
-          pastExamId: item.id,
-          listScreen,
-          materialKind,
-        })
-      }
-    />
-  );
-
-  if (isLoading) {
+  const row = (item: PastExamListItem) => {
+    const meta = [classes(item), materialKind === 'prova' && item.exam_date ? new Date(item.exam_date).toLocaleDateString('pt-BR') : null, isNew(item) ? addedOn(item) : null]
+      .filter((m): m is string => !!m);
+    const kicker = materialKind === 'prova'
+      ? [item.exam_type_label, item.subject?.name ?? 'Prova completa'].filter(Boolean).join(' · ')
+      : materialKind === 'exercicio' ? item.description?.split('\n')[0]?.slice(0, 40) || item.subject?.name : item.material_kind_label ?? item.exam_type_label;
     return (
-      <View style={styles.container}>
-        <ProvasAnterioresHeader title={copy.title} listScreen={listScreen} />
-        <View style={styles.centrado}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.carregandoTexto}>{copy.loading}</Text>
-        </View>
+      <FileRow key={item.id} compact={!isDesktop} fileType={fileTypeLabel(item)} subject={kicker ?? null}
+        subjectDot={item.subject ? subjectColor(p, item.subject.id, (item.subject as { color?: string | null }).color) : undefined}
+        title={item.title} meta={meta} isNew={isNew(item)} onOpen={() => open(item)} onDownload={item.content ? () => download(item) : undefined} />
+    );
+  };
+
+  const LIMIT = 4;
+  const list = isLoading ? <ActivityIndicator color={p.brand} style={{ marginTop: space[6] }} />
+    : isError ? (
+      <View style={{ gap: space[3] }}>
+        <Notice tone="danger" title={`Não foi possível carregar ${copy.title.toLowerCase()}`} text={getApiErrorMessage(error, 'Tente de novo.')} />
+        <Button variant="secondary" icon="refresh" label="Tentar de novo" onPress={() => refetch()} />
       </View>
+    ) : !all.length ? (
+      <EmptyState icon="archive" title={copy.emptyTitle} text={copy.emptyText}
+        action={materialKind === 'prova' ? <Button variant="secondary" size="sm" icon="library" label="Treinar no banco de questões" onPress={() => navigation.getParent()?.navigate('Questoes', { screen: 'BancoQuestoes' })} /> : undefined} />
+    ) : !items.length ? <EmptyState icon="search" title="Nada encontrado" text="Tire um filtro ou mude a busca." />
+    : (
+      <View style={{ gap: space[5] }}>
+        {groups.map(([label, list]) => {
+          const showAll = !isDesktop || expanded[label] || list.length <= LIMIT + 1;
+          return (
+            <View key={label} style={{ gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space[2], marginTop: 4 }}>
+                <Txt variant="titleSm" style={{ fontSize: 15 }}>{label}</Txt>
+                <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>{materialKind === 'prova' ? `${list.length} ${list.length === 1 ? copy.noun[0] : copy.noun[1]}` : list.length}</Txt>
+              </View>
+              {(showAll ? list : list.slice(0, LIMIT)).map(row)}
+              {!showAll ? <View style={{ alignSelf: 'flex-start' }}><LinkButton label={`Ver mais ${list.length - LIMIT} de ${label}`} onPress={() => setExpanded((e) => ({ ...e, [label]: true }))} /></View> : null}
+            </View>
+          );
+        })}
+      </View>
+    );
+
+  const toSimulados = () => navigation.navigate('SimuladosList');
+  const refresh = <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={p.brand} colors={[p.brand]} />;
+
+  if (isDesktop) {
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: p.bg }} refreshControl={refresh}>
+        <PageBody maxWidth="none">
+          <PageHeader title={copy.title} subtitle={copy.sub(all.length)} actions={<Button variant="secondary" icon="clipboard" label="Simulados" onPress={toSimulados} />} />
+          <View style={{ maxWidth: 980, gap: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], flexWrap: 'wrap' }}>
+              <View style={{ flex: 1, minWidth: 280 }}><SearchField value={search} onChangeText={setSearch} placeholder={copy.search} /></View>
+              {materialKind === 'prova' ? (
+                <>
+                  <SelectButton label="Ano:" value={year} options={[{ value: 0, label: 'Todos' }, ...years.map((y) => ({ value: y, label: String(y) }))]} onChange={setYear} />
+                  <SelectButton label="Disciplina:" value={subjectId} options={[{ value: 0, label: 'Todas' }, ...subjects.map((s) => ({ value: s.id, label: s.name }))]} onChange={setSubjectId} />
+                </>
+              ) : (
+                <>
+                  {courses.length > 1 ? <SelectButton label="Turma:" value={course} options={[{ value: 0, label: 'Todas' }, ...courses.map((c) => ({ value: c.id, label: c.name }))]} onChange={setCourse} /> : null}
+                  <SelectButton label="Ordenar:" value={sort} options={[{ value: 'recent' as const, label: 'Mais recentes' }, { value: 'oldest' as const, label: 'Mais antigas' }]} onChange={setSort} />
+                </>
+              )}
+            </View>
+            {materialKind === 'exercicio' && subjects.length > 1 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                <Chip label="Todas" count={all.length} selected={!subjectId} onPress={() => setSubjectId(0)} />
+                {subjects.map((s) => <Chip key={s.id} label={s.name} count={s.count} dot={subjectColor(p, s.id, s.color)} selected={subjectId === s.id} onPress={() => setSubjectId(s.id)} />)}
+              </View>
+            ) : null}
+            {list}
+          </View>
+        </PageBody>
+      </ScrollView>
     );
   }
 
-  if (erro) {
-    return (
-      <View style={styles.container}>
-        <ProvasAnterioresHeader title={copy.title} listScreen={listScreen} />
-        <View style={styles.centrado}>
-          <Ionicons name="cloud-offline-outline" size={48} color={colors.border} />
-          <Text style={styles.erroTexto}>{erro}</Text>
-          <TouchableOpacity style={styles.botaoTentar} onPress={() => refetch()} activeOpacity={0.8}>
-            <Text style={styles.botaoTentarTexto}>Tentar novamente</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const chips = materialKind === 'prova'
+    ? (years.length > 1 ? [<Chip key="all" label="Todos" selected={!year} onPress={() => setYear(0)} />, ...years.map((y) => <Chip key={y} label={String(y)} selected={year === y} onPress={() => setYear(y)} />)] : [])
+    : (subjects.length > 1 ? [<Chip key="all" label="Todas" count={all.length} selected={!subjectId} onPress={() => setSubjectId(0)} />,
+      ...subjects.map((s) => <Chip key={s.id} label={s.name} count={s.count} dot={subjectColor(p, s.id, s.color)} selected={subjectId === s.id} onPress={() => setSubjectId(s.id)} />)] : []);
 
   return (
-    <View style={styles.container}>
-      <ProvasAnterioresHeader title={copy.title} listScreen={listScreen} />
-      <FlatList
-        data={itens}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={renderItem}
-        contentContainerStyle={[styles.lista, itens.length === 0 && styles.listaComVazio]}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => refetch()}
-            colors={[colors.primary]}
-            tintColor={colors.primary}
-          />
-        }
-        ListHeaderComponent={
-          <View style={styles.filtros}>
-            <TextInput
-              style={styles.busca}
-              placeholder={copy.searchPlaceholder}
-              placeholderTextColor={colors.muted}
-              value={busca}
-              onChangeText={setBusca}
-            />
-            {anos.length > 0 ? (
-              <View style={styles.chipsRow}>
-                <TouchableOpacity
-                  style={[styles.filtroChip, anoFiltro === null && styles.filtroChipAtivo]}
-                  onPress={() => setAnoFiltro(null)}
-                >
-                  <Text style={[styles.filtroChipTexto, anoFiltro === null && styles.filtroChipTextoAtivo]}>
-                    Todos os anos
-                  </Text>
-                </TouchableOpacity>
-                {anos.map((ano) => (
-                  <TouchableOpacity
-                    key={ano}
-                    style={[styles.filtroChip, anoFiltro === ano && styles.filtroChipAtivo]}
-                    onPress={() => setAnoFiltro(ano)}
-                  >
-                    <Text style={[styles.filtroChipTexto, anoFiltro === ano && styles.filtroChipTextoAtivo]}>
-                      {ano}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
-            {disciplinas.length > 0 ? (
-              <View style={styles.chipsRow}>
-                <TouchableOpacity
-                  style={[styles.filtroChip, disciplinaFiltro === null && styles.filtroChipAtivo]}
-                  onPress={() => setDisciplinaFiltro(null)}
-                >
-                  <Text style={[styles.filtroChipTexto, disciplinaFiltro === null && styles.filtroChipTextoAtivo]}>
-                    Todas
-                  </Text>
-                </TouchableOpacity>
-                {disciplinas.map((d) => (
-                  <TouchableOpacity
-                    key={d.id}
-                    style={[styles.filtroChip, disciplinaFiltro === d.id && styles.filtroChipAtivo]}
-                    onPress={() => setDisciplinaFiltro(d.id)}
-                  >
-                    <Text style={[styles.filtroChipTexto, disciplinaFiltro === d.id && styles.filtroChipTextoAtivo]}>
-                      {d.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
-            <Text style={styles.contador}>{copy.counter(itens.length)}</Text>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.vazio}>
-            <Ionicons name="folder-open-outline" size={48} color={colors.border} />
-            <Text style={styles.vazioTitulo}>{copy.emptyTitle}</Text>
-            <Text style={styles.vazioSub}>{copy.emptySub}</Text>
-          </View>
-        }
-      />
+    <View style={{ flex: 1, backgroundColor: p.bg }}>
+      <AppBar large title={copy.title}
+        subtitle={materialKind === 'exercicio' ? `${all.length} ${all.length === 1 ? 'lista' : 'listas'} para praticar` : copy.sub(all.length)}
+        leading={drawer && isMobile ? <IconButton icon="menu" label="Abrir menu" variant="outline" onPress={drawer.open} />
+          : <IconButton icon="arrow-left" label="Voltar" onPress={() => (navigation.canGoBack() ? navigation.goBack() : toSimulados())} />}
+        trailing={<IconButton icon="clipboard" label="Simulados" onPress={toSimulados} />} />
+      <ScrollView refreshControl={refresh} keyboardShouldPersistTaps="handled">
+        <ScreenBody gap={20} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
+          <SearchField value={search} onChangeText={setSearch} placeholder={copy.search} />
+          {chips.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[4] }} contentContainerStyle={{ gap: space[2], paddingHorizontal: space[4] }}>
+              {chips}
+            </ScrollView>
+          ) : null}
+          {list}
+        </ScreenBody>
+      </ScrollView>
     </View>
   );
-}
-
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    lista: { padding: 16, paddingTop: 12, paddingBottom: 32 },
-    listaComVazio: { flexGrow: 1 },
-    filtros: { gap: 10, marginBottom: 12 },
-    busca: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-      color: colors.ink,
-    },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    filtroChip: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 999,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    filtroChipAtivo: { backgroundColor: colors.primary, borderColor: colors.primary },
-    filtroChipTexto: { fontSize: 12, fontWeight: '600', color: colors.ink },
-    filtroChipTextoAtivo: { color: colors.surface },
-    contador: { fontSize: 13, color: colors.muted, fontWeight: '600' },
-    centrado: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 32,
-    },
-    carregandoTexto: { marginTop: 12, fontSize: 14, color: colors.muted },
-    erroTexto: { fontSize: 14, color: colors.text, textAlign: 'center', marginTop: 12, lineHeight: 20 },
-    botaoTentar: {
-      marginTop: 20,
-      backgroundColor: colors.primary,
-      borderRadius: 12,
-      paddingHorizontal: 24,
-      paddingVertical: 12,
-    },
-    botaoTentarTexto: { color: colors.surface, fontWeight: '600', fontSize: 15 },
-    vazio: { alignItems: 'center', padding: 32 },
-    vazioTitulo: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 16, textAlign: 'center' },
-    vazioSub: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 8, lineHeight: 18 },
-  });
 }

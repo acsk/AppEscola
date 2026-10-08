@@ -23,6 +23,8 @@ export interface PastExamListItem {
   course: { id: number; name: string } | null;
   courses?: { id: number; name: string }[];
   course_ids?: number[];
+  /** Publicação ("Novo" por 7 dias). */
+  created_at?: string | null;
 }
 
 interface ApiEnvelope<T> {

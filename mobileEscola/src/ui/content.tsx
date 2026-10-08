@@ -161,25 +161,25 @@ export function NotificationItem({
   icon = 'bell', title, text, time, unread, isNew, action, onPress, first,
 }: { icon?: IconName; title: string; text?: string | null; time: string; unread?: boolean; isNew?: boolean; action?: React.ReactNode; onPress?: () => void; first?: boolean }) {
   const p = usePalette();
+  // A ação fica fora da área clicável (na web, botão dentro de botão é inválido).
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${unread ? 'Não lida: ' : ''}${title}`} onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row', gap: space[3], padding: space[4], borderTopWidth: first ? 0 : 1, borderTopColor: p.line,
-        backgroundColor: pressed ? p.surfaceSunken : unread ? p.surface : 'transparent',
-      })}>
-      {unread ? <View style={{ position: 'absolute', top: 20, left: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: p.info }} /> : null}
-      <View style={{ width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: isNew ? p.infoSoft : p.surfaceSunken }}>
-        <Icon name={icon} size={20} color={isNew ? p.info : p.inkMuted} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 4, alignItems: 'flex-start' }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3], alignSelf: 'stretch' }}>
-          <Text numberOfLines={2} style={{ flex: 1, fontSize: 15, lineHeight: 20, ...(unread ? font.bold : font.semibold), color: unread ? p.ink : p.inkMuted }}>{title}</Text>
-          <Txt variant="caption" tone="subtle">{time}</Txt>
+    <View style={{ borderTopWidth: first ? 0 : 1, borderTopColor: p.line, backgroundColor: unread ? p.surface : 'transparent' }}>
+      {unread ? <View style={{ position: 'absolute', top: 20, left: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: p.info, zIndex: 1 }} /> : null}
+      <Pressable accessibilityRole="button" accessibilityLabel={`${unread ? 'Não lida: ' : ''}${title}`} onPress={onPress}
+        style={({ pressed }) => ({ flexDirection: 'row', gap: space[3], padding: space[4], paddingBottom: action ? space[2] : space[4], backgroundColor: pressed ? p.surfaceSunken : 'transparent' })}>
+        <View style={{ width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: isNew ? p.infoSoft : p.surfaceSunken }}>
+          <Icon name={icon} size={20} color={isNew ? p.info : p.inkMuted} />
         </View>
-        {text ? <Txt tone="muted" numberOfLines={3} style={{ fontSize: 14, lineHeight: 20 }}>{text}</Txt> : null}
-        {action ? <View style={{ marginTop: 6 }}>{action}</View> : null}
-      </View>
-    </Pressable>
+        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}>
+            <Text numberOfLines={2} style={{ flex: 1, fontSize: 15, lineHeight: 20, ...(unread ? font.bold : font.semibold), color: unread ? p.ink : p.inkMuted }}>{title}</Text>
+            <Txt variant="caption" tone="subtle">{time}</Txt>
+          </View>
+          {text ? <Txt tone="muted" numberOfLines={3} style={{ fontSize: 14, lineHeight: 20 }}>{text}</Txt> : null}
+        </View>
+      </Pressable>
+      {action ? <View style={{ paddingLeft: space[4] + 40 + space[3], paddingBottom: space[4], alignItems: 'flex-start' }}>{action}</View> : null}
+    </View>
   );
 }
 
@@ -194,38 +194,38 @@ export function FileRow({
 }) {
   const p = usePalette();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onOpen}
-      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => ({
-        flexDirection: 'row', alignItems: 'center', gap: compact ? space[3] : space[4], padding: space[3], paddingHorizontal: compact ? space[3] : space[4],
-        backgroundColor: pressed ? p.surfaceSunken : p.surface, borderWidth: 1, borderColor: hovered ? p.lineStrong : p.line, borderRadius: radius.lg,
-      }) as never}>
-      <View style={{ width: 44, height: 48, borderRadius: radius.sm, backgroundColor: p.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="file" size={22} color={p.inkMuted} />
-        <View style={{ position: 'absolute', bottom: -4, right: -6, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: p.surfaceInverse }}>
-          <Text style={{ ...font.extrabold, fontSize: 9, lineHeight: 13, letterSpacing: 0.36, color: p.onInverse }}>{fileType}</Text>
-        </View>
-      </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-        {subject || isNew ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-            {subject ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectDot ?? p.inkSubtle }} />
-                <Text numberOfLines={1} style={[type.caption, { ...font.bold, textTransform: 'uppercase', letterSpacing: 0.48, color: p.inkMuted, flexShrink: 1 }]}>{subject}</Text>
-              </View>
-            ) : null}
-            {isNew ? <Tag tone="info" label="Novo" /> : null}
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: space[1], paddingRight: compact ? space[2] : space[3],
+      backgroundColor: p.surface, borderWidth: 1, borderColor: p.line, borderRadius: radius.lg, overflow: 'hidden',
+    }}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Abrir ${title}`} onPress={onOpen}
+        style={({ pressed }) => ({ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: compact ? space[3] : space[4], padding: space[3], paddingLeft: compact ? space[3] : space[4], backgroundColor: pressed ? p.surfaceSunken : 'transparent' })}>
+        <View style={{ width: 44, height: 48, borderRadius: radius.sm, backgroundColor: p.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="file" size={22} color={p.inkMuted} />
+          <View style={{ position: 'absolute', bottom: -4, right: -6, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: p.surfaceInverse }}>
+            <Text style={{ ...font.extrabold, fontSize: 9, lineHeight: 13, letterSpacing: 0.36, color: p.onInverse }}>{fileType}</Text>
           </View>
-        ) : null}
-        <Txt variant="titleSm" numberOfLines={compact ? 2 : 1} style={{ fontSize: 15, lineHeight: 20 }}>{title}</Txt>
-        {meta?.length ? <Txt variant="bodySm" tone="subtle" numberOfLines={1}>{meta.join('  ·  ')}</Txt> : null}
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
-        {primaryAction}
-        {!compact && onOpen ? <Button variant={primaryAction ? 'ghost' : 'secondary'} size="sm" icon="eye" label="Abrir" onPress={onOpen} /> : null}
-        {onDownload ? <IconButton icon="download" label={`Baixar ${title}`} onPress={onDownload} /> : null}
-      </View>
-    </Pressable>
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          {subject || isNew ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+              {subject ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectDot ?? p.inkSubtle }} />
+                  <Text numberOfLines={1} style={[type.caption, { ...font.bold, textTransform: 'uppercase', letterSpacing: 0.48, color: p.inkMuted, flexShrink: 1 }]}>{subject}</Text>
+                </View>
+              ) : null}
+              {isNew ? <Tag tone="info" label="Novo" /> : null}
+            </View>
+          ) : null}
+          <Txt variant="titleSm" numberOfLines={compact ? 2 : 1} style={{ fontSize: 15, lineHeight: 20 }}>{title}</Txt>
+          {meta?.length ? <Txt variant="bodySm" tone="subtle" numberOfLines={1}>{meta.join('  ·  ')}</Txt> : null}
+        </View>
+      </Pressable>
+      {primaryAction}
+      {!compact && onOpen ? <Button variant={primaryAction ? 'ghost' : 'secondary'} size="sm" icon="eye" label="Abrir" onPress={onOpen} /> : null}
+      {onDownload ? <IconButton icon="download" label={`Baixar ${title}`} onPress={onDownload} /> : null}
+    </View>
   );
 }
 
@@ -347,7 +347,7 @@ export function MonthCalendar({
       {rows.map((row, r) => (
         <View key={r} style={{ flexDirection: 'row', gap: compact ? 0 : 4 }}>
           {row.map((d, i) => {
-            if (d == null) return <View key={`b${i}`} style={{ flex: 1, minHeight: compact ? 44 : 92 }} />;
+            if (d == null) return <View key={`b${i}`} style={{ flex: 1, minWidth: 0, minHeight: compact ? 44 : 92, borderWidth: compact ? 0 : 1, borderColor: 'transparent' }} />;
             const list = events[d] ?? [];
             const on = d === selected;
             const isToday = d === today;
@@ -394,13 +394,12 @@ export function MonthCalendar({
 
 /** Evento na agenda: hora, ícone pelo tipo, título e ação direta. */
 export function EventItem({
-  kind, kindLabel, start, end, title, subtitle, action, onPress, first,
-}: { kind: EventKind; kindLabel?: string; start?: string | null; end?: string | null; title: string; subtitle?: string | null; action?: React.ReactNode; onPress?: () => void; first?: boolean }) {
+  kind, kindLabel, start, end, title, subtitle, action, first,
+}: { kind: EventKind; kindLabel?: string; start?: string | null; end?: string | null; title: string; subtitle?: string | null; action?: React.ReactNode; first?: boolean }) {
   const p = usePalette();
   const k = EVENT_KIND[kind];
   return (
-    <Pressable accessibilityRole={onPress ? 'button' : undefined} onPress={onPress} disabled={!onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[3], borderTopWidth: first ? 0 : 1, borderTopColor: p.line, opacity: pressed ? 0.7 : 1 })}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[3], paddingVertical: space[3], borderTopWidth: first ? 0 : 1, borderTopColor: p.line }}>
       <View style={{ width: 52, paddingTop: 2 }}>
         <Text style={{ ...font.bold, fontSize: 14, lineHeight: 20, color: p.ink, fontVariant: ['tabular-nums'] }}>{start || 'Dia todo'}</Text>
         {end ? <Txt variant="caption" tone="subtle" style={{ fontVariant: ['tabular-nums'] }}>{end}</Txt> : null}
@@ -414,7 +413,7 @@ export function EventItem({
         {subtitle ? <Txt variant="bodySm" tone="subtle" numberOfLines={2}>{subtitle}</Txt> : null}
       </View>
       {action ? <View style={{ alignSelf: 'center' }}>{action}</View> : null}
-    </Pressable>
+    </View>
   );
 }
 

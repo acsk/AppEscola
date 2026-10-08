@@ -1,656 +1,247 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MenuButton } from '../../../components/navigation/MenuButton';
 import { getApiErrorMessage } from '../../../lib/apiError';
-import { platformShadow } from '../../../lib/shadow';
-import { useThemeColors } from '../../../context/TenantThemeContext';
-import type { ThemeColors } from '../../../theme';
-import {
-  CalendarEventItem,
-  calendarIconName,
-  eventsForDay,
-  formatEventTime,
-  isSameDay,
-  toDateKey,
-} from '../../../services/calendar.service';
+import { type CalendarEventItem, type CalendarEventType, eventsForDay, isSameDay, toDateKey } from '../../../services/calendar.service';
 import { useStudentCalendar } from '../hooks/useStudentCalendar';
-import { buildCalendarLegendItems, useCalendarTypes } from '../hooks/useCalendarTypes';
-import { CalendarColorLegend } from '../components/CalendarColorLegend';
 import type { AlunoStackParamList } from '../../../navigation/stacks/AlunoStack';
+import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
+import {
+  AppBar, Button, Card, Chip, Chips, EVENT_KIND, EventItem, IconButton, MonthCalendar, Notice, PageBody, PageHeader, ScreenBody,
+  SegmentedControl, Tag, Txt, font, space, useLayoutMode, usePalette, type CalendarDayEvents, type EventKind,
+} from '../../../ui';
 
 type Route = RouteProp<AlunoStackParamList, 'Calendario'>;
+type Nav = NativeStackNavigationProp<AlunoStackParamList>;
 
-/** "Sext" evita Chrome Translate: Sex → Sexo. */
-const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sext', 'Sáb', 'Dom'];
-const headerShadow = platformShadow({ color: '#7C3AED', opacity: 0.08, radius: 18, elevation: 3 });
-const cardShadow = platformShadow({ color: '#6D4DE6', opacity: 0.06, radius: 14, elevation: 2 });
+const KIND: Record<CalendarEventType, EventKind> = {
+  exam: 'simulado', exam_presential: 'presencial', task: 'tarefa', billing: 'cobranca', class: 'aula', school: 'evento', general: 'geral',
+};
+type Filter = 'all' | 'exam' | 'class' | 'task' | 'billing';
+const FILTERS: { id: Filter; label: string; types: CalendarEventType[] }[] = [
+  { id: 'all', label: 'Tudo', types: [] },
+  { id: 'exam', label: 'Simulados', types: ['exam', 'exam_presential'] },
+  { id: 'class', label: 'Aulas', types: ['class'] },
+  { id: 'task', label: 'Tarefas', types: ['task'] },
+  { id: 'billing', label: 'Cobranças', types: ['billing'] },
+];
 
-function monthStart(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const monthLabel = (d: Date) => cap(d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
+const hm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const dayDiff = (a: Date, b: Date) => Math.round((new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime() - new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime()) / 86400000);
+
+/** "Hoje, quinta 8" · "Sexta, 10" · "Sex, 10/10" */
+function dayTitle(d: Date, today: Date, short = false): string {
+  const diff = dayDiff(d, today);
+  const weekday = d.toLocaleDateString('pt-BR', { weekday: short ? 'short' : 'long' }).replace('.', '').replace('-feira', '');
+  if (diff === 0) return `Hoje, ${weekday} ${d.getDate()}`;
+  if (diff === 1) return `Amanhã, ${weekday} ${d.getDate()}`;
+  return short ? `${cap(weekday)}, ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : `${cap(weekday)}, ${d.getDate()}`;
 }
+const relative = (d: Date, today: Date) => {
+  const diff = dayDiff(d, today);
+  return diff === 0 ? 'hoje' : diff === 1 ? 'amanhã' : diff > 1 ? `em ${diff} dias` : `há ${-diff} dias`;
+};
 
-function buildMonthGrid(month: Date): (Date | null)[][] {
-  const start = monthStart(month);
-  const firstWeekday = start.getDay() === 0 ? 6 : start.getDay() - 1;
-  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < firstWeekday; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(new Date(month.getFullYear(), month.getMonth(), d));
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const weeks: (Date | null)[][] = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    weeks.push(cells.slice(i, i + 7));
-  }
-  return weeks;
-}
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function formatMonthLabel(date: Date): string {
-  return capitalize(date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
-}
-
-function formatAgendaDate(date: Date): string {
-  return capitalize(
-    date.toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      day: '2-digit',
-      month: 'long',
-    }),
-  );
-}
-
-function formatEventCount(count: number): string {
-  return `${count} ${count === 1 ? 'evento' : 'eventos'}`;
-}
-
-function formatFoundEvents(count: number): string {
-  return `${formatEventCount(count)} ${count === 1 ? 'encontrado' : 'encontrados'}`;
-}
-
-function tint(hex: string | undefined, alpha: string, fallback: string): string {
-  if (!hex || !hex.startsWith('#')) return fallback;
-  return `${hex}${alpha}`;
-}
-
-function isEventPressable(event: CalendarEventItem): boolean {
-  return Boolean(event.exam_id || event.invoice_id || event.type === 'billing');
-}
-
-function eventActionLabel(event: CalendarEventItem): string | null {
-  if (event.exam_id) return 'Abrir simulado';
-  if (event.invoice_id || event.type === 'billing') return 'Ver financeiro';
-  return null;
-}
-
+/** Calendário (protótipos "TelaCalendario" e "DesktopCalendario"): ponto accent = pede ação; neutro = informativo. */
 export function CalendarScreen() {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createCalendarStyles(colors), [colors]);
-  const navigation = useNavigation<NativeStackNavigationProp<AlunoStackParamList>>();
+  const p = usePalette();
+  const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const insets = useSafeAreaInsets();
-  const initialDate = route.params?.selectedDate
-    ? new Date(`${route.params.selectedDate}T12:00:00`)
-    : new Date();
+  const drawer = useOptionalAlunoDrawer();
+  const { isMobile, isDesktop } = useLayoutMode();
+  const today = useMemo(() => new Date(), []);
+  const initial = route.params?.selectedDate ? new Date(`${route.params.selectedDate}T12:00:00`) : today;
 
-  const [month, setMonth] = useState(() => monthStart(initialDate));
-  const [selectedDay, setSelectedDay] = useState(initialDate);
+  const [month, setMonth] = useState(() => new Date(initial.getFullYear(), initial.getMonth(), 1));
+  const [selected, setSelected] = useState(initial);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [view, setView] = useState<'month' | 'agenda'>('month');
 
-  const rangeFrom = toDateKey(new Date(month.getFullYear(), month.getMonth(), 1));
-  const rangeTo = toDateKey(new Date(month.getFullYear(), month.getMonth() + 1, 0));
+  const monthQuery = useStudentCalendar(toDateKey(month), toDateKey(new Date(month.getFullYear(), month.getMonth() + 1, 0)));
+  const nextQuery = useStudentCalendar(toDateKey(addDays(selected, 1)), toDateKey(addDays(selected, 7)));
 
-  const { data: typesData } = useCalendarTypes();
-  const legendItems = useMemo(() => buildCalendarLegendItems(typesData), [typesData]);
+  const types = FILTERS.find((f) => f.id === filter)?.types ?? [];
+  const keep = (e: CalendarEventItem) => !types.length || types.includes(e.type);
+  const events = (monthQuery.data?.items ?? []).filter(keep);
+  const sortByStart = (a: CalendarEventItem, b: CalendarEventItem) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+  const dayEvents = eventsForDay(events, selected).sort(sortByStart);
+  const upcoming = (nextQuery.data?.items ?? []).filter(keep).sort(sortByStart);
 
-  const {
-    data,
-    isLoading,
-    refetch,
-    isRefetching,
-    isError,
-    error,
-  } = useStudentCalendar(rangeFrom, rangeTo);
-  const events = data?.items ?? [];
-  const weeks = useMemo(() => buildMonthGrid(month), [month]);
-  const dayEvents = useMemo(() => eventsForDay(events, selectedDay), [events, selectedDay]);
-  const today = new Date();
-  const errorMessage = isError
-    ? getApiErrorMessage(error, 'Não foi possível carregar o calendário.')
-    : null;
+  // Eventos por dia do mês para a grade.
+  const byDay = useMemo(() => {
+    const map: Record<number, CalendarDayEvents> = {};
+    const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    for (let d = 1; d <= days; d++) {
+      const list = eventsForDay(events, new Date(month.getFullYear(), month.getMonth(), d)).sort(sortByStart);
+      if (list.length) map[d] = list.map((e) => ({ kind: KIND[e.type] ?? 'geral', label: e.title }));
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recalcula quando os eventos/filtro mudam
+  }, [monthQuery.data, filter, month]);
 
+  const sameMonth = (d: Date) => d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
   const changeMonth = (offset: number) => {
-    const nextMonth = new Date(month.getFullYear(), month.getMonth() + offset, 1);
-    setMonth(nextMonth);
-    setSelectedDay(isSameDay(monthStart(today), nextMonth) ? today : nextMonth);
+    const next = new Date(month.getFullYear(), month.getMonth() + offset, 1);
+    setMonth(next);
+    setSelected(next.getFullYear() === today.getFullYear() && next.getMonth() === today.getMonth() ? today : next);
+  };
+  const goToday = () => { setMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today); };
+
+  const actionFor = (e: CalendarEventItem) => {
+    if (e.exam_id) {
+      return <Button size="sm" label="Abrir" onPress={() => navigation.navigate('AlunoTabs', { screen: 'Simulados', params: { screen: 'SimuladoDetalhe', params: { examId: e.exam_id as number } } })} />;
+    }
+    if (e.invoice_id || e.type === 'billing') return <Button size="sm" variant="secondary" label="Ver cobrança" onPress={() => navigation.navigate('AlunoTabs', { screen: 'Financeiro' })} />;
+    return undefined;
+  };
+  const item = (e: CalendarEventItem, i: number) => {
+    const kind = KIND[e.type] ?? 'geral';
+    const where = [e.school_class?.name, e.location].filter(Boolean).join(' · ');
+    return (
+      <EventItem key={`${e.id}-${e.starts_at}`} first={i === 0} kind={kind}
+        kindLabel={kind === 'aula' && e.school_class ? `Aula · ${e.school_class.name}` : e.type_label || EVENT_KIND[kind].label}
+        title={e.title} subtitle={kind === 'aula' ? e.location : where || e.description?.replace(/<[^>]+>/g, ' ').trim().slice(0, 90) || null}
+        start={e.all_day ? null : hm(e.starts_at)} end={!e.all_day && e.ends_at ? hm(e.ends_at) : null} action={actionFor(e)} />
+    );
   };
 
-  const goToToday = () => {
-    setMonth(monthStart(today));
-    setSelectedDay(today);
+  /** Lista agrupada por dia (próximos 7 dias e modo Agenda). */
+  const grouped = (list: CalendarEventItem[]) => {
+    const groups: [Date, CalendarEventItem[]][] = [];
+    for (const e of list) {
+      const d = new Date(e.starts_at);
+      const last = groups[groups.length - 1];
+      if (last && isSameDay(last[0], d)) last[1].push(e);
+      else groups.push([d, [e]]);
+    }
+    return groups;
   };
+  const dayHead = (title: string, sub?: string) => (
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space[2], paddingVertical: 4 }}>
+      <Txt variant="titleSm">{title}</Txt>
+      {sub ? <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>{sub}</Txt> : null}
+    </View>
+  );
+  const legend = (center?: boolean) => (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[4], justifyContent: center ? 'center' : 'flex-start', marginTop: space[3] }}>
+      {[[p.accent, isDesktop ? 'Pede ação sua: simulado, tarefa, cobrança' : 'Pede ação'], [p.inkSubtle, isDesktop ? 'Informativo: aula, evento, geral' : 'Informativo']].map(([c, l]) => (
+        <View key={l} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c }} />
+          <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>{l}</Txt>
+        </View>
+      ))}
+    </View>
+  );
+  const monthNav = (outline?: boolean) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+      <IconButton icon="chevron-left" label="Mês anterior" variant={outline ? 'outline' : 'plain'} onPress={() => changeMonth(-1)} />
+      <Txt variant="title" style={{ fontSize: outline ? 18 : 16, ...font.extrabold, minWidth: outline ? 170 : undefined, textAlign: 'center', flex: outline ? undefined : 1 }}>{monthLabel(month)}</Txt>
+      <IconButton icon="chevron-right" label="Próximo mês" variant={outline ? 'outline' : 'plain'} onPress={() => changeMonth(1)} />
+    </View>
+  );
 
-  const openEvent = (event: CalendarEventItem) => {
-    if (event.exam_id) {
-      navigation.navigate('AlunoTabs', {
-        screen: 'Simulados',
-        params: { screen: 'SimuladoDetalhe', params: { examId: event.exam_id } },
-      });
-      return;
-    }
-    if (event.invoice_id || event.type === 'billing') {
-      navigation.navigate('AlunoTabs', { screen: 'Financeiro' });
-    }
-  };
+  const errorNotice = monthQuery.isError ? <Notice tone="danger" title="Não foi possível carregar o calendário" text={getApiErrorMessage(monthQuery.error, 'Tente de novo.')} /> : null;
+  const loading = monthQuery.isLoading ? <ActivityIndicator color={p.brand} /> : null;
+  const refresh = <RefreshControl refreshing={monthQuery.isRefetching} onRefresh={() => { monthQuery.refetch(); nextQuery.refetch(); }} tintColor={p.brand} colors={[p.brand]} />;
+  const selectedInMonth = sameMonth(selected);
+  const emptyDay = <Txt tone="subtle" style={{ paddingVertical: space[3] }}>Nada marcado para este dia.</Txt>;
+
+  if (isDesktop) {
+    const agenda = grouped(events.slice().sort(sortByStart));
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: p.bg }} refreshControl={refresh}>
+        <PageBody maxWidth="none">
+          <PageHeader title="Calendário" subtitle="Aulas, simulados, tarefas e cobranças da sua turma"
+            actions={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+                <View style={{ width: 220 }}><SegmentedControl label="Visualização" options={['Mês', 'Agenda']} value={view === 'month' ? 0 : 1} onChange={(i) => setView(i ? 'agenda' : 'month')} /></View>
+                <Button variant="secondary" icon="calendar" label="Hoje" onPress={goToday} />
+              </View>
+            } />
+          {errorNotice}
+          <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
+            <Card style={{ flex: 1, minWidth: 0, padding: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2], marginBottom: space[4] }}>
+                {monthNav(true)}
+                <View style={{ flex: 1 }} />
+                <Chips>{FILTERS.map((f) => <Chip key={f.id} label={f.label} selected={filter === f.id} onPress={() => setFilter(f.id)} />)}</Chips>
+              </View>
+              {loading}
+              {view === 'month' ? (
+                <MonthCalendar year={month.getFullYear()} month={month.getMonth()} events={byDay} selected={selectedInMonth ? selected.getDate() : null}
+                  today={sameMonth(today) ? today.getDate() : null} onSelect={(d) => setSelected(new Date(month.getFullYear(), month.getMonth(), d))} />
+              ) : agenda.length ? (
+                <View style={{ gap: space[3] }}>
+                  {agenda.map(([d, list]) => (
+                    <View key={d.toISOString()}>
+                      {dayHead(dayTitle(d, today, true), relative(d, today))}
+                      {list.map(item)}
+                    </View>
+                  ))}
+                </View>
+              ) : <Txt tone="subtle">Nada marcado neste mês.</Txt>}
+              {view === 'month' ? legend() : null}
+            </Card>
+            <View style={{ width: 360, gap: space[4] }}>
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3], marginBottom: space[2] }}>
+                  <Txt variant="titleSm">{cap(selected.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).replace('-feira', ''))}</Txt>
+                  {isSameDay(selected, today) ? <Tag label="Hoje" /> : null}
+                </View>
+                {dayEvents.length ? dayEvents.map(item) : emptyDay}
+              </Card>
+              <Card>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3], marginBottom: space[2] }}>
+                  <Txt variant="titleSm">Próximos 7 dias</Txt>
+                  <Txt variant="bodySm" tone="subtle">{upcoming.length} {upcoming.length === 1 ? 'evento' : 'eventos'}</Txt>
+                </View>
+                {upcoming.length ? grouped(upcoming).map(([d, list]) => (
+                  <View key={d.toISOString()}>
+                    {dayHead(dayTitle(d, today, true), relative(d, today))}
+                    {list.map(item)}
+                  </View>
+                )) : <Txt tone="subtle">Nada marcado nos próximos dias.</Txt>}
+              </Card>
+            </View>
+          </View>
+        </PageBody>
+      </ScrollView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-        <View style={styles.headerGlowPrimary} />
-        <View style={styles.headerGlowSecondary} />
-        <View style={styles.headerRow}>
-          <MenuButton />
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle} numberOfLines={1}>Calendário</Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>Agenda escolar</Text>
+    <View style={{ flex: 1, backgroundColor: p.bg }}>
+      <AppBar large title="Calendário" subtitle={monthLabel(month)}
+        leading={drawer && isMobile ? <IconButton icon="menu" label="Abrir menu" variant="outline" onPress={drawer.open} />
+          : <IconButton icon="arrow-left" label="Voltar" onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('AlunoTabs'))} />}
+        trailing={<Button variant="ghost" size="sm" label="Hoje" onPress={goToday} />} />
+      <ScrollView refreshControl={refresh}>
+        <ScreenBody gap={20} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
+          {errorNotice}
+          <Card>
+            <View style={{ marginTop: -6, marginHorizontal: -6, marginBottom: space[2] }}>{monthNav()}</View>
+            <MonthCalendar compact year={month.getFullYear()} month={month.getMonth()} events={byDay} selected={selectedInMonth ? selected.getDate() : null}
+              today={sameMonth(today) ? today.getDate() : null} onSelect={(d) => setSelected(new Date(month.getFullYear(), month.getMonth(), d))} />
+            {legend(true)}
+          </Card>
+          {loading}
+          <View style={{ gap: 10 }}>
+            {dayHead(dayTitle(selected, today), dayEvents.length ? `${dayEvents.length} ${dayEvents.length === 1 ? 'evento' : 'eventos'}` : undefined)}
+            <Card style={{ paddingVertical: 4 }}>{dayEvents.length ? dayEvents.map(item) : emptyDay}</Card>
           </View>
-          <TouchableOpacity
-            onPress={() => refetch()}
-            style={styles.refreshBtn}
-            activeOpacity={0.85}
-            disabled={isRefetching}
-          >
-            {isRefetching ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Ionicons name="refresh-outline" size={21} color={colors.primary} />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{isLoading ? '--' : events.length}</Text>
-            <Text style={styles.summaryLabel}>no mês</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, dayEvents.length > 0 && styles.summaryValueActive]}>
-              {isLoading ? '--' : dayEvents.length}
-            </Text>
-            <Text style={styles.summaryLabel}>no dia</Text>
-          </View>
-        </View>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={() => refetch()}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        <View style={styles.monthPanel}>
-          <View style={styles.monthNav}>
-            <TouchableOpacity
-              onPress={() => changeMonth(-1)}
-              style={styles.navBtn}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="chevron-back" size={20} color={colors.primary} />
-            </TouchableOpacity>
-
-            <View style={styles.monthTitleWrap}>
-              <Text style={styles.monthLabel} numberOfLines={1}>{formatMonthLabel(month)}</Text>
-              <Text style={styles.monthSubtitle} numberOfLines={1}>
-                {isLoading ? 'Carregando eventos' : formatFoundEvents(events.length)}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => changeMonth(1)}
-              style={styles.navBtn}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="chevron-forward" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity onPress={goToToday} style={styles.todayBtn} activeOpacity={0.85}>
-            <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-            <Text style={styles.todayBtnText}>Hoje</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.gridCard}>
-          <View style={styles.weekHeader}>
-            {WEEKDAY_LABELS.map((label) => (
-              <Text key={label} style={styles.weekHeaderText}>
-                {label}
-              </Text>
-            ))}
-          </View>
-
-          {weeks.map((week, wi) => (
-            <View key={`w-${wi}`} style={styles.weekRow}>
-              {week.map((day, di) => {
-                if (!day) {
-                  return <View key={`e-${wi}-${di}`} style={styles.dayCell} />;
-                }
-                const selected = isSameDay(day, selectedDay);
-                const isToday = isSameDay(day, today);
-                const dayItems = eventsForDay(events, day);
-                const count = dayItems.length;
-
-                return (
-                  <TouchableOpacity
-                    key={toDateKey(day)}
-                    style={[styles.dayCell, selected && styles.dayCellSelected]}
-                    onPress={() => setSelectedDay(day)}
-                    activeOpacity={0.85}
-                  >
-                    <View
-                      style={[
-                        styles.dayNumWrap,
-                        isToday && styles.dayToday,
-                        selected && styles.dayNumWrapSelected,
-                      ]}
-                    >
-                      <Text style={[styles.dayNum, selected && styles.dayNumSelected]}>
-                        {day.getDate()}
-                      </Text>
-                    </View>
-                    {count > 0 ? (
-                      <View style={styles.dayMarkers}>
-                        {dayItems.slice(0, 3).map((ev) => (
-                          <View
-                            key={ev.id}
-                            style={[styles.miniDot, { backgroundColor: ev.type_color }]}
-                          />
-                        ))}
-                      </View>
-                    ) : (
-                      <View style={styles.dayMarkersPlaceholder} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+          {grouped(upcoming).map(([d, list]) => (
+            <View key={d.toISOString()} style={{ gap: 10 }}>
+              {dayHead(dayTitle(d, today), relative(d, today))}
+              <Card style={{ paddingVertical: 4 }}>{list.map(item)}</Card>
             </View>
           ))}
-
-          <CalendarColorLegend items={legendItems} />
-        </View>
-
-        <View style={styles.agendaHeader}>
-          <View style={styles.agendaTitleWrap}>
-            <Text style={styles.agendaTitle}>{formatAgendaDate(selectedDay)}</Text>
-            <Text style={styles.agendaSubtitle}>
-              {isLoading ? 'Carregando...' : formatEventCount(dayEvents.length)}
-            </Text>
-          </View>
-          <View style={styles.agendaBadge}>
-            <Ionicons name="list-outline" size={16} color={colors.primary} />
-            <Text style={styles.agendaBadgeText}>Agenda</Text>
-          </View>
-        </View>
-
-        {isLoading ? (
-          <View style={styles.stateBox}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.stateText}>Carregando agenda...</Text>
-          </View>
-        ) : errorMessage ? (
-          <View style={styles.stateBox}>
-            <View style={styles.stateIcon}>
-              <Ionicons name="alert-circle-outline" size={34} color={colors.debit} />
-            </View>
-            <Text style={styles.stateTitle}>Não foi possível carregar</Text>
-            <Text style={styles.stateText}>{errorMessage}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()} activeOpacity={0.85}>
-              <Text style={styles.retryBtnText}>Tentar novamente</Text>
-            </TouchableOpacity>
-          </View>
-        ) : dayEvents.length === 0 ? (
-          <View style={styles.stateBox}>
-            <View style={styles.stateIcon}>
-              <Ionicons name="calendar-clear-outline" size={34} color={colors.primary} />
-            </View>
-            <Text style={styles.stateTitle}>Agenda livre</Text>
-            <Text style={styles.stateText}>Nenhum evento cadastrado para este dia.</Text>
-          </View>
-        ) : (
-          <View style={styles.eventsList}>
-            {dayEvents.map((event) => {
-              const actionLabel = eventActionLabel(event);
-              const pressable = isEventPressable(event);
-
-              return (
-                <TouchableOpacity
-                  key={event.id}
-                  style={[
-                    styles.eventCard,
-                    {
-                      borderColor: tint(event.type_color, '34', colors.soft),
-                      backgroundColor: tint(event.type_color, '0D', colors.soft),
-                    },
-                  ]}
-                  activeOpacity={pressable ? 0.85 : 1}
-                  onPress={() => openEvent(event)}
-                  disabled={!pressable}
-                >
-                  <View style={[styles.eventIcon, { backgroundColor: tint(event.type_color, '18', colors.soft) }]}>
-                    <Ionicons
-                      name={calendarIconName(event.type_icon) as any}
-                      size={21}
-                      color={event.type_color}
-                    />
-                  </View>
-
-                  <View style={styles.eventBody}>
-                    <View style={styles.eventMetaRow}>
-                      <Text style={[styles.eventType, { color: event.type_color }]} numberOfLines={1}>
-                        {event.type_label}
-                      </Text>
-                      <Text style={styles.eventTime} numberOfLines={1}>{formatEventTime(event)}</Text>
-                    </View>
-                    <Text style={styles.eventTitle} numberOfLines={2}>
-                      {event.title}
-                    </Text>
-                    {event.location || event.course?.name || event.school_class?.name ? (
-                      <Text style={styles.eventMeta} numberOfLines={1}>
-                        {[event.location, event.course?.name, event.school_class?.name]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </Text>
-                    ) : null}
-                    {actionLabel ? (
-                      <Text style={styles.eventAction}>{actionLabel}</Text>
-                    ) : null}
-                  </View>
-
-                  {pressable ? (
-                    <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        <View style={{ height: 24 }} />
+        </ScreenBody>
       </ScrollView>
     </View>
   );
-}
-
-function createCalendarStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  headerWrap: {
-    backgroundColor: '#FBFAFF',
-    paddingHorizontal: 20,
-    paddingBottom: 18,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
-    ...(headerShadow as object),
-  },
-  headerGlowPrimary: {
-    position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    right: -104,
-    top: -150,
-    backgroundColor: '#F0E9FF',
-    opacity: 0.92,
-  },
-  headerGlowSecondary: {
-    position: 'absolute',
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    left: -76,
-    top: 58,
-    backgroundColor: '#F7F2FF',
-    opacity: 0.98,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 14,
-    paddingBottom: 14,
-  },
-  headerTextWrap: { flex: 1, minWidth: 0 },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: colors.ink },
-  headerSubtitle: { fontSize: 12, color: colors.muted, fontWeight: '700', marginTop: 2 },
-  refreshBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: '#EEE8FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  summaryCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.74)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EEE8FF',
-    padding: 12,
-  },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryValue: { fontSize: 22, fontWeight: '900', color: colors.ink },
-  summaryValueActive: { color: colors.primary },
-  summaryLabel: { fontSize: 11, color: colors.muted, fontWeight: '800', marginTop: 2 },
-  summaryDivider: { width: 1, height: 36, backgroundColor: colors.border },
-  content: { padding: 16, paddingBottom: 28 },
-  monthPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  monthNav: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F0ECFA',
-    padding: 10,
-    ...(cardShadow as object),
-  },
-  navBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  monthTitleWrap: { flex: 1, minWidth: 0, alignItems: 'center', paddingHorizontal: 8 },
-  monthLabel: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: colors.ink,
-    textAlign: 'center',
-  },
-  monthSubtitle: { fontSize: 12, fontWeight: '700', color: colors.muted, marginTop: 2 },
-  todayBtn: {
-    height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  todayBtnText: { fontSize: 13, fontWeight: '800', color: colors.primary },
-  gridCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#F0ECFA',
-    marginBottom: 18,
-    ...(cardShadow as object),
-  },
-  weekHeader: { flexDirection: 'row', marginBottom: 8 },
-  weekHeaderText: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.muted,
-  },
-  weekRow: { flexDirection: 'row' },
-  dayCell: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 7,
-    minHeight: 54,
-    borderRadius: 12,
-  },
-  dayCellSelected: { backgroundColor: colors.soft },
-  dayNumWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayNumWrapSelected: { backgroundColor: colors.primary },
-  dayToday: { borderWidth: 1.5, borderColor: colors.primary },
-  dayNum: { fontSize: 14, fontWeight: '800', color: colors.ink },
-  dayNumSelected: { color: colors.surface },
-  dayMarkers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    marginTop: 5,
-    height: 6,
-  },
-  miniDot: { width: 5, height: 5, borderRadius: 3 },
-  dayMarkersPlaceholder: { height: 11 },
-  agendaHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 10,
-  },
-  agendaTitleWrap: { flex: 1, minWidth: 0 },
-  agendaTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.ink,
-  },
-  agendaSubtitle: { fontSize: 13, fontWeight: '700', color: colors.muted, marginTop: 2 },
-  agendaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: colors.soft,
-  },
-  agendaBadgeText: { fontSize: 12, fontWeight: '800', color: colors.primary },
-  stateBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#F0ECFA',
-    padding: 24,
-    minHeight: 150,
-  },
-  stateIcon: {
-    width: 66,
-    height: 66,
-    borderRadius: 22,
-    backgroundColor: colors.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  stateTitle: { fontSize: 18, color: colors.ink, fontWeight: '900', textAlign: 'center' },
-  stateText: {
-    fontSize: 14,
-    color: colors.muted,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: 7,
-  },
-  retryBtn: {
-    marginTop: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-  },
-  retryBtnText: { fontSize: 13, fontWeight: '800', color: colors.surface },
-  eventsList: { gap: 10 },
-  eventCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-  },
-  eventIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eventBody: { flex: 1, minWidth: 0 },
-  eventMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 4,
-  },
-  eventType: { flex: 1, fontSize: 12, fontWeight: '900' },
-  eventTime: { fontSize: 12, color: colors.muted, fontWeight: '800', textAlign: 'right' },
-  eventTitle: { fontSize: 17, fontWeight: '900', color: colors.ink, lineHeight: 22 },
-  eventMeta: { fontSize: 13, color: colors.muted, lineHeight: 18, marginTop: 5 },
-  eventAction: { fontSize: 13, color: colors.primary, fontWeight: '900', marginTop: 8 },
-});
 }

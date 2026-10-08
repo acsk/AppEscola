@@ -67,12 +67,12 @@ export function usePaymentModal({ onPaid }: UsePaymentModalOptions = {}) {
   }, [paymentOptionsQuery.isError, paymentOptionsQuery.error]);
 
   const abrir = useCallback(
-    (cobranca: Cobranca) => {
+    (cobranca: Cobranca, tab: 'boleto' | 'pix' = 'boleto') => {
       setCobrancaSelecionada(cobranca);
       setVisible(true);
       setPaymentResult(null);
       setPaymentError(null);
-      setActivePaymentTab('boleto');
+      setActivePaymentTab(tab);
       modalTranslateY.setValue(520);
       Animated.timing(modalTranslateY, {
         toValue: 0,

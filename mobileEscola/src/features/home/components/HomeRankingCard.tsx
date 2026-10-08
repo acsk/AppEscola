@@ -12,10 +12,10 @@ function initials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 }
 
-/** Top 5 dos últimos 30 dias no banco de questões; o aluno fora do top aparece logo abaixo. */
+/** Top 5 da semana (últimos 7 dias) no banco de questões; o aluno fora do top aparece logo abaixo. */
 export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; onPractice: () => void }) {
   const p = usePalette();
-  const { data, isLoading, isError, refetch } = usePracticeRanking('month');
+  const { data, isLoading, isError, refetch } = usePracticeRanking('week');
   const top = data?.ranking.slice(0, TOP) ?? [];
   const meOutside = data?.me && !top.some((row) => row.is_me) ? data.me : null;
 
@@ -50,11 +50,11 @@ export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; on
   };
 
   return (
-    <Section title="Ranking do banco" action={<LinkButton label="Ver ranking" onPress={onOpen} />}>
+    <Section title="Ranking da semana" action={<LinkButton label="Ver ranking" onPress={onOpen} />}>
       <Card style={{ gap: space[1] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
           <Icon name="trophy" size={16} color={p.inkMuted} />
-          <Txt variant="bodySm" tone="subtle" style={{ flex: 1 }}>Quem mais respondeu questões nos últimos 30 dias</Txt>
+          <Txt variant="bodySm" tone="subtle" style={{ flex: 1 }}>Quem mais respondeu questões nos últimos 7 dias</Txt>
         </View>
 
         {isLoading ? (
@@ -66,7 +66,7 @@ export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; on
           </View>
         ) : top.length === 0 ? (
           <View style={{ alignItems: 'center', gap: space[2], paddingVertical: space[3] }}>
-            <Txt variant="bodySm" tone="subtle" style={{ textAlign: 'center' }}>Ninguém respondeu questões neste período. Seja o primeiro!</Txt>
+            <Txt variant="bodySm" tone="subtle" style={{ textAlign: 'center' }}>Ninguém respondeu questões nesta semana. Seja o primeiro!</Txt>
             <Button variant="secondary" size="sm" icon="play" label="Praticar agora" onPress={onPractice} />
           </View>
         ) : (

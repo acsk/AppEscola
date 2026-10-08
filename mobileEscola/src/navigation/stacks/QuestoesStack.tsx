@@ -6,6 +6,7 @@ import { BancoPraticarScreen } from '../../features/banco-questoes/screens/Banco
 import { BancoSimuladoScreen } from '../../features/banco-questoes/screens/BancoSimuladoScreen';
 import { BancoDesempenhoScreen } from '../../features/banco-questoes/screens/BancoDesempenhoScreen';
 import { BancoRankingScreen } from '../../features/banco-questoes/screens/BancoRankingScreen';
+import type { RankingPeriod } from '../../services/practice.service';
 
 /** Aba "Questões" (banco de questões do aluno). */
 export type QuestoesStackParamList = {
@@ -15,7 +16,8 @@ export type QuestoesStackParamList = {
   /** `setId` inicia (ou retoma) o simulado do banco; `attemptId` abre uma tentativa já existente. */
   BancoSimulado: { setId?: number; attemptId?: number; title?: string };
   BancoDesempenho: undefined;
-  BancoRanking: undefined;
+  /** `period` abre já no filtro (a tela inicial mostra a semana). */
+  BancoRanking: { period?: RankingPeriod } | undefined;
 };
 
 const Stack = createNativeStackNavigator<QuestoesStackParamList>();

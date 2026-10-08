@@ -281,7 +281,7 @@ export function HomeScreen() {
 
           {isAluno ? (
             <HomeRankingCard
-              onOpen={() => navigation.navigate('Questoes', { screen: 'BancoRanking', initial: false })}
+              onOpen={() => navigation.navigate('Questoes', { screen: 'BancoRanking', params: { period: 'week' }, initial: false })}
               onPractice={() => navigation.navigate('Questoes', { screen: 'BancoQuestoes' })}
             />
           ) : null}
