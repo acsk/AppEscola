@@ -121,8 +121,23 @@ export function TopicRow({
   );
 }
 
+/** Seta da foto horária: positivo sobe, negativo desce. Sem foto ou sem mudança, não mostra nada. */
+export function RankMovement({ movement }: { movement?: number | null }) {
+  const p = usePalette();
+  if (movement == null || movement === 0) return null;
+  const up = movement > 0;
+  const places = Math.abs(movement);
+  return (
+    <View accessibilityLabel={up ? `Subiu ${places} ${places === 1 ? 'posição' : 'posições'}` : `Caiu ${places} ${places === 1 ? 'posição' : 'posições'}`}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
+      <Icon name={up ? 'arrow-up' : 'arrow-down'} size={14} color={up ? p.success : p.danger} />
+      <Text style={{ ...font.bold, fontSize: 12, color: up ? p.success : p.danger, fontVariant: ['tabular-nums'] }}>{places}</Text>
+    </View>
+  );
+}
+
 /** Linha do ranking. A sua linha tem contorno ink e o selo "você". */
-export function RankRow({ pos, initials, name, rate, count, me, photoUrl }: { pos: number; initials: string; name: string; rate: number | null; count: number; me?: boolean; photoUrl?: string | null }) {
+export function RankRow({ pos, initials, name, rate, count, me, photoUrl, movement }: { pos: number; initials: string; name: string; rate: number | null; count: number; me?: boolean; photoUrl?: string | null; movement?: number | null }) {
   const p = usePalette();
   const top = pos <= 3;
   return (
@@ -133,6 +148,9 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl }: { po
       <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pos === 1 ? p.surfaceInverse : me ? p.surface : top ? p.surfaceSunken : 'transparent' }}>
         {pos === 1 ? <Icon name="trophy" size={18} color={p.onInverse} />
           : <Text style={{ ...font.extrabold, fontSize: 15, color: top ? p.ink : p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>}
+      </View>
+      <View style={{ width: 28, alignItems: 'flex-start' }}>
+        <RankMovement movement={movement} />
       </View>
       {photoUrl ? (
         <Image source={{ uri: photoUrl }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: p.surfaceSunken }} />

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { hashQuery } from "../../utils/questionBankQuery";
+import { parseExamsListState, serializeExamsListState, type ExamsListState } from "../../utils/examsQuery";
 import {
   View,
   Text,
@@ -87,6 +89,13 @@ function fmtRespondedPct(value: number | null | undefined) {
   return `${value.toFixed(1)}%`;
 }
 
+const LIST_HASH = "#/simulados";
+const SEARCH_DEBOUNCE_MS = 300;
+
+function readStateFromHash(): ExamsListState {
+  return parseExamsListState(typeof window === "undefined" ? "" : hashQuery(window.location.hash));
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExamsScreen({ navigate }: ExamsScreenProps) {
@@ -98,10 +107,8 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
 
   const [rows, setRows] = useState<ExamListItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [page, setPage] = useState(1);
+  const [state, setState] = useState<ExamsListState>(readStateFromHash);
+  const [searchText, setSearchText] = useState(state.search);
   const [meta, setMeta] = useState({
     current_page: 1,
     last_page: 1,
@@ -134,6 +141,43 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
+  const updateState = useCallback((next: ExamsListState, options: { replace?: boolean } = {}) => {
+    const query = serializeExamsListState(next);
+    const hash = query ? `${LIST_HASH}?${query}` : LIST_HASH;
+    setState(next);
+    if (typeof window === "undefined") return;
+    if (options.replace) {
+      window.history.replaceState(window.history.state, "", hash);
+    } else if (window.location.hash !== hash) {
+      window.location.hash = hash;
+    }
+  }, []);
+
+  const listQuery = serializeExamsListState({ ...state, search: searchText });
+  const openListTarget = (screen: string, params: Record<string, unknown> = {}) => {
+    navigate(screen, listQuery ? { ...params, query: listQuery } : params);
+  };
+
+  // Voltar/avançar do navegador restaura busca, status, tipo e página.
+  useEffect(() => {
+    const onHashChange = () => {
+      if (/^#\/simulados(\?|$)/.test(window.location.hash)) {
+        const next = readStateFromHash();
+        setState(next);
+        setSearchText(next.search);
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // Busca com debounce (substitui a entrada do histórico para não criar um passo por tecla).
+  useEffect(() => {
+    if (searchText === state.search) return;
+    const timer = setTimeout(() => updateState({ ...state, search: searchText, page: 1 }, { replace: true }), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchText, state, updateState]);
+
   // Preview
   const [previewExam, setPreviewExam] = useState<ExamListItem | null>(null);
   const [previewQuestions, setPreviewQuestions] = useState<ExamPreviewPlayerQuestion[]>([]);
@@ -157,16 +201,16 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
   const fetchExams = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, any> = { page };
-      if (search) params.search = search;
-      if (statusFilter) params.status = statusFilter;
-      if (typeFilter) params.exam_type = typeFilter;
+      const params: Record<string, any> = { page: state.page };
+      if (state.search) params.search = state.search;
+      if (state.status) params.status = state.status;
+      if (state.examType) params.exam_type = state.examType;
       const { data } = await api.get("/exams", { params });
       setRows(data.data);
       setMeta(data.meta);
     } catch {}
     setLoading(false);
-  }, [page, search, statusFilter, typeFilter]);
+  }, [state.page, state.search, state.status, state.examType]);
 
   useEffect(() => {
     fetchExams();
@@ -217,7 +261,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       return;
     }
     if (action === "edit") {
-      navigate("simulados-form", { examId: exam.id });
+      openListTarget("simulados-form", { examId: exam.id });
       return;
     }
     if (action === "open_delivery_reports") {
@@ -285,7 +329,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         </View>
         {allowManageExams && (
           <TouchableOpacity
-            onPress={() => navigate("simulados-form", { examId: null })}
+            onPress={() => openListTarget("simulados-form", { examId: null })}
             className="flex-row items-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md justify-center"
             activeOpacity={0.85}
           >
@@ -301,7 +345,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
       {summary !== null && (
         <View className="flex-row gap-3 mb-5 flex-wrap">
           <TouchableOpacity
-            onPress={() => navigate("simulados-tentativas", { status: "in_progress" })}
+            onPress={() => openListTarget("simulados-tentativas", { status: "in_progress" })}
             className="flex-1 bg-surface rounded-ds-md p-4 border border-border"
             style={{ minWidth: 140 }}
             activeOpacity={0.85}
@@ -315,7 +359,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigate("simulados-tentativas", { status: "pending_review" })}
+            onPress={() => openListTarget("simulados-tentativas", { status: "pending_review" })}
             className="flex-1 rounded-ds-md p-4 border"
             style={{ minWidth: 140,
               backgroundColor: summary.pending_review > 0 ? 'var(--ds-warning-tint)' : 'white',
@@ -339,7 +383,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigate("simulados-tentativas", { status: "awaiting_release" })}
+            onPress={() => openListTarget("simulados-tentativas", { status: "awaiting_release" })}
             className="flex-1 bg-surface rounded-ds-md p-4 border border-border"
             style={{ minWidth: 140 }}
             activeOpacity={0.85}
@@ -355,7 +399,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigate("simulados-tentativas", { status: "completed" })}
+            onPress={() => openListTarget("simulados-tentativas", { status: "completed" })}
             className="flex-1 bg-surface rounded-ds-md p-4 border border-success"
             style={{ minWidth: 140 }}
             activeOpacity={0.85}
@@ -369,7 +413,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigate("simulados-tentativas")}
+            onPress={() => openListTarget("simulados-tentativas")}
             className="bg-surface rounded-ds-md p-4 border border-border"
             style={{ minWidth: 140, alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={0.85}
@@ -389,21 +433,21 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
         >
           <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
-            value={search}
-            onChangeText={(v) => { setSearch(v); setPage(1); }}
+            value={searchText}
+            onChangeText={setSearchText}
             placeholder="Buscar por título..."
             placeholderTextColor="var(--ds-ink-subtle)"
             className="flex-1 ml-2 text-sm text-ink"
           />
-          {!!search && (
-            <TouchableOpacity onPress={() => setSearch("")}>
+          {!!searchText && (
+            <TouchableOpacity onPress={() => setSearchText("")}>
               <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}
         </View>
         <select
-          value={statusFilter}
-          onChange={(e: any) => { setStatusFilter(e.target.value); setPage(1); }}
+          value={state.status}
+          onChange={(e: any) => updateState({ ...state, status: e.target.value, page: 1 })}
           style={selectStyle}
         >
           <option value="">Todos os status</option>
@@ -412,8 +456,8 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
           ))}
         </select>
         <select
-          value={typeFilter}
-          onChange={(e: any) => { setTypeFilter(e.target.value); setPage(1); }}
+          value={state.examType}
+          onChange={(e: any) => updateState({ ...state, examType: e.target.value, page: 1 })}
           style={selectStyle}
         >
           <option value="">Todos os tipos</option>
@@ -535,7 +579,7 @@ export default function ExamsScreen({ navigate }: ExamsScreenProps) {
             lastPage={meta.last_page}
             total={meta.total}
             perPage={meta.per_page}
-            onPageChange={setPage}
+            onPageChange={(page) => updateState({ ...state, page })}
           />
         </View>
       )}

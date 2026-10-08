@@ -136,6 +136,8 @@ export interface RankingRow extends PerformanceScore {
   photo_url: string | null;
   questions: number;
   is_me: boolean;
+  /** Positivo = subiu desde a última foto horária; negativo = caiu; null = sem comparação. */
+  movement?: number | null;
 }
 
 export interface PracticeRanking {

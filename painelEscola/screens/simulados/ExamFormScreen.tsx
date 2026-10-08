@@ -194,7 +194,7 @@ function resolveExamId(data: unknown): number | null {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps) {
+export default function ExamFormScreen({ examId, navigate, listQuery = "" }: ExamFormScreenProps) {
   const { contentPadding, isMobile } = useResponsiveLayout();
   const [savedExamId, setSavedExamId] = useState<number | null>(null);
   const [postCreatePrompt, setPostCreatePrompt] = useState(false);
@@ -435,7 +435,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
           throw new Error("Resposta da API sem identificador do simulado.");
         }
         setSavedExamId(newId);
-        navigate("simulados-form", { examId: newId });
+        navigate("simulados-form", { examId: newId, ...(listQuery ? { query: listQuery } : {}) });
         setPostCreatePrompt(true);
         showApiToast(setToast, data, "Simulado criado com sucesso.");
       }
@@ -842,6 +842,8 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
     if (canManageContent) fetchSupportMaterials();
   }, [canManageContent, fetchSupportMaterials]);
 
+  const goToList = () => navigate("simulados", listQuery ? { query: listQuery } : undefined);
+
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -855,7 +857,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
   const handlePostCreateLater = () => {
     setPostCreatePrompt(false);
-    navigate("simulados");
+    goToList();
   };
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -913,7 +915,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
       <View className="flex-row items-center justify-between mb-6">
         <View className="flex-row items-center gap-3">
           <TouchableOpacity
-            onPress={() => navigate("simulados")}
+            onPress={goToList}
             className="p-2 rounded-ds-md bg-surface border border-border"
             activeOpacity={0.7}
           >
@@ -1223,7 +1225,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
 
         <View className="flex-row gap-3 mt-2">
           <TouchableOpacity
-            onPress={() => navigate("simulados")}
+            onPress={goToList}
             className="flex-1 border border-border py-3 rounded-ds-md items-center"
             activeOpacity={0.7}
           >
@@ -1617,7 +1619,7 @@ export default function ExamFormScreen({ examId, navigate }: ExamFormScreenProps
               <Text className="text-sm font-semibold text-ink">Voltar para materiais</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => navigate("simulados")}
+              onPress={goToList}
               className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
               activeOpacity={0.85}
             >

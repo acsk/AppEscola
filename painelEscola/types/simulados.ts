@@ -179,8 +179,12 @@ export type ExamsScreenProps = WithNavigate;
 
 export type ExamFormScreenProps = WithNavigate & {
   examId: number | null;
+  /** Query da listagem (#/simulados?...) para o voltar restaurar os filtros. */
+  listQuery?: string;
 };
 
 export type ExamAttemptsScreenProps = WithNavigate & {
   initialStatusFilter?: string;
+  /** Query da listagem de simulados, devolvida ao voltar. */
+  listQuery?: string;
 };

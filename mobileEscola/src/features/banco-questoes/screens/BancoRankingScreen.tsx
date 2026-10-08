@@ -8,7 +8,7 @@ import type { RankingPeriod, RankingRow } from '../../../services/practice.servi
 import { usePracticeRanking } from '../hooks';
 import { rankingWeekRange } from '../lib/format';
 import {
-  AppBar, Button, Card, IconButton, Notice, Overline, PageBody, PageHeader, RankRow, ScreenBody, SegmentedControl, Txt,
+  AppBar, Button, Card, IconButton, Notice, Overline, PageBody, PageHeader, RankMovement, RankRow, ScreenBody, SegmentedControl, Txt,
   font, space, useLayoutMode, usePalette,
 } from '../../../ui';
 
@@ -53,7 +53,7 @@ export function BancoRankingScreen() {
 
   const row = (r: RankingRow) => (
     <RankRow key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} initials={initials(r.name)} name={r.name.replace(/\s*\(você\)\s*/i, '')}
-      photoUrl={r.photo_url} rate={r.accuracy} count={r.questions} me={r.is_me} />
+      photoUrl={r.photo_url} rate={r.accuracy} count={r.questions} me={r.is_me} movement={r.movement} />
   );
 
   const body = isLoading ? <ActivityIndicator color={p.brand} style={{ marginTop: space[6] }} />
@@ -62,6 +62,7 @@ export function BancoRankingScreen() {
       <>
         <Card padding="lg" style={{ flexDirection: 'row', flexWrap: isDesktop ? 'nowrap' : 'wrap', alignItems: 'center', gap: 14 }}>
           <Text style={{ ...font.extrabold, fontSize: 40, lineHeight: 44, color: p.ink, fontVariant: ['tabular-nums'] }}>{me ? `${me.position}º` : '—'}</Text>
+          {me ? <RankMovement movement={me.movement} /> : null}
           <View style={{ flex: 1, minWidth: 180, gap: 2 }}>
             <Txt variant="titleSm">{headline}</Txt>
             <Txt tone="muted" style={{ fontSize: 14, lineHeight: 20 }}>{detail}</Txt>
@@ -83,6 +84,7 @@ export function BancoRankingScreen() {
         ) : <Txt tone="subtle">{closed ? 'Ninguém respondeu questões na semana anterior.' : 'Ninguém respondeu questões neste período ainda.'}</Txt>}
         <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 19 }}>
           Conta quantas questões diferentes cada aluno respondeu no banco (prática e simulados do banco). Repetir a mesma questão não sobe posição.
+          A seta compara com a última atualização, feita de hora em hora.
         </Txt>
       </>
     );

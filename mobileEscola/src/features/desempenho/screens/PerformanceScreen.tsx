@@ -7,7 +7,7 @@ import { fetchStudentPerformance, type PerformanceMonthlyEvolution } from '../..
 import { usePracticePerformance, usePracticeRanking, usePracticeSummary, useStartPracticeSession } from '../../banco-questoes/hooks';
 import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import {
-  AppBar, Button, Card, EmptyState, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, QuickAction, ScreenBody,
+  AppBar, Button, Card, EmptyState, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, QuickAction, RankMovement, ScreenBody,
   SegmentedControl, StatTile, SubjectScore, Tag, Txt, font, space, subjectColor, useLayoutMode, usePalette, type MonthBar,
 } from '../../../ui';
 
@@ -180,8 +180,9 @@ export function PerformanceScreen() {
                       <Txt variant="titleSm">Ranking do banco</Txt>
                       <Icon name="trophy" size={20} color={p.ink} />
                     </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space[2] }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
                       <Text style={{ ...font.extrabold, fontSize: 32, lineHeight: 40, color: p.ink }}>{me ? `${me.position}º` : '—'}</Text>
+                      {me ? <RankMovement movement={me.movement} /> : null}
                       <Txt tone="muted" style={{ fontSize: 14 }}>{me ? `de ${ranking.data?.participants ?? 0} alunos nos últimos 30 dias` : 'Responda questões para entrar'}</Txt>
                     </View>
                     <View style={{ alignSelf: 'flex-start', marginLeft: -12 }}><Button variant="ghost" size="sm" iconRight="arrow-right" label="Ver ranking" onPress={openRanking} /></View>
@@ -226,7 +227,7 @@ export function PerformanceScreen() {
               {subjectsCard}
               {studyCard}
               <QuickAction icon="trophy" title="Ranking do banco"
-                subtitle={me ? `Você está em ${me.position}º de ${ranking.data?.participants ?? 0}` : 'Veja quem mais respondeu questões'} onPress={openRanking} />
+                subtitle={me ? `Você está em ${me.position}º de ${ranking.data?.participants ?? 0}${me.movement ? ` (${me.movement > 0 ? 'subiu' : 'caiu'} ${Math.abs(me.movement)})` : ''}` : 'Veja quem mais respondeu questões'} onPress={openRanking} />
             </>
           ))}
         </ScreenBody>

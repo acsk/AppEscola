@@ -66,7 +66,7 @@ type AttemptDetailQuestion = Pick<ExamQuestion, "id" | "image_url" | "options">;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" }: ExamAttemptsScreenProps) {
+export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "", listQuery = "" }: ExamAttemptsScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<ExamAttempt[]>([]);
   const [loading, setLoading] = useState(false);
@@ -316,7 +316,7 @@ export default function ExamAttemptsScreen({ navigate, initialStatusFilter = "" 
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View className="flex-row items-center gap-3" style={{ flex: 1 }}>
           <TouchableOpacity
-            onPress={() => navigate("simulados")}
+            onPress={() => navigate("simulados", listQuery ? { query: listQuery } : undefined)}
             className="p-2 rounded-ds-md bg-surface border border-border"
             activeOpacity={0.7}
           >

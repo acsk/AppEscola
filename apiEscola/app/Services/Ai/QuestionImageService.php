@@ -214,6 +214,66 @@ class QuestionImageService
         return $generation->reviewPayload();
     }
 
+    /**
+     * Enunciado enviado como imagem: a IA lê a imagem, transcreve o texto e devolve o Image Spec da figura
+     * (gráfico, diagrama, mapa) quando houver uma além do texto. A imagem original não é reaproveitada.
+     *
+     * @param  array{image_url: string, question_text?: string|null, type?: string|null, options?: array, convert_to_objective?: bool}  $input
+     * @return array{data: array, image: string, credential: array}
+     */
+    public function readStatement(?User $user, int $tenantId, array $input): array
+    {
+        $credential = $this->credential($user, $tenantId);
+        $question = (new ExamQuestion)->forceFill([
+            'tenant_id' => $tenantId,
+            'type' => ($input['type'] ?? 'multiple_choice') === 'essay' ? 'essay' : 'multiple_choice',
+            'question_text' => (string) ($input['question_text'] ?? ''),
+            'image_url' => $input['image_url'],
+        ]);
+        $question->setRelation('options', collect());
+        $image = $this->storage->source($question);
+        $convert = filter_var($input['convert_to_objective'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        $prompt = "A imagem é o ENUNCIADO de uma questão de prova (pode incluir alternativas e uma figura). Leia-a e devolva JSON.\n"
+            ."- \"question_text\": transcreva fielmente TODO o texto do enunciado (texto de apoio, comando, dados e fórmulas), "
+            ."corrigindo só a leitura. NÃO inclua as alternativas nem a transcrição de textos que estão DENTRO da figura.\n"
+            ."- \"options\": as alternativas transcritas na ordem, sem a letra; vazio se a questão for dissertativa"
+            .($convert ? ' (esta será transformada em objetiva depois, então pode vir vazio)' : '').".\n"
+            ."- \"tem_figura\": true SOMENTE quando, além do texto, existe uma figura que a questão exige ver para ser respondida "
+            ."(gráfico, diagrama, mapa, tabela desenhada, figura geométrica, charge). false quando a imagem é apenas texto.\n"
+            ."- Se \"tem_figura\" for true, \"image_spec\" descreve a figura para ser REDESENHADA do zero, com os MESMOS números, textos e "
+            ."labels lidos na imagem; não inclua o enunciado nem as alternativas na figura e não revele o gabarito. Se false, omita \"image_spec\".\n"
+            ."Não invente o que não conseguir ler.\n"
+            ."Formato: ".json_encode([
+                'question_text' => 'enunciado transcrito sem alternativas',
+                'options' => [['option_text' => 'alternativa sem letra']],
+                'tem_figura' => false,
+                'image_spec' => QuestionImageSpec::specFormat(),
+            ], JSON_UNESCAPED_UNICODE);
+
+        $result = $this->router->vision($credential, $this->system(), $prompt, [$image]);
+
+        return ['data' => $result['data'], 'image' => $image, 'credential' => $credential];
+    }
+
+    /**
+     * Gera a figura a partir do Image Spec lido de um enunciado em imagem e anexa a URL ao conteúdo sugerido.
+     *
+     * @param  array{image: string, credential: array}  $read
+     */
+    public function attachRedrawnFigure(?User $user, int $tenantId, array $content, array $spec, array $read): array
+    {
+        $generation = QuestionImageGeneration::create([
+            'tenant_id' => $tenantId, 'created_by' => $user?->id,
+            'origin' => QuestionImageGeneration::ORIGIN_EDITOR_REDRAW,
+            'content' => $content, 'image_spec' => $spec, 'status' => 'PENDING', 'attempts' => 0,
+            'metadata' => ['history' => []],
+        ]);
+        $this->generate($generation, $read['credential'], $read['image']);
+
+        return $content + ['image_url' => $generation->image_url];
+    }
+
     public function documentDraft(?User $user, int $tenantId, array $content, array $raw, string $documentHash): array
     {
         if (! $raw['possui_imagem']) {

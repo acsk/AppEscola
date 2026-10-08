@@ -101,33 +101,23 @@ class PracticePerformanceService
     public function ranking(int $tenantId, string $period, int $limit, ?int $viewerStudentId = null, bool $fullNames = false): array
     {
         [$since, $until] = $this->periodRange($period);
-        $rows = PracticeAnswer::query()->counted()
-            ->where('practice_answers.tenant_id', $tenantId)
-            ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
-            ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
-            ->join('students as s', 's.id', '=', 'practice_answers.student_id')
-            ->where('s.status', 'active')
-            ->whereNull('s.deleted_at')
-            ->select(
-                's.id', 's.name', 's.photo_url', 's.enrollment_number',
-                DB::raw('count(distinct practice_answers.exam_question_id) as questions'),
-                ...$this->scoreColumns(),
-            )
-            ->groupBy('s.id', 's.name', 's.photo_url', 's.enrollment_number')
-            ->orderByDesc('questions')->orderByDesc('correct')->orderBy('s.id')
-            ->get();
+        $rows = $this->rankingRows($tenantId, $since, $until);
+        $previousPositions = $this->previousPositions($tenantId, $period);
 
         $position = 0;
         $previous = null;
-        $ranked = $rows->values()->map(function ($row, int $index) use (&$position, &$previous, $viewerStudentId, $fullNames) {
+        $ranked = $rows->values()->map(function ($row, int $index) use (&$position, &$previous, $previousPositions, $viewerStudentId, $fullNames) {
             $key = $row->questions.'|'.$row->correct;
             if ($key !== $previous) {
                 $position = $index + 1;
                 $previous = $key;
             }
+            $before = $previousPositions[(int) $row->id] ?? null;
 
             return [
                 'position'  => $position,
+                // Positivo = subiu desde a última foto horária; negativo = caiu; null = entrou agora ou ainda não há foto.
+                'movement'  => $before === null ? null : $before - $position,
                 'name'      => $fullNames ? $row->name : $this->shortName($row->name),
                 'photo_url' => $row->photo_url,
                 'questions' => (int) $row->questions,
@@ -146,6 +136,72 @@ class PracticePerformanceService
             'ranking'      => $ranked->take($limit)->values(),
             'me'           => $viewerStudentId !== null ? $ranked->firstWhere('is_me', true) : null,
         ];
+    }
+
+    /**
+     * Linhas da foto horária (sem nome): o comando usa isto no SQLite, onde a view não existe.
+     *
+     * @return array<int, array{student_id: int, position: int, questions: int, correct: int}>
+     */
+    public function captureRows(int $tenantId, string $period): array
+    {
+        [$since, $until] = $this->periodRange($period);
+        $position = 0;
+        $previous = null;
+
+        return $this->rankingRows($tenantId, $since, $until)->values()->map(function ($row, int $index) use (&$position, &$previous) {
+            $key = $row->questions.'|'.$row->correct;
+            if ($key !== $previous) {
+                $position = $index + 1;
+                $previous = $key;
+            }
+
+            return [
+                'student_id' => (int) $row->id,
+                'position' => $position,
+                'questions' => (int) $row->questions,
+                'correct' => (int) $row->correct,
+            ];
+        })->all();
+    }
+
+    /** @return array<int, int> student_id => posição na última foto horária */
+    private function previousPositions(int $tenantId, string $period): array
+    {
+        $capturedAt = DB::table('practice_ranking_snapshots')
+            ->where('tenant_id', $tenantId)
+            ->where('period', $period)
+            ->max('captured_at');
+        if ($capturedAt === null) {
+            return [];
+        }
+
+        return DB::table('practice_ranking_snapshots')
+            ->where('tenant_id', $tenantId)
+            ->where('period', $period)
+            ->where('captured_at', $capturedAt)
+            ->pluck('position', 'student_id')
+            ->mapWithKeys(fn ($position, $studentId) => [(int) $studentId => (int) $position])
+            ->all();
+    }
+
+    private function rankingRows(int $tenantId, ?Carbon $since, ?Carbon $until): Collection
+    {
+        return PracticeAnswer::query()->counted()
+            ->where('practice_answers.tenant_id', $tenantId)
+            ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
+            ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
+            ->join('students as s', 's.id', '=', 'practice_answers.student_id')
+            ->where('s.status', 'active')
+            ->whereNull('s.deleted_at')
+            ->select(
+                's.id', 's.name', 's.photo_url', 's.enrollment_number',
+                DB::raw('count(distinct practice_answers.exam_question_id) as questions'),
+                ...$this->scoreColumns(),
+            )
+            ->groupBy('s.id', 's.name', 's.photo_url', 's.enrollment_number')
+            ->orderByDesc('questions')->orderByDesc('correct')->orderBy('s.id')
+            ->get();
     }
 
     /** @return array{0: ?Carbon, 1: ?Carbon} início (inclusivo) e fim (exclusivo), em UTC; null = sem limite. */

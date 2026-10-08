@@ -215,18 +215,19 @@ function hashToNav(hash: string): NavState {
   }
 
   if (seg0 === "simulados") {
-    if (!seg1) return { screen: "simulados" };
+    const listQuery = query ? { query } : {};
+    if (!seg1) return { screen: "simulados", params: query ? { query } : undefined };
     if (seg1 === "tentativas") {
       const [,, seg2] = path.split("/").filter(Boolean);
       return {
         screen: "simulados-tentativas",
-        params: seg2 ? { status: seg2 } : undefined,
+        params: { ...(seg2 ? { status: seg2 } : {}), ...listQuery },
       };
     }
-    if (seg1 === "novo") return { screen: "simulados-form", params: { examId: null } };
+    if (seg1 === "novo") return { screen: "simulados-form", params: { examId: null, ...listQuery } };
     const id = parseInt(seg1, 10);
-    if (!isNaN(id)) return { screen: "simulados-form", params: { examId: id } };
-    return { screen: "simulados" };
+    if (!isNaN(id)) return { screen: "simulados-form", params: { examId: id, ...listQuery } };
+    return { screen: "simulados", params: query ? { query } : undefined };
   }
 
   if (seg0 === "avaliacoes-oficiais") {
@@ -314,13 +315,21 @@ function navToHash(nav: NavState): string {
     const id = nav.params?.enrollmentId;
     return id != null ? `#/matriculas/${id}` : "#/matriculas";
   }
+  if (nav.screen === "simulados") {
+    const query = nav.params?.query;
+    return query ? `#/simulados?${query}` : "#/simulados";
+  }
   if (nav.screen === "simulados-form") {
     const id = nav.params?.examId;
-    return id != null ? `#/simulados/${id}` : "#/simulados/novo";
+    const query = nav.params?.query;
+    const base = id != null ? `#/simulados/${id}` : "#/simulados/novo";
+    return query ? `${base}?${query}` : base;
   }
   if (nav.screen === "simulados-tentativas") {
     const status = nav.params?.status;
-    return status ? `#/simulados/tentativas/${status}` : "#/simulados/tentativas";
+    const query = nav.params?.query;
+    const base = status ? `#/simulados/tentativas/${status}` : "#/simulados/tentativas";
+    return query ? `${base}?${query}` : base;
   }
   if (nav.screen === "avaliacoes-oficiais-form") {
     const id = nav.params?.assessmentId as number | null | undefined;
@@ -957,8 +966,22 @@ function AppContent() {
           );
         }
         return <CalendarScreen navigate={navigate} />;
-      case "simulados-form": return <ExamFormScreen navigate={navigate} examId={nav.params?.examId ?? null} />;
-      case "simulados-tentativas": return <ExamAttemptsScreen navigate={navigate} initialStatusFilter={nav.params?.status ?? ""} />;
+      case "simulados-form":
+        return (
+          <ExamFormScreen
+            navigate={navigate}
+            examId={nav.params?.examId ?? null}
+            listQuery={String(nav.params?.query ?? "")}
+          />
+        );
+      case "simulados-tentativas":
+        return (
+          <ExamAttemptsScreen
+            navigate={navigate}
+            initialStatusFilter={nav.params?.status ?? ""}
+            listQuery={String(nav.params?.query ?? "")}
+          />
+        );
       case "avaliacoes-oficiais-form":
         return (
           <OfficialAssessmentFormScreen

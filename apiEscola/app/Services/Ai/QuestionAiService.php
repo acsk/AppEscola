@@ -115,6 +115,23 @@ class QuestionAiService
         ));
         $expectedAnswer = $convert ? trim((string) ($input['explanation'] ?? '')) : '';
 
+        // Enunciado enviado como imagem: a IA lê, transcreve o texto e descreve a figura (se houver) para redesenhar.
+        $statementImage = trim((string) ($input['image_url'] ?? ''));
+        $read = null;
+        if ($statementImage !== '') {
+            $read = $this->images->readStatement($user, $tenantId, $input);
+            $transcribed = trim((string) ($read['data']['question_text'] ?? ''));
+            if ($transcribed !== '') {
+                $input['question_text'] = $transcribed;
+            }
+            if ($filledOptions === [] && ! $convert) {
+                $filledOptions = array_values(array_filter(
+                    array_map(fn ($o) => trim((string) (is_array($o) ? ($o['option_text'] ?? '') : $o)), (array) ($read['data']['options'] ?? [])),
+                    fn ($t) => $t !== ''
+                ));
+            }
+        }
+
         $this->logSuspicious($tenantId, 'autofill', [$input['question_text'], ...$filledOptions, $expectedAnswer]);
 
         $system = 'Você é um professor especialista em elaborar e classificar questões de provas e vestibulares brasileiros. '
@@ -174,7 +191,14 @@ class QuestionAiService
 
         $fallbackYear = QuestionYear::detect([$input['question_text']], [$input['source_exam_name'] ?? null]);
 
-        return $content + $this->sanitizeClassification($raw, $catalogs, $onlySubjectId, $fallbackYear);
+        $suggestion = $content + $this->sanitizeClassification($raw, $catalogs, $onlySubjectId, $fallbackYear);
+
+        if ($read !== null && ($read['data']['tem_figura'] ?? false) === true) {
+            $spec = QuestionImageSpec::spec(is_array($read['data']['image_spec'] ?? null) ? $read['data']['image_spec'] : []);
+            $suggestion = $this->images->attachRedrawnFigure($user, $tenantId, $suggestion, $spec, $read);
+        }
+
+        return $suggestion;
     }
 
     /** Campos que a classificação em lote pode sugerir → chaves da sugestão. */

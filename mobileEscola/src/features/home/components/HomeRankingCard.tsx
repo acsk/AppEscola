@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, Text, View } from 'react-native';
 import type { RankingRow } from '../../../services/practice.service';
 import { usePracticeRanking } from '../../banco-questoes/hooks';
 import { formatPercent, rankingWeekRange } from '../../banco-questoes/lib/format';
-import { Button, Card, Icon, LinkButton, Section, Txt, font, space, usePalette } from '../../../ui';
+import { Button, Card, Icon, LinkButton, RankMovement, Section, Txt, font, space, usePalette } from '../../../ui';
 
 const TOP = 5;
 const MEDAL = ['#F59E0B', '#94A3B8', '#B45309'];
@@ -32,6 +32,9 @@ export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; on
         }}>
         <View style={{ minWidth: 32, height: 28, borderRadius: 14, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: medal ?? p.surfaceSunken }}>
           <Text style={{ ...font.extrabold, fontSize: 12, color: medal ? '#FFFFFF' : p.ink }}>{row.position}º</Text>
+        </View>
+        <View style={{ width: 28, alignItems: 'flex-start' }}>
+          <RankMovement movement={row.movement} />
         </View>
         {row.photo_url ? (
           <Image source={{ uri: row.photo_url }} style={{ width: 32, height: 32, borderRadius: 16 }} />

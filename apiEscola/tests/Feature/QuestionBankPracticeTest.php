@@ -394,4 +394,39 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertSame('2026-10-05T03:00:00+00:00', $lastWeek['until']);
         $this->assertSame(1, $lastWeek['me']['position']);
     }
+
+    public function test_ranking_movement_uses_the_hourly_snapshot(): void
+    {
+        $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
+        $maria = $this->student('MARIA DA SILVA');
+        $joao = $this->student('JOAO PEREIRA');
+        $answer = function (Student $student, ExamQuestion $q) {
+            $this->actingAsStudent($student);
+            $this->postJson("/api/aluno/practice/questions/{$q->id}/answer", ['option_id' => $this->correct($q)])->assertOk();
+        };
+
+        $answer($joao, $qs[0]);
+        $answer($joao, $qs[1]);
+        $answer($maria, $qs[0]);
+
+        $this->artisan('ranking:snapshot')->assertSuccessful();
+        $snapshot = DB::table('vw_practice_ranking')
+            ->where('period', 'all')
+            ->where('tenant_id', $this->tenant->id)
+            ->pluck('position', 'student_id');
+        $this->assertSame(1, (int) $snapshot[$joao->id]);
+        $this->assertSame(2, (int) $snapshot[$maria->id]);
+
+        $answer($maria, $qs[1]);
+        $answer($maria, $qs[2]);
+
+        $this->actingAsStudent($maria);
+        $body = $this->getJson('/api/aluno/practice/ranking?period=all')->assertOk()->json('body');
+        $byName = collect($body['ranking'])->keyBy('name');
+        $this->assertSame(1, $byName['MARIA S.']['position']);
+        $this->assertSame(1, $byName['MARIA S.']['movement']);
+        $this->assertSame(2, $byName['JOAO P.']['position']);
+        $this->assertSame(-1, $byName['JOAO P.']['movement']);
+        $this->assertSame(1, $body['me']['movement']);
+    }
 }

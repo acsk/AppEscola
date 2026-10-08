@@ -12,7 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import {
-  Archive, ArrowLeft, ArrowRight, Bell, Book, Bookmark, Calendar, Camera, ChartNoAxesColumn, Check, ChevronDown, ChevronLeft,
+  Archive, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Bell, Book, Bookmark, Calendar, Camera, ChartNoAxesColumn, Check, ChevronDown, ChevronLeft,
   ChevronRight, CircleAlert, CircleCheck, CircleX, Clipboard, Clock, Download, Eye, Flag, Folder, Funnel, House, Info,
   KeyRound, LayoutGrid, Library, Lightbulb, ListFilter, LogOut, Menu, MessageSquare, PanelLeft, Pause, PenLine, Play,
   Plus, RefreshCw, Search, SlidersHorizontal, Target, TriangleAlert, Trophy, Wallet, X, GraduationCap, Sparkles, FileText,
@@ -29,7 +29,7 @@ export const ICONS = {
   'chevron-right': ChevronRight, 'chevron-left': ChevronLeft, 'chevron-down': ChevronDown, check: Check, x: X,
   search: Search, sliders: SlidersHorizontal, book: Book, library: Library, calendar: Calendar, clock: Clock,
   target: Target, bookmark: Bookmark, logout: LogOut, key: KeyRound, folder: Folder, archive: Archive, edit: PenLine,
-  'arrow-right': ArrowRight, 'arrow-left': ArrowLeft, play: Play, pause: Pause, download: Download, plus: Plus, eye: Eye,
+  'arrow-right': ArrowRight, 'arrow-left': ArrowLeft, 'arrow-up': ArrowUp, 'arrow-down': ArrowDown, play: Play, pause: Pause, download: Download, plus: Plus, eye: Eye,
   message: MessageSquare, trophy: Trophy, alert: CircleAlert, warning: TriangleAlert, info: Info, refresh: RefreshCw,
   flag: Flag, sort: ListFilter, filter: Funnel, grid: LayoutGrid, 'panel-left': PanelLeft, 'circle-check': CircleCheck,
   'circle-x': CircleX, lightbulb: Lightbulb, graduation: GraduationCap, camera: Camera, sparkle: Sparkles, file: FileText,
