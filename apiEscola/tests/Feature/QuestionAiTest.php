@@ -381,6 +381,32 @@ class QuestionAiTest extends TestCase
         $this->postJson('/api/question-bank/taxonomy/import-default')->assertStatus(403);
     }
 
+    public function test_imports_default_topics_into_school_subject_with_custom_name(): void
+    {
+        $portuguese = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português CPM']);
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática CPM']);
+        SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $math->id, 'name' => 'Frações']);
+
+        $this->getJson("/api/question-bank/subjects/{$portuguese->id}/default-topics")
+            ->assertOk()->assertJsonPath('body.suggested', 'Língua Portuguesa');
+        $this->getJson("/api/question-bank/subjects/{$math->id}/default-topics")
+            ->assertOk()->assertJsonPath('body.suggested', 'Matemática');
+
+        $this->postJson("/api/question-bank/subjects/{$math->id}/topics/import-default", ['source' => 'matematica'])
+            ->assertOk()->assertJsonPath('body.topics_created', 19)->assertJsonPath('body.topics_existing', 1);
+        $this->postJson("/api/question-bank/subjects/{$math->id}/topics/import-default", ['source' => 'Matemática'])
+            ->assertOk()->assertJsonPath('body.topics_created', 0);
+        $this->assertSame(20, SubjectTopic::where('subject_id', $math->id)->count());
+        $this->assertFalse(Subject::where('tenant_id', $this->tenant->id)->where('name', 'Matemática')->exists());
+
+        $this->postJson("/api/question-bank/subjects/{$portuguese->id}/topics/import-default", ['source' => 'Inexistente'])->assertStatus(422);
+        $other = Subject::factory()->create(['tenant_id' => Tenant::factory()->create()->id]);
+        $this->getJson("/api/question-bank/subjects/{$other->id}/default-topics")->assertNotFound();
+
+        Sanctum::actingAs(User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'professor', 'status' => 'active']));
+        $this->postJson("/api/question-bank/subjects/{$portuguese->id}/topics/import-default", ['source' => 'Língua Portuguesa'])->assertStatus(403);
+    }
+
     public function test_autofill_requires_meaningful_statement(): void
     {
         $this->tenantKey();

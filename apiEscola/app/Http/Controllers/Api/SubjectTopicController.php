@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SubjectTopicRequest;
+use App\Models\Subject;
 use App\Models\SubjectTopic;
 use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
@@ -12,6 +13,7 @@ use App\Services\SubjectTopicService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 
 /** Assuntos de disciplina do banco de questões. */
 class SubjectTopicController extends Controller
@@ -50,12 +52,11 @@ class SubjectTopicController extends Controller
     public function importDefault(Request $request, QuestionTaxonomyImporter $importer): JsonResponse
     {
         $tenantId = $this->authorizeStaff($request);
-        if (! in_array($request->user()->role, ['admin', 'super_admin'], true)) {
+        if (! $this->isAdmin($request)) {
             return $this->forbidden('Apenas administradores podem importar a taxonomia padrão.');
         }
 
-        $data = json_decode((string) file_get_contents(database_path('seeders/data/question_taxonomy.json')), true);
-        $report = $importer->import($tenantId, (array) $data, $request->boolean('dry_run'));
+        $report = $importer->import($tenantId, $importer->defaultData(), $request->boolean('dry_run'));
         $created = $report['subjects_created'] + $report['topics_created'] + $report['boards_created'];
 
         return $this->success($report, $request->boolean('dry_run')
@@ -63,6 +64,41 @@ class SubjectTopicController extends Controller
             : ($created > 0
                 ? "Taxonomia importada: {$report['subjects_created']} disciplina(s), {$report['topics_created']} assunto(s) e {$report['boards_created']} banca(s) criados."
                 : 'A taxonomia padrão já estava completa. Nada foi criado.'));
+    }
+
+    /**
+     * GET /question-bank/subjects/{subject}/default-topics — disciplinas padrão (com assuntos) para importar
+     * na disciplina da escola, com a sugestão pelo nome ("PORTUGUÊS CPM" → Língua Portuguesa).
+     */
+    public function defaultTopics(Request $request, int $subject, QuestionTaxonomyImporter $importer): JsonResponse
+    {
+        $target = $this->subject($request, $subject);
+        $data = $importer->defaultData();
+
+        return $this->success([
+            'suggested' => $importer->suggestSource($data, $target->name),
+            'subjects'  => $importer->defaultSubjects($data),
+        ]);
+    }
+
+    /** POST /question-bank/subjects/{subject}/topics/import-default — cria na disciplina os assuntos padrão que faltam. */
+    public function importDefaultTopics(Request $request, int $subject, QuestionTaxonomyImporter $importer): JsonResponse
+    {
+        $target = $this->subject($request, $subject);
+        if (! $this->isAdmin($request)) {
+            return $this->forbidden('Apenas administradores podem importar assuntos padrão.');
+        }
+        $data = $request->validate(['source' => ['required', 'string', 'max:150']]);
+
+        try {
+            $report = $importer->importTopics($target, $importer->defaultData(), $data['source']);
+        } catch (InvalidArgumentException $e) {
+            return $this->error($e->getMessage(), null, 422);
+        }
+
+        return $this->success($report, $report['topics_created'] > 0
+            ? "{$report['topics_created']} assunto(s) importado(s) para {$target->name}."
+            : "{$target->name} já tinha todos os assuntos padrão. Nada foi criado.");
     }
 
     public function store(SubjectTopicRequest $request): JsonResponse
@@ -94,6 +130,16 @@ class SubjectTopicController extends Controller
         $this->examAccess->assertCanManageExams($request->user());
 
         return $this->requireTenantId($request);
+    }
+
+    private function isAdmin(Request $request): bool
+    {
+        return in_array($request->user()->role, ['admin', 'super_admin'], true);
+    }
+
+    private function subject(Request $request, int $id): Subject
+    {
+        return Subject::query()->where('tenant_id', $this->authorizeStaff($request))->findOrFail($id);
     }
 
     private function present(SubjectTopic $topic): array

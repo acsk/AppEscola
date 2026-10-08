@@ -22,11 +22,14 @@ import {
   deleteTopic,
   fetchCatalog,
   fetchCatalogDefinitions,
+  fetchDefaultTopics,
   fetchSubjectsWithCounts,
   fetchTopics,
   importDefaultTaxonomy,
+  importDefaultTopics,
   saveCatalogItem,
   saveTopic,
+  type DefaultTopicsSource,
 } from "../../services/questionBank";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import { foldText } from "../../utils/questionBankQuery";
@@ -74,6 +77,9 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   const canImport = user?.role === "admin" || user?.role === "super_admin";
   const [confirmImport, setConfirmImport] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [topicImport, setTopicImport] = useState<{ subject: SubjectRow; sources: DefaultTopicsSource[]; source: string } | null>(null);
+  const [loadingSourcesFor, setLoadingSourcesFor] = useState<number | null>(null);
+  const [importingTopics, setImportingTopics] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
     type: "success",
@@ -117,6 +123,35 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
       showApiErrorToast(setToast, error, "Não foi possível importar a taxonomia.");
     } finally {
       setImporting(false);
+    }
+  };
+
+  /** Assuntos padrão numa disciplina da escola (ex.: "PORTUGUÊS CPM" recebe os de Língua Portuguesa). */
+  const openTopicImport = async (subject: SubjectRow) => {
+    setLoadingSourcesFor(subject.id);
+    try {
+      const { suggested, subjects: sources } = await fetchDefaultTopics(subject.id);
+      setTopicImport({ subject, sources, source: suggested ?? "" });
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível carregar os assuntos padrão.");
+    } finally {
+      setLoadingSourcesFor(null);
+    }
+  };
+
+  const runTopicImport = async () => {
+    if (!topicImport?.source) return;
+    setImportingTopics(true);
+    try {
+      const response = await importDefaultTopics(topicImport.subject.id, topicImport.source);
+      showApiToast(setToast, response, "Assuntos importados.");
+      setExpanded((prev) => new Set(prev).add(topicImport.subject.id));
+      setTopicImport(null);
+      await load();
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível importar os assuntos.");
+    } finally {
+      setImportingTopics(false);
     }
   };
 
@@ -273,14 +308,29 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                             />
                           </DataTableRow>
                         ))}
-                        <TouchableOpacity
-                          onPress={() => setEdit({ kind: "topic", subjectId: subject.id, name: "", description: "" })}
-                          className="flex-row items-center gap-2 px-4 py-3"
-                          style={{ paddingLeft: 44 }}
-                        >
-                          <Ionicons name="add-circle-outline" size={16} color="var(--ds-brand)" />
-                          <Text className="text-xs font-semibold text-brand">Novo assunto em {subject.name}</Text>
-                        </TouchableOpacity>
+                        <View className="flex-row flex-wrap items-center" style={{ paddingLeft: 28 }}>
+                          <TouchableOpacity
+                            onPress={() => setEdit({ kind: "topic", subjectId: subject.id, name: "", description: "" })}
+                            className="flex-row items-center gap-2 px-4 py-3"
+                          >
+                            <Ionicons name="add-circle-outline" size={16} color="var(--ds-brand)" />
+                            <Text className="text-xs font-semibold text-brand">Novo assunto em {subject.name}</Text>
+                          </TouchableOpacity>
+                          {canImport && (
+                            <TouchableOpacity
+                              onPress={() => void openTopicImport(subject)}
+                              disabled={loadingSourcesFor !== null}
+                              className="flex-row items-center gap-2 px-4 py-3"
+                            >
+                              {loadingSourcesFor === subject.id ? (
+                                <ActivityIndicator size="small" color="var(--ds-brand)" />
+                              ) : (
+                                <Ionicons name="download-outline" size={16} color="var(--ds-brand)" />
+                              )}
+                              <Text className="text-xs font-semibold text-brand">Importar assuntos padrão</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
                     )}
                   </View>
@@ -408,6 +458,74 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
         onConfirm={() => void runImport()}
         onCancel={() => setConfirmImport(false)}
       />
+
+      <Modal
+        visible={!!topicImport}
+        title={`Importar assuntos padrão — ${topicImport?.subject.name ?? ""}`}
+        onClose={() => !importingTopics && setTopicImport(null)}
+        size="md"
+        compact
+        footer={
+          <View className="flex-row justify-end gap-3">
+            <TouchableOpacity
+              onPress={() => setTopicImport(null)}
+              disabled={importingTopics}
+              className="px-4 rounded-ds-md border border-border-strong py-2 min-h-control-md justify-center"
+            >
+              <Text className="text-sm font-semibold text-ink-muted">Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => void runTopicImport()}
+              disabled={importingTopics || !topicImport?.source}
+              className={`px-4 py-2.5 rounded-ds-md flex-row items-center gap-2 ${importingTopics || !topicImport?.source ? "bg-brand-tint" : "bg-brand"}`}
+            >
+              {importingTopics && <ActivityIndicator size="small" color="var(--ds-on-brand)" />}
+              <Text className="text-sm font-medium text-on-brand">Importar</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      >
+        {topicImport && (() => {
+          const source = topicImport.sources.find((s) => s.name === topicImport.source);
+          const existing = new Set((topicsBySubject.get(topicImport.subject.id) ?? []).map((t) => foldText(t.name)));
+          const newCount = source ? source.topics.filter((t) => !existing.has(foldText(t))).length : 0;
+          return (
+            <View style={{ gap: 12 }}>
+              <Text className="text-sm text-ink-muted">
+                Copia para {topicImport.subject.name} os assuntos de uma disciplina padrão. Só cria os que faltam; nada é alterado ou removido.
+              </Text>
+              <SearchableSelect
+                dense
+                label="Assuntos de"
+                modalTitle="Disciplina padrão"
+                options={topicImport.sources.map((s) => ({ value: s.name, label: `${s.name} (${s.topics.length} assuntos)` }))}
+                value={topicImport.source}
+                onChange={(v) => setTopicImport({ ...topicImport, source: v ?? "" })}
+              />
+              {source && (
+                <View style={{ gap: 6 }}>
+                  <Text className="text-xs font-semibold text-ink">
+                    {newCount} novo(s) · {source.topics.length - newCount} já existente(s)
+                  </Text>
+                  <View className="flex-row flex-wrap" style={{ gap: 6 }}>
+                    {source.topics.map((t) => {
+                      const has = existing.has(foldText(t));
+                      return (
+                        <View key={t} className={`px-2 py-1 rounded-ds-md border ${has ? "border-border bg-surface-sunken" : "border-brand bg-brand-tint"}`}>
+                          <Text className={`text-xs ${has ? "text-ink-muted" : "text-ink"}`}>
+                            {t}
+                            {has ? " · já existe" : ""}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </View>
+          );
+        })()}
+      </Modal>
 
       <ToastBanner
         visible={toast.visible}

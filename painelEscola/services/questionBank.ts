@@ -221,6 +221,20 @@ export async function importDefaultTaxonomy() {
   return data as { type: string; message: string; body: TaxonomyImportReport };
 }
 
+export type DefaultTopicsSource = { name: string; topics: string[] };
+
+/** Disciplinas padrão (com assuntos) para importar numa disciplina da escola, com a sugestão pelo nome. */
+export async function fetchDefaultTopics(subjectId: number): Promise<{ suggested: string | null; subjects: DefaultTopicsSource[] }> {
+  const { data } = await api.get(`/question-bank/subjects/${subjectId}/default-topics`);
+  return data.body ?? { suggested: null, subjects: [] };
+}
+
+/** Cria na disciplina os assuntos padrão que faltam. Devolve o envelope (toast usa a mensagem da API). */
+export async function importDefaultTopics(subjectId: number, source: string) {
+  const { data } = await api.post(`/question-bank/subjects/${subjectId}/topics/import-default`, { source });
+  return data as { type: string; message: string; body: { topics_created: number; topics_existing: number } };
+}
+
 export async function fetchActiveSubjects(): Promise<SubjectSummary[]> {
   const subjects = await fetchSubjectsWithCounts();
   return subjects.map(({ id, name }) => ({ id, name }));
