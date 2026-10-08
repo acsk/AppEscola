@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { usePalette } from './theme';
-import { radius, shadow, size, space, type, type Palette } from './tokens';
+import { font, radius, shadow, size, space, type, type Palette } from './tokens';
 
 // ── Ícones (Lucide, traço 2) ─────────────────────────────────────────────────
 
@@ -170,7 +170,7 @@ export function IconButton({
 export function LinkButton({ label, onPress }: { label: string; onPress?: () => void }) {
   return (
     <Pressable accessibilityRole="link" onPress={onPress} hitSlop={8}>
-      <Txt variant="label" tone="brand" style={{ fontFamily: type.button.fontFamily }}>{label}</Txt>
+      <Txt variant="label" tone="brand" style={{ ...font.bold }}>{label}</Txt>
     </Pressable>
   );
 }
@@ -249,7 +249,7 @@ export function EmptyState({ icon = 'archive', title, text, action }: { icon?: I
         <Icon name={icon} size={22} color={p.inkMuted} />
       </View>
       <Txt variant="titleSm" style={{ fontSize: 15, lineHeight: 20, textAlign: 'center' }}>{title}</Txt>
-      {text ? <Txt variant="bodySm" tone="subtle" style={{ textAlign: 'center', maxWidth: 260, fontFamily: type.body.fontFamily }}>{text}</Txt> : null}
+      {text ? <Txt variant="bodySm" tone="subtle" style={{ textAlign: 'center', maxWidth: 260, ...font.regular }}>{text}</Txt> : null}
       {action}
     </View>
   );

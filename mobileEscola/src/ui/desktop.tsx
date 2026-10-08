@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View, type StyleProp, type ViewStyl
 import { Button, Dot, Icon, Tag, Txt, type IconName } from './primitives';
 import type { ExamStatus } from './data';
 import { usePalette } from './theme';
-import { layout, radius, shadow, size, space, type } from './tokens';
+import { font, layout, radius, shadow, size, space, type } from './tokens';
 
 // ── Página (desktop) ─────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: space[4] }}>
       <View style={{ flexShrink: 1 }}>
-        <Text accessibilityRole="header" style={{ fontSize: 28, lineHeight: 34, fontFamily: type.display.fontFamily, letterSpacing: -0.56, color: p.ink }}>{title}</Text>
+        <Text accessibilityRole="header" style={{ fontSize: 28, lineHeight: 34, ...font.extrabold, letterSpacing: -0.56, color: p.ink }}>{title}</Text>
         {subtitle ? <Txt tone="muted" style={{ marginTop: 4 }}>{subtitle}</Txt> : null}
       </View>
       {actions}
@@ -53,7 +53,7 @@ export function Checkbox({
         {checked && !radio ? <Icon name="check" size={14} strokeWidth={3} color={p.onInverse} /> : null}
       </View>
       {dot ? <Dot color={dot} /> : null}
-      <Text numberOfLines={1} style={[type.label, { fontFamily: type.bodySm.fontFamily, fontSize: 14, color: p.ink, flex: 1 }]}>{label}</Text>
+      <Text numberOfLines={1} style={[type.label, { ...font.medium, fontSize: 14, color: p.ink, flex: 1 }]}>{label}</Text>
       {count != null ? <Text style={[type.caption, { color: p.inkSubtle, fontVariant: ['tabular-nums'] }]}>{count}</Text> : null}
     </Pressable>
   );
@@ -69,10 +69,10 @@ export function FilterGroup({ title, selected, defaultOpen = true, children }: {
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)}
         style={{ height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-          <Text style={[type.label, { fontFamily: type.button.fontFamily, color: p.ink }]}>{title}</Text>
+          <Text style={[type.label, { ...font.bold, color: p.ink }]}>{title}</Text>
           {selected ? (
             <View style={{ minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: radius.pill, backgroundColor: p.surfaceInverse, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 11, fontFamily: type.button.fontFamily, color: p.onInverse }}>{selected}</Text>
+              <Text style={{ fontSize: 11, ...font.bold, color: p.onInverse }}>{selected}</Text>
             </View>
           ) : null}
         </View>
@@ -96,7 +96,7 @@ export function SelectButton<T extends string | number>({
       <Pressable accessibilityRole="button" accessibilityLabel={`${label ?? ''} ${current?.label ?? ''}`} onPress={() => setOpen(true)}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: size.controlSm, paddingLeft: 12, paddingRight: 10, borderRadius: radius.sm, borderWidth: 1, borderColor: p.lineStrong, backgroundColor: p.surface }}>
         {icon ? <Icon name={icon} size={18} color={p.ink} /> : null}
-        {label ? <Text style={[type.label, { fontFamily: type.bodySm.fontFamily, color: p.inkSubtle }]}>{label}</Text> : null}
+        {label ? <Text style={[type.label, { ...font.medium, color: p.inkSubtle }]}>{label}</Text> : null}
         <Text numberOfLines={1} style={[type.label, { color: p.ink }]}>{current?.label ?? ''}</Text>
         <Icon name="chevron-down" size={16} color={p.inkSubtle} />
       </Pressable>
@@ -142,7 +142,7 @@ export function Kbd({ children }: { children: React.ReactNode }) {
   const p = usePalette();
   return (
     <Text style={{
-      fontFamily: type.button.fontFamily, fontSize: 11, lineHeight: 14, color: p.inkMuted, backgroundColor: p.surface,
+      ...font.bold, fontSize: 11, lineHeight: 14, color: p.inkMuted, backgroundColor: p.surface,
       borderWidth: 1, borderBottomWidth: 2, borderColor: p.lineStrong, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1,
     }}>{children}</Text>
   );
@@ -189,7 +189,7 @@ export function ExamRow({
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Dot color={subjectColor ?? p.inkSubtle} />
-          <Text numberOfLines={1} style={[type.caption, { fontFamily: type.button.fontFamily, letterSpacing: 0.48, textTransform: 'uppercase', color: p.inkMuted }]}>{subject}</Text>
+          <Text numberOfLines={1} style={[type.caption, { ...font.bold, letterSpacing: 0.48, textTransform: 'uppercase', color: p.inkMuted }]}>{subject}</Text>
         </View>
         <Txt variant="titleSm" numberOfLines={1}>{title}</Txt>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], flexWrap: 'wrap' }}>

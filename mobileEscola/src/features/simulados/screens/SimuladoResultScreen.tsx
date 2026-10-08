@@ -8,7 +8,7 @@ import type { ReviewQuestion } from '../../../services/simulados.service';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { useAttemptResult } from '../hooks';
 import { QuestionImage } from '../components/ReviewQuestionCard';
-import {
+import { font,
   AnswerOption, BottomBar, Button, Card, EmptyState, Icon, IconButton, Notice, ProgressBar, QuestionNavigator, ScreenBody, Sheet,
   Tag, Txt, layout, radius, space, subjectColor, type, usePalette, type AnswerState,
 } from '../../../ui';
@@ -103,7 +103,7 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
       {top('Correção',
         <View style={{ flex: 1, gap: 6 }}>
           <Text style={[type.bodySm, { color: p.inkSubtle, textAlign: 'center' }]}>
-            <Text style={{ color: p.ink, fontFamily: type.button.fontFamily }}>Questão {atual + 1}</Text> de {questoes.length}
+            <Text style={{ color: p.ink, ...font.bold }}>Questão {atual + 1}</Text> de {questoes.length}
           </Text>
           <ProgressBar value={atual + 1} max={questoes.length} size="sm" label="Progresso da correção" />
         </View>,

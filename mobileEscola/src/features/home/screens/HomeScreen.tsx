@@ -15,7 +15,7 @@ import { WeeklyCalendarWidget } from '../../calendar/components/WeeklyCalendarWi
 import { enrollmentHeadline, primaryActiveEnrollment, type StudentActiveEnrollment } from '../../../types/student-enrollment';
 import { examCardProps, isClosed, isDone, isUpcoming, daysLeft } from '../../simulados/lib/examCard';
 import type { SimuladoListItem } from '../../../services/simulados.service';
-import {
+import { font,
   AppBar, Button, Card, EmptyState, ExamCard, Icon, IconButton, LinkButton, Overline, ScreenBody, Section, SegmentedControl,
   StatTile, Tag, Txt, radius, space, type, usePalette, useLayoutMode,
 } from '../../../ui';
@@ -194,7 +194,7 @@ export function HomeScreen() {
               <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 {avatarUploading ? <ActivityIndicator color={p.brand} />
                   : avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 52, height: 52 }} />
-                  : <Text style={{ fontFamily: type.display.fontFamily, fontSize: 16, color: p.inkMuted }}>{getInitials(user?.name ?? 'U')}</Text>}
+                  : <Text style={{ ...font.extrabold, fontSize: 16, color: p.inkMuted }}>{getInitials(user?.name ?? 'U')}</Text>}
               </View>
               {isAluno && !avatarUploading ? (
                 <View style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: p.surface, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
@@ -277,7 +277,7 @@ export function HomeScreen() {
                 <SegmentedControl label="Período" options={['Este mês', 'Período geral']} value={PERIODS.indexOf(period)} onChange={(i) => setPeriod(PERIODS[i])} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: space[4] }}>
                   <Text style={[type.display, { color: p.ink }]}>
-                    {fmt(accuracy)}<Text style={{ fontSize: 22, fontFamily: type.title.fontFamily }}>%</Text>
+                    {fmt(accuracy)}<Text style={{ fontSize: 22, ...font.bold }}>%</Text>
                   </Text>
                   {dashboardLoading ? <ActivityIndicator color={p.brand} />
                     : <Tag tone={change >= 0 ? 'success' : 'danger'} icon={change >= 0 ? 'arrow-right' : 'arrow-left'} label={`${change >= 0 ? '+' : '−'}${fmt(Math.abs(change))} p.p.`} />}

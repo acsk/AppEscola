@@ -10,7 +10,7 @@ import type { PracticeFeedback } from '../../../services/practice.service';
 import { useAnswerInAttempt, useFinishAttempt, usePracticeAttempt, useStartQuestionSet, useToggleSavedQuestion } from '../hooks';
 import { PracticeQuestionView } from '../components/PracticeQuestionView';
 import { formatPercent } from '../lib/format';
-import {
+import { font,
   BottomBar, Button, Card, Icon, IconButton, Kbd, Notice, Overline, ProgressBar, QuestionNavigator, ScreenBody, Sheet, Txt,
   layout, space, type, useLayoutMode, usePalette,
 } from '../../../ui';
@@ -301,7 +301,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
             <Button variant="ghost" size="sm" icon="x" label={finished ? 'Sair' : 'Pausar e sair'} onPress={leave} />
           </View>
           <View style={{ width: 560, maxWidth: '50%', gap: 6 }}>
-            <Txt variant="label" numberOfLines={1} style={{ textAlign: 'center', fontFamily: type.button.fontFamily }}>{title}</Txt>
+            <Txt variant="label" numberOfLines={1} style={{ textAlign: 'center', ...font.bold }}>{title}</Txt>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
               <View style={{ flex: 1 }}><ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" /></View>
               <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{finished ? index + 1 : answeredCount} de {questions.length}</Txt>
@@ -316,7 +316,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 48, paddingTop: space[8], paddingHorizontal: space[8], paddingBottom: 48 }}>
             <View style={{ flex: 1, maxWidth: layout.readingMax, gap: 18 }}>
               {index === 0 ? resultCard : null}
-              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontFamily: type.button.fontFamily, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {index + 1}</Txt>
+              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, ...font.bold, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {index + 1}</Txt>
               {questionView}
               {errorNotice}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: 6 }}>
@@ -370,7 +370,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
         <IconButton icon="x" label={finished ? 'Sair' : 'Pausar e sair'} onPress={leave} />
         <View style={{ flex: 1, gap: 6 }}>
           <Text style={[type.bodySm, { color: p.inkSubtle, textAlign: 'center' }]}>
-            <Text style={{ color: p.ink, fontFamily: type.button.fontFamily }}>Questão {index + 1}</Text> de {questions.length}
+            <Text style={{ color: p.ink, ...font.bold }}>Questão {index + 1}</Text> de {questions.length}
             {remaining != null && !finished ? <Text style={{ color: urgent ? p.dangerInk : p.inkSubtle }}>{`  ·  ${formatClock(remaining)}`}</Text> : null}
           </Text>
           <ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" />

@@ -18,7 +18,7 @@ import {
 } from '../../../services/simulados.service';
 import { invalidateSimuladosQueries } from '../hooks';
 import { getApiErrorMessage } from '../../../lib/apiError';
-import {
+import { font,
   AnswerOption, BottomBar, Button, Card, IconButton, Notice, ProgressBar, QuestionNavigator, ScreenBody, Sheet, Tag, Txt,
   layout, radius, space, subjectColor, type, usePalette, useLayoutMode, Kbd, Overline, Icon,
 } from '../../../ui';
@@ -416,7 +416,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
             <Button variant="ghost" size="sm" icon="x" label="Pausar e sair" onPress={sair} />
           </View>
           <View style={{ width: 560, maxWidth: '50%', gap: 6 }}>
-            <Txt variant="label" numberOfLines={1} style={{ textAlign: 'center', fontFamily: type.button.fontFamily }}>{detalhe.title}</Txt>
+            <Txt variant="label" numberOfLines={1} style={{ textAlign: 'center', ...font.bold }}>{detalhe.title}</Txt>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
               <View style={{ flex: 1 }}><ProgressBar value={respondidas} max={questoes.length} size="sm" label="Progresso" /></View>
               <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{respondidas} de {questoes.length}</Txt>
@@ -435,7 +435,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
         <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 48, paddingTop: space[8], paddingHorizontal: space[8], paddingBottom: 48 }}>
             <View style={{ flex: 1, maxWidth: layout.readingMax, gap: 18 }}>
-              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontFamily: type.button.fontFamily, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {atual + 1}</Txt>
+              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, ...font.bold, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {atual + 1}</Txt>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -6 }}>
                 {q.subject ? <Tag tone="outline" dot={subjectColor(p, q.subject.id)} label={q.subject.name} /> : null}
                 <Tag label={q.type === 'essay' ? 'Discursiva' : 'Objetiva'} />
@@ -492,7 +492,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
         <IconButton icon="x" label="Sair do simulado" onPress={sair} />
         <View style={{ flex: 1, gap: 6 }}>
           <Text style={[type.bodySm, { color: p.inkSubtle, textAlign: 'center' }]}>
-            <Text style={{ color: p.ink, fontFamily: type.button.fontFamily }}>Questão {atual + 1}</Text> de {questoes.length}
+            <Text style={{ color: p.ink, ...font.bold }}>Questão {atual + 1}</Text> de {questoes.length}
             {secondsLeft !== null ? <Text style={{ color: urgente ? p.dangerInk : p.inkSubtle }}>{`  ·  ${formatTimerSeconds(secondsLeft)}`}</Text> : null}
           </Text>
           <ProgressBar value={respondidas} max={questoes.length} size="sm" label="Questões respondidas" />

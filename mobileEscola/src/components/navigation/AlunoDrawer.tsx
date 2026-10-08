@@ -8,7 +8,7 @@ import { navigationRef } from '../../navigation/navigationRef';
 import { useRootNavigationState } from '../../navigation/useRootNavigationState';
 import { useTenantTheme } from '../../context/TenantThemeContext';
 import ConfirmModal from '../ConfirmModal';
-import { IconButton, ListItem, Overline, Txt, radius, shadow, space, type, usePalette } from '../../ui';
+import { font, IconButton, ListItem, Overline, Txt, radius, shadow, space, type, usePalette } from '../../ui';
 
 const DRAWER_WIDTH = 312;
 
@@ -85,7 +85,7 @@ export function AlunoDrawer() {
                 <Image source={{ uri: logoUrl }} resizeMode="contain" accessibilityLabel={tenantName ? `Logo ${tenantName}` : 'Logo da escola'}
                   style={{ height: 32, width: 160 }} />
               ) : (
-                <Text numberOfLines={1} style={{ fontSize: 20, lineHeight: 24, fontFamily: type.display.fontFamily, letterSpacing: -0.2, color: p.ink, flexShrink: 1 }}>
+                <Text numberOfLines={1} style={{ fontSize: 20, lineHeight: 24, ...font.extrabold, letterSpacing: -0.2, color: p.ink, flexShrink: 1 }}>
                   {tenantName ?? 'App Escola'}
                 </Text>
               )}
@@ -94,7 +94,7 @@ export function AlunoDrawer() {
 
             <View style={{ flexDirection: 'row', gap: space[3], alignItems: 'center', marginVertical: space[2], marginHorizontal: space[1], padding: space[3], borderRadius: radius.md, backgroundColor: p.surfaceSunken }}>
               <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: p.surface, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontFamily: type.display.fontFamily, fontSize: 14, color: p.inkMuted }}>{userInitials(user?.name)}</Text>
+                <Text style={{ ...font.extrabold, fontSize: 14, color: p.inkMuted }}>{userInitials(user?.name)}</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20 }}>{user?.name ?? 'Aluno'}</Txt>

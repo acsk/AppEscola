@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Icon, type IconName } from './primitives';
 import { usePalette } from './theme';
-import { layout, radius, space, type } from './tokens';
+import { font, layout, radius, space, type } from './tokens';
 
 export type SideNavItem = { key: string; icon: IconName; label: string; count?: number };
 
@@ -24,12 +24,12 @@ export function SideNav({
     }}>
       {collapsed ? (
         <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: p.surfaceInverse, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: space[4] }}>
-          <Text style={{ fontFamily: type.display.fontFamily, fontSize: 18, color: p.onInverse }}>{brand.charAt(0).toUpperCase()}</Text>
+          <Text style={{ ...font.extrabold, fontSize: 18, color: p.onInverse }}>{brand.charAt(0).toUpperCase()}</Text>
         </View>
       ) : logoUrl ? (
         <Image source={{ uri: logoUrl }} resizeMode="contain" accessibilityLabel={`Logo ${brand}`} style={{ height: 32, width: 180, marginHorizontal: space[3], marginTop: space[2], marginBottom: space[5] }} />
       ) : (
-        <Text numberOfLines={1} style={{ fontSize: 19, lineHeight: 24, fontFamily: type.display.fontFamily, letterSpacing: -0.2, color: p.ink, paddingHorizontal: space[3], paddingTop: space[2], paddingBottom: space[5] }}>{brand}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 19, lineHeight: 24, ...font.extrabold, letterSpacing: -0.2, color: p.ink, paddingHorizontal: space[3], paddingTop: space[2], paddingBottom: space[5] }}>{brand}</Text>
       )}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 2 }} showsVerticalScrollIndicator={false}>
         {items.map((item) => {
@@ -44,7 +44,7 @@ export function SideNav({
               }) as never}>
               <Icon name={item.icon} size={20} color={on ? p.brandInk : p.inkMuted} />
               {!collapsed ? <Text numberOfLines={1} style={[type.label, { color: on ? p.ink : p.inkMuted, flex: 1 }]}>{item.label}</Text> : null}
-              {!collapsed && item.count != null ? <Text style={[type.caption, { fontFamily: type.button.fontFamily, color: p.inkSubtle }]}>{item.count}</Text> : null}
+              {!collapsed && item.count != null ? <Text style={[type.caption, { ...font.bold, color: p.inkSubtle }]}>{item.count}</Text> : null}
             </Pressable>
           );
         })}
@@ -53,12 +53,12 @@ export function SideNav({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], paddingTop: space[3], paddingHorizontal: collapsed ? 0 : space[2], justifyContent: collapsed ? 'center' : 'flex-start', borderTopWidth: 1, borderTopColor: p.line }}>
           <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             {user.photoUrl ? <Image source={{ uri: user.photoUrl }} style={{ width: 36, height: 36 }} />
-              : <Text style={{ fontFamily: type.display.fontFamily, fontSize: 13, color: p.inkMuted }}>{user.initials}</Text>}
+              : <Text style={{ ...font.extrabold, fontSize: 13, color: p.inkMuted }}>{user.initials}</Text>}
           </View>
           {!collapsed ? (
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text numberOfLines={1} style={[type.label, { color: p.ink, lineHeight: 18 }]}>{user.name}</Text>
-              {user.meta ? <Text numberOfLines={1} style={[type.caption, { fontFamily: type.bodySm.fontFamily, color: p.inkSubtle }]}>{user.meta}</Text> : null}
+              {user.meta ? <Text numberOfLines={1} style={[type.caption, { ...font.medium, color: p.inkSubtle }]}>{user.meta}</Text> : null}
             </View>
           ) : null}
         </View>

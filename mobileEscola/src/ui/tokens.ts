@@ -213,35 +213,42 @@ export const layout = {
   readingMax: 720,
 } as const;
 
-// ── Tipografia (Figtree) ─────────────────────────────────────────────────────
+// ── Tipografia (sem serifa do sistema) ───────────────────────────────────────
 
-export const fontFamily = {
-  regular: 'Figtree_400Regular',
-  medium: 'Figtree_500Medium',
-  semibold: 'Figtree_600SemiBold',
-  bold: 'Figtree_700Bold',
-  extrabold: 'Figtree_800ExtraBold',
-} as const;
+/** iOS: San Francisco · Android: Roboto · web: pilha sem serifa do sistema. */
+const SANS = Platform.select<string | undefined>({
+  web: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  default: undefined,
+});
 
-const t = (fontSize: number, lineHeight: number, family: string, extra: TextStyle = {}): TextStyle => ({
+/** Família + peso; use com spread: `{ ...font.bold, fontSize: 18 }`. */
+export const font = {
+  regular: { fontFamily: SANS, fontWeight: '400' },
+  medium: { fontFamily: SANS, fontWeight: '500' },
+  semibold: { fontFamily: SANS, fontWeight: '600' },
+  bold: { fontFamily: SANS, fontWeight: '700' },
+  extrabold: { fontFamily: SANS, fontWeight: '800' },
+} as const satisfies Record<string, TextStyle>;
+
+const t = (fontSize: number, lineHeight: number, weight: TextStyle, extra: TextStyle = {}): TextStyle => ({
   fontSize,
   lineHeight,
-  fontFamily: family,
+  ...weight,
   ...extra,
 });
 
 export const type = {
-  display: t(40, 44, fontFamily.extrabold, { letterSpacing: -0.8, fontVariant: ['tabular-nums'] }),
-  titleLg: t(24, 30, fontFamily.bold, { letterSpacing: -0.24 }),
-  title: t(18, 24, fontFamily.bold),
-  titleSm: t(16, 22, fontFamily.bold),
-  reading: t(17, 27, fontFamily.regular),
-  body: t(15, 22, fontFamily.regular),
-  bodySm: t(13, 18, fontFamily.medium),
-  label: t(14, 20, fontFamily.semibold),
-  button: t(16, 20, fontFamily.bold),
-  overline: t(11, 16, fontFamily.bold, { letterSpacing: 0.88, textTransform: 'uppercase' }),
-  caption: t(12, 16, fontFamily.semibold),
+  display: t(40, 44, font.extrabold, { letterSpacing: -0.8, fontVariant: ['tabular-nums'] }),
+  titleLg: t(24, 30, font.bold, { letterSpacing: -0.24 }),
+  title: t(18, 24, font.bold),
+  titleSm: t(16, 22, font.bold),
+  reading: t(17, 27, font.regular),
+  body: t(15, 22, font.regular),
+  bodySm: t(13, 18, font.medium),
+  label: t(14, 20, font.semibold),
+  button: t(16, 20, font.bold),
+  overline: t(11, 16, font.bold, { letterSpacing: 0.88, textTransform: 'uppercase' }),
+  caption: t(12, 16, font.semibold),
 } as const;
 
 // ── Sombras ──────────────────────────────────────────────────────────────────

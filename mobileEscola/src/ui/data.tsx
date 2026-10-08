@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Button, Dot, Icon, Tag, Txt, type IconName, type TagTone } from './primitives';
 import { usePalette } from './theme';
-import { radius, shadow, size, space, type } from './tokens';
+import { font, radius, shadow, size, space, type } from './tokens';
 
 // ── StatTile ─────────────────────────────────────────────────────────────────
 
@@ -11,7 +11,7 @@ export function StatTile({ label, value, hint, tone, style }: { label: string; v
   return (
     <View style={[{ flex: 1, padding: space[3], borderRadius: radius.md, backgroundColor: p.surfaceSunken }, style]}>
       <Txt variant="bodySm" tone="muted">{label}</Txt>
-      <Text style={[type.title, { fontSize: 22, lineHeight: 28, fontFamily: type.display.fontFamily, letterSpacing: -0.22, color: p.ink, marginTop: 2, fontVariant: ['tabular-nums'] }]}>{value}</Text>
+      <Text style={[type.title, { fontSize: 22, lineHeight: 28, ...font.extrabold, letterSpacing: -0.22, color: p.ink, marginTop: 2, fontVariant: ['tabular-nums'] }]}>{value}</Text>
       {hint ? <Txt variant="caption" style={{ marginTop: 2, color: tone === 'success' ? p.success : tone === 'danger' ? p.dangerInk : p.inkSubtle }}>{hint}</Txt> : null}
     </View>
   );
@@ -69,7 +69,7 @@ export function Chip({ label, selected, dot, count, disabled, onPress }: { label
       }}>
       {selected ? <Icon name="check" size={16} strokeWidth={2.5} color={p.onInverse} /> : dot ? <Dot color={dot} /> : null}
       <Text numberOfLines={1} style={[type.label, { color: selected ? p.onInverse : p.ink }]}>{label}</Text>
-      {count != null ? <Text style={[type.caption, { fontFamily: type.button.fontFamily, color: selected ? p.onInverse : p.inkSubtle, opacity: selected ? 0.75 : 1 }]}>{count}</Text> : null}
+      {count != null ? <Text style={[type.caption, { ...font.bold, color: selected ? p.onInverse : p.inkSubtle, opacity: selected ? 0.75 : 1 }]}>{count}</Text> : null}
     </Pressable>
   );
 }
@@ -153,11 +153,11 @@ export function AnswerOption({
       }}>
         {state === 'correct' || state === 'missed' ? <Icon name="check" size={16} strokeWidth={3} color={s.letterFg} />
           : state === 'incorrect' ? <Icon name="x" size={16} strokeWidth={3} color={s.letterFg} />
-          : <Text style={[type.caption, { fontSize: 13, fontFamily: type.button.fontFamily, color: s.letterFg }]}>{letter}</Text>}
+          : <Text style={[type.caption, { fontSize: 13, ...font.bold, color: s.letterFg }]}>{letter}</Text>}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2, opacity: state === 'dimmed' ? 0.72 : 1 }}>
         {typeof children === 'string' ? <Txt style={{ color: s.fg }}>{children}</Txt> : children}
-        {shownNote ? <Txt variant="caption" style={{ fontFamily: type.button.fontFamily, color: s.noteFg }}>{shownNote}</Txt> : null}
+        {shownNote ? <Txt variant="caption" style={{ ...font.bold, color: s.noteFg }}>{shownNote}</Txt> : null}
       </View>
     </Pressable>
   );
@@ -194,7 +194,7 @@ export function ExamCard({
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
           <Dot color={subjectColor ?? p.inkSubtle} />
-          <Text numberOfLines={1} style={[type.caption, { fontFamily: type.button.fontFamily, letterSpacing: 0.48, textTransform: 'uppercase', color: p.inkMuted, flexShrink: 1 }]}>{subject}</Text>
+          <Text numberOfLines={1} style={[type.caption, { ...font.bold, letterSpacing: 0.48, textTransform: 'uppercase', color: p.inkMuted, flexShrink: 1 }]}>{subject}</Text>
         </View>
         <Tag tone={s.tone} icon={s.icon} label={statusText ?? s.text} />
       </View>
@@ -204,7 +204,7 @@ export function ExamCard({
         <View style={{ gap: 6, marginTop: space[1] }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <Txt variant="bodySm" tone="muted">Aproveitamento</Txt>
-            <Text style={[type.title, { fontFamily: type.display.fontFamily, color: p.ink, fontVariant: ['tabular-nums'] }]}>{score}</Text>
+            <Text style={[type.title, { ...font.extrabold, color: p.ink, fontVariant: ['tabular-nums'] }]}>{score}</Text>
           </View>
           <ProgressBar value={scoreValue ?? 0} tone="success" size="sm" marker={minimum} label="Aproveitamento" />
         </View>
@@ -262,8 +262,8 @@ export function QuestionRow({
       style={({ pressed }) => ({ gap: space[2], paddingVertical: compact ? space[3] : space[4], paddingHorizontal: space[4], borderRadius: radius.lg, borderWidth: 1, borderColor: p.line, backgroundColor: pressed ? p.surfaceSunken : p.surface })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingRight: onToggleSave ? 26 : 0 }}>
         <Dot color={subjectColor ?? p.inkSubtle} />
-        <Text numberOfLines={1} style={[type.caption, { fontFamily: type.button.fontFamily, textTransform: 'uppercase', letterSpacing: 0.48, color: p.inkMuted, flexShrink: 1 }]}>{subject}</Text>
-        {topic && !compact ? <Txt variant="bodySm" tone="muted" numberOfLines={1} style={{ flexShrink: 1, fontFamily: type.label.fontFamily }}>·  {topic}</Txt> : null}
+        <Text numberOfLines={1} style={[type.caption, { ...font.bold, textTransform: 'uppercase', letterSpacing: 0.48, color: p.inkMuted, flexShrink: 1 }]}>{subject}</Text>
+        {topic && !compact ? <Txt variant="bodySm" tone="muted" numberOfLines={1} style={{ flexShrink: 1, ...font.semibold }}>·  {topic}</Txt> : null}
         <View style={{ flex: 1 }} />
         <Tag tone={s.tone} icon={s.icon} label={s.t} />
       </View>

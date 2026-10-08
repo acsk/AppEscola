@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { fontFamily, usePalette } from '../../ui';
+import { font, usePalette } from '../../ui';
 import { BancoQuestoesScreen } from '../../features/banco-questoes/screens/BancoQuestoesScreen';
 import { BancoPraticarScreen } from '../../features/banco-questoes/screens/BancoPraticarScreen';
 import { BancoSimuladoScreen } from '../../features/banco-questoes/screens/BancoSimuladoScreen';
@@ -32,7 +32,7 @@ export function QuestoesNavigator() {
         headerStyle: { backgroundColor: p.bg },
         headerTintColor: p.ink,
         headerShadowVisible: false,
-        headerTitleStyle: { fontFamily: fontFamily.bold, fontSize: 17 },
+        headerTitleStyle: { ...font.bold, fontSize: 17 },
         headerBackTitle: 'Voltar',
         contentStyle: { backgroundColor: p.bg },
       }}
