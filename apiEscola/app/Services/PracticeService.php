@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  */
 class PracticeService
 {
-    private const QUESTION_RELATIONS = ['options', 'subject:id,name', 'topics:id,name', 'difficulty:id,name', 'examType:id,label'];
+    private const QUESTION_RELATIONS = ['options', 'subject:id,name', 'topics:id,name', 'difficulty:id,name', 'examType:id,label', 'exam:id,title'];
 
     public function __construct(
         private readonly QuestionSetService $sets,
@@ -360,6 +360,7 @@ class PracticeService
             'question_text'    => $question->question_text,
             'image_url'        => $question->image_url,
             'source_exam_name' => $question->source_exam_name,
+            'exam_title'       => $question->exam?->title,
             'subject'          => $question->subject ? ['id' => $question->subject->id, 'name' => $question->subject->name] : null,
             'topics'           => $question->topics->pluck('name')->values(),
             'difficulty'       => $question->difficulty?->name,

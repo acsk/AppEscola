@@ -84,6 +84,16 @@ class ExamQuestionClassificationTest extends TestCase
         $this->getJson("/api/question-bank/questions/{$id}")->assertOk()->assertJsonPath('body.difficulty_id', $difficulty->id);
     }
 
+    public function test_questions_of_archived_exam_stay_in_question_bank(): void
+    {
+        $id = $this->postJson("/api/exams/{$this->exam->id}/questions", $this->payload())->assertCreated()->json('body.id');
+
+        $this->putJson("/api/exams/{$this->exam->id}", ['status' => 'archived'])->assertOk();
+
+        $this->getJson('/api/question-bank/questions?origin=simulado')->assertOk()->assertJsonPath('data.0.id', $id);
+        $this->getJson("/api/question-bank/questions?exam_id={$this->exam->id}")->assertOk()->assertJsonPath('data.0.id', $id);
+    }
+
     public function test_update_changes_classification_and_keeps_content(): void
     {
         $id = $this->postJson("/api/exams/{$this->exam->id}/questions", $this->payload(['topic_ids' => [$this->algebra->id]]))->json('body.id');

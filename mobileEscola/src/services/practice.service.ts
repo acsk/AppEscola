@@ -14,6 +14,8 @@ export interface PracticeQuestion {
   question_text: string | null;
   image_url: string | null;
   source_exam_name: string | null;
+  /** Simulado da escola de onde a questão veio (já encerrado). */
+  exam_title?: string | null;
   subject: { id: number; name: string } | null;
   topics: string[];
   difficulty: string | null;
@@ -238,6 +240,7 @@ export interface CatalogQuestion {
   difficulty: string | null;
   source: string | null;
   year: number | null;
+  exam_title?: string | null;
   /** % da turma que acerta (null com poucas respostas). */
   rate: number | null;
   status: 'new' | 'right' | 'wrong';

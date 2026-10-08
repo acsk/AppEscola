@@ -207,7 +207,9 @@ class QuestionBankPracticeTest extends TestCase
         $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 2);
         $seen = [];
         for ($i = 0; $i < 12; $i++) {
-            $seen[] = $this->getJson('/api/aluno/practice/next-question')->assertOk()->json('body.id');
+            $body = $this->getJson('/api/aluno/practice/next-question')->assertOk()->json('body');
+            $seen[] = $body['id'];
+            $this->assertSame($body['id'] === $ended->id ? 'Oficial published' : 'Oficial archived', $body['exam_title']);
         }
         $this->assertEqualsCanonicalizing([$ended->id, $archived->id], array_values(array_unique($seen)));
         $this->postJson("/api/aluno/practice/questions/{$ended->id}/answer", ['option_id' => $this->correct($ended)])

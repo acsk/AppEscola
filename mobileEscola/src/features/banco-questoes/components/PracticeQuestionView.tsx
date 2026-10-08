@@ -22,6 +22,7 @@ export function PracticeQuestionView({ question, selectedId, onSelect, feedback,
   const p = usePalette();
   const locked = disabled || !!feedback;
   const correctIndex = feedback ? question.options.findIndex((o) => o.id === feedback.correct_option_id) : -1;
+  const examName = question.exam_title || question.source_exam_name;
 
   const stateFor = (optionId: number): AnswerState => {
     const selected = optionId === selectedId;
@@ -50,12 +51,19 @@ export function PracticeQuestionView({ question, selectedId, onSelect, feedback,
         </View>
       ) : null}
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-        {question.subject ? <Tag tone="outline" dot={subjectColor(p, question.subject.id)} label={question.subject.name} /> : null}
-        {question.topics.slice(0, 2).map((t) => <Tag key={t} label={t} />)}
-        {question.difficulty ? <Tag label={question.difficulty} /> : null}
-        {question.source_exam_name ? <Tag label={question.source_exam_name} /> : null}
-        {isNew ? <NewPill label="Nova" /> : null}
+      <View style={{ gap: space[2] }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Icon name="clipboard" size={14} color={p.inkSubtle} />
+          <Txt variant="caption" tone="subtle" style={{ flexShrink: 1 }} numberOfLines={2}>
+            Questão #{question.id}{examName ? ` · ${examName}` : ''}
+          </Txt>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {question.subject ? <Tag tone="outline" dot={subjectColor(p, question.subject.id)} label={question.subject.name} /> : null}
+          {question.topics.slice(0, 2).map((t) => <Tag key={t} label={t} />)}
+          {question.difficulty ? <Tag label={question.difficulty} /> : null}
+          {isNew ? <NewPill label="Nova" /> : null}
+        </View>
       </View>
 
       {question.question_text ? <Txt variant="reading"><RichText value={question.question_text} /></Txt> : null}

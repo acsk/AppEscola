@@ -34,7 +34,7 @@ class PracticeCatalogService
         $query = $this->filtered($student, $filters);
         $total = (clone $query)->count();
         $rows = $query
-            ->with(['subject:id,name', 'topics:id,name', 'difficulty:id,name', 'examType:id,label'])
+            ->with(['subject:id,name', 'topics:id,name', 'difficulty:id,name', 'examType:id,label', 'exam:id,title'])
             ->when($sort === 'oldest', fn (Builder $q) => $q->orderBy('exam_questions.id'), fn (Builder $q) => $q->orderByDesc('exam_questions.id'))
             ->forPage($page, $perPage)
             ->get(['exam_questions.*']);
@@ -57,6 +57,7 @@ class PracticeCatalogService
                 'difficulty' => $q->difficulty?->name,
                 'source'     => $q->source_exam_name ?: trim(($q->examType?->label ?? '').' '.($q->year ?? '')) ?: null,
                 'year'       => $q->year,
+                'exam_title' => $q->exam?->title,
                 'rate'       => $rates[$q->id] ?? null,
                 'status'     => $status[$q->id] ?? 'new',
                 'saved'      => isset($saved[$q->id]),

@@ -347,6 +347,8 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       ['Disciplina', current.subject?.name ?? '—'],
       ['Assunto', current.topics[0] ?? '—'],
       ['Dificuldade', current.difficulty ?? '—'],
+      ['Código', `#${current.id}`],
+      ['Simulado', current.exam_title || '—'],
       ['Origem', current.source_exam_name ?? '—'],
     ] : [];
     return (
