@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
+import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 import { getApiErrorMessage } from '../../../lib/apiError';
@@ -17,7 +17,7 @@ import {
 import { usePracticePerformance } from '../hooks';
 import { formatPercent } from '../lib/format';
 
-type Nav = NativeStackNavigationProp<SimuladosStackParamList, 'BancoDesempenho'>;
+type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoDesempenho'>;
 
 function scoreLine(score: PerformanceScore & { available: number }): string {
   if (score.answered === 0) return `${score.available} questão${score.available !== 1 ? 'ões' : ''} para praticar`;

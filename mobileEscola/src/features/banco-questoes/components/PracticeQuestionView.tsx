@@ -1,102 +1,84 @@
-import React, { useMemo } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { Image, View } from 'react-native';
 import RichText from '../../../components/RichText';
-import { useThemeColors } from '../../../context/TenantThemeContext';
-import type { ThemeColors } from '../../../theme';
 import type { PracticeFeedback, PracticeQuestion } from '../../../services/practice.service';
+import { AnswerOption, Card, Icon, Tag, Txt, radius, space, subjectColor, usePalette, type AnswerState } from '../../../ui';
 
 const LETTERS = 'ABCDEFGHIJ';
-const CORRECT = '#16A34A';
-const WRONG = '#DC2626';
 
 type Props = {
   question: PracticeQuestion;
   selectedId: number | null;
   onSelect?: (optionId: number) => void;
-  /** Com correção: alternativas travadas, certa em verde e a marcada errada em vermelho. */
+  /** Com correção: alternativas travadas, a certa em verde e a marcada errada em vermelho. */
   feedback?: PracticeFeedback | null;
   disabled?: boolean;
 };
 
+/** Questão do banco (protótipos "TelaResponderQuestao" / "TelaCorrecao"). */
 export function PracticeQuestionView({ question, selectedId, onSelect, feedback, disabled }: Props) {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const p = usePalette();
   const locked = disabled || !!feedback;
-  const meta = [question.subject?.name, question.topics.join(', '), question.source_exam_name].filter(Boolean).join(' · ');
+  const correctIndex = feedback ? question.options.findIndex((o) => o.id === feedback.correct_option_id) : -1;
+
+  const stateFor = (optionId: number): AnswerState => {
+    const selected = optionId === selectedId;
+    if (!feedback) return selected ? 'selected' : 'default';
+    const isRight = optionId === feedback.correct_option_id;
+    if (selected && isRight) return 'correct';
+    if (selected) return 'incorrect';
+    if (isRight) return 'missed';
+    return 'dimmed';
+  };
 
   return (
-    <View style={styles.wrap}>
-      {meta ? <Text style={styles.meta}>{meta}</Text> : null}
-      {question.question_text ? <RichText style={styles.statement} value={question.question_text} /> : null}
-      {question.image_url ? (
-        <Image source={{ uri: question.image_url }} style={styles.image} resizeMode="contain" accessibilityLabel="Imagem do enunciado" />
+    <View style={{ gap: 18 }}>
+      {feedback && feedback.is_correct !== null ? (
+        <View accessibilityRole="alert" style={{
+          flexDirection: 'row', gap: space[3], alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: space[4], borderRadius: radius.md,
+          backgroundColor: feedback.is_correct ? p.successSoft : p.dangerSoft,
+        }}>
+          <Icon name={feedback.is_correct ? 'circle-check' : 'alert'} size={22} color={feedback.is_correct ? p.success : p.dangerInk} />
+          <View style={{ flex: 1 }}>
+            <Txt variant="titleSm" style={{ fontSize: 15, lineHeight: 20, color: feedback.is_correct ? p.success : p.dangerInk }}>
+              {feedback.is_correct ? 'Resposta correta' : 'Resposta incorreta'}
+            </Txt>
+            {!feedback.is_correct && correctIndex >= 0 ? <Txt variant="bodySm" tone="muted">A alternativa correta é a {LETTERS[correctIndex]}.</Txt> : null}
+          </View>
+        </View>
       ) : null}
 
-      <View style={styles.options}>
-        {question.options.map((option, index) => {
-          const selected = option.id === selectedId;
-          const isCorrect = !!feedback && option.id === feedback.correct_option_id;
-          const isWrong = !!feedback && selected && !isCorrect;
-          const accent = isCorrect ? CORRECT : isWrong ? WRONG : selected ? colors.primary : colors.border;
-          return (
-            <TouchableOpacity
-              key={option.id}
-              disabled={locked}
-              onPress={() => onSelect?.(option.id)}
-              activeOpacity={0.85}
-              accessibilityRole="radio"
-              accessibilityState={{ selected, disabled: locked }}
-              style={[
-                styles.option,
-                { borderColor: accent, backgroundColor: isCorrect ? '#F0FDF4' : isWrong ? '#FEF2F2' : selected ? colors.soft : colors.surface },
-              ]}
-            >
-              <View style={[styles.letter, { backgroundColor: selected || isCorrect ? accent : colors.soft }]}>
-                <Text style={[styles.letterText, { color: selected || isCorrect ? colors.surface : colors.text }]}>
-                  {LETTERS[index] ?? index + 1}
-                </Text>
-              </View>
-              <RichText style={styles.optionText} value={option.option_text} />
-              {isCorrect ? <Ionicons name="checkmark-circle" size={20} color={CORRECT} /> : null}
-              {isWrong ? <Ionicons name="close-circle" size={20} color={WRONG} /> : null}
-            </TouchableOpacity>
-          );
-        })}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {question.subject ? <Tag tone="outline" dot={subjectColor(p, question.subject.id)} label={question.subject.name} /> : null}
+        {question.topics.slice(0, 2).map((t) => <Tag key={t} label={t} />)}
+        {question.difficulty ? <Tag label={question.difficulty} /> : null}
+        {question.source_exam_name ? <Tag label={question.source_exam_name} /> : null}
       </View>
 
-      {feedback ? (
-        <View style={[styles.feedback, { borderColor: feedback.is_correct ? CORRECT : feedback.is_correct === false ? WRONG : colors.border }]}>
-          <Text style={[styles.feedbackTitle, { color: feedback.is_correct ? CORRECT : feedback.is_correct === false ? WRONG : colors.muted }]}>
-            {feedback.is_correct ? 'Resposta correta!' : feedback.is_correct === false ? 'Resposta incorreta' : 'Não respondida'}
-          </Text>
-          {feedback.explanation ? <RichText style={styles.explanation} value={feedback.explanation} /> : null}
-        </View>
+      {question.question_text ? <Txt variant="reading"><RichText value={question.question_text} /></Txt> : null}
+      {question.image_url ? (
+        <Image source={{ uri: question.image_url }} resizeMode="contain" accessibilityLabel="Imagem do enunciado"
+          style={{ width: '100%', height: 220, borderRadius: radius.md }} />
+      ) : null}
+
+      <View accessibilityRole="radiogroup" style={{ gap: 10 }}>
+        {question.options.map((option, index) => (
+          <AnswerOption key={option.id} letter={LETTERS[index] ?? String(index + 1)} state={stateFor(option.id)}
+            onPress={locked ? undefined : () => onSelect?.(option.id)}>
+            <Txt><RichText value={option.option_text} /></Txt>
+          </AnswerOption>
+        ))}
+      </View>
+
+      {feedback?.explanation ? (
+        <Card style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+            <Icon name="message" size={18} color={p.ink} />
+            <Txt variant="titleSm" style={{ fontSize: 15, lineHeight: 20 }}>Comentário do professor</Txt>
+          </View>
+          <Txt tone="muted" style={{ lineHeight: 23 }}><RichText value={feedback.explanation} /></Txt>
+        </Card>
       ) : null}
     </View>
   );
-}
-
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    wrap: { gap: 12 },
-    meta: { fontSize: 12, color: colors.muted, fontWeight: '600' },
-    statement: { fontSize: 16, lineHeight: 24, color: colors.ink },
-    image: { width: '100%', height: 240, borderRadius: 12, backgroundColor: colors.surface },
-    options: { gap: 10 },
-    option: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      padding: 12,
-      borderRadius: 14,
-      borderWidth: 1.5,
-    },
-    letter: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    letterText: { fontSize: 13, fontWeight: '800' },
-    optionText: { flex: 1, fontSize: 15, lineHeight: 21, color: colors.ink },
-    feedback: { borderWidth: 1.5, borderRadius: 14, padding: 14, gap: 6, backgroundColor: colors.surface },
-    feedbackTitle: { fontSize: 15, fontWeight: '800' },
-    explanation: { fontSize: 14, lineHeight: 21, color: colors.text },
-  });
 }

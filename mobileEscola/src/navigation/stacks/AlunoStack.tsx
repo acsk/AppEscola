@@ -7,18 +7,21 @@ import { PerformanceScreen } from '../../features/desempenho/screens/Performance
 import { AlterarSenhaScreen } from '../../features/home/screens/AlterarSenhaScreen';
 import { SimuladosNavigator } from './SimuladosStack';
 import type { SimuladosStackParamList } from './SimuladosStack';
+import { QuestoesNavigator, type QuestoesStackParamList } from './QuestoesStack';
 import { FinanceiroScreen } from '../../features/financeiro/screens/FinanceiroScreen';
 import { NotificationsListScreen } from '../../features/notifications/screens/NotificationsListScreen';
 import { NotificationDetailScreen } from '../../features/notifications/screens/NotificationDetailScreen';
 import { CalendarScreen } from '../../features/calendar/screens/CalendarScreen';
 import { AlunoDrawerProvider } from '../../context/AlunoDrawerContext';
-import { TenantThemeProvider, useThemeColors } from '../../context/TenantThemeContext';
+import { TenantThemeProvider } from '../../context/TenantThemeContext';
 import { AlunoDrawer } from '../../components/navigation/AlunoDrawer';
-import { Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
+import { TabBar, usePalette, type TabItem } from '../../ui';
 
 export type AlunoTabParamList = {
   Home: undefined;
   Desempenho: undefined;
+  Questoes: NavigatorScreenParams<QuestoesStackParamList> | undefined;
   Simulados: NavigatorScreenParams<SimuladosStackParamList> | undefined;
   Financeiro: undefined;
 };
@@ -31,57 +34,42 @@ export type AlunoStackParamList = {
   Calendario: { selectedDate?: string } | undefined;
 };
 
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+const TABS: TabItem[] = [
+  { key: 'Home', icon: 'home', label: 'Início' },
+  { key: 'Desempenho', icon: 'chart', label: 'Desempenho' },
+  { key: 'Questoes', icon: 'library', label: 'Questões' },
+  { key: 'Simulados', icon: 'clipboard', label: 'Simulados' },
+  { key: 'Financeiro', icon: 'wallet', label: 'Financeiro' },
+];
 
-const ICONS: Record<string, { active: IoniconsName; inactive: IoniconsName }> = {
-  Home:       { active: 'home',           inactive: 'home-outline' },
-  Desempenho: { active: 'stats-chart',    inactive: 'stats-chart-outline' },
-  Simulados:  { active: 'clipboard',      inactive: 'clipboard-outline' },
-  Financeiro: { active: 'wallet',         inactive: 'wallet-outline' },
-};
+/** Telas raiz de cada aba: tocar na aba ativa volta à raiz dela. */
+const TAB_ROOT: Record<string, string | undefined> = { Questoes: 'BancoQuestoes', Simulados: 'SimuladosList' };
 
 const Tab = createBottomTabNavigator<AlunoTabParamList>();
 const Stack = createNativeStackNavigator<AlunoStackParamList>();
 
 function AlunoTabs() {
-  const colors = useThemeColors();
-
+  const palette = usePalette();
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: colors.surface,
-        headerTitleStyle: { fontWeight: '600' },
-        tabBarActiveTintColor: colors.surface,
-        tabBarInactiveTintColor: colors.tab_bar_inactive,
-        tabBarStyle: {
-          backgroundColor: colors.primary,
-          borderTopWidth: 0,
-          height: 60,
-          paddingBottom: 4,
-        },
-        tabBarLabelStyle: { fontWeight: '700' },
-        tabBarIcon: ({ focused, color, size }) => {
-          const icons = ICONS[route.name];
-          return <Ionicons name={focused ? icons.active : icons.inactive} size={size} color={color} />;
-        },
-        headerShown: false,
-      })}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: palette.bg } }}
+      tabBar={({ state, navigation }) => (
+        <TabBar
+          items={TABS}
+          activeKey={state.routes[state.index]?.name ?? 'Home'}
+          onPress={(key) => {
+            const root = TAB_ROOT[key];
+            if (root) navigation.navigate(key, { screen: root });
+            else navigation.navigate(key);
+          }}
+        />
+      )}
     >
-      <Tab.Screen name="Home"       component={HomeScreen}          options={{ title: 'Home', headerShown: false }} />
-      <Tab.Screen name="Desempenho" component={PerformanceScreen}   options={{ title: 'Desempenho', headerShown: false }} />
-      <Tab.Screen
-        name="Simulados"
-        component={SimuladosNavigator}
-        options={{ title: 'Simulados', headerShown: false }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            e.preventDefault();
-            navigation.navigate('Simulados', { screen: 'SimuladosList' });
-          },
-        })}
-      />
-      <Tab.Screen name="Financeiro" component={FinanceiroScreen}    options={{ title: 'Financeiro', headerShown: false }} />
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Desempenho" component={PerformanceScreen} />
+      <Tab.Screen name="Questoes" component={QuestoesNavigator} />
+      <Tab.Screen name="Simulados" component={SimuladosNavigator} />
+      <Tab.Screen name="Financeiro" component={FinanceiroScreen} />
     </Tab.Navigator>
   );
 }
@@ -90,6 +78,7 @@ export function AlunoStack() {
   return (
     <TenantThemeProvider>
       <AlunoDrawerProvider>
+        <StatusBar style="dark" />
         <Stack.Navigator
           screenOptions={{
             headerShown: false,

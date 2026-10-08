@@ -3,7 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
+import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
 import { getApiErrorMessage } from '../../../lib/apiError';
@@ -11,7 +11,7 @@ import { fetchNextPracticeQuestion, type PracticeFeedback, type PracticeQuestion
 import { useAnswerPracticeQuestion, usePracticeFilters } from '../hooks';
 import { PracticeQuestionView } from '../components/PracticeQuestionView';
 
-type Props = NativeStackScreenProps<SimuladosStackParamList, 'BancoPraticar'>;
+type Props = NativeStackScreenProps<QuestoesStackParamList, 'BancoPraticar'>;
 
 /** Prática avulsa: uma questão por vez, filtrada por disciplina/assunto, com correção logo após responder. */
 export function BancoPraticarScreen({ route }: Props) {

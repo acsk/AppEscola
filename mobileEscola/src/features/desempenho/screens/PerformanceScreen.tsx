@@ -243,7 +243,7 @@ export function PerformanceScreen() {
             <TouchableOpacity
               style={styles.practiceButton}
               activeOpacity={0.85}
-              onPress={() => navigation.navigate('Simulados', { screen: 'BancoDesempenho', initial: false })}
+              onPress={() => navigation.navigate('Questoes', { screen: 'BancoDesempenho', initial: false })}
             >
               <Ionicons name="analytics-outline" size={16} color={colors.surface} />
               <Text style={styles.practiceButtonText}>O que estudar</Text>
@@ -251,7 +251,7 @@ export function PerformanceScreen() {
             <TouchableOpacity
               style={[styles.practiceButton, styles.practiceButtonOutline]}
               activeOpacity={0.85}
-              onPress={() => navigation.navigate('Simulados', { screen: 'BancoRanking', initial: false })}
+              onPress={() => navigation.navigate('Questoes', { screen: 'BancoRanking', initial: false })}
             >
               <Ionicons name="trophy-outline" size={16} color={colors.primary} />
               <Text style={[styles.practiceButtonText, { color: colors.primary }]}>Ranking</Text>

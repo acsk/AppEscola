@@ -3,7 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
+import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import ConfirmModal from '../../../components/ConfirmModal';
 import { useThemeColors } from '../../../context/TenantThemeContext';
 import type { ThemeColors } from '../../../theme';
@@ -12,7 +12,7 @@ import { useAnswerInAttempt, useFinishAttempt, usePracticeAttempt, useStartQuest
 import { PracticeQuestionView } from '../components/PracticeQuestionView';
 import { formatPercent } from '../lib/format';
 
-type Props = NativeStackScreenProps<SimuladosStackParamList, 'BancoSimulado'>;
+type Props = NativeStackScreenProps<QuestoesStackParamList, 'BancoSimulado'>;
 
 /**
  * Simulado do banco: o aluno marca as respostas no próprio ritmo (ficam salvas) e só vê a correção ao finalizar.
