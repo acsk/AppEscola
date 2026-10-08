@@ -100,7 +100,7 @@ export function SimuladoDetailPanel({ examId, score }: { examId: number; score?:
         )}
         {!done && d.subject ? (
           <Button variant="ghost" block icon="library" label="Treinar estes assuntos antes"
-            onPress={() => navigation.getParent()?.navigate('Questoes', { screen: 'BancoPraticar', params: { subjectId: d.subject?.id } })} />
+            onPress={() => navigation.getParent()?.navigate('Questoes', { screen: 'BancoQuestoes', params: { subjectId: d.subject?.id } })} />
         ) : null}
       </View>
     </Card>

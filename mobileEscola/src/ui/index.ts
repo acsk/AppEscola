@@ -7,3 +7,4 @@ export * from './data';
 export * from './layout';
 export * from './SideNav';
 export * from './desktop';
+export * from './content';

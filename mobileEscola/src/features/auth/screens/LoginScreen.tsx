@@ -2,9 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -12,7 +9,8 @@ import {
   Modal,
   useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../../context/AuthContext';
@@ -29,7 +27,7 @@ import {
   type MetaInfo,
 } from '../../../services/version.service';
 import { AxiosError } from 'axios';
-import { colors } from '../../../theme';
+import { Button, Icon, Notice, TextField, Txt, font, radius, shadow, space, usePalette } from '../../../ui';
 import { AuthStackParamList } from '../../../navigation/AuthNavigator';
 import buildInfo from '../../../../buildInfo.json';
 import appJson from '../../../../app.json';
@@ -54,6 +52,8 @@ export function LoginScreen() {
   const { signIn } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { width, height } = useWindowDimensions();
+  const p = usePalette();
+  const insets = useSafeAreaInsets();
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
   const [senhaVisivel, setSenhaVisivel] = useState(false);
@@ -81,9 +81,6 @@ export function LoginScreen() {
   const [reloadConfirmationMessage, setReloadConfirmationMessage] = useState<string>('');
 
   const isEmail = login.includes('@');
-  const isWide = width >= 768;
-  const isCompactHeight = !isWide && height < 820;
-  const isVeryCompactHeight = !isWide && height < 720;
 
   function showChecklistStep(step: ChecklistStepKey) {
     setLoginChecklistStep(step);
@@ -285,280 +282,132 @@ export function LoginScreen() {
   const activeChecklistLabel =
     CHECKLIST_STEPS.find((step) => step.key === loginChecklistStep)?.label ?? 'Validando acesso';
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          styles.scrollContent,
-          isCompactHeight && styles.scrollContentCompact,
-        ]}
-      >
-        <View style={[styles.inner, isWide && styles.innerWide]}>
-          <View
-            style={[
-              styles.hero,
-              isCompactHeight && styles.heroCompact,
-              isVeryCompactHeight && styles.heroVeryCompact,
-              isWide && styles.heroWide,
-            ]}
-          >
-            <View style={styles.heroAccent} />
-            <View style={styles.heroHeader}>
-              <View style={[styles.logoBadge, isCompactHeight && styles.logoBadgeCompact]}>
-                <Ionicons
-                  name="school"
-                  size={isCompactHeight ? 26 : 30}
-                  color={colors.surface}
-                />
-              </View>
-              <Text style={[styles.heroTitle, isCompactHeight && styles.heroTitleCompact]}>
-                App Curso
-              </Text>
+  const desktop = width >= 1024;
+  const disabled = carregando || mustUpdate;
+
+  // Painel de marca (protótipos "TelaLogin" / "DesktopLogin"): faixa nav-bg no celular, coluna inteira no desktop.
+  const brandPanel = (
+    <View style={{
+      backgroundColor: p.navBg, overflow: 'hidden', gap: space[4],
+      paddingTop: desktop ? 48 : insets.top + space[6], paddingHorizontal: desktop ? 56 : space[5], paddingBottom: desktop ? 48 : 64,
+      ...(desktop ? { flex: 46, minHeight: '100%' as const } : {}),
+    }}>
+      <Text style={{ ...font.extrabold, fontSize: 20, lineHeight: 24, letterSpacing: -0.2, color: p.navInk }}>
+        App<Text style={{ ...font.medium, color: p.navInkMuted }}> Curso</Text>
+      </Text>
+      {desktop ? <View style={{ flex: 1 }} /> : null}
+      {desktop ? <AnswerSheetArt color={p.navAccent} line={p.navLine} /> : null}
+      <Text accessibilityRole="header" style={{
+        ...font.extrabold, color: p.navInk, letterSpacing: desktop ? -0.88 : -0.6, maxWidth: 520, marginTop: desktop ? 0 : space[6],
+        fontSize: desktop ? 44 : 30, lineHeight: desktop ? 48 : 34,
+      }}>Estude no seu ritmo.</Text>
+      <Text style={{ ...font.regular, color: p.navInkMuted, maxWidth: 440, fontSize: desktop ? 17 : 15, lineHeight: desktop ? 26 : 22 }}>
+        Simulados, banco de questões e o seu desempenho, tudo num lugar só.
+      </Text>
+      {desktop ? (
+        <View style={{ gap: 12, marginTop: space[6] }}>
+          {['Simulados com correção na hora', 'Questões novas toda semana', 'Veja o que estudar em cada matéria'].map((t) => (
+            <View key={t} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Icon name="check" size={20} strokeWidth={2.5} color={p.navAccent} />
+              <Text style={{ ...font.semibold, fontSize: 16, color: p.navInk }}>{t}</Text>
             </View>
-            <Text style={[styles.heroText, isCompactHeight && styles.heroTextCompact]}>
-              Acesse sua rotina escolar com uma experiência mais simples, clara e segura.
-            </Text>
-          </View>
+          ))}
+        </View>
+      ) : null}
+      {desktop ? <View style={{ flex: 1 }} /> : null}
+      {desktop ? <Text style={{ ...font.medium, fontSize: 12, color: p.navInkMuted }}>© {new Date().getFullYear()} App Curso</Text> : null}
+    </View>
+  );
 
-          <View
-            style={[
-              styles.formPanel,
-              isCompactHeight && styles.formPanelCompact,
-              isWide && styles.formPanelWide,
-            ]}
-          >
-            <View style={[styles.formHeader, isCompactHeight && styles.formHeaderCompact]}>
-              <View style={[styles.formIcon, isCompactHeight && styles.formIconCompact]}>
-                <Ionicons
-                  name="log-in-outline"
-                  size={isCompactHeight ? 22 : 24}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.formTitleGroup}>
-                <Text style={[styles.titulo, isCompactHeight && styles.tituloCompact]}>
-                  Entrar na conta
-                </Text>
-                <Text style={styles.subtitulo}>Informe seus dados para continuar</Text>
-              </View>
-            </View>
+  const form = (
+    <View style={{
+      width: '100%', maxWidth: desktop ? 400 : 420, alignSelf: 'center', gap: desktop ? 20 : 18,
+      ...(desktop ? {} : { backgroundColor: p.surface, borderRadius: radius.xl, paddingVertical: space[6], paddingHorizontal: space[5], ...shadow.card, shadowOpacity: 0.1, shadowRadius: 32, shadowOffset: { width: 0, height: 8 }, elevation: 4 }),
+    }}>
+      <View style={{ gap: 6 }}>
+        <Text style={{ ...font.extrabold, fontSize: desktop ? 32 : 26, lineHeight: desktop ? 38 : 32, letterSpacing: -0.52, color: p.ink }}>Entrar</Text>
+        <Txt tone="muted">Use a sua matrícula ou o e-mail cadastrado na escola.</Txt>
+      </View>
 
-            {/* Banners de status da API/App */}
-            {metaError ? (
-              <View style={[styles.banner, styles.bannerWarn]}>
-                <Ionicons name="warning-outline" size={16} color="#92400E" />
-                <Text style={[styles.bannerText, { color: '#92400E' }]}>{metaError}</Text>
-              </View>
-            ) : null}
+      {metaError ? <Notice tone="warning" icon="warning" title={metaError} /> : null}
+      {mustUpdate ? (
+        <Notice tone="danger" title="Atualização obrigatória"
+          text={`A versão atual do app (${APP_VERSION}) não é mais suportada.${minSupportedVersion ? ` Mínima: ${minSupportedVersion}.` : ''}`} />
+      ) : shouldRecommendUpdate ? (
+        <Notice tone="info" title={`Atualização recomendada${recommendedVersion ? ` para a versão ${recommendedVersion}` : ''}.`} />
+      ) : null}
 
-            {mustUpdate ? (
-              <View style={[styles.banner, styles.bannerError]}>
-                <Ionicons name="alert-circle-outline" size={16} color="#991B1B" />
-                <Text style={[styles.bannerText, { color: '#991B1B' }]}>
-                  Atualização obrigatória: a versão atual do app ({APP_VERSION}) não é mais suportada.
-                  {minSupportedVersion ? ` Mínima: ${minSupportedVersion}.` : ''}
-                </Text>
-              </View>
-            ) : shouldRecommendUpdate ? (
-              <View style={[styles.banner, styles.bannerInfo]}>
-                <Ionicons name="information-circle-outline" size={16} color="#1E40AF" />
-                <Text style={[styles.bannerText, { color: '#1E40AF' }]}>
-                  Atualização recomendada
-                  {recommendedVersion ? ` para a versão ${recommendedVersion}.` : '.'}
-                </Text>
-              </View>
-            ) : null}
-
-            <View style={[styles.campo, isCompactHeight && styles.campoCompact]}>
-              <Ionicons
-                name={isEmail ? 'mail-outline' : 'card-outline'}
-                size={20}
-                color={colors.muted}
-                style={styles.icone}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="E-mail ou número de matrícula"
-                placeholderTextColor="#94A3B8"
-                keyboardType={isEmail ? 'email-address' : 'default'}
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={login}
-                onChangeText={(v) => {
-                  setLogin(v);
-                  setErro(null);
-                }}
-              />
-            </View>
-
-            <View style={[styles.campo, isCompactHeight && styles.campoCompact]}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={colors.muted}
-                style={styles.icone}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Senha"
-                placeholderTextColor="#94A3B8"
-                secureTextEntry={!senhaVisivel}
-                value={senha}
-                onChangeText={(v) => {
-                  setSenha(v);
-                  setErro(null);
-                }}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                onPress={() => setSenhaVisivel(!senhaVisivel)}
-                style={styles.iconButton}
-                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-              >
-                <Ionicons
-                  name={senhaVisivel ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={colors.muted}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.dicaContainer, isCompactHeight && styles.dicaContainerCompact]}>
-              <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
-              <Text style={styles.dica}>
-                {isEmail
-                  ? 'Acesso para administradores e professores'
-                  : login.length > 0
-                  ? 'Acesso para alunos (matrícula)'
-                  : 'Use e-mail para admin/professor ou matrícula para aluno'}
-              </Text>
-            </View>
-
-            {erro ? (
-              <View style={styles.erroContainer}>
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={16}
-                  color="#DC2626"
-                  style={styles.erroIcone}
-                />
-                <Text style={styles.erroTexto}>{erro}</Text>
-              </View>
-            ) : null}
-
-            <TouchableOpacity
-              style={[
-                styles.botao,
-                isCompactHeight && styles.botaoCompact,
-                (carregando || mustUpdate) && styles.botaoDesabilitado,
-              ]}
-              onPress={handleLogin}
-              disabled={carregando || mustUpdate}
-              activeOpacity={0.85}
-            >
-              {carregando ? (
-                <ActivityIndicator color={colors.surface} />
-              ) : (
-                <View style={styles.botaoConteudo}>
-                  <Text style={styles.botaoTexto}>Entrar</Text>
-                  <Ionicons name="arrow-forward" size={18} color={colors.surface} />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.botaoCadastro, isCompactHeight && styles.botaoCadastroCompact]}
-              onPress={() => navigation.navigate('PublicRegister')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="person-add-outline" size={18} color={colors.primary} />
-              <Text style={styles.botaoCadastroTexto}>Cadastre-se</Text>
-            </TouchableOpacity>
-
-            {/* Rodapé do card: versões */}
-            <View style={[styles.metaFooter, isCompactHeight && styles.metaFooterCompact]}>
-              {metaLoading ? (
-                <Text style={styles.metaFooterText}>Carregando informações da API…</Text>
-              ) : (
-                <>
-                  <Text style={styles.metaFooterText}>
-                    API {apiVersion} · Contrato {contractVersion}
-                  </Text>
-                  <Text style={styles.metaFooterText}>
-                    App {APP_VERSION} · Build {APP_BUILD_VERSION}
-                    {APP_BUILD_DATE ? ` (${formatBuildDateTime(APP_BUILD_DATE)})` : ''}
-                  </Text>
-                  {remoteBuildVersion ? (
-                    <Text style={styles.metaFooterText}>
-                      Última build no servidor: {remoteBuildVersion}
-                      {remoteBuildDate ? ` · ${formatDateToPtBr(remoteBuildDate)}` : ''}
-                    </Text>
-                  ) : null}
-                </>
-              )}
-            </View>
-          </View>
-
-          <View style={[styles.versionFooter, isCompactHeight && styles.versionFooterCompact]}>
-            <Text style={styles.versionFooterText}>App {APP_BUILD_VERSION}</Text>
+      {erro ? (
+        <View accessibilityRole="alert" style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingVertical: 12, paddingHorizontal: 14, borderRadius: radius.md, backgroundColor: p.dangerSoft }}>
+          <Icon name="alert" size={20} color={p.dangerInk} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...font.semibold, fontSize: 14, lineHeight: 20, color: p.dangerInk }}>{erro}</Text>
+            <Txt tone="muted" style={{ fontSize: 14, lineHeight: 20, ...font.medium }}>Confira os dados e tente de novo.</Txt>
           </View>
         </View>
+      ) : null}
+
+      <TextField label="Matrícula ou e-mail" placeholder="Ex.: 202600001" value={login} autoComplete="username"
+        keyboardType={isEmail ? 'email-address' : 'default'} returnKeyType="next"
+        hint={isEmail ? 'Acesso de professores e administração' : 'Alunos entram com a matrícula'}
+        onChangeText={(v) => { setLogin(v); setErro(null); }} />
+      <TextField label="Senha" placeholder="Sua senha" password value={senha} autoComplete="current-password" returnKeyType="go"
+        onSubmitEditing={() => { if (!disabled) void handleLogin(); }}
+        onChangeText={(v) => { setSenha(v); setErro(null); }} />
+
+      <Button block size="lg" iconRight="arrow-right" label="Entrar" loading={carregando} disabled={disabled} onPress={() => void handleLogin()} />
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ flex: 1, height: 1, backgroundColor: p.line }} />
+        <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>Primeiro acesso?</Txt>
+        <View style={{ flex: 1, height: 1, backgroundColor: p.line }} />
+      </View>
+      <Button block variant="secondary" icon="key" label="Fazer meu cadastro" onPress={() => navigation.navigate('PublicRegister')} />
+
+      <Txt variant="caption" tone="subtle" style={{ textAlign: 'center', ...font.medium }}>
+        {metaLoading ? 'Carregando informações da API…'
+          : `API ${apiVersion} · App ${APP_VERSION} · Build ${APP_BUILD_VERSION}${APP_BUILD_DATE ? ` (${formatBuildDateTime(APP_BUILD_DATE)})` : ''}${remoteBuildVersion ? ` · Servidor ${remoteBuildVersion}${remoteBuildDate ? ` (${formatDateToPtBr(remoteBuildDate)})` : ''}` : ''}`}
+      </Txt>
+    </View>
+  );
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: p.bg }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
+        {desktop ? (
+          <View style={{ flex: 1, flexDirection: 'row', minHeight: height }}>
+            {brandPanel}
+            <View style={{ flex: 54, alignItems: 'center', justifyContent: 'center', padding: 48 }}>{form}</View>
+          </View>
+        ) : (
+          <View style={{ flex: 1 }}>
+            {brandPanel}
+            <View style={{ marginTop: -32, paddingHorizontal: space[4], paddingBottom: space[8] + insets.bottom }}>{form}</View>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Modal: checklist mínimo (um passo por vez, sem detalhes de debug) */}
-      <Modal
-        visible={loginChecklistVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={hideChecklist}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, styles.checklistModalCard]}>
-            <View style={styles.checklistRow}>
-              <View style={styles.checklistIcon}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-              <Text style={styles.checklistLabel}>{activeChecklistLabel}</Text>
-            </View>
+      {/* Um passo por vez enquanto valida conexão, versão e login */}
+      <Modal visible={loginChecklistVisible} transparent animationType="fade" onRequestClose={hideChecklist}>
+        <View style={{ flex: 1, backgroundColor: p.scrim, alignItems: 'center', justifyContent: 'center', padding: space[6] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], backgroundColor: p.surface, borderRadius: radius.lg, paddingVertical: space[4], paddingHorizontal: space[5], ...shadow.sheet }}>
+            <ActivityIndicator size="small" color={p.brand} />
+            <Txt variant="label">{activeChecklistLabel}</Txt>
           </View>
         </View>
       </Modal>
 
-      {/* Modal: Confirmação de reload */}
-      <Modal
-        visible={reloadConfirmationVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeReloadConfirmation}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="refresh-outline" size={22} color={colors.primary} />
-              <Text style={styles.modalTitle}>Atualização disponível</Text>
+      <Modal visible={reloadConfirmationVisible} transparent animationType="fade" onRequestClose={closeReloadConfirmation}>
+        <View style={{ flex: 1, backgroundColor: p.scrim, alignItems: 'center', justifyContent: 'center', padding: space[6] }}>
+          <View style={{ width: '100%', maxWidth: 400, gap: space[3], backgroundColor: p.surface, borderRadius: radius.lg, padding: space[5], ...shadow.sheet }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+              <Icon name="refresh" size={22} color={p.brandInk} />
+              <Txt variant="title">Atualização disponível</Txt>
             </View>
-            <Text style={styles.modalBody}>{reloadConfirmationMessage}</Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={closeReloadConfirmation}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.modalButtonSecondaryText}>Depois</Text>
-              </TouchableOpacity>
-              {Platform.OS === 'web' ? (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonPrimary]}
-                  onPress={confirmReloadAndRefresh}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.modalButtonPrimaryText}>Recarregar</Text>
-                </TouchableOpacity>
-              ) : null}
+            <Txt tone="muted">{reloadConfirmationMessage}</Txt>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: space[2], marginTop: space[2] }}>
+              <Button variant="secondary" label="Depois" onPress={closeReloadConfirmation} />
+              {Platform.OS === 'web' ? <Button label="Recarregar" onPress={confirmReloadAndRefresh} /> : null}
             </View>
           </View>
         </View>
@@ -567,385 +416,17 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    justifyContent: 'center',
-  },
-  scrollContentCompact: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-  },
-  versionFooter: {
-    alignItems: 'center',
-    paddingTop: 18,
-    paddingBottom: 6,
-  },
-  versionFooterCompact: {
-    paddingTop: 10,
-    paddingBottom: 0,
-  },
-  versionFooterText: {
-    fontSize: 11,
-    color: colors.muted,
-    opacity: 0.7,
-  },
-  inner: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    width: '100%',
-    maxWidth: 1120,
-    alignSelf: 'center',
-  },
-  innerWide: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 28,
-  },
-  hero: {
-    minHeight: 170,
-    borderRadius: 24,
-    backgroundColor: colors.ink,
-    padding: 20,
-    marginBottom: 14,
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  heroCompact: {
-    minHeight: 142,
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 12,
-  },
-  heroVeryCompact: {
-    minHeight: 122,
-    padding: 16,
-    marginBottom: 10,
-  },
-  heroWide: {
-    flex: 1,
-    marginBottom: 0,
-    minHeight: 560,
-    padding: 36,
-  },
-  heroAccent: {
-    position: 'absolute',
-    width: 360,
-    height: 92,
-    backgroundColor: colors.primary,
-    opacity: 0.26,
-    top: 34,
-    right: -110,
-    transform: [{ rotate: '-18deg' }],
-  },
-  heroHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  logoBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  logoBadgeCompact: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    marginRight: 12,
-  },
-  heroTitle: {
-    flex: 1,
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '800',
-    color: colors.surface,
-  },
-  heroTitleCompact: {
-    fontSize: 27,
-    lineHeight: 32,
-  },
-  heroText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#C7D2FE',
-    maxWidth: 430,
-  },
-  heroTextCompact: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  formPanel: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    elevation: 5,
-  },
-  formPanelCompact: {
-    borderRadius: 22,
-    padding: 18,
-  },
-  formPanelWide: {
-    width: 430,
-    alignSelf: 'center',
-    padding: 28,
-  },
-  formHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  formHeaderCompact: {
-    marginBottom: 18,
-  },
-  formIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: colors.soft,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  formIconCompact: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    marginRight: 12,
-  },
-  formTitleGroup: { flex: 1 },
-  titulo: { fontSize: 24, fontWeight: '800', color: colors.ink, marginBottom: 4 },
-  tituloCompact: { fontSize: 22, lineHeight: 27 },
-  subtitulo: { fontSize: 14, color: colors.muted, lineHeight: 19 },
-  campo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    minHeight: 56,
-    marginBottom: 14,
-  },
-  campoCompact: {
-    minHeight: 52,
-    marginBottom: 10,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-  },
-  icone: { marginRight: 10 },
-  input: { flex: 1, fontSize: 15, color: colors.ink, minHeight: 52 },
-  iconButton: {
-    width: 34,
-    height: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dicaContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: colors.soft,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 18,
-  },
-  dicaContainerCompact: {
-    paddingVertical: 8,
-    marginBottom: 14,
-  },
-  dica: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.text,
-    marginLeft: 8,
-  },
-  botao: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    elevation: 3,
-  },
-  botaoCompact: {
-    borderRadius: 14,
-    paddingVertical: 14,
-  },
-  botaoDesabilitado: { opacity: 0.6 },
-  botaoCadastro: {
-    marginTop: 10,
-    minHeight: 48,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  botaoCadastroCompact: {
-    minHeight: 46,
-    borderRadius: 14,
-  },
-  botaoCadastroTexto: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  botaoConteudo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  botaoTexto: { color: colors.surface, fontSize: 16, fontWeight: '700', marginRight: 8 },
-  erroContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  erroIcone: { marginRight: 8, marginTop: 1 },
-  erroTexto: { flex: 1, fontSize: 13, color: '#DC2626', lineHeight: 18 },
-
-  // Banners
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  bannerText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 17,
-    marginLeft: 6,
-  },
-  bannerInfo: { backgroundColor: '#DBEAFE', borderWidth: 1, borderColor: '#BFDBFE' },
-  bannerWarn: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A' },
-  bannerError: { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA' },
-
-  // Footer com versões dentro do card
-  metaFooter: {
-    marginTop: 18,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    alignItems: 'center',
-  },
-  metaFooterCompact: {
-    marginTop: 12,
-    paddingTop: 10,
-  },
-  metaFooterText: {
-    fontSize: 11,
-    color: colors.muted,
-    lineHeight: 16,
-    textAlign: 'center',
-  },
-
-  // Modais
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 22,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.ink,
-    marginLeft: 8,
-  },
-  modalBody: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.text,
-    marginBottom: 16,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 6,
-  },
-  modalButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    minWidth: 96,
-    alignItems: 'center',
-  },
-  modalButtonPrimary: {
-    backgroundColor: colors.primary,
-    marginLeft: 8,
-  },
-  modalButtonPrimaryText: {
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  modalButtonSecondary: {
-    backgroundColor: colors.soft,
-  },
-  modalButtonSecondaryText: {
-    color: colors.text,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  checklistModalCard: {
-    paddingVertical: 20,
-    paddingHorizontal: 22,
-  },
-  checklistRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checklistIcon: {
-    width: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  checklistLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.ink,
-  },
-});
+/** Padrão de cartão-resposta (bolinhas, algumas marcadas) no painel de marca do desktop. */
+function AnswerSheetArt({ color, line }: { color: string; line: string }) {
+  const marked = new Set(['0-1', '1-3', '2-0', '3-2', '4-4', '5-1']);
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', right: -40, bottom: 56 }}>
+      <Svg width={220} height={240} viewBox="0 0 220 240">
+        {Array.from({ length: 6 }, (_, r) => Array.from({ length: 5 }, (_, c) => {
+          const on = marked.has(`${r}-${c}`);
+          return <Circle key={`${r}-${c}`} cx={20 + c * 40} cy={20 + r * 40} r={12} fill={on ? color : 'none'} stroke={on ? color : line} strokeWidth={1.5} />;
+        }))}
+      </Svg>
+    </View>
+  );
+}

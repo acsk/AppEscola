@@ -37,6 +37,16 @@ export type Palette = {
   infoSoft: string;
   focus: string;
   scrim: string;
+  /** Barra lateral, menu-gaveta e painel do login: fundo de cor derivado da marca. */
+  navBg: string;
+  navInk: string;
+  navInkMuted: string;
+  navActive: string;
+  navAccent: string;
+  navLine: string;
+  /** "Novas" sobre navBg (o info normal fica escuro demais ali). */
+  navNew: string;
+  onNavNew: string;
   subjects: string[];
 };
 
@@ -72,6 +82,14 @@ export const LIGHT: Palette = {
   infoSoft: '#EBF2FD',
   focus: '#2563EB',
   scrim: 'rgba(18, 20, 23, 0.48)',
+  navBg: '#0F2E1F',
+  navInk: '#FFFFFF',
+  navInkMuted: '#B4C7BC',
+  navActive: 'rgba(255, 255, 255, 0.10)',
+  navAccent: '#5BE394',
+  navLine: 'rgba(255, 255, 255, 0.12)',
+  navNew: '#7EB0FF',
+  onNavNew: '#0B1A33',
   subjects: ['#6E56CF', '#E5484D', '#0E9384', '#D97706', '#2F6FEB', '#C2298A'],
 };
 
@@ -108,6 +126,14 @@ export const DARK: Palette = {
   infoSoft: '#12223F',
   focus: '#7EB0FF',
   scrim: 'rgba(0, 0, 0, 0.64)',
+  navBg: '#0A1A12',
+  navInk: '#FFFFFF',
+  navInkMuted: '#B4C7BC',
+  navActive: 'rgba(255, 255, 255, 0.08)',
+  navAccent: '#5BE394',
+  navLine: 'rgba(255, 255, 255, 0.10)',
+  navNew: '#7EB0FF',
+  onNavNew: '#0B1A33',
   subjects: ['#9D8CF0', '#FF7A7E', '#2CC4B2', '#F5A524', '#6E9EFF', '#F06BBE'],
 };
 
@@ -166,6 +192,13 @@ export function deriveBrand(base: Palette, brand?: string | null, accent?: strin
       brandInk: ink,
       onBrand: contrast(brandHex, '#FFFFFF') >= 4.5 ? '#FFFFFF' : '#04150B',
     });
+    // nav-bg: a marca escurecida até segurar texto branco com folga; nav-accent: versão clara com 4.5:1 sobre ele.
+    let navBg = mix(rgb, BLACK, 0.6);
+    for (let t = 0.65; contrast(navBg, '#FFFFFF') < 13 && t <= 0.9; t += 0.05) navBg = mix(rgb, BLACK, t);
+    let navAccent = mix(rgb, WHITE, 0.3);
+    for (let t = 0.4; contrast(navAccent, navBg) < 4.5 && t <= 0.8; t += 0.1) navAccent = mix(rgb, WHITE, t);
+    const navRgb = parseHex(navBg) as Rgb;
+    Object.assign(out, { navBg, navAccent, navInkMuted: mix(WHITE, navRgb, 0.28) });
   }
   const accentRgb = accent ? parseHex(accent) : null;
   if (accentRgb) {

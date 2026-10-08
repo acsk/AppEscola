@@ -249,7 +249,7 @@ export function SimuladoDetalheScreen({ route, navigation }: Props) {
 
           {!concluido && detalhe.subject ? (
             <Button variant="ghost" icon="library" block label="Treinar estes assuntos antes"
-              onPress={() => navigation.getParent()?.navigate('Questoes', { screen: 'BancoPraticar', params: { subjectId: detalhe.subject?.id } })} />
+              onPress={() => navigation.getParent()?.navigate('Questoes', { screen: 'BancoQuestoes', params: { subjectId: detalhe.subject?.id } })} />
           ) : null}
 
           {concluido ? (

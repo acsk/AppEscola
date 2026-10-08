@@ -9,6 +9,7 @@ use App\Models\Subject;
 use App\Models\SubjectTopic;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\PracticeCatalogService;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -77,13 +78,13 @@ class PracticeCatalogTest extends TestCase
         $items = collect($all->json('body.items'))->keyBy('id');
         $this->assertSame(['wrong', 'right', 'new'], [$items[$a->id]['status'], $items[$b->id]['status'], $items[$c->id]['status']]);
         $this->assertTrue($items[$c->id]['saved']);
-        $this->assertSame(['all' => 3, 'unanswered' => 1, 'wrong' => 1, 'saved' => 1], $all->json('body.facets.situations'));
+        $this->assertSame(['all' => 3, 'unanswered' => 1, 'wrong' => 1, 'saved' => 1, 'new' => 1], $all->json('body.facets.situations'));
 
         // Disciplina filtrada: a contagem de disciplinas ignora o próprio filtro; a de situação respeita.
         $math_only = $this->getJson("/api/aluno/practice/facets?subject_ids[]={$math->id}")->assertOk();
         $this->assertSame(2, collect($math_only->json('body.subjects'))->firstWhere('id', $math->id)['total']);
         $this->assertSame(1, collect($math_only->json('body.subjects'))->firstWhere('id', $pt->id)['total']);
-        $this->assertSame(['all' => 2, 'unanswered' => 0, 'wrong' => 1, 'saved' => 0], $math_only->json('body.situations'));
+        $this->assertSame(['all' => 2, 'unanswered' => 0, 'wrong' => 1, 'saved' => 0, 'new' => 0], $math_only->json('body.situations'));
 
         $this->assertSame([$a->id], array_column($this->getJson('/api/aluno/practice/questions?situation=wrong')->json('body.items'), 'id'));
         $this->assertSame([$c->id], array_column($this->getJson('/api/aluno/practice/questions?situation=saved')->json('body.items'), 'id'));
@@ -94,6 +95,28 @@ class PracticeCatalogTest extends TestCase
 
         $this->deleteJson("/api/aluno/practice/questions/{$c->id}/save")->assertOk();
         $this->getJson('/api/aluno/practice/questions?situation=saved')->assertJsonPath('body.total', 0);
+    }
+
+    public function test_new_questions_are_recent_and_unanswered_with_counts_per_subject_and_topic(): void
+    {
+        $math = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $fractions = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $math->id, 'name' => 'Frações']);
+        $fresh = $this->question('Nova de frações', $math->id, [$fractions->id]);
+        $answered = $this->question('Nova já respondida', $math->id, [$fractions->id]);
+        $old = $this->question('Antiga', $math->id, [$fractions->id]);
+        $old->forceFill(['created_at' => now()->subDays(PracticeCatalogService::NEW_DAYS + 1)])->save();
+        $this->answer($answered, true);
+
+        $facets = $this->getJson('/api/aluno/practice/facets')->assertOk();
+        $this->assertSame(1, $facets->json('body.situations.new'));
+        $mathFacet = collect($facets->json('body.subjects'))->firstWhere('id', $math->id);
+        $this->assertSame([3, 1], [$mathFacet['total'], $mathFacet['new']]);
+        $this->assertSame(1, collect($facets->json('body.topics'))->firstWhere('id', $fractions->id)['new']);
+        $this->assertSame([$fresh->id], array_column($this->getJson('/api/aluno/practice/questions?situation=new')->json('body.items'), 'id'));
+
+        // Sessão só com novas, 5 questões, correção a cada questão.
+        $payload = $this->postJson('/api/aluno/practice/sessions', ['situation' => 'new', 'quantity' => 5, 'correction_mode' => 'each'])->assertCreated()->json('body');
+        $this->assertSame([$fresh->id], array_column($payload['questions'], 'id'));
     }
 
     public function test_session_each_mode_reveals_feedback_per_question_and_counts_in_summary(): void

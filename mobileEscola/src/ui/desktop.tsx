@@ -36,13 +36,13 @@ export function PageBody({ children, maxWidth = layout.contentMax, style }: { ch
 // ── Checkbox / radio ─────────────────────────────────────────────────────────
 
 export function Checkbox({
-  label, checked, radio, dot, count, disabled, onPress,
-}: { label: string; checked?: boolean; radio?: boolean; dot?: string; count?: number; disabled?: boolean; onPress?: () => void }) {
+  label, checked, radio, dot, count, disabled, onPress, trailing, large,
+}: { label: string; checked?: boolean; radio?: boolean; dot?: string; count?: number; disabled?: boolean; onPress?: () => void; trailing?: React.ReactNode; /** Alvo de toque maior (celular). */ large?: boolean }) {
   const p = usePalette();
   return (
     <Pressable accessibilityRole={radio ? 'radio' : 'checkbox'} accessibilityState={{ checked: !!checked, disabled }} disabled={disabled} onPress={onPress}
       style={(({ hovered }: { hovered?: boolean }) => ({
-        flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 36, paddingHorizontal: space[2], marginHorizontal: -space[2],
+        flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: large ? 44 : 36, paddingHorizontal: space[2], marginHorizontal: -space[2],
         borderRadius: radius.sm, backgroundColor: hovered ? p.surfaceSunken : 'transparent', opacity: disabled ? 0.45 : 1,
       })) as never}>
       <View style={{
@@ -53,7 +53,8 @@ export function Checkbox({
         {checked && !radio ? <Icon name="check" size={14} strokeWidth={3} color={p.onInverse} /> : null}
       </View>
       {dot ? <Dot color={dot} /> : null}
-      <Text numberOfLines={1} style={[type.label, { ...font.medium, fontSize: 14, color: p.ink, flex: 1 }]}>{label}</Text>
+      <Text numberOfLines={1} style={[type.label, { ...font.medium, fontSize: large ? 15 : 14, color: p.ink }, trailing ? { flexShrink: 1 } : { flex: 1 }]}>{label}</Text>
+      {trailing}
       {count != null ? <Text style={[type.caption, { color: p.inkSubtle, fontVariant: ['tabular-nums'] }]}>{count}</Text> : null}
     </Pressable>
   );

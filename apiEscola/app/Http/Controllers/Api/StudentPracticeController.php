@@ -91,7 +91,7 @@ class StudentPracticeController extends Controller
         $student = $this->student($request);
         $filters = $this->catalogFilters($request);
         $data = $request->validate([
-            'quantity'        => ['nullable', 'integer', Rule::in([10, 20, 30])],
+            'quantity'        => ['nullable', 'integer', Rule::in([5, 10, 20, 30])],
             'correction_mode' => ['required', Rule::in(['each', 'end'])],
             'timed'           => ['sometimes', 'boolean'],
             'title'           => ['nullable', 'string', 'max:120'],

@@ -1,218 +1,174 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
-import { useThemeColors } from '../../../context/TenantThemeContext';
-import type { ThemeColors } from '../../../theme';
 import { getApiErrorMessage } from '../../../lib/apiError';
-import {
-  LEVEL_COLOR,
-  LEVEL_LABEL,
-  type PerformanceScore,
-  type PerformanceSubject,
-  type StudyFocusItem,
-} from '../../../services/practice.service';
-import { usePracticePerformance } from '../hooks';
+import type { PerformanceLevel, PerformanceSubject, PerformanceTopic } from '../../../services/practice.service';
+import { usePracticeFacets, usePracticePerformance, useStartPracticeSession } from '../hooks';
 import { formatPercent } from '../lib/format';
+import {
+  AppBar, Button, Card, Icon, IconButton, Notice, Overline, PageBody, PageHeader, ProgressBar, ScreenBody, Tag, TopicRow, Txt,
+  font, space, subjectColor, useLayoutMode, usePalette, type TopicStatus,
+} from '../../../ui';
 
 type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoDesempenho'>;
 
-const questions = (n: number) => `${n.toLocaleString('pt-BR')} ${n === 1 ? 'questão' : 'questões'}`;
+const STATUS: Record<PerformanceLevel, TopicStatus> = { weak: 'reforcar', attention: 'atencao', good: 'bom', few_data: 'poucos', not_started: 'nao' };
+/** Respostas para o "O que estudar" ficar confiável. */
+const TARGET = 10;
 
-function scoreLine(score: PerformanceScore & { available: number }): string {
-  if (score.answered === 0) return `${questions(score.available)} para praticar`;
-  return `${score.correct} de ${score.answered} ${score.answered === 1 ? 'certa' : 'certas'}`;
-}
-
-/** Desempenho na prática do banco por disciplina → assunto, com os assuntos que mais precisam de estudo. */
+/** O que estudar (protótipos "TelaOQueEstudar" e "DesktopOQueEstudar"): frase simples, assuntos por matéria e "Praticar" em cada um. */
 export function BancoDesempenhoScreen() {
-  const colors = useThemeColors();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const p = usePalette();
   const navigation = useNavigation<Nav>();
+  const { isDesktop } = useLayoutMode();
   const { data, isLoading, isError, error, refetch, isRefetching } = usePracticePerformance();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const facets = usePracticeFacets({ situation: 'all' });
+  const start = useStartPracticeSession();
+  const [startError, setStartError] = useState<string | null>(null);
 
-  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+  const refetchFacets = facets.refetch;
+  useFocusEffect(useCallback(() => { refetch(); refetchFacets(); }, [refetch, refetchFacets]));
 
-  const practice = (subjectId: number | null, topicId: number | null) =>
-    navigation.navigate('BancoPraticar', { subjectId: subjectId ?? undefined, topicId: topicId ?? undefined });
+  const newByTopic = useMemo(() => new Map((facets.data?.topics ?? []).map((t) => [t.id, t.new])), [facets.data]);
+  const newBySubject = useMemo(() => new Map((facets.data?.subjects ?? []).map((s) => [s.id, s.new])), [facets.data]);
 
-  const LevelBadge = ({ score }: { score: PerformanceScore }) => (
-    <View style={[styles.badge, { backgroundColor: `${LEVEL_COLOR[score.level]}22` }]}>
-      <Text style={[styles.badgeText, { color: LEVEL_COLOR[score.level] }]}>{LEVEL_LABEL[score.level]}</Text>
-    </View>
-  );
-
-  const Bar = ({ score }: { score: PerformanceScore }) => (
-    <View style={styles.barTrack}>
-      <View style={[styles.barFill, { width: `${Math.min(100, score.accuracy ?? 0)}%`, backgroundColor: LEVEL_COLOR[score.level] }]} />
-    </View>
-  );
-
-  const focusReason = (item: StudyFocusItem) =>
-    item.reason === 'low_accuracy'
-      ? `${formatPercent(item.accuracy)} de acerto em ${questions(item.answered)}`
-      : `Ainda não praticado · ${questions(item.available)}`;
-
-  const renderSubject = (subject: PerformanceSubject) => {
-    const key = String(subject.id ?? 'none');
-    const open = !!expanded[key];
-    return (
-      <View key={key} style={styles.subjectCard}>
-        <TouchableOpacity onPress={() => setExpanded((prev) => ({ ...prev, [key]: !open }))} activeOpacity={0.85}
-          accessibilityRole="button" accessibilityState={{ expanded: open }}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.subjectName} numberOfLines={1}>{subject.name}</Text>
-            <Text style={styles.subjectPct}>{formatPercent(subject.accuracy)}</Text>
-          </View>
-          <Bar score={subject} />
-          <View style={styles.rowBetween}>
-            <Text style={styles.meta}>{scoreLine(subject)} · {subject.topics.length} assunto{subject.topics.length !== 1 ? 's' : ''}</Text>
-            <View style={styles.rowGap}>
-              <LevelBadge score={subject} />
-              <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.muted} />
-            </View>
-          </View>
-        </TouchableOpacity>
-        {open ? (
-          <View style={styles.topics}>
-            {subject.topics.map((topic) => (
-              <View key={String(topic.id ?? 'none')} style={styles.topicRow}>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <View style={styles.rowBetween}>
-                    <Text style={styles.topicName} numberOfLines={2}>{topic.name}</Text>
-                    <Text style={styles.topicPct}>{formatPercent(topic.accuracy)}</Text>
-                  </View>
-                  <Bar score={topic} />
-                  <View style={styles.rowBetween}>
-                    <Text style={styles.meta}>{scoreLine(topic)}</Text>
-                    <LevelBadge score={topic} />
-                  </View>
-                </View>
-                {topic.available > 0 && subject.id != null ? (
-                  <TouchableOpacity style={styles.practiceIcon} onPress={() => practice(subject.id, topic.id)}
-                    accessibilityLabel={`Praticar ${topic.name}`}>
-                    <Ionicons name="play" size={16} color={colors.surface} />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </View>
-    );
+  const practice = (subject: { id: number | null; name: string }, topic?: { id: number | null; name: string }) => {
+    setStartError(null);
+    const title = `${subject.name} · ${topic?.name ?? 'Todos os assuntos'}`;
+    start.mutate({
+      filters: { subject_ids: subject.id ? [subject.id] : [], topic_ids: topic?.id ? [topic.id] : [], situation: 'all' },
+      options: { quantity: 10, correction_mode: 'each', timed: false, title },
+    }, {
+      onSuccess: (payload) => navigation.navigate('BancoSimulado', { attemptId: payload.attempt.id, title }),
+      onError: (cause) => setStartError(getApiErrorMessage(cause, 'Não foi possível começar. Tente de novo.')),
+    });
   };
 
-  if (isLoading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>;
-  }
+  if (isLoading) return <View style={{ flex: 1, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color={p.brand} /></View>;
+
+  const back = <IconButton icon="arrow-left" label="Voltar" onPress={() => navigation.goBack()} />;
   if (isError || !data) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.muted}>{getApiErrorMessage(error, 'Não foi possível carregar seu desempenho.')}</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => refetch()}>
-          <Text style={styles.primaryButtonText}>Tentar novamente</Text>
-        </TouchableOpacity>
+      <View style={{ flex: 1, backgroundColor: p.bg }}>
+        {!isDesktop ? <AppBar large title="O que estudar" leading={back} /> : null}
+        <ScreenBody gap={space[3]} style={{ paddingTop: space[4] }}>
+          <Notice tone="danger" title="Não foi possível carregar" text={getApiErrorMessage(error, 'Tente de novo.')} />
+          <Button variant="secondary" icon="refresh" label="Tentar de novo" onPress={() => refetch()} />
+        </ScreenBody>
       </View>
+    );
+  }
+
+  const { overall } = data;
+  const missing = Math.max(0, TARGET - overall.answered);
+  const lowest = data.study_focus[0] ?? null;
+  // Próximo passo: o assunto mais fraco; sem ele, a matéria com mais questões novas.
+  const nextSubject = lowest ? null : [...data.subjects].filter((s) => s.available > 0)
+    .sort((a, b) => (newBySubject.get(b.id ?? -1) ?? 0) - (newBySubject.get(a.id ?? -1) ?? 0) || a.answered - b.answered)[0] ?? null;
+
+  const motivation = (
+    <Card padding="lg" style={{ flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'flex-start', gap: 14 }}>
+      <Text style={{ ...font.extrabold, fontSize: 40, lineHeight: 44, color: p.ink, fontVariant: ['tabular-nums'] }}>{formatPercent(overall.accuracy)}</Text>
+      <View style={{ flex: isDesktop ? 1 : undefined, alignSelf: 'stretch', gap: 2 }}>
+        <Txt variant="titleSm">
+          {overall.answered ? `Você acertou ${overall.correct} de ${overall.answered} ${overall.answered === 1 ? 'questão' : 'questões'}` : 'Você ainda não respondeu questões do banco'}
+        </Txt>
+        <Txt tone="muted" style={{ fontSize: 14, lineHeight: 20 }}>
+          {missing ? `Responda mais ${missing} para a gente saber seus pontos fortes e fracos.` : 'Veja abaixo onde reforçar e o que já está bom.'}
+        </Txt>
+        {missing ? <View style={{ marginTop: space[2] }}><ProgressBar value={overall.answered} max={TARGET} size="sm" label="Respostas" /></View> : null}
+      </View>
+    </Card>
+  );
+
+  const legend = (
+    <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 20 }}>
+      <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Reforçar</Txt>: menos de 50% de acerto · <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Atenção</Txt>: 50% a 69% ·{' '}
+      <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Bom</Txt>: 70% ou mais · <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Poucos dados</Txt>: menos de {data.min_sample} respostas no assunto.
+    </Txt>
+  );
+
+  const weakestTopicId = lowest?.topic.id ?? null;
+  const subjectCard = (subject: PerformanceSubject) => (
+    <Card key={String(subject.id ?? 'none')} padding="lg" style={{ gap: 0 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 6 }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectColor(p, subject.id) }} />
+          <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 17, flexShrink: 1 }}>{subject.name}</Txt>
+        </View>
+        {subject.answered ? <Text style={{ ...font.extrabold, fontSize: 20, color: p.ink, fontVariant: ['tabular-nums'] }}>{formatPercent(subject.accuracy)}</Text>
+          : <Tag tone="outline" label="Não praticado" />}
+      </View>
+      {subject.topics.length ? subject.topics.map((topic: PerformanceTopic, i) => (
+        <TopicRow key={String(topic.id ?? `none-${i}`)} first={i === 0} topic={topic.name} status={STATUS[topic.level]} right={topic.correct} total={topic.answered}
+          available={topic.available} newCount={topic.id != null ? newByTopic.get(topic.id) : undefined} primary={topic.id != null && topic.id === weakestTopicId}
+          onPractice={() => practice(subject, topic)} />
+      )) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3], paddingTop: space[2] }}>
+          <Txt variant="bodySm" tone="subtle">{subject.available} {subject.available === 1 ? 'questão para praticar' : 'questões para praticar'}</Txt>
+          <Button size="sm" variant="secondary" icon="play" label="Praticar" disabled={!subject.available} onPress={() => practice(subject)} />
+        </View>
+      )}
+    </Card>
+  );
+
+  const subjects = data.subjects.length
+    ? data.subjects.map(subjectCard)
+    : <Notice tone="info" title="Ainda não há questões do banco para praticar" text="Quando a escola liberar questões, os assuntos aparecem aqui." />;
+  const errorNotice = startError ? <Notice tone="danger" title="Não foi possível começar" text={startError} /> : null;
+  const refresh = <RefreshControl refreshing={isRefetching} onRefresh={() => { refetch(); facets.refetch(); }} tintColor={p.brand} colors={[p.brand]} />;
+
+  if (isDesktop) {
+    const next = lowest
+      ? { title: `Reforce ${lowest.topic.name}`, text: lowest.reason === 'low_accuracy' ? `Você acerta ${formatPercent(lowest.accuracy)} neste assunto de ${lowest.subject.name}.` : `Você ainda não praticou este assunto de ${lowest.subject.name}.`, label: `Praticar ${lowest.topic.name}`, run: () => practice(lowest.subject, lowest.topic) }
+      : nextSubject
+        ? { title: `Comece por ${nextSubject.name}`, text: (newBySubject.get(nextSubject.id ?? -1) ?? 0) ? `Há ${newBySubject.get(nextSubject.id ?? -1)} questões novas esperando.` : 'É a matéria em que você menos praticou.', label: `Praticar ${nextSubject.name}`, run: () => practice(nextSubject) }
+        : null;
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: p.bg }} refreshControl={refresh}>
+        <PageBody maxWidth="none">
+          <PageHeader title="O que estudar" subtitle="Baseado nas suas respostas no banco de questões e nos simulados do banco"
+            actions={<Button variant="secondary" icon="library" label="Banco de questões" onPress={() => navigation.navigate('BancoQuestoes')} />} />
+          <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, minWidth: 0, gap: 20 }}>
+              {motivation}
+              {subjects}
+            </View>
+            <View style={{ width: 360, gap: space[4] }}>
+              {next ? (
+                <Card padding="lg" style={{ gap: 12 }}>
+                  <Overline>Próximo passo</Overline>
+                  <Text style={{ ...font.extrabold, fontSize: 17, color: p.ink }}>{next.title}</Text>
+                  <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 19 }}>{next.text}</Txt>
+                  <Button block size="lg" cta icon="play" label={next.label} loading={start.isPending} onPress={next.run} />
+                  {errorNotice}
+                </Card>
+              ) : null}
+              <Card style={{ gap: space[2] }}>
+                <Overline>Como ler</Overline>
+                {legend}
+              </Card>
+            </View>
+          </View>
+        </PageBody>
+      </ScrollView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} colors={[colors.primary]} />}
-    >
-      <View style={styles.overall}>
-        <Text style={styles.overallValue}>{formatPercent(data.overall.accuracy, 1)}</Text>
-        <Text style={styles.overallLabel}>
-          de acerto em {data.overall.answered} resposta{data.overall.answered !== 1 ? 's' : ''} no banco de questões
-        </Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>O que estudar agora</Text>
-      {data.study_focus.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>
-            {data.overall.answered === 0
-              ? 'Responda algumas questões para descobrir seus pontos fracos.'
-              : 'Nenhum assunto em alerta. Continue praticando para manter o ritmo!'}
-          </Text>
-        </View>
-      ) : (
-        data.study_focus.map((item) => (
-          <View key={`${item.subject.id}-${item.topic.id}`} style={styles.focusCard}>
-            <View style={[styles.focusIcon, { backgroundColor: `${LEVEL_COLOR[item.level]}22` }]}>
-              <Ionicons name={item.reason === 'low_accuracy' ? 'alert-circle' : 'sparkles'} size={20} color={LEVEL_COLOR[item.level]} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.focusTitle} numberOfLines={2}>{item.topic.name}</Text>
-              <Text style={styles.meta}>{item.subject.name} · {focusReason(item)}</Text>
-            </View>
-            {item.available > 0 && item.subject.id != null ? (
-              <TouchableOpacity style={styles.practiceButton} onPress={() => practice(item.subject.id, item.topic.id)}>
-                <Text style={styles.practiceButtonText}>Praticar</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        ))
-      )}
-
-      <Text style={styles.sectionTitle}>Por disciplina e assunto</Text>
-      {data.subjects.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.muted}>Ainda não há questões do banco disponíveis para praticar.</Text>
-        </View>
-      ) : (
-        data.subjects.map(renderSubject)
-      )}
-
-      <Text style={styles.legend}>
-        “Reforçar”: menos de 50% de acerto · “Atenção”: de 50% a 69% · “Bom”: 70% ou mais. Com menos de {data.min_sample} respostas
-        o assunto aparece como “Poucos dados”. Contam as questões avulsas e os simulados do banco finalizados.
-      </Text>
-    </ScrollView>
+    <View style={{ flex: 1, backgroundColor: p.bg }}>
+      <AppBar large title="O que estudar" subtitle="Baseado nas suas respostas no banco" leading={back} />
+      <ScrollView refreshControl={refresh}>
+        <ScreenBody gap={22} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
+          {motivation}
+          {errorNotice}
+          {subjects}
+          {legend}
+          {start.isPending ? <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'center' }}><Icon name="clock" size={16} color={p.inkSubtle} /><Txt variant="bodySm" tone="subtle">Abrindo a prática…</Txt></View> : null}
+        </ScreenBody>
+      </ScrollView>
+    </View>
   );
-}
-
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 16, gap: 10, paddingBottom: 32 },
-    centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: colors.background },
-    muted: { fontSize: 13, color: colors.muted, lineHeight: 19, textAlign: 'center' },
-    overall: { backgroundColor: colors.primary, borderRadius: 18, padding: 18, alignItems: 'center' },
-    overallValue: { fontSize: 32, fontWeight: '900', color: colors.surface },
-    overallLabel: { fontSize: 13, color: colors.surface, opacity: 0.9, textAlign: 'center', marginTop: 2 },
-    sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.ink, marginTop: 12 },
-    card: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border },
-    focusCard: {
-      flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 16, padding: 14,
-      borderWidth: 1, borderColor: colors.border,
-    },
-    focusIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-    focusTitle: { fontSize: 15, fontWeight: '800', color: colors.ink },
-    practiceButton: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-    practiceButtonText: { color: colors.surface, fontWeight: '800', fontSize: 12 },
-    subjectCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 8, borderWidth: 1, borderColor: colors.border },
-    rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-    rowGap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    subjectName: { flex: 1, fontSize: 15, fontWeight: '800', color: colors.ink },
-    subjectPct: { fontSize: 16, fontWeight: '900', color: colors.ink },
-    meta: { fontSize: 12, color: colors.muted, flexShrink: 1 },
-    barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.soft, overflow: 'hidden', marginVertical: 6 },
-    barFill: { height: 8, borderRadius: 4 },
-    badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-    badgeText: { fontSize: 11, fontWeight: '800' },
-    topics: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, gap: 4 },
-    topicRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-    topicName: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.text },
-    topicPct: { fontSize: 13, fontWeight: '800', color: colors.ink },
-    practiceIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-    legend: { fontSize: 11, color: colors.muted, lineHeight: 16, marginTop: 8 },
-    primaryButton: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 20 },
-    primaryButtonText: { color: colors.surface, fontWeight: '800' },
-  });
 }

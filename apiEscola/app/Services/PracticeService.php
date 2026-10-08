@@ -198,20 +198,45 @@ class PracticeService
         $each = $attempt->correctsEachQuestion();
         $saved = PracticeSavedQuestion::query()->where('student_id', $attempt->student_id)
             ->whereIn('exam_question_id', $questions->pluck('id'))->pluck('exam_question_id')->flip();
+        $newIds = $this->newQuestionIds($attempt, $questions);
 
         return [
             'attempt' => $this->attemptSummary($attempt),
             'question_set' => $set ? ['id' => $set->id, 'title' => $set->title, 'description' => $set->description] : null,
-            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished, $each, $saved) {
+            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished, $each, $saved, $newIds) {
                 $answer = $answers->get($question->id);
                 $reveal = $finished || ($each && $answer);
 
                 return $this->questionPayload($question) + [
                     'selected_option_id' => $answer?->option_id,
                     'saved'              => $saved->has($question->id),
+                    'is_new'             => $newIds->has($question->id),
                 ] + ($reveal ? $this->feedback($question, $answer?->option_id, (bool) $answer?->is_correct) : []);
             })->values(),
         ];
+    }
+
+    /**
+     * Questões "novas" para o aluno (mesma regra do catálogo): entraram no banco há até NEW_DAYS dias
+     * e o aluno não as respondeu fora desta tentativa.
+     */
+    private function newQuestionIds(PracticeAttempt $attempt, Collection $questions): Collection
+    {
+        if ($questions->isEmpty()) {
+            return collect();
+        }
+        $since = now()->subDays(PracticeCatalogService::NEW_DAYS);
+        $questions->loadMissing('exam:id,ends_at,updated_at');
+        $answeredElsewhere = PracticeAnswer::query()->where('student_id', $attempt->student_id)
+            ->whereIn('exam_question_id', $questions->pluck('id'))
+            ->where(fn (Builder $q) => $q->whereNull('practice_attempt_id')->orWhere('practice_attempt_id', '!=', $attempt->id))
+            ->pluck('exam_question_id')->flip();
+
+        return $questions->filter(function (ExamQuestion $q) use ($since, $answeredElsewhere) {
+            $availableAt = $q->exam_id ? ($q->exam?->ends_at ?? $q->exam?->updated_at) : $q->created_at;
+
+            return ! $answeredElsewhere->has($q->id) && $availableAt && $availableAt->gte($since);
+        })->pluck('id')->flip();
     }
 
     /**

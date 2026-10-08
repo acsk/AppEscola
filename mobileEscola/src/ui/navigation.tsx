@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, Text, View, type StyleProp, type ViewStyl
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, IconButton, Txt, type IconName } from './primitives';
 import { usePalette } from './theme';
-import { radius, shadow, size, space, type } from './tokens';
+import { font, radius, shadow, size, space, type } from './tokens';
 
 // ── AppBar ───────────────────────────────────────────────────────────────────
 
@@ -39,7 +39,7 @@ export function AppBar({
 
 // ── TabBar ───────────────────────────────────────────────────────────────────
 
-export type TabItem = { key: string; icon: IconName; label: string };
+export type TabItem = { key: string; icon: IconName; label: string; /** Número azul de novidades. */ badge?: number };
 
 /** Tab bar branca; a cor só marca a aba ativa (pílula brand-soft). */
 export function TabBar({ items, activeKey, onPress }: { items: TabItem[]; activeKey: string; onPress: (key: string) => void }) {
@@ -53,10 +53,15 @@ export function TabBar({ items, activeKey, onPress }: { items: TabItem[]; active
       {items.map((item) => {
         const on = item.key === activeKey;
         return (
-          <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={item.label}
+          <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={item.badge ? `${item.label}, ${item.badge} novas` : item.label}
             onPress={() => onPress(item.key)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 }}>
             <View style={{ width: 52, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? p.brandSoft : 'transparent' }}>
               <Icon name={item.icon} size={22} strokeWidth={on ? 2.25 : 2} color={on ? p.brandInk : p.inkSubtle} />
+              {item.badge ? (
+                <View style={{ position: 'absolute', top: -4, right: 2, minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: radius.pill, backgroundColor: p.info, borderWidth: 2, borderColor: p.surface, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ ...font.extrabold, fontSize: 10, lineHeight: 13, color: p.surface }}>{item.badge > 99 ? '99+' : item.badge}</Text>
+                </View>
+              ) : null}
             </View>
             <Text numberOfLines={1} style={[type.caption, { color: on ? p.ink : p.inkSubtle }]}>{item.label}</Text>
           </Pressable>
@@ -69,30 +74,43 @@ export function TabBar({ items, activeKey, onPress }: { items: TabItem[]; active
 // ── ListItem ─────────────────────────────────────────────────────────────────
 
 export function ListItem({
-  icon, title, subtitle, trailing, chevron = true, tone, active, onPress,
-}: { icon?: IconName; title: string; subtitle?: string; trailing?: React.ReactNode; chevron?: boolean; tone?: 'danger'; active?: boolean; onPress?: () => void }) {
+  icon, title, subtitle, trailing, chevron = true, tone, active, onPress, onNav,
+}: {
+  icon?: IconName; title: string; subtitle?: string; trailing?: React.ReactNode; chevron?: boolean; tone?: 'danger'; active?: boolean; onPress?: () => void;
+  /** Sobre o fundo de cor da navegação (menu-gaveta). */
+  onNav?: boolean;
+}) {
   const p = usePalette();
   const danger = tone === 'danger';
+  const NAV_DANGER = '#FF9A90';
+  const c = onNav
+    ? {
+      title: danger ? NAV_DANGER : p.navInk, sub: p.navInkMuted, rowOn: p.navActive,
+      iconBg: danger ? 'rgba(255, 107, 94, 0.14)' : active ? p.navAccent : p.navActive,
+      iconFg: danger ? NAV_DANGER : active ? p.navBg : p.navInkMuted, chev: p.navInkMuted,
+    }
+    : {
+      title: danger ? p.dangerInk : p.ink, sub: p.inkSubtle, rowOn: p.surfaceSunken,
+      iconBg: danger ? p.dangerSoft : active ? p.brand : p.surfaceSunken,
+      iconFg: danger ? p.dangerInk : active ? p.onBrand : p.inkMuted, chev: p.inkSubtle,
+    };
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ selected: !!active }} onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 52, paddingVertical: 6, paddingHorizontal: space[3],
-        borderRadius: radius.md, backgroundColor: active || pressed ? p.surfaceSunken : 'transparent',
+        borderRadius: radius.md, backgroundColor: active || pressed ? c.rowOn : 'transparent',
       })}>
       {icon ? (
-        <View style={{
-          width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: danger ? p.dangerSoft : active ? p.brand : p.surfaceSunken,
-        }}>
-          <Icon name={icon} size={20} color={danger ? p.dangerInk : active ? p.onBrand : p.inkMuted} />
+        <View style={{ width: 36, height: 36, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: c.iconBg }}>
+          <Icon name={icon} size={20} color={c.iconFg} />
         </View>
       ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={[type.label, { fontSize: 15, color: danger ? p.dangerInk : p.ink }]}>{title}</Text>
-        {subtitle ? <Txt variant="bodySm" tone="subtle" numberOfLines={1}>{subtitle}</Txt> : null}
+        <Text numberOfLines={1} style={[type.label, { fontSize: 15, color: c.title }]}>{title}</Text>
+        {subtitle ? <Text numberOfLines={1} style={[type.bodySm, { color: c.sub }]}>{subtitle}</Text> : null}
       </View>
       {trailing}
-      {chevron && !danger ? <Icon name="chevron-right" size={18} color={p.inkSubtle} /> : null}
+      {chevron && !danger ? <Icon name="chevron-right" size={18} color={c.chev} /> : null}
     </Pressable>
   );
 }

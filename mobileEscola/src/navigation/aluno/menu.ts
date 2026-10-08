@@ -1,6 +1,9 @@
 import type { IconName } from '../../ui';
 import { navigationRef } from '../navigationRef';
 
+/** Logo do tenant desligada provisoriamente: menu e SideNav mostram só o nome. Volte para true para reativar. */
+export const SHOW_TENANT_LOGO = false;
+
 /** Itens de navegação do aluno (menu-gaveta no celular e SideNav no tablet/desktop). */
 export type MenuId =
   | 'home' | 'calendario' | 'desempenho' | 'questoes' | 'simulados' | 'provas-anteriores' | 'exercicios' | 'materiais' | 'financeiro';

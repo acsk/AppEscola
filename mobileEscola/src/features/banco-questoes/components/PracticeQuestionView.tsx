@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, View } from 'react-native';
 import RichText from '../../../components/RichText';
 import type { PracticeFeedback, PracticeQuestion } from '../../../services/practice.service';
-import { AnswerOption, Card, Icon, Tag, Txt, radius, space, subjectColor, usePalette, type AnswerState } from '../../../ui';
+import { AnswerOption, Card, Icon, NewPill, Tag, Txt, radius, space, subjectColor, usePalette, type AnswerState } from '../../../ui';
 
 const LETTERS = 'ABCDEFGHIJ';
 
@@ -13,10 +13,12 @@ type Props = {
   /** Com correção: alternativas travadas, a certa em verde e a marcada errada em vermelho. */
   feedback?: PracticeFeedback | null;
   disabled?: boolean;
+  /** Questão nova para o aluno: pílula azul "Nova". */
+  isNew?: boolean;
 };
 
 /** Questão do banco (protótipos "TelaResponderQuestao" / "TelaCorrecao"). */
-export function PracticeQuestionView({ question, selectedId, onSelect, feedback, disabled }: Props) {
+export function PracticeQuestionView({ question, selectedId, onSelect, feedback, disabled, isNew }: Props) {
   const p = usePalette();
   const locked = disabled || !!feedback;
   const correctIndex = feedback ? question.options.findIndex((o) => o.id === feedback.correct_option_id) : -1;
@@ -53,6 +55,7 @@ export function PracticeQuestionView({ question, selectedId, onSelect, feedback,
         {question.topics.slice(0, 2).map((t) => <Tag key={t} label={t} />)}
         {question.difficulty ? <Tag label={question.difficulty} /> : null}
         {question.source_exam_name ? <Tag label={question.source_exam_name} /> : null}
+        {isNew ? <NewPill label="Nova" /> : null}
       </View>
 
       {question.question_text ? <Txt variant="reading"><RichText value={question.question_text} /></Txt> : null}

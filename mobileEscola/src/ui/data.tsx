@@ -58,7 +58,7 @@ export function SegmentedControl({ options, value, onChange, label }: { options:
 
 // ── Chip (seleção é tinta, nunca a cor da marca) ─────────────────────────────
 
-export function Chip({ label, selected, dot, count, disabled, onPress }: { label: string; selected?: boolean; dot?: string; count?: number; disabled?: boolean; onPress?: () => void }) {
+export function Chip({ label, selected, dot, count, disabled, onPress, trailing }: { label: string; selected?: boolean; dot?: string; count?: number; disabled?: boolean; onPress?: () => void; /** Ex.: pílula azul de novas. */ trailing?: React.ReactNode }) {
   const p = usePalette();
   return (
     <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: !!selected, disabled }} disabled={disabled} onPress={onPress}
@@ -70,6 +70,7 @@ export function Chip({ label, selected, dot, count, disabled, onPress }: { label
       {selected ? <Icon name="check" size={16} strokeWidth={2.5} color={p.onInverse} /> : dot ? <Dot color={dot} /> : null}
       <Text numberOfLines={1} style={[type.label, { color: selected ? p.onInverse : p.ink }]}>{label}</Text>
       {count != null ? <Text style={[type.caption, { ...font.bold, color: selected ? p.onInverse : p.inkSubtle, opacity: selected ? 0.75 : 1 }]}>{count}</Text> : null}
+      {trailing}
     </Pressable>
   );
 }

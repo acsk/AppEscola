@@ -1,166 +1,180 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, RefreshControl, ScrollView, View } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import { getApiErrorMessage } from '../../../lib/apiError';
-import type { CatalogFilters, CatalogQuestion, QuestionSetSummary, SessionOptions } from '../../../services/practice.service';
-import {
-  usePracticeCatalog, usePracticeFacets, usePracticePerformance, usePracticeSummary, useQuestionSets, useStartPracticeSession, useToggleSavedQuestion,
-} from '../hooks';
+import type { CatalogFilters, QuestionSetSummary } from '../../../services/practice.service';
+import { usePracticeFacets, usePracticeSummary, useQuestionSets, useStartPracticeSession } from '../hooks';
 import { formatPercent } from '../lib/format';
 import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import {
-  ActiveFilterPills, BankFiltersPanel, BankFiltersSheet, DEFAULT_SESSION, SessionOptionsFields, activeFilterCount, sessionCount, sessionHint,
-  useBankFilters, useSessionTitle,
-} from '../components/bankFilters';
-import {
-  AppBar, BottomBar, Button, Card, EmptyState, Icon, IconButton, Notice, Overline, PageBody, PageHeader, ProgressBar, QuestionRow, QuickAction,
-  ScreenBody, SearchField, Section, SelectButton, Sheet, Tag, Txt, layout, radius, space, subjectColor, useLayoutMode, usePalette,
+  AppBar, BottomBar, Button, Card, Checkbox, Chip, Chips, EmptyState, Icon, IconButton, NewBanner, NewPill, Notice, Overline, PageBody,
+  PageHeader, ProgressBar, QuickAction, ScreenBody, Section, SegmentedControl, StepHeader, SubjectTile, Txt, newLabel, radius, space,
+  subjectColor, useLayoutMode, usePalette,
 } from '../../../ui';
 
 type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoQuestoes'>;
-type Sort = 'recent' | 'oldest';
-const SORTS: { value: Sort; label: string }[] = [{ value: 'recent', label: 'Mais recentes' }, { value: 'oldest', label: 'Mais antigas' }];
+const QUANTITIES = [5, 10, 20] as const;
+type Quantity = (typeof QUANTITIES)[number];
 
-/** Espera o aluno parar de digitar antes de consultar. */
-function useDebounced<T>(value: T, ms = 350): T {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return v;
-}
-
-const plural = (n: number) => `${n.toLocaleString('pt-BR')} ${n === 1 ? 'questão' : 'questões'}`;
-
-/** Banco de questões (protótipos "TelaBancoQuestoes" e "DesktopBancoQuestoes"). */
+/**
+ * Banco de questões em uma tela só (protótipos "TelaBancoQuestoes" e "DesktopBancoQuestoes"), para alunos de 10 a 14 anos:
+ * 1. matéria, 2. assunto (opcional), 3. quantas questões, "Só questões novas" e um botão "Começar".
+ * A sessão sorteia novas → não respondidas → erradas e mostra a resposta certa depois de cada questão.
+ */
 export function BancoQuestoesScreen() {
   const p = usePalette();
   const navigation = useNavigation<Nav>();
   const drawer = useOptionalAlunoDrawer();
-  const { isMobile, isDesktop, isWide } = useLayoutMode();
-  const bank = useBankFilters();
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounced(search.trim());
-  const filters: CatalogFilters = useMemo(() => ({ ...bank.filters, search: debouncedSearch }), [bank.filters, debouncedSearch]);
-  const [sort, setSort] = useState<Sort>('recent');
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [sessionOpen, setSessionOpen] = useState(false);
-  const [session, setSession] = useState<SessionOptions>(DEFAULT_SESSION);
-  const [expanded, setExpanded] = useState(false);
+  const { isMobile, isDesktop } = useLayoutMode();
+
+  const route = useRoute<RouteProp<QuestoesStackParamList, 'BancoQuestoes'>>();
+  const presetSubject = route.params?.subjectId;
+  const [subjectIds, setSubjectIds] = useState<number[]>(presetSubject ? [presetSubject] : []);
+  const [topicIds, setTopicIds] = useState<number[]>([]);
+  const [quantity, setQuantity] = useState<Quantity>(10);
+  const [onlyNew, setOnlyNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Chegou de "Treinar estes assuntos antes": marca a matéria do simulado.
+  useEffect(() => {
+    if (presetSubject) { setSubjectIds([presetSubject]); setTopicIds([]); }
+  }, [presetSubject]);
+
+  const scope: CatalogFilters = useMemo(() => ({ subject_ids: subjectIds, topic_ids: topicIds }), [subjectIds, topicIds]);
+  const all = usePracticeFacets({ situation: 'all' });
+  const bySubject = usePracticeFacets({ subject_ids: subjectIds });
+  const current = usePracticeFacets(scope);
   const summary = usePracticeSummary();
-  const performance = usePracticePerformance();
   const sets = useQuestionSets();
-  const facets = usePracticeFacets(filters);
-  const allFacets = usePracticeFacets({ situation: 'all' });
-  const catalog = usePracticeCatalog(filters, sort);
-  const toggleSaved = useToggleSavedQuestion();
   const start = useStartPracticeSession();
-  const title = useSessionTitle(filters, facets.data);
 
   useFocusEffect(useCallback(() => {
-    summary.refetch(); sets.refetch(); performance.refetch(); allFacets.refetch();
+    all.refetch(); current.refetch(); summary.refetch(); sets.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recarrega ao voltar para a tela
   }, []));
 
-  useEffect(() => setExpanded(false), [filters, sort]);
-
-  const items: CatalogQuestion[] = catalog.data?.pages.flatMap((pg) => pg.items) ?? [];
-  const matching = catalog.data?.pages[0]?.total ?? facets.data?.total ?? 0;
-  const available = facets.data?.total ?? 0;
-  const count = sessionCount(session, available);
-  const filterCount = activeFilterCount(bank.filters);
-  const focus = performance.data?.study_focus?.[0] ?? null;
+  const subjects = all.data?.subjects ?? [];
+  const total = all.data?.total ?? 0;
+  const totalNew = all.data?.situations.new ?? 0;
+  const topics = subjectIds.length ? (bySubject.data?.topics ?? []).filter((t) => subjectIds.includes(t.subject_id)) : [];
+  const available = current.data?.total ?? 0;
+  const availableNew = current.data?.situations.new ?? 0;
+  const pool = onlyNew ? availableNew : available;
+  const count = Math.min(quantity, pool);
+  const newInSession = Math.min(count, availableNew);
   const open = summary.data?.open_session ?? null;
-  const wrongCount = allFacets.data?.situations.wrong ?? 0;
 
-  const refresh = () => { catalog.refetch(); facets.refetch(); allFacets.refetch(); summary.refetch(); sets.refetch(); };
+  const subjectName = subjectIds.length ? subjects.filter((s) => subjectIds.includes(s.id)).map((s) => s.name).join(', ') : 'Todas as matérias';
+  const topicName = topicIds.length ? topics.filter((t) => topicIds.includes(t.id)).map((t) => t.name).join(', ') : 'Todos os assuntos';
+  const title = `${subjectName} · ${topicName}`;
 
-  const startSession = (f: CatalogFilters, opts: SessionOptions, sessionTitle: string) => {
+  // "7 de Português e 5 de Matemática"
+  const newBreakdown = useMemo(() => {
+    const parts = subjects.filter((s) => s.new > 0).sort((a, b) => b.new - a.new).map((s) => `${s.new} de ${s.name}`);
+    if (parts.length <= 1) return parts[0];
+    return `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
+  }, [subjects]);
+
+  const toggleSubject = (id: number) => {
+    setSubjectIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setTopicIds([]);
+  };
+  const toggleTopic = (id: number) => setTopicIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const begin = () => {
     setError(null);
-    start.mutate({ filters: f, options: { ...opts, title: sessionTitle } }, {
-      onSuccess: (payload) => navigation.navigate('BancoSimulado', { attemptId: payload.attempt.id, title: sessionTitle }),
-      onError: (cause) => setError(getApiErrorMessage(cause, 'Não foi possível montar a sessão.')),
+    const filters: CatalogFilters = { ...scope, situation: onlyNew ? 'new' : 'all' };
+    start.mutate({ filters, options: { quantity, correction_mode: 'each', timed: false, title } }, {
+      onSuccess: (payload) => navigation.navigate('BancoSimulado', { attemptId: payload.attempt.id, title }),
+      onError: (cause) => setError(getApiErrorMessage(cause, 'Não foi possível começar. Tente de novo.')),
     });
   };
   const openSet = (set: QuestionSetSummary) =>
     navigation.navigate('BancoSimulado', set.open_attempt_id ? { attemptId: set.open_attempt_id, title: set.title } : { setId: set.id, title: set.title });
-  /** Tocar numa questão abre só ela, com a correção na hora. */
-  const openQuestion = (q: CatalogQuestion) =>
-    startSession({ search: `#${q.id}` }, { quantity: 10, correction_mode: 'each', timed: false }, `Questão #${q.id}`);
+  const refresh = () => { all.refetch(); bySubject.refetch(); current.refetch(); summary.refetch(); sets.refetch(); };
 
-  const subtitle = [
-    allFacets.data ? plural(allFacets.data.total) : null,
-    summary.data
-      ? `você já respondeu ${summary.data.answered.toLocaleString('pt-BR')}${isDesktop && summary.data.accuracy != null ? ` e acerta ${formatPercent(summary.data.accuracy)}` : ''}`
-      : null,
-  ].filter(Boolean).join(' · ');
+  const ctaLabel = !pool ? (onlyNew ? 'Sem questões novas aqui' : 'Sem questões aqui') : `Começar ${count} ${count === 1 ? 'questão' : 'questões'}`;
 
-  // Começar rápido: continuar, revisar erros e reforçar o assunto mais fraco.
-  const quickActions: React.ReactElement[] = [];
-  if (open) {
-    quickActions.push(
-      <QuickAction key="continue" icon="play" title="Continuar sessão"
-        subtitle={`${open.title ?? 'Sessão'} · ${open.answered_count} de ${open.question_count}`}
-        progress={open.question_count ? (open.answered_count / open.question_count) * 100 : 0}
-        onPress={() => navigation.navigate('BancoSimulado', { attemptId: open.id, title: open.title ?? undefined })} />,
-    );
-  }
-  if (wrongCount) {
-    quickActions.push(
-      <QuickAction key="wrong" icon="refresh" title="Revisar o que errei" subtitle={plural(wrongCount)}
-        onPress={() => startSession({ situation: 'wrong' }, { ...DEFAULT_SESSION, quantity: null }, 'Revisar o que errei')} />,
-    );
-  }
-  if (focus) {
-    quickActions.push(
-      <QuickAction key="focus" icon="target" title={`Reforçar ${focus.topic.name}`}
-        subtitle={focus.reason === 'not_started' ? `Você ainda não praticou · ${focus.available} novas` : `Você acerta ${formatPercent(focus.accuracy)} · ${focus.available} questões`}
-        onPress={() => startSession({ topic_ids: [focus.topic.id], subject_ids: focus.subject.id ? [focus.subject.id] : [] }, DEFAULT_SESSION, `Reforçar ${focus.topic.name}`)} />,
-    );
-  }
-  if (quickActions.length < 3) {
-    quickActions.push(
-      <QuickAction key="study" icon="chart" title="O que estudar" subtitle="Seu desempenho por disciplina e assunto" onPress={() => navigation.navigate('BancoDesempenho')} />,
-    );
+  if (all.isLoading) {
+    return <View style={{ flex: 1, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color={p.brand} /></View>;
   }
 
-  const row = (q: CatalogQuestion, compact: boolean) => (
-    <QuestionRow key={q.id} compact={compact} id={q.id} subject={q.subject?.name ?? 'Sem disciplina'} subjectColor={subjectColor(p, q.subject?.id)}
-      topic={q.topic} text={q.text || (q.has_image ? 'Questão com imagem' : '')} difficulty={q.difficulty} source={q.source} rate={q.rate}
-      status={q.status} saved={q.saved} onToggleSave={() => toggleSaved.mutate({ questionId: q.id, saved: !q.saved })} onPress={() => openQuestion(q)} />
+  const banner = totalNew ? (
+    <NewBanner count={totalNew} text={isDesktop && newBreakdown ? `${newBreakdown}. Elas aparecem marcadas com "novas" abaixo.` : newBreakdown} />
+  ) : null;
+  const continueAction = open ? (
+    <QuickAction icon="play" title="Continuar de onde parei"
+      subtitle={`${open.title ?? 'Sessão'} · questão ${Math.min(open.answered_count + 1, open.question_count)} de ${open.question_count}`}
+      progress={open.question_count ? (open.answered_count / open.question_count) * 100 : 0}
+      onPress={() => navigation.navigate('BancoSimulado', { attemptId: open.id, title: open.title ?? undefined })} />
+  ) : null;
+
+  const tiles = [
+    <SubjectTile key="all" icon="grid" subject="Todas as matérias" count={total} newCount={totalNew} selected={!subjectIds.length}
+      onPress={() => { setSubjectIds([]); setTopicIds([]); }} />,
+    ...subjects.map((s) => (
+      <SubjectTile key={s.id} subject={s.name} dot={subjectColor(p, s.id, s.color)} count={s.total} newCount={s.new}
+        selected={subjectIds.includes(s.id)} onPress={() => toggleSubject(s.id)} />
+    )),
+  ];
+  // Celular: "Todas as matérias" ocupa a linha inteira e o resto vai em 2 colunas. Desktop: 3 colunas.
+  const cols = isDesktop ? 3 : 2;
+  const [head, rest] = isDesktop ? [[] as React.ReactElement[], tiles] : [[tiles[0]], tiles.slice(1)];
+  const rows: React.ReactElement[][] = [];
+  for (let i = 0; i < rest.length; i += cols) rows.push(rest.slice(i, i + cols));
+  const tileGrid = (
+    <View style={{ gap: space[3] }}>
+      {head.map((tile) => React.cloneElement(tile, { key: tile.key, style: { minHeight: 0 } }))}
+      {rows.map((row, r) => (
+        <View key={r} style={{ flexDirection: 'row', gap: space[3] }}>
+          {row.map((tile) => <View key={tile.key} style={{ flex: 1, minWidth: 0 }}>{tile}</View>)}
+          {Array.from({ length: cols - row.length }, (_, k) => <View key={`pad${k}`} style={{ flex: 1 }} />)}
+        </View>
+      ))}
+    </View>
   );
 
-  const results = (compact: boolean) => {
-    if (catalog.isLoading) return <ActivityIndicator color={p.brand} />;
-    if (catalog.isError) return <Notice tone="danger" title="Não foi possível carregar as questões" text={getApiErrorMessage(catalog.error, 'Tente de novo.')} />;
-    if (!items.length) {
-      return allFacets.data?.total
-        ? <EmptyState icon="search" title="Nenhuma questão com esses filtros" text="Tire um filtro ou mude a busca para ver mais questões." />
-        : <EmptyState icon="library" title="Nenhuma questão para praticar ainda" text="Quando a escola liberar questões no banco, elas aparecem aqui." />;
-    }
-    // No celular mostra 3 e "Ver mais questões" abre a lista; daí em diante carrega de 20 em 20.
-    const visible = compact && !expanded ? items.slice(0, 3) : items;
-    const hasMore = (compact && !expanded && items.length > 3) || !!catalog.hasNextPage;
-    return (
-      <>
-        {visible.map((q) => row(q, compact))}
-        {hasMore ? (
-          <Button variant={compact ? 'ghost' : 'secondary'} block loading={catalog.isFetchingNextPage}
-            label={compact ? 'Ver mais questões' : 'Carregar mais 20'}
-            onPress={() => (compact && !expanded ? setExpanded(true) : catalog.fetchNextPage())} />
-        ) : null}
-      </>
-    );
-  };
+  const steps = (
+    <>
+      <View style={{ gap: space[3] }}>
+        <StepHeader n={1} title="Escolha a matéria" />
+        {subjects.length ? tileGrid : <EmptyState icon="library" title="Nenhuma questão para praticar ainda" text="Quando a escola liberar questões no banco, elas aparecem aqui." />}
+      </View>
+      {subjects.length ? (
+        <View style={{ gap: space[3] }}>
+          <StepHeader n={2} title="Escolha o assunto" optional="opcional" />
+          {!subjectIds.length ? <Txt variant="bodySm" tone="subtle">Escolha uma matéria para ver os assuntos dela.</Txt>
+            : !topics.length ? <Txt variant="bodySm" tone="subtle">Esta matéria ainda não tem assuntos cadastrados.</Txt>
+            : (
+              <Chips>
+                <Chip label="Todos os assuntos" selected={!topicIds.length} onPress={() => setTopicIds([])} />
+                {topics.map((t) => {
+                  const on = topicIds.includes(t.id);
+                  return <Chip key={t.id} label={t.name} count={t.total} selected={on} onPress={() => toggleTopic(t.id)}
+                    trailing={t.new ? <NewPill label={newLabel(t.new)} inverse={on} /> : null} />;
+                })}
+              </Chips>
+            )}
+        </View>
+      ) : null}
+      {subjects.length ? (
+        <View style={{ gap: space[3] }}>
+          <StepHeader n={3} title="Quantas questões?" />
+          <View style={{ maxWidth: isDesktop ? 360 : undefined }}>
+            <SegmentedControl label="Quantidade" options={QUANTITIES.map(String)} value={QUANTITIES.indexOf(quantity)} onChange={(i) => setQuantity(QUANTITIES[i])} />
+          </View>
+          <Checkbox large label="Só questões novas" checked={onlyNew} disabled={!availableNew && !onlyNew} onPress={() => setOnlyNew((v) => !v)}
+            trailing={availableNew ? <NewPill label={String(availableNew)} /> : null} />
+        </View>
+      ) : null}
+    </>
+  );
 
   const setsSection = sets.data?.length ? (
     <Section title="Simulados do banco">
-      <Txt variant="bodySm" tone="subtle" style={{ marginTop: -6 }}>Montados pela escola. Não valem nota: a correção aparece quando você finaliza.</Txt>
+      <Txt variant="bodySm" tone="subtle" style={{ marginTop: -6 }}>Montados pela escola. A correção aparece quando você finaliza.</Txt>
       {sets.data.map((set) => (
         <Card key={set.id} onPress={() => openSet(set)} accessibilityLabel={set.title} style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
           <View style={{ width: 40, height: 40, borderRadius: radius.sm, backgroundColor: p.surfaceSunken, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
@@ -170,93 +184,69 @@ export function BancoQuestoesScreen() {
           <View style={{ flex: 1, minWidth: 0 }}>
             <Txt variant="titleSm" numberOfLines={1}>{set.title}</Txt>
             <Txt variant="bodySm" tone="subtle" numberOfLines={1}>
-              {[plural(set.questions_count), set.exam_type?.label, set.last_result ? `melhor ${set.last_result.correct}/${set.last_result.total}` : null].filter(Boolean).join(' · ')}
+              {[`${set.questions_count} questões`, set.exam_type?.label, set.last_result ? `melhor ${set.last_result.correct}/${set.last_result.total}` : null].filter(Boolean).join(' · ')}
             </Txt>
           </View>
-          <Button size="sm" decorative iconRight="arrow-right" label={set.open_attempt_id ? 'Continuar' : set.attempts_count ? 'Refazer' : 'Começar'} />
+          <Button size="sm" variant="secondary" decorative iconRight="arrow-right" label={set.open_attempt_id ? 'Continuar' : set.attempts_count ? 'Refazer' : 'Começar'} />
         </Card>
       ))}
     </Section>
   ) : null;
 
   const errorNotice = error ? <Notice tone="danger" title="Não foi possível começar" text={error} /> : null;
-  const searchField = <SearchField value={search} onChangeText={setSearch} placeholder="Buscar assunto, palavra ou nº da questão" />;
 
   // ── Desktop ───────────────────────────────────────────────────────────────
   if (isDesktop) {
-    const accuracy = summary.data?.accuracy ?? null;
-    const sessionCard = (
-      <View style={{ gap: space[4] }}>
-        <Card padding="lg" style={{ gap: 18 }}>
-          <View>
-            <Overline>Sua sessão</Overline>
-            <Txt variant="titleSm" style={{ fontSize: 17, marginTop: 4 }}>{title}</Txt>
-          </View>
-          <SessionOptionsFields value={session} onChange={setSession} />
-          <Button block size="lg" cta iconRight="arrow-right" disabled={!available} loading={start.isPending}
-            label={available ? `Começar ${plural(count)}` : 'Sem questões neste filtro'} onPress={() => startSession(filters, session, title)} />
-          {available ? (
-            <Txt variant="bodySm" tone="subtle" style={{ textAlign: 'center', marginTop: -6 }}>
-              Sorteadas entre as {available.toLocaleString('pt-BR')} do filtro. Você pode pausar quando quiser.
-            </Txt>
-          ) : null}
-          {errorNotice}
-        </Card>
-        {/* Em 2 colunas a sessão fica acima da lista; o histórico só aparece com a coluna lateral. */}
-        {isWide ? <Card style={{ gap: 10 }}>
-          <Overline>Seu histórico</Overline>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Txt tone="muted" style={{ fontSize: 14 }}>Acerto</Txt>
-            <Txt variant="label">{formatPercent(accuracy)}</Txt>
-          </View>
-          <ProgressBar value={accuracy ?? 0} tone={(accuracy ?? 0) >= 70 ? 'success' : 'danger'} size="sm" label="Acerto" />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Txt tone="muted" style={{ fontSize: 14 }}>Respondidas</Txt>
-            <Txt variant="label">{(summary.data?.answered ?? 0).toLocaleString('pt-BR')}</Txt>
-          </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Txt tone="muted" style={{ fontSize: 14 }}>Para revisar</Txt>
-            <Txt variant="label">{wrongCount.toLocaleString('pt-BR')}</Txt>
-          </View>
-          <View style={{ flexDirection: 'row', gap: space[2] }}>
-            <Button variant="ghost" size="sm" icon="chart" label="O que estudar" onPress={() => navigation.navigate('BancoDesempenho')} />
-            <Button variant="ghost" size="sm" icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} />
-          </View>
-        </Card> : null}
-      </View>
-    );
-
+    const rows: [string, string][] = [
+      ['Matéria', subjectIds.length ? subjectName : 'Todas'],
+      ['Assunto', topicIds.length ? topicName : 'Todos'],
+      ['Questões', pool ? `${count}${newInSession && !onlyNew ? ` (${newLabel(newInSession)})` : onlyNew ? ' novas' : ''}` : '—'],
+      ['Resposta certa', 'Depois de cada questão'],
+    ];
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: p.bg }} keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={catalog.isRefetching && !catalog.isFetchingNextPage} onRefresh={refresh} tintColor={p.brand} />}>
+      <ScrollView style={{ flex: 1, backgroundColor: p.bg }} refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={p.brand} />}>
         <PageBody maxWidth="none">
-          <PageHeader title="Banco de questões" subtitle={subtitle || undefined} actions={<View style={{ width: 380, maxWidth: '100%' }}>{searchField}</View>} />
-          <View style={{ flexDirection: 'row', gap: space[4] }}>
-            {quickActions.map((qa) => <View key={qa.key} style={{ flex: 1, minWidth: 0 }}>{qa}</View>)}
-          </View>
-          <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
-            <View style={{ width: layout.filtersW }}>
-              <BankFiltersPanel filters={bank.filters} facets={facets.data} onChange={bank.update} onClear={bank.clear} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0, gap: space[3] }}>
-              {filterCount ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2], alignItems: 'center' }}>
-                  <ActiveFilterPills filters={bank.filters} facets={facets.data} onChange={bank.update} onClear={bank.clear} />
-                </View>
-              ) : null}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3], paddingVertical: 4 }}>
-                <Txt style={{ flexShrink: 1 }}>
-                  <Txt variant="titleSm" style={{ fontSize: 15 }}>{plural(matching)}</Txt>
-                  <Txt tone="muted" style={{ fontSize: 14 }}> correspondem aos filtros</Txt>
-                </Txt>
-                <SelectButton label="Ordenar:" value={sort} options={SORTS} onChange={setSort} />
+          <PageHeader title="Banco de questões" subtitle={`Escolha o que praticar e aperte começar. ${total.toLocaleString('pt-BR')} questões no total.`}
+            actions={
+              <View style={{ flexDirection: 'row', gap: space[3] }}>
+                <Button variant="secondary" icon="target" label="O que estudar" onPress={() => navigation.navigate('BancoDesempenho')} />
+                <Button variant="secondary" icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} />
               </View>
-              {/* Abaixo de 1360px a sessão sobe para cima da lista (2 colunas). */}
-              {!isWide ? sessionCard : null}
-              {results(false)}
+            } />
+          <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, minWidth: 0, gap: 28 }}>
+              {banner}
+              {continueAction}
+              {steps}
               {setsSection}
             </View>
-            {isWide ? <View style={{ width: layout.asideW }}>{sessionCard}</View> : null}
+            <View style={{ width: 360, gap: space[4] }}>
+              <Card padding="lg" style={{ gap: 4 }}>
+                <Overline>Sua prática</Overline>
+                <View style={{ height: 8 }} />
+                {rows.map(([label, value], i) => (
+                  <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3], paddingVertical: 10, borderTopWidth: 1, borderTopColor: p.line, marginBottom: i === rows.length - 1 ? 12 : 0 }}>
+                    <Txt tone="muted" style={{ fontSize: 14 }}>{label}</Txt>
+                    <Txt variant="label" style={{ flexShrink: 1, textAlign: 'right', fontSize: 14 }}>{value}</Txt>
+                  </View>
+                ))}
+                <Button block size="lg" cta iconRight="arrow-right" label={ctaLabel} disabled={!pool} loading={start.isPending} onPress={begin} />
+                {errorNotice ? <View style={{ marginTop: space[3] }}>{errorNotice}</View> : null}
+              </Card>
+              {summary.data ? (
+                <Card style={{ gap: 0 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 10 }}>
+                    <Txt tone="muted" style={{ fontSize: 14 }}>Seu acerto no banco</Txt>
+                    <Txt variant="label">{formatPercent(summary.data.accuracy)}</Txt>
+                  </View>
+                  <ProgressBar value={summary.data.accuracy ?? 0} tone="ink" size="sm" label="Acerto" />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, marginTop: 10, borderTopWidth: 1, borderTopColor: p.line }}>
+                    <Txt tone="muted" style={{ fontSize: 14 }}>Questões respondidas</Txt>
+                    <Txt variant="label">{summary.data.answered.toLocaleString('pt-BR')}</Txt>
+                  </View>
+                </Card>
+              ) : null}
+            </View>
           </View>
         </PageBody>
       </ScrollView>
@@ -264,53 +254,29 @@ export function BancoQuestoesScreen() {
   }
 
   // ── Celular / tablet ──────────────────────────────────────────────────────
-  const savedOnly = bank.filters.situation === 'saved';
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <AppBar large title="Banco de questões" subtitle={subtitle || undefined}
+      <AppBar large title="Banco de questões" subtitle="Escolha o que praticar e aperte começar"
         leading={drawer && isMobile ? <IconButton icon="menu" label="Abrir menu" variant="outline" onPress={drawer.open} /> : undefined}
-        trailing={<IconButton icon="bookmark" label={savedOnly ? 'Mostrar todas as questões' : 'Questões salvas'} color={savedOnly ? p.brandInk : undefined}
-          onPress={() => bank.update({ situation: savedOnly ? 'all' : 'saved' })} />} />
-      <ScrollView keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={catalog.isRefetching && !catalog.isFetchingNextPage} onRefresh={refresh} tintColor={p.brand} colors={[p.brand]} />}>
-        <ScreenBody gap={22} style={{ paddingTop: space[2] }}>
-          {searchField}
-          <Section title="Começar rápido"><View style={{ gap: 10 }}>{quickActions}</View></Section>
+        trailing={<IconButton icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} />} />
+      <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={p.brand} colors={[p.brand]} />}>
+        <ScreenBody gap={22} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
+          {banner}
+          {continueAction}
+          {steps}
+          <View style={{ flexDirection: 'row', gap: space[3] }}>
+            <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="target" label="O que estudar" onPress={() => navigation.navigate('BancoDesempenho')} /></View>
+            <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} /></View>
+          </View>
           {errorNotice}
-          <Section title="Montar sessão">
-            <View style={{ gap: 10 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[4] }}
-                contentContainerStyle={{ gap: space[2], paddingHorizontal: space[4], paddingVertical: 2, alignItems: 'center' }}>
-                <Button variant="secondary" size="sm" icon="sliders" label={filterCount ? `Filtros · ${filterCount}` : 'Filtros'} onPress={() => setFiltersOpen(true)} />
-                <ActiveFilterPills filters={bank.filters} facets={facets.data} onChange={bank.update} />
-              </ScrollView>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                <Txt variant="titleSm" style={{ fontSize: 15 }}>{plural(matching)}</Txt>
-                <SelectButton icon="sort" value={sort} options={SORTS} onChange={setSort} />
-              </View>
-              {results(true)}
-            </View>
-          </Section>
           {setsSection}
         </ScreenBody>
       </ScrollView>
-
-      <BottomBar hint={available ? sessionHint(session, available) : undefined}>
-        <IconButton icon="sliders" label="Quantidade e correção" variant="outline" style={{ width: 56, height: 56 }} onPress={() => setSessionOpen(true)} />
+      <BottomBar hint="Depois de cada questão você vê a resposta certa.">
         <View style={{ flex: 1 }}>
-          <Button block size="lg" cta iconRight="arrow-right" disabled={!available} loading={start.isPending}
-            label={available ? `Responder ${plural(count)}` : 'Sem questões neste filtro'} onPress={() => startSession(filters, session, title)} />
+          <Button block size="lg" cta iconRight="arrow-right" label={ctaLabel} disabled={!pool} loading={start.isPending} onPress={begin} />
         </View>
       </BottomBar>
-
-      <BankFiltersSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} filters={bank.filters} facets={facets.data} onChange={bank.update} onClear={bank.clear} />
-      <Sheet visible={sessionOpen} title="Sua sessão" onClose={() => setSessionOpen(false)}
-        footer={<Button block size="lg" label="Pronto" onPress={() => setSessionOpen(false)} />}>
-        <View style={{ gap: space[4] }}>
-          <Tag tone="outline" label={title} />
-          <SessionOptionsFields value={session} onChange={setSession} />
-        </View>
-      </Sheet>
     </View>
   );
 }

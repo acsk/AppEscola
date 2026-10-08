@@ -73,7 +73,7 @@ export interface PracticeAttemptSummary {
   finished_at: string | null;
 }
 
-export type AttemptQuestion = PracticeQuestion & { selected_option_id: number | null; saved?: boolean } & Partial<PracticeFeedback>;
+export type AttemptQuestion = PracticeQuestion & { selected_option_id: number | null; saved?: boolean; is_new?: boolean } & Partial<PracticeFeedback>;
 
 export interface PracticeAttemptPayload {
   attempt: PracticeAttemptSummary;
@@ -216,7 +216,8 @@ export const LEVEL_COLOR: Record<PerformanceLevel, string> = {
 
 // ── Catálogo do banco (lista, filtros com contagem, salvas, sessões) ─────────
 
-export type PracticeSituation = 'all' | 'unanswered' | 'wrong' | 'saved';
+/** 'new' = ainda não respondida e entrou no banco nos últimos 14 dias. */
+export type PracticeSituation = 'all' | 'unanswered' | 'wrong' | 'saved' | 'new';
 
 export interface CatalogFilters {
   search?: string;
@@ -245,8 +246,8 @@ export interface CatalogQuestion {
 
 export interface CatalogFacets {
   total: number;
-  subjects: Array<{ id: number; name: string; color: string | null; total: number }>;
-  topics: Array<{ id: number; name: string; subject_id: number; total: number }>;
+  subjects: Array<{ id: number; name: string; color: string | null; total: number; new: number }>;
+  topics: Array<{ id: number; name: string; subject_id: number; total: number; new: number }>;
   situations: Record<PracticeSituation, number>;
   difficulties: Array<{ id: number; name: string; total: number }>;
   years: Array<{ year: number; total: number }>;
@@ -283,7 +284,7 @@ export async function setQuestionSaved(questionId: number, saved: boolean): Prom
 }
 
 export interface SessionOptions {
-  quantity: 10 | 20 | 30 | null;
+  quantity: 5 | 10 | 20 | 30 | null;
   correction_mode: 'each' | 'end';
   timed: boolean;
   title?: string;

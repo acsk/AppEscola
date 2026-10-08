@@ -15,11 +15,15 @@ use Illuminate\Support\Facades\DB;
  * Catálogo do banco de questões para o aluno (protótipo do app): lista filtrada e, para cada filtro,
  * quantas questões cada opção traz com os OUTROS filtros aplicados (opção com 0 fica desabilitada no app).
  *
- * Filtros: search, subject_ids[], topic_ids[], situation (all|unanswered|wrong|saved), difficulty_id, years[], year_before.
+ * Filtros: search, subject_ids[], topic_ids[], situation (all|unanswered|wrong|saved|new), difficulty_id, years[], year_before.
+ *
+ * "Nova" = o aluno ainda não respondeu e a questão entrou no banco nos últimos NEW_DAYS dias
+ * (questão do banco: criação; questão de simulado: quando o simulado encerrou).
  */
 class PracticeCatalogService
 {
-    public const SITUATIONS = ['all', 'unanswered', 'wrong', 'saved'];
+    public const SITUATIONS = ['all', 'unanswered', 'wrong', 'saved', 'new'];
+    public const NEW_DAYS = 14;
     /** Mínimo de respostas da turma para mostrar "% que acertam". */
     public const RATE_MIN_SAMPLE = 5;
 
@@ -67,6 +71,12 @@ class PracticeCatalogService
 
         $subjects = $without('subject_ids', 'topic_ids')->whereNotNull('exam_questions.subject_id')
             ->select('exam_questions.subject_id', DB::raw('count(*) as total'))->groupBy('exam_questions.subject_id')->pluck('total', 'subject_id');
+        $newBySubject = tap($without('subject_ids', 'topic_ids', 'situation'), fn (Builder $q) => $this->applySituation($q, $student, 'new'))
+            ->whereNotNull('exam_questions.subject_id')
+            ->select('exam_questions.subject_id', DB::raw('count(*) as total'))->groupBy('exam_questions.subject_id')->pluck('total', 'subject_id');
+        $newByTopic = tap($without('topic_ids', 'situation'), fn (Builder $q) => $this->applySituation($q, $student, 'new'))
+            ->join('exam_question_topic as n_eqt', 'n_eqt.exam_question_id', '=', 'exam_questions.id')
+            ->select('n_eqt.subject_topic_id', DB::raw('count(distinct exam_questions.id) as total'))->groupBy('n_eqt.subject_topic_id')->pluck('total', 'subject_topic_id');
         $topics = $without('topic_ids')
             ->join('exam_question_topic as eqt', 'eqt.exam_question_id', '=', 'exam_questions.id')
             ->join('subject_topics as st', 'st.id', '=', 'eqt.subject_topic_id')
@@ -86,8 +96,8 @@ class PracticeCatalogService
         return [
             'total' => $this->filtered($student, $filters)->count(),
             'subjects' => Subject::query()->whereIn('id', $subjects->keys())->orderBy('name')->get(['id', 'name', 'color'])
-                ->map(fn (Subject $s) => ['id' => $s->id, 'name' => $s->name, 'color' => $s->color ?? null, 'total' => (int) $subjects[$s->id]])->values(),
-            'topics' => $topics->map(fn ($t) => ['id' => (int) $t->id, 'name' => $t->name, 'subject_id' => (int) $t->subject_id, 'total' => (int) $t->total])->values(),
+                ->map(fn (Subject $s) => ['id' => $s->id, 'name' => $s->name, 'color' => $s->color ?? null, 'total' => (int) $subjects[$s->id], 'new' => (int) ($newBySubject[$s->id] ?? 0)])->values(),
+            'topics' => $topics->map(fn ($t) => ['id' => (int) $t->id, 'name' => $t->name, 'subject_id' => (int) $t->subject_id, 'total' => (int) $t->total, 'new' => (int) ($newByTopic[$t->id] ?? 0)])->values(),
             'situations' => $situations,
             'difficulties' => QuestionDifficulty::query()->orderBy('sort_order')->get(['id', 'name'])
                 ->map(fn ($d) => ['id' => $d->id, 'name' => $d->name, 'total' => (int) ($difficulties[$d->id] ?? 0)])->values(),
@@ -95,19 +105,30 @@ class PracticeCatalogService
         ];
     }
 
-    /** Ids sorteados para uma sessão (questões não respondidas primeiro). */
+    /**
+     * Ids sorteados para uma sessão, por prioridade: novas, não respondidas, as que errou e, por fim, as demais.
+     * Dentro de cada grupo a ordem é aleatória.
+     */
     public function drawIds(Student $student, array $filters, ?int $limit): array
     {
-        $query = $this->filtered($student, $filters)->select('exam_questions.id');
-        $answered = fn (QueryBuilder $e) => $e->select(DB::raw(1))->from('practice_answers as pa')
-            ->whereColumn('pa.exam_question_id', 'exam_questions.id')->where('pa.student_id', $student->id);
-        $unseen = (clone $query)->whereNotExists($answered)->inRandomOrder()->when($limit, fn (Builder $q) => $q->limit($limit))->pluck('exam_questions.id')->all();
-        if ($limit === null || count($unseen) >= $limit) {
-            return $unseen;
+        $situation = $filters['situation'] ?? 'all';
+        $tiers = match ($situation) {
+            'all' => ['new', 'unanswered', 'wrong', 'all'],
+            'unanswered' => ['new', 'unanswered'],
+            default => [$situation],
+        };
+        $ids = [];
+        foreach ($tiers as $tier) {
+            $query = $this->filtered($student, ['situation' => $tier] + $filters)->select('exam_questions.id');
+            $remaining = $limit === null ? null : $limit - count($ids);
+            if ($remaining !== null && $remaining <= 0) {
+                break;
+            }
+            $ids = array_merge($ids, $query->whereNotIn('exam_questions.id', $ids ?: [0])->inRandomOrder()
+                ->when($remaining, fn (Builder $q) => $q->limit($remaining))->pluck('exam_questions.id')->all());
         }
-        $rest = (clone $query)->whereNotIn('exam_questions.id', $unseen ?: [0])->inRandomOrder()->limit($limit - count($unseen))->pluck('exam_questions.id')->all();
 
-        return array_merge($unseen, $rest);
+        return $ids;
     }
 
     public function filtered(Student $student, array $filters): Builder
@@ -157,6 +178,12 @@ class PracticeCatalogService
                 ->whereRaw('s_pa.id = (select max(l_pa.id) from practice_answers as l_pa where l_pa.exam_question_id = exam_questions.id and l_pa.student_id = ?)', [$student->id])),
             'saved' => $query->whereExists(fn (QueryBuilder $e) => $e->select(DB::raw(1))->from('practice_saved_questions as sv')
                 ->whereColumn('sv.exam_question_id', 'exam_questions.id')->where('sv.student_id', $student->id)),
+            'new' => $query->whereNotExists($answers)->where(function (Builder $q) {
+                $since = now()->subDays(self::NEW_DAYS);
+                $q->where(fn (Builder $b) => $b->whereNull('exam_questions.exam_id')->where('exam_questions.created_at', '>=', $since))
+                    ->orWhereExists(fn (QueryBuilder $e) => $e->select(DB::raw(1))->from('exams as n_ex')
+                        ->whereColumn('n_ex.id', 'exam_questions.exam_id')->whereRaw('coalesce(n_ex.ends_at, n_ex.updated_at) >= ?', [$since]));
+            }),
             default => null,
         };
     }

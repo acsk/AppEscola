@@ -12,7 +12,7 @@ import { PracticeQuestionView } from '../components/PracticeQuestionView';
 import { formatPercent } from '../lib/format';
 import { font,
   BottomBar, Button, Card, Icon, IconButton, Kbd, Notice, Overline, ProgressBar, QuestionNavigator, ScreenBody, Sheet, Txt,
-  layout, space, type, useLayoutMode, usePalette,
+  layout, space, type, useLayoutMode, usePalette, Tag, subjectColor, type IconName,
 } from '../../../ui';
 
 type Props = NativeStackScreenProps<QuestoesStackParamList, 'BancoSimulado'>;
@@ -187,14 +187,23 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const waitingConfirm = !!current && eachMode && !finished && answers[current.id] != null && !currentFeedback;
 
   /** Ação principal: confirmar → próxima → finalizar. */
-  const primary = (() => {
+  type Primary = { label: string; icon?: IconName; iconRight?: IconName; onPress: () => void; loading?: boolean; disabled?: boolean };
+  const primary: Primary | null = (() => {
     if (!current) return null;
-    if (finished) return isLast ? { label: 'Concluir revisão', icon: 'check' as const, onPress: leave } : { label: 'Próxima questão', iconRight: 'arrow-right' as const, onPress: () => goTo(index + 1) };
-    if (waitingConfirm) return { label: 'Confirmar resposta', icon: 'check' as const, onPress: confirmAnswer, loading: answer.isPending };
-    if (isLast) return { label: eachMode ? 'Ver resultado' : 'Finalizar e ver correção', icon: 'check' as const, onPress: () => setConfirmFinish(true), loading: finish.isPending };
-    const done = eachMode ? !!currentFeedback : answers[current.id] != null;
-    return { label: done ? 'Próxima questão' : 'Pular', iconRight: 'arrow-right' as const, onPress: () => goTo(index + 1) };
+    if (finished) return isLast ? { label: 'Concluir revisão', icon: 'check', onPress: leave } : { label: 'Próxima questão', iconRight: 'arrow-right', onPress: () => goTo(index + 1) };
+    if (eachMode) {
+      // Protótipo "Praticar": responde, vê a correção e segue; o botão fica desabilitado até escolher.
+      if (!currentFeedback) return { label: isDesktop ? 'Responder' : 'Confirmar resposta', onPress: confirmAnswer, loading: answer.isPending, disabled: answers[current.id] == null };
+      if (isLast) return { label: 'Ver resultado', icon: 'check', onPress: () => (answeredCount < questions.length ? setConfirmFinish(true) : doFinish()), loading: finish.isPending };
+      return { label: 'Próxima questão', iconRight: 'arrow-right', onPress: () => goTo(index + 1) };
+    }
+    if (isLast) return { label: 'Finalizar e ver correção', icon: 'check', onPress: () => setConfirmFinish(true), loading: finish.isPending };
+    return { label: answers[current.id] != null ? 'Próxima questão' : 'Pular', iconRight: 'arrow-right', onPress: () => goTo(index + 1) };
   })();
+  /** "Pular" ao lado do botão principal enquanto a questão não foi respondida (sessões). */
+  const canSkip = !!current && eachMode && !finished && !currentFeedback && !isLast;
+  /** Sessão de prática em andamento (correção a cada questão): layout "Praticar", sem mapa. */
+  const practicing = eachMode && !finished;
 
   // Teclado (web): A–E marca, Enter confirma/avança, ←/→ navega, R revisar depois, S salvar.
   useEffect(() => {
@@ -204,7 +213,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       if (event.key === 'ArrowRight') goTo(index + 1);
       else if (event.key === 'ArrowLeft') goTo(index - 1);
-      else if (event.key === 'Enter') primary?.onPress();
+      else if (event.key === 'Enter') { if (primary && !primary.disabled) primary.onPress(); }
       else if (event.key === 'r' || event.key === 'R') toggleFlag();
       else if (event.key === 's' || event.key === 'S') toggleSave();
       else {
@@ -258,7 +267,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
 
   const questionView = current ? (
     <PracticeQuestionView question={current} selectedId={answers[current.id] ?? null} onSelect={(optionId) => select(current.id, optionId)}
-      feedback={finished || eachMode ? currentFeedback : null} disabled={finish.isPending || (eachMode && answer.isPending)} />
+      feedback={finished || eachMode ? currentFeedback : null} disabled={finish.isPending || (eachMode && answer.isPending)} isNew={!!current.is_new && !currentFeedback} />
   ) : <Txt tone="subtle">Esta sessão não tem questões disponíveis no momento.</Txt>;
 
   const errorNotice = error ? <Notice tone="danger" title="Algo deu errado" text={error} /> : null;
@@ -285,6 +294,52 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       <Txt variant="titleSm" style={{ fontSize: 15, color: urgent ? p.dangerInk : p.inkMuted, fontVariant: ['tabular-nums'] }}>{formatClock(remaining)}</Txt>
     </View>
   ) : null;
+
+  // ── Desktop, sessão de prática (protótipo "DesktopPraticar"): leitura central, progresso e acertos no topo ──
+  if (isDesktop && practicing) {
+    const subjectDot = current?.subject ? subjectColor(p, current.subject.id) : p.inkSubtle;
+    return (
+      <View style={{ flex: 1, backgroundColor: p.bg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[6], paddingVertical: space[3], paddingHorizontal: space[6], backgroundColor: p.surface, borderBottomWidth: 1, borderBottomColor: p.line }}>
+          <View style={{ flex: 1, alignItems: 'flex-start' }}>
+            <Button variant="ghost" size="sm" icon="x" label="Sair" onPress={leave} />
+          </View>
+          <View style={{ width: 560, maxWidth: '50%', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[2] }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectDot }} />
+              <Txt variant="label" numberOfLines={1} style={{ ...font.bold, flexShrink: 1 }}>{title}</Txt>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+              <View style={{ flex: 1 }}><ProgressBar value={Math.min(index + 1, questions.length)} max={questions.length || 1} size="sm" label="Progresso" /></View>
+              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{index + 1} de {questions.length}</Txt>
+            </View>
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: space[4] }}>
+            {timer}
+            <Tag tone="success" icon="check" label={`${rightIdx.length} ${rightIdx.length === 1 ? 'acerto' : 'acertos'}`} />
+          </View>
+        </View>
+        <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
+          <View style={{ width: '100%', maxWidth: layout.readingMax, alignSelf: 'center', paddingTop: space[8], paddingHorizontal: space[6], paddingBottom: 48, gap: space[4] }}>
+            {questionView}
+            {errorNotice}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], marginTop: space[2] }}>
+              {canSkip ? <Button variant="ghost" label="Pular" onPress={() => goTo(index + 1)} /> : null}
+              <View style={{ flex: 1 }} />
+              {primary?.disabled ? <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>Escolha uma alternativa</Txt> : null}
+              {primary ? <Button size="lg" icon={primary.icon} iconRight={primary.iconRight} label={primary.label} loading={primary.loading} disabled={primary.disabled} onPress={primary.onPress} /> : null}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <Kbd>A</Kbd><Txt variant="bodySm" tone="subtle">–</Txt><Kbd>{lastLetter}</Kbd><Txt variant="bodySm" tone="subtle"> marcar   </Txt>
+              <Kbd>Enter</Kbd><Txt variant="bodySm" tone="subtle">{currentFeedback ? ' próxima   ' : ' responder   '}</Txt>
+              <Kbd>S</Kbd><Txt variant="bodySm" tone="subtle"> salvar</Txt>
+            </View>
+          </View>
+        </ScrollView>
+        {finishModal}
+      </View>
+    );
+  }
 
   // ── Desktop (protótipo "DesktopResponder"): modo foco ──
   if (isDesktop) {
@@ -323,9 +378,8 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
                 <Button variant="ghost" icon="arrow-left" label="Anterior" disabled={index === 0} onPress={() => goTo(index - 1)} />
                 {!finished ? <Button variant="ghost" icon="flag" label={flagged.includes(index + 1) ? 'Desmarcar revisão' : 'Revisar depois'} onPress={toggleFlag} /> : null}
                 <View style={{ flex: 1 }} />
-                {!finished && !isLast && waitingConfirm ? <Button variant="ghost" label="Pular" onPress={() => goTo(index + 1)} /> : null}
-                {primary ? <Button size="lg" icon={'icon' in primary ? primary.icon : undefined} iconRight={'iconRight' in primary ? primary.iconRight : undefined}
-                  label={primary.label} loading={'loading' in primary ? primary.loading : false} onPress={primary.onPress} /> : null}
+                {canSkip ? <Button variant="ghost" label="Pular" onPress={() => goTo(index + 1)} /> : null}
+                {primary ? <Button size="lg" icon={primary.icon} iconRight={primary.iconRight} label={primary.label} loading={primary.loading} disabled={primary.disabled} onPress={primary.onPress} /> : null}
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 {!finished ? <><Kbd>A</Kbd><Txt variant="bodySm" tone="subtle">–</Txt><Kbd>{lastLetter}</Kbd><Txt variant="bodySm" tone="subtle"> marcar   </Txt></> : null}
@@ -367,7 +421,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: insets.top + space[2], paddingHorizontal: space[2], paddingBottom: space[2] }}>
-        <IconButton icon="x" label={finished ? 'Sair' : 'Pausar e sair'} onPress={leave} />
+        <IconButton icon="x" label={finished ? 'Sair' : practicing ? 'Encerrar sessão' : 'Pausar e sair'} onPress={leave} />
         <View style={{ flex: 1, gap: 6 }}>
           <Text style={[type.bodySm, { color: p.inkSubtle, textAlign: 'center' }]}>
             <Text style={{ color: p.ink, ...font.bold }}>Questão {index + 1}</Text> de {questions.length}
@@ -376,7 +430,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           <ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" />
         </View>
         <IconButton icon="bookmark" label={isSaved ? 'Remover das salvas' : 'Salvar questão'} color={isSaved ? p.brandInk : undefined} onPress={toggleSave} />
-        <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} />
+        {!practicing ? <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} /> : null}
       </View>
 
       <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
@@ -387,13 +441,14 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
         </ScreenBody>
       </ScrollView>
 
-      <BottomBar hint={finished ? `${correct} de ${total} acertos` : eachMode ? 'Correção a cada questão' : `${answeredCount} de ${questions.length} respondidas · correção no final`}>
-        <Button variant="ghost" label={index === 0 ? 'Mapa' : 'Anterior'} icon={index === 0 ? 'grid' : 'chevron-left'}
-          onPress={() => (index === 0 ? setMapOpen(true) : goTo(index - 1))} />
+      <BottomBar hint={finished ? `${correct} de ${total} acertos` : eachMode ? undefined : `${answeredCount} de ${questions.length} respondidas · correção no final`}>
+        {practicing ? (canSkip ? <Button variant="ghost" label="Pular" onPress={() => goTo(index + 1)} /> : null) : (
+          <Button variant="ghost" label={index === 0 ? 'Mapa' : 'Anterior'} icon={index === 0 ? 'grid' : 'chevron-left'}
+            onPress={() => (index === 0 ? setMapOpen(true) : goTo(index - 1))} />
+        )}
         {primary ? (
           <View style={{ flex: 1 }}>
-            <Button block size="lg" cta icon={'icon' in primary ? primary.icon : undefined} iconRight={'iconRight' in primary ? primary.iconRight : undefined}
-              label={primary.label} loading={'loading' in primary ? primary.loading : false} onPress={primary.onPress} />
+            <Button block size="lg" cta icon={primary.icon} iconRight={primary.iconRight} label={primary.label} loading={primary.loading} disabled={primary.disabled} onPress={primary.onPress} />
           </View>
         ) : null}
       </BottomBar>

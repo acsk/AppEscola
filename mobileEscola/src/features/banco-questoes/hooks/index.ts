@@ -111,6 +111,17 @@ export function usePracticeFacets(filters: CatalogFilters) {
   return useQuery({ queryKey: bancoKeys.facets(filters), queryFn: () => fetchPracticeFacets(filters), placeholderData: keepPreviousData });
 }
 
+/** Questões novas para o aluno (número azul na aba Questões e na SideNav). */
+export function useNewQuestionsCount(enabled = true): number {
+  const { data } = useQuery({
+    queryKey: bancoKeys.facets({ situation: 'all' }),
+    queryFn: () => fetchPracticeFacets({ situation: 'all' }),
+    enabled,
+    staleTime: 60_000,
+  });
+  return enabled ? (data?.situations.new ?? 0) : 0;
+}
+
 export function useToggleSavedQuestion() {
   const queryClient = useQueryClient();
   return useMutation({

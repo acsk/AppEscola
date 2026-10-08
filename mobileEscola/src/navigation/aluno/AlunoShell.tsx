@@ -3,8 +3,9 @@ import { View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantTheme } from '../../context/TenantThemeContext';
 import { useRootNavigationState } from '../useRootNavigationState';
-import { MENU_ITEMS, getActiveMenuId, isFocusScreen, navigateToMenuItem, userInitials } from './menu';
+import { SHOW_TENANT_LOGO, MENU_ITEMS, getActiveMenuId, isFocusScreen, navigateToMenuItem, userInitials } from './menu';
 import { SideNav, useLayoutMode, usePalette } from '../../ui';
+import { useNewQuestionsCount } from '../../features/banco-questoes/hooks';
 
 /**
  * Casca responsiva do aluno: no celular só o conteúdo (tab bar + menu-gaveta);
@@ -16,6 +17,7 @@ export function AlunoShell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { tenantName, logoUrl } = useTenantTheme();
   const state = useRootNavigationState() as never;
+  const newQuestions = useNewQuestionsCount(mode !== 'mobile');
   if (mode === 'mobile') return <>{children}</>;
   const collapsed = mode === 'tablet' || isFocusScreen(state);
   const enrollment = user?.student?.enrollment_number;
@@ -24,8 +26,8 @@ export function AlunoShell({ children }: { children: React.ReactNode }) {
       <SideNav
         collapsed={collapsed}
         brand={tenantName ?? 'App Escola'}
-        logoUrl={logoUrl}
-        items={MENU_ITEMS.map((m) => ({ key: m.id, icon: m.icon, label: m.label }))}
+        logoUrl={SHOW_TENANT_LOGO ? logoUrl : null}
+        items={MENU_ITEMS.map((m) => ({ key: m.id, icon: m.icon, label: m.label, badge: m.id === 'questoes' ? newQuestions : undefined }))}
         activeKey={getActiveMenuId(state)}
         onSelect={(key) => {
           const item = MENU_ITEMS.find((m) => m.id === key);

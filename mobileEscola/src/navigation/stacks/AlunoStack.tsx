@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { TabBar, useLayoutMode, usePalette, type TabItem } from '../../ui';
 import { AlunoShell } from '../aluno/AlunoShell';
 import { FOCUS_SCREENS } from '../aluno/menu';
+import { useNewQuestionsCount } from '../../features/banco-questoes/hooks';
 
 export type AlunoTabParamList = {
   Home: undefined;
@@ -60,6 +61,7 @@ function isFocusTabState(state: TabSnapshot) {
 function AlunoTabs() {
   const palette = usePalette();
   const { isMobile } = useLayoutMode();
+  const newQuestions = useNewQuestionsCount();
   return (
     <Tab.Navigator
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: palette.bg } }}
@@ -67,7 +69,7 @@ function AlunoTabs() {
       // Telas de foco (responder simulado/sessão) também escondem a tab bar.
       tabBar={({ state, navigation }) => !isMobile || isFocusTabState(state) ? null : (
         <TabBar
-          items={TABS}
+          items={TABS.map((t) => (t.key === 'Questoes' ? { ...t, badge: newQuestions } : t))}
           activeKey={state.routes[state.index]?.name ?? 'Home'}
           onPress={(key) => {
             const root = TAB_ROOT[key];

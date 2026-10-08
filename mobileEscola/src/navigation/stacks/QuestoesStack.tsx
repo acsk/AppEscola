@@ -9,7 +9,8 @@ import { BancoRankingScreen } from '../../features/banco-questoes/screens/BancoR
 
 /** Aba "Questões" (banco de questões do aluno). */
 export type QuestoesStackParamList = {
-  BancoQuestoes: undefined;
+  /** `subjectId` chega já marcado (ex.: "Treinar estes assuntos antes" no simulado). */
+  BancoQuestoes: { subjectId?: number } | undefined;
   BancoPraticar: { subjectId?: number; topicId?: number } | undefined;
   /** `setId` inicia (ou retoma) o simulado do banco; `attemptId` abre uma tentativa já existente. */
   BancoSimulado: { setId?: number; attemptId?: number; title?: string };
@@ -40,8 +41,8 @@ export function QuestoesNavigator() {
       <Stack.Screen name="BancoQuestoes" component={BancoQuestoesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BancoPraticar" component={BancoPraticarScreen} options={{ title: 'Praticar questões' }} />
       <Stack.Screen name="BancoSimulado" component={BancoSimuladoScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="BancoDesempenho" component={BancoDesempenhoScreen} options={{ title: 'O que estudar' }} />
-      <Stack.Screen name="BancoRanking" component={BancoRankingScreen} options={{ title: 'Ranking' }} />
+      <Stack.Screen name="BancoDesempenho" component={BancoDesempenhoScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="BancoRanking" component={BancoRankingScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
