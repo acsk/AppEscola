@@ -481,7 +481,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
             <Button icon={FileStack} label="Simulados do banco" onPress={() => setQuestionSetsOpen(true)} />
             <Button icon={Trophy} label="Ranking" onPress={() => setRankingOpen(true)} />
             <Button icon={Archive} variant="ghost" label="Importados (formato antigo)" onPress={() => setImportedExamsOpen(true)} />
-            <Button icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
+            <Button variant="ai" icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
             <Button
               variant="primary"
               icon={Plus}
@@ -686,10 +686,10 @@ export default function QuestionBankScreen({ navigate }: Props) {
               <TouchableOpacity
                 onPress={() => setAiBulkOpen(true)}
                 aria-label="Em massa: atualizar com IA"
-                className="flex-row items-center gap-1 px-3 py-1.5 rounded-ds-md bg-surface border border-brand"
+                className="flex-row items-center gap-1 px-3 py-1.5 rounded-ds-md bg-accent border border-accent"
               >
-                <Sparkles size={13} color="var(--ds-brand)" strokeWidth={1.5} />
-                <Text className="text-xs font-semibold text-brand">Atualizar com IA</Text>
+                <Sparkles size={13} color="var(--ds-on-brand)" strokeWidth={1.5} />
+                <Text className="text-xs font-semibold text-on-brand">Atualizar com IA</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => void openAddToSet()}

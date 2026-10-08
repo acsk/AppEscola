@@ -12,6 +12,8 @@ export type ActionsMenuItem = {
   onPress: () => void;
   /** Excluir/remover: destacado em vermelho (padrão do painel). */
   danger?: boolean;
+  /** Ação de IA: ícone e texto no ocre do tema. */
+  ai?: boolean;
   /** Linha divisória antes do item (separa a zona de risco). */
   separatorBefore?: boolean;
   disabled?: boolean;
@@ -72,11 +74,11 @@ export default function ActionsMenu({ items, label = "Mais ações" }: Props) {
                     setOpen(false);
                     item.onPress();
                   }}
-                  className={`flex-row items-center rounded-ds-md ${item.danger ? "bg-danger-tint" : ""}`}
+                  className={`flex-row items-center rounded-ds-md ${item.danger ? "bg-danger-tint" : item.ai ? "bg-accent-tint" : ""}`}
                   style={{ gap: 8, height: 34, paddingHorizontal: 12, opacity: item.disabled ? 0.45 : 1 }}
                 >
-                  {item.icon ? <Icon icon={item.icon} color={item.danger ? color.danger : color["ink-muted"]} /> : null}
-                  <Text className={`text-sm ${item.danger ? "font-semibold text-danger" : "text-ink"}`} numberOfLines={1}>
+                  {item.icon ? <Icon icon={item.icon} color={item.danger ? color.danger : item.ai ? color.accent : color["ink-muted"]} /> : null}
+                  <Text className={`text-sm ${item.danger ? "font-semibold text-danger" : item.ai ? "font-semibold text-accent" : "text-ink"}`} numberOfLines={1}>
                     {item.label}
                   </Text>
                 </TouchableOpacity>

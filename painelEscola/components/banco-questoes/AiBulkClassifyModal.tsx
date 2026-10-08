@@ -160,7 +160,7 @@ export default function AiBulkClassifyModal({ visible, ids, catalogs, applying, 
     step === "config" ? (
       <>
         <Button label="Cancelar" onPress={onClose} />
-        <Button variant="primary" icon={Sparkles} label="Sugerir com IA" onPress={() => void run()} disabled={!fields.length || tooMany} />
+        <Button variant="ai" icon={Sparkles} label="Sugerir com IA" onPress={() => void run()} disabled={!fields.length || tooMany} />
       </>
     ) : step === "running" ? (
       <Button label="Parar" onPress={() => { cancelled.current = true; }} />

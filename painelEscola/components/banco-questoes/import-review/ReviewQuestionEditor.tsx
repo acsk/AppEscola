@@ -98,7 +98,7 @@ export default function ReviewQuestionEditor({
           <Button size="sm" variant="ghost" icon={ChevronRight} iconOnly={compact} label="Próxima" disabled={!canNext} onPress={onNext} />
           <Button size="sm" label={compact ? "Pendente" : "Próxima pendente"} accessibilityLabel="Próxima pendente" disabled={!hasPending} onPress={onNextPending} />
           <ActionsMenu label="Mais ações (completar com IA, remover da importação)" items={[
-            { key: "ai", label: "Completar com IA", icon: Sparkles, onPress: onAutofill, disabled: busy },
+            { key: "ai", label: "Completar com IA", icon: Sparkles, ai: true, onPress: onAutofill, disabled: busy },
             { key: "remove", label: "Remover da importação", icon: Trash2, onPress: onRemove, danger: true, separatorBefore: true, disabled: busy },
           ]} />
         </View>
@@ -139,7 +139,7 @@ export default function ReviewQuestionEditor({
           )}
         </View>
 
-        <Card title="Enunciado" right={<Button size="sm" variant="ghost" icon={Sparkles} label="Completar com IA" disabled={busy} onPress={onAutofill} />}>
+        <Card title="Enunciado" right={<Button variant="ai" size="sm" icon={Sparkles} label="Completar com IA" disabled={busy} onPress={onAutofill} />}>
           <RichTextInput value={content.question_text} minHeight={96} disabled={busy}
             onChange={(question_text) => onChange({ content: { ...content, question_text } })} />
         </Card>
@@ -222,7 +222,7 @@ export default function ReviewQuestionEditor({
               onChange={(options) => onChange({ content: { ...content, options }, answerFromPdf: draft.answerFromPdf })} />
           </Card>
         ) : (
-          <Card title="Alternativas" right={<Button size="sm" variant="ghost" icon={Sparkles} label="Transformar em objetiva com IA"
+          <Card title="Alternativas" right={<Button variant="ai" size="sm" icon={Sparkles} label="Transformar em objetiva com IA"
             disabled={busy} onPress={onConvertToObjective} />}>
             <Text className="text-sm text-ink-muted">
               Questão dissertativa: sem alternativas. A resposta esperada fica na resolução; a IA a usa para definir a alternativa correta.

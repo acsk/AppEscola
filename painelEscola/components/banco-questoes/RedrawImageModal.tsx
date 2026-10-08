@@ -111,7 +111,7 @@ export default function RedrawImageModal({ visible, questionId, content, onClose
                 )}
               </>
             ) : (
-              <Button variant="primary" icon={Sparkles} label="Gerar nova imagem" onPress={() => void generate()} />
+              <Button variant="ai" icon={Sparkles} label="Gerar nova imagem" onPress={() => void generate()} />
             )}
           </View>
         }

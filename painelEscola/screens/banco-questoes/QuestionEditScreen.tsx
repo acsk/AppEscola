@@ -479,7 +479,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           <Text className="text-sm text-ink-muted" style={{ flex: 1, minWidth: 220 }}>
             A IA pode reescrever o comando e criar 5 alternativas, usando a explicação como resposta esperada.
           </Text>
-          <Button size="sm" icon={Sparkles} label="Transformar em objetiva com IA" loading={aiFilling}
+          <Button variant="ai" size="sm" icon={Sparkles} label="Transformar em objetiva com IA" loading={aiFilling}
             disabled={loading || saving !== null || uploading} onPress={() => setConfirmConvert(true)} />
         </View>
       )}
@@ -538,7 +538,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             />
             <View className="flex-row flex-wrap" style={{ gap: 8 }}>
               <Button size="sm" icon={ImagePlus} label="Trocar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
-              <Button
+              <Button variant="ai"
                 size="sm"
                 icon={Sparkles}
                 label="Gerar nova imagem com IA"
@@ -599,7 +599,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             actions={
               <View className="flex-row flex-wrap" style={{ gap: 8 }}>
                 {!isFromExam && (
-                <Button
+                <Button variant="ai"
                   icon={Sparkles}
                   label="Autocompletar com IA"
                   onPress={() => void autofill()}
@@ -608,7 +608,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
                 />
                 )}
                 {isEdit && (
-                  <Button
+                  <Button variant="ai"
                     icon={Sparkles}
                     label="Gerar similares com IA"
                     onPress={() => void openSimilar()}

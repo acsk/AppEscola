@@ -241,11 +241,11 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     step === "config" ? (
       <>
         <Button label="Cancelar" onPress={onClose} disabled={generating} />
-        <Button variant="primary" icon={Sparkles} label="Gerar questões" onPress={() => void generate()} loading={generating} />
+        <Button variant="ai" icon={Sparkles} label="Gerar questões" onPress={() => void generate()} loading={generating} />
       </>
     ) : (
       <>
-        <Button icon={Sparkles} label="Gerar de novo" onPress={() => setStep("config")} disabled={busy} />
+        <Button variant="ai" icon={Sparkles} label="Gerar de novo" onPress={() => setStep("config")} disabled={busy} />
         <Button
           variant="primary"
           icon={Check}
@@ -405,7 +405,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                         placeholder="Ex.: fundo simples e labels maiores"
                         editable={!busy}
                       />
-                      <Button
+                      <Button variant="ai"
                         icon={Sparkles}
                         label="Regenerar imagem com IA"
                         onPress={() => void regenerateImage(draft)}

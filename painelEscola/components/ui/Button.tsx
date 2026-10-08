@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react-native";
 import Icon from "./Icon";
 import { color, size as dsSize } from "../../constants/theme";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "ai";
 
 type Props = {
   /** Rótulo em caixa de frase: "Salvar alterações", "Nova turma". */
@@ -28,6 +28,8 @@ const VARIANTS: Record<ButtonVariant, { bg: string; fg: string; border: string }
   secondary: { bg: color.surface, fg: color.ink, border: color["border-strong"] },
   ghost: { bg: "transparent", fg: color["ink-muted"], border: "transparent" },
   danger: { bg: color.danger, fg: color["on-danger"], border: color.danger },
+  // Ações de IA: fundo no ocre do tema (amarelo queimado), com texto claro para contrastar.
+  ai: { bg: color.accent, fg: color["on-brand"], border: color.accent },
 };
 
 /** Botão do design system: retangular (raio 4px); só o primário tem cor cheia. */

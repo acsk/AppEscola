@@ -714,7 +714,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           <Text className="text-xs font-semibold text-warning">A IA não separou {f.pages}: as questões dessas páginas não estão na lista.</Text>
           <Text className="text-xs text-warning" numberOfLines={2}>{f.message}</Text>
           {pdfText.current ? (
-            <View className="self-start"><Button size="sm" icon={Sparkles} label={`Reprocessar ${f.pages}`} disabled={busy} onPress={() => void reprocessBlock(f)} /></View>
+            <View className="self-start"><Button variant="ai" size="sm" icon={Sparkles} label={`Reprocessar ${f.pages}`} disabled={busy} onPress={() => void reprocessBlock(f)} /></View>
           ) : null}
         </View>
       ))}
@@ -745,7 +745,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         footer={
           <View className="flex-row flex-wrap justify-end" style={{ gap: 8 }}>
             <Button label="Cancelar" onPress={close} disabled={busy} />
-            <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || topicsLoading || busy} />
+            <Button variant="ai" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || topicsLoading || busy} />
           </View>
         }
       >
