@@ -75,7 +75,16 @@ export interface PracticeAttemptSummary {
   finished_at: string | null;
 }
 
-export type AttemptQuestion = PracticeQuestion & { selected_option_id: number | null; saved?: boolean; is_new?: boolean } & Partial<PracticeFeedback>;
+export type AttemptQuestion = PracticeQuestion & {
+  selected_option_id: number | null;
+  saved?: boolean;
+  is_new?: boolean;
+  year?: number | null;
+  /** % da escola que acerta (null com poucas respostas). */
+  class_rate?: number | null;
+  /** Seu acerto no primeiro assunto da questão. */
+  topic_score?: { right: number; total: number } | null;
+} & Partial<PracticeFeedback>;
 
 export interface PracticeAttemptPayload {
   attempt: PracticeAttemptSummary;

@@ -199,11 +199,13 @@ class PracticeService
         $saved = PracticeSavedQuestion::query()->where('student_id', $attempt->student_id)
             ->whereIn('exam_question_id', $questions->pluck('id'))->pluck('exam_question_id')->flip();
         $newIds = $this->newQuestionIds($attempt, $questions);
+        $rates = $this->classRates((int) $attempt->tenant_id, $questions->pluck('id')->all());
+        $topicScores = $this->topicScores((int) $attempt->student_id, $questions);
 
         return [
             'attempt' => $this->attemptSummary($attempt),
             'question_set' => $set ? ['id' => $set->id, 'title' => $set->title, 'description' => $set->description] : null,
-            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished, $each, $saved, $newIds) {
+            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished, $each, $saved, $newIds, $rates, $topicScores) {
                 $answer = $answers->get($question->id);
                 $reveal = $finished || ($each && $answer);
 
@@ -211,9 +213,43 @@ class PracticeService
                     'selected_option_id' => $answer?->option_id,
                     'saved'              => $saved->has($question->id),
                     'is_new'             => $newIds->has($question->id),
+                    'year'               => $question->year,
+                    // "Sobre esta questão" (Praticar no desktop): % da escola que acerta e o seu acerto no assunto.
+                    'class_rate'         => $rates[$question->id] ?? null,
+                    'topic_score'        => ($topic = $question->topics->first()) ? ($topicScores[$topic->id] ?? ['right' => 0, 'total' => 0]) : null,
                 ] + ($reveal ? $this->feedback($question, $answer?->option_id, (bool) $answer?->is_correct) : []);
             })->values(),
         ];
+    }
+
+    /** % de acerto da escola por questão (só com amostra mínima, como no catálogo). */
+    private function classRates(int $tenantId, array $ids): array
+    {
+        if (! $ids) {
+            return [];
+        }
+
+        return DB::table('practice_answers')->where('tenant_id', $tenantId)->whereIn('exam_question_id', $ids)
+            ->select('exam_question_id', DB::raw('count(*) as n'), DB::raw('sum(case when is_correct then 1 else 0 end) as ok'))
+            ->groupBy('exam_question_id')->get()
+            ->filter(fn ($r) => $r->n >= PracticeCatalogService::RATE_MIN_SAMPLE)
+            ->mapWithKeys(fn ($r) => [$r->exam_question_id => (int) round($r->ok / $r->n * 100)])->all();
+    }
+
+    /** Acerto do aluno por assunto (respostas já corrigidas), para o primeiro assunto de cada questão. */
+    private function topicScores(int $studentId, Collection $questions): array
+    {
+        $topicIds = $questions->map(fn (ExamQuestion $q) => $q->topics->first()?->id)->filter()->unique()->values();
+        if ($topicIds->isEmpty()) {
+            return [];
+        }
+
+        return PracticeAnswer::query()->counted()->where('practice_answers.student_id', $studentId)
+            ->join('exam_question_topic as st_eqt', 'st_eqt.exam_question_id', '=', 'practice_answers.exam_question_id')
+            ->whereIn('st_eqt.subject_topic_id', $topicIds)
+            ->select('st_eqt.subject_topic_id', DB::raw('count(*) as total'), DB::raw('sum(case when practice_answers.is_correct then 1 else 0 end) as ok'))
+            ->groupBy('st_eqt.subject_topic_id')->get()
+            ->mapWithKeys(fn ($r) => [(int) $r->subject_topic_id => ['right' => (int) $r->ok, 'total' => (int) $r->total]])->all();
     }
 
     /**

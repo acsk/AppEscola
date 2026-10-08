@@ -9,6 +9,7 @@ import { getApiErrorMessage } from '../../../lib/apiError';
 import type { PracticeFeedback } from '../../../services/practice.service';
 import { useAnswerInAttempt, useFinishAttempt, usePracticeAttempt, useStartQuestionSet, useToggleSavedQuestion } from '../hooks';
 import { PracticeQuestionView } from '../components/PracticeQuestionView';
+import { PracticeDesktop } from '../components/PracticeDesktop';
 import { formatPercent } from '../lib/format';
 import { font,
   BottomBar, Button, Card, Icon, IconButton, Kbd, Notice, Overline, ProgressBar, QuestionNavigator, ScreenBody, Sheet, Txt,
@@ -93,14 +94,15 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
     if (firstOpen > 0) setIndex(firstOpen);
   }, [payload]);
 
-  // Cronômetro: tempo gasto fica salvo por tentativa, então pausar de fato pausa.
+  // Tempo da sessão: conta com a tela aberta e fica salvo por tentativa (pausar de fato pausa).
+  // Com cronômetro, ao chegar no limite a sessão é finalizada.
   useEffect(() => {
-    if (!limit || finished || attemptId == null) return;
+    if (finished || attemptId == null) return;
     AsyncStorage.getItem(timerKey(attemptId)).then((raw) => setElapsed(Number(raw) || 0)).catch(() => setElapsed(0));
-  }, [limit, finished, attemptId]);
+  }, [finished, attemptId]);
   useEffect(() => {
-    if (!limit || finished || elapsed == null || attemptId == null) return;
-    if (elapsed >= limit) {
+    if (finished || elapsed == null || attemptId == null) return;
+    if (limit && elapsed >= limit) {
       if (!timeUpRef.current) {
         timeUpRef.current = true;
         doFinish();
@@ -295,49 +297,17 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
     </View>
   ) : null;
 
-  // ── Desktop, sessão de prática (protótipo "DesktopPraticar"): leitura central, progresso e acertos no topo ──
-  if (isDesktop && practicing) {
-    const subjectDot = current?.subject ? subjectColor(p, current.subject.id) : p.inkSubtle;
+  // ── Desktop, sessão de prática (protótipo "DesktopPraticar"): sessão · questão · ajuda ──
+  if (isDesktop && practicing && attemptId != null) {
     return (
-      <View style={{ flex: 1, backgroundColor: p.bg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[6], paddingVertical: space[3], paddingHorizontal: space[6], backgroundColor: p.surface, borderBottomWidth: 1, borderBottomColor: p.line }}>
-          <View style={{ flex: 1, alignItems: 'flex-start' }}>
-            <Button variant="ghost" size="sm" icon="x" label="Sair" onPress={leave} />
-          </View>
-          <View style={{ width: 560, maxWidth: '50%', gap: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[2] }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: subjectDot }} />
-              <Txt variant="label" numberOfLines={1} style={{ ...font.bold, flexShrink: 1 }}>{title}</Txt>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
-              <View style={{ flex: 1 }}><ProgressBar value={Math.min(index + 1, questions.length)} max={questions.length || 1} size="sm" label="Progresso" /></View>
-              <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{index + 1} de {questions.length}</Txt>
-            </View>
-          </View>
-          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: space[4] }}>
-            {timer}
-            <Tag tone="success" icon="check" label={`${rightIdx.length} ${rightIdx.length === 1 ? 'acerto' : 'acertos'}`} />
-          </View>
-        </View>
-        <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
-          <View style={{ width: '100%', maxWidth: layout.readingMax, alignSelf: 'center', paddingTop: space[8], paddingHorizontal: space[6], paddingBottom: 48, gap: space[4] }}>
-            {questionView}
-            {errorNotice}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], marginTop: space[2] }}>
-              {canSkip ? <Button variant="ghost" label="Pular" onPress={() => goTo(index + 1)} /> : null}
-              <View style={{ flex: 1 }} />
-              {primary?.disabled ? <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>Escolha uma alternativa</Txt> : null}
-              {primary ? <Button size="lg" icon={primary.icon} iconRight={primary.iconRight} label={primary.label} loading={primary.loading} disabled={primary.disabled} onPress={primary.onPress} /> : null}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <Kbd>A</Kbd><Txt variant="bodySm" tone="subtle">–</Txt><Kbd>{lastLetter}</Kbd><Txt variant="bodySm" tone="subtle"> marcar   </Txt>
-              <Kbd>Enter</Kbd><Txt variant="bodySm" tone="subtle">{currentFeedback ? ' próxima   ' : ' responder   '}</Txt>
-              <Kbd>S</Kbd><Txt variant="bodySm" tone="subtle"> salvar</Txt>
-            </View>
-          </View>
-        </ScrollView>
+      <>
+        <PracticeDesktop attemptId={attemptId} title={title} questions={questions} index={index} onGoTo={goTo}
+          answers={answers} feedbacks={feedbacks} onSelect={select} flagged={flagged} onToggleFlag={toggleFlag}
+          saved={isSaved} onToggleSave={toggleSave} primary={primary} canSkip={canSkip} onLeave={leave}
+          onFinish={() => setConfirmFinish(true)} finishing={finish.isPending} elapsed={elapsed} remaining={remaining}
+          busy={finish.isPending || answer.isPending} error={errorNotice} />
         {finishModal}
-      </View>
+      </>
     );
   }
 

@@ -130,6 +130,10 @@ class PracticeCatalogTest extends TestCase
         $this->assertSame(90, $payload['attempt']['seconds_per_question']);
         $this->assertCount(10, $payload['questions']);
         $this->assertArrayNotHasKey('correct_option_id', $payload['questions'][0]);
+        // "Sobre esta questão": sem amostra mínima não há % da escola; sem assunto não há acerto por assunto.
+        $this->assertNull($payload['questions'][0]['class_rate']);
+        $this->assertNull($payload['questions'][0]['topic_score']);
+        $this->assertArrayHasKey('year', $payload['questions'][0]);
         $attemptId = $payload['attempt']['id'];
         $this->getJson('/api/aluno/practice/summary')->assertJsonPath('body.open_session.id', $attemptId);
 

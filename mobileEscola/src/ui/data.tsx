@@ -128,8 +128,12 @@ const OPT_NOTE: Partial<Record<AnswerState, string>> = { correct: 'Sua resposta 
 
 /** Alternativa: default · selected (antes de confirmar) · correct · incorrect · missed (a certa, não marcada) · dimmed. */
 export function AnswerOption({
-  letter, state = 'default', note, onPress, children,
-}: { letter: string; state?: AnswerState; note?: string | null; onPress?: () => void; children: React.ReactNode }) {
+  letter, state = 'default', note, onPress, children, eliminated, onEliminate, textScale = 1,
+}: {
+  letter: string; state?: AnswerState; note?: string | null; onPress?: () => void; children: React.ReactNode;
+  /** "Riscar alternativa": o aluno elimina as que sabe que estão erradas, como no papel. */
+  eliminated?: boolean; onEliminate?: () => void; textScale?: number;
+}) {
   const p = usePalette();
   const s = {
     default: { border: p.line, bg: p.surface, letterBg: 'transparent', letterBorder: p.lineStrong, letterFg: p.inkMuted, fg: p.ink, noteFg: p.ink, dashed: false },
@@ -139,28 +143,46 @@ export function AnswerOption({
     missed: { border: p.success, bg: p.surface, letterBg: 'transparent', letterBorder: p.success, letterFg: p.success, fg: p.ink, noteFg: p.success, dashed: true },
     dimmed: { border: p.line, bg: p.surface, letterBg: 'transparent', letterBorder: p.lineStrong, letterFg: p.inkMuted, fg: p.inkMuted, noteFg: p.inkMuted, dashed: false },
   }[state];
-  const shownNote = note !== undefined ? note : OPT_NOTE[state];
+  const out = !!eliminated && state === 'default';
+  const shownNote = out ? 'Você riscou esta' : note !== undefined ? note : OPT_NOTE[state];
   const locked = ['correct', 'incorrect', 'missed', 'dimmed'].includes(state) && !onPress;
-  return (
+  const option = (
     <Pressable accessibilityRole="radio" accessibilityState={{ checked: state === 'selected' || state === 'correct' || state === 'incorrect', disabled: locked }}
       accessibilityLabel={`Alternativa ${letter}`} disabled={locked} onPress={onPress}
       style={{
-        flexDirection: 'row', gap: space[3], alignItems: 'flex-start', paddingVertical: 14, paddingLeft: space[3], paddingRight: space[4],
+        flexDirection: 'row', gap: space[3], alignItems: 'flex-start', paddingVertical: 14, paddingLeft: space[3], paddingRight: onEliminate ? 52 : space[4],
         borderRadius: radius.md, borderWidth: 1.5, borderStyle: s.dashed ? 'dashed' : 'solid', borderColor: s.border, backgroundColor: s.bg,
       }}>
       <View style={{
-        width: 28, height: 28, marginTop: -3, borderRadius: 14, borderWidth: 1.5, borderColor: s.letterBorder,
+        width: 28, height: 28, marginTop: -3, borderRadius: 14, borderWidth: 1.5, borderColor: s.letterBorder, borderStyle: out ? 'dashed' : 'solid',
         backgroundColor: s.letterBg, alignItems: 'center', justifyContent: 'center',
       }}>
         {state === 'correct' || state === 'missed' ? <Icon name="check" size={16} strokeWidth={3} color={s.letterFg} />
           : state === 'incorrect' ? <Icon name="x" size={16} strokeWidth={3} color={s.letterFg} />
-          : <Text style={[type.caption, { fontSize: 13, ...font.bold, color: s.letterFg }]}>{letter}</Text>}
+          : <Text style={[type.caption, { fontSize: 13, ...font.bold, color: out ? p.inkSubtle : s.letterFg }]}>{letter}</Text>}
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 2, opacity: state === 'dimmed' ? 0.72 : 1 }}>
-        {typeof children === 'string' ? <Txt style={{ color: s.fg }}>{children}</Txt> : children}
-        {shownNote ? <Txt variant="caption" style={{ ...font.bold, color: s.noteFg }}>{shownNote}</Txt> : null}
+      <View style={{ flex: 1, minWidth: 0, gap: 2, opacity: out ? 0.6 : state === 'dimmed' ? 0.72 : 1 }}>
+        {typeof children === 'string'
+          ? <Txt style={{ color: out ? p.inkSubtle : s.fg, fontSize: 15 * textScale, lineHeight: 22 * textScale, textDecorationLine: out ? 'line-through' : 'none' }}>{children}</Txt>
+          : children}
+        {shownNote ? <Txt variant="caption" style={{ ...font.bold, color: out ? p.inkSubtle : s.noteFg }}>{shownNote}</Txt> : null}
       </View>
     </Pressable>
+  );
+  if (!onEliminate) return option;
+  // O botão de riscar fica fora da alternativa (na web, botão dentro de botão é inválido).
+  return (
+    <View style={{ position: 'relative', justifyContent: 'center' }}>
+      {option}
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: out }} accessibilityLabel={`${out ? 'Desfazer risco da alternativa' : 'Riscar alternativa'} ${letter}`}
+        onPress={onEliminate}
+        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => ({
+          position: 'absolute', right: 8, width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+          borderRadius: radius.sm, backgroundColor: pressed || hovered ? p.surfaceSunken : 'transparent',
+        }) as never}>
+        <Icon name={out ? 'undo' : 'strike'} size={18} color={out ? p.ink : p.inkSubtle} />
+      </Pressable>
+    </View>
   );
 }
 
