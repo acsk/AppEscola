@@ -8,7 +8,8 @@ import { fetchPracticeRanking, type PracticeRankingPeriod, type PracticeRankingR
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 
 const PERIODS: { id: PracticeRankingPeriod; label: string }[] = [
-  { id: "week", label: "Últimos 7 dias" },
+  { id: "week", label: "Esta semana" },
+  { id: "last_week", label: "Semana anterior" },
   { id: "month", label: "Últimos 30 dias" },
   { id: "all", label: "Desde o início" },
 ];
@@ -49,6 +50,7 @@ export default function PracticeRankingModal({ visible, onClose }: Props) {
         <Text className="text-sm text-ink-muted">
           Alunos que mais responderam questões diferentes no app (prática avulsa e simulados do banco finalizados).
           Repetir a mesma questão não sobe posição; empates são decididos pelos acertos. No app, os alunos veem o nome abreviado.
+          A semana vai de segunda a domingo e reinicia toda segunda às 00h; "Semana anterior" mostra o resultado já fechado.
         </Text>
         <Tabs items={PERIODS} value={period} onChange={setPeriod} accessibilityLabel="Período do ranking" />
 

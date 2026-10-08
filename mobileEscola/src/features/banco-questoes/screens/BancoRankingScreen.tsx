@@ -6,13 +6,16 @@ import type { QuestoesStackParamList } from '../../../navigation/stacks/Questoes
 import { getApiErrorMessage } from '../../../lib/apiError';
 import type { RankingPeriod, RankingRow } from '../../../services/practice.service';
 import { usePracticeRanking } from '../hooks';
+import { rankingWeekRange } from '../lib/format';
 import {
   AppBar, Button, Card, IconButton, Notice, Overline, PageBody, PageHeader, RankRow, ScreenBody, SegmentedControl, Txt,
   font, space, useLayoutMode, usePalette,
 } from '../../../ui';
 
 type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoRanking'>;
-const PERIODS: { id: RankingPeriod; label: string }[] = [{ id: 'week', label: '7 dias' }, { id: 'month', label: '30 dias' }, { id: 'all', label: 'Geral' }];
+const PERIODS: { id: RankingPeriod; label: string }[] = [
+  { id: 'week', label: 'Semana' }, { id: 'last_week', label: 'Anterior' }, { id: 'month', label: '30 dias' }, { id: 'all', label: 'Geral' },
+];
 
 const initials = (name: string) => name.replace(/\(.*?\)/g, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
 const firstName = (name: string) => name.split(/\s+/)[0] ?? name;
@@ -30,8 +33,14 @@ export function BancoRankingScreen() {
   const above: RankingRow | null = me && me.position > 1 ? data?.ranking.find((r) => r.position === me.position - 1) ?? null : null;
   const meInList = !!data?.ranking.some((r) => r.is_me);
 
-  const headline = !me ? 'Você ainda não está no ranking' : me.position === 1 ? 'Você está em 1º lugar!' : `Você está em ${me.position}º lugar!`;
-  const detail = !me
+  const closed = period === 'last_week';
+  const weekRange = data ? rankingWeekRange(data) : null;
+  const headline = closed
+    ? (!me ? 'Você não pontuou na semana anterior' : me.position === 1 ? 'Você foi o 1º lugar da semana!' : `Você terminou em ${me.position}º lugar`)
+    : !me ? 'Você ainda não está no ranking' : me.position === 1 ? 'Você está em 1º lugar!' : `Você está em ${me.position}º lugar!`;
+  const detail = closed
+    ? 'Esse resultado já está fechado. Pratique agora para subir no ranking desta semana.'
+    : !me
     ? 'Responda questões do banco neste período para entrar.'
     : above
       ? `Responda mais ${Math.max(1, above.questions - me.questions + 1)} ${Math.max(1, above.questions - me.questions + 1) === 1 ? 'questão diferente' : 'questões diferentes'} para passar ${firstName(above.name)}.`
@@ -61,13 +70,17 @@ export function BancoRankingScreen() {
             <Button icon="play" block={!isDesktop} label="Praticar" onPress={practice} />
           </View>
         </Card>
-        <Overline>{data.participants} {data.participants === 1 ? 'aluno' : 'alunos'} no período</Overline>
+        <Overline>
+          {weekRange ? `${closed ? 'Resultado final · ' : 'Semana de '}${weekRange} · ` : ''}
+          {data.participants} {data.participants === 1 ? 'aluno' : 'alunos'}
+        </Overline>
+        {period === 'week' ? <Txt variant="bodySm" tone="subtle">O ranking da semana reinicia toda segunda-feira às 00h.</Txt> : null}
         {data.ranking.length ? (
           <Card padding="none" style={{ padding: isDesktop ? 8 : 6 }}>
             {data.ranking.map(row)}
             {me && !meInList ? <>{<View style={{ height: 1, backgroundColor: p.line, marginVertical: 6 }} />}{row(me)}</> : null}
           </Card>
-        ) : <Txt tone="subtle">Ninguém respondeu questões neste período ainda.</Txt>}
+        ) : <Txt tone="subtle">{closed ? 'Ninguém respondeu questões na semana anterior.' : 'Ninguém respondeu questões neste período ainda.'}</Txt>}
         <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 19 }}>
           Conta quantas questões diferentes cada aluno respondeu no banco (prática e simulados do banco). Repetir a mesma questão não sobe posição.
         </Txt>

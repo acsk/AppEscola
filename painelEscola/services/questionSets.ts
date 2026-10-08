@@ -99,7 +99,8 @@ export async function removeQuestionFromSet(id: number, questionId: number) {
 
 // ── Ranking de participação ─────────────────────────────────────────────────
 
-export type PracticeRankingPeriod = "week" | "month" | "all";
+/** week = semana corrente (desde segunda 00:00); last_week = semana anterior, já fechada. */
+export type PracticeRankingPeriod = "week" | "last_week" | "month" | "all";
 
 export type PracticeRankingRow = {
   position: number;
@@ -115,7 +116,7 @@ export type PracticeRankingRow = {
 };
 
 export async function fetchPracticeRanking(period: PracticeRankingPeriod, limit = 50) {
-  const { data } = await api.get<Envelope<{ period: PracticeRankingPeriod; since: string | null; participants: number; ranking: PracticeRankingRow[] }>>(
+  const { data } = await api.get<Envelope<{ period: PracticeRankingPeriod; since: string | null; until?: string | null; participants: number; ranking: PracticeRankingRow[] }>>(
     "/question-bank/practice-ranking", { params: { period, limit } }
   );
   return data.body;

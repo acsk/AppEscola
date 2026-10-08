@@ -118,7 +118,8 @@ export interface PracticePerformance {
   subjects: PerformanceSubject[];
 }
 
-export type RankingPeriod = 'week' | 'month' | 'all';
+/** week = semana corrente (desde segunda 00:00); last_week = semana anterior, já fechada. */
+export type RankingPeriod = 'week' | 'last_week' | 'month' | 'all';
 
 export interface RankingRow extends PerformanceScore {
   position: number;
@@ -131,6 +132,7 @@ export interface RankingRow extends PerformanceScore {
 export interface PracticeRanking {
   period: RankingPeriod;
   since: string | null;
+  until?: string | null;
   participants: number;
   ranking: RankingRow[];
   me: RankingRow | null;
