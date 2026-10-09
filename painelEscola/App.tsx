@@ -48,7 +48,7 @@ import { AiSettingsScreen, BillingSettingsScreen, MobileThemeSettingsScreen } fr
 import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
-import { ClassStudentsReportScreen } from "./screens/relatorios";
+import { ClassStudentsReportScreen, FinanceReportScreen } from "./screens/relatorios";
 
 import type { NavState } from "./types/navigation";
 import { canManageExams as roleCanManageExams } from "./utils/permissions";
@@ -262,6 +262,7 @@ function hashToNav(hash: string): NavState {
   }
 
   if (seg0 === "relatorios") {
+    if (seg1 === "financeiro") return { screen: "relatorios-financeiro" };
     if (seg1 === "turmas") return { screen: "relatorios-turmas" };
     return { screen: "relatorios-turmas" };
   }
@@ -355,6 +356,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
+  if (nav.screen === "relatorios-financeiro") return "#/relatorios/financeiro";
   return `#/${nav.screen}`;
 }
 
@@ -717,6 +719,8 @@ function AppContent() {
     ? "notificacoes"
     : nav.screen.startsWith("calendario")
     ? "calendario"
+    : nav.screen === "relatorios-financeiro"
+    ? "relatorios-financeiro"
     : nav.screen.startsWith("relatorios")
     ? "relatorios-turmas"
     : nav.screen.startsWith("simulados")
@@ -1016,6 +1020,7 @@ function AppContent() {
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       case "relatorios-turmas": return <ClassStudentsReportScreen navigate={navigate} />;
+      case "relatorios-financeiro": return <FinanceReportScreen navigate={navigate} />;
       default: return <DashboardScreen navigate={navigate} />;
     }
   };

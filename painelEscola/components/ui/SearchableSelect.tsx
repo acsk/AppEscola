@@ -25,8 +25,13 @@ interface Props {
   required?: boolean;
   placeholder?: string;
   options: SearchableOption[];
-  value: string;
-  onChange: (value: string) => void;
+  /** Seleção única. Obrigatório quando `multiple` não está ativo. */
+  value?: string;
+  onChange?: (value: string) => void;
+  /** Várias opções na mesma combo. O modal permanece aberto para marcar e desmarcar. */
+  multiple?: boolean;
+  values?: string[];
+  onChangeValues?: (values: string[]) => void;
   error?: string;
   disabled?: boolean;
   /** Título da modal */
@@ -51,8 +56,11 @@ export default function SearchableSelect({
   required,
   placeholder = "Selecione...",
   options,
-  value,
+  value = "",
   onChange,
+  multiple = false,
+  values = [],
+  onChangeValues,
   error,
   disabled = false,
   modalTitle = "Selecionar",
@@ -70,11 +78,26 @@ export default function SearchableSelect({
 
   const asyncMode = !!onSearch;
 
+  const selectedValues = multiple ? values : value ? [value] : [];
+
   const selected =
     (selectedOption?.value === value ? selectedOption : null) ??
     (pickedOption?.value === value ? pickedOption : null) ??
     options.find((o) => o.value === value) ??
     asyncOptions.find((o) => o.value === value);
+
+  const labelFor = (optionValue: string) =>
+    options.find((option) => option.value === optionValue)?.label ??
+    asyncOptions.find((option) => option.value === optionValue)?.label ??
+    optionValue;
+
+  const triggerLabel = multiple
+    ? selectedValues.length === 0
+      ? placeholder
+      : selectedValues.map(labelFor).join(", ")
+    : selected
+      ? selected.label
+      : placeholder;
 
   const filtered = asyncMode
     ? asyncOptions
@@ -110,17 +133,28 @@ export default function SearchableSelect({
 
   const handleSelect = useCallback(
     (opt: SearchableOption) => {
+      if (multiple) {
+        const next = selectedValues.includes(opt.value)
+          ? selectedValues.filter((current) => current !== opt.value)
+          : [...selectedValues, opt.value];
+        onChangeValues?.(next);
+        return;
+      }
       setPickedOption(opt);
-      onChange(opt.value);
+      onChange?.(opt.value);
       setOpen(false);
       setQuery("");
       setAsyncOptions([]);
     },
-    [onChange]
+    [multiple, onChange, onChangeValues, selectedValues]
   );
 
   const handleClear = () => {
-    onChange("");
+    if (multiple) {
+      onChangeValues?.([]);
+      return;
+    }
+    onChange?.("");
     setQuery("");
     setPickedOption(null);
   };
@@ -288,7 +322,7 @@ export default function SearchableSelect({
             </View>
           ) : (
             filtered.map((opt) => {
-              const isSelected = opt.value === value;
+              const isSelected = selectedValues.includes(opt.value);
               return (
                 <TouchableOpacity
                   key={opt.value}
@@ -362,7 +396,7 @@ export default function SearchableSelect({
             }}
           >
             <Text style={{ fontSize: 14, fontWeight: "600", color: "var(--ds-ink)" }}>
-              Fechar
+              {multiple ? "Concluir" : "Fechar"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -395,6 +429,7 @@ export default function SearchableSelect({
         aria-label={label ?? placeholder}
         aria-expanded={open}
         aria-disabled={disabled}
+        aria-multiselectable={multiple || undefined}
         style={{
           flexDirection: "row",
           alignItems: "center",
@@ -412,14 +447,14 @@ export default function SearchableSelect({
           style={{
             flex: 1,
             fontSize: 14,
-            color: selected ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
+            color: selectedValues.length > 0 ? "var(--ds-ink)" : "var(--ds-ink-subtle)",
           }}
           numberOfLines={1}
         >
-          {selected ? selected.label : placeholder}
+          {triggerLabel}
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          {selected && !disabled && (
+          {selectedValues.length > 0 && !disabled && (
             <TouchableOpacity
               onPress={handleClear}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

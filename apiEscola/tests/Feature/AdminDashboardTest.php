@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Invoice;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
@@ -98,5 +99,46 @@ class AdminDashboardTest extends TestCase
             ->getJson("/api/dashboard?tenant_id={$tenant->id}")
             ->assertOk()
             ->assertJsonPath('body.stats.0.value', 1);
+    }
+
+    public function test_dashboard_finance_includes_previous_month_and_six_month_series(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $admin = User::factory()->admin()->create([
+            'tenant_id' => $tenant->id,
+            'status' => 'active',
+        ]);
+        $student = Student::factory()->create([
+            'tenant_id' => $tenant->id,
+            'status' => 'active',
+        ]);
+
+        Invoice::factory()->create([
+            'tenant_id' => $tenant->id,
+            'student_id' => $student->id,
+            'amount' => 320,
+            'status' => 'paid',
+            'payment_method' => 'pix',
+            'type' => 'monthly',
+            'due_date' => now()->startOfMonth()->toDateString(),
+            'paid_at' => now()->startOfMonth()->addDay(),
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/dashboard')
+            ->assertOk()
+            ->assertJsonPath('body.finance.paid_month_count', 1)
+            ->assertJsonPath('body.finance.monthly.5.paid_count', 1)
+            ->assertJsonStructure([
+                'body' => [
+                    'finance' => [
+                        'paid_previous_month_amount',
+                        'paid_month_trend_percent',
+                        'monthly' => [
+                            '*' => ['period', 'label', 'paid_amount', 'paid_count', 'due_amount', 'due_count'],
+                        ],
+                    ],
+                ],
+            ]);
     }
 }

@@ -39,6 +39,16 @@ export type DashboardPayload = {
     overdue_amount: string;
     paid_month_count: number;
     paid_month_amount: string;
+    paid_previous_month_amount?: string;
+    paid_month_trend_percent?: number | null;
+    monthly?: Array<{
+      period: string;
+      label: string;
+      paid_amount: string;
+      paid_count: number;
+      due_amount: string;
+      due_count: number;
+    }>;
     exam_passes_30d: number;
     enrollments_active: number;
   };

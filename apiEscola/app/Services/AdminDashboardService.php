@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Models\StudentAttendance;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class AdminDashboardService
@@ -40,7 +41,7 @@ class AdminDashboardService
             'generated_at' => now()->toISOString(),
             'stats' => $this->buildStats($row),
             'students_breakdown' => $this->buildStudentsBreakdown($row),
-            'finance' => $this->buildFinance($row),
+            'finance' => $this->buildFinance($row, $tenantId),
             'attendance' => $this->buildAttendanceWeekly($tenantId, $schoolClassId),
             'attendance_class' => $attendanceClass
                 ? ['id' => $attendanceClass->id, 'name' => $attendanceClass->name]
@@ -131,18 +132,99 @@ class AdminDashboardService
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
-    private function buildFinance(array $row): array
+    private function buildFinance(array $row, int $tenantId): array
     {
+        $current = (float) ($row['paid_current_month_amount'] ?? 0);
+        $previous = (float) ($row['paid_previous_month_amount'] ?? 0);
+
         return [
             'open_count' => (int) ($row['invoices_open_count'] ?? 0),
             'open_amount' => number_format((float) ($row['invoices_open_amount'] ?? 0), 2, '.', ''),
             'overdue_count' => (int) ($row['invoices_overdue_count'] ?? 0),
             'overdue_amount' => number_format((float) ($row['invoices_overdue_amount'] ?? 0), 2, '.', ''),
             'paid_month_count' => (int) ($row['paid_current_month_count'] ?? 0),
-            'paid_month_amount' => number_format((float) ($row['paid_current_month_amount'] ?? 0), 2, '.', ''),
+            'paid_month_amount' => number_format($current, 2, '.', ''),
+            'paid_previous_month_amount' => number_format($previous, 2, '.', ''),
+            'paid_month_trend_percent' => $this->percentChange($current, $previous),
+            'monthly' => $this->buildFinanceMonthly($tenantId),
             'exam_passes_30d' => (int) ($row['exam_passes_30d'] ?? 0),
             'enrollments_active' => (int) ($row['enrollments_active'] ?? 0),
         ];
+    }
+
+    /**
+     * Últimos 6 meses: recebido (por paid_at) e faturado (por due_date, sem canceladas).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildFinanceMonthly(int $tenantId): array
+    {
+        $start = Carbon::now()->startOfMonth()->subMonths(5);
+        $end = Carbon::now()->endOfMonth();
+
+        $base = Invoice::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->excludingImportedFromCoraSync();
+
+        $paidExpr = $this->yearMonthExpression('paid_at');
+        $dueExpr = $this->yearMonthExpression('due_date');
+
+        $paid = $this->resetColumns(clone $base)
+            ->where('status', 'paid')
+            ->whereBetween('paid_at', [$start, $end])
+            ->selectRaw("{$paidExpr} as period, COUNT(*) as aggregate_count, COALESCE(SUM(amount), 0) as total_amount")
+            ->groupBy(DB::raw($paidExpr))
+            ->get()
+            ->keyBy('period');
+
+        $due = $this->resetColumns(clone $base)
+            ->where('status', '!=', 'cancelled')
+            ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw("{$dueExpr} as period, COUNT(*) as aggregate_count, COALESCE(SUM(amount), 0) as total_amount")
+            ->groupBy(DB::raw($dueExpr))
+            ->get()
+            ->keyBy('period');
+
+        $months = [];
+        for ($i = 0; $i < 6; $i++) {
+            $cursor = $start->copy()->addMonths($i);
+            $key = $cursor->format('Y-m');
+            $months[] = [
+                'period' => $key,
+                'label' => $this->monthLabel($cursor),
+                'paid_amount' => number_format((float) ($paid[$key]->total_amount ?? 0), 2, '.', ''),
+                'paid_count' => (int) ($paid[$key]->aggregate_count ?? 0),
+                'due_amount' => number_format((float) ($due[$key]->total_amount ?? 0), 2, '.', ''),
+                'due_count' => (int) ($due[$key]->aggregate_count ?? 0),
+            ];
+        }
+
+        return $months;
+    }
+
+    private function resetColumns($query)
+    {
+        $query->getQuery()->columns = null;
+        $query->getQuery()->orders = null;
+
+        return $query;
+    }
+
+    private function yearMonthExpression(string $column): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'sqlite' => "strftime('%Y-%m', {$column})",
+            'pgsql' => "to_char({$column}, 'YYYY-MM')",
+            default => "DATE_FORMAT({$column}, '%Y-%m')",
+        };
+    }
+
+    private function monthLabel(Carbon $date): string
+    {
+        $names = [1 => 'jan', 2 => 'fev', 3 => 'mar', 4 => 'abr', 5 => 'mai', 6 => 'jun', 7 => 'jul', 8 => 'ago', 9 => 'set', 10 => 'out', 11 => 'nov', 12 => 'dez'];
+
+        return ($names[(int) $date->month] ?? $date->format('m')).'/'.$date->format('y');
     }
 
     /**

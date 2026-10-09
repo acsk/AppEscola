@@ -97,7 +97,13 @@ export default function Sidebar({
         { id: "matriculas", label: "Matrículas", icon: ClipboardList },
       ],
     },
-    { label: "Relatórios", items: [{ id: "relatorios-turmas", label: "Turmas (alunos)", icon: ChartColumn }] },
+    {
+      label: "Relatórios",
+      items: [
+        { id: "relatorios-turmas", label: "Turmas (alunos)", icon: ChartColumn },
+        { id: "relatorios-financeiro", label: "Financeiro", icon: ChartColumn },
+      ],
+    },
     ...(canSendNotifications
       ? [
           {

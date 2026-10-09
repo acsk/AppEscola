@@ -212,6 +212,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     // Turmas
     Route::apiResource('school-classes', SchoolClassController::class);
     Route::get('reports/class-students', [ReportController::class, 'classStudents']);
+    Route::get('reports/finance', [ReportController::class, 'finance']);
 
     // Horários por turma (nested)
     Route::prefix('school-classes/{schoolClass}/schedules')->group(function () {

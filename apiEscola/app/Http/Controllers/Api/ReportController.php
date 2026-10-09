@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\ClassStudentsReportService;
+use App\Services\FinanceReportService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class ReportController extends Controller
 {
@@ -23,6 +25,7 @@ class ReportController extends Controller
 
     public function __construct(
         private readonly ClassStudentsReportService $classStudentsReport,
+        private readonly FinanceReportService $financeReport,
     ) {
     }
 
@@ -58,6 +61,51 @@ class ReportController extends Controller
                 'total' => $report->total(),
             ],
         ], 'Relatório de turmas carregado com sucesso.');
+    }
+
+    public function finance(Request $request): JsonResponse
+    {
+        if ($denied = $this->denyUnlessStaff($request)) {
+            return $denied;
+        }
+
+        $tenantId = $this->getTenantId($request);
+        if ($tenantId === null) {
+            return $this->validationError(
+                ['tenant_id' => ['Informe o tenant no login ou envie ?tenant_id= na requisição.']],
+                'tenant_id é obrigatório para esta operação.'
+            );
+        }
+
+        $validated = $request->validate([
+            'date_basis' => ['nullable', 'in:due_date,paid_at,created_at'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'status' => ['nullable', 'in:pending,paid,overdue,cancelled'],
+            'payment_method' => ['nullable', 'string', 'max:40'],
+            'type' => ['nullable', 'string', 'max:40'],
+            'school_class_id' => ['nullable', 'integer', 'min:1'],
+            'course_id' => ['nullable', 'integer', 'min:1'],
+            'search' => ['nullable', 'string', 'max:120'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        if (! empty($validated['date_from']) && ! empty($validated['date_to'])) {
+            $from = Carbon::parse($validated['date_from'])->startOfMonth();
+            $to = Carbon::parse($validated['date_to'])->startOfMonth();
+            if ((int) abs($from->diffInMonths($to)) > 24) {
+                return $this->validationError(
+                    ['date_to' => ['O período pode ter no máximo 24 meses.']],
+                    'O período pode ter no máximo 24 meses.'
+                );
+            }
+        }
+
+        return $this->success(
+            $this->financeReport->build($tenantId, $validated),
+            'Relatório financeiro carregado com sucesso.'
+        );
     }
 
     private function denyUnlessStaff(Request $request): ?JsonResponse

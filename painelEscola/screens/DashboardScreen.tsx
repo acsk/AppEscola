@@ -8,6 +8,7 @@ import FormSelect from "../components/ui/FormSelect";
 import StatTile from "../components/ui/StatTile";
 import Badge from "../components/ui/Badge";
 import AttendanceBarChart from "../components/dashboard/AttendanceBarChart";
+import FinanceMonthChart from "../components/dashboard/FinanceMonthChart";
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchDashboard, type DashboardPayload, type DashboardStat } from "../services/dashboard";
@@ -198,16 +199,31 @@ export default function DashboardScreen({ navigate }: Props) {
           {/* Financeiro + alunos */}
           <View style={row()}>
             <View style={{ flex: 1, width: isMobile ? "100%" : undefined }}>
-              <Panel title="Financeiro" description="Cobranças do cursinho.">
+              <Panel
+                title="Financeiro"
+                description="Recebido no mês comparado ao anterior, e os últimos 6 meses."
+                actions={
+                  navigate ? (
+                    <Button variant="ghost" size="sm" label="Relatório" onPress={() => navigate("relatorios-financeiro")} />
+                  ) : undefined
+                }
+              >
                 <View style={{ gap: 12 }}>
                   {[
-                    { label: "Recebido no mês", value: formatBrl(data.finance.paid_month_amount), sub: `${formatInt(data.finance.paid_month_count)} pagamentos`, tone: null },
-                    { label: "Em aberto", value: formatBrl(data.finance.open_amount), sub: `${formatInt(data.finance.open_count)} cobranças`, tone: null },
+                    {
+                      label: "Recebido no mês",
+                      value: formatBrl(data.finance.paid_month_amount),
+                      sub: `${formatInt(data.finance.paid_month_count)} pagamentos`,
+                      tone: null,
+                      trend: data.finance.paid_month_trend_percent,
+                    },
+                    { label: "Em aberto", value: formatBrl(data.finance.open_amount), sub: `${formatInt(data.finance.open_count)} cobranças`, tone: null, trend: null },
                     {
                       label: "Vencidas",
                       value: formatBrl(data.finance.overdue_amount),
                       sub: `${formatInt(data.finance.overdue_count)} cobranças`,
                       tone: data.finance.overdue_count > 0 ? ("danger" as const) : null,
+                      trend: null,
                     },
                   ].map((item, i) => (
                     <View
@@ -218,6 +234,11 @@ export default function DashboardScreen({ navigate }: Props) {
                       <View style={{ flexShrink: 1 }}>
                         <Text className="text-sm text-ink">{item.label}</Text>
                         <Text className="text-xs text-ink-subtle">{item.sub}</Text>
+                        {item.trend != null ? (
+                          <Text className={item.trend > 0 ? "text-xs text-success" : item.trend < 0 ? "text-xs text-danger" : "text-xs text-ink-subtle"}>
+                            {item.trend > 0 ? "▲" : item.trend < 0 ? "▼" : "•"} {Math.abs(item.trend).toLocaleString("pt-BR")}% vs. mês anterior
+                          </Text>
+                        ) : null}
                       </View>
                       <View style={{ alignItems: "flex-end", gap: 4 }}>
                         <Text className="font-mono font-medium text-ink" style={{ fontSize: 15 }}>
@@ -227,6 +248,19 @@ export default function DashboardScreen({ navigate }: Props) {
                       </View>
                     </View>
                   ))}
+                  {(data.finance.monthly ?? []).some((month) => parseFloat(month.paid_amount) > 0 || parseFloat(month.due_amount) > 0) ? (
+                    <FinanceMonthChart
+                      data={(data.finance.monthly ?? []).map((month) => ({
+                        label: month.label,
+                        paid: parseFloat(month.paid_amount) || 0,
+                        reference: parseFloat(month.due_amount) || 0,
+                      }))}
+                      paidLabel="Recebido"
+                      referenceLabel="Faturado"
+                      accessibilityLabel="Recebido e faturado nos últimos 6 meses"
+                      height={168}
+                    />
+                  ) : null}
                   <Text className="text-xs text-ink-subtle" style={{ marginTop: 4 }}>
                     {formatInt(data.finance.enrollments_active)} matrículas ativas · {formatInt(data.finance.exam_passes_30d)} aprovações em simulados (≥70%) nos últimos 30 dias
                   </Text>

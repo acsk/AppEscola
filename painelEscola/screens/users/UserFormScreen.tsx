@@ -7,95 +7,14 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  Calculator, BookOpen, FlaskConical, Landmark, Globe,
-  Dumbbell, Languages, Atom, Music, Palette, Code2,
-  Brain, BookMarked, GraduationCap, Microscope, Earth,
-  Lightbulb, PenLine, Sigma,
-} from "lucide-react-native";
 import api from "../../services/api";
 import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
+import SearchableSelect from "../../components/ui/SearchableSelect";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { parseApiErrors } from "../../utils/apiErrors";
 import { useAuth } from "../../contexts/AuthContext";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
-
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
-  calculator: Calculator,
-  "book-open": BookOpen,
-  "flask-conical": FlaskConical,
-  landmark: Landmark,
-  globe: Globe,
-  dumbbell: Dumbbell,
-  languages: Languages,
-  atom: Atom,
-  music: Music,
-  palette: Palette,
-  code2: Code2,
-  brain: Brain,
-  "book-marked": BookMarked,
-  "graduation-cap": GraduationCap,
-  microscope: Microscope,
-  earth: Earth,
-  lightbulb: Lightbulb,
-  "pen-line": PenLine,
-  sigma: Sigma,
-};
-
-const ICON_LABELS: Record<string, string> = {
-  calculator: "Calculadora",
-  "book-open": "Livro aberto",
-  "flask-conical": "Frasco",
-  landmark: "Colunas",
-  globe: "Globo",
-  dumbbell: "Halter",
-  languages: "Idiomas",
-  atom: "Atomo",
-  music: "Musica",
-  palette: "Paleta",
-  code2: "Código",
-  brain: "Cerebro",
-  "book-marked": "Livro marcado",
-  "graduation-cap": "Capelo",
-  microscope: "Microscopio",
-  earth: "Terra",
-  lightbulb: "Lampada",
-  "pen-line": "Caneta",
-  sigma: "Sigma",
-};
-
-function SubjectIcon({
-  icon,
-  color,
-  size = 18,
-}: {
-  icon?: string | null;
-  color?: string | null;
-  size?: number;
-}) {
-  const bg = color ?? "var(--ds-brand)";
-  const IconComp = icon ? ICON_MAP[icon] : null;
-
-  return (
-    <View
-      style={{
-        width: size + 16,
-        height: size + 16,
-        borderRadius: 4,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: bg + "22",
-      }}
-    >
-      {IconComp ? (
-        <IconComp size={size} color={bg} strokeWidth={2} />
-      ) : (
-        <Ionicons name="book-outline" size={size} color={bg} />
-      )}
-    </View>
-  );
-}
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -110,8 +29,6 @@ type TenantOption = {
 type SubjectOption = {
   id: number;
   name: string;
-  icon?: string | null;
-  color?: string | null;
 };
 
 type RoleOption = {
@@ -308,8 +225,6 @@ export default function UserFormScreen({ navigate, userId }: Props) {
           list.map((s: any) => ({
             id: s.id,
             name: s.name,
-            icon: s.icon ?? null,
-            color: s.color ?? null,
           }))
         );
       } catch {
@@ -335,15 +250,6 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       subject_ids: nextRole === "professor" || nextRole === "admin" ? prev.subject_ids : [],
     }));
     setErrors((prev) => ({ ...prev, role: "", tenant_id: "" }));
-  };
-
-  const toggleSubject = (id: number) => {
-    setForm((prev) => ({
-      ...prev,
-      subject_ids: prev.subject_ids.includes(id)
-        ? prev.subject_ids.filter((s) => s !== id)
-        : [...prev.subject_ids, id],
-    }));
   };
 
   const save = async () => {
@@ -565,35 +471,53 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       </View>
 
       {canTeach && (
-        <View className="bg-surface rounded-ds-md p-5 mb-5 border border-border" style={{ }}>
+        <View className="bg-surface rounded-ds-md p-5 mb-5 border border-border">
           <Text className="text-base font-semibold text-ink mb-1">Disciplinas</Text>
-          <Text className="text-xs text-ink-subtle mb-3">Selecione as disciplinas que este usuário leciona</Text>
+          <Text className="text-xs text-ink-subtle mb-3">Busque e marque as disciplinas que este usuário leciona</Text>
           {subjects.length === 0 ? (
             <Text className="text-sm text-ink-subtle">Nenhuma disciplina disponivel.</Text>
           ) : (
-            subjects.map((s) => {
-              const selected = form.subject_ids.includes(s.id);
-              return (
-                <TouchableOpacity
-                  key={s.id}
-                  className="flex-row items-center py-2"
-                  onPress={() => toggleSubject(s.id)}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name={selected ? "checkbox" : "square-outline"}
-                    size={20}
-                    color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
-                  />
-                  <View className="flex-row items-center gap-2 ml-2" style={{ flex: 1 }}>
-                    <SubjectIcon icon={s.icon} color={s.color} size={16} />
-                    <Text className="text-sm text-ink" style={{ flex: 1 }}>
-                      {s.name}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
+            <>
+              <SearchableSelect
+                modalTitle="Selecionar disciplinas"
+                placeholder="Buscar disciplina"
+                multiple
+                values={form.subject_ids.map(String)}
+                onChangeValues={(ids) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    subject_ids: ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0),
+                  }))
+                }
+                options={subjects.map((subject) => ({ value: String(subject.id), label: subject.name }))}
+                showSelectedPreview={false}
+              />
+              {form.subject_ids.length > 0 ? (
+                <View className="flex-row flex-wrap" style={{ gap: 8, marginTop: -8 }}>
+                  {form.subject_ids.map((id) => {
+                    const subject = subjects.find((item) => item.id === id);
+                    const name = subject?.name ?? `Disciplina #${id}`;
+                    return (
+                      <View key={id} className="flex-row items-center rounded-full bg-brand-tint border border-border pl-2 pr-1 py-0.5">
+                        <Text className="text-xs text-brand">{name}</Text>
+                        <TouchableOpacity
+                          onPress={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              subject_ids: prev.subject_ids.filter((current) => current !== id),
+                            }))
+                          }
+                          accessibilityLabel={`Remover ${name}`}
+                          className="ml-1"
+                        >
+                          <Ionicons name="close" size={12} color="var(--ds-brand-hover)" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </>
           )}
         </View>
       )}
