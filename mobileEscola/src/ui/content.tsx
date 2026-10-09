@@ -121,21 +121,40 @@ export function TopicRow({
   );
 }
 
-/** Seta contra a foto de cerca de 24h atrás: positivo sobe, negativo desce, zero manteve. Sem foto antiga, não marca. */
-/** Variação de posição (protótipo "Delta"): ▲ subiu, ▼ caiu, "–" manteve; sem comparação, nada. */
-export function RankMovement({ movement }: { movement?: number | null }) {
+const RANK_MEDAL = ['🥇', '🥈', '🥉'];
+
+const movementWhen = (referenceAt?: string | null) => {
+  if (!referenceAt) return null;
+  const date = new Date(referenceAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+};
+
+/** Seta do ranking: ↑ subiu, ↓ caiu, — manteve, NEW entrou depois do fechamento. Sem status e sem número, não marca. */
+export function RankMovement({ movement, status, referenceAt }: {
+  movement?: number | null;
+  status?: 'up' | 'down' | 'same' | 'new' | null;
+  referenceAt?: string | null;
+}) {
   const p = usePalette();
-  if (movement == null) return null;
-  if (movement === 0) {
-    return <Text accessibilityLabel="Sem mudança" style={{ ...font.bold, fontSize: 12, color: p.inkSubtle }}>–</Text>;
+  const when = movementWhen(referenceAt);
+  const since = when ? ` desde ${when}` : '';
+  if (status === 'new') {
+    const label = when ? `Entrou no ranking depois de ${when}` : 'Novo no ranking';
+    return <Text accessibilityLabel={label} {...{ title: label }} style={{ ...font.extrabold, fontSize: 10, letterSpacing: 0.4, color: p.inkSubtle }}>NEW</Text>;
   }
-  const up = movement > 0;
+  if (status === 'same' || movement === 0) {
+    const label = `Mesma posição${since}`;
+    return <Text accessibilityLabel={label} {...{ title: label }} style={{ ...font.bold, fontSize: 12, color: p.inkSubtle }}>—</Text>;
+  }
+  if (movement == null) return null;
+  const up = status === 'down' ? false : movement > 0;
   const places = Math.abs(movement);
+  const label = `${up ? 'Subiu' : 'Caiu'} ${places} ${places === 1 ? 'posição' : 'posições'}${since}`;
   return (
-    <View accessibilityLabel={`${up ? 'Subiu' : 'Desceu'} ${places} ${places === 1 ? 'posição' : 'posições'}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-      <Icon name={up ? 'chevron-up' : 'chevron-down'} size={14} strokeWidth={3} color={up ? p.success : p.dangerInk} />
-      <Text style={{ ...font.bold, fontSize: 12, color: up ? p.success : p.dangerInk, fontVariant: ['tabular-nums'] }}>{places}</Text>
-    </View>
+    <Text accessibilityLabel={label} {...{ title: label }} style={{ ...font.bold, fontSize: 12, color: up ? p.success : p.dangerInk, fontVariant: ['tabular-nums'] }}>
+      {up ? '↑' : '↓'}{places}
+    </Text>
   );
 }
 
@@ -166,8 +185,9 @@ const YouBadge = () => {
  * Linha do ranking (celular). A sua linha tem contorno ink e o selo "você".
  * Com `score`: pontos à direita e "6 questões · 83%" embaixo do nome.
  */
-export function RankRow({ pos, initials, name, rate, count, me, photoUrl, movement, score, scoreDecimals = 1 }: {
+export function RankRow({ pos, initials, name, rate, count, me, photoUrl, movement, movementStatus, movementReferenceAt, score, scoreDecimals = 1 }: {
   pos: number; initials: string; name: string; rate: number | null; count: number; me?: boolean; photoUrl?: string | null; movement?: number | null;
+  movementStatus?: 'up' | 'down' | 'same' | 'new' | null; movementReferenceAt?: string | null;
   score?: number | null; scoreDecimals?: 0 | 1;
 }) {
   const p = usePalette();
@@ -179,10 +199,14 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl, moveme
       backgroundColor: me ? p.surfaceSunken : 'transparent', borderWidth: me ? 1.5 : 0, borderColor: p.ink,
     }}>
       <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pos === 1 ? p.surfaceInverse : me ? p.surface : top ? p.surfaceSunken : 'transparent' }}>
-        {pos === 1 ? <Icon name="trophy" size={18} color={p.onInverse} />
-          : <Text style={{ ...font.extrabold, fontSize: 15, color: top ? p.ink : p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>}
+        {pos <= 3 ? <Text style={{ fontSize: 18, lineHeight: 22 }}>{RANK_MEDAL[pos - 1]}</Text>
+          : <Text style={{ ...font.extrabold, fontSize: 15, color: p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>}
       </View>
-      {movement !== undefined ? <View style={{ width: 40, alignItems: 'flex-start' }}><RankMovement movement={movement} /></View> : null}
+      {movement !== undefined || movementStatus != null ? (
+        <View style={{ minWidth: 40, alignItems: 'flex-start' }}>
+          <RankMovement movement={movement} status={movementStatus} referenceAt={movementReferenceAt} />
+        </View>
+      ) : null}
       <Avatar initials={initials} photoUrl={photoUrl} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
@@ -204,7 +228,7 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl, moveme
 }
 
 /** Colunas da tabela do ranking (desktop). */
-const RANK_COLS = { pos: 96, n1: 84, n2: 76, n3: 92, score: 200 };
+const RANK_COLS = { pos: 128, n1: 84, n2: 76, n3: 92, score: 200 };
 
 /** Cabeçalho da tabela do ranking. */
 export function RankHead({ labels = ['Questões', 'Acertos', 'Aproveit.', 'Pontos'] }: { labels?: [string, string, string, string] | string[] }) {
@@ -223,8 +247,9 @@ export function RankHead({ labels = ['Questões', 'Acertos', 'Aproveit.', 'Ponto
 }
 
 /** Linha da tabela do ranking (desktop): posição com a seta, aluno, três números e os pontos com barra. */
-export function RankLine({ pos, movement, initials, name, photoUrl, me, note, values, score, scoreLabel, max = 100 }: {
-  pos: number; movement?: number | null; initials: string; name: string; photoUrl?: string | null; me?: boolean;
+export function RankLine({ pos, movement, movementStatus, movementReferenceAt, initials, name, photoUrl, me, note, values, score, scoreLabel, max = 100 }: {
+  pos: number; movement?: number | null; movementStatus?: 'up' | 'down' | 'same' | 'new' | null; movementReferenceAt?: string | null;
+  initials: string; name: string; photoUrl?: string | null; me?: boolean;
   /** Ex.: "+3 repetidas, não contam". */
   note?: string | null;
   values: [string, string, string]; score: number; scoreLabel: string; max?: number;
@@ -236,16 +261,17 @@ export function RankLine({ pos, movement, initials, name, photoUrl, me, note, va
       flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.md,
       backgroundColor: me ? p.surfaceSunken : 'transparent', borderWidth: 1.5, borderColor: me ? p.ink : 'transparent',
     }}>
-      <View style={{ width: RANK_COLS.pos, flexDirection: 'row', alignItems: 'center', gap: space[2], overflow: 'visible' }}>
-        <Text style={{ ...font.extrabold, fontSize: 15, color: p.ink, minWidth: 26, fontVariant: ['tabular-nums'] }}>{pos}º</Text>
-        <RankMovement movement={movement} />
+      <View style={{ width: RANK_COLS.pos, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'visible' }}>
+        <Text style={{ ...font.extrabold, fontSize: 15, color: p.ink, fontVariant: ['tabular-nums'] }}>
+          {pos <= 3 ? `${RANK_MEDAL[pos - 1]} ` : ''}{pos}º
+        </Text>
+        <RankMovement movement={movement} status={movementStatus} referenceAt={movementReferenceAt} />
       </View>
       <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Avatar initials={initials} photoUrl={photoUrl} size={32} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, flexShrink: 1 }}>{name}</Txt>
-            {pos === 1 ? <Icon name="trophy" size={15} color={p.inkMuted} /> : null}
             {me ? <YouBadge /> : null}
           </View>
           {note ? <Txt variant="caption" tone="subtle" style={{ ...font.medium }}>{note}</Txt> : null}

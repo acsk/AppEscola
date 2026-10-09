@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\PracticeRankingHistoryService;
 use App\Models\ClassSchedule;
 use App\Models\Course;
 use App\Models\Enrollment;
@@ -639,6 +640,116 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertSame(11, $porNome['UM D.']['dedication_score']);
         $this->assertSame(1, $porNome['DOIS D.']['position']);
         $this->assertSame(2, $body['me']['position']);
+    }
+
+    public function test_daily_ranking_history_marks_rise_fall_same_and_newcomer(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-08 15:00', 'America/Sao_Paulo'));
+        $yesterday = Carbon::parse('2026-10-07 12:00', 'America/Sao_Paulo');
+        $today = Carbon::parse('2026-10-08 10:00', 'America/Sao_Paulo');
+        $qs = collect(range(1, 4))->map(fn ($i) => $this->practicable("H{$i}"));
+        $joao = $this->student('JOAO PEREIRA');
+        $maria = $this->student('MARIA DA SILVA');
+        $pedro = $this->student('PEDRO ALVES');
+        $ana = $this->student('ANA COSTA');
+        $this->record($joao, $qs[0], true, $yesterday);
+        $this->record($joao, $qs[1], true, $yesterday);
+        $this->record($maria, $qs[0], true, $yesterday);
+        $this->record($pedro, $qs[2], true, $yesterday);
+        $this->record($maria, $qs[1], true, $today);
+        $this->record($maria, $qs[3], true, $today);
+        $this->record($ana, $qs[2], true, $today);
+
+        $this->actingAsStudent($maria);
+        $body = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
+        $byName = collect($body['ranking'])->keyBy('name');
+        $this->assertSame(1, $byName['MARIA S.']['position']);
+        $this->assertSame(2, $byName['MARIA S.']['previous_position']);
+        $this->assertSame(1, $byName['MARIA S.']['movement']);
+        $this->assertSame('up', $byName['MARIA S.']['movement_status']);
+        $this->assertSame(1, $byName['JOAO P.']['previous_position']);
+        $this->assertSame(-1, $byName['JOAO P.']['movement']);
+        $this->assertSame('down', $byName['JOAO P.']['movement_status']);
+        $this->assertSame(3, $byName['PEDRO A.']['previous_position']);
+        $this->assertSame(0, $byName['PEDRO A.']['movement']);
+        $this->assertSame('same', $byName['PEDRO A.']['movement_status']);
+        $this->assertNull($byName['ANA C.']['previous_position']);
+        $this->assertNull($byName['ANA C.']['movement']);
+        $this->assertSame('new', $byName['ANA C.']['movement_status']);
+        $this->assertNotNull($body['movement_reference_at']);
+        $this->assertSame('up', $body['me']['movement_status']);
+
+        $days = DB::table('practice_ranking_snapshot_days')
+            ->where('tenant_id', $this->tenant->id)->where('criterion', 'wilson')->where('period', 'all')->count();
+        $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk();
+        $this->assertSame($days, DB::table('practice_ranking_snapshot_days')
+            ->where('tenant_id', $this->tenant->id)->where('criterion', 'wilson')->where('period', 'all')->count());
+    }
+
+    public function test_ranking_history_stays_inside_the_same_period_scope_and_criterion(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-08 15:00', 'America/Sao_Paulo'));
+        $matematica = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $maria = $this->student('MARIA DA SILVA');
+        $this->record($maria, $this->practicable('Escopo', $matematica->id), true, Carbon::parse('2026-10-07 12:00', 'America/Sao_Paulo'));
+        $history = app(PracticeRankingHistoryService::class);
+        $history->store($this->tenant->id, 'wilson', 'week', null, null, '2026-10-07', [
+            ['student_id' => $maria->id, 'position' => 9, 'score' => 1],
+        ], now());
+
+        $this->actingAsStudent($maria);
+        $week = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=week')->assertOk()->json('body');
+        $this->assertSame(9, $week['me']['previous_position']);
+        $this->assertSame('up', $week['me']['movement_status']);
+
+        $month = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=month')->assertOk()->json('body');
+        $this->assertSame(1, $month['me']['previous_position']);
+        $this->assertSame('same', $month['me']['movement_status']);
+
+        $history->store($this->tenant->id, 'wilson', 'all', null, null, '2026-10-07', [
+            ['student_id' => $maria->id, 'position' => 7, 'score' => 1],
+        ], now());
+        $geral = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
+        $this->assertSame(7, $geral['me']['previous_position']);
+
+        $dedication = $this->getJson('/api/aluno/practice/ranking?criterion=dedication&period=all')->assertOk()->json('body');
+        $this->assertSame(1, $dedication['me']['previous_position']);
+        $this->assertSame('same', $dedication['me']['movement_status']);
+
+        $filtrado = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&subject_id='.$matematica->id)->assertOk()->json('body');
+        $this->assertSame(1, $filtrado['me']['previous_position']);
+        $this->assertSame('same', $filtrado['me']['movement_status']);
+    }
+
+    public function test_ranking_history_keeps_the_tie_break_of_the_live_ranking(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-08 15:00', 'America/Sao_Paulo'));
+        $at = Carbon::parse('2026-10-07 12:00', 'America/Sao_Paulo');
+        $bia = $this->student('BIA LIMA');
+        $ana = $this->student('ANA COSTA');
+        $this->record($bia, $this->practicable('B'), true, $at);
+        $this->record($ana, $this->practicable('A'), true, $at);
+
+        $this->actingAsStudent($bia);
+        $body = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
+        $this->assertSame(['BIA L.', 'ANA C.'], array_column($body['ranking'], 'name'));
+        $this->assertSame([1, 2], array_column($body['ranking'], 'previous_position'));
+        $this->assertSame(['same', 'same'], array_column($body['ranking'], 'movement_status'));
+    }
+
+    public function test_daily_snapshot_command_is_idempotent(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-08 15:00', 'America/Sao_Paulo'));
+        $maria = $this->student('MARIA DA SILVA');
+        $this->record($maria, $this->practicable('Dia'), true, Carbon::parse('2026-10-07 12:00', 'America/Sao_Paulo'));
+
+        $this->artisan('ranking:daily-snapshot')->assertSuccessful();
+        $this->artisan('ranking:daily-snapshot')->assertSuccessful();
+
+        $days = DB::table('practice_ranking_snapshot_days')
+            ->where('tenant_id', $this->tenant->id)->where('criterion', 'wilson')->where('period', 'all')->where('scope_key', 'all');
+        $this->assertSame(1, $days->count());
+        $this->assertSame(1, DB::table('practice_ranking_snapshot_positions')->where('snapshot_day_id', $days->value('id'))->count());
     }
 
     /** @param  ExamQuestion[]  $questions */

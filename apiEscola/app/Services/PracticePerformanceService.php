@@ -43,7 +43,7 @@ class PracticePerformanceService
     public const SCORED_CRITERIA = [self::CRITERION_WILSON, self::CRITERION_DEDICATION];
 
     /** A semana do ranking vira na segunda 00:00 do horário escolar, não em UTC. */
-    private const RANKING_TIMEZONE = 'America/Sao_Paulo';
+    public const RANKING_TIMEZONE = 'America/Sao_Paulo';
 
     private const FOCUS_LIMIT = 5;
 
@@ -217,15 +217,12 @@ class PracticePerformanceService
             $until = $before;
         }
         if (in_array($criterion, self::SCORED_CRITERIA, true)) {
-            return $this->rankedStats($tenantId, $since, $until, null, null, $before, $criterion)
-                ->values()
-                ->map(fn ($row, int $index) => [
-                    'student_id' => (int) $row->id,
-                    'position' => $index + 1,
-                    'questions' => (int) $row->questions,
-                    'correct' => (int) $row->first_attempt_correct,
-                ])
-                ->all();
+            return array_map(fn (array $row) => [
+                'student_id' => $row['student_id'],
+                'position' => $row['position'],
+                'questions' => $row['questions'],
+                'correct' => $row['correct'],
+            ], $this->captureScoredRows($tenantId, $period, $criterion, null, null, $before));
         }
         $position = 0;
         $previous = null;
@@ -329,6 +326,31 @@ class PracticePerformanceService
     }
 
     /**
+     * Posição e pontuação do desempenho ou da dedicação, com o mesmo desempate da lista ao vivo.
+     * $before corta as respostas (fechamento de um dia).
+     *
+     * @return list<array{student_id: int, position: int, questions: int, correct: int, score: float}>
+     */
+    public function captureScoredRows(int $tenantId, string $period, string $criterion, ?int $subjectId, ?int $topicId, ?Carbon $before = null): array
+    {
+        [$since, $until] = $this->periodRange($period);
+        if ($before !== null && ($until === null || $before->lt($until))) {
+            $until = $before;
+        }
+
+        return $this->rankedStats($tenantId, $since, $until, $subjectId, $topicId, $before, $criterion)
+            ->values()
+            ->map(fn ($row, int $index) => [
+                'student_id' => (int) $row->id,
+                'position' => $index + 1,
+                'questions' => (int) $row->questions,
+                'correct' => (int) $row->first_attempt_correct,
+                'score' => $criterion === self::CRITERION_DEDICATION ? (float) $row->dedication_score : (float) $row->wilson_score,
+            ])
+            ->all();
+    }
+
+    /**
      * Desempenho (Wilson) ou dedicação.
      *
      * questions = questões cuja primeira tentativa histórica cai no período e no filtro.
@@ -346,12 +368,15 @@ class PracticePerformanceService
         $topicId = isset($filters['topic_id']) ? (int) $filters['topic_id'] : null;
         $perPage = max(1, min(100, $limit));
         $page = max(1, (int) ($filters['page'] ?? 1));
-        $previousPositions = $this->previousPositions($tenantId, $period, $criterion);
-        $rows = $this->rankedStats($tenantId, $since, $until, $subjectId ?: null, $topicId ?: null, null, $criterion);
+        $subject = $subjectId ?: null;
+        $topic = $topicId ?: null;
+        $history = app(PracticeRankingHistoryService::class);
+        $history->ensureClosedDay($this, $tenantId, $criterion, $period, $subject, $topic);
+        $baseline = $history->baseline($tenantId, $criterion, $period, $subject, $topic);
+        $rows = $this->rankedStats($tenantId, $since, $until, $subject, $topic, null, $criterion);
 
-        $ranked = $rows->values()->map(function ($row, int $index) use ($viewerStudentId, $fullNames, $previousPositions, $criterion) {
+        $ranked = $rows->values()->map(function ($row, int $index) use ($viewerStudentId, $fullNames, $history, $baseline, $criterion) {
             $position = $index + 1;
-            $before = $previousPositions[(int) $row->id] ?? null;
             $questions = (int) $row->questions;
             $firstCorrect = (int) $row->first_attempt_correct;
             $accuracy = $questions > 0 ? round($firstCorrect / $questions * 100, 1) : null;
@@ -360,7 +385,7 @@ class PracticePerformanceService
 
             return [
                 'position'              => $position,
-                'movement'              => $before === null ? null : $before - $position,
+                ...$history->movementFor($position, (int) $row->id, $baseline),
                 'name'                  => $fullNames ? $row->name : $this->shortName($row->name),
                 'photo_url'             => $row->photo_url,
                 'questions'             => $questions,
@@ -390,6 +415,7 @@ class PracticePerformanceService
             'until'        => $until?->toIso8601String(),
             'subject_id'   => $subjectId ?: null,
             'topic_id'     => $topicId ?: null,
+            'movement_reference_at' => $baseline['reference_at'] ?? null,
             'participants' => $total,
             'page'         => $page,
             'per_page'     => $perPage,

@@ -86,7 +86,7 @@ export function BancoRankingScreen() {
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Txt variant="titleSm" style={{ fontSize: isDesktop ? 17 : 16 }}>{headline}</Txt>
-          {me ? <RankMovement movement={me.movement ?? null} /> : null}
+          {me ? <RankMovement movement={me.movement ?? null} status={me.movement_status} referenceAt={me.movement_reference_at ?? data?.movement_reference_at} /> : null}
         </View>
         <Txt tone="muted" style={{ fontSize: 14, lineHeight: 20 }}>{detail}</Txt>
       </View>
@@ -98,9 +98,9 @@ export function BancoRankingScreen() {
     <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 20, maxWidth: 760 }}>
       {performance
         ? isDesktop
-          ? 'Os pontos vão de 0 a 100 e valorizam quem acerta muito e responde bastante: acertar 24 de 29 vale mais do que 2 de 2. Só conta a primeira tentativa de cada questão neste período; repetir não soma. A seta compara com ontem.'
+          ? 'Os pontos vão de 0 a 100 e valorizam quem acerta muito e responde bastante: acertar 24 de 29 vale mais do que 2 de 2. Só conta a primeira tentativa de cada questão neste período; repetir não soma. A seta compara com o fechamento de ontem. NEW entrou depois disso.'
           : 'Pontos de 0 a 100: acertar muito e responder bastante vale mais. Só conta a primeira tentativa de cada questão.'
-        : 'A dedicação soma questões novas e dias com estudo. Repetir uma questão não soma ponto. A seta compara com ontem.'}
+          : 'A dedicação soma questões novas e dias com estudo. Repetir uma questão não soma ponto. A seta compara com o fechamento de ontem. NEW entrou depois disso.'}
       {period === 'week' ? ' A semana reinicia toda segunda-feira às 00h.' : ''}
     </Txt>
   );
@@ -118,7 +118,8 @@ export function BancoRankingScreen() {
     const rest = (data?.participants ?? 0) - shown.length - (meMissing ? 1 : 0);
     const max = performance ? 100 : Math.max(1, ...rows.map((r) => r.score ?? 0));
     const line = (r: RankingRow) => (
-      <RankLine key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} movement={r.movement ?? null} initials={initials(r.name)} name={cleanName(r.name)}
+      <RankLine key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} movement={r.movement ?? null} movementStatus={r.movement_status}
+        movementReferenceAt={r.movement_reference_at ?? data?.movement_reference_at} initials={initials(r.name)} name={cleanName(r.name)}
         photoUrl={r.photo_url} me={r.is_me}
         note={r.retakes ? `+${r.retakes} ${r.retakes === 1 ? 'repetida, não conta' : 'repetidas, não contam'}` : null}
         values={performance
@@ -174,7 +175,8 @@ export function BancoRankingScreen() {
 
   // ── Celular ───────────────────────────────────────────────────────────────
   const row = (r: RankingRow) => (
-    <RankRow key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} movement={r.movement ?? null} initials={initials(r.name)} name={cleanName(r.name)}
+    <RankRow key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} movement={r.movement ?? null} movementStatus={r.movement_status}
+      movementReferenceAt={r.movement_reference_at ?? data?.movement_reference_at} initials={initials(r.name)} name={cleanName(r.name)}
       photoUrl={r.photo_url} rate={r.accuracy} count={r.questions} me={r.is_me} score={r.score ?? 0} scoreDecimals={performance ? 1 : 0} />
   );
   // Lista curta: top 3, você e o próximo (ou o top 5, se você já estiver no pódio).

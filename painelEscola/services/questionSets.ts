@@ -124,6 +124,11 @@ export type PracticeRankingRow = {
   retakes?: number;
   active_days?: number;
   streak?: number;
+  previous_position?: number | null;
+  /** Positivo = subiu desde o fechamento anterior; negativo = caiu; null = sem posição anterior. */
+  movement?: number | null;
+  movement_status?: "up" | "down" | "same" | "new" | null;
+  movement_reference_at?: string | null;
 };
 
 export type PracticeRanking = {
@@ -133,6 +138,7 @@ export type PracticeRanking = {
   until?: string | null;
   subject_id?: number | null;
   topic_id?: number | null;
+  movement_reference_at?: string | null;
   participants: number;
   page?: number;
   per_page?: number;

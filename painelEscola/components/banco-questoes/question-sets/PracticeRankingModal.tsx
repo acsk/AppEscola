@@ -33,6 +33,33 @@ const AJUDA = {
 };
 
 const medalha = (pos: number) => (pos === 1 ? "🥇" : pos === 2 ? "🥈" : pos === 3 ? "🥉" : null);
+const quando = (iso?: string | null) => {
+  if (!iso) return null;
+  const data = new Date(iso);
+  return Number.isNaN(data.getTime()) ? null : data.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+};
+
+function Movimento({ row }: { row: PracticeRankingRow }) {
+  const dia = quando(row.movement_reference_at);
+  const desde = dia ? ` desde ${dia}` : "";
+  if (row.movement_status === "new") {
+    const title = dia ? `Entrou no ranking depois de ${dia}` : "Novo no ranking";
+    return <Text className="text-xs font-semibold text-ink-subtle" accessibilityLabel={title} {...{ title }}>NEW</Text>;
+  }
+  if (row.movement_status === "same" || row.movement === 0) {
+    const title = `Mesma posição${desde}`;
+    return <Text className="text-xs font-semibold text-ink-subtle" accessibilityLabel={title} {...{ title }}>—</Text>;
+  }
+  if (row.movement == null) return null;
+  const subiu = row.movement_status === "down" ? false : row.movement > 0;
+  const lugares = Math.abs(row.movement);
+  const title = `${subiu ? "Subiu" : "Caiu"} ${lugares} ${lugares === 1 ? "posição" : "posições"}${desde}`;
+  return (
+    <Text className={`text-xs font-semibold ${subiu ? "text-success" : "text-danger"}`} accessibilityLabel={title} {...{ title }}>
+      {subiu ? "↑" : "↓"}{lugares}
+    </Text>
+  );
+}
 const pontos = (score: number) => score.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const pct = (value: number | null) => (value == null ? "—" : `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
@@ -155,6 +182,7 @@ function LinhaRanking({ row, first, mobile, mode, maxScore }: { row: PracticeRan
         <Text accessibilityLabel={`${row.position}º lugar`} className="font-mono text-base font-semibold text-ink" style={{ width: mobile ? 64 : 72 }}>
           {medal ? `${medal} ` : ""}{row.position}º
         </Text>
+        <Movimento row={row} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text className="text-sm font-semibold text-ink" numberOfLines={1}>{row.name}</Text>
           {row.enrollment_number ? <Text className="text-xs text-ink-muted">Matrícula {row.enrollment_number}</Text> : null}

@@ -150,8 +150,12 @@ export interface RankingRow extends PerformanceScore {
   retakes?: number;
   active_days?: number;
   streak?: number;
-  /** Positivo = subiu em relação a cerca de 24h atrás; negativo = caiu; null = sem comparação. */
+  /** Positivo = subiu desde o fechamento anterior; negativo = caiu; null = sem posição anterior. */
   movement?: number | null;
+  previous_position?: number | null;
+  /** up, down, same ou new. A participação da inicial não envia. */
+  movement_status?: 'up' | 'down' | 'same' | 'new' | null;
+  movement_reference_at?: string | null;
 }
 
 export interface PracticeRanking {
@@ -161,6 +165,7 @@ export interface PracticeRanking {
   until?: string | null;
   subject_id?: number | null;
   topic_id?: number | null;
+  movement_reference_at?: string | null;
   participants: number;
   page?: number;
   per_page?: number;
