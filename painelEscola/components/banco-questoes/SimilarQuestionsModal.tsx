@@ -6,10 +6,12 @@ import Button from "../ui/Button";
 import Icon from "../ui/Icon";
 import FormSelect from "../ui/FormSelect";
 import FormInput from "../ui/FormInput";
+import SearchableSelect from "../ui/SearchableSelect";
 import RichTextInput from "../ui/RichTextInput";
 import DeleteIconButton from "../ui/DeleteIconButton";
 import ClassificationFields from "./ClassificationFields";
 import OptionsEditor from "./OptionsEditor";
+import TopicMultiSelect from "./TopicMultiSelect";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import { aiSimilarQuestions, aiRegenerateImage, type SimilarFormContext } from "../../services/questionAi";
 import type { AiImageReview } from "../../types/questionAi";
@@ -92,6 +94,8 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [instructions, setInstructions] = useState("");
   const [instructionsError, setInstructionsError] = useState<string | undefined>();
+  const [subjectId, setSubjectId] = useState<number | null>(null);
+  const [topicIds, setTopicIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (!visible || !source) return;
@@ -102,7 +106,20 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     setInstructions("");
     setInstructionsError(undefined);
     setOptionsCount(Math.min(6, Math.max(2, source.optionsCount || 5)));
+    setSubjectId(source.context?.subject_id ?? null);
+    setTopicIds(source.context?.topic_ids ?? []);
   }, [visible, source]);
+
+  const allTopics = useMemo(
+    () => catalogs.taxonomy.flatMap((s) => s.topics.map((t) => ({ ...t, subject_id: s.id, subject_name: s.name }))),
+    [catalogs.taxonomy]
+  );
+  const topicSubjectById = useMemo(() => new Map(allTopics.map((t) => [t.id, t.subject_id])), [allTopics]);
+  const topicsForSubject = useMemo(
+    () => (subjectId ? allTopics.filter((t) => t.subject_id === subjectId).map(({ subject_name, ...t }) => t) : allTopics),
+    [allTopics, subjectId]
+  );
+  const subjectWithoutTopics = !!subjectId && topicsForSubject.length === 0;
 
   const included = drafts.filter((d) => d.include);
   const busy = generating || saving || regenerating !== null;
@@ -135,14 +152,19 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         difficulty_id: difficulty === SAME_DIFFICULTY ? undefined : Number(difficulty),
         options_count: isEssay ? undefined : optionsCount,
         instructions: instructions.trim() || undefined,
-        context: source.context,
+        context: source.context
+          ? { ...source.context, subject_id: subjectId, topic_ids: topicIds }
+          : undefined,
       }, Boolean(source.imageUrl));
       setDrafts(
         response.body.questions.map((q) => ({
           key: `draft-${draftSeq++}`,
           include: true,
           content: contentFromSuggestion(q),
-          classification: classificationFromSuggestion(q),
+          classification: {
+            ...classificationFromSuggestion(q),
+            ...(subjectId !== null ? { subject_id: subjectId, topic_ids: [...topicIds] } : {}),
+          },
           errors: {},
           showClassification: false,
           image: q.generation_id && q.image_generation
@@ -292,6 +314,36 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
               onChange={(v) => setOptionsCount(Number(v))}
             />
           )}
+          <SearchableSelect
+            dense
+            showSelectedPreview={false}
+            label="Disciplina"
+            placeholder="Selecione a disciplina"
+            modalTitle="Selecionar disciplina"
+            options={catalogs.subjects.map((s) => ({ value: String(s.id), label: s.name }))}
+            value={subjectId ? String(subjectId) : ""}
+            onChange={(value) => {
+              const next = value ? Number(value) : null;
+              setSubjectId(next);
+              setTopicIds((ids) => ids.filter((id) => next !== null && topicSubjectById.get(id) === next));
+            }}
+          />
+          <TopicMultiSelect
+            topics={topicsForSubject}
+            value={topicIds}
+            onChange={(ids) => {
+              if (subjectId || ids.length === 0) {
+                setTopicIds(ids);
+                return;
+              }
+              const nextSubject = topicSubjectById.get(ids[0]) ?? null;
+              setSubjectId(nextSubject);
+              setTopicIds(ids.filter((id) => topicSubjectById.get(id) === nextSubject));
+            }}
+            required={!subjectWithoutTopics}
+            disabled={subjectWithoutTopics}
+            disabledHint="Esta disciplina não tem assuntos cadastrados. Cadastre em Banco de questões › Taxonomia."
+          />
           <FormInput
             dense
             label="Observações para a IA (opcional)"

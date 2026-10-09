@@ -434,14 +434,17 @@ class QuestionAiService
         $difficulty = $difficultyId ? $catalogs['difficulties']->firstWhere('id', (int) $difficultyId) : null;
 
         $sourceText = $source->question_text ?: '(enunciado apenas em imagem; baseie-se na classificação e nas alternativas)';
-        $sourceOptions = $source->options->sortBy('order')->values()
+        $orderedOptions = $source->options->sortBy('order')->values();
+        $sourceOptionTexts = $orderedOptions->map(fn ($o) => (string) $o->option_text)->all();
+        $sourceOptions = $orderedOptions
             ->map(fn ($o, $i) => chr(65 + $i).') '.$o->option_text.($o->is_correct ? '  [CORRETA]' : ''))
             ->implode("\n");
 
         $instructions = trim((string) ($params['instructions'] ?? ''));
         $this->logSuspicious($tenantId, 'similar', [$source->question_text, $sourceOptions, $source->explanation]);
 
-        $system = 'Você é um professor especialista em elaborar questões de provas e vestibulares brasileiros. '
+        $system = 'Você é um professor que elabora questões inéditas de provas e vestibulares brasileiros. '
+            .'Semelhante significa a mesma habilidade, nunca o mesmo enunciado, os mesmos dados ou as mesmas respostas. '
             .'Responda somente com um objeto JSON válido. '.self::FORMAT_RULES."\n\n".AiPromptGuard::SYSTEM_RULES;
 
         $questionFormat = [
@@ -457,10 +460,10 @@ class QuestionAiService
         }
 
         $user = implode("\n\n", array_filter([
-            "Crie {$quantity} questão(ões) INÉDITA(S) semelhante(s) à questão de referência: mesmo conteúdo e habilidade avaliada, "
-            .'mas com contexto, dados e redação diferentes (não copie o enunciado).',
-            "QUESTÃO DE REFERÊNCIA:\n".AiPromptGuard::wrap('referencia', $sourceText),
-            $sourceOptions !== '' ? "ALTERNATIVAS DA REFERÊNCIA:\n".AiPromptGuard::wrap('alternativas', $sourceOptions) : null,
+            "Crie {$quantity} questão(ões) INÉDITA(S). Semelhante significa a mesma habilidade da referência, em outro contexto.",
+            SimilarQuestionDiversity::RULES,
+            "QUESTÃO DE REFERÊNCIA (não copie este texto nem estes exemplos):\n".AiPromptGuard::wrap('referencia', $sourceText),
+            $sourceOptions !== '' ? "ALTERNATIVAS DA REFERÊNCIA (mostram o tipo de distrator; não reutilize o texto):\n".AiPromptGuard::wrap('alternativas', $sourceOptions) : null,
             $source->explanation ? "EXPLICAÇÃO DA REFERÊNCIA:\n".AiPromptGuard::wrap('explicacao', $source->explanation) : null,
             $source->subject ? "Disciplina:\n".AiPromptGuard::wrap('disciplina', $source->subject->name) : null,
             $source->topics->isNotEmpty() ? "Assuntos:\n".AiPromptGuard::wrap('assuntos', $source->topics->pluck('name')->implode(', ')) : null,
@@ -495,7 +498,7 @@ class QuestionAiService
                 .'Não preserve números da referência que mudaram. Não coloque a resposta no spec.';
         }
         $raw = $imageContext === null
-            ? $this->client->json($credential, $system, $user, 0.8)
+            ? $this->client->json($credential, $system, $user, 0.9)
             : $this->images->recreate($imageContext, $system, $user);
 
         // Base herdada da referência; disciplina, assuntos e tags vêm da IA por questão (validados) quando houver.
@@ -508,7 +511,9 @@ class QuestionAiService
         ];
 
         $questions = [];
+        $acceptedStems = [];
         $brokenGabarito = false;
+        $tooCloseDiscarded = false;
         foreach (array_slice((array) ($raw['questions'] ?? []), 0, $quantity) as $item) {
             if (! is_array($item)) {
                 continue;
@@ -545,6 +550,37 @@ class QuestionAiService
 
                 continue;
             }
+            if (SimilarQuestionDiversity::tooClose(
+                $content['question_text'],
+                (array) ($content['options'] ?? []),
+                $sourceText,
+                $sourceOptionTexts,
+                $acceptedStems,
+            )) {
+                $tooCloseDiscarded = true;
+                $rewritten = $imageContext === null
+                    ? $this->rewriteIfTooClose($credential, $system, $item, $sourceText)
+                    : null;
+                $content = is_array($rewritten)
+                    ? $this->sanitizeContent(['type' => $type] + $rewritten, $type, $optionsCount ?: null)
+                    : null;
+                if ($content === null || trim(QuestionRichText::plain($content['question_text'])) === ''
+                    || SimilarQuestionDiversity::tooClose(
+                        $content['question_text'],
+                        (array) ($content['options'] ?? []),
+                        $sourceText,
+                        $sourceOptionTexts,
+                        $acceptedStems,
+                    )) {
+                    Log::warning('IA: questão semelhante descartada por repetir o contexto da referência', [
+                        'tenant_id' => $tenantId,
+                        'source_id' => $source->id,
+                    ]);
+
+                    continue;
+                }
+                $item = $rewritten;
+            }
             $suggested = array_intersect_key(
                 $this->sanitizeClassification($item, $catalogs),
                 array_flip(['subject_id', 'topic_ids', 'tags'])
@@ -553,12 +589,20 @@ class QuestionAiService
                 $suggested['topic_ids'] = []; // disciplina trocada: assuntos da referência não valem
             }
             $suggestion = $this->shuffleOptions($content) + $suggested + $inherited;
+            $acceptedStems[] = $content['question_text'];
             $questions[] = $imageContext === null
                 ? $suggestion
                 : $this->images->create($actor, $tenantId, $source, $suggestion, $item, $imageContext);
         }
 
         if ($questions === []) {
+            if ($tooCloseDiscarded && ! $brokenGabarito) {
+                throw new AiException(
+                    'A IA repetiu o contexto da questão original. Tente novamente.',
+                    502,
+                    'ai_invalid_response'
+                );
+            }
             if ($brokenGabarito) {
                 throw new AiException(
                     'A IA errou o gabarito (nenhuma alternativa correta ou tonicidade incorreta). Tente novamente.',
@@ -1063,6 +1107,55 @@ class QuestionAiService
             (array) ($merged['options'] ?? [])
         ) !== null) {
             return $item;
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Uma nova chamada quando o rascunho repete situação, dados ou alternativas da referência.
+     *
+     * @param  array<string, mixed>  $credential
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>|null
+     */
+    private function rewriteIfTooClose(array $credential, string $system, array $item, string $sourceText): ?array
+    {
+        $prompt = implode("\n\n", [
+            'O rascunho abaixo ficou parecido demais com a referência: mesmo contexto, mesmos dados ou as mesmas respostas.',
+            'Reescreva a questão inteira com OUTRA situação. Troque números, nomes, listas de exemplos e o texto de todas as alternativas. Mantenha só a habilidade cobrada.',
+            SimilarQuestionDiversity::RULES,
+            "REFERÊNCIA (não reutilize):\n".AiPromptGuard::wrap('referencia', $sourceText),
+            "RASCUNHO (não reaproveite este texto):\n".AiPromptGuard::wrap('rascunho', json_encode([
+                'question_text' => $item['question_text'] ?? '',
+                'options' => $item['options'] ?? [],
+                'explanation' => $item['explanation'] ?? '',
+            ], JSON_UNESCAPED_UNICODE)),
+            QuestionGabaritoGuard::AUTHORING_RULE,
+            'Responda somente com o objeto JSON da questão reescrita: question_text, explanation, options (option_text e is_correct).',
+        ]);
+
+        try {
+            $raw = $this->client->json($credential, $system, $prompt, 0.9);
+        } catch (\Throwable $e) {
+            Log::warning('IA: falha ao reescrever questão semelhante repetida', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $repaired = isset($raw['questions'][0]) && is_array($raw['questions'][0]) ? $raw['questions'][0] : $raw;
+        if (! is_array($repaired)) {
+            return null;
+        }
+        $merged = array_merge($item, $repaired);
+        if (QuestionGabaritoGuard::problem(
+            (string) ($merged['question_text'] ?? ''),
+            (string) ($merged['explanation'] ?? ''),
+            (array) ($merged['options'] ?? [])
+        ) !== null) {
+            return null;
         }
 
         return $merged;

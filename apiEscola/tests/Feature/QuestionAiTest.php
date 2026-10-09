@@ -673,6 +673,7 @@ class QuestionAiTest extends TestCase
             [$system, $user] = [$r['messages'][0]['content'], $r['messages'][1]['content']];
 
             return str_contains($system, 'REGRAS DE SEGURANÇA')
+                && str_contains($user, 'DIVERSIDADE (obrigatório)')
                 && str_contains($user, "<<<DADOS:OBSERVACAO>>>\nUse contextos do dia a dia com frutas.\n<<<FIM:OBSERVACAO>>>")
                 && str_contains($user, "<<<DADOS:REFERENCIA>>>\nQuanto é 2 + 2?\n<<<FIM:REFERENCIA>>>");
         });
