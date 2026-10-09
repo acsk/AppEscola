@@ -42,4 +42,17 @@ class WilsonScoreTest extends TestCase
 
         $this->assertSame([99, 9, 1, 2, 7], array_column($linhas, 'id'));
     }
+
+    public function test_dedication_score_uses_configurable_weights_and_tie_breaks(): void
+    {
+        $this->assertSame(6, PracticePerformanceService::dedicationScore(1, 1, 1, 5));
+        $this->assertSame(11, PracticePerformanceService::dedicationScore(1, 2, 1, 5));
+
+        $maisDias = ['score' => 11, 'active_days' => 2, 'questions' => 1, 'id' => 8];
+        $maisQuestoes = ['score' => 11, 'active_days' => 1, 'questions' => 6, 'id' => 2];
+        $linhas = [$maisQuestoes, $maisDias];
+        usort($linhas, [PracticePerformanceService::class, 'compareDedication']);
+
+        $this->assertSame([8, 2], array_column($linhas, 'id'));
+    }
 }

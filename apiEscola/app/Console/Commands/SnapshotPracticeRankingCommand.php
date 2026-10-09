@@ -24,7 +24,10 @@ class SnapshotPracticeRankingCommand extends Command
         }
         $count = DB::getDriverName() === 'sqlite'
             ? $this->snapshotFromService($performance, $capturedAt)
-            : $this->snapshotFromView($capturedAt);
+            : $this->snapshotFromView($capturedAt) + $this->snapshotFromService($performance, $capturedAt, criteria: [
+                PracticePerformanceService::CRITERION_WILSON,
+                PracticePerformanceService::CRITERION_DEDICATION,
+            ]);
 
         $removed = DB::table('practice_ranking_snapshots')
             ->where('captured_at', '<', now()->subHours(48))
@@ -44,18 +47,30 @@ class SnapshotPracticeRankingCommand extends Command
         ', [$capturedAt]);
     }
 
-    /** SQLite dos testes não tem a view. $before limita as respostas (foto de 24h atrás). */
-    private function snapshotFromService(PracticePerformanceService $performance, Carbon $capturedAt, ?Carbon $before = null): int
+    /**
+     * SQLite dos testes não tem a view. $before limita as respostas (foto de 24h atrás).
+     *
+     * @param  list<string>|null  $criteria
+     */
+    private function snapshotFromService(PracticePerformanceService $performance, Carbon $capturedAt, ?Carbon $before = null, ?array $criteria = null): int
     {
+        $criteria ??= [
+            PracticePerformanceService::CRITERION_PARTICIPATION,
+            PracticePerformanceService::CRITERION_WILSON,
+            PracticePerformanceService::CRITERION_DEDICATION,
+        ];
         $rows = [];
         foreach (DB::table('tenants')->pluck('id') as $tenantId) {
             foreach (PracticePerformanceService::PERIODS as $period) {
-                foreach ($performance->captureRows((int) $tenantId, $period, $before) as $row) {
-                    $rows[] = $row + [
-                        'captured_at' => $capturedAt,
-                        'tenant_id' => (int) $tenantId,
-                        'period' => $period,
-                    ];
+                foreach ($criteria as $criterion) {
+                    foreach ($performance->captureRows((int) $tenantId, $period, $before, $criterion) as $row) {
+                        $rows[] = $row + [
+                            'captured_at' => $capturedAt,
+                            'tenant_id' => (int) $tenantId,
+                            'period' => $period,
+                            'criterion' => $criterion,
+                        ];
+                    }
                 }
             }
         }

@@ -457,8 +457,10 @@ class QuestionBankPracticeTest extends TestCase
         foreach ([76.7, 67.0, 59.6, 58.4, 30.0] as $i => $pontuacao) {
             $this->assertEqualsWithDelta($pontuacao, (float) $body['ranking'][$i]['score'], 0.001);
         }
-        $this->assertSame([100, 50, 10, 20, 80], array_column($body['ranking'], 'answered'));
-        $this->assertSame([85, 40, 9, 16, 32], array_column($body['ranking'], 'correct'));
+        $this->assertSame([100, 50, 10, 20, 80], array_column($body['ranking'], 'questions'));
+        $this->assertSame([85, 40, 9, 16, 32], array_column($body['ranking'], 'first_attempt_correct'));
+        $this->assertSame([0, 0, 0, 0, 0], array_column($body['ranking'], 'retakes'));
+        $this->assertEqualsWithDelta(76.7, (float) $body['ranking'][0]['wilson_score'], 0.001);
         $this->assertSame(1, $body['me']['position']);
         $this->assertTrue($body['me']['is_me']);
         $this->assertArrayNotHasKey('student_id', $body['ranking'][0]);
@@ -492,9 +494,12 @@ class QuestionBankPracticeTest extends TestCase
         $geral = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
         $porNome = collect($geral['ranking'])->keyBy('name');
         // A segunda resposta da mesma questão (agora certa) não entra: fica o primeiro erro.
-        $this->assertSame(2, $porNome['ANA S.']['answered']);
+        $this->assertSame(2, $porNome['ANA S.']['questions']);
+        $this->assertSame(3, $porNome['ANA S.']['answered']);
+        $this->assertSame(1, $porNome['ANA S.']['retakes']);
+        $this->assertSame(1, $porNome['ANA S.']['first_attempt_correct']);
         $this->assertSame(1, $porNome['ANA S.']['correct']);
-        $this->assertSame(2, $porNome['BIA L.']['answered']);
+        $this->assertSame(2, $porNome['BIA L.']['questions']);
 
         $disciplina = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&subject_id='.$portugues->id)->assertOk()->json('body');
         $this->assertSame(['BIA L.', 'ANA S.'], array_column($disciplina['ranking'], 'name'));
@@ -515,6 +520,80 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertSame(2, $pagina['me']['position']);
 
         $this->getJson('/api/aluno/practice/ranking?criterion=wilson&subject_id=999999')->assertStatus(422);
+    }
+
+    public function test_old_question_retaken_inside_the_period_does_not_count_as_new(): void
+    {
+        $antiga = $this->practicable('Antiga');
+        $nova = $this->practicable('Nova');
+        $revisor = $this->student('REVISOR SILVA');
+        $iniciante = $this->student('INICIANTE COSTA');
+        $this->travelTo(Carbon::parse('2026-10-08 15:00:00', 'America/Sao_Paulo'));
+
+        // A primeira vez foi antes do período. Acertar de novo agora não cria questão nova.
+        $this->record($revisor, $antiga, false, now()->subDays(10));
+        $this->record($revisor, $antiga, true, now());
+        $this->record($iniciante, $nova, true, now());
+
+        $this->actingAsStudent($iniciante);
+        $desempenho = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=7d')->assertOk()->json('body');
+        $this->assertSame(['INICIANTE C.'], array_column($desempenho['ranking'], 'name'));
+        $this->assertSame(1, $desempenho['me']['position']);
+        $this->assertSame(1, $desempenho['me']['questions']);
+
+        $dedicacao = $this->getJson('/api/aluno/practice/ranking?criterion=dedication&period=7d')->assertOk()->json('body');
+        $porNome = collect($dedicacao['ranking'])->keyBy('name');
+        $this->assertSame(0, $porNome['REVISOR S.']['questions']);
+        $this->assertSame(1, $porNome['REVISOR S.']['retakes']);
+        $this->assertSame(1, $porNome['REVISOR S.']['active_days']);
+        $this->assertSame(5, $porNome['REVISOR S.']['dedication_score']);
+        $this->assertSame(6, $porNome['INICIANTE C.']['dedication_score']);
+        $this->assertSame(1, $porNome['INICIANTE C.']['position']);
+        $this->assertSame(2, $porNome['REVISOR S.']['position']);
+    }
+
+    public function test_first_attempt_follows_answered_at_not_insert_order(): void
+    {
+        $questao = $this->practicable('Ordem');
+        $aluno = $this->student('ORDEM REAL');
+        $this->record($aluno, $questao, true, now()->addHour());
+        $this->record($aluno, $questao, false, now()->subHour());
+
+        $this->actingAsStudent($aluno);
+        $linha = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body.ranking.0');
+        $this->assertSame(0, $linha['first_attempt_correct']);
+        $this->assertSame(1, $linha['questions']);
+        $this->assertSame(1, $linha['retakes']);
+    }
+
+    public function test_dedication_values_new_questions_and_active_days_in_school_timezone(): void
+    {
+        $questoes = collect(range(1, 6))->map(fn ($i) => $this->practicable("D{$i}"));
+        $umDia = $this->student('UM DIA');
+        $doisDias = $this->student('DOIS DIAS');
+        $this->travelTo(Carbon::parse('2026-10-08 12:00:00', 'America/Sao_Paulo'));
+
+        foreach ($questoes as $questao) {
+            $this->record($umDia, $questao, true, Carbon::parse('2026-10-08 15:00:00', 'UTC'));
+        }
+        $this->record($doisDias, $questoes[0], true, Carbon::parse('2026-10-08 02:00:00', 'UTC'));
+        $this->record($doisDias, $questoes[0], true, Carbon::parse('2026-10-08 04:00:00', 'UTC'));
+
+        $this->actingAsStudent($umDia);
+        $body = $this->getJson('/api/aluno/practice/ranking?criterion=dedication&period=all')->assertOk()->json('body');
+        $porNome = collect($body['ranking'])->keyBy('name');
+
+        // 02:00 UTC ainda é 07/10 em Brasília; 04:00 UTC já é 08/10. Mesma questão, dois dias.
+        $this->assertSame(1, $porNome['DOIS D.']['questions']);
+        $this->assertSame(1, $porNome['DOIS D.']['retakes']);
+        $this->assertSame(2, $porNome['DOIS D.']['active_days']);
+        $this->assertSame(2, $porNome['DOIS D.']['streak']);
+        $this->assertSame(11, $porNome['DOIS D.']['dedication_score']);
+        $this->assertSame(6, $porNome['UM D.']['questions']);
+        $this->assertSame(1, $porNome['UM D.']['active_days']);
+        $this->assertSame(11, $porNome['UM D.']['dedication_score']);
+        $this->assertSame(1, $porNome['DOIS D.']['position']);
+        $this->assertSame(2, $body['me']['position']);
     }
 
     /** @param  ExamQuestion[]  $questions */

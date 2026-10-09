@@ -30,6 +30,7 @@ class QuestionBankPracticeController extends Controller
             'criterion'  => ['nullable', Rule::in([
                 PracticePerformanceService::CRITERION_PARTICIPATION,
                 PracticePerformanceService::CRITERION_WILSON,
+                PracticePerformanceService::CRITERION_DEDICATION,
             ])],
             'subject_id' => ['nullable', 'integer', Rule::exists('subjects', 'id')->where('tenant_id', $tenantId)],
             'topic_id'   => ['nullable', 'integer', Rule::exists('subject_topics', 'id')->where('tenant_id', $tenantId)],
@@ -37,13 +38,12 @@ class QuestionBankPracticeController extends Controller
             'per_page'   => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $criterion = $data['criterion'] ?? PracticePerformanceService::CRITERION_PARTICIPATION;
+        $scored = in_array($criterion, PracticePerformanceService::SCORED_CRITERIA, true);
 
         return $this->success($this->performance->ranking(
             $tenantId,
             $data['period'] ?? 'month',
-            $criterion === PracticePerformanceService::CRITERION_WILSON
-                ? (int) ($data['per_page'] ?? 50)
-                : (int) ($data['limit'] ?? 50),
+            $scored ? (int) ($data['per_page'] ?? 50) : (int) ($data['limit'] ?? 50),
             fullNames: true,
             filters: [
                 'criterion'  => $criterion,

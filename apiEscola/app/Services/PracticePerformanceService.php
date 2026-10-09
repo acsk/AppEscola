@@ -37,6 +37,11 @@ class PracticePerformanceService
 
     public const CRITERION_WILSON = 'wilson';
 
+    public const CRITERION_DEDICATION = 'dedication';
+
+    /** @var list<string> */
+    public const SCORED_CRITERIA = [self::CRITERION_WILSON, self::CRITERION_DEDICATION];
+
     /** A semana do ranking vira na segunda 00:00 do horário escolar, não em UTC. */
     private const RANKING_TIMEZONE = 'America/Sao_Paulo';
 
@@ -133,6 +138,22 @@ class PracticePerformanceService
             <=> [$a['score'], $a['correct'], $a['questions'], $b['id']];
     }
 
+    /** Dedicação: mais pontos, depois mais dias ativos, depois mais questões inéditas, depois o id. */
+    public static function compareDedication(array $a, array $b): int
+    {
+        return [$b['score'], $b['active_days'], $b['questions'], $a['id']]
+            <=> [$a['score'], $a['active_days'], $a['questions'], $b['id']];
+    }
+
+    /** (questões inéditas × peso) + (dias ativos × peso). Os pesos ficam em config/practice.php. */
+    public static function dedicationScore(int $questions, int $activeDays, ?int $questionWeight = null, ?int $dayWeight = null): int
+    {
+        $questionWeight ??= (int) config('practice.dedication_question_weight', 1);
+        $dayWeight ??= (int) config('practice.dedication_day_weight', 5);
+
+        return ($questions * $questionWeight) + ($activeDays * $dayWeight);
+    }
+
     /**
      * Ranking do período. Sem critério, é participação (questões diferentes; empate pelos acertos;
      * posições iguais ficam 1, 2, 2, 4). Com criterion=wilson, ordena pela pontuação de Wilson.
@@ -141,13 +162,14 @@ class PracticePerformanceService
      */
     public function ranking(int $tenantId, string $period, int $limit, ?int $viewerStudentId = null, bool $fullNames = false, array $filters = []): array
     {
-        if (($filters['criterion'] ?? self::CRITERION_PARTICIPATION) === self::CRITERION_WILSON) {
-            return $this->wilsonRanking($tenantId, $period, $limit, $viewerStudentId, $fullNames, $filters);
+        $criterion = $filters['criterion'] ?? self::CRITERION_PARTICIPATION;
+        if (in_array($criterion, self::SCORED_CRITERIA, true)) {
+            return $this->scoredRanking($tenantId, $period, $limit, $viewerStudentId, $fullNames, $filters, $criterion);
         }
 
         [$since, $until] = $this->periodRange($period);
         $rows = $this->rankingRows($tenantId, $since, $until);
-        $previousPositions = $this->previousPositions($tenantId, $period);
+        $previousPositions = $this->previousPositions($tenantId, $period, self::CRITERION_PARTICIPATION);
 
         $position = 0;
         $previous = null;
@@ -188,11 +210,22 @@ class PracticePerformanceService
      *
      * @return array<int, array{student_id: int, position: int, questions: int, correct: int}>
      */
-    public function captureRows(int $tenantId, string $period, ?Carbon $before = null): array
+    public function captureRows(int $tenantId, string $period, ?Carbon $before = null, string $criterion = self::CRITERION_PARTICIPATION): array
     {
         [$since, $until] = $this->periodRange($period);
         if ($before !== null && ($until === null || $before->lt($until))) {
             $until = $before;
+        }
+        if (in_array($criterion, self::SCORED_CRITERIA, true)) {
+            return $this->rankedStats($tenantId, $since, $until, null, null, $before, $criterion)
+                ->values()
+                ->map(fn ($row, int $index) => [
+                    'student_id' => (int) $row->id,
+                    'position' => $index + 1,
+                    'questions' => (int) $row->questions,
+                    'correct' => (int) $row->first_attempt_correct,
+                ])
+                ->all();
         }
         $position = 0;
         $previous = null;
@@ -214,13 +247,14 @@ class PracticePerformanceService
     }
 
     /** @return array<int, int> student_id => posição na foto usada pela seta (cerca de 24h atrás) */
-    private function previousPositions(int $tenantId, string $period): array
+    private function previousPositions(int $tenantId, string $period, string $criterion): array
     {
-        $baseline = $this->baselineCapturedAt($tenantId, $period);
+        $baseline = $this->baselineCapturedAt($tenantId, $period, $criterion);
         if ($baseline !== null) {
             return DB::table('practice_ranking_snapshots')
                 ->where('tenant_id', $tenantId)
                 ->where('period', $period)
+                ->where('criterion', $criterion)
                 ->where('captured_at', $baseline)
                 ->pluck('position', 'student_id')
                 ->mapWithKeys(fn ($position, $studentId) => [(int) $studentId => (int) $position])
@@ -230,18 +264,19 @@ class PracticePerformanceService
         // As fotos recém-gravadas repetem o ranking de agora. Sem uma foto antiga, a posição de 24h atrás
         // sai das respostas daquele momento — senão a seta compara o ranking com ele mesmo e some.
         $positions = [];
-        foreach ($this->captureRows($tenantId, $period, now()->subDay()) as $row) {
+        foreach ($this->captureRows($tenantId, $period, now()->subDay(), $criterion) as $row) {
             $positions[$row['student_id']] = $row['position'];
         }
 
         return $positions;
     }
 
-    private function baselineCapturedAt(int $tenantId, string $period): mixed
+    private function baselineCapturedAt(int $tenantId, string $period, string $criterion): mixed
     {
         $times = DB::table('practice_ranking_snapshots')
             ->where('tenant_id', $tenantId)
             ->where('period', $period)
+            ->where('criterion', $criterion)
             ->distinct()
             ->orderByDesc('captured_at')
             ->pluck('captured_at');
@@ -291,30 +326,54 @@ class PracticePerformanceService
     }
 
     /**
-     * Desempenho: primeira resposta contada de cada questão no período e nos filtros.
-     * A pontuação sai das respostas já gravadas, então muda assim que entra uma resposta nova.
+     * Desempenho (Wilson) ou dedicação.
+     *
+     * questions = questões cuja primeira tentativa histórica cai no período e no filtro.
+     * answered = todas as respostas contadas no período, inclusive retentativas.
+     * correct = acertos dessa primeira tentativa (não o total de acertos).
+     * retakes = respostas do período que não são a primeira tentativa histórica.
+     * Uma retentativa não transforma questão antiga em questão nova.
      *
      * @param  array{subject_id?: ?int, topic_id?: ?int, page?: int}  $filters
      */
-    private function wilsonRanking(int $tenantId, string $period, int $limit, ?int $viewerStudentId, bool $fullNames, array $filters): array
+    private function scoredRanking(int $tenantId, string $period, int $limit, ?int $viewerStudentId, bool $fullNames, array $filters, string $criterion): array
     {
         [$since, $until] = $this->periodRange($period);
         $subjectId = isset($filters['subject_id']) ? (int) $filters['subject_id'] : null;
         $topicId = isset($filters['topic_id']) ? (int) $filters['topic_id'] : null;
         $perPage = max(1, min(100, $limit));
         $page = max(1, (int) ($filters['page'] ?? 1));
-        $rows = $this->wilsonRows($tenantId, $since, $until, $subjectId ?: null, $topicId ?: null);
+        $previousPositions = $this->previousPositions($tenantId, $period, $criterion);
+        $rows = $this->rankedStats($tenantId, $since, $until, $subjectId ?: null, $topicId ?: null, null, $criterion);
 
-        $ranked = $rows->values()->map(function ($row, int $index) use ($viewerStudentId, $fullNames) {
+        $ranked = $rows->values()->map(function ($row, int $index) use ($viewerStudentId, $fullNames, $previousPositions, $criterion) {
+            $position = $index + 1;
+            $before = $previousPositions[(int) $row->id] ?? null;
+            $questions = (int) $row->questions;
+            $firstCorrect = (int) $row->first_attempt_correct;
+            $accuracy = $questions > 0 ? round($firstCorrect / $questions * 100, 1) : null;
+            $wilson = (float) $row->wilson_score;
+            $dedication = (int) $row->dedication_score;
+
             return [
-                'position'  => $index + 1,
-                'movement'  => null,
-                'name'      => $fullNames ? $row->name : $this->shortName($row->name),
-                'photo_url' => $row->photo_url,
-                'questions' => (int) $row->questions,
-                'score'     => (float) $row->score,
-                'is_me'     => $viewerStudentId !== null && (int) $row->id === $viewerStudentId,
-            ] + $this->score($row) + ($fullNames ? [
+                'position'              => $position,
+                'movement'              => $before === null ? null : $before - $position,
+                'name'                  => $fullNames ? $row->name : $this->shortName($row->name),
+                'photo_url'             => $row->photo_url,
+                'questions'             => $questions,
+                'answered'              => (int) $row->answered,
+                'correct'               => $firstCorrect,
+                'accuracy'              => $accuracy,
+                'level'                 => $this->level($questions, $accuracy),
+                'first_attempt_correct' => $firstCorrect,
+                'retakes'               => (int) $row->retakes,
+                'wilson_score'          => $wilson,
+                'dedication_score'      => $dedication,
+                'active_days'           => (int) $row->active_days,
+                'streak'                => (int) $row->streak,
+                'score'                 => $criterion === self::CRITERION_DEDICATION ? $dedication : $wilson,
+                'is_me'                 => $viewerStudentId !== null && (int) $row->id === $viewerStudentId,
+            ] + ($fullNames ? [
                 'student_id'        => (int) $row->id,
                 'enrollment_number' => $row->enrollment_number,
             ] : []);
@@ -323,7 +382,7 @@ class PracticePerformanceService
 
         return [
             'period'       => $period,
-            'criterion'    => self::CRITERION_WILSON,
+            'criterion'    => $criterion,
             'since'        => $since?->toIso8601String(),
             'until'        => $until?->toIso8601String(),
             'subject_id'   => $subjectId ?: null,
@@ -337,13 +396,113 @@ class PracticePerformanceService
         ];
     }
 
-    /** Uma linha por aluno ativo, já ordenada pela pontuação de Wilson. */
-    private function wilsonRows(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId): Collection
+    /** Alunos do critério, já ordenados. Desempenho exige ao menos uma questão inédita no período. */
+    private function rankedStats(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before, string $criterion): Collection
     {
-        $firstAttempts = PracticeAnswer::query()->counted()
-            ->where('practice_answers.tenant_id', $tenantId)
+        $rows = $this->attemptStats($tenantId, $since, $until, $subjectId, $topicId, $before);
+        if ($criterion === self::CRITERION_WILSON) {
+            $rows = $rows->filter(fn ($row) => (int) $row->questions > 0)->values();
+        }
+
+        $sort = $criterion === self::CRITERION_DEDICATION
+            ? fn ($a, $b) => self::compareDedication(
+                ['score' => (int) $a->dedication_score, 'active_days' => (int) $a->active_days, 'questions' => (int) $a->questions, 'id' => (int) $a->id],
+                ['score' => (int) $b->dedication_score, 'active_days' => (int) $b->active_days, 'questions' => (int) $b->questions, 'id' => (int) $b->id],
+            )
+            : fn ($a, $b) => self::compareWilson(
+                ['score' => (float) $a->wilson_score, 'correct' => (int) $a->first_attempt_correct, 'questions' => (int) $a->questions, 'id' => (int) $a->id],
+                ['score' => (float) $b->wilson_score, 'correct' => (int) $b->first_attempt_correct, 'questions' => (int) $b->questions, 'id' => (int) $b->id],
+            );
+
+        return $rows->sort($sort)->values();
+    }
+
+    /**
+     * Uma passagem pelas respostas contadas. A numeração da tentativa ignora o período,
+     * para achar a primeira tentativa histórica (answered_at, depois id).
+     */
+    private function attemptStats(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before): Collection
+    {
+        $checks = [];
+        $bindings = [];
+        if ($since) {
+            $checks[] = 'practice_answers.answered_at >= ?';
+            $bindings[] = $since->toDateTimeString();
+        }
+        if ($until) {
+            $checks[] = 'practice_answers.answered_at < ?';
+            $bindings[] = $until->toDateTimeString();
+        }
+        $noPeriodo = $checks === [] ? '1 = 1' : implode(' AND ', $checks);
+
+        $marked = $this->scopedAnswers($tenantId, $subjectId, $topicId, $before)
+            ->select('practice_answers.student_id', 'practice_answers.is_correct', 'practice_answers.answered_at')
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.student_id, practice_answers.exam_question_id ORDER BY practice_answers.answered_at ASC, practice_answers.id ASC) as tentativa')
+            ->selectRaw("CASE WHEN {$noPeriodo} THEN 1 ELSE 0 END as no_periodo", $bindings);
+
+        $days = $this->activeDays($tenantId, $since, $until, $subjectId, $topicId, $before);
+
+        return DB::query()
+            ->fromSub($marked, 'tentativa')
+            ->join('students as s', 's.id', '=', 'tentativa.student_id')
+            ->where('s.tenant_id', $tenantId)
+            ->where('s.status', 'active')
+            ->whereNull('s.deleted_at')
+            ->groupBy('s.id', 's.name', 's.photo_url', 's.enrollment_number')
+            ->havingRaw('sum(tentativa.no_periodo) > 0')
+            ->select(
+                's.id',
+                's.name',
+                's.photo_url',
+                's.enrollment_number',
+                DB::raw('sum(case when tentativa.tentativa = 1 and tentativa.no_periodo = 1 then 1 else 0 end) as questions'),
+                DB::raw('sum(case when tentativa.tentativa = 1 and tentativa.no_periodo = 1 and tentativa.is_correct = 1 then 1 else 0 end) as first_attempt_correct'),
+                DB::raw('sum(tentativa.no_periodo) as answered'),
+                DB::raw('sum(case when tentativa.no_periodo = 1 and tentativa.tentativa > 1 then 1 else 0 end) as retakes'),
+            )
+            ->get()
+            ->each(function ($row) use ($days) {
+                $questions = (int) $row->questions;
+                $firstCorrect = (int) $row->first_attempt_correct;
+                $studentDays = $days[(int) $row->id] ?? [];
+                $row->questions = $questions;
+                $row->first_attempt_correct = $firstCorrect;
+                $row->answered = (int) $row->answered;
+                $row->retakes = (int) $row->retakes;
+                $row->active_days = count($studentDays);
+                $row->streak = $this->longestStreak($studentDays);
+                $row->wilson_score = self::wilsonScore($firstCorrect, $questions);
+                $row->dedication_score = self::dedicationScore($questions, $row->active_days);
+            });
+    }
+
+    /** @return array<int, list<string>> student_id => dias (America/Sao_Paulo) com resposta contada no período */
+    private function activeDays(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before): array
+    {
+        $day = DB::getDriverName() === 'sqlite'
+            ? "date(practice_answers.answered_at, '-3 hours')"
+            : "DATE(CONVERT_TZ(practice_answers.answered_at, '+00:00', '-03:00'))";
+
+        $grouped = [];
+        foreach ($this->scopedAnswers($tenantId, $subjectId, $topicId, $before)
             ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
             ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
+            ->select('practice_answers.student_id')
+            ->selectRaw("{$day} as dia")
+            ->groupBy('practice_answers.student_id', DB::raw($day))
+            ->get() as $row) {
+            $grouped[(int) $row->student_id][] = (string) $row->dia;
+        }
+
+        return $grouped;
+    }
+
+    /** Respostas contadas da escola, já filtradas por disciplina/assunto. Sem filtro de período. */
+    private function scopedAnswers(int $tenantId, ?int $subjectId, ?int $topicId, ?Carbon $before): Builder
+    {
+        return PracticeAnswer::query()->counted()
+            ->where('practice_answers.tenant_id', $tenantId)
+            ->when($before, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $before))
             ->join('exam_questions as eq', 'eq.id', '=', 'practice_answers.exam_question_id')
             ->where('eq.tenant_id', $tenantId)
             ->whereNull('eq.deleted_at')
@@ -357,36 +516,26 @@ class PracticePerformanceService
                         ->where('eqt.subject_topic_id', $topicId)
                         ->when($subjectId, fn ($topic) => $topic->where('st.subject_id', $subjectId));
                 });
-            })
-            ->select('practice_answers.student_id', 'practice_answers.is_correct')
-            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.student_id, practice_answers.exam_question_id ORDER BY practice_answers.answered_at ASC, practice_answers.id ASC) as tentativa');
+            });
+    }
 
-        return DB::query()
-            ->fromSub($firstAttempts, 'primeira')
-            ->where('primeira.tentativa', 1)
-            ->join('students as s', 's.id', '=', 'primeira.student_id')
-            ->where('s.tenant_id', $tenantId)
-            ->where('s.status', 'active')
-            ->whereNull('s.deleted_at')
-            ->groupBy('s.id', 's.name', 's.photo_url', 's.enrollment_number')
-            ->select(
-                's.id',
-                's.name',
-                's.photo_url',
-                's.enrollment_number',
-                DB::raw('count(*) as questions'),
-                DB::raw('count(*) as answered'),
-                DB::raw('sum(case when primeira.is_correct = 1 then 1 else 0 end) as correct'),
-            )
-            ->get()
-            ->each(function ($row) {
-                $row->score = self::wilsonScore((int) $row->correct, (int) $row->answered);
-            })
-            ->sort(fn ($a, $b) => self::compareWilson(
-                ['score' => (float) $a->score, 'correct' => (int) $a->correct, 'questions' => (int) $a->questions, 'id' => (int) $a->id],
-                ['score' => (float) $b->score, 'correct' => (int) $b->correct, 'questions' => (int) $b->questions, 'id' => (int) $b->id],
-            ))
-            ->values();
+    /** Maior sequência de dias consecutivos. */
+    private function longestStreak(array $days): int
+    {
+        $days = array_values(array_unique($days));
+        sort($days);
+        $best = 0;
+        $current = 0;
+        $previous = null;
+        foreach ($days as $day) {
+            $current = $previous !== null && Carbon::parse($previous)->addDay()->toDateString() === $day
+                ? $current + 1
+                : 1;
+            $best = max($best, $current);
+            $previous = $day;
+        }
+
+        return $best;
     }
 
     /** Até 5 assuntos para estudar: primeiro os de acerto baixo, depois os ainda não praticados. */

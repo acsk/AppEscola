@@ -130,17 +130,26 @@ export interface PracticePerformance {
 /** week = semana corrente (desde segunda 00:00); last_week = semana anterior, já fechada; 7d = últimos 7 dias. */
 export type RankingPeriod = 'week' | 'last_week' | '7d' | 'month' | 'all';
 
-/** participation = quem mais respondeu; wilson = pontuação de desempenho. */
-export type RankingCriterion = 'participation' | 'wilson';
+/** participation = quem mais respondeu; wilson = desempenho; dedication = questões inéditas e dias ativos. */
+export type RankingCriterion = 'participation' | 'wilson' | 'dedication';
 
 export interface RankingRow extends PerformanceScore {
   position: number;
   name: string;
   photo_url: string | null;
+  /** Questões distintas cuja primeira tentativa histórica cai no período. Na participação, questões diferentes respondidas. */
   questions: number;
   is_me: boolean;
-  /** Pontuação de Wilson (0–100), só no ranking de desempenho. */
+  /** Pontuação do ranking aberto: Wilson (0–100) ou dedicação (inteiro). */
   score?: number;
+  wilson_score?: number;
+  dedication_score?: number;
+  /** Acertos na primeira tentativa. */
+  first_attempt_correct?: number;
+  /** Respostas do período que não são a primeira tentativa. */
+  retakes?: number;
+  active_days?: number;
+  streak?: number;
   /** Positivo = subiu em relação a cerca de 24h atrás; negativo = caiu; null = sem comparação. */
   movement?: number | null;
 }
@@ -205,7 +214,7 @@ export async function fetchPracticeRanking(periodOrQuery: RankingPeriod | Rankin
   if (query.subjectId) params.subject_id = query.subjectId;
   if (query.topicId) params.topic_id = query.topicId;
   if (query.page) params.page = query.page;
-  if (query.criterion === 'wilson') params.per_page = query.perPage ?? 20;
+  if (query.criterion === 'wilson' || query.criterion === 'dedication') params.per_page = query.perPage ?? 20;
   const { data } = await api.get<Envelope<PracticeRanking>>('/api/aluno/practice/ranking', { params });
   return data.body;
 }
