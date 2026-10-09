@@ -140,6 +140,9 @@ class LearningGenerationService
         if ($correct !== 1) {
             return 'gabarito';
         }
+        if (QuestionGabaritoGuard::stressMismatch($text, $explanation, $options) !== null) {
+            return 'tonicidade incorreta';
+        }
         if (! $this->difficultyId($payload['difficulty'] ?? null)) {
             return 'dificuldade';
         }

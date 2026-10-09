@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use App\Support\PortugueseStress;
 use App\Support\QuestionRichText;
 
 /**
@@ -48,6 +49,155 @@ class QuestionGabaritoGuard
         }
 
         return false;
+    }
+
+    /**
+     * Motivo para recusar a questão, ou null se o gabarito pode seguir.
+     *
+     * @param  array<int, mixed>  $options
+     */
+    public static function problem(string $questionText, string $explanation, array $options): ?string
+    {
+        if (self::admitsBrokenQuestion($explanation)) {
+            return 'A explicação admite que nenhuma alternativa está correta.';
+        }
+
+        return self::stressMismatch($questionText, $explanation, $options);
+    }
+
+    /**
+     * Fatos de tonicidade das palavras que aparecem nas alternativas.
+     *
+     * @param  array<int, mixed>  $options
+     */
+    public static function stressFacts(array $options): string
+    {
+        $lines = [];
+        foreach (self::optionRows($options) as $row) {
+            foreach (self::words($row['text']) as $word) {
+                $described = PortugueseStress::describe($word);
+                if ($described !== null) {
+                    $lines[$described] = $described;
+                }
+            }
+        }
+
+        return $lines === [] ? '' : implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<int, mixed>  $options
+     */
+    public static function stressMismatch(string $questionText, string $explanation, array $options): ?string
+    {
+        $target = self::targetStressClass($questionText."\n".$explanation);
+        if ($target === null) {
+            return null;
+        }
+
+        $rows = self::optionRows($options);
+        $fitting = [];
+        $marked = null;
+        $facts = [];
+        foreach ($rows as $index => $row) {
+            $classes = [];
+            foreach (self::words($row['text']) as $word) {
+                $class = PortugueseStress::classify($word);
+                if ($class === null) {
+                    continue;
+                }
+                $classes[$word] = $class;
+                $described = PortugueseStress::describe($word);
+                if ($described !== null) {
+                    $facts[$word] = $described;
+                }
+            }
+            if ($classes === []) {
+                continue;
+            }
+            $ok = ! in_array(false, array_map(fn (string $class) => $class === $target, $classes), true);
+            if ($ok) {
+                $fitting[] = $index;
+            }
+            if ($row['is_correct']) {
+                $marked = ['index' => $index, 'ok' => $ok, 'classes' => $classes];
+            }
+        }
+
+        if ($facts === [] || ($marked !== null && $marked['ok'])) {
+            return null;
+        }
+
+        $label = PortugueseStress::label($target);
+        $lines = array_values($facts);
+        if ($marked === null) {
+            return null;
+        }
+
+        $detail = "Tonicidade: a alternativa marcada não contém só {$label}s.\n".implode("\n", $lines);
+        if ($fitting === []) {
+            $detail .= "\nNenhuma alternativa contém somente {$label}s. Troque as palavras da alternativa correta.";
+        }
+
+        return $detail;
+    }
+
+    private static function targetStressClass(string $text): ?string
+    {
+        $folded = self::fold($text);
+        if (! str_contains($folded, 'oxiton') && ! str_contains($folded, 'paroxiton')) {
+            return null;
+        }
+
+        $pattern = '/(?:todas|somente|apenas|so)\b.{0,50}\b(proparoxitonas?|paroxitonas?|oxitonas?)\b/u';
+        if (! preg_match($pattern, $folded, $match)) {
+            $pattern = '/alternativa correta\b.{0,80}\b(proparoxitonas?|paroxitonas?|oxitonas?)\b/u';
+            if (! preg_match($pattern, $folded, $match)) {
+                return null;
+            }
+        }
+
+        return match (true) {
+            str_starts_with($match[1], 'proparox') => 'proparoxitona',
+            str_starts_with($match[1], 'parox') => 'paroxitona',
+            default => 'oxitona',
+        };
+    }
+
+    /**
+     * @param  array<int, mixed>  $options
+     * @return array<int, array{text: string, is_correct: bool}>
+     */
+    private static function optionRows(array $options): array
+    {
+        $rows = [];
+        foreach ($options as $option) {
+            if (! is_array($option)) {
+                continue;
+            }
+            $text = (string) ($option['option_text'] ?? $option['text'] ?? '');
+            $rows[] = [
+                'text' => $text,
+                'is_correct' => filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @return array<int, string> */
+    private static function words(string $text): array
+    {
+        $text = preg_replace('/\([^)]*\)/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\b(proparoxítonas?|paroxítonas?|oxítonas?|proparoxitonas?|paroxitonas?|oxitonas?|palavras?|todas?|somente|apenas|são|sao)\b/ui', ' ', $text) ?? $text;
+        $words = [];
+        if (preg_match_all('/\p{L}{2,}/u', $text, $found)) {
+            foreach ($found[0] as $word) {
+                $words[] = $word;
+            }
+        }
+
+        return $words;
     }
 
     private static function fold(string $value): string

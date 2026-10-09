@@ -182,12 +182,12 @@ class QuestionAiService
 
         $raw = $this->client->json($credential, $system, $user, 0.3);
         $raw = $this->rewriteIfGabaritoBroken($credential, $system, $raw);
-        if (QuestionGabaritoGuard::admitsBrokenQuestion((string) ($raw['explanation'] ?? ''))) {
-            throw new AiException(
-                'A IA montou uma questão em que nenhuma alternativa está correta. Tente novamente.',
-                502,
-                'ai_invalid_response'
-            );
+        if ($reason = QuestionGabaritoGuard::problem(
+            (string) ($raw['question_text'] ?? ''),
+            (string) ($raw['explanation'] ?? ''),
+            (array) ($raw['options'] ?? [])
+        )) {
+            throw new AiException(self::brokenGabaritoMessage($reason), 502, 'ai_invalid_response');
         }
 
         $content = $this->sanitizeContent($raw, $convert ? 'multiple_choice' : ($input['type'] ?? null), $filledOptions === [] ? null : count($filledOptions));
@@ -513,10 +513,18 @@ class QuestionAiService
             if (! is_array($item)) {
                 continue;
             }
-            if (QuestionGabaritoGuard::admitsBrokenQuestion((string) ($item['explanation'] ?? ''))) {
+            if (QuestionGabaritoGuard::problem(
+                (string) ($item['question_text'] ?? ''),
+                (string) ($item['explanation'] ?? ''),
+                (array) ($item['options'] ?? [])
+            ) !== null) {
                 $brokenGabarito = true;
                 $item = $this->rewriteIfGabaritoBroken($credential, $system, $item);
-                if (QuestionGabaritoGuard::admitsBrokenQuestion((string) ($item['explanation'] ?? ''))) {
+                if (QuestionGabaritoGuard::problem(
+                    (string) ($item['question_text'] ?? ''),
+                    (string) ($item['explanation'] ?? ''),
+                    (array) ($item['options'] ?? [])
+                ) !== null) {
                     Log::warning('IA: questão semelhante descartada por gabarito inconsistente', [
                         'tenant_id' => $tenantId,
                         'source_id' => $source->id,
@@ -553,7 +561,7 @@ class QuestionAiService
         if ($questions === []) {
             if ($brokenGabarito) {
                 throw new AiException(
-                    'A IA montou uma questão em que nenhuma alternativa está correta. Tente novamente.',
+                    'A IA errou o gabarito (nenhuma alternativa correta ou tonicidade incorreta). Tente novamente.',
                     502,
                     'ai_invalid_response'
                 );
@@ -1025,12 +1033,17 @@ class QuestionAiService
      */
     private function rewriteIfGabaritoBroken(array $credential, string $system, array $item): array
     {
-        if (! QuestionGabaritoGuard::admitsBrokenQuestion((string) ($item['explanation'] ?? ''))) {
+        $problem = QuestionGabaritoGuard::problem(
+            (string) ($item['question_text'] ?? ''),
+            (string) ($item['explanation'] ?? ''),
+            (array) ($item['options'] ?? [])
+        );
+        if ($problem === null) {
             return $item;
         }
 
         try {
-            $raw = $this->client->json($credential, $system, $this->repairPrompt($item), 0.2);
+            $raw = $this->client->json($credential, $system, $this->repairPrompt($item, $problem), 0.2);
         } catch (\Throwable $e) {
             Log::warning('IA: falha ao reescrever questão com gabarito inconsistente', [
                 'message' => $e->getMessage(),
@@ -1040,19 +1053,31 @@ class QuestionAiService
         }
 
         $repaired = isset($raw['questions'][0]) && is_array($raw['questions'][0]) ? $raw['questions'][0] : $raw;
-        if (! is_array($repaired) || QuestionGabaritoGuard::admitsBrokenQuestion((string) ($repaired['explanation'] ?? ''))) {
+        if (! is_array($repaired)) {
+            return $item;
+        }
+        $merged = array_merge($item, $repaired);
+        if (QuestionGabaritoGuard::problem(
+            (string) ($merged['question_text'] ?? ''),
+            (string) ($merged['explanation'] ?? ''),
+            (array) ($merged['options'] ?? [])
+        ) !== null) {
             return $item;
         }
 
-        return array_merge($item, $repaired);
+        return $merged;
     }
 
     /** @param  array<string, mixed>  $item */
-    private function repairPrompt(array $item): string
+    private function repairPrompt(array $item, string $problem): string
     {
-        return implode("\n\n", [
-            'A questão abaixo é INVÁLIDA: a explicação conclui que nenhuma alternativa satisfaz o enunciado, ou aponta erro na própria questão.',
-            'Reescreva a questão inteira. Mantenha o assunto e o comando, mas troque as alternativas até que exatamente uma esteja correta e conferida.',
+        $facts = QuestionGabaritoGuard::stressFacts((array) ($item['options'] ?? []));
+
+        return implode("\n\n", array_filter([
+            'A questão abaixo é INVÁLIDA.',
+            $problem,
+            $facts !== '' ? "Classificação ortográfica obrigatória (não recalcule; use estes fatos):\n".$facts : null,
+            'Reescreva a questão inteira. Mantenha o assunto, mas troque as palavras das alternativas até que exatamente uma satisfaça o comando e esteja de acordo com a classificação acima.',
             QuestionGabaritoGuard::AUTHORING_RULE,
             AiPromptGuard::wrap('questao', json_encode([
                 'question_text' => $item['question_text'] ?? '',
@@ -1060,7 +1085,16 @@ class QuestionAiService
                 'explanation' => $item['explanation'] ?? '',
             ], JSON_UNESCAPED_UNICODE)),
             'Responda somente com o objeto JSON da questão reescrita: question_text, explanation, options (option_text e is_correct).',
-        ]);
+        ]));
+    }
+
+    private static function brokenGabaritoMessage(string $reason): string
+    {
+        if (str_starts_with($reason, 'Tonicidade:')) {
+            return 'A IA errou a sílaba tônica das palavras. Tente novamente.';
+        }
+
+        return 'A IA montou uma questão em que nenhuma alternativa está correta. Tente novamente.';
     }
 
     private function credential(?User $user, int $tenantId): array
