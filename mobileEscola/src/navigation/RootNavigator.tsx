@@ -59,6 +59,7 @@ const linking: LinkingOptions<any> = {
               },
               BancoDesempenho: 'banco/desempenho',
               BancoRanking: 'banco/ranking',
+              Aprendizagem: 'banco/aprendizagem',
               SimuladoDetalhe: {
                 path: ':examId',
                 parse:     { examId: (id: string) => Number(id) },

@@ -356,3 +356,78 @@ export async function startPracticeSession(filters: CatalogFilters, options: Ses
   const { data } = await api.post<Envelope<PracticeAttemptPayload>>('/api/aluno/practice/sessions', { ...catalogParams(filters), ...options });
   return data.body;
 }
+
+export type LearningLevel = 'critical' | 'attention' | 'good' | 'excellent' | 'insufficient';
+
+export interface LearningOverview {
+  questions: number;
+  first_correct: number;
+  first_wrong: number;
+  accuracy: number | null;
+  retakes: number;
+  reinforcement_topics: number;
+  min_sample: number;
+}
+
+export interface LearningTopic {
+  subject_id: number | null;
+  subject_name: string;
+  topic_id: number | null;
+  topic_name: string;
+  questions: number;
+  first_correct: number;
+  first_wrong: number;
+  accuracy: number | null;
+  retakes: number;
+  level: LearningLevel;
+  label: string;
+}
+
+export interface LearningPlan {
+  subject_id: number | null;
+  subject_name: string;
+  topic_id: number;
+  topic_name: string;
+  questions: number;
+  first_correct: number;
+  accuracy: number | null;
+  level: LearningLevel;
+  label: string;
+  source: 'unseen' | 'review' | 'preparing';
+  quantity: number;
+  message: string;
+  action: string;
+}
+
+export interface LearningEvolution {
+  months: Array<{ month: string; label: string; questions: number; first_correct: number; first_wrong: number; accuracy: number | null }>;
+  comparison: {
+    current: { questions: number; first_correct: number; first_wrong: number; accuracy: number | null };
+    previous: { questions: number; first_correct: number; first_wrong: number; accuracy: number | null };
+  };
+}
+
+export async function fetchLearningOverview(): Promise<LearningOverview> {
+  const { data } = await api.get<Envelope<LearningOverview>>('/api/aluno/learning/overview');
+  return data.body;
+}
+
+export async function fetchLearningTopics(): Promise<LearningTopic[]> {
+  const { data } = await api.get<Envelope<LearningTopic[]>>('/api/aluno/learning/topics');
+  return data.body;
+}
+
+export async function fetchLearningRecommendations(): Promise<LearningPlan[]> {
+  const { data } = await api.get<Envelope<LearningPlan[]>>('/api/aluno/learning/recommendations');
+  return data.body;
+}
+
+export async function fetchLearningEvolution(): Promise<LearningEvolution> {
+  const { data } = await api.get<Envelope<LearningEvolution>>('/api/aluno/learning/evolution');
+  return data.body;
+}
+
+export async function startLearningReinforcement(topicId: number): Promise<PracticeAttemptPayload> {
+  const { data } = await api.post<Envelope<PracticeAttemptPayload>>('/api/aluno/learning/reinforcement', { topic_id: topicId });
+  return data.body;
+}

@@ -6,12 +6,12 @@ export const SHOW_TENANT_LOGO = false;
 
 /** Itens de navegação do aluno (menu-gaveta no celular e SideNav no tablet/desktop). */
 export type MenuId =
-  | 'home' | 'calendario' | 'desempenho' | 'questoes' | 'simulados' | 'provas-anteriores' | 'exercicios' | 'materiais' | 'financeiro';
+  | 'home' | 'calendario' | 'desempenho' | 'questoes' | 'aprendizagem' | 'simulados' | 'provas-anteriores' | 'exercicios' | 'materiais' | 'financeiro';
 
 type TabName = 'Home' | 'Desempenho' | 'Questoes' | 'Simulados' | 'Financeiro';
 
 export type MenuItem =
-  | { id: MenuId; label: string; icon: IconName; tab: TabName; nestedScreen?: 'ProvasAnteriores' | 'Exercicios' | 'Materiais' | 'SimuladosList' }
+  | { id: MenuId; label: string; icon: IconName; tab: TabName; nestedScreen?: 'ProvasAnteriores' | 'Exercicios' | 'Materiais' | 'SimuladosList' | 'Aprendizagem' | 'BancoQuestoes' }
   | { id: MenuId; label: string; icon: IconName; stack: 'Calendario' };
 
 export const MENU_ITEMS: MenuItem[] = [
@@ -19,6 +19,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: 'calendario', label: 'Calendário', stack: 'Calendario', icon: 'calendar' },
   { id: 'desempenho', label: 'Desempenho', tab: 'Desempenho', icon: 'chart' },
   { id: 'questoes', label: 'Banco de questões', tab: 'Questoes', icon: 'library' },
+  { id: 'aprendizagem', label: 'Minha Aprendizagem', tab: 'Questoes', nestedScreen: 'Aprendizagem', icon: 'lightbulb' },
   { id: 'simulados', label: 'Simulados', tab: 'Simulados', icon: 'clipboard' },
   { id: 'provas-anteriores', label: 'Provas anteriores', tab: 'Simulados', nestedScreen: 'ProvasAnteriores', icon: 'archive' },
   { id: 'exercicios', label: 'Exercícios', tab: 'Simulados', nestedScreen: 'Exercicios', icon: 'edit' },
@@ -66,6 +67,11 @@ export function getActiveMenuId(state: Snapshot): MenuId | null {
   if (stackRoute?.name === 'Calendario') return 'calendario';
   const tab = activeTab(state);
   if (!tab) return null;
+  if (tab.name === 'Questoes') {
+    const name = tab.state?.routes?.[tab.state?.index ?? 0]?.name;
+    if (name === 'Aprendizagem') return 'aprendizagem';
+    return 'questoes';
+  }
   if (tab.name === 'Simulados') {
     const simRoute = tab.state?.routes?.[tab.state?.index ?? 0];
     const name = simRoute?.name ?? 'SimuladosList';
@@ -92,7 +98,7 @@ export function navigateToMenuItem(item: MenuItem) {
     return;
   }
   if (item.tab === 'Questoes') {
-    rootNav.navigate('AlunoTabs', { screen: 'Questoes', params: { screen: 'BancoQuestoes' } });
+    rootNav.navigate('AlunoTabs', { screen: 'Questoes', params: { screen: item.nestedScreen ?? 'BancoQuestoes' } });
     return;
   }
   rootNav.navigate('AlunoTabs', { screen: item.tab });

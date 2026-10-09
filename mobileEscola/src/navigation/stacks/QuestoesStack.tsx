@@ -6,6 +6,7 @@ import { BancoPraticarScreen } from '../../features/banco-questoes/screens/Banco
 import { BancoSimuladoScreen } from '../../features/banco-questoes/screens/BancoSimuladoScreen';
 import { BancoDesempenhoScreen } from '../../features/banco-questoes/screens/BancoDesempenhoScreen';
 import { BancoRankingScreen } from '../../features/banco-questoes/screens/BancoRankingScreen';
+import { AprendizagemScreen } from '../../features/banco-questoes/screens/AprendizagemScreen';
 import type { RankingPeriod } from '../../services/practice.service';
 
 /** Aba "Questões" (banco de questões do aluno). */
@@ -18,6 +19,7 @@ export type QuestoesStackParamList = {
   BancoDesempenho: undefined;
   /** `period` abre já no filtro (a tela inicial mostra a semana). */
   BancoRanking: { period?: RankingPeriod } | undefined;
+  Aprendizagem: undefined;
 };
 
 const Stack = createNativeStackNavigator<QuestoesStackParamList>();
@@ -45,6 +47,7 @@ export function QuestoesNavigator() {
       <Stack.Screen name="BancoSimulado" component={BancoSimuladoScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BancoDesempenho" component={BancoDesempenhoScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BancoRanking" component={BancoRankingScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Aprendizagem" component={AprendizagemScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\QuestionBankException;
+use App\Services\Learning\LearningReviewService;
 use App\Models\ExamQuestion;
 use App\Models\PracticeAnswer;
 use App\Models\PracticeAttempt;
@@ -102,7 +103,7 @@ class PracticeService
             throw new QuestionBankException('Questão indisponível para prática.', 404);
         }
         $isCorrect = $this->isCorrect($question, $optionId);
-        PracticeAnswer::create([
+        $answer = PracticeAnswer::create([
             'tenant_id'        => $student->tenant_id,
             'student_id'       => $student->id,
             'exam_question_id' => $question->id,
@@ -110,6 +111,7 @@ class PracticeService
             'is_correct'       => $isCorrect,
             'answered_at'      => now(),
         ]);
+        $this->rememberReview($answer);
 
         return $this->feedback($question, $optionId, $isCorrect);
     }
@@ -322,6 +324,31 @@ class PracticeService
         ]);
     }
 
+    /** Sessão de reforço com questões já escolhidas (inéditas ou revisão). Correção a cada questão. */
+    public function startWithQuestions(Student $student, array $questionIds, string $title, array $filters = []): PracticeAttempt
+    {
+        $allowed = $this->practicableFor($student)->whereIn('exam_questions.id', $questionIds)->pluck('exam_questions.id')->flip();
+        $ids = array_values(array_filter(
+            array_map('intval', $questionIds),
+            fn (int $id) => $allowed->has($id),
+        ));
+        if ($ids === []) {
+            throw new QuestionBankException('Nenhuma questão encontrada com esses filtros.');
+        }
+
+        return PracticeAttempt::create([
+            'tenant_id'       => $student->tenant_id,
+            'student_id'      => $student->id,
+            'kind'            => PracticeAttempt::KIND_SESSION,
+            'title'           => mb_substr($title, 0, 255),
+            'question_ids'    => $ids,
+            'filters'         => $filters,
+            'correction_mode' => 'each',
+            'question_count'  => count($ids),
+            'started_at'      => now(),
+        ]);
+    }
+
     /** Sessão aberta mais recente (atalho "Continuar sessão"). */
     public function openSession(Student $student): ?array
     {
@@ -345,7 +372,7 @@ class PracticeService
         if ($attempt->correctsEachQuestion() && $attempt->answers()->where('exam_question_id', $question->id)->exists()) {
             throw QuestionBankException::conflict('Esta questão já foi respondida e corrigida.');
         }
-        PracticeAnswer::updateOrCreate(
+        $answer = PracticeAnswer::updateOrCreate(
             ['practice_attempt_id' => $attempt->id, 'exam_question_id' => $question->id],
             [
                 'tenant_id'   => $attempt->tenant_id,
@@ -355,6 +382,9 @@ class PracticeService
                 'answered_at' => now(),
             ],
         );
+        if ($attempt->correctsEachQuestion()) {
+            $this->rememberReview($answer);
+        }
     }
 
     /** Correção de uma questão já respondida (sessão com correção a cada questão). */
@@ -382,8 +412,22 @@ class PracticeService
             'correct_count'  => $answers->where('is_correct', true)->count(),
             'finished_at'    => now(),
         ]);
+        if (! $attempt->correctsEachQuestion()) {
+            foreach ($answers as $answer) {
+                $this->rememberReview($answer);
+            }
+        }
 
         return $attempt;
+    }
+
+    /** Agenda a revisão só depois que a resposta passa a contar (gabarito já visto). */
+    private function rememberReview(PracticeAnswer $answer): void
+    {
+        if (! PracticeAnswer::query()->counted()->whereKey($answer->id)->exists()) {
+            return;
+        }
+        app(LearningReviewService::class)->record($answer);
     }
 
     /** Resumo para o Desempenho (o detalhe por disciplina/assunto fica em PracticePerformanceService). */

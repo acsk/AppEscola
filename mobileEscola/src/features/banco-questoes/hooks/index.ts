@@ -18,6 +18,11 @@ import {
   fetchPracticeFacets,
   setQuestionSaved,
   startPracticeSession,
+  fetchLearningOverview,
+  fetchLearningTopics,
+  fetchLearningRecommendations,
+  fetchLearningEvolution,
+  startLearningReinforcement,
 } from '../../../services/practice.service';
 import { bancoKeys } from '../queryKeys';
 
@@ -142,6 +147,25 @@ export function useToggleSavedQuestion() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...bancoKeys.all, 'catalog'] });
       queryClient.invalidateQueries({ queryKey: [...bancoKeys.all, 'facets'] });
+    },
+  });
+}
+
+export function useLearning() {
+  const overview = useQuery({ queryKey: [...bancoKeys.learning(), 'overview'], queryFn: fetchLearningOverview });
+  const topics = useQuery({ queryKey: [...bancoKeys.learning(), 'topics'], queryFn: fetchLearningTopics });
+  const plans = useQuery({ queryKey: [...bancoKeys.learning(), 'plans'], queryFn: fetchLearningRecommendations });
+  const evolution = useQuery({ queryKey: [...bancoKeys.learning(), 'evolution'], queryFn: fetchLearningEvolution });
+  const refetch = () => Promise.all([overview.refetch(), topics.refetch(), plans.refetch(), evolution.refetch()]);
+  return { overview, topics, plans, evolution, refetch, isLoading: overview.isLoading || topics.isLoading, isError: overview.isError || topics.isError };
+}
+
+export function useStartReinforcement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (topicId: number) => startLearningReinforcement(topicId),
+    onSuccess: (payload) => {
+      queryClient.setQueryData(bancoKeys.attempt(payload.attempt.id), payload);
     },
   });
 }

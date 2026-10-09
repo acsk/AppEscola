@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\ExamTypeController;
 use App\Http\Controllers\Api\QuestionSetController;
 use App\Http\Controllers\Api\QuestionBankPracticeController;
 use App\Http\Controllers\Api\StudentPracticeController;
+use App\Http\Controllers\Api\StudentLearningController;
 use App\Http\Controllers\Api\QuestionBankController;
 use App\Http\Controllers\Api\QuestionCatalogController;
 use App\Http\Controllers\Api\SubjectTopicController;
@@ -324,6 +325,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('aluno/practice-attempts/{attempt}',            [StudentPracticeController::class, 'showAttempt'])->whereNumber('attempt');
     Route::post('aluno/practice-attempts/{attempt}/answer',    [StudentPracticeController::class, 'answerInAttempt'])->whereNumber('attempt');
     Route::post('aluno/practice-attempts/{attempt}/finish',    [StudentPracticeController::class, 'finishAttempt'])->whereNumber('attempt');
+
+    Route::get('aluno/learning/overview',         [StudentLearningController::class, 'overview']);
+    Route::get('aluno/learning/topics',           [StudentLearningController::class, 'topics']);
+    Route::get('aluno/learning/recommendations',  [StudentLearningController::class, 'recommendations']);
+    Route::get('aluno/learning/evolution',        [StudentLearningController::class, 'evolution']);
+    Route::post('aluno/learning/reinforcement',   [StudentLearningController::class, 'reinforcement']);
 
     Route::get('aluno/past-exams', [StudentPastExamController::class, 'index']);
     Route::get('aluno/past-exams/{pastExam}', [StudentPastExamController::class, 'show']);

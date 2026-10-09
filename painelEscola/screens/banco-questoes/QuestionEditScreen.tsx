@@ -439,6 +439,14 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       }
     >
       <View style={{ gap: 12 }}>
+        <FormInput
+          label="Nome da prova/simulado de origem"
+          value={examQuestion.exam?.title || examQuestion.source_exam_name || ""}
+          editable={false}
+        />
+        <Text className="text-xs text-ink-subtle" style={{ marginTop: -8 }}>
+          Definido pelo simulado. Não pode ser alterado nesta tela.
+        </Text>
         {!!examQuestion.question_text?.trim() && <RichText className="text-sm text-ink leading-6" selectable value={examQuestion.question_text} />}
         {!!examQuestion.image_url && (
           <Image source={{ uri: examQuestion.image_url }} accessibilityLabel="Imagem do enunciado" style={{ width: "100%", height: isMobile ? 180 : 260 }} resizeMode="contain" />
@@ -462,8 +470,6 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       title="Conteúdo"
       description="Enunciado, alternativas e gabarito da questão avulsa."
     >
-      <FormInput label="Nome da prova/simulado de origem" value={sourceExamName} onChangeText={setSourceExamName}
-        maxLength={255} editable={!aiFilling && saving === null} error={errors.source_exam_name} />
       <SegmentedControl<QuestionType>
         label="Tipo"
         allowClear={false}

@@ -11,4 +11,5 @@ export const bancoKeys = {
   attempt: (attemptId: number) => [...bancoKeys.all, 'attempt', attemptId] as const,
   catalog: (filters: unknown, sort: string) => [...bancoKeys.all, 'catalog', filters, sort] as const,
   facets: (filters: unknown) => [...bancoKeys.all, 'facets', filters] as const,
+  learning: () => [...bancoKeys.all, 'learning'] as const,
 };
