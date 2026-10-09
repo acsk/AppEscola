@@ -122,31 +122,57 @@ export function TopicRow({
 }
 
 /** Seta contra a foto de cerca de 24h atrás: positivo sobe, negativo desce, zero manteve. Sem foto antiga, não marca. */
+/** Variação de posição (protótipo "Delta"): ▲ subiu, ▼ caiu, "–" manteve; sem comparação, nada. */
 export function RankMovement({ movement }: { movement?: number | null }) {
   const p = usePalette();
   if (movement == null) return null;
   if (movement === 0) {
-    return (
-      <View accessibilityLabel="Manteve a posição" style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Icon name="minus" size={14} color={p.inkSubtle} />
-      </View>
-    );
+    return <Text accessibilityLabel="Sem mudança" style={{ ...font.bold, fontSize: 12, color: p.inkSubtle }}>–</Text>;
   }
   const up = movement > 0;
   const places = Math.abs(movement);
   return (
-    <View accessibilityLabel={up ? `Subiu ${places} ${places === 1 ? 'posição' : 'posições'}` : `Caiu ${places} ${places === 1 ? 'posição' : 'posições'}`}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-      <Icon name={up ? 'arrow-up' : 'arrow-down'} size={14} color={up ? p.success : p.danger} />
-      <Text style={{ ...font.bold, fontSize: 12, color: up ? p.success : p.danger, fontVariant: ['tabular-nums'] }}>{places}</Text>
+    <View accessibilityLabel={`${up ? 'Subiu' : 'Desceu'} ${places} ${places === 1 ? 'posição' : 'posições'}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
+      <Icon name={up ? 'chevron-up' : 'chevron-down'} size={14} strokeWidth={3} color={up ? p.success : p.dangerInk} />
+      <Text style={{ ...font.bold, fontSize: 12, color: up ? p.success : p.dangerInk, fontVariant: ['tabular-nums'] }}>{places}</Text>
     </View>
   );
 }
 
-/** Linha do ranking. A sua linha tem contorno ink e o selo "você". */
-export function RankRow({ pos, initials, name, rate, count, me, photoUrl, movement }: { pos: number; initials: string; name: string; rate: number | null; count: number; me?: boolean; photoUrl?: string | null; movement?: number | null }) {
+const fmt1 = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const pct = (v: number | null | undefined) => (v == null ? '—' : `${fmt1(v).replace(',0', '')}%`);
+
+function Avatar({ initials, photoUrl, size = 36 }: { initials: string; photoUrl?: string | null; size?: number }) {
+  const p = usePalette();
+  return photoUrl ? (
+    <Image source={{ uri: photoUrl }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: p.surfaceSunken }} />
+  ) : (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ ...font.extrabold, fontSize: size <= 32 ? 12 : 13, color: p.inkMuted }}>{initials}</Text>
+    </View>
+  );
+}
+
+const YouBadge = () => {
+  const p = usePalette();
+  return (
+    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: p.surfaceInverse }}>
+      <Text style={{ ...font.extrabold, fontSize: 11, letterSpacing: 0.44, color: p.onInverse }}>VOCÊ</Text>
+    </View>
+  );
+};
+
+/**
+ * Linha do ranking (celular). A sua linha tem contorno ink e o selo "você".
+ * Com `score`: pontos à direita e "6 questões · 83%" embaixo do nome.
+ */
+export function RankRow({ pos, initials, name, rate, count, me, photoUrl, movement, score, scoreDecimals = 1 }: {
+  pos: number; initials: string; name: string; rate: number | null; count: number; me?: boolean; photoUrl?: string | null; movement?: number | null;
+  score?: number | null; scoreDecimals?: 0 | 1;
+}) {
   const p = usePalette();
   const top = pos <= 3;
+  const scored = score != null;
   return (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 12, paddingHorizontal: space[4], borderRadius: radius.md,
@@ -156,30 +182,83 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl, moveme
         {pos === 1 ? <Icon name="trophy" size={18} color={p.onInverse} />
           : <Text style={{ ...font.extrabold, fontSize: 15, color: top ? p.ink : p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>}
       </View>
-      <View style={{ width: 28, alignItems: 'flex-start' }}>
-        <RankMovement movement={movement} />
-      </View>
-      {photoUrl ? (
-        <Image source={{ uri: photoUrl }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: p.surfaceSunken }} />
-      ) : (
-        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ ...font.extrabold, fontSize: 13, color: p.inkMuted }}>{initials}</Text>
-        </View>
-      )}
+      {movement !== undefined ? <View style={{ width: 28, alignItems: 'flex-start' }}><RankMovement movement={movement} /></View> : null}
+      <Avatar initials={initials} photoUrl={photoUrl} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, flexShrink: 1 }}>{name}</Txt>
-          {me ? (
-            <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: p.surfaceInverse }}>
-              <Text style={{ ...font.extrabold, fontSize: 11, letterSpacing: 0.44, color: p.onInverse }}>VOCÊ</Text>
-            </View>
-          ) : null}
+          {me ? <YouBadge /> : null}
         </View>
-        <Txt variant="bodySm" tone="subtle">{rate != null ? `${rate.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}% de acerto` : 'Poucos dados'}</Txt>
+        <Txt variant="bodySm" tone="subtle">
+          {scored ? `${count} ${count === 1 ? 'questão' : 'questões'} · ${pct(rate)}` : rate != null ? `${Math.round(rate)}% de acerto` : 'Poucos dados'}
+        </Txt>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text style={{ ...font.extrabold, fontSize: 18, lineHeight: 22, color: p.ink, fontVariant: ['tabular-nums'] }}>{count}</Text>
-        <Txt variant="caption" tone="subtle">{count === 1 ? 'questão' : 'questões'}</Txt>
+        <Text style={{ ...font.extrabold, fontSize: 18, lineHeight: 22, color: p.ink, fontVariant: ['tabular-nums'] }}>
+          {scored ? (scoreDecimals ? fmt1(score as number) : String(Math.round(score as number))) : count}
+        </Text>
+        <Txt variant="caption" tone="subtle">{scored ? 'pontos' : count === 1 ? 'questão' : 'questões'}</Txt>
+      </View>
+    </View>
+  );
+}
+
+/** Colunas da tabela do ranking (desktop). */
+const RANK_COLS = { pos: 64, n1: 84, n2: 76, n3: 92, score: 200 };
+
+/** Cabeçalho da tabela do ranking. */
+export function RankHead({ labels = ['Questões', 'Acertos', 'Aproveit.', 'Pontos'] }: { labels?: [string, string, string, string] | string[] }) {
+  const p = usePalette();
+  const th = { ...font.bold, fontSize: 11, lineHeight: 16, letterSpacing: 0.88, textTransform: 'uppercase' as const, color: p.inkSubtle };
+  return (
+    <View accessibilityRole="header" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 40, paddingHorizontal: 12 }}>
+      <Text style={[th, { width: RANK_COLS.pos }]}>#</Text>
+      <Text style={[th, { flex: 1 }]}>Aluno</Text>
+      <Text style={[th, { width: RANK_COLS.n1, textAlign: 'right' }]}>{labels[0]}</Text>
+      <Text style={[th, { width: RANK_COLS.n2, textAlign: 'right' }]}>{labels[1]}</Text>
+      <Text style={[th, { width: RANK_COLS.n3, textAlign: 'right' }]}>{labels[2]}</Text>
+      <Text style={[th, { width: RANK_COLS.score, textAlign: 'right' }]}>{labels[3]}</Text>
+    </View>
+  );
+}
+
+/** Linha da tabela do ranking (desktop): posição com a seta, aluno, três números e os pontos com barra. */
+export function RankLine({ pos, movement, initials, name, photoUrl, me, note, values, score, scoreLabel, max = 100 }: {
+  pos: number; movement?: number | null; initials: string; name: string; photoUrl?: string | null; me?: boolean;
+  /** Ex.: "+3 repetidas, não contam". */
+  note?: string | null;
+  values: [string, string, string]; score: number; scoreLabel: string; max?: number;
+}) {
+  const p = usePalette();
+  const num = { fontSize: 15, color: me ? p.ink : p.inkMuted, fontVariant: ['tabular-nums' as const], textAlign: 'right' as const, ...font.regular };
+  return (
+    <View accessibilityLabel={`${pos}º ${name}${me ? ', você' : ''}, ${scoreLabel} pontos`} style={{
+      flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.md,
+      backgroundColor: me ? p.surfaceSunken : 'transparent', borderWidth: 1.5, borderColor: me ? p.ink : 'transparent',
+    }}>
+      <View style={{ width: RANK_COLS.pos, flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+        <Text style={{ ...font.extrabold, fontSize: 15, color: p.ink, minWidth: 26, fontVariant: ['tabular-nums'] }}>{pos}º</Text>
+        <RankMovement movement={movement} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Avatar initials={initials} photoUrl={photoUrl} size={32} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+            <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, flexShrink: 1 }}>{name}</Txt>
+            {pos === 1 ? <Icon name="trophy" size={15} color={p.inkMuted} /> : null}
+            {me ? <YouBadge /> : null}
+          </View>
+          {note ? <Txt variant="caption" tone="subtle" style={{ ...font.medium }}>{note}</Txt> : null}
+        </View>
+      </View>
+      <Text style={[num, { width: RANK_COLS.n1 }]}>{values[0]}</Text>
+      <Text style={[num, { width: RANK_COLS.n2 }]}>{values[1]}</Text>
+      <Text style={[num, { width: RANK_COLS.n3 }]}>{values[2]}</Text>
+      <View style={{ width: RANK_COLS.score, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+        <View style={{ flex: 1, maxWidth: 120, height: 6, borderRadius: radius.pill, backgroundColor: me ? p.surface : p.surfaceSunken, overflow: 'hidden' }}>
+          <View style={{ width: `${Math.max(0, Math.min(100, max ? (score / max) * 100 : 0))}%`, height: '100%', borderRadius: radius.pill, backgroundColor: me ? p.ink : p.inkMuted }} />
+        </View>
+        <Text style={{ ...font.extrabold, fontSize: 16, minWidth: 40, textAlign: 'right', color: p.ink, fontVariant: ['tabular-nums'] }}>{scoreLabel}</Text>
       </View>
     </View>
   );

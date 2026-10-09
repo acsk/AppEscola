@@ -16,7 +16,7 @@ import {
   ChevronRight, CircleAlert, CircleCheck, CircleX, Clipboard, Clock, Download, Eye, Flag, Folder, Funnel, House, Info,
   KeyRound, LayoutGrid, Library, Lightbulb, ListFilter, LogOut, Menu, MessageSquare, PanelLeft, Pause, PenLine, Play,
   Minus, Plus, RefreshCw, Search, SlidersHorizontal, Target, TriangleAlert, Trophy, Wallet, X, GraduationCap, Sparkles, FileText,
-  Receipt, Users, TrendingUp, TrendingDown, Strikethrough, ZoomIn, Calculator, Undo2,
+  Receipt, Users, TrendingUp, TrendingDown, Strikethrough, ZoomIn, Calculator, Undo2, ChevronUp,
   type LucideIcon,
 } from 'lucide-react-native';
 import { usePalette } from './theme';
@@ -34,7 +34,7 @@ export const ICONS = {
   flag: Flag, sort: ListFilter, filter: Funnel, grid: LayoutGrid, 'panel-left': PanelLeft, 'circle-check': CircleCheck,
   'circle-x': CircleX, lightbulb: Lightbulb, graduation: GraduationCap, camera: Camera, sparkle: Sparkles, file: FileText,
   receipt: Receipt, users: Users, 'trend-up': TrendingUp, 'trend-down': TrendingDown,
-  strike: Strikethrough, zoom: ZoomIn, calc: Calculator, undo: Undo2,
+  strike: Strikethrough, zoom: ZoomIn, calc: Calculator, undo: Undo2, 'chevron-up': ChevronUp,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
