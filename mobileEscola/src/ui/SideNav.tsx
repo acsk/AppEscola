@@ -5,7 +5,12 @@ import { NewPill } from './content';
 import { usePalette } from './theme';
 import { font, layout, radius, space, type } from './tokens';
 
-export type SideNavItem = { key: string; icon: IconName; label: string; count?: number; /** Novidades: pílula azul (ponto azul no rail). */ badge?: number };
+export type SideNavItem = {
+  key: string; icon: IconName; label: string; count?: number;
+  /** Pílula azul. Sem `badgeText`, o texto é "N novas". */
+  badge?: number;
+  badgeText?: string;
+};
 
 /**
  * Navegação lateral do tablet/desktop (protótipo "SideNav"): completa (248px) ou rail (72px, só ícones).
@@ -35,8 +40,9 @@ export function SideNav({
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 2 }} showsVerticalScrollIndicator={false}>
         {items.map((item) => {
           const on = item.key === activeKey;
+          const pill = item.badge ? (item.badgeText ?? `${item.badge} ${item.badge === 1 ? 'nova' : 'novas'}`) : null;
           return (
-            <Pressable key={item.key} accessibilityRole="menuitem" accessibilityLabel={item.badge ? `${item.label}, ${item.badge} novas` : item.label} accessibilityState={{ selected: on }}
+            <Pressable key={item.key} accessibilityRole="menuitem" accessibilityLabel={pill ? `${item.label}, ${pill}` : item.label} accessibilityState={{ selected: on }}
               onPress={() => onSelect(item.key)}
               style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => ({
                 flexDirection: 'row', alignItems: 'center', gap: space[3], height: collapsed ? 44 : 40, borderRadius: radius.sm,
@@ -48,7 +54,7 @@ export function SideNav({
                 {collapsed && item.badge ? <View style={{ position: 'absolute', top: -2, right: -3, width: 8, height: 8, borderRadius: 4, backgroundColor: p.navNew, borderWidth: 1.5, borderColor: p.navBg }} /> : null}
               </View>
               {!collapsed ? <Text numberOfLines={1} style={[type.label, { color: on ? p.navInk : p.navInkMuted, flex: 1 }]}>{item.label}</Text> : null}
-              {!collapsed && item.badge ? <NewPill tone="nav" label={`${item.badge} ${item.badge === 1 ? 'nova' : 'novas'}`} /> : null}
+              {!collapsed && pill ? <NewPill tone="nav" label={pill} /> : null}
               {!collapsed && !item.badge && item.count != null ? <Text style={[type.caption, { ...font.bold, color: p.navInkMuted }]}>{item.count}</Text> : null}
             </Pressable>
           );

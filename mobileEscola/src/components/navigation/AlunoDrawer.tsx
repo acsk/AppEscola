@@ -10,6 +10,7 @@ import { useTenantTheme } from '../../context/TenantThemeContext';
 import ConfirmModal from '../ConfirmModal';
 import { font, IconButton, ListItem, NewPill, Overline, Txt, newLabel, radius, shadow, space, type, usePalette } from '../../ui';
 import { useNewQuestionsCount } from '../../features/banco-questoes/hooks';
+import { usePendingSimuladosCount } from '../../features/simulados/hooks';
 
 const DRAWER_WIDTH = 312;
 
@@ -18,6 +19,7 @@ export function AlunoDrawer() {
   const p = usePalette();
   const { logoUrl, tenantName } = useTenantTheme();
   const newQuestions = useNewQuestionsCount();
+  const pendingSimulados = usePendingSimuladosCount();
   const { visible, close } = useAlunoDrawer();
   const { signOut, user } = useAuth();
   const rootNavState = useRootNavigationState();
@@ -108,7 +110,9 @@ export function AlunoDrawer() {
               <Overline style={{ paddingTop: space[4], paddingBottom: 6, paddingHorizontal: space[3], color: p.navInkMuted }}>Navegação</Overline>
               {MENU_ITEMS.map((item) => (
                 <ListItem key={item.id} icon={item.icon} title={item.label} chevron={false} active={item.id === activeMenuId} onPress={() => handleMenuPress(item)} onNav
-                  trailing={item.id === 'questoes' && newQuestions ? <NewPill tone="nav" label={newLabel(newQuestions)} /> : undefined} />
+                  trailing={item.id === 'questoes' && newQuestions ? <NewPill tone="nav" label={newLabel(newQuestions)} />
+                    : item.id === 'simulados' && pendingSimulados ? <NewPill tone="nav" label={`${pendingSimulados} ${pendingSimulados === 1 ? 'pendente' : 'pendentes'}`} />
+                    : undefined} />
               ))}
               <Overline style={{ paddingTop: space[4], paddingBottom: 6, paddingHorizontal: space[3], color: p.navInkMuted }}>Conta</Overline>
               <ListItem icon="key" title="Trocar senha" chevron={false} onNav onPress={handleAlterarSenha} />

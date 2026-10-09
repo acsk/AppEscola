@@ -1,4 +1,4 @@
-export { useSimuladosList } from './useSimuladosList';
+export { usePendingSimuladosCount, useSimuladosList } from './useSimuladosList';
 export { useSimuladoDetail } from './useSimuladoDetail';
 export { useSimuladoMateriais } from './useSimuladoMateriais';
 export { useAttemptReview } from './useAttemptReview';
