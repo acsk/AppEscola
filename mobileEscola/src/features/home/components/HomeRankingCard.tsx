@@ -6,17 +6,18 @@ import { formatPercent, rankingWeekRange } from '../../banco-questoes/lib/format
 import { Button, Card, Icon, LinkButton, RankMovement, Section, Txt, font, space, usePalette } from '../../../ui';
 
 const TOP = 5;
-const MEDAL = ['#F59E0B', '#94A3B8', '#B45309'];
+const MEDAL = ['🥇', '🥈', '🥉'];
+const points = (score?: number | null) => (score ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 function initials(name: string): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 }
 
-/** Top 5 da semana corrente (segunda a domingo) no banco de questões, mais o campeão da semana anterior já fechada. */
+/** Top 5 de desempenho da semana (Wilson, primeira tentativa), mais o campeão da semana anterior. */
 export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; onPractice: () => void }) {
   const p = usePalette();
-  const { data, isLoading, isError, refetch } = usePracticeRanking('week');
-  const lastWeek = usePracticeRanking('last_week').data;
+  const { data, isLoading, isError, refetch } = usePracticeRanking('week', { criterion: 'wilson' });
+  const lastWeek = usePracticeRanking('last_week', { criterion: 'wilson' }).data;
   const top = data?.ranking.slice(0, TOP) ?? [];
   const weekRange = data ? rankingWeekRange(data) : null;
   const champions = lastWeek?.ranking.filter((row) => row.position === 1) ?? [];
@@ -30,26 +31,31 @@ export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; on
           flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[2], paddingHorizontal: space[2],
           borderRadius: 12, backgroundColor: row.is_me ? p.brandSoft : 'transparent',
         }}>
-        <View style={{ minWidth: 32, height: 28, borderRadius: 14, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: medal ?? p.surfaceSunken }}>
-          <Text style={{ ...font.extrabold, fontSize: 12, color: medal ? '#FFFFFF' : p.ink }}>{row.position}º</Text>
+        <View style={{ minWidth: 32, height: 28, borderRadius: 14, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: p.surfaceSunken }}>
+          <Text style={{ ...font.extrabold, fontSize: 12, color: p.ink }}>{row.position}º</Text>
         </View>
-        <View style={{ width: 28, alignItems: 'flex-start' }}>
-          <RankMovement movement={row.movement} />
+        <View style={{ width: 36, alignItems: 'flex-start' }}>
+          <RankMovement movement={row.movement} status={row.movement_status} referenceAt={row.movement_reference_at} />
         </View>
-        {row.photo_url ? (
-          <Image source={{ uri: row.photo_url }} style={{ width: 32, height: 32, borderRadius: 16 }} />
-        ) : (
-          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: p.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ ...font.bold, fontSize: 11, color: p.inkMuted }}>{initials(row.name)}</Text>
-          </View>
-        )}
+        <View style={{ width: 32, height: 32, overflow: 'visible' }}>
+          {row.photo_url ? (
+            <Image source={{ uri: row.photo_url }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+          ) : (
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: p.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ ...font.bold, fontSize: 11, color: p.inkMuted }}>{initials(row.name)}</Text>
+            </View>
+          )}
+          {medal ? (
+            <Text accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ position: 'absolute', bottom: -9, left: 0, right: 0, textAlign: 'center', fontSize: 16, lineHeight: 18 }}>{medal}</Text>
+          ) : null}
+        </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt variant="label" numberOfLines={1}>{row.name}{row.is_me ? ' (você)' : ''}</Txt>
-          <Txt variant="caption" tone="subtle">{formatPercent(row.accuracy)} de acerto</Txt>
+          <Txt variant="caption" tone="subtle">{row.questions} {row.questions === 1 ? 'questão' : 'questões'} · {formatPercent(row.accuracy)}</Txt>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Txt variant="titleSm" tone="brand">{row.questions}</Txt>
-          <Txt variant="caption" tone="subtle">questões</Txt>
+          <Txt variant="titleSm" tone="brand">{points(row.score)}</Txt>
+          <Txt variant="caption" tone="subtle">pontos</Txt>
         </View>
       </View>
     );
@@ -61,18 +67,18 @@ export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; on
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
           <Icon name="trophy" size={16} color={p.inkMuted} />
           <Txt variant="bodySm" tone="subtle" style={{ flex: 1 }}>
-            Quem mais respondeu questões {weekRange ? `de ${weekRange}` : 'nesta semana'} · reinicia toda segunda
+            Quem mais acerta de primeira {weekRange ? `de ${weekRange}` : 'nesta semana'} · reinicia toda segunda
           </Txt>
         </View>
         {champions.length ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], padding: space[2], borderRadius: 12, backgroundColor: p.surfaceSunken, marginBottom: space[1] }}>
-            <Icon name="trophy" size={16} color={MEDAL[0]} />
+            <Text style={{ fontSize: 16, lineHeight: 18 }}>{MEDAL[0]}</Text>
             <Txt variant="bodySm" style={{ flex: 1 }} numberOfLines={2}>
               {champions.length === 1 ? 'Campeão da semana anterior: ' : 'Campeões da semana anterior: '}
               <Txt variant="bodySm" style={font.bold}>
                 {champions.map((row) => `${row.name}${row.is_me ? ' (você)' : ''}`).join(', ')}
               </Txt>
-              {` · ${champions[0].questions} ${champions[0].questions === 1 ? 'questão' : 'questões'}`}
+              {` · ${points(champions[0].score)} pontos`}
             </Txt>
           </View>
         ) : null}
@@ -86,7 +92,7 @@ export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; on
           </View>
         ) : top.length === 0 ? (
           <View style={{ alignItems: 'center', gap: space[2], paddingVertical: space[3] }}>
-            <Txt variant="bodySm" tone="subtle" style={{ textAlign: 'center' }}>Ninguém respondeu questões nesta semana. Seja o primeiro!</Txt>
+            <Txt variant="bodySm" tone="subtle" style={{ textAlign: 'center' }}>Ninguém pontuou nesta semana. Seja o primeiro!</Txt>
             <Button variant="secondary" size="sm" icon="play" label="Praticar agora" onPress={onPractice} />
           </View>
         ) : (

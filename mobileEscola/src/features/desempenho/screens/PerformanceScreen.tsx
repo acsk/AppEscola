@@ -35,7 +35,7 @@ export function PerformanceScreen() {
   const query = useQuery({ queryKey: ['aluno', 'performance', months], queryFn: () => fetchStudentPerformance(months) });
   const practice = usePracticeSummary();
   const practicePerf = usePracticePerformance();
-  const ranking = usePracticeRanking('month');
+  const ranking = usePracticeRanking('month', { criterion: 'wilson' });
   const start = useStartPracticeSession();
   const [startError, setStartError] = useState<string | null>(null);
 
@@ -182,7 +182,7 @@ export function PerformanceScreen() {
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
                       <Text style={{ ...font.extrabold, fontSize: 32, lineHeight: 40, color: p.ink }}>{me ? `${me.position}º` : '—'}</Text>
-                      {me ? <RankMovement movement={me.movement} /> : null}
+                      {me ? <RankMovement movement={me.movement} status={me.movement_status} referenceAt={me.movement_reference_at} /> : null}
                       <Txt tone="muted" style={{ fontSize: 14 }}>{me ? `de ${ranking.data?.participants ?? 0} alunos nos últimos 30 dias` : 'Responda questões para entrar'}</Txt>
                     </View>
                     <View style={{ alignSelf: 'flex-start', marginLeft: -12 }}><Button variant="ghost" size="sm" iconRight="arrow-right" label="Ver ranking" onPress={openRanking} /></View>
@@ -227,7 +227,7 @@ export function PerformanceScreen() {
               {subjectsCard}
               {studyCard}
               <QuickAction icon="trophy" title="Ranking do banco"
-                subtitle={me ? `Você está em ${me.position}º de ${ranking.data?.participants ?? 0}${me.movement ? ` (${me.movement > 0 ? 'subiu' : 'caiu'} ${Math.abs(me.movement)})` : ''}` : 'Veja quem mais respondeu questões'} onPress={openRanking} />
+                subtitle={me ? `Você está em ${me.position}º de ${ranking.data?.participants ?? 0}${me.movement ? ` (${me.movement > 0 ? 'subiu' : 'caiu'} ${Math.abs(me.movement)})` : ''}` : 'Veja quem mais acerta de primeira'} onPress={openRanking} />
             </>
           ))}
         </ScreenBody>

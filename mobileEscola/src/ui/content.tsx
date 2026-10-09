@@ -161,13 +161,23 @@ export function RankMovement({ movement, status, referenceAt }: {
 const fmt1 = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const pct = (v: number | null | undefined) => (v == null ? '—' : `${fmt1(v).replace(',0', '')}%`);
 
-function Avatar({ initials, photoUrl, size = 36 }: { initials: string; photoUrl?: string | null; size?: number }) {
+function Avatar({ initials, photoUrl, size = 36, medal }: { initials: string; photoUrl?: string | null; size?: number; medal?: string | null }) {
   const p = usePalette();
-  return photoUrl ? (
-    <Image source={{ uri: photoUrl }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: p.surfaceSunken }} />
-  ) : (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ ...font.extrabold, fontSize: size <= 32 ? 12 : 13, color: p.inkMuted }}>{initials}</Text>
+  return (
+    <View style={{ width: size, height: size, overflow: 'visible' }}>
+      {photoUrl ? (
+        <Image source={{ uri: photoUrl }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: p.surfaceSunken }} />
+      ) : (
+        <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: p.surfaceSunken, borderWidth: 1, borderColor: p.line, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ ...font.extrabold, fontSize: size <= 32 ? 12 : 13, color: p.inkMuted }}>{initials}</Text>
+        </View>
+      )}
+      {medal ? (
+        <Text accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{
+          position: 'absolute', bottom: -Math.round(size * 0.28), left: 0, right: 0, textAlign: 'center',
+          fontSize: Math.round(size * 0.5), lineHeight: Math.round(size * 0.55),
+        }}>{medal}</Text>
+      ) : null}
     </View>
   );
 }
@@ -199,15 +209,14 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl, moveme
       backgroundColor: me ? p.surfaceSunken : 'transparent', borderWidth: me ? 1.5 : 0, borderColor: p.ink,
     }}>
       <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pos === 1 ? p.surfaceInverse : me ? p.surface : top ? p.surfaceSunken : 'transparent' }}>
-        {pos <= 3 ? <Text style={{ fontSize: 18, lineHeight: 22 }}>{RANK_MEDAL[pos - 1]}</Text>
-          : <Text style={{ ...font.extrabold, fontSize: 15, color: p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>}
+        <Text style={{ ...font.extrabold, fontSize: 15, color: pos === 1 ? p.onInverse : top ? p.ink : p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>
       </View>
       {movement !== undefined || movementStatus != null ? (
         <View style={{ minWidth: 40, alignItems: 'flex-start' }}>
           <RankMovement movement={movement} status={movementStatus} referenceAt={movementReferenceAt} />
         </View>
       ) : null}
-      <Avatar initials={initials} photoUrl={photoUrl} />
+      <Avatar initials={initials} photoUrl={photoUrl} medal={top ? RANK_MEDAL[pos - 1] : null} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, flexShrink: 1 }}>{name}</Txt>
@@ -228,7 +237,7 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl, moveme
 }
 
 /** Colunas da tabela do ranking (desktop). */
-const RANK_COLS = { pos: 128, n1: 84, n2: 76, n3: 92, score: 200 };
+const RANK_COLS = { pos: 88, n1: 84, n2: 76, n3: 92, score: 200 };
 
 /** Cabeçalho da tabela do ranking. */
 export function RankHead({ labels = ['Questões', 'Acertos', 'Aproveit.', 'Pontos'] }: { labels?: [string, string, string, string] | string[] }) {
@@ -262,13 +271,11 @@ export function RankLine({ pos, movement, movementStatus, movementReferenceAt, i
       backgroundColor: me ? p.surfaceSunken : 'transparent', borderWidth: 1.5, borderColor: me ? p.ink : 'transparent',
     }}>
       <View style={{ width: RANK_COLS.pos, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'visible' }}>
-        <Text style={{ ...font.extrabold, fontSize: 15, color: p.ink, fontVariant: ['tabular-nums'] }}>
-          {pos <= 3 ? `${RANK_MEDAL[pos - 1]} ` : ''}{pos}º
-        </Text>
+        <Text style={{ ...font.extrabold, fontSize: 15, color: p.ink, minWidth: 28, fontVariant: ['tabular-nums'] }}>{pos}º</Text>
         <RankMovement movement={movement} status={movementStatus} referenceAt={movementReferenceAt} />
       </View>
       <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Avatar initials={initials} photoUrl={photoUrl} size={32} />
+        <Avatar initials={initials} photoUrl={photoUrl} size={32} medal={pos <= 3 ? RANK_MEDAL[pos - 1] : null} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, flexShrink: 1 }}>{name}</Txt>
