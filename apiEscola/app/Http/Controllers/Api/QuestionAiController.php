@@ -10,6 +10,7 @@ use App\Http\Requests\QuestionAiExtractRequest;
 use App\Http\Requests\QuestionAiPdfRequest;
 use App\Http\Requests\QuestionAiSeparateTextRequest;
 use App\Http\Requests\QuestionAiSimilarRequest;
+use App\Http\Requests\QuestionReviewRequest;
 use App\Http\Requests\RedrawQuestionImageRequest;
 use App\Http\Requests\RegenerateQuestionImageRequest;
 use App\Models\ExamQuestion;
@@ -17,6 +18,7 @@ use App\Models\QuestionImageGeneration;
 use App\Services\Ai\AiCredentialResolver;
 use App\Services\Ai\QuestionAiService;
 use App\Services\Ai\QuestionImageService;
+use App\Services\Ai\ValidadorQuestaoService;
 use App\Services\ExamAccessService;
 use App\Support\QuestionRichText;
 use App\Traits\ScopedByTenant;
@@ -37,6 +39,7 @@ class QuestionAiController extends Controller
         private readonly AiCredentialResolver $resolver,
         private readonly QuestionAiService $ai,
         private readonly QuestionImageService $images,
+        private readonly ValidadorQuestaoService $validador,
     ) {}
 
     /** GET /question-bank/ai/status — se há chave disponível para o usuário (sem expor a chave). */
@@ -130,6 +133,16 @@ class QuestionAiController extends Controller
         $source = ExamQuestion::query()->inQuestionBank($tenantId)->findOrFail($question);
 
         $questions = $this->ai->similar($request->user(), $tenantId, $source, $request->validated());
+        $credential = $this->resolver->resolve($request->user(), $tenantId);
+        if ($credential !== null) {
+            foreach ($questions as &$question) {
+                $question['review'] = $this->validador->avaliar($credential, $question, [
+                    'tenant_id' => $tenantId,
+                    'source_question_id' => $source->id,
+                ]);
+            }
+            unset($question);
+        }
 
         return $this->success(
             ['questions' => $questions],
@@ -184,6 +197,89 @@ class QuestionAiController extends Controller
         return $this->success($payload, $payload['image_generation']['status'] === 'READY'
             ? 'Imagem regenerada. Revise antes de aprovar.'
             : 'A imagem precisa de revisão. Confira o motivo antes de tentar novamente.');
+    }
+
+    /** POST /question-bank/ai/review — regras locais e segunda resolução, sem publicar. */
+    public function review(QuestionReviewRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $credential = $this->resolver->resolve($request->user(), $tenantId) ?? throw AiException::notConfigured();
+        $data = $request->validated();
+        $questionId = $data['question_id'] ?? null;
+        if ($questionId !== null) {
+            ExamQuestion::query()->inQuestionBank($tenantId)->findOrFail($questionId);
+        }
+
+        $evaluation = $this->validador->avaliar($credential, $data, [
+            'tenant_id' => $tenantId,
+            'question_id' => $questionId,
+            'force' => (bool) ($data['force'] ?? false),
+            'persist' => $questionId !== null,
+            'attempts' => (int) ($data['attempts'] ?? 1),
+        ]);
+
+        return $this->success($evaluation, $this->reviewMessage($evaluation['status'] ?? ''));
+    }
+
+    /** POST /question-bank/ai/review/correct — uma correção e nova validação. No máximo duas. */
+    public function correct(QuestionReviewRequest $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $credential = $this->resolver->resolve($request->user(), $tenantId) ?? throw AiException::notConfigured();
+        $data = $request->validated();
+        $attempts = (int) ($data['attempts'] ?? 0);
+        if ($attempts >= 2) {
+            $evaluation = $this->validador->avaliar($credential, $data, [
+                'tenant_id' => $tenantId,
+                'question_id' => $data['question_id'] ?? null,
+                'force' => true,
+                'persist' => ! empty($data['question_id']),
+                'attempts' => 2,
+            ]);
+            $evaluation['result'] = 'revisao_pendente';
+            $evaluation['status'] = 'revisao_pendente';
+            $evaluation['recomendacao'] = 'revisar';
+            $evaluation['question'] = $data;
+
+            return $this->success($evaluation, 'A correção automática esgotou as tentativas. A questão ficou para revisão humana.');
+        }
+
+        $evaluation = $this->validador->validarECorrigir($credential, $data, [
+            'tenant_id' => $tenantId,
+            'question_id' => $data['question_id'] ?? null,
+            'persist' => ! empty($data['question_id']),
+        ]);
+
+        return $this->success($evaluation, $this->reviewMessage($evaluation['status'] ?? ''));
+    }
+
+    /** POST /question-bank/questions/{question}/ai/review/approve — aprovação manual. */
+    public function approveReview(Request $request, int $question): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        ExamQuestion::query()->inQuestionBank($tenantId)->findOrFail($question);
+        $review = $this->validador->aprovarManualmente($tenantId, $question, $request->user()?->id);
+
+        return $this->success($this->validador->present($review), 'Questão aprovada manualmente.');
+    }
+
+    /** GET /question-bank/questions/{question}/ai/reviews */
+    public function reviews(Request $request, int $question): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        ExamQuestion::query()->inQuestionBank($tenantId)->findOrFail($question);
+
+        return $this->success(['reviews' => $this->validador->historico($tenantId, $question)]);
+    }
+
+    private function reviewMessage(string $status): string
+    {
+        return match ($status) {
+            'aprovada' => 'A revisão aprovou a questão.',
+            'aprovada_manual' => 'Questão aprovada manualmente.',
+            'revisao_pendente' => 'A questão ficou para revisão humana.',
+            default => 'A revisão reprovou a questão. Corrija antes de publicar.',
+        };
     }
 
     private function authorizeStaff(Request $request): int

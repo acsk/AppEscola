@@ -21,6 +21,9 @@ class PortugueseStress
         if ($syllables === [] || count($syllables) === 0) {
             return null;
         }
+        if (count($syllables) === 1) {
+            return 'monossilabo';
+        }
 
         $tonic = self::tonicIndex($syllables);
         $fromEnd = count($syllables) - $tonic;
@@ -38,6 +41,7 @@ class PortugueseStress
             'oxitona' => 'oxítona',
             'paroxitona' => 'paroxítona',
             'proparoxitona' => 'proparoxítona',
+            'monossilabo' => 'monossílabo',
             default => 'indeterminada',
         };
     }

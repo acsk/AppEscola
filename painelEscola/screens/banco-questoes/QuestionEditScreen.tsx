@@ -24,7 +24,9 @@ import {
   updateStandaloneQuestion,
   uploadQuestionBankImage,
 } from "../../services/questionBank";
-import { aiAutofillQuestion } from "../../services/questionAi";
+import { aiApproveQuestionReview, aiAutofillQuestion, aiCorrectQuestion, aiReviewQuestion, fetchQuestionReviews } from "../../services/questionAi";
+import type { QuestionReview } from "../../types/questionAi";
+import QuestionReviewPanel from "../../components/banco-questoes/QuestionReviewPanel";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import { prepareImageForUpload } from "../../utils/imageCompression";
@@ -108,6 +110,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [sourceDifficultyId, setSourceDifficultyId] = useState<number | null>(null);
   /** Questão de simulado: conteúdo só leitura aqui. */
   const [examQuestion, setExamQuestion] = useState<QuestionBankQuestion | null>(null);
+  const [review, setReview] = useState<QuestionReview | null>(null);
+  const [reviewHistory, setReviewHistory] = useState<QuestionReview[]>([]);
+  const [reviewing, setReviewing] = useState(false);
   const isFromExam = examQuestion !== null;
 
   const load = useCallback(async () => {
@@ -126,6 +131,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setClassification(classified);
       setSourceExamName(q.source_exam_name ?? "");
       setInitialSourceExamName(q.source_exam_name ?? "");
+      const reviews = await fetchQuestionReviews(questionId).catch(() => []);
+      setReviewHistory(reviews);
+      setReview(reviews[0] ?? null);
     } catch (error) {
       setLoadError(getApiErrorMessage(error, "Não foi possível carregar a questão."));
     } finally {
@@ -293,6 +301,51 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         source_exam_name: sourceExamName.trim() || null,
       },
     });
+  };
+
+  const reviewPayload = () => ({
+    question_text: content.question_text,
+    explanation: content.explanation,
+    type: content.type,
+    options: content.options.map(({ option_text, is_correct }) => ({ option_text, is_correct })),
+    subject_name: catalogs.subjects.find((subject) => subject.id === classification.subject_id)?.name ?? null,
+    difficulty_name: catalogs.difficulties.find((item) => item.id === classification.difficulty_id)?.name ?? null,
+    topic_names: catalogs.taxonomy.flatMap((subject) => subject.topics).filter((topic) => classification.topic_ids.includes(topic.id)).map((topic) => topic.name),
+    question_id: questionId,
+    attempts: review?.attempts ?? 0,
+    force: true,
+  });
+
+  const runReview = async (action: "validate" | "correct" | "approve") => {
+    if (reviewing) return;
+    setReviewing(true);
+    try {
+      if (action === "approve") {
+        if (questionId === null) return;
+        const response = await aiApproveQuestionReview(questionId);
+        setReview(response.body);
+        setReviewHistory((prev) => [response.body, ...prev]);
+        return;
+      }
+      const response = action === "correct" ? await aiCorrectQuestion(reviewPayload()) : await aiReviewQuestion(reviewPayload());
+      setReview(response.body);
+      if (response.body.id) setReviewHistory((prev) => [response.body, ...prev.filter((item) => item.id !== response.body.id)]);
+      const question = response.body.question;
+      if (action === "correct" && question && !isFromExam) {
+        setContent((prev) => ({
+          ...prev,
+          question_text: question.question_text || prev.question_text,
+          explanation: question.explanation ?? prev.explanation,
+          options: question.options?.length
+            ? question.options.map((option, index) => ({ key: `opt-review-${index}-${Date.now()}`, option_text: option.option_text, is_correct: option.is_correct }))
+            : prev.options,
+        }));
+      }
+    } catch (error) {
+      setAiError(describeAiError(error, "Não foi possível revisar a questão"));
+    } finally {
+      setReviewing(false);
+    }
   };
 
   // Questão que vem com o ano (cabeçalho do enunciado ou nome da prova): preenche o ano vazio da classificação.
@@ -625,6 +678,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             }
           />
         </View>
+
+        {!loading && !loadError ? (
+          <QuestionReviewPanel
+            review={review}
+            history={reviewHistory}
+            busy={reviewing}
+            canCorrect={!isFromExam}
+            onValidate={() => void runReview("validate")}
+            onCorrect={() => void runReview("correct")}
+            onApprove={questionId !== null ? () => void runReview("approve") : undefined}
+          />
+        ) : null}
 
         {loading ? (
           <View className="py-20 items-center">

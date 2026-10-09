@@ -27,6 +27,33 @@ export type AiQuestionSuggestion = {
   needs_image?: boolean;
   /** Importação de PDF: o gabarito veio do próprio PDF (e não da IA). */
   answer_from_pdf?: boolean;
+  review?: QuestionReview;
+};
+
+export type QuestionReviewProblem = {
+  tipo: string;
+  gravidade: string;
+  descricao: string;
+};
+
+export type QuestionReviewStatus = "aprovada" | "reprovada" | "revisao_pendente" | "aprovada_manual";
+
+/** Resultado da revisão pedagógica. `aprovada` também fica true na aprovação manual. */
+export type QuestionReview = {
+  id?: number;
+  aprovada: boolean;
+  result: Exclude<QuestionReviewStatus, "aprovada_manual"> | "aprovada";
+  status: QuestionReviewStatus;
+  gabarito_original: string | null;
+  gabarito_revisor: string | null;
+  problemas: QuestionReviewProblem[];
+  recomendacao?: string | null;
+  explicacao?: string | null;
+  attempts?: number;
+  generation_model?: string | null;
+  review_model?: string | null;
+  validated_at?: string | null;
+  question?: Pick<AiQuestionSuggestion, "question_text" | "explanation" | "options">;
 };
 
 export type AiImageGeneration = {

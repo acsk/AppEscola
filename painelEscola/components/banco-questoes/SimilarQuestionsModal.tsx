@@ -13,7 +13,9 @@ import ClassificationFields from "./ClassificationFields";
 import OptionsEditor from "./OptionsEditor";
 import TopicMultiSelect from "./TopicMultiSelect";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
-import { aiSimilarQuestions, aiRegenerateImage, type SimilarFormContext } from "../../services/questionAi";
+import { aiCorrectQuestion, aiRegenerateImage, aiReviewQuestion, aiSimilarQuestions, type SimilarFormContext } from "../../services/questionAi";
+import type { QuestionReview } from "../../types/questionAi";
+import QuestionReviewPanel from "./QuestionReviewPanel";
 import type { AiImageReview } from "../../types/questionAi";
 import { imageContentSignature, imageQuestionContent, imageReviewIssue } from "../../utils/questionImageReview";
 import { createStandaloneQuestion } from "../../services/questionBank";
@@ -58,6 +60,8 @@ type Draft = {
   imageSignature?: string;
   imageInstructions: string;
   imageLoadError: boolean;
+  review?: QuestionReview;
+  manualApproved: boolean;
 };
 
 type Props = {
@@ -89,6 +93,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   /** Falha da IA: exibida no modal de erro padrão do sistema. */
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
@@ -122,7 +127,8 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   const subjectWithoutTopics = !!subjectId && topicsForSubject.length === 0;
 
   const included = drafts.filter((d) => d.include);
-  const busy = generating || saving || regenerating !== null;
+  const reviewBlocks = (draft: Draft) => draft.include && !!draft.review && !draft.review.aprovada && !draft.manualApproved;
+  const busy = generating || saving || regenerating !== null || reviewing !== null;
   const isEssay = source?.type === "essay";
 
   const difficultyOptions = useMemo(
@@ -173,6 +179,8 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
           imageSignature: imageContentSignature(contentFromSuggestion(q)),
           imageInstructions: "",
           imageLoadError: false,
+          review: q.review,
+          manualApproved: false,
         }))
       );
       setStep("review");
@@ -210,6 +218,54 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     }
   };
 
+  const reviewInput = (draft: Draft) => ({
+    question_text: draft.content.question_text,
+    explanation: draft.content.explanation,
+    type: draft.content.type,
+    options: draft.content.options.map(({ option_text, is_correct }) => ({ option_text, is_correct })),
+    attempts: draft.review?.attempts ?? 0,
+    force: true,
+  });
+
+  const validateDraft = async (draft: Draft) => {
+    setReviewing(draft.key);
+    try {
+      const response = await aiReviewQuestion(reviewInput(draft));
+      updateDraft(draft.key, { review: response.body, manualApproved: false, errors: {} });
+    } catch (err) {
+      setError(describeAiError(err, "Não foi possível validar a questão"));
+    } finally {
+      setReviewing(null);
+    }
+  };
+
+  const correctDraft = async (draft: Draft) => {
+    setReviewing(draft.key);
+    try {
+      const response = await aiCorrectQuestion(reviewInput(draft));
+      const question = response.body.question;
+      updateDraft(draft.key, {
+        review: response.body,
+        manualApproved: false,
+        errors: {},
+        content: question
+          ? {
+              ...draft.content,
+              question_text: question.question_text,
+              explanation: question.explanation ?? "",
+              options: question.options?.length
+                ? contentFromSuggestion({ ...question, type: draft.content.type }).options
+                : draft.content.options,
+            }
+          : draft.content,
+      });
+    } catch (err) {
+      setError(describeAiError(err, "Não foi possível corrigir a questão"));
+    } finally {
+      setReviewing(null);
+    }
+  };
+
   /** Salva as marcadas uma a uma; as salvas saem da lista e as com erro ficam para correção. */
   const includeQuestions = async () => {
     let hasClientErrors = false;
@@ -217,6 +273,9 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
       if (!d.include) return d;
       const classificationErrors = validateClassification(d.classification, catalogs.taxonomy);
       const errors = { ...validateContent(d.content), ...classificationErrors };
+      if (d.review && !d.review.aprovada && !d.manualApproved) {
+        errors.review = "A revisão não aprovou esta questão. Corrija com IA ou aprove manualmente.";
+      }
       const imageIssue = imageReviewIssue(d.content, d.image, d.imageSignature);
       if (imageIssue || d.imageLoadError) errors.image = imageIssue || "Não foi possível visualizar a imagem. Regenere antes de aprovar.";
       if (Object.keys(errors).length) hasClientErrors = true;
@@ -274,7 +333,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
           label={included.length === 1 ? "Incluir 1 questão" : `Incluir ${included.length} questões`}
           onPress={() => void includeQuestions()}
           loading={saving}
-          disabled={busy || included.length === 0 || included.some((draft) => imageReviewIssue(draft.content, draft.image, draft.imageSignature) !== null || draft.imageLoadError)}
+          disabled={busy || included.length === 0 || included.some((draft) => reviewBlocks(draft) || imageReviewIssue(draft.content, draft.image, draft.imageSignature) !== null || draft.imageLoadError)}
         />
       </>
     );
@@ -476,6 +535,22 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                       disabled={busy}
                     />
                   )}
+                  {draft.errors.review ? (
+                    <Text className="text-xs font-medium text-danger" style={{ marginBottom: 8 }}>
+                      {draft.errors.review}
+                    </Text>
+                  ) : null}
+                  <QuestionReviewPanel
+                    review={draft.review ?? null}
+                    busy={reviewing === draft.key}
+                    onValidate={() => void validateDraft(draft)}
+                    onCorrect={() => void correctDraft(draft)}
+                    onApprove={() => updateDraft(draft.key, {
+                      manualApproved: true,
+                      errors: {},
+                      review: draft.review ? { ...draft.review, aprovada: true, status: "aprovada_manual" } : draft.review,
+                    })}
+                  />
                   <RichTextInput
                     label="Explicação"
                     value={draft.content.explanation}

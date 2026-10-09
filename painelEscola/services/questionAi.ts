@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AiQuestionSuggestion, AiStatus, AiImageReview } from "../types/questionAi";
+import type { AiQuestionSuggestion, AiStatus, AiImageReview, QuestionReview } from "../types/questionAi";
 
 /** IA do banco de questões (só sugere; o salvamento usa os endpoints normais de questão avulsa). */
 
@@ -78,6 +78,39 @@ export async function aiSimilarQuestions(
 ) {
   const { data } = await api.post(`/question-bank/questions/${questionId}/ai/similar`, params, { timeout: withImage ? 900000 : 180000 });
   return data as { type: string; message: string; body: { questions: AiQuestionSuggestion[] } };
+}
+
+export type QuestionReviewInput = {
+  question_text: string;
+  explanation?: string;
+  type?: "multiple_choice" | "essay";
+  options?: { option_text: string; is_correct: boolean }[];
+  subject_name?: string | null;
+  difficulty_name?: string | null;
+  topic_names?: string[];
+  question_id?: number | null;
+  attempts?: number;
+  force?: boolean;
+};
+
+export async function aiReviewQuestion(input: QuestionReviewInput) {
+  const { data } = await api.post("/question-bank/ai/review", input, { timeout: 120000 });
+  return data as { type: string; message: string; body: QuestionReview };
+}
+
+export async function aiCorrectQuestion(input: QuestionReviewInput) {
+  const { data } = await api.post("/question-bank/ai/review/correct", input, { timeout: 180000 });
+  return data as { type: string; message: string; body: QuestionReview };
+}
+
+export async function fetchQuestionReviews(questionId: number) {
+  const { data } = await api.get(`/question-bank/questions/${questionId}/ai/reviews`);
+  return data.body.reviews as QuestionReview[];
+}
+
+export async function aiApproveQuestionReview(questionId: number) {
+  const { data } = await api.post(`/question-bank/questions/${questionId}/ai/review/approve`);
+  return data as { type: string; message: string; body: QuestionReview };
 }
 
 export async function aiRegenerateImage(

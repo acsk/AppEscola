@@ -410,6 +410,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
             Route::post('ai/extract-pdf', [QuestionAiController::class, 'extractPdf']);
             Route::post('ai/separate-text', [QuestionAiController::class, 'separateText']);
             Route::post('questions/{question}/ai/similar',   [QuestionAiController::class, 'similar'])->whereNumber('question');
+            Route::post('ai/review', [QuestionAiController::class, 'review']);
+            Route::post('ai/review/correct', [QuestionAiController::class, 'correct']);
+            Route::get('questions/{question}/ai/reviews', [QuestionAiController::class, 'reviews'])->whereNumber('question');
+            Route::post('questions/{question}/ai/review/approve', [QuestionAiController::class, 'approveReview'])->whereNumber('question');
             Route::post('ai/image-generations/{generation}/regenerate', [QuestionAiController::class, 'regenerateImage'])->whereUuid('generation');
             Route::post('ai/redraw-image', [QuestionAiController::class, 'redrawImage']);
         });

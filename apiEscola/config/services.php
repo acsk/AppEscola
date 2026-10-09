@@ -87,6 +87,13 @@ return [
             'timeout' => max(60, min(300, (int) env('AI_PDF_TIMEOUT', 180))),
             'max_questions' => 50,
         ],
+        /** Revisão pedagógica: modelo barato e, se divergir, um modelo mais capaz. Os dois diferentes do gerador. */
+        'review' => [
+            'model' => env('OPENROUTER_REVIEW_MODEL', 'google/gemini-2.5-flash'),
+            'advanced_model' => env('OPENROUTER_REVIEW_ADVANCED_MODEL', 'openai/gpt-4o-mini'),
+            'temperature' => 0.1,
+            'max_corrections' => 2,
+        ],
         'openrouter' => [
             'api_key' => env('OPENROUTER_API_KEY'),
             'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),

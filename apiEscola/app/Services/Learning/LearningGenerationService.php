@@ -11,6 +11,8 @@ use App\Services\Ai\AiChatClient;
 use App\Services\Ai\AiCredentialResolver;
 use App\Services\Ai\ExplanationLetterAligner;
 use App\Services\Ai\QuestionGabaritoGuard;
+use App\Services\Ai\ValidadorQuestaoService;
+use App\Models\QuestionReview;
 use Illuminate\Support\Str;
 
 /**
@@ -22,6 +24,7 @@ class LearningGenerationService
     public function __construct(
         private readonly AiCredentialResolver $credentials,
         private readonly AiChatClient $chat,
+        private readonly ValidadorQuestaoService $validador,
     ) {}
 
     public function enqueue(int $tenantId, int $subjectId, int $topicId): ?QuestionGenerationJob
@@ -100,7 +103,24 @@ class LearningGenerationService
                     $rejected[] = ['reason' => $reason, 'payload' => $payload];
                     continue;
                 }
-                $this->publish($job, $topic, $payload);
+                $payload['subject_name'] = $topic->subject?->name;
+                $payload['topic_names'] = [$topic->name];
+                $review = $this->validador->validarECorrigir($credential, $this->reviewPayload($payload), [
+                    'tenant_id' => $job->tenant_id,
+                    'persist' => true,
+                ]);
+                if (($review['result'] ?? '') !== QuestionReview::APROVADA) {
+                    $rejected[] = [
+                        'reason' => 'revisao pedagogica',
+                        'payload' => $payload,
+                        'review' => $review,
+                    ];
+                    continue;
+                }
+                $saved = $this->publish($job, $topic, $review['question'] ?? $payload);
+                if (! empty($review['review_ids'])) {
+                    QuestionReview::query()->whereIn('id', $review['review_ids'])->update(['question_id' => $saved->id]);
+                }
                 $created++;
             }
             $usage = $result['usage'] ?? [];
@@ -161,7 +181,25 @@ class LearningGenerationService
     }
 
     /** @param  array<string, mixed>  $payload */
-    private function publish(QuestionGenerationJob $job, SubjectTopic $topic, array $payload): void
+    private function reviewPayload(array $payload): array
+    {
+        $options = [];
+        foreach ((array) ($payload['options'] ?? []) as $option) {
+            if (! is_array($option)) {
+                continue;
+            }
+            $options[] = [
+                'option_text' => (string) ($option['option_text'] ?? $option['text'] ?? ''),
+                'is_correct' => ! empty($option['is_correct']),
+            ];
+        }
+        $payload['options'] = $options;
+
+        return $payload;
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function publish(QuestionGenerationJob $job, SubjectTopic $topic, array $payload): ExamQuestion
     {
         $question = ExamQuestion::query()->create([
             'tenant_id' => $job->tenant_id,
@@ -180,11 +218,13 @@ class LearningGenerationService
         foreach (array_values($payload['options']) as $index => $option) {
             ExamQuestionOption::query()->create([
                 'question_id' => $question->id,
-                'option_text' => trim((string) $option['text']),
+                'option_text' => trim((string) ($option['text'] ?? $option['option_text'] ?? '')),
                 'is_correct' => ! empty($option['is_correct']),
                 'order' => $index + 1,
             ]);
         }
+
+        return $question;
     }
 
     private function difficultyId(mixed $name): ?int
