@@ -41,6 +41,7 @@ export function usePracticeRanking(period: RankingPeriod, extra?: Omit<RankingQu
   return useQuery({
     queryKey: bancoKeys.ranking(period, criterion, subjectId, topicId, page),
     queryFn: () => fetchPracticeRanking({ period, criterion, subjectId, topicId, page, perPage: extra?.perPage }),
+    refetchInterval: 10 * 60_000,
   });
 }
 

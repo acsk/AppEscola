@@ -141,7 +141,7 @@ export function BancoRankingScreen() {
         <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 19 }}>
           {desempenho
             ? 'Cada questão entra uma vez, pela primeira resposta válida no período. A pontuação não é só o percentual de acertos: uma amostra pequena não passa na frente de quem praticou mais.'
-            : 'Conta quantas questões diferentes cada aluno respondeu no banco (prática e simulados do banco). Repetir a mesma questão não sobe posição. A seta compara com a posição de cerca de 24 horas atrás e a foto é atualizada de hora em hora.'}
+            : 'Conta quantas questões diferentes cada aluno respondeu no banco (prática e simulados do banco). Repetir a mesma questão não sobe posição. A seta compara com a posição de cerca de 24 horas atrás e a foto é atualizada a cada 10 minutos.'}
         </Txt>
       </>
     );

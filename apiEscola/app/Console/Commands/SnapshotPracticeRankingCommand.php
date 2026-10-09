@@ -12,7 +12,7 @@ class SnapshotPracticeRankingCommand extends Command
 {
     protected $signature = 'ranking:snapshot';
 
-    protected $description = 'Grava a foto horária do ranking do banco de questões';
+    protected $description = 'Grava a foto do ranking do banco de questões, a cada 10 minutos';
 
     public function handle(PracticePerformanceService $performance): int
     {
