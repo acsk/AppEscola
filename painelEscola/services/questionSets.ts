@@ -99,25 +99,55 @@ export async function removeQuestionFromSet(id: number, questionId: number) {
 
 // ── Ranking de participação ─────────────────────────────────────────────────
 
-/** week = semana corrente (desde segunda 00:00); last_week = semana anterior, já fechada. */
-export type PracticeRankingPeriod = "week" | "last_week" | "month" | "all";
+/** week = semana corrente (desde segunda 00:00); last_week = semana anterior, já fechada; 7d = últimos 7 dias. */
+export type PracticeRankingPeriod = "week" | "last_week" | "7d" | "month" | "all";
+
+export type PracticeRankingCriterion = "participation" | "wilson";
 
 export type PracticeRankingRow = {
   position: number;
-  student_id: number;
+  student_id?: number;
   name: string;
   enrollment_number: string | null;
   photo_url: string | null;
-  /** Questões diferentes respondidas no período (critério do ranking). */
+  /** Questões diferentes respondidas no período (critério do ranking de participação). */
   questions: number;
   answered: number;
   correct: number;
   accuracy: number | null;
+  /** Pontuação de Wilson (0–100), só no ranking de desempenho. */
+  score?: number;
 };
 
-export async function fetchPracticeRanking(period: PracticeRankingPeriod, limit = 50) {
-  const { data } = await api.get<Envelope<{ period: PracticeRankingPeriod; since: string | null; until?: string | null; participants: number; ranking: PracticeRankingRow[] }>>(
-    "/question-bank/practice-ranking", { params: { period, limit } }
-  );
+export type PracticeRanking = {
+  period: PracticeRankingPeriod;
+  criterion?: PracticeRankingCriterion;
+  since: string | null;
+  until?: string | null;
+  subject_id?: number | null;
+  topic_id?: number | null;
+  participants: number;
+  page?: number;
+  per_page?: number;
+  last_page?: number;
+  ranking: PracticeRankingRow[];
+};
+
+export async function fetchPracticeRanking(
+  period: PracticeRankingPeriod,
+  limit = 50,
+  wilson?: { subjectId?: number | null; topicId?: number | null; page?: number; perPage?: number },
+) {
+  const params: Record<string, string | number> = { period };
+  if (wilson) {
+    params.criterion = "wilson";
+    params.per_page = wilson.perPage ?? 20;
+    if (wilson.subjectId) params.subject_id = wilson.subjectId;
+    if (wilson.topicId) params.topic_id = wilson.topicId;
+    if (wilson.page) params.page = wilson.page;
+  } else {
+    params.limit = limit;
+  }
+  const { data } = await api.get<Envelope<PracticeRanking>>("/question-bank/practice-ranking", { params });
   return data.body;
 }

@@ -11,6 +11,7 @@ import {
   finishPracticeAttempt,
   startQuestionSet,
   type RankingPeriod,
+  type RankingQuery,
   type CatalogFilters,
   type SessionOptions,
   fetchPracticeQuestions,
@@ -32,8 +33,15 @@ export function usePracticePerformance() {
   return useQuery({ queryKey: bancoKeys.performance(), queryFn: fetchPracticePerformance });
 }
 
-export function usePracticeRanking(period: RankingPeriod) {
-  return useQuery({ queryKey: bancoKeys.ranking(period), queryFn: () => fetchPracticeRanking(period) });
+export function usePracticeRanking(period: RankingPeriod, extra?: Omit<RankingQuery, 'period'>) {
+  const criterion = extra?.criterion ?? 'participation';
+  const subjectId = extra?.subjectId ?? null;
+  const topicId = extra?.topicId ?? null;
+  const page = extra?.page ?? 1;
+  return useQuery({
+    queryKey: bancoKeys.ranking(period, criterion, subjectId, topicId, page),
+    queryFn: () => fetchPracticeRanking({ period, criterion, subjectId, topicId, page, perPage: extra?.perPage }),
+  });
 }
 
 export function useQuestionSets() {

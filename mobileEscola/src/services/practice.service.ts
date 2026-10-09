@@ -127,8 +127,11 @@ export interface PracticePerformance {
   subjects: PerformanceSubject[];
 }
 
-/** week = semana corrente (desde segunda 00:00); last_week = semana anterior, já fechada. */
-export type RankingPeriod = 'week' | 'last_week' | 'month' | 'all';
+/** week = semana corrente (desde segunda 00:00); last_week = semana anterior, já fechada; 7d = últimos 7 dias. */
+export type RankingPeriod = 'week' | 'last_week' | '7d' | 'month' | 'all';
+
+/** participation = quem mais respondeu; wilson = pontuação de desempenho. */
+export type RankingCriterion = 'participation' | 'wilson';
 
 export interface RankingRow extends PerformanceScore {
   position: number;
@@ -136,17 +139,34 @@ export interface RankingRow extends PerformanceScore {
   photo_url: string | null;
   questions: number;
   is_me: boolean;
+  /** Pontuação de Wilson (0–100), só no ranking de desempenho. */
+  score?: number;
   /** Positivo = subiu em relação a cerca de 24h atrás; negativo = caiu; null = sem comparação. */
   movement?: number | null;
 }
 
 export interface PracticeRanking {
   period: RankingPeriod;
+  criterion?: RankingCriterion;
   since: string | null;
   until?: string | null;
+  subject_id?: number | null;
+  topic_id?: number | null;
   participants: number;
+  page?: number;
+  per_page?: number;
+  last_page?: number;
   ranking: RankingRow[];
   me: RankingRow | null;
+}
+
+export interface RankingQuery {
+  period: RankingPeriod;
+  criterion?: RankingCriterion;
+  subjectId?: number | null;
+  topicId?: number | null;
+  page?: number;
+  perPage?: number;
 }
 
 export async function fetchPracticeFilters(): Promise<PracticeFilters> {
@@ -178,8 +198,15 @@ export async function fetchPracticePerformance(): Promise<PracticePerformance> {
   return data.body;
 }
 
-export async function fetchPracticeRanking(period: RankingPeriod): Promise<PracticeRanking> {
-  const { data } = await api.get<Envelope<PracticeRanking>>('/api/aluno/practice/ranking', { params: { period } });
+export async function fetchPracticeRanking(periodOrQuery: RankingPeriod | RankingQuery): Promise<PracticeRanking> {
+  const query: RankingQuery = typeof periodOrQuery === 'string' ? { period: periodOrQuery } : periodOrQuery;
+  const params: Record<string, string | number> = { period: query.period };
+  if (query.criterion) params.criterion = query.criterion;
+  if (query.subjectId) params.subject_id = query.subjectId;
+  if (query.topicId) params.topic_id = query.topicId;
+  if (query.page) params.page = query.page;
+  if (query.criterion === 'wilson') params.per_page = query.perPage ?? 20;
+  const { data } = await api.get<Envelope<PracticeRanking>>('/api/aluno/practice/ranking', { params });
   return data.body;
 }
 

@@ -185,14 +185,39 @@ class StudentPracticeController extends Controller
     public function ranking(Request $request): JsonResponse
     {
         $student = $this->student($request);
-        $data = $request->validate(['period' => ['nullable', Rule::in(PracticePerformanceService::PERIODS)]]);
+        $tenantId = (int) $student->tenant_id;
+        $data = $request->validate($this->rankingRules($tenantId));
+        $criterion = $data['criterion'] ?? PracticePerformanceService::CRITERION_PARTICIPATION;
 
         return $this->success($this->performance->ranking(
-            (int) $student->tenant_id,
+            $tenantId,
             $data['period'] ?? 'month',
-            20,
+            $criterion === PracticePerformanceService::CRITERION_WILSON ? (int) ($data['per_page'] ?? 20) : 20,
             $student->id,
+            false,
+            [
+                'criterion'  => $criterion,
+                'subject_id' => $data['subject_id'] ?? null,
+                'topic_id'   => $data['topic_id'] ?? null,
+                'page'       => (int) ($data['page'] ?? 1),
+            ],
         ));
+    }
+
+    /** @return array<string, mixed> */
+    private function rankingRules(int $tenantId): array
+    {
+        return [
+            'period'     => ['nullable', Rule::in(PracticePerformanceService::PERIODS)],
+            'criterion'  => ['nullable', Rule::in([
+                PracticePerformanceService::CRITERION_PARTICIPATION,
+                PracticePerformanceService::CRITERION_WILSON,
+            ])],
+            'subject_id' => ['nullable', 'integer', Rule::exists('subjects', 'id')->where('tenant_id', $tenantId)],
+            'topic_id'   => ['nullable', 'integer', Rule::exists('subject_topics', 'id')->where('tenant_id', $tenantId)],
+            'page'       => ['nullable', 'integer', 'min:1'],
+            'per_page'   => ['nullable', 'integer', 'min:1', 'max:100'],
+        ];
     }
 
     private function student(Request $request): Student

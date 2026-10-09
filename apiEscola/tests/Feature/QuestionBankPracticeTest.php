@@ -6,6 +6,7 @@ use App\Models\ClassSchedule;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Exam;
+use App\Models\PracticeAnswer;
 use App\Models\ExamQuestion;
 use App\Models\ExamType;
 use App\Models\Student;
@@ -430,5 +431,108 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertSame(2, $byName['JOAO P.']['position']);
         $this->assertSame(-1, $byName['JOAO P.']['movement']);
         $this->assertSame(1, $body['me']['movement']);
+    }
+
+    public function test_wilson_ranking_orders_by_score_not_by_raw_accuracy(): void
+    {
+        $perfis = [
+            'ALUNO D' => [100, 85],
+            'ALUNO E' => [50, 40],
+            'ALUNO C' => [10, 9],
+            'ALUNO B' => [20, 16],
+            'ALUNO A' => [80, 32],
+        ];
+        $alunos = [];
+        foreach ($perfis as $nome => [$total, $acertos]) {
+            $aluno = $this->student($nome);
+            $alunos[$nome] = $aluno;
+            $this->seedCountedAnswers($aluno, $total, $acertos);
+        }
+
+        $this->actingAsStudent($alunos['ALUNO D']);
+        $body = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&per_page=10')->assertOk()->json('body');
+
+        $this->assertSame('wilson', $body['criterion']);
+        $this->assertSame(['ALUNO D.', 'ALUNO E.', 'ALUNO C.', 'ALUNO B.', 'ALUNO A.'], array_column($body['ranking'], 'name'));
+        foreach ([76.7, 67.0, 59.6, 58.4, 30.0] as $i => $pontuacao) {
+            $this->assertEqualsWithDelta($pontuacao, (float) $body['ranking'][$i]['score'], 0.001);
+        }
+        $this->assertSame([100, 50, 10, 20, 80], array_column($body['ranking'], 'answered'));
+        $this->assertSame([85, 40, 9, 16, 32], array_column($body['ranking'], 'correct'));
+        $this->assertSame(1, $body['me']['position']);
+        $this->assertTrue($body['me']['is_me']);
+        $this->assertArrayNotHasKey('student_id', $body['ranking'][0]);
+
+        Sanctum::actingAs($this->admin);
+        $staff = $this->getJson('/api/question-bank/practice-ranking?criterion=wilson&period=all')->assertOk()->json('body.ranking');
+        $this->assertSame('ALUNO D', $staff[0]['name']);
+        $this->assertSame($alunos['ALUNO D']->id, $staff[0]['student_id']);
+    }
+
+    public function test_wilson_ranking_keeps_the_first_attempt_and_honors_filters(): void
+    {
+        $portugues = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Português']);
+        $matematica = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
+        $crase = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $portugues->id, 'name' => 'Crase']);
+        $algebra = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $matematica->id, 'name' => 'Álgebra']);
+        $repetida = $this->practicable('Repetida', $portugues->id, [$crase->id]);
+        $dePortugues = $this->practicable('Texto', $portugues->id, [$crase->id]);
+        $deMatematica = $this->practicable('Conta', $matematica->id, [$algebra->id]);
+
+        $ana = $this->student('ANA SOUZA');
+        $bia = $this->student('BIA LIMA');
+        $this->travelTo(Carbon::parse('2026-10-08 12:00:00'));
+        $this->record($ana, $repetida, false, now()->subHour());
+        $this->record($ana, $repetida, true, now());
+        $this->record($ana, $dePortugues, true, now());
+        $this->record($bia, $deMatematica, true, now()->subDays(8));
+        $this->record($bia, $dePortugues, true, now());
+
+        $this->actingAsStudent($ana);
+        $geral = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
+        $porNome = collect($geral['ranking'])->keyBy('name');
+        // A segunda resposta da mesma questão (agora certa) não entra: fica o primeiro erro.
+        $this->assertSame(2, $porNome['ANA S.']['answered']);
+        $this->assertSame(1, $porNome['ANA S.']['correct']);
+        $this->assertSame(2, $porNome['BIA L.']['answered']);
+
+        $disciplina = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&subject_id='.$portugues->id)->assertOk()->json('body');
+        $this->assertSame(['BIA L.', 'ANA S.'], array_column($disciplina['ranking'], 'name'));
+        $this->assertSame($portugues->id, $disciplina['subject_id']);
+
+        $assunto = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&topic_id='.$algebra->id)->assertOk()->json('body.ranking');
+        $this->assertSame(['BIA L.'], array_column($assunto, 'name'));
+        $this->assertSame(1, $assunto[0]['answered']);
+
+        $seteDias = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=7d')->assertOk()->json('body');
+        $this->assertSame(['BIA L.', 'ANA S.'], array_column($seteDias['ranking'], 'name'));
+        $this->assertSame(1, collect($seteDias['ranking'])->firstWhere('name', 'BIA L.')['answered']);
+
+        $pagina = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&per_page=1&page=2')->assertOk()->json('body');
+        $this->assertSame(2, $pagina['participants']);
+        $this->assertSame(2, $pagina['last_page']);
+        $this->assertSame([2], array_column($pagina['ranking'], 'position'));
+        $this->assertSame(2, $pagina['me']['position']);
+
+        $this->getJson('/api/aluno/practice/ranking?criterion=wilson&subject_id=999999')->assertStatus(422);
+    }
+
+    /** @param  ExamQuestion[]  $questions */
+    private function seedCountedAnswers(Student $student, int $total, int $correct): void
+    {
+        for ($i = 0; $i < $total; $i++) {
+            $this->record($student, $this->practicable('W'.$student->id.'-'.$i), $i < $correct, now()->addSeconds($i));
+        }
+    }
+
+    private function record(Student $student, ExamQuestion $question, bool $correct, Carbon $at): void
+    {
+        PracticeAnswer::query()->create([
+            'tenant_id' => $this->tenant->id,
+            'student_id' => $student->id,
+            'exam_question_id' => $question->id,
+            'is_correct' => $correct,
+            'answered_at' => $at,
+        ]);
     }
 }

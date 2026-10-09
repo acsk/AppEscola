@@ -12,8 +12,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Desempenho de prática do aluno (disciplina → assunto, com o que estudar) e ranking de quem mais
- * responde no banco de questões. Só usa respostas "contadas" (avulsas e de simulados finalizados).
+ * Desempenho de prática do aluno (disciplina → assunto, com o que estudar) e rankings do banco.
+ * Participação: quem respondeu mais questões diferentes. Desempenho: Wilson Score (95%).
+ * Só usa respostas "contadas" (avulsas e de simulados finalizados).
  */
 class PracticePerformanceService
 {
@@ -26,8 +27,15 @@ class PracticePerformanceService
     public const LEVEL_ATTENTION = 'attention';
     public const LEVEL_GOOD = 'good';
 
-    /** week = semana corrente (segunda 00:00 até agora); last_week = semana anterior fechada (consolidada). */
-    public const PERIODS = ['week', 'last_week', 'month', 'all'];
+    /**
+     * week = semana corrente (segunda 00:00 até agora); last_week = semana anterior fechada.
+     * 7d = últimos 7 dias; month = últimos 30 dias; all = geral.
+     */
+    public const PERIODS = ['week', 'last_week', '7d', 'month', 'all'];
+
+    public const CRITERION_PARTICIPATION = 'participation';
+
+    public const CRITERION_WILSON = 'wilson';
 
     /** A semana do ranking vira na segunda 00:00 do horário escolar, não em UTC. */
     private const RANKING_TIMEZONE = 'America/Sao_Paulo';
@@ -95,11 +103,48 @@ class PracticePerformanceService
     }
 
     /**
-     * Ranking de quem mais respondeu no período: conta questões diferentes (repetir a mesma questão
-     * não sobe posição); empate pelos acertos. Posições empatadas são iguais (1, 2, 2, 4).
+     * Limite inferior do intervalo de Wilson (z = 1,96, 95%), em pontos de 0 a 100 com 1 casa.
+     * Poucas respostas certas ficam abaixo de uma amostra maior com aproveitamento parecido.
      */
-    public function ranking(int $tenantId, string $period, int $limit, ?int $viewerStudentId = null, bool $fullNames = false): array
+    public static function wilsonScore(int $acertos, int $total): float
     {
+        if ($total <= 0) {
+            return 0.0;
+        }
+
+        $z = 1.96;
+        $p = $acertos / $total;
+        $z2 = $z * $z;
+        $centro = ($p * (1 - $p) + $z2 / (4 * $total)) / $total;
+        $score = ($p + $z2 / (2 * $total) - $z * sqrt(max(0, $centro))) / (1 + $z2 / $total);
+
+        return round($score * 100, 1);
+    }
+
+    /**
+     * Maior pontuação primeiro. Empate: mais acertos, depois mais questões, depois o id do aluno.
+     *
+     * @param  array{score: float|int, correct: int, questions: int, id: int}  $a
+     * @param  array{score: float|int, correct: int, questions: int, id: int}  $b
+     */
+    public static function compareWilson(array $a, array $b): int
+    {
+        return [$b['score'], $b['correct'], $b['questions'], $a['id']]
+            <=> [$a['score'], $a['correct'], $a['questions'], $b['id']];
+    }
+
+    /**
+     * Ranking do período. Sem critério, é participação (questões diferentes; empate pelos acertos;
+     * posições iguais ficam 1, 2, 2, 4). Com criterion=wilson, ordena pela pontuação de Wilson.
+     *
+     * @param  array{criterion?: string, subject_id?: ?int, topic_id?: ?int, page?: int}  $filters
+     */
+    public function ranking(int $tenantId, string $period, int $limit, ?int $viewerStudentId = null, bool $fullNames = false, array $filters = []): array
+    {
+        if (($filters['criterion'] ?? self::CRITERION_PARTICIPATION) === self::CRITERION_WILSON) {
+            return $this->wilsonRanking($tenantId, $period, $limit, $viewerStudentId, $fullNames, $filters);
+        }
+
         [$since, $until] = $this->periodRange($period);
         $rows = $this->rankingRows($tenantId, $since, $until);
         $previousPositions = $this->previousPositions($tenantId, $period);
@@ -239,9 +284,109 @@ class PracticePerformanceService
         return match ($period) {
             'week'      => [$weekStart, null],
             'last_week' => [$weekStart->copy()->subWeek(), $weekStart],
+            '7d'        => [now()->subDays(7), null],
             'month'     => [now()->subDays(30), null],
             default     => [null, null],
         };
+    }
+
+    /**
+     * Desempenho: primeira resposta contada de cada questão no período e nos filtros.
+     * A pontuação sai das respostas já gravadas, então muda assim que entra uma resposta nova.
+     *
+     * @param  array{subject_id?: ?int, topic_id?: ?int, page?: int}  $filters
+     */
+    private function wilsonRanking(int $tenantId, string $period, int $limit, ?int $viewerStudentId, bool $fullNames, array $filters): array
+    {
+        [$since, $until] = $this->periodRange($period);
+        $subjectId = isset($filters['subject_id']) ? (int) $filters['subject_id'] : null;
+        $topicId = isset($filters['topic_id']) ? (int) $filters['topic_id'] : null;
+        $perPage = max(1, min(100, $limit));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $rows = $this->wilsonRows($tenantId, $since, $until, $subjectId ?: null, $topicId ?: null);
+
+        $ranked = $rows->values()->map(function ($row, int $index) use ($viewerStudentId, $fullNames) {
+            return [
+                'position'  => $index + 1,
+                'movement'  => null,
+                'name'      => $fullNames ? $row->name : $this->shortName($row->name),
+                'photo_url' => $row->photo_url,
+                'questions' => (int) $row->questions,
+                'score'     => (float) $row->score,
+                'is_me'     => $viewerStudentId !== null && (int) $row->id === $viewerStudentId,
+            ] + $this->score($row) + ($fullNames ? [
+                'student_id'        => (int) $row->id,
+                'enrollment_number' => $row->enrollment_number,
+            ] : []);
+        });
+        $total = $ranked->count();
+
+        return [
+            'period'       => $period,
+            'criterion'    => self::CRITERION_WILSON,
+            'since'        => $since?->toIso8601String(),
+            'until'        => $until?->toIso8601String(),
+            'subject_id'   => $subjectId ?: null,
+            'topic_id'     => $topicId ?: null,
+            'participants' => $total,
+            'page'         => $page,
+            'per_page'     => $perPage,
+            'last_page'    => max(1, (int) ceil($total / $perPage)),
+            'ranking'      => $ranked->forPage($page, $perPage)->values(),
+            'me'           => $viewerStudentId !== null ? $ranked->firstWhere('is_me', true) : null,
+        ];
+    }
+
+    /** Uma linha por aluno ativo, já ordenada pela pontuação de Wilson. */
+    private function wilsonRows(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId): Collection
+    {
+        $firstAttempts = PracticeAnswer::query()->counted()
+            ->where('practice_answers.tenant_id', $tenantId)
+            ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
+            ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
+            ->join('exam_questions as eq', 'eq.id', '=', 'practice_answers.exam_question_id')
+            ->where('eq.tenant_id', $tenantId)
+            ->whereNull('eq.deleted_at')
+            ->when($subjectId, fn (Builder $q) => $q->where('eq.subject_id', $subjectId))
+            ->when($topicId, function (Builder $q) use ($topicId, $subjectId) {
+                $q->whereExists(function ($exists) use ($topicId, $subjectId) {
+                    $exists->select(DB::raw(1))
+                        ->from('exam_question_topic as eqt')
+                        ->join('subject_topics as st', 'st.id', '=', 'eqt.subject_topic_id')
+                        ->whereColumn('eqt.exam_question_id', 'practice_answers.exam_question_id')
+                        ->where('eqt.subject_topic_id', $topicId)
+                        ->when($subjectId, fn ($topic) => $topic->where('st.subject_id', $subjectId));
+                });
+            })
+            ->select('practice_answers.student_id', 'practice_answers.is_correct')
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.student_id, practice_answers.exam_question_id ORDER BY practice_answers.answered_at ASC, practice_answers.id ASC) as tentativa');
+
+        return DB::query()
+            ->fromSub($firstAttempts, 'primeira')
+            ->where('primeira.tentativa', 1)
+            ->join('students as s', 's.id', '=', 'primeira.student_id')
+            ->where('s.tenant_id', $tenantId)
+            ->where('s.status', 'active')
+            ->whereNull('s.deleted_at')
+            ->groupBy('s.id', 's.name', 's.photo_url', 's.enrollment_number')
+            ->select(
+                's.id',
+                's.name',
+                's.photo_url',
+                's.enrollment_number',
+                DB::raw('count(*) as questions'),
+                DB::raw('count(*) as answered'),
+                DB::raw('sum(case when primeira.is_correct = 1 then 1 else 0 end) as correct'),
+            )
+            ->get()
+            ->each(function ($row) {
+                $row->score = self::wilsonScore((int) $row->correct, (int) $row->answered);
+            })
+            ->sort(fn ($a, $b) => self::compareWilson(
+                ['score' => (float) $a->score, 'correct' => (int) $a->correct, 'questions' => (int) $a->questions, 'id' => (int) $a->id],
+                ['score' => (float) $b->score, 'correct' => (int) $b->correct, 'questions' => (int) $b->questions, 'id' => (int) $b->id],
+            ))
+            ->values();
     }
 
     /** Até 5 assuntos para estudar: primeiro os de acerto baixo, depois os ainda não praticados. */

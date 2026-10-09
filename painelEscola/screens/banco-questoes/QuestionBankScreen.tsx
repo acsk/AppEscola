@@ -956,7 +956,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
 
       <QuestionSetDetailModal setId={addedSetId} onClose={() => setAddedSetId(null)} onChanged={() => {}} setToast={setToast} />
 
-      <PracticeRankingModal visible={rankingOpen} onClose={() => setRankingOpen(false)} />
+      <PracticeRankingModal visible={rankingOpen} onClose={() => setRankingOpen(false)} taxonomy={catalogs.taxonomy} />
 
       <ImportPdfModal
         visible={importPdfOpen}

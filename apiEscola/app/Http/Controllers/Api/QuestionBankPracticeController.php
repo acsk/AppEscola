@@ -25,15 +25,32 @@ class QuestionBankPracticeController extends Controller
         $this->examAccess->assertCanManageExams($request->user());
         $tenantId = $this->requireTenantId($request);
         $data = $request->validate([
-            'period' => ['nullable', Rule::in(PracticePerformanceService::PERIODS)],
-            'limit'  => ['nullable', 'integer', 'min:1', 'max:200'],
+            'period'     => ['nullable', Rule::in(PracticePerformanceService::PERIODS)],
+            'limit'      => ['nullable', 'integer', 'min:1', 'max:200'],
+            'criterion'  => ['nullable', Rule::in([
+                PracticePerformanceService::CRITERION_PARTICIPATION,
+                PracticePerformanceService::CRITERION_WILSON,
+            ])],
+            'subject_id' => ['nullable', 'integer', Rule::exists('subjects', 'id')->where('tenant_id', $tenantId)],
+            'topic_id'   => ['nullable', 'integer', Rule::exists('subject_topics', 'id')->where('tenant_id', $tenantId)],
+            'page'       => ['nullable', 'integer', 'min:1'],
+            'per_page'   => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+        $criterion = $data['criterion'] ?? PracticePerformanceService::CRITERION_PARTICIPATION;
 
         return $this->success($this->performance->ranking(
             $tenantId,
             $data['period'] ?? 'month',
-            (int) ($data['limit'] ?? 50),
+            $criterion === PracticePerformanceService::CRITERION_WILSON
+                ? (int) ($data['per_page'] ?? 50)
+                : (int) ($data['limit'] ?? 50),
             fullNames: true,
+            filters: [
+                'criterion'  => $criterion,
+                'subject_id' => $data['subject_id'] ?? null,
+                'topic_id'   => $data['topic_id'] ?? null,
+                'page'       => (int) ($data['page'] ?? 1),
+            ],
         ));
     }
 }
