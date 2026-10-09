@@ -1039,13 +1039,26 @@ class QuestionAiService
     /** Os modelos tendem a pôr a correta sempre na mesma posição: embaralha e renumera. */
     private function shuffleOptions(array $content): array
     {
-        if (! empty($content['options'])) {
-            shuffle($content['options']);
-            foreach ($content['options'] as $i => &$option) {
-                $option['order'] = $i + 1;
-            }
-            unset($option);
+        if (empty($content['options'])) {
+            return $content;
         }
+
+        $options = array_values($content['options']);
+        $order = array_keys($options);
+        shuffle($order);
+        $shuffled = [];
+        $oldToNew = [];
+        foreach ($order as $newIndex => $oldIndex) {
+            $option = $options[$oldIndex];
+            $option['order'] = $newIndex + 1;
+            $shuffled[] = $option;
+            $oldToNew[chr(65 + $oldIndex)] = chr(65 + $newIndex);
+        }
+        $content['options'] = $shuffled;
+        $content['explanation'] = ExplanationLetterAligner::align(
+            ExplanationLetterAligner::remap((string) ($content['explanation'] ?? ''), $oldToNew),
+            $shuffled
+        );
 
         return $content;
     }
@@ -1245,6 +1258,7 @@ class QuestionAiService
             $option['order'] = $i + 1;
         }
         unset($option);
+        $content['explanation'] = ExplanationLetterAligner::align($content['explanation'], $options);
 
         return $content + ['options' => $options];
     }

@@ -9,6 +9,7 @@ use App\Models\QuestionGenerationJob;
 use App\Models\SubjectTopic;
 use App\Services\Ai\AiChatClient;
 use App\Services\Ai\AiCredentialResolver;
+use App\Services\Ai\ExplanationLetterAligner;
 use App\Services\Ai\QuestionGabaritoGuard;
 use Illuminate\Support\Str;
 
@@ -87,6 +88,12 @@ class LearningGenerationService
                 if (! is_array($payload)) {
                     $rejected[] = ['reason' => 'formato', 'payload' => $payload];
                     continue;
+                }
+                if (is_array($payload['options'] ?? null)) {
+                    $payload['explanation'] = ExplanationLetterAligner::align(
+                        (string) ($payload['explanation'] ?? ''),
+                        $payload['options']
+                    );
                 }
                 $reason = $this->rejectReason($payload, $topic);
                 if ($reason) {

@@ -14,7 +14,8 @@ class QuestionGabaritoGuard
     public const AUTHORING_RULE = 'Confira o gabarito antes de responder: resolva o enunciado e só então marque a única alternativa que satisfaz o comando. '
         .'Se a resolução mostrar que nenhuma alternativa está correta, reescreva as alternativas (uma correta, já conferida, e as demais erradas) em vez de descrever o erro. '
         .'A explicação justifica somente a alternativa marcada. É proibido escrever que nenhuma alternativa está correta, que a questão apresenta erro, ou dar um exemplo de resposta que não está entre as opções. '
-        .'Em classificação de palavras (oxítona, paroxítona, proparoxítona, ortografia), separe a sílaba tônica de cada palavra da alternativa marcada e confirme que todas cumprem o critério do enunciado.';
+        .'Em classificação de palavras (oxítona, paroxítona, proparoxítona, ortografia), separe a sílaba tônica de cada palavra da alternativa marcada e confirme que todas cumprem o critério do enunciado. '
+        .'Na explicação, a letra é a posição da alternativa na lista (A é a primeira). Não diga que a resposta é C se o texto dela está na posição A.';
 
     public static function admitsBrokenQuestion(string $explanation): bool
     {
