@@ -720,3 +720,74 @@ export function SessionList({ items, onSelect }: { items: (SessionItem & { index
     </View>
   );
 }
+
+// ── Minha aprendizagem ──────────────────────────────────────────────────────
+
+export type TopicLineStatus = 'reforcar' | 'atencao' | 'bom' | 'poucos';
+const TL: Record<Exclude<TopicLineStatus, 'poucos'>, { tone: TagTone; icon: IconName; t: string }> = {
+  reforcar: { tone: 'danger', icon: 'alert', t: 'Reforçar' },
+  atencao: { tone: 'warning', icon: 'flag', t: 'Atenção' },
+  bom: { tone: 'success', icon: 'check', t: 'Bom' },
+};
+const TCOLS = { num: 76, rate: 150, st: 112, act: 150 };
+
+/** Cabeçalho do diagnóstico por assunto (desktop). */
+export function TopicHead() {
+  const p = usePalette();
+  const th = { ...font.bold, fontSize: 11, lineHeight: 16, letterSpacing: 0.88, textTransform: 'uppercase' as const, color: p.inkSubtle };
+  return (
+    <View accessibilityRole="header" style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 40, paddingHorizontal: 12 }}>
+      <Text style={[th, { flex: 1 }]}>Assunto</Text>
+      <Text numberOfLines={1} style={[th, { width: TCOLS.num, textAlign: 'right' }]}>Questões</Text>
+      <Text style={[th, { width: TCOLS.rate }]}>Acerto de primeira</Text>
+      <Text style={[th, { width: TCOLS.st }]}>Situação</Text>
+      <View style={{ width: TCOLS.act }} />
+    </View>
+  );
+}
+
+/** Grupo (disciplina) no diagnóstico: ponto, nome e "4 assuntos · 5 questões". */
+export function TopicGroup({ name, dot, meta }: { name: string; dot?: string; meta: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: 14, paddingHorizontal: 12, paddingBottom: 4 }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot ?? p.inkSubtle }} />
+      <Text style={{ ...font.extrabold, fontSize: 13, color: p.ink }}>{name}</Text>
+      <Text style={{ ...font.semibold, fontSize: 13, color: p.inkSubtle }}>{meta}</Text>
+    </View>
+  );
+}
+
+/** Linha do diagnóstico: assunto, questões, acerto de primeira com barra, situação e a ação. */
+export function TopicLine({ topic, note, count, rate, status, available, preparing, primary, loading, onPractice, first }: {
+  topic: string; note?: string | null; count: number; rate: number | null; status: TopicLineStatus;
+  available?: number; preparing?: boolean; primary?: boolean; loading?: boolean; onPractice?: () => void; first?: boolean;
+}) {
+  const p = usePalette();
+  const s = status === 'poucos' ? null : TL[status];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 60, paddingVertical: 8, paddingHorizontal: 12, borderTopWidth: first ? 0 : 1, borderTopColor: p.line }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt variant="titleSm" numberOfLines={1} style={{ fontSize: 15, lineHeight: 20 }}>{topic}</Txt>
+        {note ? <Txt variant="caption" tone="subtle">{note}</Txt> : null}
+      </View>
+      <Text style={{ width: TCOLS.num, textAlign: 'right', fontSize: 15, color: p.inkMuted, fontVariant: ['tabular-nums'], ...font.regular }}>{count}</Text>
+      <View style={{ width: TCOLS.rate, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flex: 1, height: 6, borderRadius: radius.pill, backgroundColor: p.surfaceSunken, overflow: 'hidden' }}>
+          <View style={{ width: `${Math.max(0, Math.min(100, rate ?? 0))}%`, height: '100%', borderRadius: radius.pill, backgroundColor: status === 'reforcar' ? p.danger : p.inkMuted }} />
+        </View>
+        <Text style={{ ...font.extrabold, fontSize: 15, minWidth: 40, textAlign: 'right', color: p.ink, fontVariant: ['tabular-nums'] }}>{rate == null ? '—' : `${Math.round(rate)}%`}</Text>
+      </View>
+      <View style={{ width: TCOLS.st, alignItems: 'flex-start' }}>
+        {s ? <Tag tone={s.tone} icon={s.icon} label={s.t} /> : <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>Poucos dados</Txt>}
+      </View>
+      <View style={{ width: TCOLS.act, alignItems: 'flex-end' }}>
+        {preparing ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="clock" size={16} color={p.inkSubtle} /><Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>Preparando questões</Txt></View>
+        ) : available ? (
+          <Button variant={primary ? 'primary' : 'secondary'} size="sm" icon="play" label={`Praticar ${available}`} loading={loading} onPress={onPractice} />
+        ) : <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>Sem questões novas</Txt>}
+      </View>
+    </View>
+  );
+}

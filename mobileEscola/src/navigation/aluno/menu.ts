@@ -19,7 +19,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: 'calendario', label: 'Calendário', stack: 'Calendario', icon: 'calendar' },
   { id: 'desempenho', label: 'Desempenho', tab: 'Desempenho', icon: 'chart' },
   { id: 'questoes', label: 'Banco de questões', tab: 'Questoes', icon: 'library' },
-  { id: 'aprendizagem', label: 'Minha Aprendizagem', tab: 'Questoes', nestedScreen: 'Aprendizagem', icon: 'lightbulb' },
+  { id: 'aprendizagem', label: 'Minha aprendizagem', tab: 'Questoes', nestedScreen: 'Aprendizagem', icon: 'lightbulb' },
   { id: 'simulados', label: 'Simulados', tab: 'Simulados', icon: 'clipboard' },
   { id: 'provas-anteriores', label: 'Provas anteriores', tab: 'Simulados', nestedScreen: 'ProvasAnteriores', icon: 'archive' },
   { id: 'exercicios', label: 'Exercícios', tab: 'Simulados', nestedScreen: 'Exercicios', icon: 'edit' },

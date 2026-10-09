@@ -209,7 +209,7 @@ export function BancoQuestoesScreen() {
           <PageHeader title="Banco de questões" subtitle={`Escolha o que praticar e aperte começar. ${total.toLocaleString('pt-BR')} questões no total.`}
             actions={
               <View style={{ flexDirection: 'row', gap: space[3] }}>
-                <Button variant="secondary" icon="target" label="O que estudar" onPress={() => navigation.navigate('BancoDesempenho')} />
+                <Button variant="secondary" icon="target" label="O que estudar" onPress={() => navigation.navigate('Aprendizagem')} />
                 <Button variant="secondary" icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} />
               </View>
             } />
@@ -265,7 +265,7 @@ export function BancoQuestoesScreen() {
           {continueAction}
           {steps}
           <View style={{ flexDirection: 'row', gap: space[3] }}>
-            <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="target" label="O que estudar" onPress={() => navigation.navigate('BancoDesempenho')} /></View>
+            <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="target" label="O que estudar" onPress={() => navigation.navigate('Aprendizagem')} /></View>
             <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} /></View>
           </View>
           {errorNotice}
