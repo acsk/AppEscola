@@ -84,6 +84,39 @@ class QuestionBankPracticeTest extends TestCase
         Sanctum::actingAs($student->user);
     }
 
+    /** Matricula o aluno numa turma cuja grade cobre as disciplinas das questões da escola. */
+    private function inClass(Student $student): void
+    {
+        $tenantId = (int) $student->tenant_id;
+        if (ExamQuestion::query()->where('tenant_id', $tenantId)->whereNull('subject_id')->exists()) {
+            $geral = Subject::query()->firstOrCreate(
+                ['tenant_id' => $tenantId, 'name' => 'GRADE DO ALUNO'],
+                ['status' => 'active'],
+            );
+            ExamQuestion::query()->where('tenant_id', $tenantId)->whereNull('subject_id')->update(['subject_id' => $geral->id]);
+        }
+        $subjectIds = ExamQuestion::query()->where('tenant_id', $tenantId)->whereNotNull('subject_id')->distinct()->pluck('subject_id');
+        $class = SchoolClass::factory()->create([
+            'tenant_id' => $tenantId,
+            'course_id' => Course::factory()->create(['tenant_id' => $tenantId])->id,
+        ]);
+        foreach ($subjectIds->values() as $subjectId) {
+            ClassSchedule::factory()->create([
+                'tenant_id' => $tenantId,
+                'school_class_id' => $class->id,
+                'subject_id' => $subjectId,
+            ]);
+        }
+        Enrollment::factory()->create([
+            'tenant_id' => $tenantId,
+            'student_id' => $student->id,
+            'school_class_id' => $class->id,
+            'start_date' => '2020-01-01',
+            'end_date' => null,
+            'status' => 'active',
+        ]);
+    }
+
     private function publishedSet(array $questions, string $title = 'Simulado do banco'): int
     {
         $id = $this->postJson('/api/question-bank/question-sets', [
@@ -170,7 +203,9 @@ class QuestionBankPracticeTest extends TestCase
         $this->practicable('Oficial')->update(['exam_id' => $exam->id]);
         $this->practicable('Outra escola', tenantId: Tenant::factory()->create()->id);
 
-        $this->actingAsStudent($this->student());
+        $student = $this->student();
+        $this->inClass($student);
+        $this->actingAsStudent($student);
         for ($i = 0; $i < 5; $i++) {
             $next = $this->getJson('/api/aluno/practice/next-question')->assertOk()->json('body');
             $this->assertSame($q->id, $next['id']);
@@ -206,7 +241,9 @@ class QuestionBankPracticeTest extends TestCase
         $running = $inExam('Em andamento', $exam('published', now()->addDay()->toDateTimeString()));
         $draft = $inExam('Rascunho', $exam('draft', now()->subDay()->toDateTimeString()));
 
-        $this->actingAsStudent($this->student());
+        $student = $this->student();
+        $this->inClass($student);
+        $this->actingAsStudent($student);
         $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 2);
         $seen = [];
         for ($i = 0; $i < 12; $i++) {
@@ -259,9 +296,31 @@ class QuestionBankPracticeTest extends TestCase
         $this->postJson("/api/aluno/practice/questions/{$h->id}/answer", ['option_id' => $this->correct($h)])->assertNotFound();
         $this->postJson("/api/aluno/practice/questions/{$m->id}/answer", ['option_id' => $this->correct($m)])->assertOk();
 
-        // Sem turma com grade: o banco inteiro da escola continua disponível.
+        Sanctum::actingAs($this->admin);
+        $setId = $this->publishedSet([$m, $h], 'Misto');
+        $this->actingAsStudent($enrolled);
+        $listed = collect($this->getJson('/api/aluno/question-sets')->assertOk()->json('body'))->firstWhere('id', $setId);
+        $this->assertSame(1, $listed['questions_count']);
+        $attempt = $this->postJson("/api/aluno/question-sets/{$setId}/start")->assertOk()->json('body');
+        $this->assertSame([$m->id], array_column($attempt['questions'], 'id'));
+        $this->postJson("/api/aluno/practice-attempts/{$attempt['attempt']['id']}/answer", [
+            'question_id' => $h->id, 'option_id' => $this->correct($h),
+        ])->assertNotFound();
+
+        // Sem turma, ou turma sem disciplina na grade, não responde questão nenhuma.
         $this->actingAsStudent($this->student('JOÃO SEM TURMA'));
-        $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 3);
+        $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 0);
+        $this->postJson("/api/aluno/practice/questions/{$m->id}/answer", ['option_id' => $this->correct($m)])->assertNotFound();
+        $this->assertSame([], $this->getJson('/api/aluno/question-sets')->assertOk()->json('body'));
+
+        $semGrade = $this->student('SEM GRADE');
+        Enrollment::factory()->create([
+            'tenant_id' => $this->tenant->id, 'student_id' => $semGrade->id,
+            'school_class_id' => SchoolClass::factory()->create(['tenant_id' => $this->tenant->id, 'course_id' => $class->course_id])->id,
+            'start_date' => now()->subMonth()->toDateString(), 'status' => 'active',
+        ]);
+        $this->actingAsStudent($semGrade);
+        $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 0);
     }
 
     public function test_student_answers_published_set_and_gets_correction_only_after_finishing(): void
@@ -272,6 +331,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->postJson('/api/question-bank/question-sets', ['title' => 'Rascunho', 'question_ids' => [$a->id]])->assertCreated();
 
         $student = $this->student();
+        $this->inClass($student);
         $this->actingAsStudent($student);
         $sets = $this->getJson('/api/aluno/question-sets')->assertOk()->json('body');
         $this->assertSame([$setId], array_column($sets, 'id'));
@@ -312,7 +372,9 @@ class QuestionBankPracticeTest extends TestCase
         $craseQs = collect(range(1, 5))->map(fn ($i) => $this->practicable("C{$i}", $port->id, [$crase->id]));
         $this->practicable('O1', $port->id, [$nunca->id]);
 
-        $this->actingAsStudent($this->student());
+        $student = $this->student();
+        $this->inClass($student);
+        $this->actingAsStudent($student);
         $interpQs->each(fn ($q) => $this->postJson("/api/aluno/practice/questions/{$q->id}/answer", ['option_id' => $this->correct($q)])->assertOk());
         $craseQs->each(fn ($q, $i) => $this->postJson("/api/aluno/practice/questions/{$q->id}/answer", [
             'option_id' => $i === 0 ? $this->correct($q) : $this->wrong($q),
@@ -337,6 +399,8 @@ class QuestionBankPracticeTest extends TestCase
         $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
         $maria = $this->student('MARIA DA SILVA');
         $joao = $this->student('JOAO PEREIRA');
+        $this->inClass($maria);
+        $this->inClass($joao);
         $other = Student::factory()->create(['tenant_id' => Tenant::factory()->create()->id]);
 
         $this->actingAsStudent($joao);
@@ -366,6 +430,8 @@ class QuestionBankPracticeTest extends TestCase
         $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
         $maria = $this->student('MARIA DA SILVA');
         $joao = $this->student('JOAO PEREIRA');
+        $this->inClass($maria);
+        $this->inClass($joao);
         $answer = function (Student $student, ExamQuestion $q, string $atBrasilia) {
             $this->travelTo(Carbon::parse($atBrasilia, 'America/Sao_Paulo'));
             $this->actingAsStudent($student);
@@ -402,6 +468,8 @@ class QuestionBankPracticeTest extends TestCase
         $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
         $maria = $this->student('MARIA DA SILVA');
         $joao = $this->student('JOAO PEREIRA');
+        $this->inClass($maria);
+        $this->inClass($joao);
         $answer = function (Student $student, ExamQuestion $q) {
             $this->actingAsStudent($student);
             $this->postJson("/api/aluno/practice/questions/{$q->id}/answer", ['option_id' => $this->correct($q)])->assertOk();

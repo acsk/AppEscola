@@ -2,8 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\ClassSchedule;
+use App\Models\Course;
+use App\Models\Enrollment;
 use App\Models\ExamQuestion;
 use App\Models\QuestionDifficulty;
+use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
@@ -54,6 +58,39 @@ class PracticeCatalogTest extends TestCase
         return $q->load('options');
     }
 
+    /** Cobre o aluno com as disciplinas das questões já criadas na escola. */
+    private function inClass(): void
+    {
+        $tenantId = (int) $this->tenant->id;
+        if (ExamQuestion::query()->where('tenant_id', $tenantId)->whereNull('subject_id')->exists()) {
+            $geral = Subject::query()->firstOrCreate(
+                ['tenant_id' => $tenantId, 'name' => 'GRADE DO ALUNO'],
+                ['status' => 'active'],
+            );
+            ExamQuestion::query()->where('tenant_id', $tenantId)->whereNull('subject_id')->update(['subject_id' => $geral->id]);
+        }
+        $subjectIds = ExamQuestion::query()->where('tenant_id', $tenantId)->whereNotNull('subject_id')->distinct()->pluck('subject_id');
+        $class = SchoolClass::factory()->create([
+            'tenant_id' => $tenantId,
+            'course_id' => Course::factory()->create(['tenant_id' => $tenantId])->id,
+        ]);
+        foreach ($subjectIds as $subjectId) {
+            ClassSchedule::factory()->create([
+                'tenant_id' => $tenantId,
+                'school_class_id' => $class->id,
+                'subject_id' => $subjectId,
+            ]);
+        }
+        Enrollment::factory()->create([
+            'tenant_id' => $tenantId,
+            'student_id' => $this->student->id,
+            'school_class_id' => $class->id,
+            'start_date' => '2020-01-01',
+            'end_date' => null,
+            'status' => 'active',
+        ]);
+    }
+
     private function answer(ExamQuestion $q, bool $right): void
     {
         $this->postJson("/api/aluno/practice/questions/{$q->id}/answer", ['option_id' => $q->options->firstWhere('is_correct', $right)->id])->assertOk();
@@ -68,6 +105,7 @@ class PracticeCatalogTest extends TestCase
         $a = $this->question('Pizza dividida em 8 partes', $math->id, [$fractions->id], $easy->id, 2024);
         $b = $this->question('Turma de 36 alunos', $math->id, [$fractions->id], null, 2023);
         $c = $this->question('Substantivos comuns', $pt->id, [], null, 2020);
+        $this->inClass();
 
         $this->answer($a, false);
         $this->answer($b, true);
@@ -105,6 +143,7 @@ class PracticeCatalogTest extends TestCase
         $answered = $this->question('Nova já respondida', $math->id, [$fractions->id]);
         $old = $this->question('Antiga', $math->id, [$fractions->id]);
         $old->forceFill(['created_at' => now()->subDays(PracticeCatalogService::NEW_DAYS + 1)])->save();
+        $this->inClass();
         $this->answer($answered, true);
 
         $facets = $this->getJson('/api/aluno/practice/facets')->assertOk();
@@ -122,6 +161,7 @@ class PracticeCatalogTest extends TestCase
     public function test_session_each_mode_reveals_feedback_per_question_and_counts_in_summary(): void
     {
         $qs = collect(range(1, 12))->map(fn ($i) => $this->question("Questão {$i}"));
+        $this->inClass();
 
         $payload = $this->postJson('/api/aluno/practice/sessions', ['quantity' => 10, 'correction_mode' => 'each', 'timed' => true, 'title' => 'Treino'])
             ->assertCreated()->json('body');
@@ -158,6 +198,7 @@ class PracticeCatalogTest extends TestCase
     {
         $math = Subject::factory()->create(['tenant_id' => $this->tenant->id]);
         $q = $this->question('Única', $math->id);
+        $this->inClass();
         $payload = $this->postJson('/api/aluno/practice/sessions', ['subject_ids' => [$math->id], 'correction_mode' => 'end'])->assertCreated()->json('body');
         $attemptId = $payload['attempt']['id'];
         $this->postJson("/api/aluno/practice-attempts/{$attemptId}/answer", ['question_id' => $q->id, 'option_id' => $q->options->first()->id])

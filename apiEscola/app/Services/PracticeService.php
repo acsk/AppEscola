@@ -73,15 +73,25 @@ class PracticeService
     }
 
     /**
-     * Questões avulsas que o aluno pode praticar (banco + simulados oficiais encerrados), só das disciplinas
-     * da grade das suas turmas. Sem grade cadastrada nas turmas, vale o banco inteiro da escola (o app não fica vazio).
+     * Questões que o aluno pode praticar (banco + simulados oficiais encerrados), somente das disciplinas
+     * da grade das turmas em que ele está matriculado. Sem turma ou sem disciplina na grade, não há questão.
      */
     public function practicableFor(Student $student): Builder
     {
+        return $this->onlyClassSubjects(
+            ExamQuestion::query()->practiceAvailable((int) $student->tenant_id),
+            $student,
+        );
+    }
+
+    /** Restringe a consulta às disciplinas da grade das turmas ativas do aluno. */
+    private function onlyClassSubjects(Builder $query, Student $student): Builder
+    {
         $subjectIds = $this->enrollments->activeSubjectIdsForStudent($student);
 
-        return ExamQuestion::query()->practiceAvailable((int) $student->tenant_id)
-            ->when($subjectIds->isNotEmpty(), fn (Builder $q) => $q->whereIn('exam_questions.subject_id', $subjectIds));
+        return $subjectIds->isEmpty()
+            ? $query->whereRaw('0 = 1')
+            : $query->whereIn('exam_questions.subject_id', $subjectIds);
     }
 
     /** Responde uma questão avulsa: correção imediata. */
@@ -118,7 +128,7 @@ class PracticeService
             ->orderByDesc('id')->get()->groupBy('question_set_id');
 
         return $sets
-            ->map(function (QuestionSet $set) use ($attempts) {
+            ->map(function (QuestionSet $set) use ($attempts, $student) {
                 $setAttempts = $attempts->get($set->id) ?? collect();
                 $last = $setAttempts->first();
                 $best = $setAttempts->filter->isFinished()->sortByDesc('correct_count')->first();
@@ -129,7 +139,7 @@ class PracticeService
                     'description'       => $set->description,
                     'origin'            => $set->origin,
                     'exam_type'         => $set->examType ? ['label' => $set->examType->label, 'logo_url' => $set->examType->logo_url] : null,
-                    'questions_count'   => $this->sets->practicableQuery($set)->count(),
+                    'questions_count'   => $this->setQuestions($student, $set)->count(),
                     'attempts_count'    => $setAttempts->count(),
                     'open_attempt_id'   => $last && ! $last->isFinished() ? $last->id : null,
                     'last_result'       => $best ? ['correct' => $best->correct_count, 'total' => $best->question_count, 'finished_at' => $best->finished_at?->toIso8601String()] : null,
@@ -152,7 +162,7 @@ class PracticeService
         if ($open) {
             return $open;
         }
-        $count = $this->sets->practicableQuery($set)->count();
+        $count = $this->setQuestions($student, $set)->count();
         if ($count === 0) {
             throw new QuestionBankException('Este simulado ainda não tem questões disponíveis.');
         }
@@ -166,15 +176,25 @@ class PracticeService
         ]);
     }
 
-    /** Questões de uma sessão montada pelo aluno, na ordem sorteada (só as que seguem praticáveis). */
+    /** Questões de uma sessão montada pelo aluno, na ordem sorteada e só das disciplinas da turma. */
     private function sessionQuestions(PracticeAttempt $attempt): Builder
     {
         $ids = array_map('intval', $attempt->question_ids ?? []);
+        $student = $attempt->student;
+        if (! $student) {
+            return ExamQuestion::query()->whereRaw('0 = 1');
+        }
 
-        return ExamQuestion::query()->practiceAvailable((int) $attempt->tenant_id)
+        return $this->practicableFor($student)
             ->whereIn('exam_questions.id', $ids ?: [0])
             ->when($ids, fn (Builder $q) => $q->orderByRaw('FIELD(exam_questions.id, '.implode(',', $ids).')'))
             ->select('exam_questions.*');
+    }
+
+    /** Questões do simulado do banco que pertencem às disciplinas da turma do aluno. */
+    private function setQuestions(Student $student, QuestionSet $set): Builder
+    {
+        return $this->onlyClassSubjects($this->sets->practicableQuery($set), $student);
     }
 
     /** Questões da tentativa: simulado do banco ou sessão. */
@@ -184,7 +204,9 @@ class PracticeService
             return $this->sessionQuestions($attempt);
         }
 
-        return $attempt->questionSet ? $this->sets->practicableQuery($attempt->questionSet) : null;
+        return $attempt->questionSet && $attempt->student
+            ? $this->setQuestions($attempt->student, $attempt->questionSet)
+            : null;
     }
 
     /** Questões da tentativa (sem gabarito enquanto aberta, salvo correção a cada questão) e as respostas marcadas. */
