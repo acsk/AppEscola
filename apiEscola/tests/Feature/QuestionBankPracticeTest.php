@@ -522,6 +522,28 @@ class QuestionBankPracticeTest extends TestCase
         $this->getJson('/api/aluno/practice/ranking?criterion=wilson&subject_id=999999')->assertStatus(422);
     }
 
+    public function test_scored_rankings_move_against_the_position_from_yesterday(): void
+    {
+        $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("M{$i}"));
+        $maria = $this->student('MARIA DA SILVA');
+        $joao = $this->student('JOAO PEREIRA');
+        $this->record($joao, $qs[0], true, now()->subHours(30));
+        $this->record($joao, $qs[1], true, now()->subHours(30));
+        $this->record($maria, $qs[0], true, now()->subHours(30));
+        $this->record($maria, $qs[1], true, now());
+        $this->record($maria, $qs[2], true, now());
+
+        $this->actingAsStudent($maria);
+        foreach (['wilson', 'dedication'] as $criterion) {
+            $body = $this->getJson("/api/aluno/practice/ranking?criterion={$criterion}&period=all")->assertOk()->json('body');
+            $byName = collect($body['ranking'])->keyBy('name');
+            $this->assertSame(1, $byName['MARIA S.']['position'], $criterion);
+            $this->assertSame(1, $byName['MARIA S.']['movement'], $criterion);
+            $this->assertSame(-1, $byName['JOAO P.']['movement'], $criterion);
+            $this->assertSame(1, $body['me']['movement'], $criterion);
+        }
+    }
+
     public function test_old_question_retaken_inside_the_period_does_not_count_as_new(): void
     {
         $antiga = $this->practicable('Antiga');

@@ -182,7 +182,7 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl, moveme
         {pos === 1 ? <Icon name="trophy" size={18} color={p.onInverse} />
           : <Text style={{ ...font.extrabold, fontSize: 15, color: top ? p.ink : p.inkMuted, fontVariant: ['tabular-nums'] }}>{pos}º</Text>}
       </View>
-      {movement !== undefined ? <View style={{ width: 28, alignItems: 'flex-start' }}><RankMovement movement={movement} /></View> : null}
+      {movement !== undefined ? <View style={{ width: 40, alignItems: 'flex-start' }}><RankMovement movement={movement} /></View> : null}
       <Avatar initials={initials} photoUrl={photoUrl} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
@@ -204,7 +204,7 @@ export function RankRow({ pos, initials, name, rate, count, me, photoUrl, moveme
 }
 
 /** Colunas da tabela do ranking (desktop). */
-const RANK_COLS = { pos: 64, n1: 84, n2: 76, n3: 92, score: 200 };
+const RANK_COLS = { pos: 96, n1: 84, n2: 76, n3: 92, score: 200 };
 
 /** Cabeçalho da tabela do ranking. */
 export function RankHead({ labels = ['Questões', 'Acertos', 'Aproveit.', 'Pontos'] }: { labels?: [string, string, string, string] | string[] }) {
@@ -236,7 +236,7 @@ export function RankLine({ pos, movement, initials, name, photoUrl, me, note, va
       flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.md,
       backgroundColor: me ? p.surfaceSunken : 'transparent', borderWidth: 1.5, borderColor: me ? p.ink : 'transparent',
     }}>
-      <View style={{ width: RANK_COLS.pos, flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+      <View style={{ width: RANK_COLS.pos, flexDirection: 'row', alignItems: 'center', gap: space[2], overflow: 'visible' }}>
         <Text style={{ ...font.extrabold, fontSize: 15, color: p.ink, minWidth: 26, fontVariant: ['tabular-nums'] }}>{pos}º</Text>
         <RankMovement movement={movement} />
       </View>

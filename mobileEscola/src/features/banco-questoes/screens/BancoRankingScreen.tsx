@@ -174,8 +174,8 @@ export function BancoRankingScreen() {
 
   // ── Celular ───────────────────────────────────────────────────────────────
   const row = (r: RankingRow) => (
-    <RankRow key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} initials={initials(r.name)} name={cleanName(r.name)} photoUrl={r.photo_url}
-      rate={r.accuracy} count={r.questions} me={r.is_me} score={r.score ?? 0} scoreDecimals={performance ? 1 : 0} />
+    <RankRow key={`${r.position}-${r.name}-${r.is_me}`} pos={r.position} movement={r.movement ?? null} initials={initials(r.name)} name={cleanName(r.name)}
+      photoUrl={r.photo_url} rate={r.accuracy} count={r.questions} me={r.is_me} score={r.score ?? 0} scoreDecimals={performance ? 1 : 0} />
   );
   // Lista curta: top 3, você e o próximo (ou o top 5, se você já estiver no pódio).
   const short = (() => {
