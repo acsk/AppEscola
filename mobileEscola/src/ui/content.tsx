@@ -121,10 +121,17 @@ export function TopicRow({
   );
 }
 
-/** Seta contra a foto de cerca de 24h atrás: positivo sobe, negativo desce. */
+/** Seta contra a foto de cerca de 24h atrás: positivo sobe, negativo desce, zero manteve. Sem foto antiga, não marca. */
 export function RankMovement({ movement }: { movement?: number | null }) {
   const p = usePalette();
-  if (movement == null || movement === 0) return null;
+  if (movement == null) return null;
+  if (movement === 0) {
+    return (
+      <View accessibilityLabel="Manteve a posição" style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Icon name="minus" size={14} color={p.inkSubtle} />
+      </View>
+    );
+  }
   const up = movement > 0;
   const places = Math.abs(movement);
   return (
