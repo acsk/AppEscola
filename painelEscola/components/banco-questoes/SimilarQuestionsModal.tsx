@@ -231,7 +231,20 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     setReviewing(draft.key);
     try {
       const response = await aiReviewQuestion(reviewInput(draft));
-      updateDraft(draft.key, { review: response.body, manualApproved: false, errors: {} });
+      const question = response.body.question;
+      updateDraft(draft.key, {
+        review: response.body,
+        manualApproved: false,
+        errors: {},
+        content: question?.options?.length
+          ? {
+              ...draft.content,
+              question_text: question.question_text || draft.content.question_text,
+              explanation: question.explanation ?? draft.content.explanation,
+              options: contentFromSuggestion({ ...question, type: draft.content.type }).options,
+            }
+          : draft.content,
+      });
     } catch (err) {
       setError(describeAiError(err, "Não foi possível validar a questão"));
     } finally {

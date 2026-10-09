@@ -320,6 +320,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     Route::get('aluno/practice/facets',                        [StudentPracticeController::class, 'facets']);
     Route::post('aluno/practice/questions/{question}/save',    [StudentPracticeController::class, 'saveQuestion'])->whereNumber('question');
     Route::delete('aluno/practice/questions/{question}/save',  [StudentPracticeController::class, 'unsaveQuestion'])->whereNumber('question');
+    Route::post('aluno/practice/questions/{question}/issue',   [StudentPracticeController::class, 'reportIssue'])->whereNumber('question');
+    Route::delete('aluno/practice/questions/{question}/issue', [StudentPracticeController::class, 'clearIssue'])->whereNumber('question');
     Route::post('aluno/practice/sessions',                     [StudentPracticeController::class, 'startSession']);
     Route::get('aluno/question-sets',                          [StudentPracticeController::class, 'sets']);
     Route::post('aluno/question-sets/{set}/start',             [StudentPracticeController::class, 'startSet'])->whereNumber('set');

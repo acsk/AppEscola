@@ -8,6 +8,7 @@ use App\Models\ExamQuestion;
 use App\Models\PracticeAnswer;
 use App\Models\PracticeAttempt;
 use App\Models\PracticeSavedQuestion;
+use App\Models\QuestionIssueReport;
 use App\Models\QuestionSet;
 use App\Models\Student;
 use App\Models\Subject;
@@ -222,6 +223,8 @@ class PracticeService
         $each = $attempt->correctsEachQuestion();
         $saved = PracticeSavedQuestion::query()->where('student_id', $attempt->student_id)
             ->whereIn('exam_question_id', $questions->pluck('id'))->pluck('exam_question_id')->flip();
+        $reported = QuestionIssueReport::query()->where('student_id', $attempt->student_id)
+            ->whereIn('exam_question_id', $questions->pluck('id'))->pluck('exam_question_id')->flip();
         $newIds = $this->newQuestionIds($attempt, $questions);
         $rates = $this->classRates((int) $attempt->tenant_id, $questions->pluck('id')->all());
         $topicScores = $this->topicScores((int) $attempt->student_id, $questions);
@@ -229,13 +232,14 @@ class PracticeService
         return [
             'attempt' => $this->attemptSummary($attempt),
             'question_set' => $set ? ['id' => $set->id, 'title' => $set->title, 'description' => $set->description] : null,
-            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished, $each, $saved, $newIds, $rates, $topicScores) {
+            'questions' => $questions->map(function (ExamQuestion $question) use ($answers, $finished, $each, $saved, $reported, $newIds, $rates, $topicScores) {
                 $answer = $answers->get($question->id);
                 $reveal = $finished || ($each && $answer);
 
                 return $this->questionPayload($question) + [
                     'selected_option_id' => $answer?->option_id,
                     'saved'              => $saved->has($question->id),
+                    'issue_reported'     => $reported->has($question->id),
                     'is_new'             => $newIds->has($question->id),
                     'year'               => $question->year,
                     // "Sobre esta questão" (Praticar no desktop): % da escola que acerta e o seu acerto no assunto.

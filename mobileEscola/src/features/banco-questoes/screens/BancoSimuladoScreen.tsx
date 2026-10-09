@@ -7,7 +7,7 @@ import type { QuestoesStackParamList } from '../../../navigation/stacks/Questoes
 import ConfirmModal from '../../../components/ConfirmModal';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import type { PracticeFeedback } from '../../../services/practice.service';
-import { useAnswerInAttempt, useFinishAttempt, usePracticeAttempt, useStartQuestionSet, useToggleSavedQuestion } from '../hooks';
+import { useAnswerInAttempt, useFinishAttempt, usePracticeAttempt, useStartQuestionSet, useToggleQuestionIssue, useToggleSavedQuestion } from '../hooks';
 import { PracticeQuestionView } from '../components/PracticeQuestionView';
 import { PracticeDesktop } from '../components/PracticeDesktop';
 import { formatPercent } from '../lib/format';
@@ -43,11 +43,13 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const answer = useAnswerInAttempt(attemptId ?? 0);
   const finish = useFinishAttempt(attemptId ?? 0);
   const toggleSaved = useToggleSavedQuestion();
+  const toggleIssue = useToggleQuestionIssue();
 
   /** Alternativa marcada (no modo "a cada questão", ainda não confirmada até ter feedback). */
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [feedbacks, setFeedbacks] = useState<Record<number, PracticeFeedback>>({});
   const [saved, setSaved] = useState<Record<number, boolean>>({});
+  const [reported, setReported] = useState<Record<number, boolean>>({});
   const [flagged, setFlagged] = useState<number[]>([]);
   const [index, setIndex] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
@@ -82,6 +84,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       is_correct: q.is_correct ?? null, correct_option_id: q.correct_option_id ?? null, explanation: q.explanation ?? null,
     }])));
     setSaved(Object.fromEntries(payload.questions.map((q) => [q.id, !!q.saved])));
+    setReported(Object.fromEntries(payload.questions.map((q) => [q.id, !!q.issue_reported])));
   }, [payload]);
 
   // Retoma na primeira questão sem resposta.
@@ -177,6 +180,14 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       onError: () => setSaved((prev) => ({ ...prev, [current.id]: !next })),
     });
   };
+  const toggleReport = () => {
+    if (!current) return;
+    const next = !reported[current.id];
+    setReported((prev) => ({ ...prev, [current.id]: next }));
+    toggleIssue.mutate({ questionId: current.id, reported: next }, {
+      onError: () => setReported((prev) => ({ ...prev, [current.id]: !next })),
+    });
+  };
   const toggleFlag = () => setFlagged((prev) => (prev.includes(index + 1) ? prev.filter((n) => n !== index + 1) : [...prev, index + 1]));
 
   const leave = () => {
@@ -256,6 +267,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const rightIdx = questions.map((q, i) => (feedbacks[q.id]?.is_correct ? i + 1 : 0)).filter(Boolean);
   const wrongIdx = questions.map((q, i) => (feedbacks[q.id] && !feedbacks[q.id].is_correct ? i + 1 : 0)).filter(Boolean);
   const isSaved = current ? !!saved[current.id] : false;
+  const isReported = current ? !!reported[current.id] : false;
   const lastLetter = LETTERS[Math.max(0, (current?.options.length ?? 4) - 1)];
 
   const resultCard = finished ? (
@@ -380,6 +392,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
                   </View>
                 ))}
                 <Button variant="secondary" size="sm" icon="bookmark" label={isSaved ? 'Salva nas suas questões' : 'Salvar questão'} onPress={toggleSave} />
+                <Button variant={isReported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={isReported ? 'Erro marcado para revisão' : 'Marcar erro na questão'} onPress={toggleReport} />
               </Card>
             </View>
           </View>
@@ -401,6 +414,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           </Text>
           <ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" />
         </View>
+        <IconButton icon="warning" label={isReported ? 'Erro marcado para revisão' : 'Marcar erro na questão'} color={isReported ? p.dangerInk : undefined} onPress={toggleReport} />
         <IconButton icon="bookmark" label={isSaved ? 'Remover das salvas' : 'Salvar questão'} color={isSaved ? p.brandInk : undefined} onPress={toggleSave} />
         {!practicing ? <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} /> : null}
       </View>

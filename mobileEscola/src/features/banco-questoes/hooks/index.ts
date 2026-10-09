@@ -17,6 +17,7 @@ import {
   fetchPracticeQuestions,
   fetchPracticeFacets,
   setQuestionSaved,
+  setQuestionIssue,
   startPracticeSession,
   fetchLearningOverview,
   fetchLearningTopics,
@@ -138,6 +139,12 @@ export function useNewQuestionsCount(enabled = true): number {
     staleTime: 60_000,
   });
   return enabled ? (data?.situations.new ?? 0) : 0;
+}
+
+export function useToggleQuestionIssue() {
+  return useMutation({
+    mutationFn: ({ questionId, reported }: { questionId: number; reported: boolean }) => setQuestionIssue(questionId, reported),
+  });
 }
 
 export function useToggleSavedQuestion() {

@@ -81,6 +81,7 @@ class QuestionBankController extends Controller
     {
         $model = $this->findQuestion($request, $question);
         $model->load(array_merge(QuestionClassificationService::RELATIONS, ['options']));
+        $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model));
     }

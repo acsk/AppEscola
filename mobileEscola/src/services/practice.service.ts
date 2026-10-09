@@ -78,6 +78,8 @@ export interface PracticeAttemptSummary {
 export type AttemptQuestion = PracticeQuestion & {
   selected_option_id: number | null;
   saved?: boolean;
+  /** O aluno marcou que esta questão tem um erro. */
+  issue_reported?: boolean;
   is_new?: boolean;
   year?: number | null;
   /** % da escola que acerta (null com poucas respostas). */
@@ -343,6 +345,11 @@ export async function fetchPracticeFacets(filters: CatalogFilters): Promise<Cata
 export async function setQuestionSaved(questionId: number, saved: boolean): Promise<void> {
   if (saved) await api.post(`/api/aluno/practice/questions/${questionId}/save`);
   else await api.delete(`/api/aluno/practice/questions/${questionId}/save`);
+}
+
+export async function setQuestionIssue(questionId: number, reported: boolean): Promise<void> {
+  if (reported) await api.post(`/api/aluno/practice/questions/${questionId}/issue`);
+  else await api.delete(`/api/aluno/practice/questions/${questionId}/issue`);
 }
 
 export interface SessionOptions {

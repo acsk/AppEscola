@@ -34,7 +34,7 @@ export function BancoQuestoesScreen() {
   const [subjectIds, setSubjectIds] = useState<number[]>(presetSubject ? [presetSubject] : []);
   const [topicIds, setTopicIds] = useState<number[]>([]);
   const [quantity, setQuantity] = useState<Quantity>(10);
-  const [onlyNew, setOnlyNew] = useState(false);
+  const [onlyNew, setOnlyNew] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Chegou de "Treinar estes assuntos antes": marca a matéria do simulado.

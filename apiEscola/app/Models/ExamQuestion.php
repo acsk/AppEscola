@@ -85,6 +85,11 @@ class ExamQuestion extends Model
             ->orderBy('question_tags.name');
     }
 
+    public function issueReports(): HasMany
+    {
+        return $this->hasMany(QuestionIssueReport::class, 'exam_question_id');
+    }
+
     public function options(): HasMany
     {
         return $this->hasMany(ExamQuestionOption::class, 'question_id')->orderBy('order');

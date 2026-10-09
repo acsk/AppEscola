@@ -331,7 +331,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setReview(response.body);
       if (response.body.id) setReviewHistory((prev) => [response.body, ...prev.filter((item) => item.id !== response.body.id)]);
       const question = response.body.question;
-      if (action === "correct" && question && !isFromExam) {
+      if (question && !isFromExam) {
         setContent((prev) => ({
           ...prev,
           question_text: question.question_text || prev.question_text,
@@ -678,6 +678,14 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             }
           />
         </View>
+
+        {!loading && !loadError && (examQuestion?.issue_reports_count ?? 0) > 0 ? (
+          <Text className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {examQuestion?.issue_reports_count === 1
+              ? "1 aluno marcou que esta questão tem um erro e precisa de revisão."
+              : `${examQuestion?.issue_reports_count} alunos marcaram que esta questão tem um erro e precisa de revisão.`}
+          </Text>
+        ) : null}
 
         {!loading && !loadError ? (
           <QuestionReviewPanel

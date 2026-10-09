@@ -44,6 +44,7 @@ export type QuestionBankQuestion = {
   difficulty: (IdName & { sort_order: number }) | null;
   exam_type_id: number | null;
   exam_type: { id: number; label: string } | null;
+  issue_reports_count?: number;
   is_annulled: boolean;
   is_outdated: boolean;
   tags: string[];
