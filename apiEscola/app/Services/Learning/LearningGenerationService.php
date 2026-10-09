@@ -9,6 +9,7 @@ use App\Models\QuestionGenerationJob;
 use App\Models\SubjectTopic;
 use App\Services\Ai\AiChatClient;
 use App\Services\Ai\AiCredentialResolver;
+use App\Services\Ai\QuestionGabaritoGuard;
 use Illuminate\Support\Str;
 
 /**
@@ -116,6 +117,9 @@ class LearningGenerationService
     {
         $text = trim((string) ($payload['question_text'] ?? ''));
         $explanation = trim((string) ($payload['explanation'] ?? ''));
+        if (QuestionGabaritoGuard::admitsBrokenQuestion($explanation)) {
+            return 'explicação contradiz o gabarito';
+        }
         $options = is_array($payload['options'] ?? null) ? array_values($payload['options']) : [];
         if (mb_strlen($text) < 20 || mb_strlen($explanation) < 10) {
             return 'enunciado ou explicação incompletos';
@@ -240,7 +244,8 @@ class LearningGenerationService
             'Você cria questões de concurso em JSON válido, sem texto fora do JSON.',
             "Crie {$batch} questões inéditas de múltipla escolha sobre {$topic->name}, da disciplina {$subject}. "
                 .'Formato: {"questions":[{"question_text":"...","explanation":"...","difficulty":"Fácil|Média|Difícil","options":[{"text":"...","is_correct":true}]}]} '
-                .'Cada questão tem de 2 a 5 alternativas e exatamente uma correta. Enunciado e explicação em português.',
+                .'Cada questão tem de 2 a 5 alternativas e exatamente uma correta. Enunciado e explicação em português. '
+                .QuestionGabaritoGuard::AUTHORING_RULE,
         ];
     }
 

@@ -153,6 +153,7 @@ class QuestionAiService
                     ."- Objetiva: de 4 a 5 alternativas plausíveis (ou as já informadas), exatamente uma correta, sem letras no início do texto.\n"
                     ."- Dissertativa: \"options\" vazio.\n")
             ."- \"explanation\": resolva a questão passo a passo ANTES de definir o gabarito; a alternativa correta tem de bater com essa resolução (confira os cálculos).\n"
+            .'- '.QuestionGabaritoGuard::AUTHORING_RULE."\n"
             ."- Se o enunciado citar charge, tirinha, figura ou gráfico que você não vê, resolva e classifique pelo comando e pelas alternativas, sem inventar o conteúdo da imagem.\n"
             .($onlySubjectId !== null
                 ? "- Classificação: a disciplina JÁ ESTÁ DEFINIDA (subject_id={$onlySubjectId}, a única da lista abaixo); não a troque. Escolha de 1 a 3 assuntos listados sob ela.\n"
@@ -180,6 +181,14 @@ class QuestionAiService
         ]));
 
         $raw = $this->client->json($credential, $system, $user, 0.3);
+        $raw = $this->rewriteIfGabaritoBroken($credential, $system, $raw);
+        if (QuestionGabaritoGuard::admitsBrokenQuestion((string) ($raw['explanation'] ?? ''))) {
+            throw new AiException(
+                'A IA montou uma questão em que nenhuma alternativa está correta. Tente novamente.',
+                502,
+                'ai_invalid_response'
+            );
+        }
 
         $content = $this->sanitizeContent($raw, $convert ? 'multiple_choice' : ($input['type'] ?? null), $filledOptions === [] ? null : count($filledOptions));
         if ($content === null) {
@@ -461,7 +470,8 @@ class QuestionAiService
                 ? 'Tipo: dissertativa ("options" vazio; em "explanation" traga a resposta esperada).'
                 : "Tipo: objetiva com exatamente {$optionsCount} alternativas, apenas uma correta, sem letras no início do texto; varie a posição da correta.",
             'Para cada questão: escreva primeiro "explanation" com a resolução passo a passo e só depois as alternativas; '
-            .'a alternativa correta tem de bater exatamente com a resolução (confira os cálculos) e as erradas devem ser erros plausíveis.',
+            .'a alternativa correta tem de bater exatamente com a resolução (confira os cálculos) e as erradas devem ser erros plausíveis. '
+            .QuestionGabaritoGuard::AUTHORING_RULE,
             'Classifique CADA questão: "subject_id" e de 1 a 3 "topic_ids" da lista DISCIPLINAS E ASSUNTOS (assuntos só da disciplina escolhida; '
             .'prefira a disciplina/assuntos da referência quando servirem) e "tags" com 2 a 4 palavras-chave curtas do conteúdo, em minúsculas. '
             .self::CLASSIFICATION_RULES,
@@ -498,9 +508,21 @@ class QuestionAiService
         ];
 
         $questions = [];
+        $brokenGabarito = false;
         foreach (array_slice((array) ($raw['questions'] ?? []), 0, $quantity) as $item) {
             if (! is_array($item)) {
                 continue;
+            }
+            if (QuestionGabaritoGuard::admitsBrokenQuestion((string) ($item['explanation'] ?? ''))) {
+                $brokenGabarito = true;
+                $item = $this->rewriteIfGabaritoBroken($credential, $system, $item);
+                if (QuestionGabaritoGuard::admitsBrokenQuestion((string) ($item['explanation'] ?? ''))) {
+                    Log::warning('IA: questão semelhante descartada por gabarito inconsistente', [
+                        'tenant_id' => $tenantId,
+                        'source_id' => $source->id,
+                    ]);
+                    continue;
+                }
             }
             $content = $this->sanitizeContent(['type' => $type] + $item, $type, $optionsCount ?: null);
             if ($content === null || trim(QuestionRichText::plain($content['question_text'])) === '') {
@@ -529,6 +551,13 @@ class QuestionAiService
         }
 
         if ($questions === []) {
+            if ($brokenGabarito) {
+                throw new AiException(
+                    'A IA montou uma questão em que nenhuma alternativa está correta. Tente novamente.',
+                    502,
+                    'ai_invalid_response'
+                );
+            }
             throw AiException::invalidResponse('questões sem enunciado, alternativas ou gabarito');
         }
 
@@ -984,6 +1013,54 @@ class QuestionAiService
                 return;
             }
         }
+    }
+
+    /**
+     * Uma nova chamada quando a resolução admite que nenhuma alternativa serve.
+     * Se a reescrita continuar inconsistente, devolve o item original.
+     *
+     * @param  array<string, mixed>  $credential
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private function rewriteIfGabaritoBroken(array $credential, string $system, array $item): array
+    {
+        if (! QuestionGabaritoGuard::admitsBrokenQuestion((string) ($item['explanation'] ?? ''))) {
+            return $item;
+        }
+
+        try {
+            $raw = $this->client->json($credential, $system, $this->repairPrompt($item), 0.2);
+        } catch (\Throwable $e) {
+            Log::warning('IA: falha ao reescrever questão com gabarito inconsistente', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return $item;
+        }
+
+        $repaired = isset($raw['questions'][0]) && is_array($raw['questions'][0]) ? $raw['questions'][0] : $raw;
+        if (! is_array($repaired) || QuestionGabaritoGuard::admitsBrokenQuestion((string) ($repaired['explanation'] ?? ''))) {
+            return $item;
+        }
+
+        return array_merge($item, $repaired);
+    }
+
+    /** @param  array<string, mixed>  $item */
+    private function repairPrompt(array $item): string
+    {
+        return implode("\n\n", [
+            'A questão abaixo é INVÁLIDA: a explicação conclui que nenhuma alternativa satisfaz o enunciado, ou aponta erro na própria questão.',
+            'Reescreva a questão inteira. Mantenha o assunto e o comando, mas troque as alternativas até que exatamente uma esteja correta e conferida.',
+            QuestionGabaritoGuard::AUTHORING_RULE,
+            AiPromptGuard::wrap('questao', json_encode([
+                'question_text' => $item['question_text'] ?? '',
+                'options' => $item['options'] ?? [],
+                'explanation' => $item['explanation'] ?? '',
+            ], JSON_UNESCAPED_UNICODE)),
+            'Responda somente com o objeto JSON da questão reescrita: question_text, explanation, options (option_text e is_correct).',
+        ]);
     }
 
     private function credential(?User $user, int $tenantId): array
