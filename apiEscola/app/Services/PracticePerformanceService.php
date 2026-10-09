@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -47,7 +48,10 @@ class PracticePerformanceService
 
     private const FOCUS_LIMIT = 5;
 
-    public function __construct(private readonly PracticeService $practice) {}
+    public function __construct(
+        private readonly PracticeService $practice,
+        private readonly StudentEnrollmentService $enrollments,
+    ) {}
 
     public function performance(Student $student): array
     {
@@ -158,18 +162,22 @@ class PracticePerformanceService
      * Ranking do período. Sem critério, é participação (questões diferentes; empate pelos acertos;
      * posições iguais ficam 1, 2, 2, 4). Com criterion=wilson, ordena pela pontuação de Wilson.
      *
-     * @param  array{criterion?: string, subject_id?: ?int, topic_id?: ?int, page?: int}  $filters
+     * @param  array{criterion?: string, subject_id?: ?int, topic_id?: ?int, page?: int, course_id?: ?int}  $filters
      */
     public function ranking(int $tenantId, string $period, int $limit, ?int $viewerStudentId = null, bool $fullNames = false, array $filters = []): array
     {
         $criterion = $filters['criterion'] ?? self::CRITERION_PARTICIPATION;
+        $courseId = (int) ($filters['course_id'] ?? 0);
+        if ($courseId <= 0) {
+            return $this->emptyRanking($period, $criterion, $limit, $filters);
+        }
         if (in_array($criterion, self::SCORED_CRITERIA, true)) {
             return $this->scoredRanking($tenantId, $period, $limit, $viewerStudentId, $fullNames, $filters, $criterion);
         }
 
         [$since, $until] = $this->periodRange($period);
-        $rows = $this->rankingRows($tenantId, $since, $until);
-        $previousPositions = $this->previousPositions($tenantId, $period, self::CRITERION_PARTICIPATION);
+        $rows = $this->rankingRows($tenantId, $since, $until, $courseId);
+        $previousPositions = $this->previousPositions($tenantId, $period, self::CRITERION_PARTICIPATION, $courseId);
 
         $position = 0;
         $previous = null;
@@ -199,9 +207,40 @@ class PracticePerformanceService
             'period'       => $period,
             'since'        => $since?->toIso8601String(),
             'until'        => $until?->toIso8601String(),
+            'course_id'    => $courseId,
             'participants' => $ranked->count(),
             'ranking'      => $ranked->take($limit)->values(),
             'me'           => $viewerStudentId !== null ? $ranked->firstWhere('is_me', true) : null,
+        ];
+    }
+
+    /** Ranking vazio: aluno sem curso, ou consulta sem curso (não mistura CPM com IFAL). */
+    private function emptyRanking(string $period, string $criterion, int $limit, array $filters): array
+    {
+        [$since, $until] = $this->periodRange($period);
+        $base = [
+            'period'       => $period,
+            'since'        => $since?->toIso8601String(),
+            'until'        => $until?->toIso8601String(),
+            'course_id'    => null,
+            'participants' => 0,
+            'ranking'      => collect(),
+            'me'           => null,
+        ];
+        if (! in_array($criterion, self::SCORED_CRITERIA, true)) {
+            return $base;
+        }
+
+        $perPage = max(1, min(100, $limit));
+
+        return $base + [
+            'criterion'    => $criterion,
+            'subject_id'   => isset($filters['subject_id']) ? (int) $filters['subject_id'] : null,
+            'topic_id'     => isset($filters['topic_id']) ? (int) $filters['topic_id'] : null,
+            'movement_reference_at' => null,
+            'page'         => max(1, (int) ($filters['page'] ?? 1)),
+            'per_page'     => $perPage,
+            'last_page'    => 1,
         ];
     }
 
@@ -210,7 +249,7 @@ class PracticePerformanceService
      *
      * @return array<int, array{student_id: int, position: int, questions: int, correct: int}>
      */
-    public function captureRows(int $tenantId, string $period, ?Carbon $before = null, string $criterion = self::CRITERION_PARTICIPATION): array
+    public function captureRows(int $tenantId, string $period, ?Carbon $before = null, string $criterion = self::CRITERION_PARTICIPATION, ?int $courseId = null): array
     {
         [$since, $until] = $this->periodRange($period);
         if ($before !== null && ($until === null || $before->lt($until))) {
@@ -222,12 +261,12 @@ class PracticePerformanceService
                 'position' => $row['position'],
                 'questions' => $row['questions'],
                 'correct' => $row['correct'],
-            ], $this->captureScoredRows($tenantId, $period, $criterion, null, null, $before));
+            ], $this->captureScoredRows($tenantId, $period, $criterion, null, null, $before, $courseId));
         }
         $position = 0;
         $previous = null;
 
-        return $this->rankingRows($tenantId, $since, $until)->values()->map(function ($row, int $index) use (&$position, &$previous) {
+        return $this->rankingRows($tenantId, $since, $until, $courseId)->values()->map(function ($row, int $index) use (&$position, &$previous) {
             $key = $row->questions.'|'.$row->correct;
             if ($key !== $previous) {
                 $position = $index + 1;
@@ -244,8 +283,12 @@ class PracticePerformanceService
     }
 
     /** @return array<int, int> student_id => posição na foto usada pela seta (cerca de 24h atrás) */
-    private function previousPositions(int $tenantId, string $period, string $criterion): array
+    private function previousPositions(int $tenantId, string $period, string $criterion, ?int $courseId = null): array
     {
+        // A foto de 10 minutos é da escola inteira. Com curso, a posição de ontem sai das respostas desse curso.
+        if ($courseId) {
+            return $this->positionsAt($tenantId, $period, $criterion, now()->subDay(), $courseId);
+        }
         $baseline = $this->baselineCapturedAt($tenantId, $period, $criterion);
         if ($baseline !== null) {
             return DB::table('practice_ranking_snapshots')
@@ -263,10 +306,10 @@ class PracticePerformanceService
     }
 
     /** @return array<int, int> student_id => posição com as respostas até $before */
-    private function positionsAt(int $tenantId, string $period, string $criterion, Carbon $before): array
+    private function positionsAt(int $tenantId, string $period, string $criterion, Carbon $before, ?int $courseId = null): array
     {
         $positions = [];
-        foreach ($this->captureRows($tenantId, $period, $before, $criterion) as $row) {
+        foreach ($this->captureRows($tenantId, $period, $before, $criterion, $courseId) as $row) {
             $positions[$row['student_id']] = $row['position'];
         }
 
@@ -292,9 +335,9 @@ class PracticePerformanceService
         return $times->sortBy(fn ($capturedAt) => abs(Carbon::parse($capturedAt)->getTimestamp() - $target))->first();
     }
 
-    private function rankingRows(int $tenantId, ?Carbon $since, ?Carbon $until): Collection
+    private function rankingRows(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $courseId = null): Collection
     {
-        return PracticeAnswer::query()->counted()
+        $query = PracticeAnswer::query()->counted()
             ->where('practice_answers.tenant_id', $tenantId)
             ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
             ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
@@ -307,8 +350,20 @@ class PracticePerformanceService
                 ...$this->scoreColumns(),
             )
             ->groupBy('s.id', 's.name', 's.photo_url', 's.enrollment_number')
-            ->orderByDesc('questions')->orderByDesc('correct')->orderBy('s.id')
-            ->get();
+            ->orderByDesc('questions')->orderByDesc('correct')->orderBy('s.id');
+
+        return $this->limitToCourse($query, $tenantId, $courseId, 's.id')->get();
+    }
+
+    /** Restringe aos alunos matriculados no curso. Sem curso, a consulta segue como está (foto legada da escola). */
+    private function limitToCourse(Builder|QueryBuilder $query, int $tenantId, ?int $courseId, string $column): Builder|QueryBuilder
+    {
+        if (! $courseId) {
+            return $query;
+        }
+        $ids = $this->enrollments->activeStudentIdsForCourse($tenantId, $courseId);
+
+        return $ids->isEmpty() ? $query->whereRaw('0 = 1') : $query->whereIn($column, $ids->all());
     }
 
     /** @return array{0: ?Carbon, 1: ?Carbon} início (inclusivo) e fim (exclusivo), em UTC; null = sem limite. */
@@ -331,14 +386,14 @@ class PracticePerformanceService
      *
      * @return list<array{student_id: int, position: int, questions: int, correct: int, score: float}>
      */
-    public function captureScoredRows(int $tenantId, string $period, string $criterion, ?int $subjectId, ?int $topicId, ?Carbon $before = null): array
+    public function captureScoredRows(int $tenantId, string $period, string $criterion, ?int $subjectId, ?int $topicId, ?Carbon $before = null, ?int $courseId = null): array
     {
         [$since, $until] = $this->periodRange($period);
         if ($before !== null && ($until === null || $before->lt($until))) {
             $until = $before;
         }
 
-        return $this->rankedStats($tenantId, $since, $until, $subjectId, $topicId, $before, $criterion)
+        return $this->rankedStats($tenantId, $since, $until, $subjectId, $topicId, $before, $criterion, $courseId)
             ->values()
             ->map(fn ($row, int $index) => [
                 'student_id' => (int) $row->id,
@@ -370,10 +425,11 @@ class PracticePerformanceService
         $page = max(1, (int) ($filters['page'] ?? 1));
         $subject = $subjectId ?: null;
         $topic = $topicId ?: null;
+        $courseId = (int) ($filters['course_id'] ?? 0);
         $history = app(PracticeRankingHistoryService::class);
-        $history->ensureClosedDay($this, $tenantId, $criterion, $period, $subject, $topic);
-        $baseline = $history->baseline($tenantId, $criterion, $period, $subject, $topic);
-        $rows = $this->rankedStats($tenantId, $since, $until, $subject, $topic, null, $criterion);
+        $history->ensureClosedDay($this, $tenantId, $criterion, $period, $courseId, $subject, $topic);
+        $baseline = $history->baseline($tenantId, $criterion, $period, $courseId, $subject, $topic);
+        $rows = $this->rankedStats($tenantId, $since, $until, $subject, $topic, null, $criterion, $courseId);
 
         $ranked = $rows->values()->map(function ($row, int $index) use ($viewerStudentId, $fullNames, $history, $baseline, $criterion) {
             $position = $index + 1;
@@ -415,6 +471,7 @@ class PracticePerformanceService
             'until'        => $until?->toIso8601String(),
             'subject_id'   => $subjectId ?: null,
             'topic_id'     => $topicId ?: null,
+            'course_id'    => $courseId,
             'movement_reference_at' => $baseline['reference_at'] ?? null,
             'participants' => $total,
             'page'         => $page,
@@ -426,9 +483,9 @@ class PracticePerformanceService
     }
 
     /** Alunos do critério, já ordenados. Desempenho exige ao menos uma questão inédita no período. */
-    private function rankedStats(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before, string $criterion): Collection
+    private function rankedStats(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before, string $criterion, ?int $courseId = null): Collection
     {
-        $rows = $this->attemptStats($tenantId, $since, $until, $subjectId, $topicId, $before);
+        $rows = $this->attemptStats($tenantId, $since, $until, $subjectId, $topicId, $before, $courseId);
         if ($criterion === self::CRITERION_WILSON) {
             $rows = $rows->filter(fn ($row) => (int) $row->questions > 0)->values();
         }
@@ -450,7 +507,7 @@ class PracticePerformanceService
      * Uma passagem pelas respostas contadas. A numeração da tentativa ignora o período,
      * para achar a primeira tentativa histórica (answered_at, depois id).
      */
-    private function attemptStats(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before): Collection
+    private function attemptStats(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before, ?int $courseId = null): Collection
     {
         $checks = [];
         $bindings = [];
@@ -469,14 +526,16 @@ class PracticePerformanceService
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.student_id, practice_answers.exam_question_id ORDER BY practice_answers.answered_at ASC, practice_answers.id ASC) as tentativa')
             ->selectRaw("CASE WHEN {$noPeriodo} THEN 1 ELSE 0 END as no_periodo", $bindings);
 
-        $days = $this->activeDays($tenantId, $since, $until, $subjectId, $topicId, $before);
+        $days = $this->activeDays($tenantId, $since, $until, $subjectId, $topicId, $before, $courseId);
 
-        return DB::query()
+        $stats = DB::query()
             ->fromSub($marked, 'tentativa')
             ->join('students as s', 's.id', '=', 'tentativa.student_id')
             ->where('s.tenant_id', $tenantId)
             ->where('s.status', 'active')
-            ->whereNull('s.deleted_at')
+            ->whereNull('s.deleted_at');
+
+        return $this->limitToCourse($stats, $tenantId, $courseId, 's.id')
             ->groupBy('s.id', 's.name', 's.photo_url', 's.enrollment_number')
             ->havingRaw('sum(tentativa.no_periodo) > 0')
             ->select(
@@ -506,16 +565,21 @@ class PracticePerformanceService
     }
 
     /** @return array<int, list<string>> student_id => dias (America/Sao_Paulo) com resposta contada no período */
-    private function activeDays(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before): array
+    private function activeDays(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $subjectId, ?int $topicId, ?Carbon $before, ?int $courseId = null): array
     {
         $day = DB::getDriverName() === 'sqlite'
             ? "date(practice_answers.answered_at, '-3 hours')"
             : "DATE(CONVERT_TZ(practice_answers.answered_at, '+00:00', '-03:00'))";
 
         $grouped = [];
-        foreach ($this->scopedAnswers($tenantId, $subjectId, $topicId, $before)
-            ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
-            ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
+        foreach ($this->limitToCourse(
+            $this->scopedAnswers($tenantId, $subjectId, $topicId, $before)
+                ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
+                ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until)),
+            $tenantId,
+            $courseId,
+            'practice_answers.student_id',
+        )
             ->select('practice_answers.student_id')
             ->selectRaw("{$day} as dia")
             ->groupBy('practice_answers.student_id', DB::raw($day))

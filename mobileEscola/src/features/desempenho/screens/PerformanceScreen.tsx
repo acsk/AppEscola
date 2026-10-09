@@ -7,7 +7,7 @@ import { fetchStudentPerformance, type PerformanceMonthlyEvolution } from '../..
 import { usePracticePerformance, usePracticeRanking, usePracticeSummary, useStartPracticeSession } from '../../banco-questoes/hooks';
 import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import {
-  AppBar, Button, Card, EmptyState, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, QuickAction, RankMovement, ScreenBody,
+  AppBar, Button, Card, Chip, EmptyState, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, QuickAction, RankMovement, ScreenBody,
   SegmentedControl, StatTile, SubjectScore, Tag, Txt, font, space, subjectColor, useLayoutMode, usePalette, type MonthBar,
 } from '../../../ui';
 
@@ -32,10 +32,11 @@ export function PerformanceScreen() {
   const drawer = useOptionalAlunoDrawer();
   const { isMobile, isDesktop } = useLayoutMode();
   const [months, setMonths] = useState<(typeof PERIODS)[number]>(6);
+  const [courseId, setCourseId] = useState<number | null>(null);
   const query = useQuery({ queryKey: ['aluno', 'performance', months], queryFn: () => fetchStudentPerformance(months) });
   const practice = usePracticeSummary();
   const practicePerf = usePracticePerformance();
-  const ranking = usePracticeRanking('month', { criterion: 'wilson' });
+  const ranking = usePracticeRanking('month', { criterion: 'wilson', courseId });
   const start = useStartPracticeSession();
   const [startError, setStartError] = useState<string | null>(null);
 
@@ -180,10 +181,17 @@ export function PerformanceScreen() {
                       <Txt variant="titleSm">Ranking do banco</Txt>
                       <Icon name="trophy" size={20} color={p.ink} />
                     </View>
+                    {(ranking.data?.courses?.length ?? 0) > 1 ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                        {ranking.data?.courses?.map((course) => (
+                          <Chip key={course.id} label={course.name} selected={(courseId ?? ranking.data?.course_id) === course.id} onPress={() => setCourseId(course.id)} />
+                        ))}
+                      </View>
+                    ) : null}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
                       <Text style={{ ...font.extrabold, fontSize: 32, lineHeight: 40, color: p.ink }}>{me ? `${me.position}º` : '—'}</Text>
                       {me ? <RankMovement movement={me.movement} status={me.movement_status} referenceAt={me.movement_reference_at} /> : null}
-                      <Txt tone="muted" style={{ fontSize: 14 }}>{me ? `de ${ranking.data?.participants ?? 0} alunos nos últimos 30 dias` : 'Responda questões para entrar'}</Txt>
+                      <Txt tone="muted" style={{ fontSize: 14 }}>{me ? `de ${ranking.data?.participants ?? 0} alunos${ranking.data?.course_name ? ` do ${ranking.data.course_name}` : ''} nos últimos 30 dias` : 'Responda questões para entrar'}</Txt>
                     </View>
                     <View style={{ alignSelf: 'flex-start', marginLeft: -12 }}><Button variant="ghost" size="sm" iconRight="arrow-right" label="Ver ranking" onPress={openRanking} /></View>
                   </Card>
@@ -227,7 +235,7 @@ export function PerformanceScreen() {
               {subjectsCard}
               {studyCard}
               <QuickAction icon="trophy" title="Ranking do banco"
-                subtitle={me ? `Você está em ${me.position}º de ${ranking.data?.participants ?? 0}${me.movement ? ` (${me.movement > 0 ? 'subiu' : 'caiu'} ${Math.abs(me.movement)})` : ''}` : 'Veja quem mais acerta de primeira'} onPress={openRanking} />
+                subtitle={me ? `Você está em ${me.position}º de ${ranking.data?.participants ?? 0}${ranking.data?.course_name ? ` no ${ranking.data.course_name}` : ''}${me.movement ? ` (${me.movement > 0 ? 'subiu' : 'caiu'} ${Math.abs(me.movement)})` : ''}` : 'Veja quem mais acerta de primeira'} onPress={openRanking} />
             </>
           ))}
         </ScreenBody>

@@ -165,6 +165,9 @@ export interface PracticeRanking {
   until?: string | null;
   subject_id?: number | null;
   topic_id?: number | null;
+  course_id?: number | null;
+  course_name?: string | null;
+  courses?: Array<{ id: number; name: string }>;
   movement_reference_at?: string | null;
   participants: number;
   page?: number;
@@ -179,6 +182,7 @@ export interface RankingQuery {
   criterion?: RankingCriterion;
   subjectId?: number | null;
   topicId?: number | null;
+  courseId?: number | null;
   page?: number;
   perPage?: number;
 }
@@ -216,6 +220,7 @@ export async function fetchPracticeRanking(periodOrQuery: RankingPeriod | Rankin
   const query: RankingQuery = typeof periodOrQuery === 'string' ? { period: periodOrQuery } : periodOrQuery;
   const params: Record<string, string | number> = { period: query.period };
   if (query.criterion) params.criterion = query.criterion;
+  if (query.courseId) params.course_id = query.courseId;
   if (query.subjectId) params.subject_id = query.subjectId;
   if (query.topicId) params.topic_id = query.topicId;
   if (query.page) params.page = query.page;

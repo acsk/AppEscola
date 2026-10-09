@@ -13,6 +13,7 @@ import {
   type PracticeRankingRow,
 } from "../../../services/questionSets";
 import type { TaxonomySubject } from "../../../types/questionBank";
+import api from "../../../services/api";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 
 const PERIODOS: { id: PracticeRankingPeriod; label: string }[] = [
@@ -72,6 +73,8 @@ export default function PracticeRankingModal({ visible, onClose, taxonomy = [] }
   const [period, setPeriod] = useState<PracticeRankingPeriod>("month");
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [topicId, setTopicId] = useState<number | null>(null);
+  const [courses, setCourses] = useState<{ id: number; name: string }[]>([]);
+  const [courseId, setCourseId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<PracticeRankingRow[]>([]);
   const [participants, setParticipants] = useState(0);
@@ -84,10 +87,11 @@ export default function PracticeRankingModal({ visible, onClose, taxonomy = [] }
   const topics = subjectId ? taxonomy.find((s) => s.id === subjectId)?.topics ?? [] : taxonomy.flatMap((s) => s.topics);
 
   const load = useCallback(async () => {
+    if (!courseId) return;
     setLoading(true);
     setLoadError(null);
     try {
-      const body = await fetchPracticeRanking(period, { criterion, subjectId, topicId, page, perPage: 20 });
+      const body = await fetchPracticeRanking(period, { criterion, subjectId, topicId, courseId, page, perPage: 20 });
       setRows(body.ranking);
       setParticipants(body.participants);
       setLastPage(body.last_page ?? 1);
@@ -96,11 +100,31 @@ export default function PracticeRankingModal({ visible, onClose, taxonomy = [] }
     } finally {
       setLoading(false);
     }
-  }, [criterion, period, subjectId, topicId, page]);
+  }, [criterion, period, subjectId, topicId, courseId, page]);
 
   useEffect(() => {
-    if (visible) void load();
-  }, [visible, load]);
+    if (!visible) return;
+    let active = true;
+    api.get("/courses", { params: { status: "active", per_page: 500 } })
+      .then(({ data }) => {
+        const list = data?.body ?? data?.data ?? data;
+        const rows = Array.isArray(list?.data) ? list.data : Array.isArray(list) ? list : [];
+        const next = rows
+          .filter((course: { id?: number; name?: string }) => course?.id && course?.name)
+          .map((course: { id: number; name: string }) => ({ id: Number(course.id), name: String(course.name) }));
+        if (!active) return;
+        setCourses(next);
+        setCourseId((current) => current ?? next[0]?.id ?? null);
+      })
+      .catch(() => {
+        if (active) setCourses([]);
+      });
+    return () => { active = false; };
+  }, [visible]);
+
+  useEffect(() => {
+    if (visible && courseId) void load();
+  }, [visible, load, courseId]);
 
   return (
     <Modal visible={visible} title="Ranking do banco de questões" onClose={onClose} size="lg" maxHeight="90%"
@@ -113,6 +137,9 @@ export default function PracticeRankingModal({ visible, onClose, taxonomy = [] }
             : "Dedicação por questões inéditas e dias com estudo. Repetir uma questão não soma ponto. A semana vai de segunda a domingo."}
         </Text>
         <Tabs items={PERIODOS} value={period} onChange={(id) => { setPeriod(id); setPage(1); }} accessibilityLabel="Período do ranking" />
+
+        <FormSelect dense label="Curso" value={courseId ?? ""} onChange={(value) => { setCourseId(value ? Number(value) : null); setPage(1); }}
+          options={courses.map((course) => ({ value: String(course.id), label: course.name }))} />
 
         <View style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
             <View style={{ flex: 1 }}>

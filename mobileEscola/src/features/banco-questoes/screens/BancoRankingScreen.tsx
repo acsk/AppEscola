@@ -42,10 +42,11 @@ export function BancoRankingScreen() {
   const [period, setPeriod] = useState<RankingPeriod>(route.params?.period ?? 'month');
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [topicId, setTopicId] = useState<number | null>(null);
+  const [courseId, setCourseId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const filters = usePracticeFilters();
   const { data, isLoading, isError, error, refetch, isRefetching } = usePracticeRanking(period, {
-    criterion: mode, subjectId, topicId, page: 1, perPage: expanded ? FULL_PAGE : 20,
+    criterion: mode, subjectId, topicId, courseId, page: 1, perPage: expanded ? FULL_PAGE : 20,
   });
 
   const performance = mode === 'wilson';
@@ -55,6 +56,8 @@ export function BancoRankingScreen() {
   const above: RankingRow | null = me && me.position > 1 ? rows.find((r) => r.position === me.position - 1) ?? null : null;
   const points = (v?: number | null) => (performance ? fmt1(v ?? 0) : String(Math.round(v ?? 0)));
   const weekRange = data ? rankingWeekRange(data) : null;
+  const courses = data?.courses ?? [];
+  const courseLabel = data?.course_name ? ` · ${data.course_name}` : '';
   const subjects = filters.data?.subjects ?? [];
   const topics = subjectId ? subjects.find((s) => s.id === subjectId)?.topics ?? [] : subjects.flatMap((s) => s.topics);
   const reset = () => setExpanded(false);
@@ -132,7 +135,7 @@ export function BancoRankingScreen() {
         <PageBody>
           <View style={{ maxWidth: 980, width: '100%' }}>
             <PageHeader title="Ranking"
-              subtitle={performance ? 'Quem mais acerta de primeira no banco de questões' : 'Quem mais estuda: questões novas e dias com estudo'}
+              subtitle={(performance ? 'Quem mais acerta de primeira no banco de questões' : 'Quem mais estuda: questões novas e dias com estudo') + courseLabel}
               actions={<View style={{ width: 300 }}>{modePicker}</View>} />
           </View>
           <View style={{ maxWidth: 980, width: '100%', gap: space[4] }}>
@@ -142,6 +145,10 @@ export function BancoRankingScreen() {
                   onChange={(i) => { setPeriod(PERIODS[i].id); reset(); }} />
               </View>
               <View style={{ flex: 1 }} />
+              {courses.length > 1 ? (
+                <SelectButton label="Curso:" value={courseId ?? data?.course_id ?? 0} onChange={(id) => { setCourseId(id || null); reset(); }}
+                  options={courses.map((course) => ({ value: course.id, label: course.name }))} />
+              ) : null}
               <SelectButton label="Disciplina:" value={subjectId ?? 0} onChange={(id) => { setSubjectId(id || null); setTopicId(null); reset(); }}
                 options={[{ value: 0, label: 'Todas' }, ...subjects.map((s) => ({ value: s.id, label: s.name }))]} />
               <SelectButton label="Assunto:" value={topicId ?? 0} onChange={(id) => { setTopicId(id || null); reset(); }}
@@ -190,11 +197,18 @@ export function BancoRankingScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <AppBar large title="Ranking" subtitle={performance ? 'Quem mais acerta de primeira' : 'Quem mais estuda'}
+      <AppBar large title="Ranking" subtitle={(performance ? 'Quem mais acerta de primeira' : 'Quem mais estuda') + courseLabel}
         leading={<IconButton icon="arrow-left" label="Voltar" onPress={() => navigation.goBack()} />} />
       <ScrollView refreshControl={refresh}>
         <ScreenBody gap={space[4]} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
           {modePicker}
+          {courses.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[4] }} contentContainerStyle={{ gap: space[2], paddingHorizontal: space[4] }}>
+              {courses.map((course) => (
+                <Chip key={course.id} label={course.name} selected={(courseId ?? data?.course_id) === course.id} onPress={() => { setCourseId(course.id); reset(); }} />
+              ))}
+            </ScrollView>
+          ) : null}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -space[4] }} contentContainerStyle={{ gap: space[2], paddingHorizontal: space[4] }}>
             {PERIODS.map((x) => <Chip key={x.id} label={x.label} selected={period === x.id} onPress={() => { setPeriod(x.id); reset(); }} />)}
           </ScrollView>

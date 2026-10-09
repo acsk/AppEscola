@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Course;
 use App\Services\ExamAccessService;
 use App\Services\PracticePerformanceService;
 use App\Traits\ScopedByTenant;
@@ -34,13 +35,14 @@ class QuestionBankPracticeController extends Controller
             ])],
             'subject_id' => ['nullable', 'integer', Rule::exists('subjects', 'id')->where('tenant_id', $tenantId)],
             'topic_id'   => ['nullable', 'integer', Rule::exists('subject_topics', 'id')->where('tenant_id', $tenantId)],
+            'course_id'  => ['required', 'integer', Rule::exists('courses', 'id')->where(fn ($q) => $q->where('tenant_id', $tenantId)->whereNull('deleted_at'))],
             'page'       => ['nullable', 'integer', 'min:1'],
             'per_page'   => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $criterion = $data['criterion'] ?? PracticePerformanceService::CRITERION_PARTICIPATION;
         $scored = in_array($criterion, PracticePerformanceService::SCORED_CRITERIA, true);
-
-        return $this->success($this->performance->ranking(
+        $course = Course::query()->findOrFail((int) $data['course_id']);
+        $body = $this->performance->ranking(
             $tenantId,
             $data['period'] ?? 'month',
             $scored ? (int) ($data['per_page'] ?? 50) : (int) ($data['limit'] ?? 50),
@@ -50,7 +52,12 @@ class QuestionBankPracticeController extends Controller
                 'subject_id' => $data['subject_id'] ?? null,
                 'topic_id'   => $data['topic_id'] ?? null,
                 'page'       => (int) ($data['page'] ?? 1),
+                'course_id'  => $course->id,
             ],
-        ));
+        );
+        $body['course_id'] = (int) $course->id;
+        $body['course_name'] = $course->name;
+
+        return $this->success($body);
     }
 }

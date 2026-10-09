@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Image, Text, View } from 'react-native';
 import type { RankingRow } from '../../../services/practice.service';
 import { usePracticeRanking } from '../../banco-questoes/hooks';
 import { formatPercent, rankingWeekRange } from '../../banco-questoes/lib/format';
-import { Button, Card, Icon, LinkButton, RankMovement, Section, Txt, font, space, usePalette } from '../../../ui';
+import { Button, Card, Chip, Icon, LinkButton, RankMovement, Section, Txt, font, space, usePalette } from '../../../ui';
 
 const TOP = 5;
 const MEDAL = ['🥇', '🥈', '🥉'];
@@ -16,8 +16,9 @@ function initials(name: string): string {
 /** Top 5 de desempenho da semana (Wilson, primeira tentativa), mais o campeão da semana anterior. */
 export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; onPractice: () => void }) {
   const p = usePalette();
-  const { data, isLoading, isError, refetch } = usePracticeRanking('week', { criterion: 'wilson' });
-  const lastWeek = usePracticeRanking('last_week', { criterion: 'wilson' }).data;
+  const [courseId, setCourseId] = useState<number | null>(null);
+  const { data, isLoading, isError, refetch } = usePracticeRanking('week', { criterion: 'wilson', courseId });
+  const lastWeek = usePracticeRanking('last_week', { criterion: 'wilson', courseId }).data;
   const top = data?.ranking.slice(0, TOP) ?? [];
   const weekRange = data ? rankingWeekRange(data) : null;
   const champions = lastWeek?.ranking.filter((row) => row.position === 1) ?? [];
@@ -67,9 +68,17 @@ export function HomeRankingCard({ onOpen, onPractice }: { onOpen: () => void; on
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginBottom: space[1] }}>
           <Icon name="trophy" size={16} color={p.inkMuted} />
           <Txt variant="bodySm" tone="subtle" style={{ flex: 1 }}>
-            Quem mais acerta de primeira {weekRange ? `de ${weekRange}` : 'nesta semana'} · reinicia toda segunda
+            Quem mais acerta de primeira {weekRange ? `de ${weekRange}` : 'nesta semana'}
+            {data?.course_name ? ` · ${data.course_name}` : ''} · reinicia toda segunda
           </Txt>
         </View>
+        {(data?.courses?.length ?? 0) > 1 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2], marginBottom: space[2] }}>
+            {data?.courses?.map((course) => (
+              <Chip key={course.id} label={course.name} selected={(courseId ?? data.course_id) === course.id} onPress={() => setCourseId(course.id)} />
+            ))}
+          </View>
+        ) : null}
         {champions.length ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], padding: space[2], borderRadius: 12, backgroundColor: p.surfaceSunken, marginBottom: space[1] }}>
             <Text style={{ fontSize: 16, lineHeight: 18 }}>{MEDAL[0]}</Text>

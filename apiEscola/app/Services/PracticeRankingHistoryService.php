@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
  * Histórico diário da posição nos rankings de desempenho (Wilson) e dedicação.
  *
  * A seta compara a posição ao vivo com o fechamento do dia anterior no mesmo
- * critério, período e escopo (disciplina e assunto). Períodos e filtros diferentes
- * não se misturam. O ranking não tem filtro de turma; o escopo é o que a tela já filtra.
+ * curso, critério, período e escopo (disciplina e assunto). Cursos diferentes
+ * não se misturam: CPM e IFAL têm rankings separados.
  *
  * Quem não está nesse fechamento fica sem posição anterior (não usa posição 0) e o
  * status é "new". Subiu, caiu ou ficou é só a mudança de lugar, não de pontuação.
@@ -33,14 +33,15 @@ class PracticeRankingHistoryService
 
     public const STATUS_NEW = 'new';
 
-    /** Escopo canônico. "all" é o ranking sem disciplina nem assunto. */
-    public static function scopeKey(?int $subjectId, ?int $topicId): string
+    /** Escopo canônico. Sem disciplina nem assunto, fica só o curso (`c12`). */
+    public static function scopeKey(int $courseId, ?int $subjectId, ?int $topicId): string
     {
+        $course = 'c'.$courseId;
         if (! $subjectId && ! $topicId) {
-            return 'all';
+            return $course;
         }
 
-        return 's'.($subjectId ?? 0).'-t'.($topicId ?? 0);
+        return $course.'-s'.($subjectId ?? 0).'-t'.($topicId ?? 0);
     }
 
     /**
@@ -52,23 +53,24 @@ class PracticeRankingHistoryService
         int $tenantId,
         string $criterion,
         string $period,
+        int $courseId,
         ?int $subjectId,
         ?int $topicId,
     ): void {
         $yesterday = now(PracticePerformanceService::RANKING_TIMEZONE)->subDay()->toDateString();
-        if ($this->hasDay($tenantId, $criterion, $period, $subjectId, $topicId, $yesterday)) {
+        if ($this->hasDay($tenantId, $criterion, $period, $courseId, $subjectId, $topicId, $yesterday)) {
             return;
         }
 
-        $lock = 'ranking-daily:'.$tenantId.':'.$criterion.':'.$period.':'.self::scopeKey($subjectId, $topicId).':'.$yesterday;
+        $lock = 'ranking-daily:'.$tenantId.':'.$criterion.':'.$period.':'.self::scopeKey($courseId, $subjectId, $topicId).':'.$yesterday;
         try {
-            Cache::lock($lock, 120)->block(10, function () use ($performance, $tenantId, $criterion, $period, $subjectId, $topicId, $yesterday) {
-                if ($this->hasDay($tenantId, $criterion, $period, $subjectId, $topicId, $yesterday)) {
+            Cache::lock($lock, 120)->block(10, function () use ($performance, $tenantId, $criterion, $period, $courseId, $subjectId, $topicId, $yesterday) {
+                if ($this->hasDay($tenantId, $criterion, $period, $courseId, $subjectId, $topicId, $yesterday)) {
                     return;
                 }
                 $before = now(PracticePerformanceService::RANKING_TIMEZONE)->startOfDay()->utc();
-                $rows = $performance->captureScoredRows($tenantId, $period, $criterion, $subjectId, $topicId, $before);
-                $this->store($tenantId, $criterion, $period, $subjectId, $topicId, $yesterday, $rows, now());
+                $rows = $performance->captureScoredRows($tenantId, $period, $criterion, $subjectId, $topicId, $before, $courseId);
+                $this->store($tenantId, $criterion, $period, $courseId, $subjectId, $topicId, $yesterday, $rows, now());
             });
         } catch (LockTimeoutException) {
             // Outra requisição está gravando o mesmo fechamento. A seta segue com o que já houver.
@@ -82,18 +84,19 @@ class PracticeRankingHistoryService
         int $tenantId,
         string $criterion,
         string $period,
+        int $courseId,
         ?int $subjectId,
         ?int $topicId,
         string $referenceOn,
         array $rows,
         Carbon $capturedAt,
     ): void {
-        DB::transaction(function () use ($tenantId, $criterion, $period, $subjectId, $topicId, $referenceOn, $rows, $capturedAt) {
+        DB::transaction(function () use ($tenantId, $criterion, $period, $courseId, $subjectId, $topicId, $referenceOn, $rows, $capturedAt) {
             $existingId = DB::table('practice_ranking_snapshot_days')
                 ->where('tenant_id', $tenantId)
                 ->where('criterion', $criterion)
                 ->where('period', $period)
-                ->where('scope_key', self::scopeKey($subjectId, $topicId))
+                ->where('scope_key', self::scopeKey($courseId, $subjectId, $topicId))
                 ->where('reference_on', $referenceOn)
                 ->value('id');
             if ($existingId) {
@@ -105,7 +108,7 @@ class PracticeRankingHistoryService
                 'tenant_id' => $tenantId,
                 'criterion' => $criterion,
                 'period' => $period,
-                'scope_key' => self::scopeKey($subjectId, $topicId),
+                'scope_key' => self::scopeKey($courseId, $subjectId, $topicId),
                 'subject_id' => $subjectId,
                 'topic_id' => $topicId,
                 'reference_on' => $referenceOn,
@@ -129,14 +132,14 @@ class PracticeRankingHistoryService
      *
      * @return array{reference_at: string, positions: array<int, int>}|null
      */
-    public function baseline(int $tenantId, string $criterion, string $period, ?int $subjectId, ?int $topicId): ?array
+    public function baseline(int $tenantId, string $criterion, string $period, int $courseId, ?int $subjectId, ?int $topicId): ?array
     {
         $today = now(PracticePerformanceService::RANKING_TIMEZONE)->toDateString();
         $day = DB::table('practice_ranking_snapshot_days')
             ->where('tenant_id', $tenantId)
             ->where('criterion', $criterion)
             ->where('period', $period)
-            ->where('scope_key', self::scopeKey($subjectId, $topicId))
+            ->where('scope_key', self::scopeKey($courseId, $subjectId, $topicId))
             ->where('reference_on', '<', $today)
             ->orderByDesc('reference_on')
             ->first();
@@ -181,14 +184,14 @@ class PracticeRankingHistoryService
         ];
     }
 
-    /** Escopos já fechados algum dia (além do geral), para o job diário continuar o histórico filtrado. */
-    public function knownScopes(int $tenantId, string $criterion, string $period): array
+    /** Disciplina e assunto já fechados neste curso, para o job diário continuar o histórico filtrado. */
+    public function knownScopes(int $tenantId, string $criterion, string $period, int $courseId): array
     {
         return DB::table('practice_ranking_snapshot_days')
             ->where('tenant_id', $tenantId)
             ->where('criterion', $criterion)
             ->where('period', $period)
-            ->where('scope_key', '!=', 'all')
+            ->where('scope_key', 'like', 'c'.$courseId.'-%')
             ->distinct()
             ->get(['subject_id', 'topic_id'])
             ->map(fn ($row) => ['subject_id' => $row->subject_id ? (int) $row->subject_id : null, 'topic_id' => $row->topic_id ? (int) $row->topic_id : null])
@@ -207,13 +210,13 @@ class PracticeRankingHistoryService
         return DB::table('practice_ranking_snapshot_days')->whereIn('id', $ids)->delete();
     }
 
-    private function hasDay(int $tenantId, string $criterion, string $period, ?int $subjectId, ?int $topicId, string $referenceOn): bool
+    private function hasDay(int $tenantId, string $criterion, string $period, int $courseId, ?int $subjectId, ?int $topicId, string $referenceOn): bool
     {
         return DB::table('practice_ranking_snapshot_days')
             ->where('tenant_id', $tenantId)
             ->where('criterion', $criterion)
             ->where('period', $period)
-            ->where('scope_key', self::scopeKey($subjectId, $topicId))
+            ->where('scope_key', self::scopeKey($courseId, $subjectId, $topicId))
             ->where('reference_on', $referenceOn)
             ->exists();
     }

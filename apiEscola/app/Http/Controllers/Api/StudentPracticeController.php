@@ -10,9 +10,11 @@ use App\Models\PracticeSavedQuestion;
 use App\Services\PracticeCatalogService;
 use App\Services\PracticePerformanceService;
 use App\Services\PracticeService;
+use App\Services\StudentEnrollmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /** Banco de questões no app do aluno: prática avulsa, simulados do banco, desempenho e ranking de participação. */
@@ -23,6 +25,7 @@ class StudentPracticeController extends Controller
         private readonly PracticeService $practice,
         private readonly PracticePerformanceService $performance,
         private readonly PracticeCatalogService $catalog,
+        private readonly StudentEnrollmentService $enrollments,
     ) {}
 
     /** Filtros do catálogo (busca, disciplina, assunto, situação, dificuldade, ano). */
@@ -187,10 +190,15 @@ class StudentPracticeController extends Controller
         $student = $this->student($request);
         $tenantId = (int) $student->tenant_id;
         $data = $request->validate($this->rankingRules($tenantId));
+        $courses = $this->enrollments->activeCoursesForStudent($student);
+        $requested = isset($data['course_id']) ? (int) $data['course_id'] : null;
+        if ($requested && ! $courses->contains(fn ($course) => (int) $course->id === $requested)) {
+            throw ValidationException::withMessages(['course_id' => 'Este curso não é o da sua turma.']);
+        }
+        $course = $requested ? $courses->first(fn ($item) => (int) $item->id === $requested) : $courses->first();
         $criterion = $data['criterion'] ?? PracticePerformanceService::CRITERION_PARTICIPATION;
         $scored = in_array($criterion, PracticePerformanceService::SCORED_CRITERIA, true);
-
-        return $this->success($this->performance->ranking(
+        $body = $this->performance->ranking(
             $tenantId,
             $data['period'] ?? 'month',
             $scored ? (int) ($data['per_page'] ?? 20) : 20,
@@ -201,8 +209,14 @@ class StudentPracticeController extends Controller
                 'subject_id' => $data['subject_id'] ?? null,
                 'topic_id'   => $data['topic_id'] ?? null,
                 'page'       => (int) ($data['page'] ?? 1),
+                'course_id'  => $course?->id,
             ],
-        ));
+        );
+        $body['course_id'] = $course ? (int) $course->id : null;
+        $body['course_name'] = $course?->name;
+        $body['courses'] = $courses->map(fn ($item) => ['id' => (int) $item->id, 'name' => $item->name])->values();
+
+        return $this->success($body);
     }
 
     /** @return array<string, mixed> */
@@ -217,6 +231,7 @@ class StudentPracticeController extends Controller
             ])],
             'subject_id' => ['nullable', 'integer', Rule::exists('subjects', 'id')->where('tenant_id', $tenantId)],
             'topic_id'   => ['nullable', 'integer', Rule::exists('subject_topics', 'id')->where('tenant_id', $tenantId)],
+            'course_id'  => ['nullable', 'integer', Rule::exists('courses', 'id')->where('tenant_id', $tenantId)],
             'page'       => ['nullable', 'integer', 'min:1'],
             'per_page'   => ['nullable', 'integer', 'min:1', 'max:100'],
         ];

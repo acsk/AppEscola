@@ -85,7 +85,7 @@ class QuestionBankPracticeTest extends TestCase
     }
 
     /** Matricula o aluno numa turma cuja grade cobre as disciplinas das questões da escola. */
-    private function inClass(Student $student): void
+    private function inClass(Student $student, ?Course $course = null): Course
     {
         $tenantId = (int) $student->tenant_id;
         if (ExamQuestion::query()->where('tenant_id', $tenantId)->whereNull('subject_id')->exists()) {
@@ -96,9 +96,10 @@ class QuestionBankPracticeTest extends TestCase
             ExamQuestion::query()->where('tenant_id', $tenantId)->whereNull('subject_id')->update(['subject_id' => $geral->id]);
         }
         $subjectIds = ExamQuestion::query()->where('tenant_id', $tenantId)->whereNotNull('subject_id')->distinct()->pluck('subject_id');
+        $course ??= Course::factory()->create(['tenant_id' => $tenantId, 'name' => 'CPM']);
         $class = SchoolClass::factory()->create([
             'tenant_id' => $tenantId,
-            'course_id' => Course::factory()->create(['tenant_id' => $tenantId])->id,
+            'course_id' => $course->id,
         ]);
         foreach ($subjectIds->values() as $subjectId) {
             ClassSchedule::factory()->create([
@@ -115,6 +116,27 @@ class QuestionBankPracticeTest extends TestCase
             'end_date' => null,
             'status' => 'active',
         ]);
+
+        return $course;
+    }
+
+    /** Coloca os alunos na mesma turma do mesmo curso, para o ranking não separá-los. */
+    private function sameCourse(Student ...$students): Course
+    {
+        $course = Course::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'CPM']);
+        $class = SchoolClass::factory()->create(['tenant_id' => $this->tenant->id, 'course_id' => $course->id]);
+        foreach ($students as $student) {
+            Enrollment::factory()->create([
+                'tenant_id' => $this->tenant->id,
+                'student_id' => $student->id,
+                'school_class_id' => $class->id,
+                'start_date' => '2020-01-01',
+                'end_date' => null,
+                'status' => 'active',
+            ]);
+        }
+
+        return $course;
     }
 
     private function publishedSet(array $questions, string $title = 'Simulado do banco'): int
@@ -399,8 +421,8 @@ class QuestionBankPracticeTest extends TestCase
         $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
         $maria = $this->student('MARIA DA SILVA');
         $joao = $this->student('JOAO PEREIRA');
-        $this->inClass($maria);
-        $this->inClass($joao);
+        $course = $this->inClass($maria);
+        $this->inClass($joao, $course);
         $other = Student::factory()->create(['tenant_id' => Tenant::factory()->create()->id]);
 
         $this->actingAsStudent($joao);
@@ -419,7 +441,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertTrue($body['me']['is_me']);
 
         Sanctum::actingAs($this->admin);
-        $staff = $this->getJson('/api/question-bank/practice-ranking?period=all')->assertOk()->json('body.ranking');
+        $staff = $this->getJson('/api/question-bank/practice-ranking?period=all&course_id='.$course->id)->assertOk()->json('body.ranking');
         $this->assertSame([$maria->id, $joao->id], array_column($staff, 'student_id'));
         $this->assertSame('MARIA DA SILVA', $staff[0]['name']);
         $this->assertNotContains($other->id, array_column($staff, 'student_id'));
@@ -430,8 +452,8 @@ class QuestionBankPracticeTest extends TestCase
         $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
         $maria = $this->student('MARIA DA SILVA');
         $joao = $this->student('JOAO PEREIRA');
-        $this->inClass($maria);
-        $this->inClass($joao);
+        $course = $this->inClass($maria);
+        $this->inClass($joao, $course);
         $answer = function (Student $student, ExamQuestion $q, string $atBrasilia) {
             $this->travelTo(Carbon::parse($atBrasilia, 'America/Sao_Paulo'));
             $this->actingAsStudent($student);
@@ -468,8 +490,8 @@ class QuestionBankPracticeTest extends TestCase
         $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("Q{$i}"));
         $maria = $this->student('MARIA DA SILVA');
         $joao = $this->student('JOAO PEREIRA');
-        $this->inClass($maria);
-        $this->inClass($joao);
+        $course = $this->inClass($maria);
+        $this->inClass($joao, $course);
         $answer = function (Student $student, ExamQuestion $q) {
             $this->actingAsStudent($student);
             $this->postJson("/api/aluno/practice/questions/{$q->id}/answer", ['option_id' => $this->correct($q)])->assertOk();
@@ -517,6 +539,7 @@ class QuestionBankPracticeTest extends TestCase
             $alunos[$nome] = $aluno;
             $this->seedCountedAnswers($aluno, $total, $acertos);
         }
+        $course = $this->sameCourse(...array_values($alunos));
 
         $this->actingAsStudent($alunos['ALUNO D']);
         $body = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&per_page=10')->assertOk()->json('body');
@@ -535,7 +558,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertArrayNotHasKey('student_id', $body['ranking'][0]);
 
         Sanctum::actingAs($this->admin);
-        $staff = $this->getJson('/api/question-bank/practice-ranking?criterion=wilson&period=all')->assertOk()->json('body.ranking');
+        $staff = $this->getJson('/api/question-bank/practice-ranking?criterion=wilson&period=all&course_id='.$course->id)->assertOk()->json('body.ranking');
         $this->assertSame('ALUNO D', $staff[0]['name']);
         $this->assertSame($alunos['ALUNO D']->id, $staff[0]['student_id']);
     }
@@ -558,6 +581,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->record($ana, $dePortugues, true, now());
         $this->record($bia, $deMatematica, true, now()->subDays(8));
         $this->record($bia, $dePortugues, true, now());
+        $this->sameCourse($ana, $bia);
 
         $this->actingAsStudent($ana);
         $geral = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
@@ -601,6 +625,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->record($maria, $qs[0], true, now()->subHours(30));
         $this->record($maria, $qs[1], true, now());
         $this->record($maria, $qs[2], true, now());
+        $this->sameCourse($maria, $joao);
         $capturedAt = now()->subHours(2);
         DB::table('practice_ranking_snapshots')->insert([
             ['captured_at' => $capturedAt, 'tenant_id' => $this->tenant->id, 'period' => 'all', 'criterion' => 'wilson', 'student_id' => $maria->id, 'position' => 1, 'questions' => 3, 'correct' => 3],
@@ -624,6 +649,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->record($maria, $qs[0], true, now()->subHours(30));
         $this->record($maria, $qs[1], true, now());
         $this->record($maria, $qs[2], true, now());
+        $this->sameCourse($maria, $joao);
 
         $this->actingAsStudent($maria);
         foreach (['wilson', 'dedication'] as $criterion) {
@@ -648,6 +674,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->record($revisor, $antiga, false, now()->subDays(10));
         $this->record($revisor, $antiga, true, now());
         $this->record($iniciante, $nova, true, now());
+        $this->sameCourse($revisor, $iniciante);
 
         $this->actingAsStudent($iniciante);
         $desempenho = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=7d')->assertOk()->json('body');
@@ -672,6 +699,7 @@ class QuestionBankPracticeTest extends TestCase
         $aluno = $this->student('ORDEM REAL');
         $this->record($aluno, $questao, true, now()->addHour());
         $this->record($aluno, $questao, false, now()->subHour());
+        $this->sameCourse($aluno);
 
         $this->actingAsStudent($aluno);
         $linha = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body.ranking.0');
@@ -692,6 +720,7 @@ class QuestionBankPracticeTest extends TestCase
         }
         $this->record($doisDias, $questoes[0], true, Carbon::parse('2026-10-08 02:00:00', 'UTC'));
         $this->record($doisDias, $questoes[0], true, Carbon::parse('2026-10-08 04:00:00', 'UTC'));
+        $this->sameCourse($umDia, $doisDias);
 
         $this->actingAsStudent($umDia);
         $body = $this->getJson('/api/aluno/practice/ranking?criterion=dedication&period=all')->assertOk()->json('body');
@@ -727,6 +756,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->record($maria, $qs[1], true, $today);
         $this->record($maria, $qs[3], true, $today);
         $this->record($ana, $qs[2], true, $today);
+        $this->sameCourse($joao, $maria, $pedro, $ana);
 
         $this->actingAsStudent($maria);
         $body = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
@@ -760,8 +790,9 @@ class QuestionBankPracticeTest extends TestCase
         $matematica = Subject::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Matemática']);
         $maria = $this->student('MARIA DA SILVA');
         $this->record($maria, $this->practicable('Escopo', $matematica->id), true, Carbon::parse('2026-10-07 12:00', 'America/Sao_Paulo'));
+        $course = $this->sameCourse($maria);
         $history = app(PracticeRankingHistoryService::class);
-        $history->store($this->tenant->id, 'wilson', 'week', null, null, '2026-10-07', [
+        $history->store($this->tenant->id, 'wilson', 'week', $course->id, null, null, '2026-10-07', [
             ['student_id' => $maria->id, 'position' => 9, 'score' => 1],
         ], now());
 
@@ -774,7 +805,7 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertSame(1, $month['me']['previous_position']);
         $this->assertSame('same', $month['me']['movement_status']);
 
-        $history->store($this->tenant->id, 'wilson', 'all', null, null, '2026-10-07', [
+        $history->store($this->tenant->id, 'wilson', 'all', $course->id, null, null, '2026-10-07', [
             ['student_id' => $maria->id, 'position' => 7, 'score' => 1],
         ], now());
         $geral = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
@@ -797,6 +828,7 @@ class QuestionBankPracticeTest extends TestCase
         $ana = $this->student('ANA COSTA');
         $this->record($bia, $this->practicable('B'), true, $at);
         $this->record($ana, $this->practicable('A'), true, $at);
+        $this->sameCourse($bia, $ana);
 
         $this->actingAsStudent($bia);
         $body = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
@@ -809,15 +841,50 @@ class QuestionBankPracticeTest extends TestCase
     {
         $this->travelTo(Carbon::parse('2026-10-08 15:00', 'America/Sao_Paulo'));
         $maria = $this->student('MARIA DA SILVA');
+        $course = $this->sameCourse($maria);
         $this->record($maria, $this->practicable('Dia'), true, Carbon::parse('2026-10-07 12:00', 'America/Sao_Paulo'));
 
         $this->artisan('ranking:daily-snapshot')->assertSuccessful();
         $this->artisan('ranking:daily-snapshot')->assertSuccessful();
 
         $days = DB::table('practice_ranking_snapshot_days')
-            ->where('tenant_id', $this->tenant->id)->where('criterion', 'wilson')->where('period', 'all')->where('scope_key', 'all');
+            ->where('tenant_id', $this->tenant->id)->where('criterion', 'wilson')->where('period', 'all')->where('scope_key', 'c'.$course->id);
         $this->assertSame(1, $days->count());
         $this->assertSame(1, DB::table('practice_ranking_snapshot_positions')->where('snapshot_day_id', $days->value('id'))->count());
+    }
+
+    public function test_ranking_keeps_students_of_different_courses_apart(): void
+    {
+        $questao = $this->practicable('Curso');
+        $cpmStudent = $this->student('ALUNO CPM');
+        $ifalStudent = $this->student('ALUNO IFAL');
+        $cpm = $this->sameCourse($cpmStudent);
+        $ifal = Course::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'IFAL']);
+        $class = SchoolClass::factory()->create(['tenant_id' => $this->tenant->id, 'course_id' => $ifal->id]);
+        Enrollment::factory()->create([
+            'tenant_id' => $this->tenant->id, 'student_id' => $ifalStudent->id, 'school_class_id' => $class->id,
+            'start_date' => '2020-01-01', 'end_date' => null, 'status' => 'active',
+        ]);
+        $this->record($cpmStudent, $questao, true, now());
+        $this->record($ifalStudent, $questao, true, now());
+
+        $this->actingAsStudent($cpmStudent);
+        $cpmBody = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
+        $this->assertSame($cpm->id, $cpmBody['course_id']);
+        $this->assertSame(['ALUNO C.'], array_column($cpmBody['ranking'], 'name'));
+        $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all&course_id='.$ifal->id)->assertStatus(422);
+
+        $this->actingAsStudent($ifalStudent);
+        $ifalBody = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
+        $this->assertSame($ifal->id, $ifalBody['course_id']);
+        $this->assertSame(['ALUNO I.'], array_column($ifalBody['ranking'], 'name'));
+
+        Sanctum::actingAs($this->admin);
+        $staff = $this->getJson('/api/question-bank/practice-ranking?criterion=wilson&period=all&course_id='.$cpm->id)
+            ->assertOk()->json('body');
+        $this->assertSame('CPM', $staff['course_name']);
+        $this->assertSame(['ALUNO CPM'], array_column($staff['ranking'], 'name'));
+        $this->getJson('/api/question-bank/practice-ranking?criterion=wilson&period=all')->assertStatus(422);
     }
 
     /** @param  ExamQuestion[]  $questions */

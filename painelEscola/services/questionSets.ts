@@ -138,6 +138,8 @@ export type PracticeRanking = {
   until?: string | null;
   subject_id?: number | null;
   topic_id?: number | null;
+  course_id?: number | null;
+  course_name?: string | null;
   movement_reference_at?: string | null;
   participants: number;
   page?: number;
@@ -148,10 +150,11 @@ export type PracticeRanking = {
 
 export async function fetchPracticeRanking(
   period: PracticeRankingPeriod,
-  options?: { criterion?: PracticeRankingCriterion; subjectId?: number | null; topicId?: number | null; page?: number; perPage?: number },
+  options?: { criterion?: PracticeRankingCriterion; subjectId?: number | null; topicId?: number | null; courseId?: number | null; page?: number; perPage?: number },
 ) {
   const params: Record<string, string | number> = { period, criterion: options?.criterion ?? "wilson" };
   params.per_page = options?.perPage ?? 20;
+  if (options?.courseId) params.course_id = options.courseId;
   if (options?.subjectId) params.subject_id = options.subjectId;
   if (options?.topicId) params.topic_id = options.topicId;
   if (options?.page) params.page = options.page;

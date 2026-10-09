@@ -18,20 +18,23 @@ class SnapshotPracticeRankingDailyCommand extends Command
     {
         $scopes = 0;
         foreach (DB::table('tenants')->pluck('id') as $tenantId) {
-            foreach (PracticePerformanceService::SCORED_CRITERIA as $criterion) {
-                foreach (PracticePerformanceService::PERIODS as $period) {
-                    $history->ensureClosedDay($performance, (int) $tenantId, $criterion, $period, null, null);
-                    $scopes++;
-                    foreach ($history->knownScopes((int) $tenantId, $criterion, $period) as $scope) {
-                        $history->ensureClosedDay(
-                            $performance,
-                            (int) $tenantId,
-                            $criterion,
-                            $period,
-                            $scope['subject_id'],
-                            $scope['topic_id'],
-                        );
+            foreach ($this->courseIds((int) $tenantId) as $courseId) {
+                foreach (PracticePerformanceService::SCORED_CRITERIA as $criterion) {
+                    foreach (PracticePerformanceService::PERIODS as $period) {
+                        $history->ensureClosedDay($performance, (int) $tenantId, $criterion, $period, $courseId, null, null);
                         $scopes++;
+                        foreach ($history->knownScopes((int) $tenantId, $criterion, $period, $courseId) as $scope) {
+                            $history->ensureClosedDay(
+                                $performance,
+                                (int) $tenantId,
+                                $criterion,
+                                $period,
+                                $courseId,
+                                $scope['subject_id'],
+                                $scope['topic_id'],
+                            );
+                            $scopes++;
+                        }
                     }
                 }
             }
@@ -41,5 +44,23 @@ class SnapshotPracticeRankingDailyCommand extends Command
         $this->info("Escopos conferidos: {$scopes}. Fechamentos com mais de ".PracticeRankingHistoryService::RETENTION_DAYS." dias removidos: {$removed}.");
 
         return self::SUCCESS;
+    }
+
+    /** @return list<int> */
+    private function courseIds(int $tenantId): array
+    {
+        $classes = DB::table('school_classes')
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('course_id')
+            ->whereNull('deleted_at')
+            ->distinct()
+            ->pluck('course_id');
+        $plans = DB::table('course_plans')
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->distinct()
+            ->pluck('course_id');
+
+        return $classes->merge($plans)->map(fn ($id) => (int) $id)->unique()->values()->all();
     }
 }
