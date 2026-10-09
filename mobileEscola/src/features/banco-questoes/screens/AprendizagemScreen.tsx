@@ -9,7 +9,7 @@ import { useLearning, usePracticeFacets, useStartPracticeSession, useStartReinfo
 import { formatPercent } from '../lib/format';
 import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import {
-  AppBar, Button, Card, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, ScreenBody, SelectButton, StatTile, TopicGroup,
+  AppBar, Button, Card, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, ScreenBody, SelectButton, StatTile, StatusLegend, TopicSection,
   TopicHead, TopicLine, TopicRow, Txt, font, radius, space, subjectColor, useLayoutMode, usePalette, type TopicLineStatus, type TopicStatus,
 } from '../../../ui';
 
@@ -197,26 +197,26 @@ export function AprendizagemScreen() {
     </Card>
   );
 
-  const note = (
-    <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-start', marginHorizontal: 12, marginTop: 4, marginBottom: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: p.surfaceSunken }}>
-      <Icon name="alert" size={16} color={p.inkSubtle} />
-      <Txt tone="muted" style={{ flex: 1, fontSize: 13, lineHeight: 18 }}>
-        Com menos de {summary.min_sample} respostas, o assunto fica em "Poucos dados". Responda mais para ver se ele está Bom, em Atenção ou para Reforçar.
+  /** Legenda das situações (as mesmas tags da tabela) e quando a situação aparece. */
+  const legend = (
+    <View style={{ gap: space[2] }}>
+      <Overline>Legenda</Overline>
+      <StatusLegend minSample={summary.min_sample} />
+      <Txt variant="caption" tone="subtle" style={{ lineHeight: 17 }}>
+        A situação aparece a partir de {summary.min_sample} respostas no assunto. Conta só a primeira tentativa de cada questão.
       </Txt>
     </View>
-  );
-  const legend = (
-    <Txt variant="bodySm" tone="subtle" style={{ lineHeight: 20 }}>
-      <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Reforçar</Txt>: menos de 50% · <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Atenção</Txt>: 50% a 69% ·{' '}
-      <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Bom</Txt>: 70% ou mais · <Txt variant="bodySm" tone="muted" style={{ ...font.bold }}>Poucos dados</Txt>: menos de {summary.min_sample} respostas no assunto.
-    </Txt>
   );
   const errorNotice = error ? <Notice tone="danger" title="Não foi possível começar" text={error} /> : null;
   const refresh = <RefreshControl refreshing={overview.isRefetching} onRefresh={() => { refetch(); unseen.refetch(); }} tintColor={p.brand} colors={[p.brand]} />;
   const subtitle = 'Conta só a primeira vez que você responde cada questão. Revisar um erro não muda esse número.';
+  /** "4 assuntos · 5 questões · 80% de acerto" */
   const groupMeta = (list: LearningTopic[]) => {
     const q = list.reduce((acc, t) => acc + t.questions, 0);
-    return `${list.length} ${list.length === 1 ? 'assunto' : 'assuntos'} · ${q} ${q === 1 ? 'questão' : 'questões'}`;
+    const right = list.reduce((acc, t) => acc + t.first_correct, 0);
+    const parts = [`${list.length} ${list.length === 1 ? 'assunto' : 'assuntos'}`, `${q} ${q === 1 ? 'questão' : 'questões'}`];
+    if (q) parts.push(`${Math.round((right / q) * 100)}% de acerto`);
+    return parts.join(' · ');
   };
 
   // ── Desktop ───────────────────────────────────────────────────────────────
@@ -232,8 +232,8 @@ export function AprendizagemScreen() {
           {errorNotice}
           <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
             <View style={{ flex: 1, minWidth: 0, gap: space[3] }}>
-              <Card padding="none" style={{ paddingVertical: 4, paddingHorizontal: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 14, paddingHorizontal: 12, paddingBottom: 6 }}>
+              <Card padding="none" style={{ paddingTop: space[2], paddingHorizontal: 12, paddingBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: space[2] }}>
                   <Txt variant="titleSm" style={{ ...font.extrabold, flex: 1 }}>Diagnóstico por assunto</Txt>
                   {subjects.length > 1 ? (
                     <SelectButton label="Disciplina:" value={subjectFilter} onChange={setSubjectFilter}
@@ -242,11 +242,9 @@ export function AprendizagemScreen() {
                 </View>
                 {topics.data.length ? (
                   <>
-                    {note}
                     <TopicHead />
-                    {groups.map((g) => (
-                      <View key={g.id}>
-                        <TopicGroup name={g.name} dot={dotOf(g.id || null)} meta={groupMeta(g.list)} />
+                    {groups.map((g, gi) => (
+                      <TopicSection key={g.id} subject={g.name} dot={dotOf(g.id || null)} summary={groupMeta(g.list)} last={gi === groups.length - 1}>
                         {g.list.map((t, i) => {
                           const a = actionOf(t);
                           return (
@@ -255,7 +253,7 @@ export function AprendizagemScreen() {
                               loading={busy === `t${t.topic_id}`} onPractice={() => practiceTopic(t)} />
                           );
                         })}
-                      </View>
+                      </TopicSection>
                     ))}
                   </>
                 ) : <Txt tone="subtle" style={{ padding: 12 }}>Responda questões do banco para ver o diagnóstico por assunto.</Txt>}
