@@ -261,35 +261,38 @@ class PracticePerformanceService
                 ->all();
         }
 
-        // As fotos recém-gravadas repetem o ranking de agora. Sem uma foto antiga, a posição de 24h atrás
-        // sai das respostas daquele momento — senão a seta compara o ranking com ele mesmo e some.
+        // Foto com menos de um dia repete o ranking de agora. A posição de 24h atrás sai das respostas.
+        return $this->positionsAt($tenantId, $period, $criterion, now()->subDay());
+    }
+
+    /** @return array<int, int> student_id => posição com as respostas até $before */
+    private function positionsAt(int $tenantId, string $period, string $criterion, Carbon $before): array
+    {
         $positions = [];
-        foreach ($this->captureRows($tenantId, $period, now()->subDay(), $criterion) as $row) {
+        foreach ($this->captureRows($tenantId, $period, $before, $criterion) as $row) {
             $positions[$row['student_id']] = $row['position'];
         }
 
         return $positions;
     }
 
+    /** Foto usada pela seta: a mais próxima de 24h atrás, desde que tenha pelo menos 20h. */
     private function baselineCapturedAt(int $tenantId, string $period, string $criterion): mixed
     {
         $times = DB::table('practice_ranking_snapshots')
             ->where('tenant_id', $tenantId)
             ->where('period', $period)
             ->where('criterion', $criterion)
+            ->where('captured_at', '<=', now()->subHours(20))
             ->distinct()
-            ->orderByDesc('captured_at')
             ->pluck('captured_at');
-        $hourAgo = now()->subHour()->getTimestamp();
-        $target = now()->subDay()->getTimestamp();
-        $older = $times->filter(fn ($capturedAt) => Carbon::parse($capturedAt)->getTimestamp() <= $hourAgo);
-        if ($older->isEmpty()) {
+        if ($times->isEmpty()) {
             return null;
         }
 
-        $chosen = $older->sortBy(fn ($capturedAt) => abs(Carbon::parse($capturedAt)->getTimestamp() - $target))->first();
+        $target = now()->subDay()->getTimestamp();
 
-        return $chosen;
+        return $times->sortBy(fn ($capturedAt) => abs(Carbon::parse($capturedAt)->getTimestamp() - $target))->first();
     }
 
     private function rankingRows(int $tenantId, ?Carbon $since, ?Carbon $until): Collection

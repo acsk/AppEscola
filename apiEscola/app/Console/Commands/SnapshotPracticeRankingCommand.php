@@ -17,11 +17,23 @@ class SnapshotPracticeRankingCommand extends Command
     public function handle(PracticePerformanceService $performance): int
     {
         $capturedAt = now();
-        $backfill = 0;
-        // Sem uma foto de cerca de um dia, a seta compara o ranking com uma foto igual à de agora e não aparece.
-        if (! DB::table('practice_ranking_snapshots')->where('captured_at', '<=', now()->subHours(20))->exists()) {
-            $backfill = $this->snapshotFromService($performance, now()->subDay(), now()->subDay());
-        }
+        $criteria = [
+            PracticePerformanceService::CRITERION_PARTICIPATION,
+            PracticePerformanceService::CRITERION_WILSON,
+            PracticePerformanceService::CRITERION_DEDICATION,
+        ];
+        $dayAgo = now()->subHours(20);
+        $missing = array_values(array_filter(
+            $criteria,
+            fn (string $criterion) => ! DB::table('practice_ranking_snapshots')
+                ->where('criterion', $criterion)
+                ->where('captured_at', '<=', $dayAgo)
+                ->exists(),
+        ));
+        // A foto de participação já pode existir. Desempenho e dedicação ainda assim ganham a de 24h atrás.
+        $backfill = $missing === []
+            ? 0
+            : $this->snapshotFromService($performance, now()->subDay(), now()->subDay(), $missing);
         $count = DB::getDriverName() === 'sqlite'
             ? $this->snapshotFromService($performance, $capturedAt)
             : $this->snapshotFromView($capturedAt) + $this->snapshotFromService($performance, $capturedAt, criteria: [

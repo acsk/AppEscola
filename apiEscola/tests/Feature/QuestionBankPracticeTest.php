@@ -522,6 +522,29 @@ class QuestionBankPracticeTest extends TestCase
         $this->getJson('/api/aluno/practice/ranking?criterion=wilson&subject_id=999999')->assertStatus(422);
     }
 
+    public function test_recent_ranking_photo_does_not_hide_yesterdays_movement(): void
+    {
+        $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("F{$i}"));
+        $maria = $this->student('MARIA DA SILVA');
+        $joao = $this->student('JOAO PEREIRA');
+        $this->record($joao, $qs[0], true, now()->subHours(30));
+        $this->record($joao, $qs[1], true, now()->subHours(30));
+        $this->record($maria, $qs[0], true, now()->subHours(30));
+        $this->record($maria, $qs[1], true, now());
+        $this->record($maria, $qs[2], true, now());
+        $capturedAt = now()->subHours(2);
+        DB::table('practice_ranking_snapshots')->insert([
+            ['captured_at' => $capturedAt, 'tenant_id' => $this->tenant->id, 'period' => 'all', 'criterion' => 'wilson', 'student_id' => $maria->id, 'position' => 1, 'questions' => 3, 'correct' => 3],
+            ['captured_at' => $capturedAt, 'tenant_id' => $this->tenant->id, 'period' => 'all', 'criterion' => 'wilson', 'student_id' => $joao->id, 'position' => 2, 'questions' => 2, 'correct' => 2],
+        ]);
+
+        $this->actingAsStudent($maria);
+        $body = $this->getJson('/api/aluno/practice/ranking?criterion=wilson&period=all')->assertOk()->json('body');
+        $byName = collect($body['ranking'])->keyBy('name');
+        $this->assertSame(1, $byName['MARIA S.']['movement']);
+        $this->assertSame(-1, $byName['JOAO P.']['movement']);
+    }
+
     public function test_scored_rankings_move_against_the_position_from_yesterday(): void
     {
         $qs = collect(range(1, 3))->map(fn ($i) => $this->practicable("M{$i}"));
