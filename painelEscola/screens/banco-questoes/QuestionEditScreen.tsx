@@ -337,9 +337,23 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           question_text: question.question_text || prev.question_text,
           explanation: question.explanation ?? prev.explanation,
           options: question.options?.length
-            ? question.options.map((option, index) => ({ key: `opt-review-${index}-${Date.now()}`, option_text: option.option_text, is_correct: option.is_correct }))
+            ? question.options.map((option, index) => ({
+                key: `opt-review-${index}-${Date.now()}`,
+                option_text: option.option_text,
+                is_correct: !!option.is_correct,
+              }))
             : prev.options,
         }));
+      } else if (question && examQuestion) {
+        setExamQuestion({
+          ...examQuestion,
+          explanation: question.explanation ?? examQuestion.explanation,
+          options: (examQuestion.options ?? []).map((option, index) => ({
+            ...option,
+            option_text: question.options?.[index]?.option_text || option.option_text,
+            is_correct: question.options?.[index] ? !!question.options[index].is_correct : option.is_correct,
+          })),
+        });
       }
     } catch (error) {
       setAiError(describeAiError(error, "Não foi possível revisar a questão"));
@@ -514,6 +528,12 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             <RichText className="text-sm text-ink flex-1" value={option.option_text} />
           </View>
         ))}
+        {!!examQuestion.explanation?.trim() && (
+          <View style={{ gap: 4 }}>
+            <Text className="text-xs font-medium text-ink-muted">Explicação</Text>
+            <RichText className="text-sm text-ink leading-6" selectable value={examQuestion.explanation} />
+          </View>
+        )}
       </View>
     </Panel>
   );

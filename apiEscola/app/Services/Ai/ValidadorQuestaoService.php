@@ -36,38 +36,27 @@ class ValidadorQuestaoService
         $usage = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'estimated_cost' => null];
         $reviewer = null;
         $reviewModel = null;
-        $optionsChanged = false;
+        $contentChanged = false;
         $canReview = trim(QuestionRichText::plain((string) ($question['question_text'] ?? ''))) !== ''
             && count((array) ($question['options'] ?? [])) >= 2;
 
         if ($canReview) {
             $reviewModel = $this->reviewModel($credential, false);
             $reviewer = $this->consultar($credential, $question, $reviewModel, $usage);
-            $replaced = $this->aplicarOpcoesDoRevisor($question, $reviewer);
-            if ($replaced !== null) {
-                $question = $replaced;
-                $optionsChanged = true;
-                $local = QuestionReviewRules::problems($question);
-                $letter = QuestionReviewRules::correctLetter((array) $question['options']);
-            } elseif ($this->divergiu($reviewer, $letter) && ! QuestionReviewRules::hasHighSeverity($local)) {
+            [$question, $reviewer, $letter, $local, $contentChanged] = $this->aplicarRevisor($question, $reviewer, $letter, $local);
+            if (! $contentChanged && $this->divergiu($reviewer, $letter) && ! QuestionReviewRules::hasHighSeverity($local)) {
                 $advanced = $this->reviewModel($credential, true);
                 if ($advanced !== $reviewModel) {
                     $second = $this->consultar($credential, $question, $advanced, $usage);
                     $reviewModel = $reviewModel.' + '.$advanced;
                     $reviewer = $this->combinar($reviewer, $second, $letter);
-                    $replaced = $this->aplicarOpcoesDoRevisor($question, $reviewer);
-                    if ($replaced !== null) {
-                        $question = $replaced;
-                        $optionsChanged = true;
-                        $local = QuestionReviewRules::problems($question);
-                        $letter = QuestionReviewRules::correctLetter((array) $question['options']);
-                    }
+                    [$question, $reviewer, $letter, $local, $contentChanged] = $this->aplicarRevisor($question, $reviewer, $letter, $local);
                 }
             }
         }
 
-        $evaluation = $this->decidir($question, $local, $reviewer, $letter, $reviewModel, $credential['model'] ?? null, $usage, (int) ($meta['attempts'] ?? 1), $optionsChanged);
-        if ($optionsChanged) {
+        $evaluation = $this->decidir($question, $local, $reviewer, $letter, $reviewModel, $credential['model'] ?? null, $usage, (int) ($meta['attempts'] ?? 1), $contentChanged);
+        if ($contentChanged) {
             $evaluation['question'] = [
                 'question_text' => (string) ($question['question_text'] ?? ''),
                 'explanation' => (string) ($question['explanation'] ?? ''),
@@ -369,68 +358,26 @@ class ValidadorQuestaoService
     }
 
     /**
-     * A revisão pode trocar as alternativas. A letra do revisor passa a ser o gabarito dessa lista nova.
+     * Aplica a alternativa escolhida e a explicação reescrita. A letra do revisor passa a ser a que ficou marcada.
      *
      * @param  array<string, mixed>  $question
      * @param  array<string, mixed>|null  $reviewer
-     * @return array<string, mixed>|null
+     * @param  array<int, array<string, mixed>>  $local
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>|null, 2: ?string, 3: array<int, array<string, mixed>>, 4: bool}
      */
-    private function aplicarOpcoesDoRevisor(array $question, ?array $reviewer): ?array
+    private function aplicarRevisor(array $question, ?array $reviewer, ?string $letter, array $local): array
     {
-        $raw = is_array($reviewer) ? ($reviewer['opcoes'] ?? $reviewer['options'] ?? null) : null;
-        if (! is_array($raw) || count($raw) < 2) {
-            return null;
-        }
-
-        $letter = $this->letra($reviewer['gabarito_revisor'] ?? null);
-        $options = [];
-        foreach (array_values($raw) as $index => $option) {
-            if ($index > 9) {
-                break;
+        $applied = ReviewAnswerApplier::apply($question, $reviewer);
+        if ($applied['changed']) {
+            $question = $applied['question'];
+            $letter = $applied['gabarito'];
+            if ($letter !== null && is_array($reviewer)) {
+                $reviewer['gabarito_revisor'] = $letter;
             }
-            $text = is_array($option)
-                ? trim((string) ($option['option_text'] ?? $option['text'] ?? ''))
-                : trim((string) $option);
-            if ($text === '') {
-                continue;
-            }
-            $marked = is_array($option) && filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN);
-            $options[] = [
-                'option_text' => $text,
-                'is_correct' => $letter !== null ? chr(65 + count($options)) === $letter : $marked,
-            ];
-        }
-        if (count($options) < 2) {
-            return null;
-        }
-        $correct = array_values(array_filter($options, fn (array $option) => $option['is_correct']));
-        if (count($correct) !== 1) {
-            $options[0]['is_correct'] = true;
-            foreach ($options as $index => $option) {
-                if ($index > 0) {
-                    $options[$index]['is_correct'] = false;
-                }
-            }
+            $local = QuestionReviewRules::problems($question);
         }
 
-        $explanation = trim((string) ($reviewer['justificativa'] ?? ''));
-        if ($explanation === '') {
-            $explanation = (string) ($question['explanation'] ?? '');
-        }
-        $before = array_map(function ($option) {
-            $text = is_array($option) ? ($option['option_text'] ?? $option['text'] ?? '') : $option;
-
-            return mb_strtolower(trim((string) $text)).'|'.(is_array($option) && filter_var($option['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN) ? '1' : '0');
-        }, array_values((array) ($question['options'] ?? [])));
-        $after = array_map(fn (array $option) => mb_strtolower($option['option_text']).'|'.($option['is_correct'] ? '1' : '0'), $options);
-        if ($before === $after) {
-            return null;
-        }
-
-        $question['options'] = $options;
-        $question['explanation'] = ExplanationLetterAligner::align($explanation, $options);
-
-        return $question;
+        return [$question, $reviewer, $letter, $local, $applied['changed']];
     }
 
     /** @param  array<string, mixed>  $question */
@@ -453,12 +400,14 @@ class ValidadorQuestaoService
             'Resolva a questão sem receber o gabarito. Escolha a única alternativa correta, ou informe que não há resposta única.',
             'Depois avalie enunciado e alternativas: gramática, coerência com disciplina e dificuldade, ambiguidade, cálculo e, em Português, tonicidade e acentuação. Monossílabo tônico não é oxítona.',
             'Não trate o seu acerto como prova suficiente se o enunciado estiver ambíguo ou incompleto.',
-            'Se as alternativas não tiverem exatamente uma resposta correta, troque-as. Devolva "opcoes" com a lista nova (mesmo número de itens, texto sem letra) e marque só uma com "is_correct": true. "gabarito_revisor" é a letra dessa alternativa na lista nova. Em "justificativa", explique a resposta usando essa letra. Se as alternativas já servirem, omita "opcoes" e "justificativa".',
+            'Sempre devolva "justificativa": a explicação que o aluno vai ler. Cite a letra correta e o texto dessa alternativa. Não cite outra letra.',
+            'Se a alternativa correta estiver errada, ou não houver exatamente uma correta, devolva "opcoes" com a lista inteira (mesmo número de itens, texto sem a letra) e "is_correct": true só na correta.',
+            '"gabarito_revisor" é a letra da opção com is_correct true. Não copie a letra do exemplo: use a letra da alternativa que você marcou.',
             $context === [] ? null : implode("\n", $context),
             "ENUNCIADO:\n".AiPromptGuard::wrap('enunciado', QuestionRichText::plain((string) ($question['question_text'] ?? ''))),
             "ALTERNATIVAS:\n".AiPromptGuard::wrap('alternativas', implode("\n", $lines)),
-            'JSON obrigatório: {"aprovada":false,"gabarito_original":null,"gabarito_revisor":"A","possui_resposta_unica":true,"opcoes":[{"option_text":"...","is_correct":true}],"justificativa":"...","problemas":[{"tipo":"erro_conceitual","gravidade":"alta","descricao":"..."}],"recomendacao":"corrigir","explicacao":"..."}',
-            'gabarito_revisor é a letra que VOCÊ escolheu, ou null. Não preencha gabarito_original.',
+            'JSON obrigatório: {"aprovada":false,"gabarito_original":null,"gabarito_revisor":"B","possui_resposta_unica":true,"opcoes":[{"option_text":"...","is_correct":false},{"option_text":"...","is_correct":true}],"justificativa":"A alternativa correta é a letra B ...","problemas":[{"tipo":"erro_conceitual","gravidade":"alta","descricao":"..."}],"recomendacao":"corrigir","explicacao":"..."}',
+            'gabarito_revisor é a letra da alternativa que você marcou em opcoes. Não preencha gabarito_original. justificativa é obrigatória.',
         ]));
     }
 
