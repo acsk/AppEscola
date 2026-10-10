@@ -94,6 +94,27 @@ class QuestionBankController extends Controller
         return $this->success(new QuestionBankQuestionResource($model), 'Classificação salva com sucesso.');
     }
 
+    /** POST question-bank/questions/revalidation — marca questões já revalidadas para não repetir. */
+    public function markRevalidated(Request $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer'],
+            'revalidated' => ['required', 'boolean'],
+        ]);
+
+        $ids = ExamQuestion::query()->inQuestionBank($tenantId)->whereIn('id', $data['ids'])->pluck('id');
+        ExamQuestion::query()->whereIn('id', $ids)->update([
+            'revalidated_at' => $data['revalidated'] ? now() : null,
+        ]);
+
+        return $this->success([
+            'ids' => $ids->map(fn ($id) => (int) $id)->all(),
+            'revalidated' => (bool) $data['revalidated'],
+        ], $data['revalidated'] ? 'Questões marcadas como revalidadas.' : 'Marca de revalidação removida.');
+    }
+
     public function batchClassification(BatchQuestionClassificationRequest $request): JsonResponse
     {
         $tenantId = $this->authorizeStaff($request);

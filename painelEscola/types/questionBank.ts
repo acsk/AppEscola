@@ -44,6 +44,7 @@ export type QuestionBankQuestion = {
   difficulty: (IdName & { sort_order: number }) | null;
   exam_type_id: number | null;
   exam_type: { id: number; label: string } | null;
+  revalidated_at?: string | null;
   issue_reports_count?: number;
   /** Respostas erradas na prática e em simulados oficiais. */
   wrong_count?: number;

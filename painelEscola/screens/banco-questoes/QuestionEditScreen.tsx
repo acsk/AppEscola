@@ -20,6 +20,7 @@ import { useQuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import {
   createStandaloneQuestion,
   fetchQuestionBankQuestion,
+  markQuestionsRevalidated,
   patchQuestionClassification,
   updateStandaloneQuestion,
   uploadQuestionBankImage,
@@ -325,6 +326,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         const response = await aiApproveQuestionReview(questionId);
         setReview(response.body);
         setReviewHistory((prev) => [response.body, ...prev]);
+        void markQuestionsRevalidated([questionId], true).catch(() => undefined);
         return;
       }
       const response = action === "correct" ? await aiCorrectQuestion(reviewPayload()) : await aiReviewQuestion(reviewPayload());
@@ -355,6 +357,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           })),
         });
       }
+      if (questionId !== null) void markQuestionsRevalidated([questionId], true).catch(() => undefined);
     } catch (error) {
       setAiError(describeAiError(error, "Não foi possível revisar a questão"));
     } finally {

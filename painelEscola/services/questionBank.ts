@@ -52,6 +52,11 @@ export async function fetchExamOptions(params: { search?: string; ids?: string }
   return data.body ?? [];
 }
 
+export async function markQuestionsRevalidated(ids: number[], revalidated: boolean) {
+  const { data } = await api.post("/question-bank/questions/revalidation", { ids, revalidated });
+  return data as { type: string; message: string; body: { ids: number[]; revalidated: boolean } };
+}
+
 export async function fetchQuestionBankQuestion(id: number): Promise<QuestionBankQuestion> {
   const { data } = await api.get(`/question-bank/questions/${id}`);
   return data.body;

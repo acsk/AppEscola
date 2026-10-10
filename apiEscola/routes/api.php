@@ -400,6 +400,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::get('questions/years',                    [QuestionBankController::class, 'years']);
         Route::get('exam-options',                       [QuestionBankController::class, 'examOptions']);
         Route::patch('questions/classification',         [QuestionBankController::class, 'batchClassification']);
+        Route::post('questions/revalidation',            [QuestionBankController::class, 'markRevalidated']);
         Route::get('questions/{question}',               [QuestionBankController::class, 'show'])->whereNumber('question');
         Route::patch('questions/{question}/classification', [QuestionBankController::class, 'updateClassification'])->whereNumber('question');
 

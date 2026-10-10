@@ -26,6 +26,7 @@ class ExamQuestion extends Model
         'year',
         'is_annulled',
         'is_outdated',
+        'revalidated_at',
         'type',
         'question_text',
         'image_url',
@@ -46,6 +47,7 @@ class ExamQuestion extends Model
         'year' => 'integer',
         'is_annulled' => 'boolean',
         'is_outdated' => 'boolean',
+        'revalidated_at' => 'datetime',
     ];
 
     public function exam(): BelongsTo

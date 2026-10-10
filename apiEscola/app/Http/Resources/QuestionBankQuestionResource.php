@@ -49,6 +49,7 @@ class QuestionBankQuestionResource extends JsonResource
                 isset($this->answer_count),
                 (int) $this->answer_count > 0 ? round(((int) $this->wrong_count / (int) $this->answer_count) * 100, 1) : null
             ),
+            'revalidated_at' => $this->revalidated_at?->toIso8601String(),
             'is_annulled' => (bool) $this->is_annulled,
             'is_outdated' => (bool) $this->is_outdated,
             'tags' => $this->tags->pluck('name')->values(),

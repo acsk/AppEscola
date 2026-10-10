@@ -164,6 +164,9 @@ class QuestionBankQueryService
         if (filter_var($params['with_errors'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $query->where('qe.wrong_count', '>', 0);
         }
+        if (filter_var($params['hide_revalidated'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereNull('exam_questions.revalidated_at');
+        }
 
         $this->applySearch($query, trim((string) ($params['search'] ?? '')));
 
