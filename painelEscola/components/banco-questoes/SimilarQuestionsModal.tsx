@@ -13,7 +13,7 @@ import ClassificationFields from "./ClassificationFields";
 import OptionsEditor from "./OptionsEditor";
 import TopicMultiSelect from "./TopicMultiSelect";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
-import { aiCorrectQuestion, aiRegenerateImage, aiReviewQuestion, aiSimilarQuestions, type SimilarFormContext } from "../../services/questionAi";
+import { aiApproveQuestionReview, aiCorrectQuestion, aiRegenerateImage, aiReviewQuestion, aiSimilarQuestions, type SimilarFormContext } from "../../services/questionAi";
 import type { QuestionReview } from "../../types/questionAi";
 import QuestionReviewPanel from "./QuestionReviewPanel";
 import type { AiImageReview } from "../../types/questionAi";
@@ -223,7 +223,6 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     explanation: draft.content.explanation,
     type: draft.content.type,
     options: draft.content.options.map(({ option_text, is_correct }) => ({ option_text, is_correct })),
-    attempts: draft.review?.attempts ?? 0,
     force: true,
   });
 
@@ -255,7 +254,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   const correctDraft = async (draft: Draft) => {
     setReviewing(draft.key);
     try {
-      const response = await aiCorrectQuestion(reviewInput(draft));
+      const response = await aiCorrectQuestion({ ...reviewInput(draft), attempts: Math.min(draft.review?.attempts ?? 0, 2) });
       const question = response.body.question;
       updateDraft(draft.key, {
         review: response.body,
@@ -302,6 +301,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
 
     setSaving(true);
     let saved = 0;
+    let approvalFailed = 0;
     const remaining: Draft[] = [];
     for (const draft of checked) {
       if (!draft.include) {
@@ -309,12 +309,19 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         continue;
       }
       try {
-        await createStandaloneQuestion({
+        const created = await createStandaloneQuestion({
           ...contentPayload(draft.content),
           ...diffClassification(EMPTY_CLASSIFICATION_FORM, draft.classification),
           ...(draft.image ? { generation_id: draft.image.generation_id } : {}),
         });
         saved++;
+        if (draft.review?.aprovada || draft.manualApproved) {
+          try {
+            await aiApproveQuestionReview(created.body.id);
+          } catch {
+            approvalFailed++;
+          }
+        }
       } catch (err) {
         remaining.push({ ...draft, errors: { form: getApiErrorMessage(err, "Não foi possível salvar esta questão.") } });
       }
@@ -328,6 +335,13 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
       return;
     }
     onCreated(saved);
+    if (approvalFailed > 0) {
+      setToast({
+        visible: true,
+        type: "error",
+        message: `${saved} questão(ões) salva(s). ${approvalFailed} ficou(aram) sem aprovação e só entra(m) no mobile depois de Aprovar manualmente.`,
+      });
+    }
     onClose();
   };
 
@@ -561,7 +575,18 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
                     onApprove={() => updateDraft(draft.key, {
                       manualApproved: true,
                       errors: {},
-                      review: draft.review ? { ...draft.review, aprovada: true, status: "aprovada_manual" } : draft.review,
+                      review: {
+                        ...(draft.review ?? {
+                          aprovada: true,
+                          result: "aprovada",
+                          status: "aprovada_manual",
+                          gabarito_original: null,
+                          gabarito_revisor: null,
+                          problemas: [],
+                        }),
+                        aprovada: true,
+                        status: "aprovada_manual",
+                      },
                     })}
                   />
                   <RichTextInput

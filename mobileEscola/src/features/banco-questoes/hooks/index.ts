@@ -45,9 +45,10 @@ export function usePracticeRanking(period: RankingPeriod, extra?: Omit<RankingQu
   const topicId = extra?.topicId ?? null;
   const page = extra?.page ?? 1;
   const courseId = extra?.courseId ?? null;
+  const perPage = extra?.perPage ?? 20;
   return useQuery({
-    queryKey: bancoKeys.ranking(period, criterion, subjectId, topicId, page, courseId),
-    queryFn: () => fetchPracticeRanking({ period, criterion, subjectId, topicId, page, perPage: extra?.perPage, courseId }),
+    queryKey: bancoKeys.ranking(period, criterion, subjectId, topicId, page, courseId, perPage),
+    queryFn: () => fetchPracticeRanking({ period, criterion, subjectId, topicId, page, perPage, courseId }),
     refetchInterval: 10 * 60_000,
   });
 }

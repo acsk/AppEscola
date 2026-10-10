@@ -98,7 +98,7 @@ class ValidadorQuestaoService
             }
             $previousHash = $hash;
             $current = $rewritten;
-            $evaluation = $this->avaliar($credential, $current, $meta + ['attempts' => $attempt + 1, 'force' => true]);
+            $evaluation = $this->avaliar($credential, $current, $meta + ['attempts' => min($max, $attempt + 1), 'force' => true]);
             if (! empty($evaluation['id'])) {
                 $ids[] = $evaluation['id'];
             }

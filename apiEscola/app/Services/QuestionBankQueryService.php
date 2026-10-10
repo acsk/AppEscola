@@ -312,6 +312,7 @@ class QuestionBankQueryService
             ->where('tenant_id', $tenantId)
             ->groupBy('exam_question_id')
             ->selectRaw('exam_question_id as question_id, SUM(is_correct = 0) as wrong_count, COUNT(*) as answer_count');
+        ExamQuestion::whereLatestReviewApproved($practice, 'practice_answers.exam_question_id');
 
         $official = DB::table('exam_answers as ea')
             ->join('exam_questions as eq_err', 'eq_err.id', '=', 'ea.question_id')
@@ -319,6 +320,7 @@ class QuestionBankQueryService
             ->whereNotNull('ea.is_correct')
             ->groupBy('ea.question_id')
             ->selectRaw('ea.question_id as question_id, SUM(ea.is_correct = 0) as wrong_count, COUNT(*) as answer_count');
+        ExamQuestion::whereLatestReviewApproved($official, 'ea.question_id');
 
         $stats = DB::query()
             ->fromSub($practice->unionAll($official), 'answer_errors')

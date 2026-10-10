@@ -5,8 +5,8 @@ export const bancoKeys = {
   filters: () => [...bancoKeys.all, 'filters'] as const,
   summary: () => [...bancoKeys.all, 'summary'] as const,
   performance: () => [...bancoKeys.all, 'performance'] as const,
-  ranking: (period: RankingPeriod, criterion: RankingCriterion = 'participation', subjectId: number | null = null, topicId: number | null = null, page = 1, courseId: number | null = null) =>
-    [...bancoKeys.all, 'ranking', period, criterion, subjectId, topicId, page, courseId] as const,
+  ranking: (period: RankingPeriod, criterion: RankingCriterion = 'participation', subjectId: number | null = null, topicId: number | null = null, page = 1, courseId: number | null = null, perPage = 20) =>
+    [...bancoKeys.all, 'ranking', period, criterion, subjectId, topicId, page, courseId, perPage] as const,
   sets: () => [...bancoKeys.all, 'sets'] as const,
   attempt: (attemptId: number) => [...bancoKeys.all, 'attempt', attemptId] as const,
   catalog: (filters: unknown, sort: string) => [...bancoKeys.all, 'catalog', filters, sort] as const,

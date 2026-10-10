@@ -26,7 +26,7 @@ class QuestionReviewRequest extends FormRequest
             'topic_names' => ['sometimes', 'array', 'max:5'],
             'topic_names.*' => ['string', 'max:120'],
             'question_id' => ['sometimes', 'nullable', 'integer'],
-            'attempts' => ['sometimes', 'integer', 'min:0', 'max:2'],
+            'attempts' => ['sometimes', 'integer', 'min:0', 'max:20'],
             'force' => ['sometimes', 'boolean'],
         ];
     }

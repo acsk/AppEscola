@@ -281,7 +281,7 @@ class LearningDiagnosisTest extends TestCase
         ]);
         $question->topics()->sync([$topic->id]);
 
-        return $question->load('options');
+        return $this->approveQuestionForPractice($question->load('options'));
     }
 
     private function record(Student $student, ExamQuestion $question, bool $correct, Carbon $at): void

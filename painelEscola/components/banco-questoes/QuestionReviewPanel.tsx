@@ -60,7 +60,7 @@ export default function QuestionReviewPanel({ review, history = [], busy = false
       <View className="flex-row flex-wrap" style={{ gap: 8 }}>
         {onValidate ? <Button variant="ai" icon={RefreshCw} label="Validar novamente" onPress={onValidate} loading={busy} disabled={busy} /> : null}
         {onCorrect && canCorrect ? <Button variant="ai" icon={Sparkles} label="Corrigir com IA" onPress={onCorrect} disabled={busy || !review || review.aprovada} /> : null}
-        {onApprove ? <Button icon={Check} label="Aprovar manualmente" onPress={onApprove} disabled={busy || review?.status === "aprovada" || review?.status === "aprovada_manual"} /> : null}
+        {onApprove ? <Button icon={Check} label="Aprovar manualmente" onPress={onApprove} disabled={busy} /> : null}
       </View>
       {history.length > 1 ? (
         <View>

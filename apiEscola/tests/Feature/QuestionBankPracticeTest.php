@@ -59,7 +59,7 @@ class QuestionBankPracticeTest extends TestCase
         ]);
         $question->topics()->sync($topicIds);
 
-        return $question->load('options');
+        return $this->approveQuestionForPractice($question->load('options'));
     }
 
     private function correct(ExamQuestion $q): int

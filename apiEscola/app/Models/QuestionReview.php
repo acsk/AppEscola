@@ -47,8 +47,37 @@ class QuestionReview extends Model
         'validated_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function (QuestionReview $review) {
+            if (! $review->question_id || (! $review->wasRecentlyCreated && ! $review->wasChanged('status'))) {
+                return;
+            }
+            $review->discardPracticeUntilValidated();
+        });
+    }
+
     public function question(): BelongsTo
     {
         return $this->belongsTo(ExamQuestion::class, 'question_id');
+    }
+
+    /**
+     * Respostas dadas antes da validação saem da soma. Se a questão já estava aprovada e continua aprovada, ficam.
+     */
+    public function discardPracticeUntilValidated(): void
+    {
+        $approved = in_array($this->status, [self::APROVADA, self::APROVADA_MANUAL], true);
+        $previous = self::query()
+            ->where('question_id', $this->question_id)
+            ->where('id', '!=', $this->id)
+            ->latest('id')
+            ->value('status');
+        $wasApproved = in_array($previous, [self::APROVADA, self::APROVADA_MANUAL], true);
+        if ($approved && $wasApproved) {
+            return;
+        }
+
+        PracticeAnswer::query()->where('exam_question_id', $this->question_id)->delete();
     }
 }

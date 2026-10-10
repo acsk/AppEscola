@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import { getApiErrorMessage } from '../../../lib/apiError';
-import type { RankingCriterion, RankingPeriod, RankingRow } from '../../../services/practice.service';
+import type { PracticeRanking, RankingCriterion, RankingPeriod, RankingRow } from '../../../services/practice.service';
 import { usePracticeFilters, usePracticeRanking } from '../hooks';
 import { rankingWeekRange } from '../lib/format';
 import {
@@ -44,14 +44,30 @@ export function BancoRankingScreen() {
   const [topicId, setTopicId] = useState<number | null>(null);
   const [courseId, setCourseId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(1);
+  const [accumulated, setAccumulated] = useState<RankingRow[]>([]);
+  const snapshot = useRef<PracticeRanking | null>(null);
   const filters = usePracticeFilters();
-  const { data, isLoading, isError, error, refetch, isRefetching } = usePracticeRanking(period, {
-    criterion: mode, subjectId, topicId, courseId, page: 1, perPage: expanded ? FULL_PAGE : 20,
+  const perPage = expanded ? FULL_PAGE : 20;
+  const { data: fetched, isFetching, isError, error, refetch, isRefetching } = usePracticeRanking(period, {
+    criterion: mode, subjectId, topicId, courseId, page, perPage,
   });
+  const matches = !!fetched && (fetched.page ?? 1) === page && (fetched.per_page ?? perPage) === perPage;
+  if (matches) snapshot.current = fetched;
+  const data = matches ? fetched : (snapshot.current ?? fetched);
+  useEffect(() => {
+    if (!matches || !fetched) return;
+    setAccumulated((prev) => (page <= 1
+      ? fetched.ranking
+      : [...prev, ...fetched.ranking.filter((row) => !prev.some((item) => item.position === row.position))]));
+  }, [fetched, matches, page]);
 
   const performance = mode === 'wilson';
   const closed = period === 'last_week';
-  const rows = data?.ranking ?? [];
+  const rows = matches && page <= 1 ? (fetched?.ranking ?? []) : accumulated;
+  const loadingMore = isFetching && page > 1;
+  const hasMore = expanded && (loadingMore || (matches && (fetched?.last_page ?? 1) > page));
+  const moreThanFull = (data?.participants ?? 0) > FULL_PAGE;
   const me = data?.me ?? null;
   const above: RankingRow | null = me && me.position > 1 ? rows.find((r) => r.position === me.position - 1) ?? null : null;
   const points = (v?: number | null) => (performance ? fmt1(v ?? 0) : String(Math.round(v ?? 0)));
@@ -60,7 +76,8 @@ export function BancoRankingScreen() {
   const courseLabel = data?.course_name ? ` · ${data.course_name}` : '';
   const subjects = filters.data?.subjects ?? [];
   const topics = subjectId ? subjects.find((s) => s.id === subjectId)?.topics ?? [] : subjects.flatMap((s) => s.topics);
-  const reset = () => setExpanded(false);
+  const reset = () => { snapshot.current = null; setAccumulated([]); setPage(1); setExpanded(false); };
+  const loadMore = () => { if (!loadingMore) setPage((current) => current + 1); };
   const practice = () => navigation.navigate('BancoQuestoes');
 
   const headline = !me
@@ -108,9 +125,9 @@ export function BancoRankingScreen() {
     </Txt>
   );
 
-  const state = isLoading ? <ActivityIndicator color={p.brand} style={{ marginTop: space[6] }} />
-    : isError || !data ? <Notice tone="danger" title="Não foi possível carregar o ranking" text={getApiErrorMessage(error, 'Tente de novo.')} />
-    : null;
+  const state = data ? null
+    : isError ? <Notice tone="danger" title="Não foi possível carregar o ranking" text={getApiErrorMessage(error, 'Tente de novo.')} />
+    : <ActivityIndicator color={p.brand} style={{ marginTop: space[6] }} />;
   const empty = <Txt tone="subtle">{closed ? 'Ninguém entrou no ranking da semana passada.' : 'Ninguém entrou no ranking neste período ainda.'}</Txt>;
   const refresh = <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={p.brand} colors={[p.brand]} />;
 
@@ -163,10 +180,16 @@ export function BancoRankingScreen() {
                     <RankHead labels={performance ? ['Questões', 'Acertos', 'Aproveit.', 'Pontos'] : ['Questões', 'Dias', 'Sequência', 'Pontos']} />
                     {shown.map(line)}
                     {meMissing && me ? <>{<View style={{ height: 1, backgroundColor: p.line, marginVertical: 4 }} />}{line(me)}</> : null}
-                    {rest > 0 || expanded ? (
-                      <View style={{ alignItems: 'center', paddingTop: 6, paddingBottom: 4, borderTopWidth: 1, borderTopColor: p.line, marginHorizontal: -8 }}>
-                        <Button variant="ghost" size="sm" iconRight={expanded ? 'chevron-up' : 'chevron-down'}
-                          label={expanded ? 'Mostrar menos' : `Ver os outros ${rest} ${rest === 1 ? 'aluno' : 'alunos'}`} onPress={() => setExpanded((v) => !v)} />
+                    {hasMore || rest > 0 || expanded ? (
+                      <View style={{ alignItems: 'center', gap: 4, paddingTop: 6, paddingBottom: 4, borderTopWidth: 1, borderTopColor: p.line, marginHorizontal: -8 }}>
+                        {hasMore ? (
+                          <Button variant="ghost" size="sm" label="Carregar mais" loading={loadingMore} disabled={loadingMore} onPress={loadMore} />
+                        ) : null}
+                        {rest > 0 || expanded ? (
+                          <Button variant="ghost" size="sm" iconRight={expanded ? 'chevron-up' : 'chevron-down'}
+                            label={expanded ? 'Mostrar menos' : `Ver os outros ${rest} ${rest === 1 ? 'aluno' : 'alunos'}`}
+                            onPress={() => { setPage(1); setExpanded((v) => !v); }} />
+                        ) : null}
                       </View>
                     ) : null}
                   </Card>
@@ -218,15 +241,21 @@ export function BancoRankingScreen() {
               {rows.length ? (
                 <Card padding="none" style={{ padding: 6 }}>
                   {short.map(row)}
-                  {!expanded && hidden > 0 ? (
+                  {(!expanded && hidden > 0) || hasMore ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2, paddingHorizontal: space[4] }}>
                       <View style={{ flex: 1, height: 1, backgroundColor: p.line }} />
-                      <Txt variant="caption" tone="subtle">mais {hidden} {hidden === 1 ? 'aluno' : 'alunos'}</Txt>
+                      <Txt variant="caption" tone="subtle">
+                        {moreThanFull ? '100+' : `mais ${hidden} ${hidden === 1 ? 'aluno' : 'alunos'}`}
+                      </Txt>
                       <View style={{ flex: 1, height: 1, backgroundColor: p.line }} />
                     </View>
                   ) : null}
+                  {expanded && hasMore ? (
+                    <Button variant="ghost" block size="sm" label="Carregar mais" loading={loadingMore} disabled={loadingMore} onPress={loadMore} />
+                  ) : null}
                   {hidden > 0 || expanded ? (
-                    <Button variant="ghost" block size="sm" label={expanded ? 'Mostrar menos' : 'Ver ranking completo'} onPress={() => setExpanded((v) => !v)} />
+                    <Button variant="ghost" block size="sm" label={expanded ? 'Mostrar menos' : 'Ver ranking completo'}
+                      onPress={() => { setPage(1); setExpanded((v) => !v); }} />
                   ) : null}
                 </Card>
               ) : empty}

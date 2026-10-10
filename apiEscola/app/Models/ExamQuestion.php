@@ -116,7 +116,7 @@ class ExamQuestion extends Model
      */
     public function scopePracticable(Builder $query, int $tenantId): Builder
     {
-        return $query->answerable($tenantId)->whereNull('exam_questions.exam_id');
+        return $query->answerable($tenantId)->approvedForPractice()->whereNull('exam_questions.exam_id');
     }
 
     /**
@@ -125,8 +125,27 @@ class ExamQuestion extends Model
      */
     public function scopePracticeAvailable(Builder $query, int $tenantId): Builder
     {
-        return $query->answerable($tenantId)->where(fn (Builder $q) => $q->whereNull('exam_questions.exam_id')
+        return $query->answerable($tenantId)->approvedForPractice()->where(fn (Builder $q) => $q->whereNull('exam_questions.exam_id')
             ->orWhereHas('exam', fn (Builder $e) => $e->closed()));
+    }
+
+    /** A última revisão pedagógica está aprovada (automática ou manual). Sem isso a questão não vai ao aluno. */
+    public function scopeApprovedForPractice(Builder $query): Builder
+    {
+        self::whereLatestReviewApproved($query, 'exam_questions.id');
+
+        return $query;
+    }
+
+    public static function whereLatestReviewApproved(object $query, string $questionColumn): void
+    {
+        $query->whereExists(function ($sub) use ($questionColumn) {
+            $sub->selectRaw('1')
+                ->from('question_reviews as qr')
+                ->whereColumn('qr.question_id', $questionColumn)
+                ->whereIn('qr.status', [QuestionReview::APROVADA, QuestionReview::APROVADA_MANUAL])
+                ->whereRaw('qr.id = (select max(latest.id) from question_reviews as latest where latest.question_id = qr.question_id)');
+        });
     }
 
     /** Objetiva, válida, com enunciado (texto ou imagem), exatamente uma correta e ao menos duas alternativas. */
@@ -151,7 +170,15 @@ class ExamQuestion extends Model
         $options = $this->relationLoaded('options') ? $this->options : $this->options()->get();
 
         return $options->filter(fn ($o) => trim((string) $o->option_text) !== '')->count() >= 2
-            && $options->where('is_correct', true)->count() === 1;
+            && $options->where('is_correct', true)->count() === 1
+            && $this->hasApprovedReview();
+    }
+
+    public function hasApprovedReview(): bool
+    {
+        $status = QuestionReview::query()->where('question_id', $this->id)->latest('id')->value('status');
+
+        return in_array($status, [QuestionReview::APROVADA, QuestionReview::APROVADA_MANUAL], true);
     }
 
     public function isMultipleChoice(): bool

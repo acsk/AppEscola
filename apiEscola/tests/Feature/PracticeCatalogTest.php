@@ -55,7 +55,7 @@ class PracticeCatalogTest extends TestCase
         ]);
         $q->topics()->sync($topicIds);
 
-        return $q->load('options');
+        return $this->approveQuestionForPractice($q->load('options'));
     }
 
     /** Cobre o aluno com as disciplinas das questões já criadas na escola. */

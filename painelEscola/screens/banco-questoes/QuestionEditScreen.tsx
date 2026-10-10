@@ -313,7 +313,6 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     difficulty_name: catalogs.difficulties.find((item) => item.id === classification.difficulty_id)?.name ?? null,
     topic_names: catalogs.taxonomy.flatMap((subject) => subject.topics).filter((topic) => classification.topic_ids.includes(topic.id)).map((topic) => topic.name),
     question_id: questionId,
-    attempts: review?.attempts ?? 0,
     force: true,
   });
 
@@ -329,7 +328,10 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         void markQuestionsRevalidated([questionId], true).catch(() => undefined);
         return;
       }
-      const response = action === "correct" ? await aiCorrectQuestion(reviewPayload()) : await aiReviewQuestion(reviewPayload());
+      const payload = action === "correct"
+        ? { ...reviewPayload(), attempts: Math.min(review?.attempts ?? 0, 2) }
+        : reviewPayload();
+      const response = action === "correct" ? await aiCorrectQuestion(payload) : await aiReviewQuestion(payload);
       setReview(response.body);
       if (response.body.id) setReviewHistory((prev) => [response.body, ...prev.filter((item) => item.id !== response.body.id)]);
       const question = response.body.question;
