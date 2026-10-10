@@ -20,8 +20,8 @@ type Quantity = (typeof QUANTITIES)[number];
 
 /**
  * Banco de questões em uma tela só (protótipos "TelaBancoQuestoes" e "DesktopBancoQuestoes"), para alunos de 10 a 14 anos:
- * 1. matéria, 2. assunto (opcional), 3. quantas questões, "Só questões novas" e um botão "Começar".
- * A sessão sorteia novas → não respondidas → erradas e mostra a resposta certa depois de cada questão.
+ * 1. matéria, 2. assunto (opcional), 3. quantas questões. Por padrão só entram questões novas que o aluno ainda não respondeu.
+ * A sessão mostra a resposta certa depois de cada questão.
  */
 export function BancoQuestoesScreen() {
   const p = usePalette();
@@ -34,6 +34,7 @@ export function BancoQuestoesScreen() {
   const [subjectIds, setSubjectIds] = useState<number[]>(presetSubject ? [presetSubject] : []);
   const [topicIds, setTopicIds] = useState<number[]>([]);
   const [quantity, setQuantity] = useState<Quantity>(10);
+  const [onlyUnanswered, setOnlyUnanswered] = useState(true);
   const [onlyNew, setOnlyNew] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +62,8 @@ export function BancoQuestoesScreen() {
   const topics = subjectIds.length ? (bySubject.data?.topics ?? []).filter((t) => subjectIds.includes(t.subject_id)) : [];
   const available = current.data?.total ?? 0;
   const availableNew = current.data?.situations.new ?? 0;
-  const pool = onlyNew ? availableNew : available;
+  const availableUnanswered = current.data?.situations.unanswered ?? 0;
+  const pool = onlyNew ? availableNew : onlyUnanswered ? availableUnanswered : available;
   const count = Math.min(quantity, pool);
   const newInSession = Math.min(count, availableNew);
   const open = summary.data?.open_session ?? null;
@@ -85,7 +87,7 @@ export function BancoQuestoesScreen() {
 
   const begin = () => {
     setError(null);
-    const filters: CatalogFilters = { ...scope, situation: onlyNew ? 'new' : 'all' };
+    const filters: CatalogFilters = { ...scope, situation: onlyNew ? 'new' : onlyUnanswered ? 'unanswered' : 'all' };
     start.mutate({ filters, options: { quantity, correction_mode: 'each', timed: false, title } }, {
       onSuccess: (payload) => navigation.navigate('BancoSimulado', { attemptId: payload.attempt.id, title }),
       onError: (cause) => setError(getApiErrorMessage(cause, 'Não foi possível começar. Tente de novo.')),
@@ -95,7 +97,9 @@ export function BancoQuestoesScreen() {
     navigation.navigate('BancoSimulado', set.open_attempt_id ? { attemptId: set.open_attempt_id, title: set.title } : { setId: set.id, title: set.title });
   const refresh = () => { all.refetch(); bySubject.refetch(); current.refetch(); summary.refetch(); sets.refetch(); };
 
-  const ctaLabel = !pool ? (onlyNew ? 'Sem questões novas aqui' : 'Sem questões aqui') : `Começar ${count} ${count === 1 ? 'questão' : 'questões'}`;
+  const ctaLabel = !pool
+    ? (onlyNew ? 'Sem questões novas aqui' : onlyUnanswered ? 'Você já respondeu estas' : 'Sem questões aqui')
+    : `Começar ${count} ${count === 1 ? 'questão' : 'questões'}`;
 
   if (all.isLoading) {
     return <View style={{ flex: 1, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color={p.brand} /></View>;
@@ -165,8 +169,24 @@ export function BancoQuestoesScreen() {
           <View style={{ maxWidth: isDesktop ? 360 : undefined }}>
             <SegmentedControl label="Quantidade" options={QUANTITIES.map(String)} value={QUANTITIES.indexOf(quantity)} onChange={(i) => setQuantity(QUANTITIES[i])} />
           </View>
-          <Checkbox large label="Só questões novas" checked={onlyNew} disabled={!availableNew && !onlyNew} onPress={() => setOnlyNew((v) => !v)}
+          <Checkbox large label="Ainda não respondi" count={availableUnanswered} checked={onlyUnanswered}
+            onPress={() => {
+              setOnlyUnanswered((on) => {
+                if (on) setOnlyNew(false);
+                return !on;
+              });
+            }} />
+          <Checkbox large label="Só questões novas" checked={onlyNew} disabled={!availableNew && !onlyNew}
+            onPress={() => {
+              setOnlyNew((on) => {
+                if (!on) setOnlyUnanswered(true);
+                return !on;
+              });
+            }}
             trailing={availableNew ? <NewPill label={String(availableNew)} /> : null} />
+          {onlyNew && !availableNew && availableUnanswered > 0 ? (
+            <Txt variant="bodySm" tone="subtle">Não há questões novas aqui. Desmarque “Só questões novas” para praticar as que você ainda não respondeu.</Txt>
+          ) : null}
         </View>
       ) : null}
     </>
@@ -200,7 +220,7 @@ export function BancoQuestoesScreen() {
     const rows: [string, string][] = [
       ['Matéria', subjectIds.length ? subjectName : 'Todas'],
       ['Assunto', topicIds.length ? topicName : 'Todos'],
-      ['Questões', pool ? `${count}${newInSession && !onlyNew ? ` (${newLabel(newInSession)})` : onlyNew ? ' novas' : ''}` : '—'],
+      ['Questões', !pool ? '—' : onlyNew ? `${count} novas` : onlyUnanswered ? `${count} não respondidas${newInSession ? ` (${newLabel(newInSession)})` : ''}` : `${count}${newInSession ? ` (${newLabel(newInSession)})` : ''}`],
       ['Resposta certa', 'Depois de cada questão'],
     ];
     return (
