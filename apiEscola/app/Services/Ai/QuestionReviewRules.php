@@ -45,7 +45,13 @@ class QuestionReviewRules
             );
         }
 
-        $problems = array_merge($problems, self::ambiguousOptions($options), self::citedWords($text, $options), self::arithmetic($text, $options));
+        $problems = array_merge(
+            $problems,
+            self::ambiguousOptions($options),
+            self::citedWords($text, $options),
+            self::arithmetic($text, $options),
+            ValidacaoMatematicaService::problemas($options),
+        );
 
         if (count($options) >= 2 && trim(QuestionRichText::plain($explanation)) === '') {
             $problems[] = self::problem('justificativa', 'media', 'A questão objetiva está sem justificativa.');

@@ -426,6 +426,7 @@ class ValidadorQuestaoService
         return implode("\n\n", array_filter([
             'Resolva a questão sem receber o gabarito. Escolha a única alternativa correta, ou informe que não há resposta única.',
             'Depois avalie enunciado e alternativas: gramática, coerência com disciplina e dificuldade, ambiguidade, cálculo e, em Português, tonicidade e acentuação. Monossílabo tônico não é oxítona.',
+            'Trate medidas equivalentes como a mesma resposta: 25,5 km, 25.500 m e 25,500 km não são alternativas distintas.',
             'Não trate o seu acerto como prova suficiente se o enunciado estiver ambíguo ou incompleto.',
             'Sempre devolva "justificativa": a explicação que o aluno vai ler. Cite a letra correta e o texto dessa alternativa. Não cite outra letra.',
             'Se a alternativa correta estiver errada, ou não houver exatamente uma correta, devolva "opcoes" com a lista inteira (mesmo número de itens, texto sem a letra) e "is_correct": true só na correta.',
@@ -444,8 +445,9 @@ class ValidadorQuestaoService
         if (($credential['provider'] ?? '') !== 'openrouter') {
             return $current;
         }
-        $primary = trim((string) config('services.ai.review.model'));
-        $strong = trim((string) config('services.ai.review.advanced_model'));
+        $modelos = app(GerenciadorModelosService::class);
+        $primary = $modelos->modelo(GerenciadorModelosService::REVISOR);
+        $strong = $modelos->modelo(GerenciadorModelosService::REVISOR_PREMIUM);
         $chosen = $advanced ? $strong : $primary;
         if ($chosen === '' || $chosen === $current) {
             $chosen = $advanced ? $primary : $strong;
