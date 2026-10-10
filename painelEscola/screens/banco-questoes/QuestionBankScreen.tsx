@@ -18,6 +18,7 @@ import {
 } from "../../components/ui/dataTableStyles";
 import DifficultyMeter from "../../components/banco-questoes/DifficultyMeter";
 import QuestionStatusBadge from "../../components/banco-questoes/QuestionStatusBadge";
+import Badge from "../../components/ui/Badge";
 import BulkClassifyModal, { type BulkAction } from "../../components/banco-questoes/BulkClassifyModal";
 import AiBulkClassifyModal from "../../components/banco-questoes/AiBulkClassifyModal";
 import UndoToast from "../../components/banco-questoes/UndoToast";
@@ -82,7 +83,7 @@ const LIST_HASH = "#/questoes";
 const DENSITY_KEY = "questoes_densidade";
 const SEARCH_DEBOUNCE_MS = 300;
 
-const COL = { select: 40, number: 150, board: 150, difficulty: 150, errors: 120, status: 130, actions: 44 };
+const COL = { select: 40, number: 150, board: 150, difficulty: 150, errors: 120, status: 150, actions: 44 };
 
 function readStateFromHash(): QuestionBankListState {
   return parseListState(typeof window === "undefined" ? "" : hashQuery(window.location.hash));
@@ -909,8 +910,9 @@ export default function QuestionBankScreen({ navigate }: Props) {
                         <Text className={TABLE_CELL_MUTED}>—</Text>
                       )}
                     </View>
-                    <View style={{ width: COL.status }}>
+                    <View style={{ width: COL.status, gap: 4 }}>
                       <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
+                      {row.revalidated_at ? <Badge label="Revalidada" tone="brand" dot /> : null}
                     </View>
                     <View style={{ width: COL.actions, alignItems: "flex-end" }}>
                       <TouchableOpacity onPress={() => setMenuRow(row)} aria-label={`Ações da questão ${row.id}`} className="p-1.5 rounded-ds-md">
