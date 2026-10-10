@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Filtros: search, subject_ids[], topic_ids[], situation (all|unanswered|wrong|saved|new), difficulty_id, years[], year_before.
  *
- * "Nova" = o aluno ainda não respondeu e a questão entrou no banco nos últimos NEW_DAYS dias
+ * "Nova" = o aluno ainda não respondeu e a questão entrou no banco, ou foi resetada, nos últimos NEW_DAYS dias
  * (questão do banco: criação; questão de simulado: quando o simulado encerrou).
  */
 class PracticeCatalogService
@@ -182,6 +182,7 @@ class PracticeCatalogService
             'new' => $query->whereNotExists($answers)->where(function (Builder $q) {
                 $since = now()->subDays(self::NEW_DAYS);
                 $q->where(fn (Builder $b) => $b->whereNull('exam_questions.exam_id')->where('exam_questions.created_at', '>=', $since))
+                    ->orWhere('exam_questions.practice_reset_at', '>=', $since)
                     ->orWhereExists(fn (QueryBuilder $e) => $e->select(DB::raw(1))->from('exams as n_ex')
                         ->whereColumn('n_ex.id', 'exam_questions.exam_id')->whereRaw('coalesce(n_ex.ends_at, n_ex.updated_at) >= ?', [$since]));
             }),

@@ -66,6 +66,11 @@ export async function approveQuestionsManually(ids: number[]) {
   };
 }
 
+export async function resetQuestionPractice(questionId: number) {
+  const { data } = await api.post(`/question-bank/questions/${questionId}/practice-reset`);
+  return data as { type: string; message: string; body: { id: number; removed_answers: number; practice_reset_at: string | null } };
+}
+
 export async function markQuestionsRevalidated(ids: number[], revalidated: boolean) {
   const { data } = await api.post("/question-bank/questions/revalidation", { ids, revalidated });
   return data as { type: string; message: string; body: { ids: number[]; revalidated: boolean } };

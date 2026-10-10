@@ -12,6 +12,7 @@ use App\Http\Requests\UpdateQuestionClassificationRequest;
 use App\Http\Resources\QuestionBankQuestionResource;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
+use App\Models\PracticeAnswer;
 use App\Services\Ai\ValidadorQuestaoService;
 use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
@@ -115,6 +116,20 @@ class QuestionBankController extends Controller
             'ids' => $ids->map(fn ($id) => (int) $id)->all(),
             'revalidated' => (bool) $data['revalidated'],
         ], $data['revalidated'] ? 'Questões marcadas como revalidadas.' : 'Marca de revalidação removida.');
+    }
+
+    /** POST question-bank/questions/{question}/practice-reset — descarta a prática e a questão volta como nova. */
+    public function resetPractice(Request $request, int $question): JsonResponse
+    {
+        $model = $this->findQuestion($request, $question);
+        $removed = PracticeAnswer::query()->where('exam_question_id', $model->id)->delete();
+        $model->forceFill(['practice_reset_at' => now()])->save();
+
+        return $this->success([
+            'id' => (int) $model->id,
+            'removed_answers' => $removed,
+            'practice_reset_at' => $model->practice_reset_at?->toIso8601String(),
+        ], 'A questão voltou como nova. Os alunos respondem de novo.');
     }
 
     /** POST question-bank/questions/review/approve — aprovação manual das questões selecionadas. */

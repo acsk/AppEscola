@@ -21,6 +21,7 @@ import {
   createStandaloneQuestion,
   fetchQuestionBankQuestion,
   markQuestionsRevalidated,
+  resetQuestionPractice,
   patchQuestionClassification,
   updateStandaloneQuestion,
   uploadQuestionBankImage,
@@ -116,6 +117,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [reviewing, setReviewing] = useState(false);
   const [revalidatedAt, setRevalidatedAt] = useState<string | null>(null);
   const [markingRevalidated, setMarkingRevalidated] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const isFromExam = examQuestion !== null;
 
   const load = useCallback(async () => {
@@ -391,6 +394,20 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       showApiErrorToast(setToast, error, "Não foi possível marcar a revalidação.");
     } finally {
       setMarkingRevalidated(false);
+    }
+  };
+
+  const confirmResetPractice = async () => {
+    if (questionId === null || resetting) return;
+    setResetting(true);
+    try {
+      const response = await resetQuestionPractice(questionId);
+      setConfirmReset(false);
+      showApiToast(setToast, response, "A questão voltou como nova. Os alunos respondem de novo.");
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível resetar a questão.");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -743,12 +760,17 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         ) : null}
 
         {!loading && !loadError && questionId !== null ? (
-          <View className="flex-row" style={{ marginBottom: 12 }}>
+          <View className="flex-row flex-wrap" style={{ marginBottom: 12, gap: 8 }}>
             <Button
               label={revalidatedAt ? "Revalidada" : "Marcar revalidada"}
               onPress={() => void toggleRevalidated()}
               loading={markingRevalidated}
-              disabled={markingRevalidated || reviewing}
+              disabled={markingRevalidated || reviewing || resetting}
+            />
+            <Button
+              label="Resetar como nova"
+              onPress={() => setConfirmReset(true)}
+              disabled={markingRevalidated || reviewing || resetting}
             />
           </View>
         ) : null}
@@ -824,6 +846,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           action?.();
         }}
         onCancel={() => setPendingLeave(null)}
+      />
+
+      <ConfirmModal
+        visible={confirmReset}
+        title="Resetar como nova?"
+        message="As respostas de prática desta questão saem da soma e do ranking. Ela volta como nova por 14 dias e os alunos respondem de novo. As notas do simulado oficial não mudam."
+        confirmLabel="Resetar"
+        cancelLabel="Cancelar"
+        tone="danger"
+        loading={resetting}
+        onConfirm={() => void confirmResetPractice()}
+        onCancel={() => { if (!resetting) setConfirmReset(false); }}
       />
 
       <ConfirmModal

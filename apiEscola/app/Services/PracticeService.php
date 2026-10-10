@@ -298,8 +298,9 @@ class PracticeService
 
         return $questions->filter(function (ExamQuestion $q) use ($since, $answeredElsewhere) {
             $availableAt = $q->exam_id ? ($q->exam?->ends_at ?? $q->exam?->updated_at) : $q->created_at;
+            $reset = $q->practice_reset_at && $q->practice_reset_at->gte($since);
 
-            return ! $answeredElsewhere->has($q->id) && $availableAt && $availableAt->gte($since);
+            return ! $answeredElsewhere->has($q->id) && ($reset || ($availableAt && $availableAt->gte($since)));
         })->pluck('id')->flip();
     }
 
