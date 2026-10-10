@@ -120,13 +120,13 @@ class ExamQuestion extends Model
     }
 
     /**
-     * Prática avulsa do aluno: questões do banco e as de simulados oficiais já encerrados
-     * (o gabarito de simulado em andamento ou ainda não aplicado continua protegido).
+     * Prática do aluno: questões avulsas e as de simulados oficiais já arquivados.
+     * Simulado bloqueado, publicado ou só com o prazo vencido continua fora do app.
      */
     public function scopePracticeAvailable(Builder $query, int $tenantId): Builder
     {
         return $query->answerable($tenantId)->approvedForPractice()->where(fn (Builder $q) => $q->whereNull('exam_questions.exam_id')
-            ->orWhereHas('exam', fn (Builder $e) => $e->closed()));
+            ->orWhereHas('exam', fn (Builder $e) => $e->archived()));
     }
 
     /** A última revisão pedagógica está aprovada (automática ou manual). Sem isso a questão não vai ao aluno. */

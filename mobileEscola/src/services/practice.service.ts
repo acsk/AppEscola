@@ -14,7 +14,7 @@ export interface PracticeQuestion {
   question_text: string | null;
   image_url: string | null;
   source_exam_name: string | null;
-  /** Simulado da escola de onde a questão veio (já encerrado). */
+  /** Simulado da escola de onde a questão veio (já arquivado). */
   exam_title?: string | null;
   subject: { id: number; name: string } | null;
   topics: string[];

@@ -78,6 +78,12 @@ class Exam extends Model
         return $this->course_id ? collect([(int) $this->course_id]) : collect();
     }
 
+    /** Só o simulado arquivado libera as questões para a prática do aluno. */
+    public function scopeArchived(Builder $query): Builder
+    {
+        return $query->whereHas('examStatus', fn (Builder $s) => $s->where('slug', 'archived'));
+    }
+
     /** Encerrados: arquivados, ou publicados com o prazo (ends_at) já vencido. Rascunhos e em andamento não entram. */
     public function scopeClosed(Builder $query): Builder
     {

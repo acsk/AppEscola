@@ -75,7 +75,7 @@ class PracticeService
     }
 
     /**
-     * Questões que o aluno pode praticar (banco + simulados oficiais encerrados), somente das disciplinas
+     * Questões que o aluno pode praticar (banco + simulados oficiais arquivados), somente das disciplinas
      * da grade das turmas em que ele está matriculado. Sem turma ou sem disciplina na grade, não há questão.
      */
     public function practicableFor(Student $student): Builder

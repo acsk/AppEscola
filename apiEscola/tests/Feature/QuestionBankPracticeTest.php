@@ -246,7 +246,7 @@ class QuestionBankPracticeTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_questions_from_closed_official_exams_become_available_for_practice(): void
+    public function test_only_archived_official_exam_questions_become_available_for_practice(): void
     {
         $status = fn (string $slug) => DB::table('exam_statuses')->where('slug', $slug)->value('id');
         $exam = fn (string $slug, ?string $endsAt) => Exam::create([
@@ -266,17 +266,15 @@ class QuestionBankPracticeTest extends TestCase
         $student = $this->student();
         $this->inClass($student);
         $this->actingAsStudent($student);
-        $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 2);
-        $seen = [];
-        for ($i = 0; $i < 12; $i++) {
+        $this->getJson('/api/aluno/practice/filters')->assertOk()->assertJsonPath('body.total', 1);
+        for ($i = 0; $i < 4; $i++) {
             $body = $this->getJson('/api/aluno/practice/next-question')->assertOk()->json('body');
-            $seen[] = $body['id'];
-            $this->assertSame($body['id'] === $ended->id ? 'Oficial published' : 'Oficial archived', $body['exam_title']);
+            $this->assertSame($archived->id, $body['id']);
+            $this->assertSame('Oficial archived', $body['exam_title']);
         }
-        $this->assertEqualsCanonicalizing([$ended->id, $archived->id], array_values(array_unique($seen)));
-        $this->postJson("/api/aluno/practice/questions/{$ended->id}/answer", ['option_id' => $this->correct($ended)])
+        $this->postJson("/api/aluno/practice/questions/{$archived->id}/answer", ['option_id' => $this->correct($archived)])
             ->assertOk()->assertJsonPath('body.is_correct', true);
-        foreach ([$running, $draft] as $hidden) {
+        foreach ([$ended, $running, $draft] as $hidden) {
             $this->postJson("/api/aluno/practice/questions/{$hidden->id}/answer", ['option_id' => $this->correct($hidden)])->assertNotFound();
         }
 
