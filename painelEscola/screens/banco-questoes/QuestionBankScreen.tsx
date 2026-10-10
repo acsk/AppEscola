@@ -27,8 +27,8 @@ import { QUESTION_SET_ORIGIN_LABEL, fetchQuestionSet, fetchQuestionSets } from "
 import {
   fetchExamOptions,
   fetchQuestionBankIds,
+  approveQuestionsManually,
   fetchQuestionBankPage,
-  markQuestionsRevalidated,
   fetchQuestionBankYears,
   patchClassificationBatch,
   deleteStandaloneQuestion,
@@ -100,7 +100,7 @@ function readDensity(): "padrao" | "compacta" {
 const filtersKey = (s: QuestionBankListState) =>
   JSON.stringify([
     s.search, s.subjectIds, s.topicIds, s.boardIds, s.years, s.difficultyIds,
-    s.origin, s.examTypeIds, s.examIds, s.questionSetIds, s.mostErrors, s.hideRevalidated, s.tab,
+    s.origin, s.examTypeIds, s.examIds, s.questionSetIds, s.mostErrors, s.hideRevalidated, s.withoutSubject, s.tab,
   ]);
 
 export default function QuestionBankScreen({ navigate }: Props) {
@@ -112,6 +112,8 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const [questionSetsOpen, setQuestionSetsOpen] = useState(false);
   const [addToSet, setAddToSet] = useState<{ ids: number[]; blocked: number } | null>(null);
   const [checkingAddToSet, setCheckingAddToSet] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [approving, setApproving] = useState(false);
   const [addedSetId, setAddedSetId] = useState<number | null>(null);
   const [rankingOpen, setRankingOpen] = useState(false);
   const [resumeImportId, setResumeImportId] = useState<string | null>(null);
@@ -194,19 +196,6 @@ export default function QuestionBankScreen({ navigate }: Props) {
   useEffect(() => {
     fetchQuestionBankYears().then(setYears).catch(() => setYears([]));
   }, []);
-
-  const setRevalidated = async (ids: number[], revalidated: boolean) => {
-    if (!ids.length) return;
-    try {
-      const response = await markQuestionsRevalidated(ids, revalidated);
-      setMenuRow(null);
-      setSelected(new Set());
-      showApiToast(setToast, response, revalidated ? "Questões marcadas como revalidadas." : "Marca removida.");
-      await load();
-    } catch (error) {
-      showApiErrorToast(setToast, error, "Não foi possível marcar a revalidação.");
-    }
-  };
 
   const rows = result?.data ?? [];
   const meta = result?.meta;
@@ -296,6 +285,23 @@ export default function QuestionBankScreen({ navigate }: Props) {
   // ── Seleção ────────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectingAll, setSelectingAll] = useState(false);
+
+  const confirmApprove = async () => {
+    const ids = Array.from(selected);
+    if (!ids.length || approving) return;
+    setApproving(true);
+    try {
+      const response = await approveQuestionsManually(ids);
+      setApproveOpen(false);
+      setSelected(new Set());
+      showApiToast(setToast, response, response.message || "Questões aprovadas manualmente.");
+      await load();
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível aprovar as questões.");
+    } finally {
+      setApproving(false);
+    }
+  };
   const currentFiltersKey = filtersKey(state);
   useEffect(() => setSelected(new Set()), [currentFiltersKey]);
 
@@ -678,6 +684,23 @@ export default function QuestionBankScreen({ navigate }: Props) {
             <Ionicons name={state.hideRevalidated ? "checkbox" : "square-outline"} size={16} color={state.hideRevalidated ? "var(--ds-brand)" : "var(--ds-ink-muted)"} />
             <Text className={`text-xs font-semibold ${state.hideRevalidated ? "text-brand" : "text-ink-muted"}`}>Ocultar revalidadas</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => updateState({
+              ...state,
+              withoutSubject: !state.withoutSubject,
+              subjectIds: state.withoutSubject ? state.subjectIds : [],
+              topicIds: state.withoutSubject ? state.topicIds : [],
+              page: 1,
+            })}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: state.withoutSubject }}
+            aria-label="Mostrar só questões sem disciplina"
+            className={`flex-row items-center gap-2 px-3 rounded-ds-md border justify-center ${state.withoutSubject ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
+            style={{ height: 44 }}
+          >
+            <Ionicons name={state.withoutSubject ? "checkbox" : "square-outline"} size={16} color={state.withoutSubject ? "var(--ds-brand)" : "var(--ds-ink-muted)"} />
+            <Text className={`text-xs font-semibold ${state.withoutSubject ? "text-brand" : "text-ink-muted"}`}>Sem disciplina</Text>
+          </TouchableOpacity>
           {hasActiveFilters(state) && (
             <TouchableOpacity
               onPress={() => updateState(clearFilters(state))}
@@ -721,18 +744,12 @@ export default function QuestionBankScreen({ navigate }: Props) {
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
-                onPress={() => void setRevalidated(Array.from(selected), true)}
-                aria-label="Em massa: marcar como revalidadas"
+                onPress={() => setApproveOpen(true)}
+                disabled={approving}
+                aria-label="Em massa: aprovar manualmente"
                 className="px-3 py-1.5 rounded-ds-md bg-surface border border-border"
               >
-                <Text className="text-xs font-semibold text-brand">Marcar revalidadas</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => void setRevalidated(Array.from(selected), false)}
-                aria-label="Em massa: desmarcar revalidação"
-                className="px-3 py-1.5 rounded-ds-md bg-surface border border-border"
-              >
-                <Text className="text-xs font-semibold text-brand">Desmarcar</Text>
+                <Text className="text-xs font-semibold text-brand">Aprovar manualmente</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setAiBulkOpen(true)}
@@ -891,15 +908,6 @@ export default function QuestionBankScreen({ navigate }: Props) {
                       ) : (
                         <Text className={TABLE_CELL_MUTED}>—</Text>
                       )}
-                      <TouchableOpacity
-                        onPress={() => void setRevalidated([row.id], !row.revalidated_at)}
-                        accessibilityRole="button"
-                        aria-label={row.revalidated_at ? `Desmarcar revalidação da questão ${row.id}` : `Marcar questão ${row.id} como revalidada`}
-                      >
-                        <Text className={`text-xs font-semibold ${row.revalidated_at ? "text-success" : "text-brand"}`}>
-                          {row.revalidated_at ? "Revalidada" : "Marcar revalidada"}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                     <View style={{ width: COL.status }}>
                       <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
@@ -967,7 +975,6 @@ export default function QuestionBankScreen({ navigate }: Props) {
               [
                 // Classificar e gerar semelhantes só na edição.
                 ["eye-outline", "Visualizar", () => openClassify(menuRow.id)],
-                [menuRow.revalidated_at ? "checkmark-circle-outline" : "refresh-outline", menuRow.revalidated_at ? "Desmarcar revalidação" : "Marcar como revalidada", () => { void setRevalidated([menuRow.id], !menuRow.revalidated_at); }],
                 ["pencil-outline", "Editar", () => navigate("questoes-editar", { questionId: menuRow.id, query: serializeListState(state) })],
                 ...(menuRow.exam
                   ? [["document-text-outline", `Abrir simulado "${menuRow.exam.title}"`, () => navigate("simulados-form", { examId: menuRow.exam!.id })]]
@@ -1045,6 +1052,18 @@ export default function QuestionBankScreen({ navigate }: Props) {
           void load();
         }}
         setToast={setToast}
+      />
+
+      <ConfirmModal
+        visible={approveOpen}
+        title="Aprovar manualmente"
+        message={`${selected.size} ${selected.size === 1 ? "questão passa" : "questões passam"} a valer no mobile. Respostas de prática feitas antes desta aprovação deixam de contar e o aluno responde de novo.`}
+        confirmLabel="Aprovar"
+        cancelLabel="Cancelar"
+        tone="primary"
+        loading={approving}
+        onConfirm={() => void confirmApprove()}
+        onCancel={() => { if (!approving) setApproveOpen(false); }}
       />
 
       <ConfirmModal

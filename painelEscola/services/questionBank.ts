@@ -52,6 +52,20 @@ export async function fetchExamOptions(params: { search?: string; ids?: string }
   return data.body ?? [];
 }
 
+export async function approveQuestionsManually(ids: number[]) {
+  const approved: number[] = [];
+  for (let index = 0; index < ids.length; index += 500) {
+    const { data } = await api.post("/question-bank/questions/review/approve", { ids: ids.slice(index, index + 500) });
+    approved.push(...(data.body?.ids ?? []));
+  }
+  const count = approved.length;
+  return {
+    type: "success",
+    message: count === 1 ? "1 questão aprovada manualmente." : `${count} questões aprovadas manualmente.`,
+    body: { ids: approved },
+  };
+}
+
 export async function markQuestionsRevalidated(ids: number[], revalidated: boolean) {
   const { data } = await api.post("/question-bank/questions/revalidation", { ids, revalidated });
   return data as { type: string; message: string; body: { ids: number[]; revalidated: boolean } };

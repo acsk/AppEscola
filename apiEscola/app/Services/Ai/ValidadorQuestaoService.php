@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use App\Models\ExamQuestion;
 use App\Models\QuestionReview;
 use App\Support\AiPromptGuard;
 use App\Support\QuestionRichText;
@@ -152,6 +153,32 @@ class ValidadorQuestaoService
             'content' => ['approved_by' => $userId],
             'validated_at' => now(),
         ]);
+    }
+
+    /**
+     * Aprova várias questões de uma vez e marca como revalidadas, como a aprovação de uma questão.
+     *
+     * @param  array<int, int>  $questionIds
+     * @return array<int, int>
+     */
+    public function aprovarManualmenteEmLote(int $tenantId, array $questionIds, ?int $userId = null): array
+    {
+        $ids = ExamQuestion::query()
+            ->inQuestionBank($tenantId)
+            ->whereIn('id', $questionIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        foreach ($ids as $id) {
+            $this->aprovarManualmente($tenantId, $id, $userId);
+        }
+
+        if ($ids !== []) {
+            ExamQuestion::query()->whereIn('id', $ids)->update(['revalidated_at' => now()]);
+        }
+
+        return $ids;
     }
 
     /** @return array<int, array<string, mixed>> */

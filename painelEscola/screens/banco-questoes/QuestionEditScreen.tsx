@@ -114,6 +114,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [review, setReview] = useState<QuestionReview | null>(null);
   const [reviewHistory, setReviewHistory] = useState<QuestionReview[]>([]);
   const [reviewing, setReviewing] = useState(false);
+  const [revalidatedAt, setRevalidatedAt] = useState<string | null>(null);
+  const [markingRevalidated, setMarkingRevalidated] = useState(false);
   const isFromExam = examQuestion !== null;
 
   const load = useCallback(async () => {
@@ -130,6 +132,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       const classified = formFromQuestion(q);
       setInitialClassification(classified);
       setClassification(classified);
+      setRevalidatedAt(q.revalidated_at ?? null);
       setSourceExamName(q.source_exam_name ?? "");
       setInitialSourceExamName(q.source_exam_name ?? "");
       const reviews = await fetchQuestionReviews(questionId).catch(() => []);
@@ -325,7 +328,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         const response = await aiApproveQuestionReview(questionId);
         setReview(response.body);
         setReviewHistory((prev) => [response.body, ...prev]);
-        void markQuestionsRevalidated([questionId], true).catch(() => undefined);
+        void markQuestionsRevalidated([questionId], true).then(() => setRevalidatedAt(new Date().toISOString())).catch(() => undefined);
         return;
       }
       const payload = action === "correct"
@@ -359,7 +362,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           })),
         });
       }
-      if (questionId !== null) void markQuestionsRevalidated([questionId], true).catch(() => undefined);
+      if (questionId !== null) void markQuestionsRevalidated([questionId], true).then(() => setRevalidatedAt(new Date().toISOString())).catch(() => undefined);
     } catch (error) {
       setAiError(describeAiError(error, "Não foi possível revisar a questão"));
     } finally {
@@ -375,6 +378,21 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     lastDetectedYear.current = detectedYear;
     setClassification((prev) => (prev.year === null ? { ...prev, year: detectedYear } : prev));
   }, [detectedYear, loading]);
+
+  const toggleRevalidated = async () => {
+    if (questionId === null || markingRevalidated) return;
+    const next = !revalidatedAt;
+    setMarkingRevalidated(true);
+    try {
+      const response = await markQuestionsRevalidated([questionId], next);
+      setRevalidatedAt(next ? new Date().toISOString() : null);
+      showApiToast(setToast, response, next ? "Questão marcada como revalidada." : "Marca de revalidação removida.");
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível marcar a revalidação.");
+    } finally {
+      setMarkingRevalidated(false);
+    }
+  };
 
   const openRedraw = async () => {
     if (!content.image_url || aiFilling || saving !== null || uploading) return;
@@ -722,6 +740,17 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             onCorrect={() => void runReview("correct")}
             onApprove={questionId !== null ? () => void runReview("approve") : undefined}
           />
+        ) : null}
+
+        {!loading && !loadError && questionId !== null ? (
+          <View className="flex-row" style={{ marginBottom: 12 }}>
+            <Button
+              label={revalidatedAt ? "Revalidada" : "Marcar revalidada"}
+              onPress={() => void toggleRevalidated()}
+              loading={markingRevalidated}
+              disabled={markingRevalidated || reviewing}
+            />
+          </View>
         ) : null}
 
         {loading ? (

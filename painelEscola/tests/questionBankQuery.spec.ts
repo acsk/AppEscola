@@ -78,6 +78,21 @@ test.describe("estado da listagem na URL", () => {
     expect(state.topicIds).toEqual([]);
   });
 
+  test("filtro sem disciplina vai para a URL e para a API", () => {
+    const on = { ...DEFAULT_LIST_STATE, withoutSubject: true, subjectIds: [3], topicIds: [9] };
+    const query = serializeListState({ ...on, subjectIds: [], topicIds: [] });
+    expect(query).toContain("semDisciplina=1");
+    expect(parseListState(query).withoutSubject).toBe(true);
+    expect(parseListState("semDisciplina=1&disciplina=3&assunto=9")).toMatchObject({
+      withoutSubject: true, subjectIds: [], topicIds: [],
+    });
+    expect(toApiParams({ ...DEFAULT_LIST_STATE, withoutSubject: true }).without_subject).toBe(1);
+    expect(toApiParams(DEFAULT_LIST_STATE)).not.toHaveProperty("without_subject");
+    expect(hasActiveFilters({ ...DEFAULT_LIST_STATE, withoutSubject: true })).toBe(true);
+    expect(clearFilters({ ...DEFAULT_LIST_STATE, withoutSubject: true }).withoutSubject).toBe(false);
+    expect(withSubjectFilter({ ...DEFAULT_LIST_STATE, withoutSubject: true }, [2]).withoutSubject).toBe(false);
+  });
+
   test("filtro de mais erros liga a ordenação pela taxa e volta ao padrão", () => {
     const on = toggleMostErrors(DEFAULT_LIST_STATE);
     expect(on.mostErrors).toBe(true);

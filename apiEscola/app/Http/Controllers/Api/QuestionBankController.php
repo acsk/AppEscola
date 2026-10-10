@@ -12,6 +12,7 @@ use App\Http\Requests\UpdateQuestionClassificationRequest;
 use App\Http\Resources\QuestionBankQuestionResource;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
+use App\Services\Ai\ValidadorQuestaoService;
 use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
 use App\Services\QuestionClassificationService;
@@ -33,6 +34,7 @@ class QuestionBankController extends Controller
         private readonly QuestionBankQueryService $queries,
         private readonly QuestionClassificationService $classification,
         private readonly QuestionContentService $content,
+        private readonly ValidadorQuestaoService $validador,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -113,6 +115,23 @@ class QuestionBankController extends Controller
             'ids' => $ids->map(fn ($id) => (int) $id)->all(),
             'revalidated' => (bool) $data['revalidated'],
         ], $data['revalidated'] ? 'Questões marcadas como revalidadas.' : 'Marca de revalidação removida.');
+    }
+
+    /** POST question-bank/questions/review/approve — aprovação manual das questões selecionadas. */
+    public function approveReviews(Request $request): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $ids = $this->validador->aprovarManualmenteEmLote($tenantId, $data['ids'], $request->user()?->id);
+        $count = count($ids);
+
+        return $this->success([
+            'ids' => $ids,
+        ], $count === 1 ? '1 questão aprovada manualmente.' : "{$count} questões aprovadas manualmente.");
     }
 
     public function batchClassification(BatchQuestionClassificationRequest $request): JsonResponse

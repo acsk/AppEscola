@@ -52,6 +52,8 @@ export type QuestionBankListState = {
   mostErrors: boolean;
   /** Esconde as que já foram marcadas como revalidadas. */
   hideRevalidated: boolean;
+  /** Só questões sem disciplina. */
+  withoutSubject: boolean;
   tab: QuestionBankTab;
   sort: QuestionBankSort;
   direction: SortDirection;
@@ -72,6 +74,7 @@ export const DEFAULT_LIST_STATE: QuestionBankListState = {
   questionSetIds: [],
   mostErrors: false,
   hideRevalidated: false,
+  withoutSubject: false,
   tab: "todas",
   sort: "id",
   direction: "desc",
@@ -93,6 +96,7 @@ const URL_KEYS = {
   questionSetIds: "simuladoBanco",
   mostErrors: "erros",
   hideRevalidated: "ocultarRevalidadas",
+  withoutSubject: "semDisciplina",
   tab: "aba",
   sort: "ordem",
   direction: "dir",
@@ -137,6 +141,11 @@ export function parseListState(query: string): QuestionBankListState {
 
   state.mostErrors = params.get(URL_KEYS.mostErrors) === "1";
   state.hideRevalidated = params.get(URL_KEYS.hideRevalidated) === "1";
+  state.withoutSubject = params.get(URL_KEYS.withoutSubject) === "1";
+  if (state.withoutSubject) {
+    state.subjectIds = [];
+    state.topicIds = [];
+  }
 
   const origin = params.get(URL_KEYS.origin);
   if (QUESTION_BANK_ORIGINS.some((o) => o.key === origin)) state.origin = origin as QuestionBankOrigin;
@@ -171,6 +180,7 @@ export function serializeListState(state: QuestionBankListState): string {
   }
   if (state.mostErrors) params.set(URL_KEYS.mostErrors, "1");
   if (state.hideRevalidated) params.set(URL_KEYS.hideRevalidated, "1");
+  if (state.withoutSubject) params.set(URL_KEYS.withoutSubject, "1");
   if (state.origin) params.set(URL_KEYS.origin, state.origin);
   if (state.tab !== DEFAULT_LIST_STATE.tab) params.set(URL_KEYS.tab, state.tab);
   if (state.sort !== DEFAULT_LIST_STATE.sort) params.set(URL_KEYS.sort, SORT_URL[state.sort]);
@@ -201,6 +211,7 @@ export function toApiParams(state: QuestionBankListState, options: { paginate?: 
   if (state.questionSetIds.length) params.question_set_id = state.questionSetIds.join(",");
   if (state.mostErrors) params.with_errors = 1;
   if (state.hideRevalidated) params.hide_revalidated = 1;
+  if (state.withoutSubject) params.without_subject = 1;
   if (options.paginate !== false) {
     params.page = state.page;
     params.per_page = state.perPage;
@@ -225,7 +236,7 @@ export function foldText(text: string): string {
 }
 
 export function hasActiveFilters(state: QuestionBankListState): boolean {
-  return state.mostErrors || state.hideRevalidated || state.origin !== "" || ID_LIST_FIELDS.some((field) => state[field].length > 0);
+  return state.mostErrors || state.hideRevalidated || state.withoutSubject || state.origin !== "" || ID_LIST_FIELDS.some((field) => state[field].length > 0);
 }
 
 export function clearFilters(state: QuestionBankListState): QuestionBankListState {
@@ -235,13 +246,14 @@ export function clearFilters(state: QuestionBankListState): QuestionBankListStat
     origin: "", examTypeIds: [], examIds: [], questionSetIds: [],
     mostErrors: false,
     hideRevalidated: false,
+    withoutSubject: false,
     page: 1,
   };
 }
 
 /** Troca de disciplina limpa o assunto. */
 export function withSubjectFilter(state: QuestionBankListState, subjectIds: number[]): QuestionBankListState {
-  return { ...state, subjectIds, topicIds: [], page: 1 };
+  return { ...state, subjectIds, topicIds: [], withoutSubject: subjectIds.length > 0 ? false : state.withoutSubject, page: 1 };
 }
 
 function defaultDirection(sort: QuestionBankSort): SortDirection {

@@ -167,6 +167,9 @@ class QuestionBankQueryService
         if (filter_var($params['hide_revalidated'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $query->whereNull('exam_questions.revalidated_at');
         }
+        if (filter_var($params['without_subject'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereNull('exam_questions.subject_id');
+        }
 
         $this->applySearch($query, trim((string) ($params['search'] ?? '')));
 
