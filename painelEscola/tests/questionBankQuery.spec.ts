@@ -87,7 +87,7 @@ test.describe("estado da listagem na URL", () => {
       withoutSubject: true, subjectIds: [], topicIds: [],
     });
     expect(toApiParams({ ...DEFAULT_LIST_STATE, withoutSubject: true }).without_subject).toBe(1);
-    expect(toApiParams(DEFAULT_LIST_STATE)).not.toHaveProperty("without_subject");
+    expect(toApiParams(DEFAULT_LIST_STATE).without_subject).toBe(0);
     expect(hasActiveFilters({ ...DEFAULT_LIST_STATE, withoutSubject: true })).toBe(true);
     expect(clearFilters({ ...DEFAULT_LIST_STATE, withoutSubject: true }).withoutSubject).toBe(false);
     expect(withSubjectFilter({ ...DEFAULT_LIST_STATE, withoutSubject: true }, [2]).withoutSubject).toBe(false);

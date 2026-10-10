@@ -52,7 +52,7 @@ export type QuestionBankListState = {
   mostErrors: boolean;
   /** Esconde as que já foram marcadas como revalidadas. */
   hideRevalidated: boolean;
-  /** Só questões sem disciplina. */
+  /** Ligado: só questões sem disciplina. Desligado: a lista inicial esconde essas questões. */
   withoutSubject: boolean;
   tab: QuestionBankTab;
   sort: QuestionBankSort;
@@ -211,7 +211,7 @@ export function toApiParams(state: QuestionBankListState, options: { paginate?: 
   if (state.questionSetIds.length) params.question_set_id = state.questionSetIds.join(",");
   if (state.mostErrors) params.with_errors = 1;
   if (state.hideRevalidated) params.hide_revalidated = 1;
-  if (state.withoutSubject) params.without_subject = 1;
+  params.without_subject = state.withoutSubject ? 1 : 0;
   if (options.paginate !== false) {
     params.page = state.page;
     params.per_page = state.perPage;
