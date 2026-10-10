@@ -17,6 +17,7 @@ import {
   summarizeBatch,
   tabsWithCounts,
   toApiParams,
+  toggleMostErrors,
   togglePageSelection,
   withSubjectFilter,
 } from "../utils/questionBankQuery";
@@ -75,6 +76,18 @@ test.describe("estado da listagem na URL", () => {
     expect(state.perPage).toBe(20);
     // assunto sem disciplina é descartado
     expect(state.topicIds).toEqual([]);
+  });
+
+  test("filtro de mais erros liga a ordenação pela taxa e volta ao padrão", () => {
+    const on = toggleMostErrors(DEFAULT_LIST_STATE);
+    expect(on.mostErrors).toBe(true);
+    expect(on.sort).toBe("errors");
+    expect(on.direction).toBe("desc");
+    expect(serializeListState(on)).toContain("erros=1");
+    expect(toApiParams(on).with_errors).toBe(1);
+    expect(parseListState(serializeListState(on)).mostErrors).toBe(true);
+    expect(toggleMostErrors(on).mostErrors).toBe(false);
+    expect(toggleMostErrors(on).sort).toBe("id");
   });
 
   test("lê a query a partir do hash", () => {

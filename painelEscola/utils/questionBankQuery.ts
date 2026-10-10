@@ -48,6 +48,8 @@ export type QuestionBankListState = {
   examIds: number[];
   /** Simulados do banco. */
   questionSetIds: number[];
+  /** Só questões que os alunos já erraram, da maior taxa de erro para a menor. */
+  mostErrors: boolean;
   tab: QuestionBankTab;
   sort: QuestionBankSort;
   direction: SortDirection;
@@ -66,6 +68,7 @@ export const DEFAULT_LIST_STATE: QuestionBankListState = {
   examTypeIds: [],
   examIds: [],
   questionSetIds: [],
+  mostErrors: false,
   tab: "todas",
   sort: "id",
   direction: "desc",
@@ -85,6 +88,7 @@ const URL_KEYS = {
   examTypeIds: "modalidade",
   examIds: "simulado",
   questionSetIds: "simuladoBanco",
+  mostErrors: "erros",
   tab: "aba",
   sort: "ordem",
   direction: "dir",
@@ -92,7 +96,7 @@ const URL_KEYS = {
   perPage: "porPagina",
 } as const;
 
-const SORT_URL: Record<QuestionBankSort, string> = { id: "numero", board: "banca", difficulty: "dificuldade" };
+const SORT_URL: Record<QuestionBankSort, string> = { id: "numero", board: "banca", difficulty: "dificuldade", errors: "erros" };
 
 const ID_LIST_FIELDS = [
   "subjectIds", "topicIds", "boardIds", "years", "difficultyIds", "examTypeIds", "examIds", "questionSetIds",
@@ -127,6 +131,8 @@ export function parseListState(query: string): QuestionBankListState {
   // Assunto sem disciplina não faz sentido no filtro (o select fica desabilitado).
   if (state.subjectIds.length === 0) state.topicIds = [];
 
+  state.mostErrors = params.get(URL_KEYS.mostErrors) === "1";
+
   const origin = params.get(URL_KEYS.origin);
   if (QUESTION_BANK_ORIGINS.some((o) => o.key === origin)) state.origin = origin as QuestionBankOrigin;
 
@@ -158,6 +164,7 @@ export function serializeListState(state: QuestionBankListState): string {
   for (const field of ID_LIST_FIELDS) {
     if (state[field].length) params.set(URL_KEYS[field], state[field].join(","));
   }
+  if (state.mostErrors) params.set(URL_KEYS.mostErrors, "1");
   if (state.origin) params.set(URL_KEYS.origin, state.origin);
   if (state.tab !== DEFAULT_LIST_STATE.tab) params.set(URL_KEYS.tab, state.tab);
   if (state.sort !== DEFAULT_LIST_STATE.sort) params.set(URL_KEYS.sort, SORT_URL[state.sort]);
@@ -186,6 +193,7 @@ export function toApiParams(state: QuestionBankListState, options: { paginate?: 
   if (state.examTypeIds.length) params.exam_type_id = state.examTypeIds.join(",");
   if (state.examIds.length) params.exam_id = state.examIds.join(",");
   if (state.questionSetIds.length) params.question_set_id = state.questionSetIds.join(",");
+  if (state.mostErrors) params.with_errors = 1;
   if (options.paginate !== false) {
     params.page = state.page;
     params.per_page = state.perPage;
@@ -210,7 +218,7 @@ export function foldText(text: string): string {
 }
 
 export function hasActiveFilters(state: QuestionBankListState): boolean {
-  return state.origin !== "" || ID_LIST_FIELDS.some((field) => state[field].length > 0);
+  return state.mostErrors || state.origin !== "" || ID_LIST_FIELDS.some((field) => state[field].length > 0);
 }
 
 export function clearFilters(state: QuestionBankListState): QuestionBankListState {
@@ -218,6 +226,7 @@ export function clearFilters(state: QuestionBankListState): QuestionBankListStat
     ...state,
     subjectIds: [], topicIds: [], boardIds: [], years: [], difficultyIds: [],
     origin: "", examTypeIds: [], examIds: [], questionSetIds: [],
+    mostErrors: false,
     page: 1,
   };
 }
@@ -228,7 +237,22 @@ export function withSubjectFilter(state: QuestionBankListState, subjectIds: numb
 }
 
 function defaultDirection(sort: QuestionBankSort): SortDirection {
-  return sort === "id" ? "desc" : "asc";
+  return sort === "board" || sort === "difficulty" ? "asc" : "desc";
+}
+
+/** Liga o filtro das questões que os alunos mais erram e ordena pela taxa de erro. */
+export function toggleMostErrors(state: QuestionBankListState): QuestionBankListState {
+  const mostErrors = !state.mostErrors;
+  if (mostErrors) {
+    return { ...state, mostErrors, sort: "errors", direction: "desc", page: 1 };
+  }
+  return {
+    ...state,
+    mostErrors,
+    sort: state.sort === "errors" ? "id" : state.sort,
+    direction: state.sort === "errors" ? "desc" : state.direction,
+    page: 1,
+  };
 }
 
 /** Clique no cabeçalho: mesma coluna alterna a direção; outra coluna começa na direção padrão dela. */

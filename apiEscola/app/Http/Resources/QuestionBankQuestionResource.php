@@ -43,6 +43,12 @@ class QuestionBankQuestionResource extends JsonResource
             'exam_type_id' => $this->exam_type_id,
             'exam_type' => $this->examType ? ['id' => $this->examType->id, 'label' => $this->examType->label] : null,
             'issue_reports_count' => $this->when(isset($this->issue_reports_count), (int) $this->issue_reports_count),
+            'wrong_count' => $this->when(isset($this->wrong_count), (int) $this->wrong_count),
+            'answer_count' => $this->when(isset($this->answer_count), (int) $this->answer_count),
+            'error_rate' => $this->when(
+                isset($this->answer_count),
+                (int) $this->answer_count > 0 ? round(((int) $this->wrong_count / (int) $this->answer_count) * 100, 1) : null
+            ),
             'is_annulled' => (bool) $this->is_annulled,
             'is_outdated' => (bool) $this->is_outdated,
             'tags' => $this->tags->pluck('name')->values(),

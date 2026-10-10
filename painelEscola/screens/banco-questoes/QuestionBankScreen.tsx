@@ -48,6 +48,7 @@ import {
   hashQuery,
   hasActiveFilters,
   nextSort,
+  toggleMostErrors,
   pageSelectionState,
   parseListState,
   rangeLabel,
@@ -80,7 +81,7 @@ const LIST_HASH = "#/questoes";
 const DENSITY_KEY = "questoes_densidade";
 const SEARCH_DEBOUNCE_MS = 300;
 
-const COL = { select: 40, number: 150, board: 150, difficulty: 150, status: 130, actions: 44 };
+const COL = { select: 40, number: 150, board: 150, difficulty: 150, errors: 120, status: 130, actions: 44 };
 
 function readStateFromHash(): QuestionBankListState {
   return parseListState(typeof window === "undefined" ? "" : hashQuery(window.location.hash));
@@ -98,7 +99,7 @@ function readDensity(): "padrao" | "compacta" {
 const filtersKey = (s: QuestionBankListState) =>
   JSON.stringify([
     s.search, s.subjectIds, s.topicIds, s.boardIds, s.years, s.difficultyIds,
-    s.origin, s.examTypeIds, s.examIds, s.questionSetIds, s.tab,
+    s.origin, s.examTypeIds, s.examIds, s.questionSetIds, s.mostErrors, s.tab,
   ]);
 
 export default function QuestionBankScreen({ navigate }: Props) {
@@ -641,6 +642,17 @@ export default function QuestionBankScreen({ navigate }: Props) {
               onChange={(v) => updateState({ ...state, difficultyIds: toIds(v), page: 1 })}
             />
           </View>
+          <TouchableOpacity
+            onPress={() => updateState(toggleMostErrors(state))}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: state.mostErrors }}
+            aria-label="Mostrar só as questões que os alunos mais erram"
+            className={`flex-row items-center gap-2 px-3 rounded-ds-md border justify-center ${state.mostErrors ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
+            style={{ height: 44 }}
+          >
+            <Ionicons name={state.mostErrors ? "checkbox" : "square-outline"} size={16} color={state.mostErrors ? "var(--ds-brand)" : "var(--ds-ink-muted)"} />
+            <Text className={`text-xs font-semibold ${state.mostErrors ? "text-brand" : "text-ink-muted"}`}>Mais erros dos alunos</Text>
+          </TouchableOpacity>
           {hasActiveFilters(state) && (
             <TouchableOpacity
               onPress={() => updateState(clearFilters(state))}
@@ -723,7 +735,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
           <View
             className="bg-surface rounded-ds-md overflow-hidden border border-border"
             role="table"
-            style={{ width: "100%", minWidth: isMobile ? tableMinWidth : 980, }}
+            style={{ width: "100%", minWidth: isMobile ? (tableMinWidth ?? 760) + COL.errors : 1100, }}
           >
             <View className={TABLE_HEADER_ROW} style={[TABLE_HEADER_ROW_STYLE, { alignItems: "center" }]} role="row">
               <Checkbox
@@ -738,6 +750,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
               </Text>
               <SortHeader label="Banca · Ano" sort="board" style={{ width: COL.board }} />
               <SortHeader label="Dificuldade" sort="difficulty" style={{ width: COL.difficulty }} />
+              <SortHeader label="Erros" sort="errors" style={{ width: COL.errors }} />
               <Text className={TABLE_HEADER_CELL} style={{ width: COL.status }} role="columnheader">
                 Situação
               </Text>
@@ -827,6 +840,18 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     </View>
                     <View style={{ width: COL.difficulty }}>
                       <DifficultyMeter difficulty={row.difficulty} levels={catalogs.difficulties.length} />
+                    </View>
+                    <View style={{ width: COL.errors }}>
+                      {row.answer_count ? (
+                        <>
+                          <Text className={TABLE_CELL_SEMIBOLD}>{row.error_rate}%</Text>
+                          <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
+                            {row.wrong_count} de {row.answer_count}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text className={TABLE_CELL_MUTED}>—</Text>
+                      )}
                     </View>
                     <View style={{ width: COL.status }}>
                       <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />

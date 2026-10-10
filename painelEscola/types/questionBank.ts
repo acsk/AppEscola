@@ -9,7 +9,7 @@ export type QuestionBankTab =
   | "desatualizadas"
   | "sem_classificacao";
 
-export type QuestionBankSort = "id" | "board" | "difficulty";
+export type QuestionBankSort = "id" | "board" | "difficulty" | "errors";
 
 export type SortDirection = "asc" | "desc";
 
@@ -45,6 +45,11 @@ export type QuestionBankQuestion = {
   exam_type_id: number | null;
   exam_type: { id: number; label: string } | null;
   issue_reports_count?: number;
+  /** Respostas erradas na prática e em simulados oficiais. */
+  wrong_count?: number;
+  answer_count?: number;
+  /** Percentual de erros; null quando ninguém respondeu. */
+  error_rate?: number | null;
   is_annulled: boolean;
   is_outdated: boolean;
   tags: string[];

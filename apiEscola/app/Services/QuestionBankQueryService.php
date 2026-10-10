@@ -17,7 +17,7 @@ class QuestionBankQueryService
 {
     public const TABS = ['todas', 'regulares', 'anuladas', 'desatualizadas', 'sem_classificacao'];
 
-    public const SORTS = ['id', 'board', 'difficulty'];
+    public const SORTS = ['id', 'board', 'difficulty', 'errors'];
 
     public const PER_PAGE = [20, 50, 100];
 
@@ -55,6 +55,7 @@ class QuestionBankQueryService
 
         /** @var LengthAwarePaginator $page */
         $page = $query->select('exam_questions.*')
+            ->selectRaw('COALESCE(qe.wrong_count, 0) as wrong_count, COALESCE(qe.answer_count, 0) as answer_count')
             ->with(QuestionClassificationService::RELATIONS)
             ->paginate($perPage, ['*'], 'page', max(1, (int) ($params['page'] ?? 1)));
 
@@ -108,6 +109,7 @@ class QuestionBankQueryService
     private function filtered(int $tenantId, array $params): Builder
     {
         $query = ExamQuestion::query()->inQuestionBank($tenantId);
+        $this->joinErrorStats($query, $tenantId);
 
         foreach (self::COLUMN_FILTERS as $param => $column) {
             $ids = self::idList($params[$param] ?? []);
@@ -158,6 +160,9 @@ class QuestionBankQueryService
         }
         if (filter_var($params['only_with_explanation'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $query->whereNotNull('exam_questions.explanation')->where('exam_questions.explanation', '!=', '');
+        }
+        if (filter_var($params['with_errors'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->where('qe.wrong_count', '>', 0);
         }
 
         $this->applySearch($query, trim((string) ($params['search'] ?? '')));
@@ -287,8 +292,36 @@ class QuestionBankQueryService
             $query->leftJoin('question_difficulties as qd', 'qd.id', '=', 'exam_questions.difficulty_id')
                 ->orderByRaw('qd.sort_order IS NULL')
                 ->orderBy('qd.sort_order', $direction);
+        } elseif ($sort === 'errors') {
+            // Taxa de erro; sem respostas fica no fim. O volume de erros desempata.
+            $query->orderByRaw('CASE WHEN COALESCE(qe.answer_count, 0) = 0 THEN 1 ELSE 0 END')
+                ->orderByRaw('(COALESCE(qe.wrong_count, 0) / GREATEST(COALESCE(qe.answer_count, 0), 1)) '.$direction)
+                ->orderByRaw('COALESCE(qe.wrong_count, 0) '.$direction);
         }
 
         $query->orderBy('exam_questions.id', $direction);
+    }
+
+    /** Erros dos alunos na prática e em simulados oficiais, por questão. */
+    private function joinErrorStats(Builder $query, int $tenantId): void
+    {
+        $practice = DB::table('practice_answers')
+            ->where('tenant_id', $tenantId)
+            ->groupBy('exam_question_id')
+            ->selectRaw('exam_question_id as question_id, SUM(is_correct = 0) as wrong_count, COUNT(*) as answer_count');
+
+        $official = DB::table('exam_answers as ea')
+            ->join('exam_questions as eq_err', 'eq_err.id', '=', 'ea.question_id')
+            ->where('eq_err.tenant_id', $tenantId)
+            ->whereNotNull('ea.is_correct')
+            ->groupBy('ea.question_id')
+            ->selectRaw('ea.question_id as question_id, SUM(ea.is_correct = 0) as wrong_count, COUNT(*) as answer_count');
+
+        $stats = DB::query()
+            ->fromSub($practice->unionAll($official), 'answer_errors')
+            ->groupBy('question_id')
+            ->selectRaw('question_id, SUM(wrong_count) as wrong_count, SUM(answer_count) as answer_count');
+
+        $query->leftJoinSub($stats, 'qe', 'qe.question_id', '=', 'exam_questions.id');
     }
 }
