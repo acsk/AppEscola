@@ -17,9 +17,9 @@ import {
   deleteImportDraft, fetchImportDraft, includeImportDraftQuestion, listImportDrafts, saveImportDraft,
   type ImportDraftPayload, type ImportDraftSettings, type ImportDraftSummary, type ImportDraftQuestion,
 } from "../../services/questionImportDrafts";
-import { appendToImportedExam, createStandaloneQuestion, fetchTopics, uploadQuestionBankImage } from "../../services/questionBank";
+import { appendToImportedExam, createExamFromQuestions, createStandaloneQuestion, fetchTopics, uploadQuestionBankImage } from "../../services/questionBank";
 import type { SubjectTopic } from "../../types/questionBank";
-import { addQuestionsToSet, createQuestionSet } from "../../services/questionSets";
+import { addQuestionsToSet } from "../../services/questionSets";
 import ImportReviewWorkspace, { type SaveStatus } from "./import-review/ImportReviewWorkspace";
 import type { ConcludeChoice } from "./import-review/ConcludeImportDialog";
 import { findSourcePage } from "../../utils/importReview";
@@ -39,6 +39,20 @@ type FailedBlock = { from: number; to: number; pages: string; message: string };
 type SeparatedQuestion = Awaited<ReturnType<typeof aiSeparatePdfText>>["body"]["questions"][number];
 
 const blockLabel = ({ from, to }: { from: number; to: number }) => (from === to ? `página ${from}` : `páginas ${from}–${to}`);
+
+/** O simulado oficial aceita 120 questões por chamada. O restante entra em seguida, na mesma ordem. */
+async function createOfficialImportExam(title: string, examType: string, questionIds: number[]) {
+  const first = questionIds.slice(0, 120);
+  const response = await createExamFromQuestions({
+    title, exam_type: examType, question_ids: first, description: "Importado de PDF pelo banco de questões.",
+  });
+  let created = { id: response.body.id, title: response.body.title };
+  for (let offset = 120; offset < questionIds.length; offset += 120) {
+    const appended = await appendToImportedExam(created.id, questionIds.slice(offset, offset + 120));
+    created = { id: appended.body.id, title: appended.body.title };
+  }
+  return created;
+}
 
 function toDraft(question: SeparatedQuestion, key: string, fallbackNumber: string): ImportDraftQuestion & { imageLoadError: boolean; errors: Record<string, string> } {
   return {
@@ -87,10 +101,11 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   /** Ao incluir tudo, agrupa as questões num simulado (rascunho) da modalidade escolhida — IFAL, CPM, ENEM… */
   const [createExam, setCreateExam] = useState(true);
   const [examTypeSlug, setExamTypeSlug] = useState("");
-  /** Nome do simulado (padrão: nome da prova) e simulado do banco já criado numa conclusão parcial. */
+  /** Nome do simulado (padrão: nome da prova). */
   const [examTitle, setExamTitle] = useState("");
+  /** Importação antiga que já criou um simulado do banco: as questões seguintes continuam nele. */
   const [questionSet, setQuestionSet] = useState<{ id: number; title: string } | null>(null);
-  /** Rascunhos de antes dos simulados do banco: continuam completando o simulado oficial já criado. */
+  /** Simulado oficial desta importação. As questões seguintes entram nele. */
   const [exam, setExam] = useState<{ id: number; title: string } | null>(null);
   const target = exam ?? questionSet;
   /** Texto de cada página do PDF desta sessão (página de origem de cada questão). */
@@ -639,20 +654,17 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           } else if (questionSet) {
             title = (await addQuestionsToSet(questionSet.id, ids)).body.title;
           } else {
-            const response = await createQuestionSet({
-              title: choice.examTitle, origin: "pdf_import", exam_type: choice.examTypeSlug, question_ids: ids,
-              source_exam_name: sourceExamName.trim(), description: "Importado de PDF pelo banco de questões.",
-            });
-            title = response.body.title;
-            setQuestionSet({ id: response.body.id, title });
+            const created = await createOfficialImportExam(choice.examTitle, choice.examTypeSlug, ids);
+            title = created.title;
+            setExam(created);
           }
           examMessage = ` no simulado "${title}"`;
         } catch (cause) {
           setError({
             title: "Questões incluídas, mas o simulado não foi atualizado",
-            message: getApiErrorMessage(cause, exam
-              ? "Abra Simulados e adicione as questões manualmente."
-              : "Abra Simulados do banco e adicione as questões manualmente."),
+            message: getApiErrorMessage(cause, questionSet
+              ? "Abra Simulados do banco e adicione as questões manualmente."
+              : "Abra Simulados e adicione as questões manualmente."),
           });
         }
       }
@@ -701,7 +713,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
       )}
       <Text className="text-xs text-ink-subtle">
         {createExam
-          ? `O simulado "${sourceExamName.trim() || "…"}" fica como rascunho em Simulados do banco, com o ícone da modalidade; publique para os alunos responderem no app. A modalidade vale para todas as questões e fica bloqueada na revisão.`
+          ? `O simulado "${sourceExamName.trim() || "…"}" entra como rascunho em Simulados. Arquive-o para liberar as questões no app. A modalidade vale para todas as questões e fica bloqueada na revisão.`
           : "As questões entram apenas no banco, como avulsas."}
       </Text>
     </View>

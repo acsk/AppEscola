@@ -99,12 +99,12 @@ export default function ImportedExamsModal({ visible, onClose, onOpenExam, onRes
 
   return (
     <>
-      <Modal visible={visible} title="Simulados oficiais importados (formato antigo)" onClose={onClose} size="lg" maxHeight="90%"
+      <Modal visible={visible} title="Simulados importados" onClose={onClose} size="lg" maxHeight="90%"
         footer={<Button label="Fechar" onPress={onClose} />}>
         <View style={{ gap: 14 }}>
           <Text className="text-sm text-ink-muted">
-            Provas importadas antes dos simulados do banco, que viraram simulados oficiais. Rascunhos ainda não aparecem
-            para os alunos: abra o simulado para revisar, definir turmas e publicar. As novas importações ficam em Simulados do banco.
+            Provas importadas do PDF. O simulado nasce como rascunho em Simulados e as questões ficam bloqueadas.
+            Arquive o simulado para liberar as questões no app.
           </Text>
           <PendingImportsSection visible={visible} onResumeImport={onResumeImport} setToast={setToast} nextSectionTitle="Simulados criados" />
           <Tabs items={TABS} value={status} onChange={(id) => { setStatus(id); setPage(1); }} accessibilityLabel="Status do simulado" />

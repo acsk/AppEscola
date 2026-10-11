@@ -1,7 +1,7 @@
 import api from "./api";
 import type { QuestionBankQuestion } from "../types/questionBank";
 
-/** Simulados do banco de questões (montados pelo admin ou pela importação de PDF) — /question-bank/question-sets. */
+/** Simulados do banco de questões (montados pelo admin) — /question-bank/question-sets. */
 
 type Envelope<T> = { type: string; message: string; body: T };
 

@@ -611,7 +611,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     { key: "taxonomia", label: "Taxonomia (disciplinas e assuntos)", icon: Tag, onPress: () => navigate("questoes-taxonomia") },
                     { key: "sets", label: "Simulados do banco", icon: Folder, onPress: () => setQuestionSetsOpen(true) },
                     { key: "ranking", label: "Ranking de erros", icon: Trophy, onPress: () => setRankingOpen(true) },
-                    { key: "importados", label: "Importados (formato antigo)", icon: Archive, onPress: () => setImportedExamsOpen(true), separatorBefore: true },
+                    { key: "importados", label: "Simulados importados", icon: Archive, onPress: () => setImportedExamsOpen(true), separatorBefore: true },
                   ]}
                 />
                 <Button variant="ai" icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
