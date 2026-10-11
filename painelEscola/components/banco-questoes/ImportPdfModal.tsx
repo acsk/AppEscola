@@ -30,7 +30,7 @@ import {
   EMPTY_CLASSIFICATION_FORM, applyClassificationSuggestion, classificationFromSuggestion, diffClassification,
   type ClassificationForm,
 } from "../../utils/questionClassification";
-import { applyPdfSections, extractPdfPages, pageBlocks, pdfDocumentText, questionFingerprint, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
+import { applyPdfSections, extractPdfPages, matchAnswerKey, pageBlocks, parseAnswerKey, pdfDocumentText, questionFingerprint, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { plainRichText } from "../../utils/richText";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
@@ -67,6 +67,29 @@ type Draft = ImportDraftQuestion & {
   imageLoadError: boolean;
   errors: Record<string, string>;
 };
+
+function withPdfAnswers(items: Draft[], pages: string[], subjectName: (id: number | null) => string | null): { drafts: Draft[]; marked: number } {
+  const sections = parseAnswerKey(pages.join("\n"));
+  if (!sections.length) return { drafts: items, marked: 0 };
+  const marks = matchAnswerKey(items.map((draft) => ({
+    sourceNumber: draft.sourceNumber,
+    type: draft.content.type,
+    subjectName: subjectName(draft.classification.subject_id),
+    optionCount: draft.content.options.length,
+  })), sections);
+  let marked = 0;
+  const drafts = items.map((draft, index) => {
+    const correct = marks[index];
+    if (correct < 0 || draft.content.type !== "multiple_choice") return draft;
+    marked += 1;
+    return {
+      ...draft,
+      answerFromPdf: true,
+      content: { ...draft.content, options: draft.content.options.map((option, n) => ({ ...option, is_correct: n === correct })) },
+    };
+  });
+  return { drafts, marked };
+}
 /** Nome da prova a partir do arquivo: "ifal_2024-1a-fase.pdf" → "IFAL 2024 1A FASE". */
 export function examNameFromFile(fileName: string): string {
   return fileName
@@ -110,6 +133,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const target = exam ?? questionSet;
   /** Texto de cada página do PDF desta sessão (página de origem de cada questão). */
   const pdfPages = useRef<string[]>([]);
+  const [extractedPdfText, setExtractedPdfText] = useState("");
   const [pdfFileName, setPdfFileName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "idle", at: null });
   const autosave = useRef<Promise<void> | null>(null);
@@ -152,6 +176,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     setExam(null);
     setQuestionSet(null);
     pdfPages.current = [];
+    setExtractedPdfText("");
     setPdfFileName(null);
     setSaveStatus({ state: "idle", at: null });
     setSubjectIds([]);
@@ -577,19 +602,25 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         body: { questions: numbered },
       };
       pdfPages.current = pages;
+      setExtractedPdfText(pages.join("\n"));
       setPdfFileName(file.name);
       setExamTitle((current) => current || sourceExamName.trim());
-      const converted: Draft[] = response.body.questions.map((question, index) => {
+      const subjectName = (id: number | null) => (id ? catalogs.subjects.find((subject) => subject.id === id)?.name ?? null : null);
+      const answered = withPdfAnswers(response.body.questions.map((question, index) => {
         const draft = toDraft(question, `pdf-${index}`, String(index + 1));
         return {
           ...draft, classification: withChosenClassification(draft.classification),
           sourcePage: findSourcePage(pages, question.question_text ?? ""),
         };
-      });
+      }), pages, subjectName);
+      const converted = answered.drafts;
       draftBlock.current = new Map(converted.map((draft, index) => [draft.key, fromPage[index]]));
       setDrafts(converted);
       setActiveKey(converted[0]?.key ?? "");
-      showApiToast(setToast, response, "Questões separadas. Revise e anexe as imagens necessárias.");
+      const withKey = answered.marked
+        ? { ...response, message: `${response.message} Gabarito do PDF aplicado em ${answered.marked} ${answered.marked === 1 ? "questão" : "questões"}.` }
+        : response;
+      showApiToast(setToast, withKey, "Questões separadas. Revise e anexe as imagens necessárias.");
     } catch (cause) {
       setError(cause instanceof Error && !("response" in cause)
         ? { title: "Não foi possível ler o PDF", message: cause.message }
@@ -864,6 +895,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
           subjectIds={subjectIds}
           pdfFile={file}
           pdfFileName={pdfFileName}
+          pdfText={extractedPdfText}
           onPickPdf={(picked) => { setFile(picked); setPdfFileName(picked.name); }}
           saveStatus={saveStatus}
           onClose={close}

@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Platform, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { createPortal } from "react-dom";
-import { Check, FileText, List, Save, Sparkles, X } from "lucide-react-native";
+import { Check, ClipboardList, FileText, List, Save, Sparkles, X } from "lucide-react-native";
 import Button from "../../ui/Button";
 import ConfirmModal from "../../ui/ConfirmModal";
 import ReviewQuestionList, { type ReviewFilter, type ReviewListItem } from "./ReviewQuestionList";
 import ReviewQuestionEditor, { type EditorDraft } from "./ReviewQuestionEditor";
 import PdfSourcePanel from "./PdfSourcePanel";
 import ConcludeImportDialog, { type ConcludeChoice } from "./ConcludeImportDialog";
+import AnswerKeyDialog from "./AnswerKeyDialog";
 import { color } from "../../../constants/theme";
 import type { QuestionBankCatalogs } from "../../../hooks/useQuestionBankCatalogs";
 import { reviewIssues, reviewStatus } from "../../../utils/importReview";
@@ -26,6 +27,8 @@ type Props = {
   subjectIds: number[];
   pdfFile: File | null;
   pdfFileName: string | null;
+  /** Texto das páginas já lidas nesta importação. O diálogo procura o gabarito nele. */
+  pdfText?: string;
   onPickPdf: (file: File) => void;
   saveStatus: SaveStatus;
   onClose: () => void;
@@ -58,7 +61,7 @@ function savedLabel(status: SaveStatus) {
 /** Revisão das questões convertidas pela IA (protótipo "TelaRevisaoIA"): lista, editor e PDF original. */
 export default function ImportReviewWorkspace(props: Props) {
   const {
-    sourceExamName, drafts, activeKey, onActiveKey, onChangeDraft, busy, catalogs, subjectIds, pdfFile, pdfFileName, onPickPdf,
+    sourceExamName, drafts, activeKey, onActiveKey, onChangeDraft, busy, catalogs, subjectIds, pdfFile, pdfFileName, pdfText = "", onPickPdf,
     saveStatus, onClose, onSaveAndExit, onAutofill, onConvertToObjective, onRemove, onUploadImage, exam, concluding, onConclude, listNotice, editorNotice,
   } = props;
   const { width } = useWindowDimensions();
@@ -74,6 +77,7 @@ export default function ImportReviewWorkspace(props: Props) {
   const [crops, setCrops] = useState<Record<string, PdfCropRegion>>({});
   const [enhancing, setEnhancing] = useState(false);
   const [concludeOpen, setConcludeOpen] = useState(false);
+  const [answerKeyOpen, setAnswerKeyOpen] = useState(false);
   const [removeKey, setRemoveKey] = useState<string | null>(null);
   const [, tick] = useState(0);
 
@@ -161,7 +165,7 @@ export default function ImportReviewWorkspace(props: Props) {
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const onKey = (event: KeyboardEvent) => {
-      if (concludeOpen || removeKey) return;
+      if (concludeOpen || removeKey || answerKeyOpen) return;
       const target = event.target as HTMLElement | null;
       const typing = !!target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -176,10 +180,34 @@ export default function ImportReviewWorkspace(props: Props) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  const unmarked = drafts.filter((item) => item.content.type === "multiple_choice" && item.content.options.length >= 2 && !item.content.options.some((option) => option.is_correct)).length;
+  const applyAnswerKey = (indexes: number[]) => {
+    drafts.forEach((item, at) => {
+      const correct = indexes[at];
+      if (correct < 0 || item.content.type !== "multiple_choice") return;
+      onChangeDraft(item.key, {
+        answerFromPdf: true,
+        content: { ...item.content, options: item.content.options.map((option, n) => ({ ...option, is_correct: n === correct })) },
+      });
+    });
+  };
+
   if (!draft || typeof document === "undefined") return null;
 
   const list = (
-    <ReviewQuestionList items={items} activeKey={activeKey} filter={filter} onFilter={setFilter} notice={listNotice}
+    <ReviewQuestionList items={items} activeKey={activeKey} filter={filter} onFilter={setFilter}
+      notice={
+        <>
+          {listNotice}
+          {unmarked > 0 && (
+            <Pressable onPress={() => setAnswerKeyOpen(true)} className="mx-2 mb-2 rounded-ds-md bg-brand-tint px-3 py-2">
+              <Text className="text-xs font-medium text-brand">
+                Falta o gabarito de {unmarked} {unmarked === 1 ? "questão" : "questões"}. Toque para colar a folha de respostas.
+              </Text>
+            </Pressable>
+          )}
+        </>
+      }
       onSelect={(key) => { onActiveKey(key); setListOpen(false); setCropping(false); }} />
   );
   const pdf = (
@@ -227,6 +255,7 @@ export default function ImportReviewWorkspace(props: Props) {
         {!roomy && !phone && (
           <Text className="font-mono text-xs text-ink-muted" aria-label="Questões revisadas">{reviewedCount}/{drafts.length}</Text>
         )}
+        <Button icon={ClipboardList} label="Gabarito" iconOnly={phone} onPress={() => setAnswerKeyOpen(true)} disabled={busy} />
         {!wide && <Button icon={FileText} label="PDF" iconOnly={phone} onPress={() => setPdfOpen((o) => !o)} />}
         <Button icon={phone ? Save : undefined} iconOnly={phone} label="Salvar e sair" onPress={onSaveAndExit} disabled={busy} />
         <Button variant="primary" label={phone ? "Concluir" : "Concluir importação"} onPress={() => setConcludeOpen(true)} disabled={busy} />
@@ -270,6 +299,15 @@ export default function ImportReviewWorkspace(props: Props) {
         </View>
       )}
 
+      <AnswerKeyDialog visible={answerKeyOpen} pdfFile={pdfFile} pdfText={pdfText}
+        targets={drafts.map((item) => ({
+          sourceNumber: item.sourceNumber,
+          type: item.content.type,
+          subjectName: subjectName(item.classification.subject_id),
+          optionCount: item.content.options.length,
+        }))}
+        onCancel={() => setAnswerKeyOpen(false)}
+        onApply={applyAnswerKey} />
       <ConcludeImportDialog visible={concludeOpen} loading={concluding} examTypes={catalogs.examTypes}
         counts={{ reviewed: reviewedCount, toCheck: items.filter((i) => i.status === "check").length, pending: pendingCount }}
         initial={{ createExam: exam.createExam, examTitle: exam.examTitle, examTypeSlug: exam.examTypeSlug }}

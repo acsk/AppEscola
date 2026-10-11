@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-  applyPdfSections, chunkBlocks, joinStackedFractions, layoutPageText, mergeWithNext, pageBlocks, pdfDocumentText, pdfQuestionMarks, prepareQuestionBlocks, questionFingerprint,
+  applyPdfSections, chunkBlocks, gabaritoSlice, joinStackedFractions, layoutPageText, matchAnswerKey, mergeWithNext, pageBlocks, parseAnswerKey, pdfDocumentText, pdfQuestionMarks, prepareQuestionBlocks, questionFingerprint,
   type PdfTextItem,
 } from "../utils/pdfQuestionImport";
 
@@ -153,4 +153,36 @@ test("a numeração recomeça em cada matéria e ignora instruções, títulos d
     { question_text: "Certo dia, numa padaria, um cliente comprou pães", source_number: "7", subject_id: 9 },
   ], subjects);
   expect(partial[0]).toMatchObject({ source_number: "1", subject_id: 2 });
+});
+
+test("o gabarito colado marca a letra de cada matéria, mesmo quando a numeração recomeça", () => {
+  const pasted = "GABARITO\nSimulado II - CPM\nPortuguês\n1.B\n2.D\n12.000 km\nMatemática\n1-B 2-A\n3) D";
+  const sections = parseAnswerKey(pasted);
+  expect(sections.map((section) => section.title)).toEqual(["Português", "Matemática"]);
+  expect(sections[0].answers).toMatchObject({ 1: "B", 2: "D" });
+  expect(sections[0].answers[12]).toBeUndefined();
+  expect(sections[1].answers).toMatchObject({ 1: "B", 2: "A", 3: "D" });
+  expect(gabaritoSlice("capa\nGabarito\n1.A")).toBe("Gabarito\n1.A");
+
+  const four = [
+    { sourceNumber: "1", type: "multiple_choice", subjectName: "Português", optionCount: 4 },
+    { sourceNumber: "2", type: "multiple_choice", subjectName: "Português", optionCount: 4 },
+    { sourceNumber: "1", type: "multiple_choice", subjectName: "Matemática", optionCount: 4 },
+    { sourceNumber: "2", type: "multiple_choice", subjectName: "Matemática", optionCount: 4 },
+  ];
+  expect(matchAnswerKey(four, sections)).toEqual([1, 3, 1, 0]);
+
+  const noSubject = four.map((target) => ({ ...target, subjectName: null }));
+  expect(matchAnswerKey(noSubject, sections)).toEqual([1, 3, 1, 0]);
+
+  const onlyMath = [{ sourceNumber: "2", type: "multiple_choice", subjectName: "Matemática", optionCount: 4 }];
+  expect(matchAnswerKey(onlyMath, sections)).toEqual([0]);
+
+  const wrongSubject = [
+    { sourceNumber: "1", type: "multiple_choice", subjectName: "Português", optionCount: 4 },
+    { sourceNumber: "2", type: "multiple_choice", subjectName: "Português", optionCount: 4 },
+    { sourceNumber: "1", type: "multiple_choice", subjectName: "Português", optionCount: 4 },
+    { sourceNumber: "2", type: "multiple_choice", subjectName: "Português", optionCount: 4 },
+  ];
+  expect(matchAnswerKey(wrongSubject, sections)).toEqual([1, 3, 1, 0]);
 });

@@ -336,6 +336,126 @@ export function applyPdfSections<T extends NumberedQuestion>(
   });
 }
 
+export type AnswerKeySection = { title: string; answers: Record<number, string> };
+
+export type AnswerKeyTarget = {
+  sourceNumber: string;
+  type: string;
+  subjectName: string | null;
+  optionCount: number;
+};
+
+function isAnswerHeading(line: string): boolean {
+  if (line.length < 4 || line.length > 40 || /\d/.test(line) || /^simulado\b/i.test(line)) return false;
+  return /^[A-Za-zÀ-ú][A-Za-zÀ-ú ]+$/.test(line);
+}
+
+/** Trecho do PDF a partir do título "Gabarito". Vazio quando a prova não traz essa página. */
+export function gabaritoSlice(text: string): string {
+  const at = text.search(/^gabarito\b/im);
+  return at >= 0 ? text.slice(at).trim() : "";
+}
+
+/**
+ * Lê um gabarito colado. Aceita "1.B", "1-B", "1) B" e "1 B", com um título de matéria por bloco.
+ * Se o texto tiver a palavra Gabarito, só o que vem depois dela entra.
+ */
+export function parseAnswerKey(text: string): AnswerKeySection[] {
+  const lines = text.split(/\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const titleAt = lines.findIndex((line) => /^gabarito\b/i.test(line));
+  const body = titleAt >= 0 ? lines.slice(titleAt + 1) : lines;
+  const sections: AnswerKeySection[] = [];
+  let current: AnswerKeySection = { title: "", answers: {} };
+  const flush = () => {
+    if (Object.keys(current.answers).length) sections.push(current);
+  };
+  for (const line of body) {
+    if (isAnswerHeading(line)) {
+      flush();
+      current = { title: line, answers: {} };
+      continue;
+    }
+    for (const match of line.matchAll(new RegExp(ANSWER_PAIR.source, "g"))) {
+      const letter = match[2].toUpperCase();
+      if (letter >= "A" && letter <= "E") current.answers[Number(match[1])] = letter;
+    }
+  }
+  flush();
+  return sections;
+}
+
+function parsedNumber(source: string): { prefix: string; n: number } | null {
+  const match = source.trim().match(/^([A-Za-zÀ-ú]{0,12})\s*(\d{1,3})\b/);
+  if (!match) return null;
+  return { prefix: foldName(match[1]), n: Number(match[2]) };
+}
+
+function namesMatch(title: string, subject: string | null): boolean {
+  if (!title || !subject) return false;
+  const heading = subjectCore(title);
+  const name = subjectCore(subject);
+  if (heading.length < 4 || name.length < 4) return false;
+  if (heading.includes(name) || name.includes(heading)) return true;
+  return editDistance(heading, name) <= 2;
+}
+
+function letterIndex(letter: string, optionCount: number): number {
+  const index = letter.charCodeAt(0) - 65;
+  return index >= 0 && index < optionCount ? index : -1;
+}
+
+/**
+ * Índice da alternativa correta (A = 0) para cada questão.
+ * A matéria do número vale primeiro; quando a numeração recomeça, a seção seguinte do gabarito assume.
+ * -1 quando a questão fica sem resposta.
+ */
+export function matchAnswerKey(targets: AnswerKeyTarget[], sections: AnswerKeySection[]): number[] {
+  const indexes = targets.map(() => -1);
+  if (!sections.length) return indexes;
+  let sectionIndex = 0;
+  let last = 0;
+  let locked = false;
+  targets.forEach((target, index) => {
+    if (target.type === "essay" || target.optionCount < 2) return;
+    const parsed = parsedNumber(target.sourceNumber);
+    if (!parsed) return;
+    const { prefix, n } = parsed;
+    if (prefix.length >= 2) {
+      const byPrefix = sections.findIndex((section) => {
+        const title = foldName(section.title);
+        return title.startsWith(prefix) || (title.length >= 2 && prefix.startsWith(title.slice(0, Math.min(4, title.length))));
+      });
+      if (byPrefix >= 0) {
+        sectionIndex = byPrefix;
+        locked = true;
+      }
+    } else if (last > 0 && n < last && sectionIndex < sections.length - 1) {
+      sectionIndex += 1;
+      locked = true;
+    } else if (!locked) {
+      const byName = sections.findIndex((section) => namesMatch(section.title, target.subjectName));
+      if (byName >= 0) sectionIndex = byName;
+    }
+    const letter = sections[sectionIndex]?.answers[n];
+    last = n;
+    if (letter) indexes[index] = letterIndex(letter, target.optionCount);
+  });
+
+  sections.forEach((section) => {
+    const numbers = Object.keys(section.answers).map(Number).sort((a, b) => a - b);
+    const group = targets
+      .map((target, index) => ({ target, index }))
+      .filter(({ target }) => target.type !== "essay" && target.optionCount >= 2 && namesMatch(section.title, target.subjectName));
+    const unmatched = group.filter(({ index }) => indexes[index] < 0);
+    if (!numbers.length || unmatched.length !== group.length || group.length !== numbers.length) return;
+    group.forEach((item, order) => {
+      const letter = section.answers[numbers[order]];
+      if (letter) indexes[item.index] = letterIndex(letter, item.target.optionCount);
+    });
+  });
+  return indexes;
+}
+
 /** Lê o texto de cada página do PDF no navegador (pdf.js do react-pdf, worker do CDN). */
 /** Páginas por chamada à IA: provas longas numa chamada só fazem o modelo encurtar a lista de questões. */
 export const PAGES_PER_AI_BLOCK = 2;
