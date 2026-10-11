@@ -37,6 +37,7 @@ import { prepareImageForUpload } from "../../utils/imageCompression";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import ExamPreviewPlayer from "../../components/simulados/ExamPreviewPlayer";
 import ExamQuestionErrorsReportModal from "../../components/simulados/ExamQuestionErrorsReportModal";
+import ExamAnswerKeyDialog from "../../components/simulados/ExamAnswerKeyDialog";
 import { mapExamQuestionToPreview } from "../../components/simulados/examPreviewUtils";
 import type {
   ExamForm,
@@ -275,6 +276,7 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
     message: "",
   });
   const [errorsReportOpen, setErrorsReportOpen] = useState(false);
+  const [answerKeyOpen, setAnswerKeyOpen] = useState(false);
 
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
@@ -1283,16 +1285,28 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
               </Text>
             </View>
             {questions.length > 0 && (
-              <TouchableOpacity
-                onPress={openNewQuestion}
-                className={`flex-row items-center justify-center bg-brand px-4 py-2.5 rounded-ds-md ${
-                  isMobile ? "w-full" : ""
-                }`}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="add" size={16} color="var(--ds-on-brand)" />
-                <Text className="text-on-brand text-sm font-medium ml-1">Nova questão</Text>
-              </TouchableOpacity>
+              <View className={isMobile ? "w-full" : "flex-row"} style={{ gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setAnswerKeyOpen(true)}
+                  className={`flex-row items-center justify-center border border-border-strong bg-surface px-4 py-2.5 rounded-ds-md ${
+                    isMobile ? "w-full" : ""
+                  }`}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="clipboard-outline" size={16} color="var(--ds-ink)" />
+                  <Text className="text-ink text-sm font-medium ml-1">Importar gabarito</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={openNewQuestion}
+                  className={`flex-row items-center justify-center bg-brand px-4 py-2.5 rounded-ds-md ${
+                    isMobile ? "w-full" : ""
+                  }`}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="add" size={16} color="var(--ds-on-brand)" />
+                  <Text className="text-on-brand text-sm font-medium ml-1">Nova questão</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -2198,6 +2212,23 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
       />
 
     </ScrollView>
+
+      {effectiveExamId != null && (
+        <ExamAnswerKeyDialog
+          visible={answerKeyOpen}
+          examId={effectiveExamId}
+          questions={questions.map((question) => ({
+            id: question.id,
+            type: question.type,
+            order: question.order,
+            subjectName: question.subject?.name ?? null,
+            options: question.options.map((option) => ({ is_correct: option.is_correct, order: option.order })),
+          }))}
+          onClose={() => setAnswerKeyOpen(false)}
+          onApplied={() => { void fetchQuestions(); }}
+          setToast={setToast}
+        />
+      )}
 
       <ExamQuestionErrorsReportModal
         visible={errorsReportOpen}

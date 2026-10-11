@@ -441,6 +441,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     });
 
     // Questões de um simulado (nested)
+    Route::post('exams/{exam}/answer-key',             [ExamQuestionController::class, 'applyAnswerKey']);
     Route::get('exams/{exam}/questions',               [ExamQuestionController::class, 'index']);
     Route::post('exams/{exam}/questions/upload-image', [ExamQuestionController::class, 'uploadImage']);
     Route::post('exams/{exam}/questions',              [ExamQuestionController::class, 'store']);

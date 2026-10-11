@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Support\QuestionRichText;
 use App\Http\Controllers\Controller;
 use OpenApi\Attributes as OA;
+use App\Http\Requests\ApplyExamAnswerKeyRequest;
 use App\Http\Requests\StoreExamQuestionRequest;
 use App\Http\Requests\UpdateExamQuestionRequest;
 use App\Http\Requests\UpdateQuestionClassificationRequest;
@@ -12,6 +13,7 @@ use App\Http\Resources\ExamQuestionResource;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
 use App\Services\ExamAccessService;
+use App\Services\ExamAnswerKeyService;
 use App\Services\ExamPublishValidator;
 use App\Services\QuestionClassificationService;
 use App\Services\QuestionContentService;
@@ -299,6 +301,19 @@ class ExamQuestionController extends Controller
         $question->delete();
 
         return response()->json(['message' => 'Questão removida com sucesso.']);
+    }
+
+    /** Aplica o gabarito conferido: troca a alternativa correta e recalcula provas já corrigidas. */
+    public function applyAnswerKey(ApplyExamAnswerKeyRequest $request, Exam $exam, ExamAnswerKeyService $answerKey): JsonResponse
+    {
+        $this->authorizeTenant($request, $exam->tenant_id);
+        app(ExamAccessService::class)->assertCanManageExams($request->user());
+
+        $result = $answerKey->apply($exam, $request->validated('corrections'));
+
+        return $this->success($result, $result['updated'] === 1
+            ? '1 questão corrigida pelo gabarito.'
+            : "{$result['updated']} questões corrigidas pelo gabarito.");
     }
 
     /** Impede acessar, pela rota do simulado, questão de outro simulado ou questão avulsa. */
