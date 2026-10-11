@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-  applyPdfSections, chunkBlocks, gabaritoSlice, joinStackedFractions, layoutPageText, matchAnswerKey, mergeWithNext, pageBlocks, parseAnswerKey, pdfDocumentText, pdfQuestionMarks, prepareQuestionBlocks, questionFingerprint,
+  applyPdfSections, chunkBlocks, gabaritoSlice, joinStackedFractions, layoutPageText, matchAnswerKey, mergeWithNext, pageBlocks, parseAnswerKey, pdfDocumentText, pdfQuestionMarks, prepareQuestionBlocks, questionFingerprint, unwrapImportedText, withFigureOptions,
   type PdfTextItem,
 } from "../utils/pdfQuestionImport";
 
@@ -185,4 +185,25 @@ test("o gabarito colado marca a letra de cada matéria, mesmo quando a numeraç�
     { sourceNumber: "2", type: "multiple_choice", subjectName: "Português", optionCount: 4 },
   ];
   expect(matchAnswerKey(wrongSubject, sections)).toEqual([1, 3, 1, 0]);
+});
+
+test("questão cuja alternativa está só na figura continua na sequência da matéria", () => {
+  const pages = [
+    "MATEMÁTICA\n4. A seta indica uma massa de:\n(A) 0,30.\n(B) 0,23.\n5. Qual reta numérica indica corretamente a\nquantidade que cada uma comprou?\n6. De quantos graus é a diferença?\n(A) 1,4 (B) 1,8",
+  ];
+  const marked = withFigureOptions(pages).join("\n");
+  expect(marked).toContain("5. Qual reta numérica");
+  expect(marked).toContain("A) [Imagem da alternativa A — anexar manualmente]");
+  expect(marked.indexOf("A) [Imagem da alternativa A")).toBeLessThan(marked.indexOf("6. De quantos graus"));
+  const numbers = pdfQuestionMarks(pages, ["Matemática"]).map((mark) => mark.number);
+  expect(numbers).toEqual([4, 5, 6]);
+});
+
+test("enunciado com quebra de linha do PDF vira frase contínua", () => {
+  const broken = "Fernando tem, no seu bolso, cinco\nmoedas de 0,05, oito moedas de R$ 0,10 e Três\nmoedas de R$0,25. Que quantia Fernando tem\nno bolso?";
+  expect(unwrapImportedText(broken)).toBe(
+    "Fernando tem, no seu bolso, cinco moedas de 0,05, oito moedas de R$ 0,10 e Três moedas de R$0,25. Que quantia Fernando tem no bolso?",
+  );
+  expect(unwrapImportedText("larguei a lâmpada-bule-não-\nmágica e fui")).toBe("larguei a lâmpada-bule-nãomágica e fui");
+  expect(unwrapImportedText("O ano passou voando.\nÉ a vida, cada vez\nmais corrida.")).toBe("O ano passou voando.\nÉ a vida, cada vez mais corrida.");
 });

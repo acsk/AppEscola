@@ -165,7 +165,7 @@ export default function ReviewQuestionEditor({
                     <Text className="text-[13px] font-medium text-danger">Remover</Text>
                   </TouchableOpacity>
                 </View>
-                {canEnhanceImage && onEnhanceImage && (
+                {(canEnhanceImage || !!content.image_url) && onEnhanceImage && (
                   <View className="flex-row mt-3">
                     <Button size="sm" icon={ImageUpscale} label="Melhorar a qualidade da imagem" loading={enhancingImage}
                       disabled={busy} onPress={onEnhanceImage} />

@@ -269,11 +269,15 @@ export function pdfQuestionMarks(pages: string[], subjectNames: string[] = []): 
     if (!match) continue;
     const number = Number(match[1]);
     const letters = new Set<string>();
+    let stem = line;
     for (let j = i + 1; j < lines.length; j += 1) {
       if (QUESTION_LINE.test(lines[j]) && !OPTION_LINE.test(lines[j])) break;
       optionLetters(lines[j]).forEach((letter) => letters.add(letter));
+      stem += ` ${lines[j]}`;
     }
-    const hasOption = letters.size >= 2;
+    // Alternativas só na figura (ex.: "qual reta numérica...") não trazem A) B) C) D) no texto.
+    const figureOptions = letters.size === 0 && /\?/.test(stem) && previous !== null;
+    const hasOption = letters.size >= 2 || figureOptions;
     const restart = previous !== null && number < previous && number <= 3;
     const sequential = previous === null ? number <= 5 : number === previous + 1;
     if (!hasOption || (!sequential && !restart)) continue;
@@ -630,6 +634,90 @@ export function layoutPageText(items: PdfTextItem[], pageWidth: number): string 
   return [...left, ...right].join("\n");
 }
 
+const FIGURE_OPTION = (letter: string) => `${letter}) [Imagem da alternativa ${letter} — anexar manualmente]`;
+
+/**
+ * Questão cuja resposta está numa figura não tem A) B) C) D) no texto.
+ * Marca as quatro alternativas para a separação não descartar a questão (ex.: Matemática 5).
+ */
+export function withFigureOptions(pages: string[]): string[] {
+  const rows: { page: number; line: string }[] = [];
+  pages.forEach((page, pageIndex) => {
+    page.split("\n").forEach((raw) => {
+      const line = raw.replace(/[ \t]+/g, " ").trim();
+      if (line) rows.push({ page: pageIndex, line });
+    });
+  });
+  let gabarito = false;
+  let previous: number | null = null;
+  const insertAt = new Map<number, string[]>();
+  for (let i = 0; i < rows.length; i += 1) {
+    if (/^gabarito\b/i.test(rows[i].line)) {
+      gabarito = true;
+      continue;
+    }
+    if (gabarito || !QUESTION_LINE.test(rows[i].line) || OPTION_LINE.test(rows[i].line)) continue;
+    const number = Number(rows[i].line.match(QUESTION_LINE)?.[1]);
+    let end = i + 1;
+    const letters = new Set<string>();
+    let stem = rows[i].line;
+    for (; end < rows.length; end += 1) {
+      if (/^gabarito\b/i.test(rows[end].line)) break;
+      if (QUESTION_LINE.test(rows[end].line) && !OPTION_LINE.test(rows[end].line)) break;
+      optionLetters(rows[end].line).forEach((letter) => letters.add(letter));
+      stem += ` ${rows[end].line}`;
+    }
+    const sequential = previous === null ? number <= 5 : number === previous + 1;
+    const restart = previous !== null && number < previous && number <= 3;
+    const counted = (letters.size >= 2 || (letters.size === 0 && /\?/.test(stem) && previous !== null)) && (sequential || restart || previous === null);
+    if (counted) previous = number;
+    if (letters.size === 0 && /\?/.test(stem) && previous === number && (sequential || restart)) {
+      insertAt.set(end, ["A", "B", "C", "D"].map(FIGURE_OPTION));
+    }
+  }
+  if (!insertAt.size) return pages;
+  const rebuilt = pages.map(() => [] as string[]);
+  rows.forEach((row, index) => {
+    const extra = insertAt.get(index);
+    if (extra) rebuilt[row.page].push(...extra);
+    rebuilt[row.page].push(row.line);
+  });
+  insertAt.get(rows.length)?.forEach((line) => rebuilt[rebuilt.length - 1].push(line));
+  return rebuilt.map((lines, index) => (lines.length ? lines.join("\n") : pages[index]));
+}
+
+/** Junta a quebra de linha do PDF no meio da frase. Parágrafo novo só depois de ponto, pergunta ou item. */
+export function unwrapImportedText(value: string): string {
+  const source = value.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>\s*<p[^>]*>/gi, "\n\n");
+  const out: string[] = [];
+  for (const raw of source.split("\n")) {
+    const line = raw.replace(/[ \t]+/g, " ").trim();
+    if (!line) {
+      const prev = out[out.length - 1];
+      if (prev && !/[.!?…:;]$/.test(prev)) continue;
+      if (prev) out.push("");
+      continue;
+    }
+    const prev = out[out.length - 1];
+    if (!prev) {
+      out.push(line);
+      continue;
+    }
+    if (prev === "") {
+      out[out.length - 1] = line;
+      continue;
+    }
+    if (/-$/.test(prev) && /^[a-záàâãéêíóôõúüç]/.test(line)) {
+      out[out.length - 1] = prev.slice(0, -1) + line;
+      continue;
+    }
+    const newBlock = /[.!?…:;]$/.test(prev) || /^(?:[A-Ea-e]\)|[•\-–]|\d+[.)])/.test(line);
+    if (newBlock) out.push(line);
+    else out[out.length - 1] = `${prev} ${line}`;
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export async function extractPdfPages(file: File): Promise<string[]> {
   const { pdfjs } = await import("react-pdf");
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -653,7 +741,7 @@ export async function extractPdfPages(file: File): Promise<string[]> {
         page.cleanup();
       }
     }
-    return pages;
+    return withFigureOptions(pages);
   } finally {
     await pdf.destroy();
   }

@@ -30,7 +30,7 @@ import {
   EMPTY_CLASSIFICATION_FORM, applyClassificationSuggestion, classificationFromSuggestion, diffClassification,
   type ClassificationForm,
 } from "../../utils/questionClassification";
-import { applyPdfSections, extractPdfPages, matchAnswerKey, pageBlocks, parseAnswerKey, pdfDocumentText, questionFingerprint, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
+import { applyPdfSections, extractPdfPages, matchAnswerKey, pageBlocks, parseAnswerKey, pdfDocumentText, questionFingerprint, unwrapImportedText, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { plainRichText } from "../../utils/richText";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
@@ -55,9 +55,15 @@ async function createOfficialImportExam(title: string, examType: string, questio
 }
 
 function toDraft(question: SeparatedQuestion, key: string, fallbackNumber: string): ImportDraftQuestion & { imageLoadError: boolean; errors: Record<string, string> } {
+  const content = contentFromSuggestion(question);
   return {
     key, include: true, sourceNumber: question.source_number ?? fallbackNumber,
-    content: contentFromSuggestion(question), classification: classificationFromSuggestion(question),
+    content: {
+      ...content,
+      question_text: unwrapImportedText(content.question_text),
+      options: content.options.map((option) => ({ ...option, option_text: unwrapImportedText(option.option_text) })),
+    },
+    classification: classificationFromSuggestion(question),
     needsImage: question.needs_image === true, imageLoadError: false,
     answerFromPdf: question.answer_from_pdf === true, errors: {},
   };

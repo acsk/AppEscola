@@ -13,6 +13,9 @@ import { color } from "../../../constants/theme";
 import type { QuestionBankCatalogs } from "../../../hooks/useQuestionBankCatalogs";
 import { reviewIssues, reviewStatus } from "../../../utils/importReview";
 import { renderPdfRegion, type PdfCropRegion } from "../../../utils/pdfRegionRender";
+import { aiRedrawQuestionImage } from "../../../services/questionAi";
+import { imageQuestionContent } from "../../../utils/questionImageReview";
+import { describeAiError } from "../../../utils/aiErrors";
 
 export type SaveStatus = { state: "idle" | "saving" | "saved" | "error"; at: Date | null };
 
@@ -149,13 +152,33 @@ export default function ImportReviewWorkspace(props: Props) {
     onUploadImage(key, file);
   };
   const enhanceImage = async () => {
+    if (!draft?.content.image_url || enhancing || busy) return;
     const region = crops[draft.key];
-    if (!pdfFile || !region || enhancing || busy) return;
     setEnhancing(true);
     try {
-      onUploadImage(draft.key, await renderPdfRegion(pdfFile, region));
-    } catch {
-      onChangeDraft(draft.key, { errors: { ...draft.errors, image: "Não foi possível melhorar a imagem. Recorte de novo do PDF." } });
+      if (pdfFile && region) {
+        onUploadImage(draft.key, await renderPdfRegion(pdfFile, region));
+        return;
+      }
+      const prepared = imageQuestionContent(draft.content);
+      const response = await aiRedrawQuestionImage({
+        image_url: draft.content.image_url,
+        type: prepared.type,
+        question_text: prepared.question_text,
+        options: prepared.options,
+        instructions: "Melhore a nitidez e a qualidade da figura. Mantenha os mesmos dados, textos, números e proporções.",
+      });
+      const url = response.body.image_url;
+      if (!url || response.body.image_generation.status !== "READY") {
+        onChangeDraft(draft.key, { errors: { ...draft.errors, image: response.body.image_generation.reason || "Não foi possível melhorar a imagem." } });
+        return;
+      }
+      onChangeDraft(draft.key, { content: { ...draft.content, image_url: url }, imageLoadError: false, errors: {} });
+    } catch (cause) {
+      const fallback = pdfFile && region
+        ? "Não foi possível melhorar a imagem. Recorte de novo do PDF."
+        : "Não foi possível melhorar a imagem.";
+      onChangeDraft(draft.key, { errors: { ...draft.errors, image: describeAiError(cause, fallback).message } });
     } finally {
       setEnhancing(false);
     }
@@ -276,7 +299,7 @@ export default function ImportReviewWorkspace(props: Props) {
             onPrev={() => go(index - 1)} onNext={() => go(index + 1)} onNextPending={nextPending}
             onAutofill={() => onAutofill(draft)} onConvertToObjective={() => onConvertToObjective(draft)} onRemove={() => setRemoveKey(draft.key)} onConfirm={confirm}
             onUploadImage={(file) => uploadFile(draft.key, file)} onStartCrop={startCrop}
-            canEnhanceImage={!!pdfFile && !!crops[draft.key]} enhancingImage={enhancing} onEnhanceImage={() => void enhanceImage()} />
+            canEnhanceImage={!!draft.content.image_url} enhancingImage={enhancing} onEnhanceImage={() => void enhanceImage()} />
         </View>
         {wide && <View style={{ width: 400, minHeight: 0 }}>{pdf}</View>}
       </View>

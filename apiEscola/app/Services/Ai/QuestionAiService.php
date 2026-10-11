@@ -804,7 +804,9 @@ class QuestionAiService
             .'needs_image deve ser booleano obrigatório: true SOMENTE quando o enunciado ou as alternativas dependem de figura, gráfico, mapa, charge, tirinha ou imagem cujo conteúdo NÃO está no texto extraído. '
             ."Não gere image_spec nem imagens. O usuário anexará as imagens manualmente. Não substitua figuras por descrições inventadas.\n"
             ."Se as alternativas forem imagens e só as letras estiverem no texto, preserve CADA alternativa como '[Imagem da alternativa A — anexar manualmente]', "
-            ."usando a letra original em cada marcador e needs_image=true. Não devolva texto vazio e não descarte alternativas visuais.\n"
+            ."usando a letra original em cada marcador e needs_image=true. Não devolva texto vazio e não descarte alternativas visuais. "
+            ."Se a pergunta termina em interrogação e o texto já traz essas alternativas de imagem, a questão é obrigatória: não a pule.\n"
+            ."No enunciado, una as quebras de linha do PDF no meio da frase. Mantenha parágrafo novo só depois de ponto, pergunta, dois-pontos ou item de lista.\n"
             .'Ignore o gabarito mesmo quando disponível no documento. Não resolva as questões nem marque respostas corretas: '
             .'deixe TODAS is_correct=false e answer_from_pdf=false. O usuário definirá o gabarito na revisão manual. '
             ."Não inclua resolução ou indicação da resposta na explicação.\n"
