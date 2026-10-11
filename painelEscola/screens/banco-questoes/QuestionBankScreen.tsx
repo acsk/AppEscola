@@ -1,24 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import SearchableSelect, { type SearchableOption } from "../../components/ui/SearchableSelect";
+import { type SearchableOption } from "../../components/ui/SearchableSelect";
 import FormSelect from "../../components/ui/FormSelect";
-import Pagination from "../../components/ui/Pagination";
 import Modal from "../../components/ui/Modal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import DataTableRow from "../../components/ui/DataTableRow";
-import {
-  TABLE_CELL,
-  TABLE_CELL_MUTED,
-  TABLE_CELL_SEMIBOLD,
-  TABLE_CELL_SUBLINE,
-  TABLE_HEADER_CELL,
-  TABLE_HEADER_ROW,
-  TABLE_HEADER_ROW_STYLE,
-} from "../../components/ui/dataTableStyles";
+import { TABLE_HEADER_CELL } from "../../components/ui/dataTableStyles";
+import PageHeader from "../../components/ui/PageHeader";
+import ActionsMenu from "../../components/ui/ActionsMenu";
+import Icon from "../../components/ui/Icon";
+import FilterChip, { ChipDivider, FilterChipShell, ToggleChip } from "../../components/ui/FilterChip";
 import DifficultyMeter from "../../components/banco-questoes/DifficultyMeter";
 import QuestionStatusBadge from "../../components/banco-questoes/QuestionStatusBadge";
-import Badge from "../../components/ui/Badge";
+import QuestionPreviewPanel from "../../components/banco-questoes/QuestionPreviewPanel";
+import { color } from "../../constants/theme";
 import BulkClassifyModal, { type BulkAction } from "../../components/banco-questoes/BulkClassifyModal";
 import AiBulkClassifyModal from "../../components/banco-questoes/AiBulkClassifyModal";
 import UndoToast from "../../components/banco-questoes/UndoToast";
@@ -63,7 +59,28 @@ import {
 } from "../../utils/questionBankQuery";
 import type { BatchItem, ClassificationPatch, QuestionBankQuestion, QuestionBankSort } from "../../types/questionBank";
 import Tabs from "../../components/ui/Tabs";
-import { Archive, FileStack, Plus, Sparkles, Trophy } from "lucide-react-native";
+import {
+  Archive,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Ellipsis,
+  Folder,
+  List,
+  Lock,
+  Minus,
+  Plus,
+  Rows3,
+  Search,
+  Sparkles,
+  Tag,
+  Trophy,
+  X,
+  type LucideIcon,
+} from "lucide-react-native";
 import ImportPdfModal from "../../components/banco-questoes/ImportPdfModal";
 import ImportedExamsModal from "../../components/banco-questoes/ImportedExamsModal";
 import QuestionSetsModal from "../../components/banco-questoes/question-sets/QuestionSetsModal";
@@ -83,7 +100,14 @@ const LIST_HASH = "#/questoes";
 const DENSITY_KEY = "questoes_densidade";
 const SEARCH_DEBOUNCE_MS = 300;
 
-const COL = { select: 40, number: 150, board: 150, difficulty: 150, errors: 120, status: 150, actions: 44 };
+const COL = { select: 44, number: 72, difficulty: 140, errors: 104, board: 104, status: 116, actions: 40 };
+/** Com a pré-visualização aberta: colunas mais estreitas, sem banca e situação. */
+const COL_NARROW = { ...COL, number: 64, difficulty: 128, errors: 92 };
+/** Largura mínima da janela para abrir a pré-visualização ao lado da lista (abaixo disso, a linha abre a página da questão). */
+const PREVIEW_MIN_WIDTH = 1280;
+const PREVIEW_WIDTH = 380;
+/** A partir desta taxa de erro, a célula fica em `danger`. */
+const HIGH_ERROR_RATE = 60;
 
 function readStateFromHash(): QuestionBankListState {
   return parseListState(typeof window === "undefined" ? "" : hashQuery(window.location.hash));
@@ -105,7 +129,7 @@ const filtersKey = (s: QuestionBankListState) =>
   ]);
 
 export default function QuestionBankScreen({ navigate }: Props) {
-  const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
+  const { width, isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const catalogs = useQuestionBankCatalogs();
   const { ensureAvailable } = useQuestionAiStatus();
   const [importPdfOpen, setImportPdfOpen] = useState(false);
@@ -281,7 +305,6 @@ export default function QuestionBankScreen({ navigate }: Props) {
       localStorage.setItem(DENSITY_KEY, next);
     } catch {}
   };
-  const rowPadding = density === "compacta" ? 6 : 12;
 
   // ── Seleção ────────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -438,30 +461,81 @@ export default function QuestionBankScreen({ navigate }: Props) {
     }
   };
 
+  // ── Pré-visualização lateral (desktop largo) ───────────────────────────────
+  const canPreview = width >= PREVIEW_MIN_WIDTH;
+  const [previewId, setPreviewId] = useState<number | null>(null);
+  const previewRow = canPreview && previewId != null ? rows.find((r) => r.id === previewId) ?? null : null;
+  const narrow = !!previewRow;
+  const col = narrow ? COL_NARROW : COL;
+
+  const onRowPress = (row: QuestionBankQuestion) => {
+    if (canPreview) setPreviewId((current) => (current === row.id ? null : row.id));
+    else openClassify(row.id);
+  };
+
+  /** Uma questão pela pré-visualização: só avulsas entram em simulados do banco. */
+  const addOneToSet = (row: QuestionBankQuestion) => {
+    if (row.exam) {
+      setToast({ visible: true, type: "error", message: "Questão de simulado oficial não entra em simulados do banco." });
+      return;
+    }
+    setAddToSet({ ids: [row.id], blocked: 0 });
+  };
+
+  // "/" foca a busca (fora de campos de texto).
+  const searchRef = useRef<TextInput>(null);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   // ── Render helpers ─────────────────────────────────────────────────────────
   const tabs = tabsWithCounts(meta?.tab_counts ?? null);
   const filtered = hasActiveFilters(state) || state.search.trim() !== "";
   const noQuestionsAtAll = !filtered && (meta?.tab_counts.todas ?? 0) === 0;
+  const optionLabel = (options: SearchableOption[], value: string) => options.find((o) => o.value === value)?.label;
+
+  const subjectOptions = catalogs.subjects.map((s) => ({ value: String(s.id), label: s.name }));
+  const topicOptions = filterTopics.map((t) => ({ value: String(t.id), label: t.name }));
+  const boardOptions = catalogs.boards.map((b) => ({ value: String(b.id), label: b.name }));
+  const yearOptions = years.map((y) => ({ value: String(y), label: String(y) }));
+  const difficultyOptions = catalogs.difficulties.map((d) => ({ value: String(d.id), label: d.name }));
+  const originOptions = QUESTION_BANK_ORIGINS.map((o) => ({ value: o.key, label: o.label }));
+  const examTypeOptions = catalogs.examTypes.map((t) => ({ value: String(t.id), label: t.label }));
+  const moreFiltersActive = !!(state.origin || state.examTypeIds.length || examFilterId || setFilterId);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const moreFiltersVisible = showMoreFilters || moreFiltersActive;
 
   const SortHeader = ({ label, sort, style }: { label: string; sort: QuestionBankSort; style: object }) => {
     const current = ariaSort(state, sort);
     return (
       <TouchableOpacity
         onPress={() => updateState(nextSort(state, sort))}
-        style={[{ flexDirection: "row", alignItems: "center", gap: 4 }, style]}
+        style={[{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12 }, style]}
         role="columnheader"
         {...({ "aria-sort": current } as object)}
         aria-label={`Ordenar por ${label}`}
       >
-        <Text className={TABLE_HEADER_CELL}>{label}</Text>
-        <Ionicons
-          name={current === "ascending" ? "arrow-up" : current === "descending" ? "arrow-down" : "swap-vertical"}
-          size={12}
-          color={current === "none" ? "var(--ds-ink-subtle)" : "var(--ds-brand)"}
-        />
+        <Text className={`text-xs font-medium ${current === "none" ? "text-ink-muted" : "text-ink"}`}>{label}</Text>
+        {current !== "none" && <Icon icon={current === "ascending" ? ArrowUp : ArrowDown} size={16} color={color.ink} />}
       </TouchableOpacity>
     );
   };
+
+  const HeaderCell = ({ label, style }: { label: string; style: object }) => (
+    <Text className={TABLE_HEADER_CELL} style={[{ paddingHorizontal: 12 }, style]} role="columnheader" numberOfLines={1}>
+      {label}
+    </Text>
+  );
 
   const Checkbox = ({ checked, mixed, onPress, label }: { checked: boolean; mixed?: boolean; onPress: () => void; label: string }) => (
     <TouchableOpacity
@@ -469,52 +543,91 @@ export default function QuestionBankScreen({ navigate }: Props) {
       role="checkbox"
       aria-checked={mixed ? "mixed" : checked}
       aria-label={label}
-      style={{ width: COL.select, alignItems: "center" }}
+      style={{ width: col.select, alignItems: "center", justifyContent: "center", alignSelf: "stretch", paddingLeft: 4 }}
     >
-      <Ionicons
-        name={mixed ? "remove-circle" : checked ? "checkbox" : "square-outline"}
-        size={18}
-        color={checked || mixed ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
-      />
+      <View
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: 2,
+          borderWidth: 1,
+          borderColor: checked || mixed ? color.brand : color["border-strong"],
+          backgroundColor: checked || mixed ? color.brand : color.surface,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {mixed ? <Minus size={12} color={color["on-brand"]} strokeWidth={3} /> : checked ? <Check size={12} color={color["on-brand"]} strokeWidth={3} /> : null}
+      </View>
     </TouchableOpacity>
   );
 
+  /** Botão da barra de seleção (fundo `nav-bg`). */
+  const SelButton = ({ label, icon, onPress, primary, caret, disabled }: { label: string; icon?: LucideIcon; onPress: () => void; primary?: boolean; caret?: boolean; disabled?: boolean }) => (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      role="button"
+      style={(s) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        height: 34,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+        opacity: disabled ? 0.45 : 1,
+        backgroundColor: primary ? color["nav-ink"] : (s as { hovered?: boolean }).hovered ? color["nav-hover"] : "transparent",
+      })}
+    >
+      {icon ? <Icon icon={icon} color={primary ? color["nav-bg"] : color["nav-ink"]} /> : null}
+      <Text className="font-medium" style={{ fontSize: 13, color: primary ? color["nav-bg"] : color["nav-ink"] }}>
+        {label}
+      </Text>
+      {caret ? <Icon icon={ChevronDown} color={color["nav-ink"]} /> : null}
+    </Pressable>
+  );
+
+  const allPageSelected = pageSelection === "all";
+  const selectionLabel =
+    allPageSelected && selected.size === pageIds.length
+      ? `Todas as ${pageIds.length} desta página`
+      : `${selected.size} ${selected.size === 1 ? "selecionada" : "selecionadas"}`;
+
   return (
     <View className="flex-1">
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 120 }}>
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 120, gap: 16 }}>
         {/* Cabeçalho */}
-        <View className="mb-5" style={{ flexDirection: isMobile ? "column" : "row", gap: 12, justifyContent: "space-between" }}>
-          <View style={{ flexShrink: 1, minWidth: 260 }}>
-            <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Banco de questões</Text>
-            <Text className="text-sm text-ink-muted mt-1">
-              Questões avulsas e de simulados. Classifique para facilitar a busca e a montagem de simulados.
-            </Text>
-          </View>
-          <View className="flex-row flex-wrap gap-2 items-start" style={{ flexShrink: 1, justifyContent: isMobile ? "flex-start" : "flex-end" }}>
-            <TouchableOpacity
-              onPress={toggleDensity}
-              className="flex-row items-center gap-1.5 px-3 rounded-ds-md border border-border-strong bg-surface py-2 min-h-control-md justify-center"
-              aria-label={`Densidade: ${density === "padrao" ? "Padrão" : "Compacta"}. Alternar`}
-            >
-              <Ionicons name={density === "padrao" ? "reorder-four-outline" : "reorder-three-outline"} size={16} color="var(--ds-ink-muted)" />
-              <Text className="text-xs font-semibold text-ink-muted">{density === "padrao" ? "Padrão" : "Compacta"}</Text>
-            </TouchableOpacity>
-            <Button label="Taxonomia" onPress={() => navigate("questoes-taxonomia")} />
-            <Button icon={FileStack} label="Simulados do banco" onPress={() => setQuestionSetsOpen(true)} />
-            <Button icon={Trophy} label="Ranking" onPress={() => setRankingOpen(true)} />
-            <Button icon={Archive} variant="ghost" label="Importados (formato antigo)" onPress={() => setImportedExamsOpen(true)} />
-            <Button variant="ai" icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
-            <Button
-              variant="primary"
-              icon={Plus}
-              label="Nova questão"
-              onPress={() => navigate("questoes-nova", { query: serializeListState(state) })}
-            />
-          </View>
+        <View style={{ zIndex: 30 }}>
+          <PageHeader
+            title="Banco de questões"
+            description="Questões avulsas e de simulados. Classifique para facilitar a busca e a montagem de simulados."
+            actions={
+              <>
+                <ActionsMenu
+                  label="Mais opções"
+                  heading="Organizar"
+                  minWidth={260}
+                  items={[
+                    { key: "taxonomia", label: "Taxonomia (disciplinas e assuntos)", icon: Tag, onPress: () => navigate("questoes-taxonomia") },
+                    { key: "sets", label: "Simulados do banco", icon: Folder, onPress: () => setQuestionSetsOpen(true) },
+                    { key: "ranking", label: "Ranking de erros", icon: Trophy, onPress: () => setRankingOpen(true) },
+                    { key: "importados", label: "Importados (formato antigo)", icon: Archive, onPress: () => setImportedExamsOpen(true), separatorBefore: true },
+                  ]}
+                />
+                <Button variant="ai" icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
+                <Button
+                  variant="primary"
+                  icon={Plus}
+                  label="Nova questão"
+                  onPress={() => navigate("questoes-nova", { query: serializeListState(state) })}
+                />
+              </>
+            }
+          />
         </View>
 
         {/* Abas (contagens atualizam sem trocar de aba: aria-live) */}
-        <View className="mb-4" aria-live="polite">
+        <View aria-live="polite">
           <Tabs
             accessibilityLabel="Situação das questões"
             items={tabs.map((tab) => ({ id: tab.key, label: tab.label, count: tab.count }))}
@@ -523,442 +636,489 @@ export default function QuestionBankScreen({ navigate }: Props) {
           />
         </View>
 
-        {/* Busca */}
-        <View
-          className="flex-row items-center bg-surface border border-border rounded-ds-md px-4 mb-3"
-          style={{ height: 44 }}
-        >
-          <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
-          <TextInput
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Buscar por nº (#123), enunciado, simulado ou tag..."
-            placeholderTextColor="var(--ds-ink-subtle)"
-            aria-label="Buscar questões"
-            className="flex-1 ml-2 text-sm text-ink"
-          />
-          {!!searchText && (
-            <TouchableOpacity onPress={() => setSearchText("")} aria-label="Limpar busca">
-              <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Busca + densidade */}
+        <View style={{ gap: 12 }}>
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            <View
+              className="flex-1 flex-row items-center bg-surface border border-border-strong rounded-ds-md"
+              style={{ height: 40, paddingLeft: 12, paddingRight: 10 }}
+            >
+              <Icon icon={Search} color={color["ink-subtle"]} />
+              <TextInput
+                ref={searchRef}
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder="Buscar por nº (#123), enunciado, simulado ou tag"
+                placeholderTextColor={color["ink-subtle"]}
+                aria-label="Buscar questões"
+                className="flex-1 text-sm text-ink"
+                style={{ marginLeft: 10, height: 38 }}
+              />
+              {searchText ? (
+                <TouchableOpacity onPress={() => setSearchText("")} aria-label="Limpar busca" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Icon icon={X} color={color["ink-subtle"]} />
+                </TouchableOpacity>
+              ) : Platform.OS === "web" && !isMobile ? (
+                <View
+                  aria-hidden
+                  className="border border-border-strong rounded-ds-sm bg-surface"
+                  style={{ borderBottomWidth: 2, paddingHorizontal: 5, paddingVertical: 2 }}
+                >
+                  <Text className="font-mono font-medium text-ink-muted" style={{ fontSize: 11, lineHeight: 12 }}>
+                    /
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <View role="group" aria-label="Densidade da lista" className="flex-row border border-border-strong rounded-ds-md overflow-hidden" style={{ height: 40 }}>
+              {([
+                ["padrao", List, "Confortável"],
+                ["compacta", Rows3, "Compacta"],
+              ] as const).map(([value, glyph, label], i) => {
+                const on = density === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => density !== value && toggleDensity()}
+                    role="button"
+                    aria-pressed={on}
+                    aria-label={`Densidade ${label.toLowerCase()}`}
+                    className={on ? "bg-surface-sunken" : "bg-surface"}
+                    style={{ width: 40, alignItems: "center", justifyContent: "center", borderLeftWidth: i ? 1 : 0, borderLeftColor: color["border-strong"] }}
+                  >
+                    <Icon icon={glyph} color={on ? color.ink : color["ink-muted"]} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
-        {/* Filtros: origem e simulados */}
-        <View className="mb-3" style={{ flexDirection: isMobile ? "column" : "row", flexWrap: "wrap", gap: 12, alignItems: isMobile ? "stretch" : "flex-end" }}>
-          <View style={filterBox(200)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
-              label="Origem"
-              placeholder="Todas"
-              modalTitle="Filtrar por origem"
-              options={[{ value: "", label: "Todas" }, ...QUESTION_BANK_ORIGINS.map((o) => ({ value: o.key, label: o.label }))]}
-              value={state.origin}
-              onChange={(v) => updateState({ ...state, origin: v as QuestionBankOrigin | "", page: 1 })}
-            />
-          </View>
-          <View style={filterBox(170)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
-              label="Modalidade"
-              placeholder="Todas"
-              modalTitle="Filtrar por modalidade"
-              options={[{ value: "", label: "Todas" }, ...catalogs.examTypes.map((t) => ({ value: String(t.id), label: t.label }))]}
-              value={single(state.examTypeIds)}
-              onChange={(v) => updateState({ ...state, examTypeIds: toIds(v), page: 1 })}
-            />
-          </View>
-          <View style={filterBox(220)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
-              label="Simulado oficial"
-              placeholder="Todos"
-              modalTitle="Filtrar por simulado oficial"
-              options={[{ value: "", label: "Todos" }]}
-              onSearch={searchExamOptions}
-              selectedOption={examFilterOption}
-              value={examFilterId}
-              onChange={(v) => updateState({ ...state, examIds: toIds(v), page: 1 })}
-            />
-          </View>
-          <View style={filterBox(220)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
-              label="Simulado do banco"
-              placeholder="Todos"
-              modalTitle="Filtrar por simulado do banco"
-              options={[{ value: "", label: "Todos" }]}
-              onSearch={searchSetOptions}
-              selectedOption={setFilterOption}
-              value={setFilterId}
-              onChange={(v) => updateState({ ...state, questionSetIds: toIds(v), page: 1 })}
-            />
-          </View>
-        </View>
-
-        {/* Filtros: classificação */}
-        <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", flexWrap: "wrap", gap: 12, alignItems: isMobile ? "stretch" : "flex-end" }}>
-          <View style={filterBox(170)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
+          {/* Filtros em chips */}
+          <View className="flex-row flex-wrap items-center" style={{ gap: 6 }}>
+            <FilterChip
               label="Disciplina"
-              placeholder="Todas"
-              modalTitle="Filtrar por disciplina"
-              options={[{ value: "", label: "Todas" }, ...catalogs.subjects.map((s) => ({ value: String(s.id), label: s.name }))]}
+              options={subjectOptions}
               value={single(state.subjectIds)}
               onChange={(v) => updateState(withSubjectFilter(state, toIds(v)))}
             />
-          </View>
-          <View style={filterBox(170)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
+            <FilterChip
               label="Assunto"
-              placeholder={subjectFilterId ? "Todos" : "Escolha a disciplina"}
-              modalTitle="Filtrar por assunto"
+              modalTitle={subjectFilterId ? "Filtrar por assunto" : "Escolha a disciplina primeiro"}
               disabled={!subjectFilterId}
-              options={[{ value: "", label: "Todos" }, ...filterTopics.map((t) => ({ value: String(t.id), label: t.name }))]}
+              options={topicOptions}
               value={single(state.topicIds)}
               onChange={(v) => updateState({ ...state, topicIds: toIds(v), page: 1 })}
             />
-          </View>
-          <View style={filterBox(150)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
-              label="Banca"
-              placeholder="Todas"
-              modalTitle="Filtrar por banca"
-              options={[{ value: "", label: "Todas" }, ...catalogs.boards.map((b) => ({ value: String(b.id), label: b.name }))]}
-              value={single(state.boardIds)}
-              onChange={(v) => updateState({ ...state, boardIds: toIds(v), page: 1 })}
-            />
-          </View>
-          <View style={filterBox(120)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
-              label="Ano"
-              placeholder="Todos"
-              modalTitle="Filtrar por ano"
-              options={[{ value: "", label: "Todos" }, ...years.map((y) => ({ value: String(y), label: String(y) }))]}
-              value={single(state.years)}
-              onChange={(v) => updateState({ ...state, years: toIds(v), page: 1 })}
-            />
-          </View>
-          <View style={filterBox(150)}>
-            <SearchableSelect
-              dense
-              showSelectedPreview={false}
+            <FilterChip label="Banca" options={boardOptions} value={single(state.boardIds)} onChange={(v) => updateState({ ...state, boardIds: toIds(v), page: 1 })} />
+            <FilterChip label="Ano" options={yearOptions} value={single(state.years)} onChange={(v) => updateState({ ...state, years: toIds(v), page: 1 })} />
+            <FilterChip
               label="Dificuldade"
-              placeholder="Todas"
-              modalTitle="Filtrar por dificuldade"
-              options={[{ value: "", label: "Todas" }, ...catalogs.difficulties.map((d) => ({ value: String(d.id), label: d.name }))]}
+              options={difficultyOptions}
               value={single(state.difficultyIds)}
               onChange={(v) => updateState({ ...state, difficultyIds: toIds(v), page: 1 })}
             />
+            {moreFiltersVisible ? (
+              <>
+                <FilterChip
+                  label="Origem"
+                  options={originOptions}
+                  value={state.origin}
+                  onChange={(v) => updateState({ ...state, origin: v as QuestionBankOrigin | "", page: 1 })}
+                />
+                <FilterChip
+                  label="Modalidade"
+                  options={examTypeOptions}
+                  value={single(state.examTypeIds)}
+                  onChange={(v) => updateState({ ...state, examTypeIds: toIds(v), page: 1 })}
+                />
+                <FilterChip
+                  label="Simulado oficial"
+                  options={[]}
+                  onSearch={searchExamOptions}
+                  selectedOption={examFilterOption}
+                  value={examFilterId}
+                  onChange={(v) => updateState({ ...state, examIds: toIds(v), page: 1 })}
+                />
+                <FilterChip
+                  label="Simulado do banco"
+                  options={[]}
+                  onSearch={searchSetOptions}
+                  selectedOption={setFilterOption}
+                  value={setFilterId}
+                  onChange={(v) => updateState({ ...state, questionSetIds: toIds(v), page: 1 })}
+                />
+              </>
+            ) : null}
+            {!moreFiltersActive && (
+              <FilterChipShell label={showMoreFilters ? "Menos filtros" : "Mais filtros"} onPress={() => setShowMoreFilters((v) => !v)} />
+            )}
+            <ChipDivider />
+            <ToggleChip
+              label="Mais erros"
+              accessibilityLabel="Mostrar só as questões que os alunos mais erram"
+              checked={state.mostErrors}
+              onPress={() => updateState(toggleMostErrors(state))}
+            />
+            <ToggleChip
+              label="Ocultar revalidadas"
+              accessibilityLabel="Ocultar questões já marcadas como revalidadas"
+              checked={state.hideRevalidated}
+              onPress={() => updateState({ ...state, hideRevalidated: !state.hideRevalidated, page: 1 })}
+            />
+            <ToggleChip
+              label="Sem disciplina"
+              accessibilityLabel="Mostrar só questões sem disciplina"
+              checked={state.withoutSubject}
+              onPress={() =>
+                updateState({
+                  ...state,
+                  withoutSubject: !state.withoutSubject,
+                  subjectIds: state.withoutSubject ? state.subjectIds : [],
+                  topicIds: state.withoutSubject ? state.topicIds : [],
+                  page: 1,
+                })
+              }
+            />
+            {hasActiveFilters(state) && (
+              <TouchableOpacity onPress={() => updateState(clearFilters(state))} style={{ marginLeft: 8 }} role="button">
+                <Text className="font-medium text-brand" style={{ fontSize: 13 }}>
+                  Limpar
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <TouchableOpacity
-            onPress={() => updateState(toggleMostErrors(state))}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: state.mostErrors }}
-            aria-label="Mostrar só as questões que os alunos mais erram"
-            className={`flex-row items-center gap-2 px-3 rounded-ds-md border justify-center ${state.mostErrors ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
-            style={{ height: 44 }}
-          >
-            <Ionicons name={state.mostErrors ? "checkbox" : "square-outline"} size={16} color={state.mostErrors ? "var(--ds-brand)" : "var(--ds-ink-muted)"} />
-            <Text className={`text-xs font-semibold ${state.mostErrors ? "text-brand" : "text-ink-muted"}`}>Mais erros dos alunos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => updateState({ ...state, hideRevalidated: !state.hideRevalidated, page: 1 })}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: state.hideRevalidated }}
-            aria-label="Ocultar questões já marcadas como revalidadas"
-            className={`flex-row items-center gap-2 px-3 rounded-ds-md border justify-center ${state.hideRevalidated ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
-            style={{ height: 44 }}
-          >
-            <Ionicons name={state.hideRevalidated ? "checkbox" : "square-outline"} size={16} color={state.hideRevalidated ? "var(--ds-brand)" : "var(--ds-ink-muted)"} />
-            <Text className={`text-xs font-semibold ${state.hideRevalidated ? "text-brand" : "text-ink-muted"}`}>Ocultar revalidadas</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => updateState({
-              ...state,
-              withoutSubject: !state.withoutSubject,
-              subjectIds: state.withoutSubject ? state.subjectIds : [],
-              topicIds: state.withoutSubject ? state.topicIds : [],
-              page: 1,
-            })}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: state.withoutSubject }}
-            aria-label="Mostrar só questões sem disciplina"
-            className={`flex-row items-center gap-2 px-3 rounded-ds-md border justify-center ${state.withoutSubject ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
-            style={{ height: 44 }}
-          >
-            <Ionicons name={state.withoutSubject ? "checkbox" : "square-outline"} size={16} color={state.withoutSubject ? "var(--ds-brand)" : "var(--ds-ink-muted)"} />
-            <Text className={`text-xs font-semibold ${state.withoutSubject ? "text-brand" : "text-ink-muted"}`}>Sem disciplina</Text>
-          </TouchableOpacity>
-          {hasActiveFilters(state) && (
-            <TouchableOpacity
-              onPress={() => updateState(clearFilters(state))}
-              className="flex-row items-center gap-1 px-3 rounded-ds-md border border-border bg-surface justify-center"
-              style={{ height: 44 }}
-            >
-              <Ionicons name="close-outline" size={16} color="var(--ds-ink-muted)" />
-              <Text className="text-xs font-semibold text-ink-muted">Limpar filtros</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
-        {/* Barra de seleção / ações em massa */}
+        {/* Barra de seleção / ações em lote (invertida, em `nav-bg`) */}
         {selected.size > 0 && (
           <View
-            className="mb-3 rounded-ds-md border border-border bg-brand-tint px-4 py-3"
-            style={{ flexDirection: isMobile ? "column" : "row", gap: 10, alignItems: isMobile ? "stretch" : "center" }}
+            role="toolbar"
+            aria-label="Ações em lote"
+            className="bg-nav-bg rounded-ds-md"
+            style={{
+              zIndex: 20,
+              flexDirection: isMobile ? "column" : "row",
+              alignItems: isMobile ? "stretch" : "center",
+              gap: 12,
+              minHeight: 52,
+              paddingVertical: isMobile ? 12 : 8,
+              paddingLeft: 16,
+              paddingRight: 12,
+            }}
           >
-            <Text className="text-sm font-semibold text-brand" aria-live="polite">
-              {selected.size} {selected.size === 1 ? "selecionada" : "selecionadas"}
-            </Text>
-            <View className="flex-row flex-wrap gap-2" style={{ flex: 1 }}>
-              {(
-                [
-                  ["difficulty", "Dificuldade"],
-                  ["subject", "Disciplina e assuntos"],
-                  ["board", "Banca"],
-                  ["year", "Ano"],
-                  ["add_tags", "Tags"],
-                  ["annul", "Anuladas"],
-                  ["outdate", "Desatualizadas"],
-                ] as [BulkAction, string][]
-              ).map(([action, label]) => (
-                <TouchableOpacity
-                  key={action}
-                  onPress={() => setBulkAction(action)}
-                  aria-label={`Em massa: ${label}`}
-                  className="px-3 py-1.5 rounded-ds-md bg-surface border border-border"
-                >
-                  <Text className="text-xs font-semibold text-brand">{label}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                onPress={() => setApproveOpen(true)}
-                disabled={approving}
-                aria-label="Em massa: aprovar manualmente"
-                className="px-3 py-1.5 rounded-ds-md bg-surface border border-border"
-              >
-                <Text className="text-xs font-semibold text-brand">Aprovar manualmente</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setAiBulkOpen(true)}
-                aria-label="Em massa: atualizar com IA"
-                className="flex-row items-center gap-1 px-3 py-1.5 rounded-ds-md bg-accent border border-accent"
-              >
-                <Sparkles size={13} color="var(--ds-on-brand)" strokeWidth={1.5} />
-                <Text className="text-xs font-semibold text-on-brand">Atualizar com IA</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => void openAddToSet()}
-                disabled={checkingAddToSet}
-                aria-label="Em massa: adicionar a simulado do banco (só questões avulsas)"
-                className="px-3 py-1.5 rounded-ds-md bg-brand border border-brand"
-              >
-                <Text className="text-xs font-semibold text-on-brand">
-                  {checkingAddToSet ? "Verificando..." : "Adicionar a simulado"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity onPress={() => setSelected(new Set())}>
-              <Text className="text-xs font-semibold text-ink-muted">Limpar seleção</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {pageSelection === "all" && total > selected.size && (
-          <View className="mb-3 flex-row items-center gap-2">
-            <Text className="text-xs text-ink-muted">Todas as {pageIds.length} desta página estão selecionadas.</Text>
-            <TouchableOpacity onPress={selectAllMatching} disabled={selectingAll}>
-              <Text className="text-xs font-semibold text-brand">
-                {selectingAll ? "Selecionando..." : `Selecionar todas as ${total}`}
+            <View className="flex-row items-center flex-wrap" style={{ gap: 12 }}>
+              <Text className="font-semibold text-nav-ink" style={{ fontSize: 14 }} aria-live="polite">
+                {selectionLabel}
               </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Tabela */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={isMobile} style={{ width: "100%" }} contentContainerStyle={{ width: isMobile ? undefined : "100%" }}>
-          <View
-            className="bg-surface rounded-ds-md overflow-hidden border border-border"
-            role="table"
-            style={{ width: "100%", minWidth: isMobile ? (tableMinWidth ?? 760) + COL.errors : 1100, }}
-          >
-            <View className={TABLE_HEADER_ROW} style={[TABLE_HEADER_ROW_STYLE, { alignItems: "center" }]} role="row">
-              <Checkbox
-                checked={pageSelection === "all"}
-                mixed={pageSelection === "some"}
-                onPress={() => setSelected(togglePageSelection(selected, pageIds))}
-                label="Selecionar questões desta página"
+              {allPageSelected && total > selected.size && (
+                <TouchableOpacity onPress={selectAllMatching} disabled={selectingAll}>
+                  <Text className="font-medium text-nav-ink-muted underline" style={{ fontSize: 13 }}>
+                    {selectingAll ? "Selecionando..." : `Selecionar todas as ${total}`}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View className="flex-row flex-wrap items-center" style={{ gap: 4, marginLeft: isMobile ? 0 : "auto" }}>
+              <ActionsMenu
+                align={isMobile ? "left" : "right"}
+                renderTrigger={({ toggle }) => <SelButton label="Classificar" icon={Tag} caret onPress={toggle} />}
+                items={(
+                  [
+                    ["subject", "Disciplina e assuntos"],
+                    ["difficulty", "Dificuldade"],
+                    ["board", "Banca"],
+                    ["year", "Ano"],
+                    ["add_tags", "Tags"],
+                  ] as [BulkAction, string][]
+                ).map(([action, label]) => ({ key: action, label, onPress: () => setBulkAction(action) }))}
               />
-              <SortHeader label="Nº" sort="id" style={{ width: COL.number }} />
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 280 }} role="columnheader">
-                Enunciado
-              </Text>
-              <SortHeader label="Banca · Ano" sort="board" style={{ width: COL.board }} />
-              <SortHeader label="Dificuldade" sort="difficulty" style={{ width: COL.difficulty }} />
-              <SortHeader label="Erros" sort="errors" style={{ width: COL.errors }} />
-              <Text className={TABLE_HEADER_CELL} style={{ width: COL.status }} role="columnheader">
-                Situação
-              </Text>
-              <View style={{ width: COL.actions }} />
+              <ActionsMenu
+                align={isMobile ? "left" : "right"}
+                renderTrigger={({ toggle }) => <SelButton label="Marcar como" caret onPress={toggle} />}
+                items={[
+                  { key: "approve", label: "Aprovada manualmente", icon: Check, onPress: () => setApproveOpen(true), disabled: approving },
+                  { key: "annul", label: "Anulada", onPress: () => setBulkAction("annul") },
+                  { key: "outdate", label: "Desatualizada", onPress: () => setBulkAction("outdate") },
+                ]}
+              />
+              <SelButton label="Atualizar com IA" icon={Sparkles} onPress={() => setAiBulkOpen(true)} />
+              <View style={{ width: 1, height: 20, backgroundColor: color["nav-divider"], marginHorizontal: 4 }} />
+              <SelButton
+                primary
+                icon={Plus}
+                label={checkingAddToSet ? "Verificando..." : "Adicionar a simulado"}
+                disabled={checkingAddToSet}
+                onPress={() => void openAddToSet()}
+              />
+              <TouchableOpacity
+                onPress={() => setSelected(new Set())}
+                aria-label="Limpar seleção"
+                style={{ width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 4 }}
+              >
+                <Icon icon={X} color={color["nav-ink"]} />
+              </TouchableOpacity>
             </View>
+          </View>
+        )}
 
-            {loading && !result ? (
-              Array.from({ length: 6 }, (_, i) => (
-                <View key={i} className="flex-row items-center px-3 py-4 gap-4" aria-hidden>
-                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 18, height: 18 }} />
-                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 70, height: 12 }} />
-                  <View className="bg-surface-sunken rounded-ds-md flex-1" style={{ height: 12 }} />
-                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 100, height: 12 }} />
-                  <View className="bg-surface-sunken rounded-ds-md" style={{ width: 90, height: 12 }} />
+        {/* Lista + pré-visualização */}
+        <View style={{ flexDirection: "row", gap: 16, alignItems: "flex-start" }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={isMobile} style={{ width: "100%" }} contentContainerStyle={{ width: isMobile ? undefined : "100%" }}>
+              <View
+                className="bg-surface rounded-ds-md overflow-hidden border border-border"
+                role="table"
+                aria-label="Questões"
+                style={{ width: "100%", minWidth: isMobile ? tableMinWidth ?? 760 : narrow ? 600 : 900 }}
+              >
+                <View className="flex-row items-center bg-surface-sunken border-b border-border" style={{ height: 40 }} role="row">
+                  <Checkbox
+                    checked={allPageSelected}
+                    mixed={pageSelection === "some"}
+                    onPress={() => setSelected(togglePageSelection(selected, pageIds))}
+                    label="Selecionar questões desta página"
+                  />
+                  <SortHeader label="Nº" sort="id" style={{ width: col.number }} />
+                  <HeaderCell label="Enunciado" style={{ flex: 1, minWidth: 240 }} />
+                  <SortHeader label="Dificuldade" sort="difficulty" style={{ width: col.difficulty }} />
+                  <SortHeader label="Erros" sort="errors" style={{ width: col.errors }} />
+                  {!narrow && <SortHeader label="Banca · ano" sort="board" style={{ width: col.board }} />}
+                  {!narrow && <HeaderCell label="Situação" style={{ width: col.status }} />}
+                  <View style={{ width: col.actions }} />
                 </View>
-              ))
-            ) : loadError ? (
-              <View className="py-14 items-center gap-3 px-6">
-                <Ionicons name="cloud-offline-outline" size={32} color="var(--ds-danger)" />
-                <Text className="text-sm text-ink-muted text-center">{loadError}</Text>
-                <TouchableOpacity onPress={() => void load()} className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center">
-                  <Text className="text-sm font-medium text-on-brand">Tentar novamente</Text>
-                </TouchableOpacity>
-              </View>
-            ) : rows.length === 0 ? (
-              <View className="py-14 items-center gap-2 px-6">
-                <Ionicons name="document-text-outline" size={32} color="var(--ds-border-strong)" />
-                <Text className="text-sm text-ink-muted text-center">
-                  {noQuestionsAtAll ? "Nenhuma questão cadastrada ainda." : "Nenhuma questão encontrada com esses filtros."}
-                </Text>
-                {!noQuestionsAtAll && filtered && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSearchText("");
-                      updateState({ ...clearFilters(state), search: "" });
-                    }}
-                  >
-                    <Text className="text-xs font-semibold text-brand">Limpar busca e filtros</Text>
-                  </TouchableOpacity>
+
+                {loading && !result ? (
+                  Array.from({ length: 6 }, (_, i) => (
+                    <View key={i} className="flex-row items-center border-b border-border" style={{ paddingVertical: 18, paddingHorizontal: 16, gap: 16 }} aria-hidden>
+                      <View className="bg-surface-sunken" style={{ width: 16, height: 16 }} />
+                      <View className="bg-surface-sunken" style={{ width: 40, height: 12 }} />
+                      <View className="bg-surface-sunken flex-1" style={{ height: 12 }} />
+                      <View className="bg-surface-sunken" style={{ width: 90, height: 12 }} />
+                      <View className="bg-surface-sunken" style={{ width: 70, height: 12 }} />
+                    </View>
+                  ))
+                ) : loadError ? (
+                  <View className="py-14 items-center gap-3 px-6">
+                    <Text className="text-sm text-ink-muted text-center">{loadError}</Text>
+                    <Button variant="primary" label="Tentar novamente" onPress={() => void load()} />
+                  </View>
+                ) : rows.length === 0 ? (
+                  <View className="py-14 items-center gap-2 px-6">
+                    <Text className="text-sm text-ink-muted text-center">
+                      {noQuestionsAtAll ? "Nenhuma questão cadastrada ainda." : "Nenhuma questão encontrada com esses filtros."}
+                    </Text>
+                    {!noQuestionsAtAll && filtered && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSearchText("");
+                          updateState({ ...clearFilters(state), search: "" });
+                        }}
+                      >
+                        <Text className="font-medium text-brand" style={{ fontSize: 13 }}>
+                          Limpar busca e filtros
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : (
+                  <View style={{ opacity: loading ? 0.6 : 1 }}>
+                    {rows.map((row, i) => {
+                      const isSelected = selected.has(row.id);
+                      const isOpen = previewRow?.id === row.id;
+                      const errorRate = row.error_rate ?? 0;
+                      const highError = errorRate >= HIGH_ERROR_RATE;
+                      const stem = plainRichText(row.question_text).trim() || (row.image_url ? "[Enunciado em imagem]" : "[Sem enunciado]");
+                      const path = row.subject
+                        ? [row.subject.name, row.topics.map((t) => t.name).join(", ")].filter(Boolean).join(" › ")
+                        : "Sem disciplina";
+                      return (
+                        <DataTableRow
+                          key={row.id}
+                          index={i}
+                          onPress={() => onRowPress(row)}
+                          style={[
+                            { paddingHorizontal: 0, paddingVertical: 0, minHeight: density === "compacta" ? 44 : 64, alignItems: "center" },
+                            isSelected ? { backgroundColor: color["brand-tint"] } : null,
+                            isOpen && Platform.OS === "web" ? ({ boxShadow: `inset 3px 0 0 ${color.accent}` } as object) : null,
+                          ]}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onPress={() => {
+                              const next = new Set(selected);
+                              next.has(row.id) ? next.delete(row.id) : next.add(row.id);
+                              setSelected(next);
+                            }}
+                            label={`Selecionar questão ${row.id}`}
+                          />
+                          <Text className="font-mono font-medium text-ink" style={{ width: col.number, paddingHorizontal: 12, fontSize: 13 }}>
+                            #{row.id}
+                          </Text>
+                          <View style={{ flex: 1, minWidth: 240, paddingHorizontal: 12, paddingVertical: density === "compacta" ? 6 : 10 }}>
+                            <Text className="font-medium text-ink" style={{ fontSize: 14, lineHeight: 20 }} numberOfLines={1}>
+                              {stem}
+                            </Text>
+                            {density !== "compacta" && (
+                              <View className="flex-row items-center" style={{ gap: 6, marginTop: 3, overflow: "hidden" }}>
+                                <View
+                                  className="flex-row items-center"
+                                  style={{ gap: 4, flexShrink: 0, maxWidth: "55%" }}
+                                  {...(row.exam
+                                    ? { role: "img", "aria-label": `Questão do simulado oficial "${row.exam.title}": conteúdo não editável e não entra em simulados do banco.` }
+                                    : {})}
+                                >
+                                  {row.exam ? <Lock size={12} color={color["ink-subtle"]} strokeWidth={1.5} /> : null}
+                                  <Text className="text-ink-subtle" style={{ fontSize: 12, lineHeight: 16 }} numberOfLines={1}>
+                                    {row.exam ? row.exam.title : row.source_exam_name || "Avulsa"}
+                                  </Text>
+                                </View>
+                                <View style={{ width: 3, height: 3, backgroundColor: color["border-strong"] }} />
+                                <Text className="text-ink-muted" style={{ fontSize: 12, lineHeight: 16, flexShrink: 1 }} numberOfLines={1}>
+                                  {path}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <View style={{ width: col.difficulty, paddingHorizontal: 12 }}>
+                            <DifficultyMeter difficulty={row.difficulty} levels={catalogs.difficulties.length} emptyLabel="Sem nível" />
+                          </View>
+                          <View style={{ width: col.errors, paddingHorizontal: 12 }}>
+                            {row.answer_count ? (
+                              <View style={{ gap: 4 }} aria-label={`${errorRate}% de erro (${row.wrong_count ?? 0} de ${row.answer_count})`}>
+                                <Text className={`font-mono font-medium ${highError ? "text-danger" : "text-ink"}`} style={{ fontSize: 13 }}>
+                                  {errorRate}%
+                                </Text>
+                                <View className="bg-surface-sunken border border-border" style={{ height: 4 }}>
+                                  <View style={{ width: `${Math.min(100, errorRate)}%`, height: "100%", backgroundColor: highError ? color.danger : color["ink-muted"] }} />
+                                </View>
+                              </View>
+                            ) : (
+                              <Text className="text-ink-subtle" style={{ fontSize: 13 }} numberOfLines={1}>
+                                Sem dados
+                              </Text>
+                            )}
+                          </View>
+                          {!narrow && (
+                            <View style={{ width: col.board, paddingHorizontal: 12 }}>
+                              {row.board || row.year ? (
+                                <>
+                                  <Text className="text-ink" style={{ fontSize: 13, lineHeight: 18 }} numberOfLines={1}>
+                                    {row.board?.name ?? "—"}
+                                  </Text>
+                                  {row.year ? (
+                                    <Text className="font-mono text-ink-subtle" style={{ fontSize: 12, lineHeight: 16 }}>
+                                      {row.year}
+                                    </Text>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <Text className="text-ink-subtle" style={{ fontSize: 13 }}>
+                                  —
+                                </Text>
+                              )}
+                            </View>
+                          )}
+                          {!narrow && (
+                            <View style={{ width: col.status, paddingHorizontal: 12 }}>
+                              {row.is_annulled || row.is_outdated ? (
+                                <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
+                              ) : row.revalidated_at ? (
+                                <View className="flex-row items-center" style={{ gap: 6 }}>
+                                  <Check size={14} color={color.success} strokeWidth={2} />
+                                  <Text className="text-ink-subtle" style={{ fontSize: 13 }}>
+                                    Revalidada
+                                  </Text>
+                                </View>
+                              ) : (
+                                <Text className="text-ink-subtle" style={{ fontSize: 13 }}>
+                                  Regular
+                                </Text>
+                              )}
+                            </View>
+                          )}
+                          <View style={{ width: col.actions, alignItems: "center" }}>
+                            <TouchableOpacity
+                              onPress={() => setMenuRow(row)}
+                              aria-label={`Ações da questão ${row.id}`}
+                              className="rounded-ds-sm items-center justify-center"
+                              style={{ width: 28, height: 28 }}
+                            >
+                              <Icon icon={Ellipsis} color={color["ink-subtle"]} />
+                            </TouchableOpacity>
+                          </View>
+                        </DataTableRow>
+                      );
+                    })}
+                  </View>
                 )}
               </View>
-            ) : (
-              <View style={{ opacity: loading ? 0.6 : 1 }}>
-                {rows.map((row, i) => (
-                  <DataTableRow key={row.id} index={i} onPress={() => setMenuRow(row)} style={{ paddingVertical: rowPadding }}>
-                    <Checkbox
-                      checked={selected.has(row.id)}
-                      onPress={() => {
-                        const next = new Set(selected);
-                        next.has(row.id) ? next.delete(row.id) : next.add(row.id);
-                        setSelected(next);
-                      }}
-                      label={`Selecionar questão ${row.id}`}
-                    />
-                    <View style={{ width: COL.number, flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8 }}>
-                      {row.exam && (
-                        <View
-                          role="img"
-                          aria-label={`Bloqueada: questão do simulado oficial "${row.exam.title}". Conteúdo não editável e não entra em simulados do banco.`}
-                        >
-                          <Ionicons name="lock-closed" size={24} color="var(--ds-warning)" />
-                        </View>
-                      )}
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text className={TABLE_CELL_SEMIBOLD}>#{row.id}</Text>
-                        <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
-                          {row.exam ? row.exam.title : row.source_exam_name || "Avulsa"}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 280, paddingRight: 12 }}>
-                      <TouchableOpacity onPress={() => openClassify(row.id)} role="link" aria-label={`Visualizar questão ${row.id}`}>
-                        <Text className="text-xs text-brand font-medium" numberOfLines={density === "compacta" ? 1 : 2}>
-                          {plainRichText(row.question_text).trim() || (row.image_url ? "[Enunciado em imagem]" : "[Sem enunciado]")}
-                        </Text>
-                      </TouchableOpacity>
-                      <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
-                        {row.subject
-                          ? [row.subject.name, row.topics.map((t) => t.name).join(", ")].filter(Boolean).join(" › ")
-                          : "Sem disciplina"}
-                      </Text>
-                    </View>
-                    <View style={{ width: COL.board }}>
-                      <Text className={row.board || row.year ? TABLE_CELL : TABLE_CELL_MUTED}>
-                        {[row.board?.name, row.year].filter(Boolean).join(" · ") || "—"}
-                      </Text>
-                    </View>
-                    <View style={{ width: COL.difficulty }}>
-                      <DifficultyMeter difficulty={row.difficulty} levels={catalogs.difficulties.length} />
-                    </View>
-                    <View style={{ width: COL.errors }}>
-                      {row.answer_count ? (
-                        <>
-                          <Text className={TABLE_CELL_SEMIBOLD}>{row.error_rate}%</Text>
-                          <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
-                            {row.wrong_count} de {row.answer_count}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text className={TABLE_CELL_MUTED}>—</Text>
-                      )}
-                    </View>
-                    <View style={{ width: COL.status, gap: 4 }}>
-                      <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
-                      {row.revalidated_at ? <Badge label="Revalidada" tone="brand" dot /> : null}
-                    </View>
-                    <View style={{ width: COL.actions, alignItems: "flex-end" }}>
-                      <TouchableOpacity onPress={() => setMenuRow(row)} aria-label={`Ações da questão ${row.id}`} className="p-1.5 rounded-ds-md">
-                        <Ionicons name="ellipsis-vertical" size={16} color="var(--ds-ink-muted)" />
-                      </TouchableOpacity>
-                    </View>
-                  </DataTableRow>
-                ))}
-              </View>
-            )}
-          </View>
-        </ScrollView>
+            </ScrollView>
 
-        {/* Paginação */}
-        {meta && meta.total > 0 && (
-          <View className="mt-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12, alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between" }}>
-            <View className="flex-row items-center gap-3">
-              <Text className={TABLE_CELL_MUTED} aria-live="polite">
-                {rangeLabel(meta.current_page, meta.per_page, meta.total)}
-              </Text>
-              <View style={{ width: 130 }}>
-                <FormSelect
-                  dense
-                  label="Por página"
-                  value={state.perPage}
-                  options={PER_PAGE_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
-                  onChange={(v) => updateState({ ...state, perPage: Number(v) as PerPage, page: 1 })}
-                />
+            {/* Rodapé: intervalo, por página, paginação */}
+            {meta && meta.total > 0 && (
+              <View className="flex-row flex-wrap items-center" style={{ gap: 16, marginTop: 12 }}>
+                <Text className="text-ink-muted" style={{ fontSize: 13 }} aria-live="polite">
+                  {rangeLabel(meta.current_page, meta.per_page, meta.total)}
+                </Text>
+                <View className="flex-row items-center" style={{ gap: 8 }}>
+                  <Text className="text-ink-muted" style={{ fontSize: 13 }}>
+                    Por página
+                  </Text>
+                  <View style={{ width: 84, marginBottom: -8 }}>
+                    <FormSelect
+                      dense
+                      label=""
+                      value={state.perPage}
+                      options={PER_PAGE_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
+                      onChange={(v) => updateState({ ...state, perPage: Number(v) as PerPage, page: 1 })}
+                    />
+                  </View>
+                </View>
+                {meta.last_page > 1 && (
+                  <View role="navigation" aria-label="Paginação" className="flex-row items-center" style={{ gap: 8, marginLeft: "auto" }}>
+                    <Button
+                      size="sm"
+                      iconOnly
+                      icon={ChevronLeft}
+                      accessibilityLabel="Página anterior"
+                      disabled={meta.current_page <= 1}
+                      onPress={() => updateState({ ...state, page: meta.current_page - 1 })}
+                    />
+                    <Text className="font-mono text-ink" style={{ fontSize: 13 }}>
+                      {meta.current_page} / {meta.last_page}
+                    </Text>
+                    <Button
+                      size="sm"
+                      iconOnly
+                      icon={ChevronRight}
+                      accessibilityLabel="Próxima página"
+                      disabled={meta.current_page >= meta.last_page}
+                      onPress={() => updateState({ ...state, page: meta.current_page + 1 })}
+                    />
+                  </View>
+                )}
               </View>
-            </View>
-            {meta.last_page > 1 && (
-              <Pagination
-                currentPage={meta.current_page}
-                lastPage={meta.last_page}
-                total={meta.total}
-                perPage={meta.per_page}
-                onPageChange={(page) => updateState({ ...state, page })}
-              />
+            )}
+            {loading && result && (
+              <View className="mt-3 items-center">
+                <ActivityIndicator color={color.brand} />
+              </View>
             )}
           </View>
-        )}
-        {loading && result && (
-          <View className="mt-3 items-center">
-            <ActivityIndicator color="var(--ds-brand)" />
-          </View>
-        )}
+
+          {previewRow && (
+            <View style={{ width: PREVIEW_WIDTH }}>
+              <QuestionPreviewPanel
+                question={previewRow}
+                onClose={() => setPreviewId(null)}
+                onOpenFull={openClassify}
+                onEdit={(id) => navigate("questoes-editar", { questionId: id, query: serializeListState(state) })}
+                onOpenExam={(examId) => navigate("simulados-form", { examId })}
+                onAddToSet={() => addOneToSet(previewRow)}
+              />
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       <Modal visible={!!menuRow} title={menuRow ? `Questão #${menuRow.id}` : ""} onClose={() => setMenuRow(null)} size="sm" compact>

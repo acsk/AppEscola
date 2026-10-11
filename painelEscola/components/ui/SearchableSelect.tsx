@@ -43,6 +43,8 @@ interface Props {
   /** Exibe caixa roxa abaixo do trigger (desligar em formulários densos) */
   showSelectedPreview?: boolean;
   dense?: boolean;
+  /** Gatilho próprio (ex.: chip de filtro); sem rótulo, erro nem margem. */
+  renderTrigger?: (props: { open: () => void; label: string; hasValue: boolean }) => React.ReactNode;
 }
 
 const MODAL_WIDTH = 380;
@@ -68,6 +70,7 @@ export default function SearchableSelect({
   selectedOption,
   showSelectedPreview = true,
   dense = false,
+  renderTrigger,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -402,6 +405,17 @@ export default function SearchableSelect({
         </View>
       </View>
   );
+
+  if (renderTrigger) {
+    return (
+      <>
+        {renderTrigger({ open: () => { if (!disabled) setOpen(true); }, label: triggerLabel, hasValue: selectedValues.length > 0 })}
+        <OverlayPortal open={open} onClose={closePicker}>
+          {pickerContent}
+        </OverlayPortal>
+      </>
+    );
+  }
 
   return (
     <View style={{ marginBottom: dense ? 8 : 16 }}>

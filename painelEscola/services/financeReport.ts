@@ -87,3 +87,20 @@ export async function fetchFinanceReport(params: FinanceReportQuery): Promise<Fi
   const { data } = await api.get("/reports/finance", { params });
   return data.body ?? data;
 }
+
+/** Limite de `per_page` aceito por GET /reports/finance. */
+const FINANCE_REPORT_MAX_PER_PAGE = 100;
+
+/** Todas as cobranças do recorte (página a página), para exportar PDF/Excel. */
+export async function fetchAllFinanceReportItems(params: Omit<FinanceReportQuery, "page" | "per_page">): Promise<FinanceReportItem[]> {
+  const items: FinanceReportItem[] = [];
+  let page = 1;
+  let lastPage = 1;
+  do {
+    const report = await fetchFinanceReport({ ...params, page, per_page: FINANCE_REPORT_MAX_PER_PAGE });
+    items.push(...report.items);
+    lastPage = report.meta.last_page;
+    page += 1;
+  } while (page <= lastPage);
+  return items;
+}
