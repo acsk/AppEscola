@@ -1,4 +1,4 @@
-import { getApiErrorMessage } from "./apiErrors";
+import { firstValidationMessage, getApiErrorMessage, getApiValidationErrors } from "./apiErrors";
 
 /** Título e mensagem do modal de erro padrão (MessageModal) para falhas da IA, pelo `body.code` da API. */
 export function describeAiError(error: unknown, fallbackTitle: string): { title: string; message: string } {
@@ -17,7 +17,10 @@ export function describeAiError(error: unknown, fallbackTitle: string): { title:
       return { title: "Falha no provedor de IA", message: apiMessage || "O provedor de IA não respondeu. Tente novamente em instantes." };
     case "ai_invalid_response":
       return { title: fallbackTitle, message: apiMessage || "A IA devolveu uma resposta inválida. Tente novamente." };
-    default:
-      return { title: fallbackTitle, message: apiMessage || "Ocorreu um erro inesperado. Tente novamente." };
+    default: {
+      const field = firstValidationMessage(getApiValidationErrors(error));
+      const message = apiMessage && apiMessage !== "Dados inválidos." ? apiMessage : field || apiMessage;
+      return { title: fallbackTitle, message: message || "Ocorreu um erro inesperado. Tente novamente." };
+    }
   }
 }

@@ -267,6 +267,90 @@ export function joinStackedFractions(items: PdfTextItem[]): PdfTextItem[] {
   return result.filter((_, index) => !removed.has(index));
 }
 
+/** Linhas da página, de cima para baixo. Itens da mesma linha ficam da esquerda para a direita. */
+function groupPdfLines(items: PdfTextItem[]): PdfTextItem[][] {
+  const lines: { y: number; items: PdfTextItem[] }[] = [];
+  items.forEach((item) => {
+    if (item.str === "") return;
+    const line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= Math.max(2, item.height * 0.35));
+    if (line) line.items.push(item);
+    else lines.push({ y: item.y, items: [item] });
+  });
+  lines.sort((a, b) => b.y - a.y);
+  lines.forEach((line) => line.items.sort((a, b) => a.x - b.x));
+  return lines.map((line) => line.items);
+}
+
+/**
+ * Meio da página com uma faixa vazia e texto dos dois lados: prova em duas colunas.
+ * Título largo (uma seção centralizada) não conta, para não tapar o vão.
+ */
+function columnGap(items: PdfTextItem[], pageWidth: number): number | null {
+  if (pageWidth < 200) return null;
+  const bins = new Array(Math.ceil(pageWidth)).fill(0);
+  items.forEach((item) => {
+    if (item.width > pageWidth * 0.45 || item.y < 40) return;
+    const from = Math.max(0, Math.floor(item.x));
+    const to = Math.min(bins.length - 1, Math.ceil(item.x + Math.max(item.width, 1)));
+    for (let x = from; x <= to; x += 1) bins[x] += 1;
+  });
+  const leftBound = Math.floor(pageWidth * 0.32);
+  const rightBound = Math.floor(pageWidth * 0.68);
+  let best: { mid: number; len: number } | null = null;
+  let run: number | null = null;
+  for (let x = leftBound; x <= rightBound; x += 1) {
+    if (bins[x] === 0) {
+      if (run === null) run = x;
+    } else if (run !== null) {
+      const len = x - run;
+      if (len >= 16 && (best === null || len > best.len)) best = { mid: run + len / 2, len };
+      run = null;
+    }
+  }
+  if (best === null) return null;
+  const left = items.filter((item) => item.x + item.width < best.mid).length;
+  const right = items.filter((item) => item.x >= best.mid).length;
+  return left >= 8 && right >= 8 ? best.mid : null;
+}
+
+/** Junta os trechos da linha. Espaço só quando há vão de palavra; "7"+"0" continua "70". */
+function joinPdfLine(items: PdfTextItem[]): string {
+  let text = "";
+  let prev: PdfTextItem | null = null;
+  items.forEach((item) => {
+    if (prev) {
+      const gap = item.x - (prev.x + prev.width);
+      const word = gap > Math.max(1.2, prev.height * 0.18);
+      if (word && text !== "" && !text.endsWith(" ") && !item.str.startsWith(" ")) text += " ";
+    }
+    text += item.str;
+    prev = item;
+  });
+  return text.replace(/[ \t]+/g, " ").trim();
+}
+
+/**
+ * Ordem de leitura da página. Com duas colunas, a da esquerda vem inteira e depois a da direita:
+ * a questão da coluna seguinte deixa de entrar na mesma linha da questão atual.
+ */
+export function layoutPageText(items: PdfTextItem[], pageWidth: number): string {
+  const lines = groupPdfLines(items);
+  const gap = columnGap(items, pageWidth);
+  if (gap === null) return lines.map(joinPdfLine).filter(Boolean).join("\n");
+
+  const left: string[] = [];
+  const right: string[] = [];
+  lines.forEach((line) => {
+    const leftItems = line.filter((item) => item.x < gap);
+    const rightItems = line.filter((item) => item.x >= gap);
+    const leftText = joinPdfLine(leftItems);
+    const rightText = joinPdfLine(rightItems);
+    if (leftText) left.push(leftText);
+    if (rightText) right.push(rightText);
+  });
+  return [...left, ...right].join("\n");
+}
+
 export async function extractPdfPages(file: File): Promise<string[]> {
   const { pdfjs } = await import("react-pdf");
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -281,10 +365,11 @@ export async function extractPdfPages(file: File): Promise<string[]> {
       const page = await pdf.getPage(n);
       try {
         const content = await page.getTextContent();
+        const viewport = page.getViewport({ scale: 1 });
         const items: PdfTextItem[] = content.items.flatMap((item) => ("str" in item
           ? [{ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height, hasEOL: item.hasEOL }]
           : []));
-        pages.push(joinStackedFractions(items).map((item) => item.str + (item.hasEOL ? "\n" : " ")).join(""));
+        pages.push(layoutPageText(joinStackedFractions(items), viewport.width));
       } finally {
         page.cleanup();
       }

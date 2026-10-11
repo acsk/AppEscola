@@ -791,7 +791,10 @@ class QuestionAiService
             ."Em CADA questão que depende dele, informe support_text_id; "
             ."o question_text da questão fica só com o comando/pergunta, sem repetir o texto de apoio. Questão sem texto de apoio: support_text_id=null. "
             ."Um texto longo, reflexivo ou com referência bibliográfica NÃO é motivo para needs_image.\n"
-            .'Não perca questões que cruzam páginas. Enunciado sem número e sem alternativas; alternativas na ordem original, sem letras. '
+            .'Não perca questões que cruzam páginas. O texto de cada página já está na ordem de leitura: a coluna da esquerda, de cima para baixo, e só depois a coluna da direita. '
+            .'Não junte na mesma questão o enunciado da outra coluna nem a questão que começa na página seguinte. '
+            .'Uma questão pode continuar no topo da outra coluna ou na página seguinte: complete essa questão e pare antes da próxima. '
+            .'Enunciado sem número e sem alternativas; alternativas na ordem original, sem letras. '
             .'A prova pode ter VÁRIAS seções/disciplinas (ex.: PORTUGUÊS e MATEMÁTICA) com a numeração reiniciada em cada uma: inclua TODAS as questões '
             .'de TODAS as seções, na ordem do documento, e use source_number com o prefixo da seção quando a numeração reinicia (ex.: "1", ..., "20", "MAT 1", ..., "MAT 20"); '
             .'total_questions conta todas as seções. '
@@ -838,9 +841,10 @@ class QuestionAiService
         }
         $data = $response['data'];
         $supportTexts = $this->supportTexts($data['support_texts'] ?? [], $text, $data['questions'] ?? []);
-        if ($focusPages !== null && is_array($data['questions'] ?? null) && ($data['total_questions'] ?? null) === count($data['questions'])) {
-            // Bloco de páginas: a IA marca complete=false por cautela com o contexto; a contagem conferida basta.
+        if ($focusPages !== null && is_array($data['questions'] ?? null) && array_is_list($data['questions']) && count($data['questions']) > 0) {
+            // Bloco de páginas: a IA marca complete=false por cautela com o contexto. A lista presente é o que dá para revisar.
             $data['complete'] = true;
+            $data['total_questions'] = count($data['questions']);
         }
         $validated = $this->validateImportedQuestions(
             $data, $catalogs, 'needs_image', $focusPages !== null, $onlySubjectId, QuestionYear::fromExamName($sourceExamName)
@@ -850,7 +854,13 @@ class QuestionAiService
             $blockStart = (int) $focusPages['from'] > 1 ? self::positionIn($text, '[PÁGINA '.(int) $focusPages['from'].']') : 0;
             $blockEnd = self::positionIn($text, '[PÁGINA '.((int) $focusPages['to'] + 1).']');
             $validated = array_values(array_filter($validated, function (array $item) use ($text, $blockStart, $blockEnd) {
-                $at = self::positionIn($text, mb_substr(trim(QuestionRichText::plain($item['content']['question_text'])), 0, 40));
+                $snippet = mb_substr(trim(QuestionRichText::plain($item['content']['question_text'])), 0, 40);
+                // A frase também pode estar no texto de apoio da página anterior: vale a ocorrência dentro do bloco.
+                $inside = self::positionIn($text, $snippet, $blockStart ?? 0);
+                if ($inside !== null && ($blockEnd === null || $inside < $blockEnd)) {
+                    return true;
+                }
+                $at = self::positionIn($text, $snippet);
 
                 return $at === null || (($blockStart === null || $at >= $blockStart) && ($blockEnd === null || $at < $blockEnd));
             }));
@@ -884,13 +894,18 @@ class QuestionAiService
     {
         $limit = 50;
         $items = $raw['questions'] ?? null;
-        if (($raw['complete'] ?? null) !== true || ! is_array($items) || ! array_is_list($items)
-            || (count($items) < 1 && ! $allowEmpty) || count($items) > $limit
-            || ! is_int($raw['total_questions'] ?? null) || $raw['total_questions'] !== count($items)) {
+        $listed = is_array($items) && array_is_list($items);
+        $focused = $allowEmpty && $listed && count($items) > 0;
+        if (! $listed || count($items) > $limit
+            || (! $focused && (($raw['complete'] ?? null) !== true
+                || (count($items) < 1 && ! $allowEmpty)
+                || ! is_int($raw['total_questions'] ?? null) || $raw['total_questions'] !== count($items)))) {
             throw new AiException('A IA não converteu o PDF completo com segurança. Divida o documento ou confira a legibilidade e tente novamente.', 422, 'pdf_incomplete');
         }
         $validated = [];
+        $skipped = null;
         foreach ($items as $index => $item) {
+            try {
             if (! is_array($item) || ! in_array($item['type'] ?? null, ['essay', 'multiple_choice'], true)) {
                 $this->invalidImportedQuestion($index, 'o tipo deve ser multiple_choice ou essay', $imageField);
             }
@@ -940,6 +955,16 @@ class QuestionAiService
                 ],
                 'raw' => $item,
             ];
+            } catch (AiException $e) {
+                if (! $focused) {
+                    throw $e;
+                }
+                $skipped = $e;
+                Log::warning('IA: questão ignorada na separação do bloco', ['posicao' => $index + 1, 'motivo' => $e->getMessage()]);
+            }
+        }
+        if ($validated === [] && $skipped !== null) {
+            throw $skipped;
         }
 
         return $validated;
@@ -1352,14 +1377,14 @@ class QuestionAiService
         return [implode("\n\n", $context), $rule];
     }
 
-    /** Posição (no texto normalizado) da primeira ocorrência de $needle, com a mesma tolerância das âncoras. */
-    private static function positionIn(string $document, string $needle): ?int
+    /** Posição (no texto normalizado) da primeira ocorrência de $needle a partir de $from, com a mesma tolerância das âncoras. */
+    private static function positionIn(string $document, string $needle, int $from = 0): ?int
     {
         if (mb_strlen(trim($needle)) < 10) {
             return null;
         }
         [, , , $haystack] = self::searchIndex($document);
-        $at = mb_strpos($haystack, self::foldForSearch($needle));
+        $at = mb_strpos($haystack, self::foldForSearch($needle), max(0, $from));
 
         return $at === false ? null : $at;
     }

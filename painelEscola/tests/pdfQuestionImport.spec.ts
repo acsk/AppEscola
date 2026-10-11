@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-  chunkBlocks, joinStackedFractions, mergeWithNext, pageBlocks, pdfDocumentText, prepareQuestionBlocks, questionFingerprint,
+  chunkBlocks, joinStackedFractions, layoutPageText, mergeWithNext, pageBlocks, pdfDocumentText, prepareQuestionBlocks, questionFingerprint,
   type PdfTextItem,
 } from "../utils/pdfQuestionImport";
 
@@ -79,6 +79,39 @@ test.describe("preparação de questões de PDF", () => {
     expect(merged[0].text).toContain("continuação errada");
     expect(chunkBlocks([1, 2, 3, 4, 5, 6, 7]).map((c) => c.length)).toEqual([5, 2]);
   });
+});
+
+test("duas colunas não misturam a questão da direita na linha da esquerda", () => {
+  const row = (left: string, right: string, y: number): PdfTextItem[] => [
+    item(left, 28, y, { width: 180 }),
+    item(right, 320, y, { width: 180 }),
+  ];
+  const filler = Array.from({ length: 8 }, (_, index) => row(`linha ${index} da esquerda`, `linha ${index} da direita`, 500 - index * 14)).flat();
+  const text = layoutPageText([
+    ...row("7. Uma loja de eletrônicos", "10. O quociente e o resto", 700),
+    ...row("vendeu celulares.", "da divisão abaixo.", 686),
+    item("a) R$ 10", 28, 640, { width: 40 }),
+    item("B) 70 pontos.", 320, 640, { width: 70 }),
+    ...filler,
+  ], 595);
+
+  const left = text.indexOf("7. Uma loja de eletrônicos");
+  const right = text.indexOf("10. O quociente e o resto");
+  expect(left).toBeGreaterThanOrEqual(0);
+  expect(right).toBeGreaterThan(left);
+  expect(text.split("\n")[0]).toBe("7. Uma loja de eletrônicos");
+  expect(text).not.toContain("eletrônicos 10.");
+  expect(text).not.toContain("R$ 10 B)");
+});
+
+test("dígitos separados por um vão mínimo continuam o mesmo número", () => {
+  const text = layoutPageText([
+    item("produziu", 28, 200, { width: 40 }),
+    item("7", 80, 200, { width: 6 }),
+    item("0", 86.1, 200, { width: 6 }),
+    item("pães", 100, 200, { width: 24 }),
+  ], 595);
+  expect(text).toBe("produziu 70 pães");
 });
 
 test("blocos de 2 páginas e questões repetidas entre blocos", () => {
