@@ -30,7 +30,7 @@ import {
   EMPTY_CLASSIFICATION_FORM, applyClassificationSuggestion, classificationFromSuggestion, diffClassification,
   type ClassificationForm,
 } from "../../utils/questionClassification";
-import { extractPdfPages, pageBlocks, pdfDocumentText, questionFingerprint, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
+import { applyPdfSections, extractPdfPages, pageBlocks, pdfDocumentText, questionFingerprint, MAX_PDF_BYTES } from "../../utils/pdfQuestionImport";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { plainRichText } from "../../utils/richText";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
@@ -210,6 +210,15 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
    * Disciplina e assuntos do formulário nas questões extraídas: uma única disciplina vale para todas;
    * os assuntos escolhidos substituem os da IA nas questões da disciplina deles.
    */
+  /** Disciplinas escolhidas primeiro: o título do PDF ("POTUGUÊS") casa com elas antes do resto do catálogo. */
+  const sectionSubjects = () => {
+    const chosen = subjectIds.flatMap((id) => {
+      const subject = catalogs.subjects.find((item) => item.id === id);
+      return subject ? [subject] : [];
+    });
+    return [...chosen, ...catalogs.subjects.filter((subject) => !subjectIds.includes(subject.id))];
+  };
+
   const withChosenClassification = (c: ClassificationForm): ClassificationForm => {
     const subjectId = subjectIds.length === 1 ? subjectIds[0] : c.subject_id;
     const chosen = subjectTopics.filter((t) => topicIds.includes(t.id) && t.subject_id === subjectId).map((t) => t.id);
@@ -486,7 +495,7 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     const text = pdfText.current;
     if (busy || !text) return;
     try {
-      const found = await separateBlock(text, failedBlock, Number.MAX_SAFE_INTEGER);
+      const found = applyPdfSections(pdfPages.current, await separateBlock(text, failedBlock, Number.MAX_SAFE_INTEGER), sectionSubjects());
       const existing = new Set(drafts.map((d) => questionFingerprint({ question_text: d.content.question_text, options: d.content.options })));
       const stamp = Date.now();
       const added: Draft[] = found
@@ -558,13 +567,14 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         }
       }
       if (!questions.length) throw lastCause ?? new Error("Nenhuma questão foi encontrada no PDF.");
+      const numbered = applyPdfSections(pages, questions, sectionSubjects());
       setFailedBlocks(failed);
       const response = {
         type: failed.length ? "warning" : "success",
         message: failed.length
           ? `${questions.length} questão(ões) separada(s). Não foi possível ler: ${failed.map((f) => f.pages).join(", ")}.`
           : `${questions.length} questão(ões) separada(s) pela IA. Revise e anexe as imagens necessárias antes de incluir.`,
-        body: { questions },
+        body: { questions: numbered },
       };
       pdfPages.current = pages;
       setPdfFileName(file.name);

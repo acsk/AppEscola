@@ -91,11 +91,16 @@ export default function ImportReviewWorkspace(props: Props) {
     return (id: number) => withTopics.has(id);
   }, [catalogs.taxonomy]);
   const subjectName = (id: number | null) => (id ? catalogs.subjects.find((s) => s.id === id)?.name ?? "Disciplina" : null);
+  const shownNumber = (source: string, index: number) => {
+    const raw = source.trim();
+    if (/^\d{1,3}$/.test(raw)) return raw.padStart(2, "0");
+    return raw || String(index + 1).padStart(2, "0");
+  };
 
   const items: ReviewListItem[] = drafts.map((draft, index) => {
     const issues = reviewIssues(draft, subjectHasTopics);
     return {
-      key: draft.key, number: index + 1, subjectName: subjectName(draft.classification.subject_id) ?? "Sem disciplina",
+      key: draft.key, number: shownNumber(draft.sourceNumber, index), subjectName: subjectName(draft.classification.subject_id) ?? "Sem disciplina",
       questionText: draft.content.question_text, issues, status: reviewStatus(draft, issues),
     };
   });
@@ -232,7 +237,7 @@ export default function ImportReviewWorkspace(props: Props) {
         {medium && <View className="border-r border-border" style={{ width: 272, minHeight: 0 }}>{list}</View>}
         <View className="flex-1" style={{ minWidth: 0, minHeight: 0 }}>
           <ReviewQuestionEditor
-            draft={draft} number={index + 1} subjectName={subjectName(draft.classification.subject_id)} issues={item.issues}
+            draft={draft} number={shownNumber(draft.sourceNumber, index)} subjectName={subjectName(draft.classification.subject_id)} issues={item.issues}
             catalogs={catalogs} preferredSubjectIds={subjectIds} busy={busy}
             canPrev={index > 0} canNext={index < drafts.length - 1} hasPending={hasPending} pdfAvailable={!!pdfFile}
             notice={editorNotice}

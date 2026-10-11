@@ -8,7 +8,7 @@ export type ReviewFilter = "todas" | "pend" | "ok";
 
 export type ReviewListItem = {
   key: string;
-  number: number;
+  number: string;
   subjectName: string;
   questionText: string;
   issues: IssueCode[];

@@ -177,6 +177,165 @@ export function chunkBlocks<T>(items: T[], size = BLOCKS_PER_REQUEST): T[][] {
   return out;
 }
 
+export type PdfQuestionMark = { number: number; section: string | null; anchor: string };
+
+const QUESTION_LINE = /^(?:quest[aã]o\s*)?(\d{1,3})\s*[.)\-–:]/i;
+const OPTION_LINE = /^\(?([A-Ea-e])\)/;
+
+/** Letras de alternativa na linha. "A), B), C) e D)" é a instrução da capa, não um gabarito. */
+function optionLetters(line: string): string[] {
+  const markers = [...line.matchAll(/(?:^|\s)\(?([A-Ea-e])\)/g)];
+  if (!markers.length) return [];
+  if (markers.length >= 2 && !/\d/.test(line.slice(0, 24)) && /[A-Ea-e]\)\s*,/i.test(line)) return [];
+  return markers.map((marker) => marker[1].toUpperCase());
+}
+const SKIP_HEADING = /\b(?:texto|instru|gabarito|c[aá]lculo)\b/i;
+
+function foldName(value: string): string {
+  return value.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z]/g, "");
+}
+
+/** "Língua Portuguesa" e "POTUGUÊS" caem no mesmo núcleo para comparar com o catálogo. */
+function subjectCore(value: string): string {
+  return foldName(value).replace(/^lingua/, "");
+}
+
+function compactText(value: string): string {
+  return value.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{M}/gu, "").replace(/<[^>]*>/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+function editDistance(a: string, b: string): number {
+  const rows = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 0; j <= b.length; j += 1) rows[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      rows[i][j] = cost === 0 ? rows[i - 1][j - 1] : 1 + Math.min(rows[i - 1][j], rows[i][j - 1], rows[i - 1][j - 1]);
+    }
+  }
+  return rows[a.length][b.length];
+}
+
+/** Título de matéria no PDF ("MATEMÁTICA", "POTUGUÊS") → nome do catálogo, quando for o mesmo. */
+function resolveSubject(heading: string, subjectNames: string[]): string | null {
+  const folded = subjectCore(heading);
+  if (folded.length < 4) return null;
+  let best: { name: string; distance: number } | null = null;
+  for (const name of subjectNames) {
+    const candidate = subjectCore(name);
+    if (candidate.length < 4) continue;
+    if (candidate.includes(folded) || folded.includes(candidate)) return name;
+    const distance = editDistance(folded, candidate);
+    if (distance <= 2 && (best === null || distance < best.distance)) best = { name, distance };
+  }
+  return best?.name ?? null;
+}
+
+function isSubjectHeading(line: string): boolean {
+  if (line.length < 4 || line.length > 48 || /\d/.test(line) || SKIP_HEADING.test(line)) return false;
+  const letters = line.replace(/[^A-Za-zÀ-ú]/g, "");
+  if (letters.length < 4) return false;
+  const upper = [...letters].filter((char) => char !== char.toLowerCase() && char === char.toUpperCase()).length;
+  return upper / letters.length >= 0.7;
+}
+
+/**
+ * Numeração do PDF por matéria. Português 1–20 e, depois do título Matemática, de novo 1–20.
+ * Instruções numeradas e o gabarito final não entram.
+ */
+export function pdfQuestionMarks(pages: string[], subjectNames: string[] = []): PdfQuestionMark[] {
+  const lines = pages.flatMap((page) => page.split("\n").map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean));
+  const marks: PdfQuestionMark[] = [];
+  let gabarito = false;
+  let section: string | null = null;
+  let heading: string | null = null;
+  let previous: number | null = null;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^gabarito\b/i.test(line)) {
+      gabarito = true;
+      continue;
+    }
+    if (gabarito) continue;
+    const namedSubject = line.length <= 48 && !/\d/.test(line) && !SKIP_HEADING.test(line)
+      ? resolveSubject(line, subjectNames)
+      : null;
+    if (isSubjectHeading(line) || namedSubject) {
+      heading = line;
+      continue;
+    }
+    const match = line.match(QUESTION_LINE);
+    if (!match) continue;
+    const number = Number(match[1]);
+    const letters = new Set<string>();
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (QUESTION_LINE.test(lines[j]) && !OPTION_LINE.test(lines[j])) break;
+      optionLetters(lines[j]).forEach((letter) => letters.add(letter));
+    }
+    const hasOption = letters.size >= 2;
+    const restart = previous !== null && number < previous && number <= 3;
+    const sequential = previous === null ? number <= 5 : number === previous + 1;
+    if (!hasOption || (!sequential && !restart)) continue;
+    if ((restart || previous === null) && heading) {
+      section = resolveSubject(heading, subjectNames) ?? heading;
+    }
+    heading = null;
+    marks.push({ number, section, anchor: compactText(line.replace(QUESTION_LINE, "")).slice(0, 40) });
+    previous = number;
+  }
+  return marks;
+}
+
+type NumberedQuestion = {
+  source_number?: string | null;
+  subject_id?: number | null;
+  topic_ids?: number[];
+  question_text?: string | null;
+};
+
+function withPdfMark<T extends NumberedQuestion>(
+  question: T,
+  mark: PdfQuestionMark,
+  subjects: { id: number; name: string }[],
+): T {
+  const subject = mark.section
+    ? subjects.find((item) => subjectCore(item.name) === subjectCore(mark.section!))
+    : undefined;
+  if (!subject || subject.id === question.subject_id) {
+    return { ...question, source_number: String(mark.number) };
+  }
+  return { ...question, source_number: String(mark.number), subject_id: subject.id, topic_ids: [] };
+}
+
+/**
+ * Grava o número da matéria (Português 1–20, Matemática 1–20) e a disciplina do trecho.
+ * Com a mesma quantidade, a ordem do PDF vale. Num bloco parcial, o enunciado localiza a questão.
+ */
+export function applyPdfSections<T extends NumberedQuestion>(
+  pages: string[],
+  questions: T[],
+  subjects: { id: number; name: string }[],
+): T[] {
+  const marks = pdfQuestionMarks(pages, subjects.map((subject) => subject.name));
+  if (!marks.length) return questions;
+  if (marks.length === questions.length) {
+    return questions.map((question, index) => withPdfMark(question, marks[index], subjects));
+  }
+  const used = new Set<number>();
+  return questions.map((question) => {
+    const key = compactText((question.question_text ?? "").replace(/^(?:quest[aã]o\s*)?\d{1,3}\s*[.)\-–:]\s*/i, ""));
+    if (key.length < 18) return question;
+    const index = marks.findIndex((mark, at) => {
+      if (used.has(at) || mark.anchor.length < 12) return false;
+      return key.includes(mark.anchor) || mark.anchor.includes(key.slice(0, 28));
+    });
+    if (index < 0) return question;
+    used.add(index);
+    return withPdfMark(question, marks[index], subjects);
+  });
+}
+
 /** Lê o texto de cada página do PDF no navegador (pdf.js do react-pdf, worker do CDN). */
 /** Páginas por chamada à IA: provas longas numa chamada só fazem o modelo encurtar a lista de questões. */
 export const PAGES_PER_AI_BLOCK = 2;

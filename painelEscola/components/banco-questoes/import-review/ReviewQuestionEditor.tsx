@@ -16,7 +16,7 @@ export type EditorDraft = ImportDraftQuestion & { imageLoadError: boolean; error
 
 type Props = {
   draft: EditorDraft;
-  number: number;
+  number: string;
   subjectName: string | null;
   issues: IssueCode[];
   catalogs: QuestionBankCatalogs;

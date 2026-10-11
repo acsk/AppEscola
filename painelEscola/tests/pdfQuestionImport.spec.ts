@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-  chunkBlocks, joinStackedFractions, layoutPageText, mergeWithNext, pageBlocks, pdfDocumentText, prepareQuestionBlocks, questionFingerprint,
+  applyPdfSections, chunkBlocks, joinStackedFractions, layoutPageText, mergeWithNext, pageBlocks, pdfDocumentText, pdfQuestionMarks, prepareQuestionBlocks, questionFingerprint,
   type PdfTextItem,
 } from "../utils/pdfQuestionImport";
 
@@ -124,4 +124,33 @@ test("blocos de 2 páginas e questões repetidas entre blocos", () => {
   expect(questionFingerprint({ ...b, question_text: "Texto longo de apoio.\n\nDe acordo com o texto, estamos" }))
     .toBe(questionFingerprint({ ...b, question_text: "De acordo com o texto, estamos" }));
   expect(questionFingerprint(a)).not.toBe(questionFingerprint({ ...b, options: [{ option_text: "infectados" }] }));
+});
+
+test("a numeração recomeça em cada matéria e ignora instruções, títulos de texto e o gabarito", () => {
+  const pages = [
+    "INSTRUÇÕES\n1. Preencha o cartão-resposta.\n2. A duração da prova é de 180 minutos.\n3. Cada questão tem quatro alternativas de resposta:\nA), B), C) e D) e apenas uma delas é correta.",
+    "POTUGUÊS\nLeia o texto.\n1. Esse texto tem o objetivo de\nA) informar\nB) convencer\nA ONÇA DOENTE\n2. No trecho, a expressão indica\nA) medo\nB) pressa",
+    "MATEMÁTICA\n1. Certo dia, numa padaria, um\na)190 pães b) 840 pães\nc) 1290 pães d) 160 pães\nÁREA DE CALCULO\n2. Um ônibus de viagem tem\na)87 b)86 c)216 d)345\nGABARITO\nPortuguês\n1.B\n2.A\nMatemática\n1-A\n2-B",
+  ];
+  const subjects = [{ id: 1, name: "Português" }, { id: 2, name: "Matemática" }];
+  const marks = pdfQuestionMarks(pages, subjects.map((subject) => subject.name));
+  expect(marks.map((mark) => `${mark.section} ${mark.number}`)).toEqual([
+    "Português 1", "Português 2", "Matemática 1", "Matemática 2",
+  ]);
+
+  const imported = applyPdfSections(pages, [
+    { question_text: "1. Esse texto tem o objetivo de", source_number: "1", subject_id: 9, topic_ids: [3] },
+    { question_text: "2. No trecho, a expressão indica", source_number: "2", subject_id: 9, topic_ids: [3] },
+    { question_text: "1. Certo dia, numa padaria, um", source_number: "3", subject_id: 9, topic_ids: [4] },
+    { question_text: "2. Um ônibus de viagem tem", source_number: "4", subject_id: 9, topic_ids: [4] },
+  ], subjects);
+  expect(imported.map((question) => question.source_number)).toEqual(["1", "2", "1", "2"]);
+  expect(imported.map((question) => question.subject_id)).toEqual([1, 1, 2, 2]);
+  expect(imported[0].topic_ids).toEqual([]);
+  expect(imported[2].topic_ids).toEqual([]);
+
+  const partial = applyPdfSections(pages, [
+    { question_text: "Certo dia, numa padaria, um cliente comprou pães", source_number: "7", subject_id: 9 },
+  ], subjects);
+  expect(partial[0]).toMatchObject({ source_number: "1", subject_id: 2 });
 });
