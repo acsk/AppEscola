@@ -28,6 +28,7 @@ class ExamQuestion extends Model
         'is_outdated',
         'revalidated_at',
         'practice_reset_at',
+        'errors_reset_at',
         'type',
         'question_text',
         'image_url',
@@ -50,6 +51,7 @@ class ExamQuestion extends Model
         'is_outdated' => 'boolean',
         'revalidated_at' => 'datetime',
         'practice_reset_at' => 'datetime',
+        'errors_reset_at' => 'datetime',
     ];
 
     public function exam(): BelongsTo

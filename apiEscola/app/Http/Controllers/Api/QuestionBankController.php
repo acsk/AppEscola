@@ -18,6 +18,7 @@ use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
 use App\Services\QuestionClassificationService;
 use App\Services\QuestionContentService;
+use App\Services\QuestionIssueReviewService;
 use App\Services\TenantUploadSettingsService;
 use App\Models\Tenant;
 use App\Traits\ScopedByTenant;
@@ -89,12 +90,24 @@ class QuestionBankController extends Controller
         return $this->success(new QuestionBankQuestionResource($model));
     }
 
-    public function updateClassification(UpdateQuestionClassificationRequest $request, int $question): JsonResponse
+    public function updateClassification(UpdateQuestionClassificationRequest $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $model = $this->findQuestion($request, $question);
         $model = $this->classification->apply($model, $request->validated(), (int) $model->tenant_id);
+        $reviews->resolve($model);
+        $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model), 'Classificação salva com sucesso.');
+    }
+
+    /** POST question-bank/questions/{question}/student-review — encerra o aviso dos alunos ao salvar sem outra alteração. */
+    public function resolveStudentReview(Request $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
+    {
+        $model = $this->findQuestion($request, $question);
+        $reviews->resolve($model);
+        $model->loadCount('issueReports');
+
+        return $this->success(new QuestionBankQuestionResource($model), 'Revisão concluída. A questão foi revalidada e a contagem de erros zerada.');
     }
 
     /** POST question-bank/questions/revalidation — marca questões já revalidadas para não repetir. */
@@ -178,10 +191,12 @@ class QuestionBankController extends Controller
     }
 
     /** Edita o conteúdo de questão avulsa (questão de simulado: 409, editar pelo simulado). */
-    public function update(SaveStandaloneQuestionRequest $request, int $question): JsonResponse
+    public function update(SaveStandaloneQuestionRequest $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $model = $this->content->updateStandalone($this->findQuestion($request, $question), $request->validated());
+        $reviews->resolve($model);
         $model->load('options');
+        $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model), 'Questão atualizada com sucesso.');
     }

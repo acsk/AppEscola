@@ -52,6 +52,8 @@ export type QuestionBankListState = {
   mostErrors: boolean;
   /** Esconde as que já foram marcadas como revalidadas. */
   hideRevalidated: boolean;
+  /** Só questões que alunos marcaram pedindo revisão. */
+  studentReview: boolean;
   /** Ligado: só questões sem disciplina. Desligado: a lista inicial esconde essas questões. */
   withoutSubject: boolean;
   tab: QuestionBankTab;
@@ -74,6 +76,7 @@ export const DEFAULT_LIST_STATE: QuestionBankListState = {
   questionSetIds: [],
   mostErrors: false,
   hideRevalidated: false,
+  studentReview: false,
   withoutSubject: false,
   tab: "todas",
   sort: "id",
@@ -96,6 +99,7 @@ const URL_KEYS = {
   questionSetIds: "simuladoBanco",
   mostErrors: "erros",
   hideRevalidated: "ocultarRevalidadas",
+  studentReview: "revisaoAlunos",
   withoutSubject: "semDisciplina",
   tab: "aba",
   sort: "ordem",
@@ -141,6 +145,7 @@ export function parseListState(query: string): QuestionBankListState {
 
   state.mostErrors = params.get(URL_KEYS.mostErrors) === "1";
   state.hideRevalidated = params.get(URL_KEYS.hideRevalidated) === "1";
+  state.studentReview = params.get(URL_KEYS.studentReview) === "1";
   state.withoutSubject = params.get(URL_KEYS.withoutSubject) === "1";
   if (state.withoutSubject) {
     state.subjectIds = [];
@@ -180,6 +185,7 @@ export function serializeListState(state: QuestionBankListState): string {
   }
   if (state.mostErrors) params.set(URL_KEYS.mostErrors, "1");
   if (state.hideRevalidated) params.set(URL_KEYS.hideRevalidated, "1");
+  if (state.studentReview) params.set(URL_KEYS.studentReview, "1");
   if (state.withoutSubject) params.set(URL_KEYS.withoutSubject, "1");
   if (state.origin) params.set(URL_KEYS.origin, state.origin);
   if (state.tab !== DEFAULT_LIST_STATE.tab) params.set(URL_KEYS.tab, state.tab);
@@ -211,6 +217,7 @@ export function toApiParams(state: QuestionBankListState, options: { paginate?: 
   if (state.questionSetIds.length) params.question_set_id = state.questionSetIds.join(",");
   if (state.mostErrors) params.with_errors = 1;
   if (state.hideRevalidated) params.hide_revalidated = 1;
+  if (state.studentReview) params.with_issue_reports = 1;
   params.without_subject = state.withoutSubject ? 1 : 0;
   if (options.paginate !== false) {
     params.page = state.page;
@@ -236,7 +243,7 @@ export function foldText(text: string): string {
 }
 
 export function hasActiveFilters(state: QuestionBankListState): boolean {
-  return state.mostErrors || state.hideRevalidated || state.withoutSubject || state.origin !== "" || ID_LIST_FIELDS.some((field) => state[field].length > 0);
+  return state.mostErrors || state.hideRevalidated || state.studentReview || state.withoutSubject || state.origin !== "" || ID_LIST_FIELDS.some((field) => state[field].length > 0);
 }
 
 export function clearFilters(state: QuestionBankListState): QuestionBankListState {
@@ -246,6 +253,7 @@ export function clearFilters(state: QuestionBankListState): QuestionBankListStat
     origin: "", examTypeIds: [], examIds: [], questionSetIds: [],
     mostErrors: false,
     hideRevalidated: false,
+    studentReview: false,
     withoutSubject: false,
     page: 1,
   };

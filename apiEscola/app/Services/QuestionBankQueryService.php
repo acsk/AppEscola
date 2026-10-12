@@ -57,6 +57,7 @@ class QuestionBankQueryService
         $page = $query->select('exam_questions.*')
             ->selectRaw('COALESCE(qe.wrong_count, 0) as wrong_count, COALESCE(qe.answer_count, 0) as answer_count')
             ->with(QuestionClassificationService::RELATIONS)
+            ->withCount('issueReports')
             ->paginate($perPage, ['*'], 'page', max(1, (int) ($params['page'] ?? 1)));
 
         return ['page' => $page, 'tab_counts' => $counts];
@@ -166,6 +167,9 @@ class QuestionBankQueryService
         }
         if (filter_var($params['hide_revalidated'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $query->whereNull('exam_questions.revalidated_at');
+        }
+        if (filter_var($params['with_issue_reports'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereHas('issueReports');
         }
         if (array_key_exists('without_subject', $params)) {
             $onlyWithout = filter_var($params['without_subject'], FILTER_VALIDATE_BOOLEAN);
@@ -313,15 +317,24 @@ class QuestionBankQueryService
     private function joinErrorStats(Builder $query, int $tenantId): void
     {
         $practice = DB::table('practice_answers')
-            ->where('tenant_id', $tenantId)
-            ->groupBy('exam_question_id')
-            ->selectRaw('exam_question_id as question_id, SUM(is_correct = 0) as wrong_count, COUNT(*) as answer_count');
+            ->join('exam_questions as eq_pr', 'eq_pr.id', '=', 'practice_answers.exam_question_id')
+            ->where('practice_answers.tenant_id', $tenantId)
+            ->where(function ($answers) {
+                $answers->whereNull('eq_pr.errors_reset_at')
+                    ->orWhereColumn('practice_answers.answered_at', '>', 'eq_pr.errors_reset_at');
+            })
+            ->groupBy('practice_answers.exam_question_id')
+            ->selectRaw('practice_answers.exam_question_id as question_id, SUM(practice_answers.is_correct = 0) as wrong_count, COUNT(*) as answer_count');
         ExamQuestion::whereLatestReviewApproved($practice, 'practice_answers.exam_question_id');
 
         $official = DB::table('exam_answers as ea')
             ->join('exam_questions as eq_err', 'eq_err.id', '=', 'ea.question_id')
             ->where('eq_err.tenant_id', $tenantId)
             ->whereNotNull('ea.is_correct')
+            ->where(function ($answers) {
+                $answers->whereNull('eq_err.errors_reset_at')
+                    ->orWhereColumn('ea.created_at', '>', 'eq_err.errors_reset_at');
+            })
             ->groupBy('ea.question_id')
             ->selectRaw('ea.question_id as question_id, SUM(ea.is_correct = 0) as wrong_count, COUNT(*) as answer_count');
         ExamQuestion::whereLatestReviewApproved($official, 'ea.question_id');

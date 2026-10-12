@@ -93,6 +93,16 @@ test.describe("estado da listagem na URL", () => {
     expect(withSubjectFilter({ ...DEFAULT_LIST_STATE, withoutSubject: true }, [2]).withoutSubject).toBe(false);
   });
 
+  test("filtro de revisão dos alunos vai para a URL e para a API", () => {
+    const on = { ...DEFAULT_LIST_STATE, studentReview: true };
+    expect(serializeListState(on)).toContain("revisaoAlunos=1");
+    expect(parseListState("revisaoAlunos=1").studentReview).toBe(true);
+    expect(toApiParams(on).with_issue_reports).toBe(1);
+    expect(toApiParams(DEFAULT_LIST_STATE).with_issue_reports).toBeUndefined();
+    expect(hasActiveFilters(on)).toBe(true);
+    expect(clearFilters(on).studentReview).toBe(false);
+  });
+
   test("filtro de mais erros liga a ordenação pela taxa e volta ao padrão", () => {
     const on = toggleMostErrors(DEFAULT_LIST_STATE);
     expect(on.mostErrors).toBe(true);

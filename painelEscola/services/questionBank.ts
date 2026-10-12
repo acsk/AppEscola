@@ -66,6 +66,12 @@ export async function approveQuestionsManually(ids: number[]) {
   };
 }
 
+/** Encerra o aviso dos alunos, marca revalidada e zera a contagem de erros. */
+export async function resolveStudentReview(questionId: number) {
+  const { data } = await api.post(`/question-bank/questions/${questionId}/student-review`);
+  return data as { type: string; message: string; body: QuestionBankQuestion };
+}
+
 export async function resetQuestionPractice(questionId: number) {
   const { data } = await api.post(`/question-bank/questions/${questionId}/practice-reset`);
   return data as { type: string; message: string; body: { id: number; removed_answers: number; practice_reset_at: string | null } };

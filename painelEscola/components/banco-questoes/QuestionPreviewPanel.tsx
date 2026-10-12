@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Platform, Text, TouchableOpacity, View } from "react-native";
-import { ExternalLink, Lock, Plus, X } from "lucide-react-native";
+import { ExternalLink, Plus, X } from "lucide-react-native";
+import { OfficialBadge } from "./QuestionMarks";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
@@ -89,12 +90,7 @@ export default function QuestionPreviewPanel({ question, onClose, onOpenFull, on
           #{q.id}
         </Text>
         {official ? (
-          <View className="flex-row items-center rounded-ds-sm bg-surface-sunken" style={{ gap: 4, paddingHorizontal: 6, height: 22 }}>
-            <Lock size={12} color={color["ink-muted"]} strokeWidth={1.5} />
-            <Text className="text-ink-muted font-medium" style={{ fontSize: 12 }}>
-              Simulado oficial
-            </Text>
-          </View>
+          <OfficialBadge label="Simulado oficial · bloqueada" title={`Questão do simulado oficial "${q.exam!.title}": edição bloqueada.`} />
         ) : (
           <Badge label="Avulsa" tone="neutral" />
         )}

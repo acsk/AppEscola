@@ -23,6 +23,7 @@ import {
   markQuestionsRevalidated,
   resetQuestionPractice,
   patchQuestionClassification,
+  resolveStudentReview,
   updateStandaloneQuestion,
   uploadQuestionBankImage,
 } from "../../services/questionBank";
@@ -467,6 +468,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
     const patch = diffClassification(initialClassification, classification);
     if (!Object.keys(patch).length) {
+      if ((examQuestion?.issue_reports_count ?? 0) > 0) {
+        setSaving("save");
+        try {
+          const response = await resolveStudentReview(questionId);
+          showApiToast(setToast, response, "Revisão concluída.");
+        } catch (error) {
+          showApiErrorToast(setToast, error, "Não foi possível concluir a revisão.");
+          setSaving(null);
+          return;
+        }
+        setSaving(null);
+      }
       navigate("questoes-classificar", { questionId, query: listQuery });
       return;
     }
@@ -742,8 +755,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         {!loading && !loadError && (examQuestion?.issue_reports_count ?? 0) > 0 ? (
           <Text className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             {examQuestion?.issue_reports_count === 1
-              ? "1 aluno marcou que esta questão tem um erro e precisa de revisão."
-              : `${examQuestion?.issue_reports_count} alunos marcaram que esta questão tem um erro e precisa de revisão.`}
+              ? "1 aluno marcou que esta questão tem um erro e precisa de revisão. Ao salvar, o aviso sai, a questão fica revalidada e a contagem de erros zera."
+              : `${examQuestion?.issue_reports_count} alunos marcaram que esta questão tem um erro e precisa de revisão. Ao salvar, o aviso sai, a questão fica revalidada e a contagem de erros zera.`}
           </Text>
         ) : null}
 

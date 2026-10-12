@@ -403,6 +403,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::post('questions/revalidation',            [QuestionBankController::class, 'markRevalidated']);
         Route::post('questions/review/approve',          [QuestionBankController::class, 'approveReviews']);
         Route::post('questions/{question}/practice-reset', [QuestionBankController::class, 'resetPractice'])->whereNumber('question');
+        Route::post('questions/{question}/student-review', [QuestionBankController::class, 'resolveStudentReview'])->whereNumber('question');
         Route::get('questions/{question}',               [QuestionBankController::class, 'show'])->whereNumber('question');
         Route::patch('questions/{question}/classification', [QuestionBankController::class, 'updateClassification'])->whereNumber('question');
 

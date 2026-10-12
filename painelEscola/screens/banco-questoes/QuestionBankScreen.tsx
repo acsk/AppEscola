@@ -15,6 +15,7 @@ import DifficultyMeter from "../../components/banco-questoes/DifficultyMeter";
 import QuestionStatusBadge from "../../components/banco-questoes/QuestionStatusBadge";
 import QuestionPreviewPanel from "../../components/banco-questoes/QuestionPreviewPanel";
 import { color } from "../../constants/theme";
+import { OfficialBadge, RevalidatedMark, StudentReviewMark } from "../../components/banco-questoes/QuestionMarks";
 import BulkClassifyModal, { type BulkAction } from "../../components/banco-questoes/BulkClassifyModal";
 import AiBulkClassifyModal from "../../components/banco-questoes/AiBulkClassifyModal";
 import UndoToast from "../../components/banco-questoes/UndoToast";
@@ -70,7 +71,6 @@ import {
   Ellipsis,
   Folder,
   List,
-  Lock,
   Minus,
   Plus,
   Rows3,
@@ -100,9 +100,9 @@ const LIST_HASH = "#/questoes";
 const DENSITY_KEY = "questoes_densidade";
 const SEARCH_DEBOUNCE_MS = 300;
 
-const COL = { select: 44, number: 72, difficulty: 140, errors: 104, board: 104, status: 116, actions: 40 };
+const COL = { select: 44, number: 88, difficulty: 140, errors: 104, board: 104, status: 132, actions: 40 };
 /** Com a pré-visualização aberta: colunas mais estreitas, sem banca e situação. */
-const COL_NARROW = { ...COL, number: 64, difficulty: 128, errors: 92 };
+const COL_NARROW = { ...COL, number: 84, difficulty: 128, errors: 92 };
 /** Largura mínima da janela para abrir a pré-visualização ao lado da lista (abaixo disso, a linha abre a página da questão). */
 const PREVIEW_MIN_WIDTH = 1280;
 const PREVIEW_WIDTH = 380;
@@ -125,7 +125,7 @@ function readDensity(): "padrao" | "compacta" {
 const filtersKey = (s: QuestionBankListState) =>
   JSON.stringify([
     s.search, s.subjectIds, s.topicIds, s.boardIds, s.years, s.difficultyIds,
-    s.origin, s.examTypeIds, s.examIds, s.questionSetIds, s.mostErrors, s.hideRevalidated, s.withoutSubject, s.tab,
+    s.origin, s.examTypeIds, s.examIds, s.questionSetIds, s.mostErrors, s.hideRevalidated, s.studentReview, s.withoutSubject, s.tab,
   ]);
 
 export default function QuestionBankScreen({ navigate }: Props) {
@@ -760,10 +760,16 @@ export default function QuestionBankScreen({ navigate }: Props) {
               onPress={() => updateState(toggleMostErrors(state))}
             />
             <ToggleChip
-              label="Ocultar revalidadas"
+              label="Sem revalidadas"
               accessibilityLabel="Ocultar questões já marcadas como revalidadas"
               checked={state.hideRevalidated}
               onPress={() => updateState({ ...state, hideRevalidated: !state.hideRevalidated, page: 1 })}
+            />
+            <ToggleChip
+              label="Revisão dos alunos"
+              accessibilityLabel="Mostrar só questões que alunos marcaram pedindo revisão"
+              checked={state.studentReview}
+              onPress={() => updateState({ ...state, studentReview: !state.studentReview, page: 1 })}
             />
             <ToggleChip
               label="Sem disciplina"
@@ -951,23 +957,21 @@ export default function QuestionBankScreen({ navigate }: Props) {
                             }}
                             label={`Selecionar questão ${row.id}`}
                           />
-                          <Text className="font-mono font-medium text-ink" style={{ width: col.number, paddingHorizontal: 12, fontSize: 13 }}>
-                            #{row.id}
-                          </Text>
+                          <View style={{ width: col.number, paddingHorizontal: 12, gap: 5 }}>
+                            <Text className="font-mono font-medium text-ink" style={{ fontSize: 13, lineHeight: 18 }}>
+                              #{row.id}
+                            </Text>
+                            {row.exam ? (
+                              <OfficialBadge title={`Questão do simulado oficial "${row.exam.title}": conteúdo não editável e não entra em simulados do banco.`} />
+                            ) : null}
+                          </View>
                           <View style={{ flex: 1, minWidth: 240, paddingHorizontal: 12, paddingVertical: density === "compacta" ? 6 : 10 }}>
                             <Text className="font-medium text-ink" style={{ fontSize: 14, lineHeight: 20 }} numberOfLines={1}>
                               {stem}
                             </Text>
                             {density !== "compacta" && (
                               <View className="flex-row items-center" style={{ gap: 6, marginTop: 3, overflow: "hidden" }}>
-                                <View
-                                  className="flex-row items-center"
-                                  style={{ gap: 4, flexShrink: 0, maxWidth: "55%" }}
-                                  {...(row.exam
-                                    ? { role: "img", "aria-label": `Questão do simulado oficial "${row.exam.title}": conteúdo não editável e não entra em simulados do banco.` }
-                                    : {})}
-                                >
-                                  {row.exam ? <Lock size={12} color={color["ink-subtle"]} strokeWidth={1.5} /> : null}
+                                <View className="flex-row items-center" style={{ gap: 4, flexShrink: 0, maxWidth: "55%" }}>
                                   <Text className="text-ink-subtle" style={{ fontSize: 12, lineHeight: 16 }} numberOfLines={1}>
                                     {row.exam ? row.exam.title : row.source_exam_name || "Avulsa"}
                                   </Text>
@@ -1020,15 +1024,12 @@ export default function QuestionBankScreen({ navigate }: Props) {
                           )}
                           {!narrow && (
                             <View style={{ width: col.status, paddingHorizontal: 12 }}>
-                              {row.is_annulled || row.is_outdated ? (
+                              {(row.issue_reports_count ?? 0) > 0 ? (
+                                <StudentReviewMark />
+                              ) : row.is_annulled || row.is_outdated ? (
                                 <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
                               ) : row.revalidated_at ? (
-                                <View className="flex-row items-center" style={{ gap: 6 }}>
-                                  <Check size={14} color={color.success} strokeWidth={2} />
-                                  <Text className="text-ink-subtle" style={{ fontSize: 13 }}>
-                                    Revalidada
-                                  </Text>
-                                </View>
+                                <RevalidatedMark />
                               ) : (
                                 <Text className="text-ink-subtle" style={{ fontSize: 13 }}>
                                   Regular
