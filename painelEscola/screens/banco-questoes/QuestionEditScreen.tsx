@@ -755,8 +755,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         {!loading && !loadError && (examQuestion?.issue_reports_count ?? 0) > 0 ? (
           <Text className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             {examQuestion?.issue_reports_count === 1
-              ? "1 aluno marcou que esta questão tem um erro e precisa de revisão. Ao salvar, o aviso sai, a questão fica revalidada e a contagem de erros zera."
-              : `${examQuestion?.issue_reports_count} alunos marcaram que esta questão tem um erro e precisa de revisão. Ao salvar, o aviso sai, a questão fica revalidada e a contagem de erros zera.`}
+              ? "1 aluno informou que esta questão tem erro. Ela está sem validação até você revisar. Ao salvar, a validação volta, o aviso sai e a contagem de erros zera."
+              : `${examQuestion?.issue_reports_count} alunos informaram que esta questão tem erro. Ela está sem validação até você revisar. Ao salvar, a validação volta, o aviso sai e a contagem de erros zera.`}
           </Text>
         ) : null}
 

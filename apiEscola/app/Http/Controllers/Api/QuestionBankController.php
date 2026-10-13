@@ -107,7 +107,7 @@ class QuestionBankController extends Controller
         $reviews->resolve($model);
         $model->loadCount('issueReports');
 
-        return $this->success(new QuestionBankQuestionResource($model), 'Revisão concluída. A questão foi revalidada e a contagem de erros zerada.');
+        return $this->success(new QuestionBankQuestionResource($model), 'Revisão concluída. A validação voltou e a contagem de erros foi zerada.');
     }
 
     /** POST question-bank/questions/revalidation — marca questões já revalidadas para não repetir. */

@@ -29,6 +29,9 @@ type Props = {
   onToggleFlag: () => void;
   saved: boolean;
   onToggleSave: () => void;
+  /** Aluno já enviou o erro desta questão ao administrador. */
+  reported: boolean;
+  onReportError: () => void;
   primary: PracticePrimary | null;
   canSkip: boolean;
   onLeave: () => void;
@@ -55,7 +58,7 @@ const plain = (html: string | null | undefined) => (html ?? '').replace(/<[^>]+>
  */
 export function PracticeDesktop(props: Props) {
   const {
-    attemptId, title, questions, index, onGoTo, answers, feedbacks, onSelect, flagged, onToggleFlag, saved, onToggleSave,
+    attemptId, title, questions, index, onGoTo, answers, feedbacks, onSelect, flagged, onToggleFlag, saved, onToggleSave, reported, onReportError,
     primary, canSkip, onLeave, onFinish, finishing, elapsed, remaining, busy, error,
   } = props;
   const p = usePalette();
@@ -170,6 +173,7 @@ export function PracticeDesktop(props: Props) {
       <Card style={{ gap: 10 }}>
         {cardHead('sparkle', 'Ferramentas')}
         <Button variant={bigText ? 'primary' : 'secondary'} size="sm" icon="zoom" label={bigText ? 'Letra normal' : 'Letra maior'} onPress={() => setBigText((v) => !v)} />
+        <Button variant={reported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={reported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={reported} onPress={onReportError} />
       </Card>
     </View>
   ) : null;

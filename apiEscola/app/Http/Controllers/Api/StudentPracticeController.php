@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ExamQuestion;
 use App\Models\PracticeAttempt;
 use App\Models\Student;
 use App\Services\ExamAccessService;
 use App\Models\PracticeSavedQuestion;
 use App\Models\QuestionIssueReport;
+use App\Services\QuestionIssueReviewService;
 use App\Services\PracticeCatalogService;
 use App\Services\PracticePerformanceService;
 use App\Services\PracticeService;
@@ -89,8 +91,8 @@ class StudentPracticeController extends Controller
         return $this->success(['saved' => false], 'Questão removida dos salvos.');
     }
 
-    /** POST/DELETE aluno/practice/questions/{question}/issue — a questão tem um erro e precisa de revisão. */
-    public function reportIssue(Request $request, int $question): JsonResponse
+    /** POST aluno/practice/questions/{question}/issue — aluno informa erro e a questão fica sem validação. */
+    public function reportIssue(Request $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $student = $this->student($request);
         if (! $this->practice->practicableFor($student)->whereKey($question)->exists()) {
@@ -101,8 +103,12 @@ class StudentPracticeController extends Controller
             ['student_id' => $student->id, 'exam_question_id' => $question],
             ['tenant_id' => $student->tenant_id, 'note' => $note !== '' ? mb_substr($note, 0, 280) : null]
         );
+        $model = ExamQuestion::query()->whereKey($question)->first();
+        if ($model) {
+            $reviews->suspendForStudentReport($model);
+        }
 
-        return $this->success(['reported' => true], 'Questão marcada para revisão.');
+        return $this->success(['reported' => true], 'Erro enviado ao administrador. A questão ficou sem validação.');
     }
 
     public function clearIssue(Request $request, int $question): JsonResponse

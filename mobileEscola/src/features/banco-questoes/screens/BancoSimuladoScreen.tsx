@@ -181,16 +181,8 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       onError: () => setSaved((prev) => ({ ...prev, [current.id]: !next })),
     });
   };
-  const toggleReport = () => {
-    if (!current) return;
-    if (reported[current.id]) {
-      const questionId = current.id;
-      setReported((prev) => ({ ...prev, [questionId]: false }));
-      toggleIssue.mutate({ questionId, reported: false }, {
-        onError: () => setReported((prev) => ({ ...prev, [questionId]: true })),
-      });
-      return;
-    }
+  const askReport = () => {
+    if (!current || reported[current.id]) return;
     setReportQuestionId(current.id);
   };
   const confirmReport = () => {
@@ -319,8 +311,8 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const reportModal = (
     <ConfirmModal
       visible={reportQuestionId != null}
-      title="Enviar para avaliação pedagógica?"
-      message="Esta questão vai para a equipe pedagógica avaliar. Confirme somente se ela estiver com erro."
+      title="Enviar erro para o administrador?"
+      message="Você informa que esta questão tem erro e precisa ser revalidada. Ela fica sem validação até o administrador revisar."
       confirmLabel="Enviar"
       cancelLabel="Cancelar"
       icon="warning-outline"
@@ -341,7 +333,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       <>
         <PracticeDesktop attemptId={attemptId} title={title} questions={questions} index={index} onGoTo={goTo}
           answers={answers} feedbacks={feedbacks} onSelect={select} flagged={flagged} onToggleFlag={toggleFlag}
-          saved={isSaved} onToggleSave={toggleSave} primary={primary} canSkip={canSkip} onLeave={leave}
+          saved={isSaved} onToggleSave={toggleSave} reported={isReported} onReportError={askReport} primary={primary} canSkip={canSkip} onLeave={leave}
           onFinish={() => setConfirmFinish(true)} finishing={finish.isPending} elapsed={elapsed} remaining={remaining}
           busy={finish.isPending || answer.isPending} error={errorNotice} />
         {finishModal}
@@ -419,7 +411,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
                   </View>
                 ))}
                 <Button variant="secondary" size="sm" icon="bookmark" label={isSaved ? 'Salva nas suas questões' : 'Salvar questão'} onPress={toggleSave} />
-                <Button variant={isReported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={isReported ? 'Enviada para avaliação pedagógica' : 'Avaliação pedagógica'} onPress={toggleReport} />
+                <Button variant={isReported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport} />
               </Card>
             </View>
           </View>
@@ -442,7 +434,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           </Text>
           <ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" />
         </View>
-        <IconButton icon="warning" label={isReported ? 'Enviada para avaliação pedagógica' : 'Enviar para avaliação pedagógica'} color={isReported ? p.dangerInk : undefined} onPress={toggleReport} />
+        <IconButton icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} color={isReported ? p.dangerInk : undefined} onPress={askReport} />
         <IconButton icon="bookmark" label={isSaved ? 'Remover das salvas' : 'Salvar questão'} color={isSaved ? p.brandInk : undefined} onPress={toggleSave} />
         {!practicing ? <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} /> : null}
       </View>

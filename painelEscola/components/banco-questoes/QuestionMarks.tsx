@@ -22,10 +22,10 @@ export function OfficialBadge({ label = "Oficial", title }: { label?: string; ti
   );
 }
 
-/** Aluno pediu revisão. Some depois que a equipe salva a questão. */
-export function StudentReviewMark({ label = "Revisão" }: { label?: string }) {
+/** Aluno informou erro. A questão fica sem validação até o administrador revisar. */
+export function StudentReviewMark({ label = "Sem validação" }: { label?: string }) {
   return (
-    <View className="flex-row items-center" style={{ gap: 8 }} aria-label="Aluno pediu revisão">
+    <View className="flex-row items-center" style={{ gap: 8 }} aria-label="Questão sem validação: aluno informou erro">
       <View
         aria-hidden
         className="rounded-ds-sm items-center justify-center"

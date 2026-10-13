@@ -766,8 +766,8 @@ export default function QuestionBankScreen({ navigate }: Props) {
               onPress={() => updateState({ ...state, hideRevalidated: !state.hideRevalidated, page: 1 })}
             />
             <ToggleChip
-              label="Revisão dos alunos"
-              accessibilityLabel="Mostrar só questões que alunos marcaram pedindo revisão"
+              label="Erro informado"
+              accessibilityLabel="Mostrar questões que alunos informaram com erro e estão sem validação"
               checked={state.studentReview}
               onPress={() => updateState({ ...state, studentReview: !state.studentReview, page: 1 })}
             />
