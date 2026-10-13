@@ -173,13 +173,13 @@ export function PracticeDesktop(props: Props) {
       <Card style={{ gap: 10 }}>
         {cardHead('sparkle', 'Ferramentas')}
         <Button variant={bigText ? 'primary' : 'secondary'} size="sm" icon="zoom" label={bigText ? 'Letra normal' : 'Letra maior'} onPress={() => setBigText((v) => !v)} />
-        <Button variant={reported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={reported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={reported} onPress={onReportError} />
       </Card>
     </View>
   ) : null;
 
   const question = current ? (
     <View style={{ gap: space[4] }}>
+      <Button block variant={reported ? 'secondary' : 'danger'} icon="warning" label={reported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={reported} onPress={onReportError} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
         <View style={{ gap: 2, flexShrink: 1 }}>
           <Txt variant="caption" tone="subtle" style={{ fontSize: 13, ...font.extrabold, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {index + 1} de {questions.length}</Txt>

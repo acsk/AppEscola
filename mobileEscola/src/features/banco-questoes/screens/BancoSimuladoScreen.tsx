@@ -374,6 +374,9 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 48, paddingTop: space[8], paddingHorizontal: space[8], paddingBottom: 48 }}>
             <View style={{ flex: 1, maxWidth: layout.readingMax, gap: 18 }}>
               {index === 0 ? resultCard : null}
+              {current ? (
+                <Button block variant={isReported ? 'secondary' : 'danger'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport} />
+              ) : null}
               <Txt variant="caption" tone="subtle" style={{ fontSize: 13, ...font.bold, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {index + 1}</Txt>
               {questionView}
               {errorNotice}
@@ -411,7 +414,6 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
                   </View>
                 ))}
                 <Button variant="secondary" size="sm" icon="bookmark" label={isSaved ? 'Salva nas suas questões' : 'Salvar questão'} onPress={toggleSave} />
-                <Button variant={isReported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport} />
               </Card>
             </View>
           </View>
@@ -434,7 +436,6 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           </Text>
           <ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" />
         </View>
-        <IconButton icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} color={isReported ? p.dangerInk : undefined} onPress={askReport} />
         <IconButton icon="bookmark" label={isSaved ? 'Remover das salvas' : 'Salvar questão'} color={isSaved ? p.brandInk : undefined} onPress={toggleSave} />
         {!practicing ? <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} /> : null}
       </View>
@@ -442,6 +443,9 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
         <ScreenBody gap={18} style={{ paddingTop: space[3], width: '100%', maxWidth: layout.readingMax, alignSelf: 'center' }}>
           {index === 0 ? resultCard : null}
+          {current ? (
+            <Button block variant={isReported ? 'secondary' : 'danger'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport} />
+          ) : null}
           {questionView}
           {errorNotice}
         </ScreenBody>
