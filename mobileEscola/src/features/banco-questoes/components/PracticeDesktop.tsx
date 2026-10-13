@@ -143,6 +143,8 @@ export function PracticeDesktop(props: Props) {
 
   const help = current ? (
     <View style={{ gap: 14 }}>
+      <Button block variant={reported ? 'secondary' : 'accent'} icon="warning" label={reported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={reported} onPress={onReportError}
+        style={reported ? undefined : { backgroundColor: '#F5A018', borderColor: '#E09010' }} />
       <Card style={{ gap: 10 }}>
         {cardHead('alert', 'Sobre esta questão')}
         {row('Turma que acerta', current.class_rate != null ? `${current.class_rate}%` : 'Poucos dados')}
@@ -179,7 +181,6 @@ export function PracticeDesktop(props: Props) {
 
   const question = current ? (
     <View style={{ gap: space[4] }}>
-      <Button block variant={reported ? 'secondary' : 'danger'} icon="warning" label={reported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={reported} onPress={onReportError} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
         <View style={{ gap: 2, flexShrink: 1 }}>
           <Txt variant="caption" tone="subtle" style={{ fontSize: 13, ...font.extrabold, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {index + 1} de {questions.length}</Txt>

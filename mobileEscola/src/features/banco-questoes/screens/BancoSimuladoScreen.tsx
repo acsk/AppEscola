@@ -374,9 +374,6 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 48, paddingTop: space[8], paddingHorizontal: space[8], paddingBottom: 48 }}>
             <View style={{ flex: 1, maxWidth: layout.readingMax, gap: 18 }}>
               {index === 0 ? resultCard : null}
-              {current ? (
-                <Button block variant={isReported ? 'secondary' : 'danger'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport} />
-              ) : null}
               <Txt variant="caption" tone="subtle" style={{ fontSize: 13, ...font.bold, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {index + 1}</Txt>
               {questionView}
               {errorNotice}
@@ -396,6 +393,10 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
               </View>
             </View>
             <View style={{ width: layout.asideW, gap: space[4] }}>
+              {current ? (
+                <Button block variant={isReported ? 'secondary' : 'accent'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport}
+                  style={isReported ? undefined : { backgroundColor: '#F5A018', borderColor: '#E09010' }} />
+              ) : null}
               <Card style={{ gap: 14 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <Txt variant="titleSm">Questões</Txt>
@@ -444,7 +445,8 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
         <ScreenBody gap={18} style={{ paddingTop: space[3], width: '100%', maxWidth: layout.readingMax, alignSelf: 'center' }}>
           {index === 0 ? resultCard : null}
           {current ? (
-            <Button block variant={isReported ? 'secondary' : 'danger'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport} />
+            <Button block variant={isReported ? 'secondary' : 'accent'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport}
+              style={isReported ? undefined : { backgroundColor: '#F5A018', borderColor: '#E09010' }} />
           ) : null}
           {questionView}
           {errorNotice}
