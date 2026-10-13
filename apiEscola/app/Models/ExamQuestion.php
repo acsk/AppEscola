@@ -106,12 +106,12 @@ class ExamQuestion extends Model
         return $this->hasMany(ExamAnswer::class, 'question_id');
     }
 
-    /** Banco de questões: avulsas e de simulados não excluídos (questões de simulado excluído ficam de fora). */
+    /** Banco de questões: avulsas e as de simulados já arquivados. Publicado e rascunho ficam só no simulado. */
     public function scopeInQuestionBank(Builder $query, int $tenantId): Builder
     {
         return $query->where('exam_questions.tenant_id', $tenantId)
             ->where(fn (Builder $q) => $q->whereNull('exam_questions.exam_id')
-                ->orWhereHas('exam'));
+                ->orWhereHas('exam', fn (Builder $e) => $e->archived()));
     }
 
     /**

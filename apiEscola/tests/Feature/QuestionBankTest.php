@@ -13,6 +13,7 @@ use App\Models\SubjectTopic;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Database\Seeders\DomainSeeder;
 use Tests\TestCase;
@@ -315,8 +316,12 @@ class QuestionBankTest extends TestCase
     {
         $enem = ExamType::create(['slug' => 'enem-filtro', 'label' => 'ENEM filtro', 'is_active' => true]);
         $oab = ExamType::create(['slug' => 'oab-filtro', 'label' => 'OAB filtro', 'is_active' => true]);
-        $exam = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Simulado ENEM 2024', 'exam_type_id' => $enem->id]);
+        $archived = DB::table('exam_statuses')->where('slug', 'archived')->value('id');
+        $published = DB::table('exam_statuses')->where('slug', 'published')->value('id');
+        $exam = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Simulado ENEM 2024', 'exam_type_id' => $enem->id, 'exam_status_id' => $archived]);
         $fromExam = $this->question(['exam_id' => $exam->id]);
+        $live = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Simulado ainda publicado', 'exam_status_id' => $published]);
+        $fromPublished = $this->question(['exam_id' => $live->id]);
         $inSet = $this->question(['exam_type_id' => $oab->id]);
         $free = $this->question(['exam_type_id' => $enem->id]);
         $set = QuestionSet::create(['tenant_id' => $this->tenant->id, 'title' => 'Treino', 'origin' => QuestionSet::ORIGIN_ADMIN]);
@@ -327,6 +332,7 @@ class QuestionBankTest extends TestCase
 
         $this->assertSame([$inSet->id, $free->id], $ids('origin=avulsa'));
         $this->assertSame([$fromExam->id], $ids('origin=simulado'));
+        $this->assertNotContains($fromPublished->id, $ids(''));
         $this->assertSame([$inSet->id], $ids('origin=simulado_banco'));
         $this->assertSame([$free->id], $ids('origin=avulsa_livre'));
         $this->assertCount(3, $ids('origin=qualquer'));
@@ -526,7 +532,11 @@ class QuestionBankTest extends TestCase
 
         $this->putJson("/api/question-bank/questions/{$id}", ['type' => 'essay'])->assertOk()->assertJsonCount(0, 'body.options');
 
-        $exam = Exam::create(['tenant_id' => $this->tenant->id, 'title' => 'Simulado A']);
+        $exam = Exam::create([
+            'tenant_id' => $this->tenant->id,
+            'title' => 'Simulado A',
+            'exam_status_id' => DB::table('exam_statuses')->where('slug', 'archived')->value('id'),
+        ]);
         $examQuestion = $this->question(['exam_id' => $exam->id]);
         $this->putJson("/api/question-bank/questions/{$examQuestion->id}", ['question_text' => 'x'])
             ->assertStatus(409)

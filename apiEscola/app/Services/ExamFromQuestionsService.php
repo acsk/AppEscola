@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Cria um simulado (rascunho) a partir de questões avulsas do banco — usado ao importar uma prova em PDF.
- * As questões são MOVIDAS para o simulado (exam_id + ordem), sem cópia: continuam no banco de questões
- * como "de simulado" e seguem a modalidade do simulado. O simulado só chega ao aluno quando publicado.
+ * As questões são MOVIDAS para o simulado (exam_id + ordem), sem cópia, e seguem a modalidade do simulado.
+ * Elas voltam ao banco de questões só quando o simulado é arquivado. O simulado oficial chega ao aluno quando publicado.
  */
 class ExamFromQuestionsService
 {

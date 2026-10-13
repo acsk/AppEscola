@@ -211,8 +211,10 @@ class QuestionBankQueryService
     {
         $query = DB::table('exams')
             ->join('exam_questions', 'exam_questions.exam_id', '=', 'exams.id')
+            ->join('exam_statuses', 'exam_statuses.id', '=', 'exams.exam_status_id')
             ->where('exams.tenant_id', $tenantId)
             ->where('exam_questions.tenant_id', $tenantId)
+            ->where('exam_statuses.slug', 'archived')
             ->whereNull('exams.deleted_at')
             ->whereNull('exam_questions.deleted_at')
             ->groupBy('exams.id', 'exams.title')

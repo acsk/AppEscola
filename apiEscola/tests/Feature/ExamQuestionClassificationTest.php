@@ -80,8 +80,10 @@ class ExamQuestionClassificationTest extends TestCase
         $id = $response->json('body.id');
 
         // A listagem do simulado e o banco de questões enxergam a mesma classificação.
-        $this->getJson("/api/exams/{$this->exam->id}/questions")->assertOk()->assertJsonPath('body.0.topics.0.name', 'Álgebra');
-        $this->getJson("/api/question-bank/questions/{$id}")->assertOk()->assertJsonPath('body.difficulty_id', $difficulty->id);
+        $this->getJson("/api/exams/{$this->exam->id}/questions")->assertOk()
+            ->assertJsonPath('body.0.topics.0.name', 'Álgebra')
+            ->assertJsonPath('body.0.difficulty_id', $difficulty->id);
+        $this->getJson("/api/question-bank/questions/{$id}")->assertNotFound();
     }
 
     public function test_questions_of_archived_exam_stay_in_question_bank(): void
