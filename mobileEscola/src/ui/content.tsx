@@ -672,19 +672,20 @@ export function TextField({
 
 // ── Sessão de prática ───────────────────────────────────────────────────────
 
-export type SessionItemStatus = 'right' | 'wrong' | 'current' | 'skipped' | 'pending';
+export type SessionItemStatus = 'right' | 'wrong' | 'current' | 'answered' | 'skipped' | 'pending';
 export type SessionItem = { topic: string; dot?: string; text: string; status: SessionItemStatus; isNew?: boolean; flagged?: boolean };
 
 /** Lista das questões da sessão (Praticar no desktop): assunto, começo do enunciado, "Nova", revisar e o resultado (✓ / ✗). */
 export function SessionList({ items, onSelect }: { items: (SessionItem & { index: number })[]; onSelect: (index: number) => void }) {
   const p = usePalette();
-  const LABEL: Record<SessionItemStatus, string> = { right: 'Acertou', wrong: 'Errou', current: 'Atual', skipped: 'Pulada', pending: 'A responder' };
+  const LABEL: Record<SessionItemStatus, string> = { right: 'Acertou', wrong: 'Errou', current: 'Atual', answered: 'Respondida', skipped: 'Pulada', pending: 'A responder' };
   return (
     <View accessibilityLabel="Questões desta sessão" style={{ gap: 2 }}>
       {items.map((q) => {
         const n = q.status === 'right' ? { bg: p.success, fg: p.surface, icon: 'check' as IconName }
           : q.status === 'wrong' ? { bg: p.danger, fg: p.surface, icon: 'x' as IconName }
           : q.status === 'current' ? { bg: p.surfaceInverse, fg: p.onInverse }
+          : q.status === 'answered' ? { bg: p.brandSoft, fg: p.brandInk }
           : { bg: 'transparent', fg: p.inkMuted };
         const active = q.status === 'current';
         return (
@@ -696,7 +697,7 @@ export function SessionList({ items, onSelect }: { items: (SessionItem & { index
             }) as never}>
             <View style={{
               width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: n.bg,
-              borderWidth: n.bg === 'transparent' ? 1.5 : 0, borderColor: p.lineStrong, borderStyle: q.status === 'skipped' ? 'dashed' : 'solid',
+              borderWidth: n.bg === 'transparent' || q.status === 'answered' ? 1.5 : 0, borderColor: q.status === 'answered' ? p.brand : p.lineStrong, borderStyle: q.status === 'skipped' ? 'dashed' : 'solid',
             }}>
               {'icon' in n && n.icon ? <Icon name={n.icon} size={15} strokeWidth={3} color={n.fg} />
                 : <Text style={{ ...font.extrabold, fontSize: 12, color: n.fg, fontVariant: ['tabular-nums'] }}>{q.index + 1}</Text>}

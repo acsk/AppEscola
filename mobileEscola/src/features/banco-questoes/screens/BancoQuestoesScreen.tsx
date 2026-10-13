@@ -16,7 +16,13 @@ import {
 
 type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoQuestoes'>;
 const QUANTITIES = [5, 10, 20] as const;
-type Quantity = (typeof QUANTITIES)[number];
+type Quantity = (typeof QUANTITIES)[number] | 'all';
+
+/** Rótulo da opção que usa todas as questões da matéria/assunto escolhidos. */
+function totalOptionLabel(pool: number): string {
+  if (pool <= 0 || (QUANTITIES as readonly number[]).includes(pool)) return 'Todas';
+  return String(pool);
+}
 
 /**
  * Banco de questões em uma tela só (protótipos "TelaBancoQuestoes" e "DesktopBancoQuestoes"), para alunos de 10 a 14 anos:
@@ -64,7 +70,7 @@ export function BancoQuestoesScreen() {
   const availableNew = current.data?.situations.new ?? 0;
   const availableUnanswered = current.data?.situations.unanswered ?? 0;
   const pool = onlyNew ? availableNew : onlyUnanswered ? availableUnanswered : available;
-  const count = Math.min(quantity, pool);
+  const count = quantity === 'all' ? pool : Math.min(quantity, pool);
   const newInSession = Math.min(count, availableNew);
   const open = summary.data?.open_session ?? null;
 
@@ -88,7 +94,7 @@ export function BancoQuestoesScreen() {
   const begin = () => {
     setError(null);
     const filters: CatalogFilters = { ...scope, situation: onlyNew ? 'new' : onlyUnanswered ? 'unanswered' : 'all' };
-    start.mutate({ filters, options: { quantity, correction_mode: 'each', timed: false, title } }, {
+    start.mutate({ filters, options: { quantity: quantity === 'all' ? pool : quantity, correction_mode: 'each', timed: false, title } }, {
       onSuccess: (payload) => navigation.navigate('BancoSimulado', { attemptId: payload.attempt.id, title }),
       onError: (cause) => setError(getApiErrorMessage(cause, 'Não foi possível começar. Tente de novo.')),
     });
@@ -166,8 +172,13 @@ export function BancoQuestoesScreen() {
       {subjects.length ? (
         <View style={{ gap: space[3] }}>
           <StepHeader n={3} title="Quantas questões?" />
-          <View style={{ maxWidth: isDesktop ? 360 : undefined }}>
-            <SegmentedControl label="Quantidade" options={QUANTITIES.map(String)} value={QUANTITIES.indexOf(quantity)} onChange={(i) => setQuantity(QUANTITIES[i])} />
+          <View style={{ maxWidth: isDesktop ? 480 : undefined }}>
+            <SegmentedControl
+              label="Quantidade"
+              options={[...QUANTITIES.map(String), totalOptionLabel(pool)]}
+              value={quantity === 'all' ? QUANTITIES.length : QUANTITIES.indexOf(quantity)}
+              onChange={(i) => setQuantity(i === QUANTITIES.length ? 'all' : QUANTITIES[i])}
+            />
           </View>
           <Checkbox large label="Ainda não respondi" count={availableUnanswered} checked={onlyUnanswered}
             onPress={() => {

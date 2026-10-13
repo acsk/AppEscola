@@ -49,64 +49,6 @@ function clock(total: number) {
 }
 const plain = (html: string | null | undefined) => (html ?? '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-/** Calculadora simples (+ − × ÷) sem eval: respeita a precedência de × e ÷. */
-function calculate(expr: string): string {
-  const tokens = expr.match(/(\d+[.,]?\d*|[+\-×÷])/g);
-  if (!tokens) return '';
-  const nums: number[] = [];
-  const ops: string[] = [];
-  tokens.forEach((t) => (/[+\-×÷]/.test(t) && t.length === 1 ? ops.push(t) : nums.push(parseFloat(t.replace(',', '.')))));
-  if (nums.length !== ops.length + 1 || nums.some(Number.isNaN)) return 'Erro';
-  for (let i = 0; i < ops.length;) {
-    if (ops[i] === '×' || ops[i] === '÷') {
-      if (ops[i] === '÷' && nums[i + 1] === 0) return 'Erro';
-      nums.splice(i, 2, ops[i] === '×' ? nums[i] * nums[i + 1] : nums[i] / nums[i + 1]);
-      ops.splice(i, 1);
-    } else i++;
-  }
-  const result = ops.reduce((acc, op, i) => (op === '+' ? acc + nums[i + 1] : acc - nums[i + 1]), nums[0]);
-  return Number.isFinite(result) ? String(Math.round(result * 1e8) / 1e8).replace('.', ',') : 'Erro';
-}
-
-function Calculator({ onClose }: { onClose: () => void }) {
-  const p = usePalette();
-  const [expr, setExpr] = useState('');
-  const [result, setResult] = useState('');
-  const press = (k: string) => {
-    if (k === 'C') { setExpr(''); setResult(''); return; }
-    if (k === '⌫') { setExpr((e) => e.slice(0, -1)); return; }
-    if (k === '=') { setResult(calculate(expr)); return; }
-    setExpr((e) => (result && !/[+\-×÷]/.test(k) ? k : (result ? result + k : e + k)));
-    setResult('');
-  };
-  const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', ',', '=', '+'];
-  return (
-    <Card style={{ gap: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}><Icon name="calc" size={18} color={p.inkMuted} /><Txt variant="label" style={{ ...font.extrabold }}>Calculadora</Txt></View>
-        <IconButton icon="x" label="Fechar calculadora" onPress={onClose} />
-      </View>
-      <View style={{ padding: space[3], borderRadius: radius.md, backgroundColor: p.surfaceSunken, minHeight: 60, alignItems: 'flex-end', justifyContent: 'center' }}>
-        <Txt variant="bodySm" tone="subtle" numberOfLines={1}>{expr || '0'}</Txt>
-        <Text style={{ ...font.extrabold, fontSize: 22, color: p.ink, fontVariant: ['tabular-nums'] }}>{result || ' '}</Text>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        <View style={{ flex: 1 }}><Button size="sm" variant="secondary" block label="C" onPress={() => press('C')} /></View>
-        <View style={{ flex: 1 }}><Button size="sm" variant="secondary" block label="⌫" onPress={() => press('⌫')} /></View>
-      </View>
-      {[0, 1, 2, 3].map((r) => (
-        <View key={r} style={{ flexDirection: 'row', gap: 6 }}>
-          {keys.slice(r * 4, r * 4 + 4).map((k) => (
-            <View key={k} style={{ flex: 1 }}>
-              <Button size="sm" block variant={k === '=' ? 'primary' : 'secondary'} label={k} onPress={() => press(k === '−' ? '-' : k)} />
-            </View>
-          ))}
-        </View>
-      ))}
-    </Card>
-  );
-}
-
 /**
  * Praticar no desktop (protótipo "DesktopPraticar"): sessão à esquerda, questão no meio, ajuda à direita.
  * Abaixo de 1360px a coluna da direita vira a aba "Ajuda" na coluna da questão.
@@ -126,7 +68,6 @@ export function PracticeDesktop(props: Props) {
   const [eliminated, setEliminated] = useState<Record<number, number[]>>({});
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [bigText, setBigText] = useState(false);
-  const [calcOpen, setCalcOpen] = useState(false);
   const [zoom, setZoom] = useState<string | null>(null);
   const draftKey = `banco_sessao_rascunho_${attemptId}`;
 
@@ -167,17 +108,18 @@ export function PracticeDesktop(props: Props) {
     const f = feedbacks[q.id];
     if (f) return f.is_correct ? 'right' : 'wrong';
     if (i === index) return 'current';
+    if (answers[q.id] != null) return 'answered';
     return i < index ? 'skipped' : 'pending';
   };
   const items = useMemo(() => questions.map((q, i) => ({
     index: i, topic: q.topics[0] ?? q.subject?.name ?? 'Questão', dot: q.subject ? subjectColor(p, q.subject.id) : undefined,
     text: plain(q.question_text) || 'Questão com imagem', status: statusOf(q, i), isNew: !!q.is_new && !feedbacks[q.id], flagged: flagged.includes(i + 1),
   // eslint-disable-next-line react-hooks/exhaustive-deps -- statusOf depende de index/feedbacks
-  })), [questions, feedbacks, index, flagged, p]);
-  const visible = items.filter((it) => filter === 'all' || (filter === 'open' ? it.status !== 'right' && it.status !== 'wrong' : it.flagged));
+  })), [questions, feedbacks, answers, index, flagged, p]);
+  const visible = items.filter((it) => filter === 'all' || (filter === 'open' ? it.status !== 'right' && it.status !== 'wrong' && it.status !== 'answered' : it.flagged));
   const right = items.filter((i) => i.status === 'right').length;
   const wrong = items.filter((i) => i.status === 'wrong').length;
-  const done = right + wrong;
+  const marked = questions.filter((q) => answers[q.id] != null || feedbacks[q.id]).length;
   const subjectDot = current?.subject ? subjectColor(p, current.subject.id) : p.inkSubtle;
   const origin = [current?.exam_title || current?.source_exam_name, current?.year].filter(Boolean).join(' · ');
   const lastLetter = LETTERS[Math.max(0, (current?.options.length ?? 4) - 1)];
@@ -227,12 +169,8 @@ export function PracticeDesktop(props: Props) {
       </Card>
       <Card style={{ gap: 10 }}>
         {cardHead('sparkle', 'Ferramentas')}
-        <View style={{ flexDirection: 'row', gap: space[2], flexWrap: 'wrap' }}>
-          <Button variant={calcOpen ? 'primary' : 'secondary'} size="sm" icon="calc" label="Calculadora" onPress={() => setCalcOpen((v) => !v)} />
-          <Button variant={bigText ? 'primary' : 'secondary'} size="sm" icon="zoom" label={bigText ? 'Letra normal' : 'Letra maior'} onPress={() => setBigText((v) => !v)} />
-        </View>
+        <Button variant={bigText ? 'primary' : 'secondary'} size="sm" icon="zoom" label={bigText ? 'Letra normal' : 'Letra maior'} onPress={() => setBigText((v) => !v)} />
       </Card>
-      {calcOpen ? <Calculator onClose={() => setCalcOpen(false)} /> : null}
     </View>
   ) : null;
 
@@ -284,8 +222,8 @@ export function PracticeDesktop(props: Props) {
             <Txt variant="label" numberOfLines={1} style={{ ...font.bold, flexShrink: 1 }}>Prática · {title}</Txt>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], width: '100%', maxWidth: 520 }}>
-            <View style={{ flex: 1 }}><ProgressBar value={done} max={questions.length || 1} size="sm" label="Progresso" /></View>
-            <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{done} de {questions.length}</Txt>
+            <View style={{ flex: 1 }}><ProgressBar value={marked} max={questions.length || 1} size="sm" label="Progresso" /></View>
+            <Txt variant="caption" tone="subtle" style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{marked} de {questions.length}</Txt>
           </View>
         </View>
         <View style={{ width: RIGHT_W, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: space[3], paddingHorizontal: 20 }}>
@@ -307,7 +245,7 @@ export function PracticeDesktop(props: Props) {
           <View style={{ padding: space[4], paddingBottom: space[3], gap: 10, borderBottomWidth: 1, borderBottomColor: p.line }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Txt variant="titleSm" style={{ fontSize: 15 }}>Sua sessão</Txt>
-              <Txt variant="caption" tone="subtle" style={{ ...font.medium }}>{done} de {questions.length} respondidas</Txt>
+              <Txt variant="caption" tone="subtle" style={{ ...font.medium }}>{marked} de {questions.length} respondidas</Txt>
             </View>
             <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
               <Tag tone="success" icon="check" label={`${right} ${right === 1 ? 'certa' : 'certas'}`} />

@@ -306,11 +306,11 @@ class PracticeService
 
     /**
      * Sessão montada pelo aluno (protótipo "Montar sessão"): sorteia `quantity` questões do filtro
-     * (null = todas, até 100) e guarda a ordem. Correção a cada questão ou no final; cronômetro opcional.
+     * (null = até 100) e guarda a ordem. Correção a cada questão ou no final; cronômetro opcional.
      */
     public function startSession(Student $student, array $filters, ?int $quantity, string $correctionMode, ?int $secondsPerQuestion, string $title, PracticeCatalogService $catalog): PracticeAttempt
     {
-        $ids = $catalog->drawIds($student, $filters, min($quantity ?? 100, 100));
+        $ids = $catalog->drawIds($student, $filters, $quantity ?? 100);
         if (! $ids) {
             throw new QuestionBankException('Nenhuma questão encontrada com esses filtros.');
         }
@@ -369,15 +369,27 @@ class PracticeService
         if ($attempt->isFinished()) {
             throw QuestionBankException::conflict('Este simulado já foi finalizado.');
         }
-        $query = $this->attemptQuestions($attempt);
-        $question = $query?->with('options')->find($questionId);
-        if (! $question) {
-            throw new QuestionBankException('Esta questão não faz parte do simulado.', 404);
-        }
-        if ($attempt->correctsEachQuestion() && $attempt->answers()->where('exam_question_id', $question->id)->exists()) {
+        if ($attempt->correctsEachQuestion() && $attempt->answers()->where('exam_question_id', $questionId)->exists()) {
             throw QuestionBankException::conflict('Esta questão já foi respondida e corrigida.');
         }
-        $answer = PracticeAnswer::updateOrCreate(
+        $answer = $this->storeAttemptAnswer($attempt, $questionId, $optionId);
+        if (! $answer) {
+            throw new QuestionBankException('Esta questão não faz parte do simulado.', 404);
+        }
+        if ($attempt->correctsEachQuestion()) {
+            $this->rememberReview($answer);
+        }
+    }
+
+    /** Grava a alternativa escolhida. Devolve null se a questão não pertence à tentativa. */
+    private function storeAttemptAnswer(PracticeAttempt $attempt, int $questionId, int $optionId): ?PracticeAnswer
+    {
+        $question = $this->attemptQuestions($attempt)?->with('options')->find($questionId);
+        if (! $question) {
+            return null;
+        }
+
+        return PracticeAnswer::updateOrCreate(
             ['practice_attempt_id' => $attempt->id, 'exam_question_id' => $question->id],
             [
                 'tenant_id'   => $attempt->tenant_id,
@@ -387,9 +399,6 @@ class PracticeService
                 'answered_at' => now(),
             ],
         );
-        if ($attempt->correctsEachQuestion()) {
-            $this->rememberReview($answer);
-        }
     }
 
     /** Correção de uma questão já respondida (sessão com correção a cada questão). */
@@ -404,11 +413,27 @@ class PracticeService
         return $question && $answer ? $this->feedback($question, $answer->option_id, (bool) $answer->is_correct) : null;
     }
 
-    public function finishAttempt(PracticeAttempt $attempt): PracticeAttempt
+    /**
+     * Grava as marcações ainda só no aparelho e encerra a tentativa.
+     *
+     * @param  array<int, array{question_id: int, option_id: int}>  $selections
+     */
+    public function finishAttempt(PracticeAttempt $attempt, array $selections = []): PracticeAttempt
     {
         if ($attempt->isFinished()) {
             return $attempt;
         }
+
+        $alreadyReviewed = $attempt->correctsEachQuestion()
+            ? $attempt->answers()->pluck('exam_question_id')->flip()
+            : collect();
+        foreach ($selections as $row) {
+            if (! isset($row['question_id'], $row['option_id'])) {
+                continue;
+            }
+            $this->storeAttemptAnswer($attempt, (int) $row['question_id'], (int) $row['option_id']);
+        }
+
         $questionIds = $this->attemptQuestions($attempt)?->pluck('exam_questions.id') ?? collect();
         $answers = $attempt->answers()->whereIn('exam_question_id', $questionIds)->get();
         $attempt->update([
@@ -417,10 +442,11 @@ class PracticeService
             'correct_count'  => $answers->where('is_correct', true)->count(),
             'finished_at'    => now(),
         ]);
-        if (! $attempt->correctsEachQuestion()) {
-            foreach ($answers as $answer) {
-                $this->rememberReview($answer);
+        foreach ($answers as $answer) {
+            if ($alreadyReviewed->has($answer->exam_question_id)) {
+                continue;
             }
+            $this->rememberReview($answer);
         }
 
         return $attempt;

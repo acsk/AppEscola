@@ -255,8 +255,11 @@ export async function answerInPracticeAttempt(attemptId: number, questionId: num
   return data.body;
 }
 
-export async function finishPracticeAttempt(attemptId: number): Promise<PracticeAttemptPayload> {
-  const { data } = await api.post<Envelope<PracticeAttemptPayload>>(`/api/aluno/practice-attempts/${attemptId}/finish`);
+export async function finishPracticeAttempt(
+  attemptId: number,
+  answers: { question_id: number; option_id: number }[] = [],
+): Promise<PracticeAttemptPayload> {
+  const { data } = await api.post<Envelope<PracticeAttemptPayload>>(`/api/aluno/practice-attempts/${attemptId}/finish`, { answers });
   return data.body;
 }
 
@@ -353,7 +356,7 @@ export async function setQuestionIssue(questionId: number, reported: boolean): P
 }
 
 export interface SessionOptions {
-  quantity: 5 | 10 | 20 | 30 | null;
+  quantity: number | null;
   correction_mode: 'each' | 'end';
   timed: boolean;
   title?: string;

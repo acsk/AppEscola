@@ -118,7 +118,7 @@ class StudentPracticeController extends Controller
         $student = $this->student($request);
         $filters = $this->catalogFilters($request);
         $data = $request->validate([
-            'quantity'        => ['nullable', 'integer', Rule::in([5, 10, 20, 30])],
+            'quantity'        => ['nullable', 'integer', 'min:1', 'max:500'],
             'correction_mode' => ['required', Rule::in(['each', 'end'])],
             'timed'           => ['sometimes', 'boolean'],
             'title'           => ['nullable', 'string', 'max:120'],
@@ -194,9 +194,14 @@ class StudentPracticeController extends Controller
 
     public function finishAttempt(Request $request, int $attempt): JsonResponse
     {
-        $model = $this->practice->finishAttempt($this->attempt($request, $attempt));
+        $data = $request->validate([
+            'answers' => ['sometimes', 'array', 'max:100'],
+            'answers.*.question_id' => ['required', 'integer'],
+            'answers.*.option_id' => ['required', 'integer'],
+        ], [], ['answers' => 'respostas', 'answers.*.question_id' => 'questão', 'answers.*.option_id' => 'alternativa']);
+        $model = $this->practice->finishAttempt($this->attempt($request, $attempt), $data['answers'] ?? []);
 
-        return $this->success($this->practice->attemptPayload($model), "Simulado finalizado: {$model->correct_count} de {$model->question_count} acertos.");
+        return $this->success($this->practice->attemptPayload($model), "Sessão finalizada: {$model->correct_count} de {$model->question_count} acertos.");
     }
 
     public function summary(Request $request): JsonResponse

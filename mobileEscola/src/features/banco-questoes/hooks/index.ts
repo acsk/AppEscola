@@ -103,7 +103,7 @@ export function useAnswerInAttempt(attemptId: number) {
 export function useFinishAttempt(attemptId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => finishPracticeAttempt(attemptId),
+    mutationFn: (answers: { question_id: number; option_id: number }[] = []) => finishPracticeAttempt(attemptId, answers),
     onSuccess: (payload) => {
       queryClient.setQueryData(bancoKeys.attempt(attemptId), payload);
       queryClient.invalidateQueries({ queryKey: bancoKeys.sets() });
