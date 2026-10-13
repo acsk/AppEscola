@@ -173,7 +173,14 @@ class QuestionBankQueryService
         }
         if (array_key_exists('without_subject', $params)) {
             $onlyWithout = filter_var($params['without_subject'], FILTER_VALIDATE_BOOLEAN);
-            $query->whereNull('exam_questions.subject_id', 'and', ! $onlyWithout);
+            if ($onlyWithout) {
+                $query->whereNull('exam_questions.subject_id');
+            } else {
+                // Avulsa sem disciplina fica de fora da lista inicial. Questão de simulado arquivado aparece
+                // mesmo sem disciplina, para poder classificá-la.
+                $query->where(fn (Builder $q) => $q->whereNotNull('exam_questions.subject_id')
+                    ->orWhereNotNull('exam_questions.exam_id'));
+            }
         }
 
         $this->applySearch($query, trim((string) ($params['search'] ?? '')));
