@@ -54,6 +54,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const [index, setIndex] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
+  const [reportQuestionId, setReportQuestionId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -182,10 +183,23 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   };
   const toggleReport = () => {
     if (!current) return;
-    const next = !reported[current.id];
-    setReported((prev) => ({ ...prev, [current.id]: next }));
-    toggleIssue.mutate({ questionId: current.id, reported: next }, {
-      onError: () => setReported((prev) => ({ ...prev, [current.id]: !next })),
+    if (reported[current.id]) {
+      const questionId = current.id;
+      setReported((prev) => ({ ...prev, [questionId]: false }));
+      toggleIssue.mutate({ questionId, reported: false }, {
+        onError: () => setReported((prev) => ({ ...prev, [questionId]: true })),
+      });
+      return;
+    }
+    setReportQuestionId(current.id);
+  };
+  const confirmReport = () => {
+    const questionId = reportQuestionId;
+    setReportQuestionId(null);
+    if (questionId == null) return;
+    setReported((prev) => ({ ...prev, [questionId]: true }));
+    toggleIssue.mutate({ questionId, reported: true }, {
+      onError: () => setReported((prev) => ({ ...prev, [questionId]: false })),
     });
   };
   const toggleFlag = () => setFlagged((prev) => (prev.includes(index + 1) ? prev.filter((n) => n !== index + 1) : [...prev, index + 1]));
@@ -302,6 +316,18 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       onCancel={() => setConfirmFinish(false)}
     />
   );
+  const reportModal = (
+    <ConfirmModal
+      visible={reportQuestionId != null}
+      title="Enviar para avaliação pedagógica?"
+      message="Esta questão vai para a equipe pedagógica avaliar. Confirme somente se ela estiver com erro."
+      confirmLabel="Enviar"
+      cancelLabel="Cancelar"
+      icon="warning-outline"
+      onConfirm={confirmReport}
+      onCancel={() => setReportQuestionId(null)}
+    />
+  );
   const timer = remaining != null && !finished ? (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <Icon name="clock" size={18} color={urgent ? p.dangerInk : p.inkMuted} />
@@ -319,6 +345,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           onFinish={() => setConfirmFinish(true)} finishing={finish.isPending} elapsed={elapsed} remaining={remaining}
           busy={finish.isPending || answer.isPending} error={errorNotice} />
         {finishModal}
+        {reportModal}
       </>
     );
   }
@@ -392,12 +419,13 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
                   </View>
                 ))}
                 <Button variant="secondary" size="sm" icon="bookmark" label={isSaved ? 'Salva nas suas questões' : 'Salvar questão'} onPress={toggleSave} />
-                <Button variant={isReported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={isReported ? 'Erro marcado para revisão' : 'Marcar erro na questão'} onPress={toggleReport} />
+                <Button variant={isReported ? 'secondary' : 'ghost'} size="sm" icon="warning" label={isReported ? 'Enviada para avaliação pedagógica' : 'Avaliação pedagógica'} onPress={toggleReport} />
               </Card>
             </View>
           </View>
         </ScrollView>
         {finishModal}
+        {reportModal}
       </View>
     );
   }
@@ -414,7 +442,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           </Text>
           <ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" />
         </View>
-        <IconButton icon="warning" label={isReported ? 'Erro marcado para revisão' : 'Marcar erro na questão'} color={isReported ? p.dangerInk : undefined} onPress={toggleReport} />
+        <IconButton icon="warning" label={isReported ? 'Enviada para avaliação pedagógica' : 'Enviar para avaliação pedagógica'} color={isReported ? p.dangerInk : undefined} onPress={toggleReport} />
         <IconButton icon="bookmark" label={isSaved ? 'Remover das salvas' : 'Salvar questão'} color={isSaved ? p.brandInk : undefined} onPress={toggleSave} />
         {!practicing ? <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} /> : null}
       </View>
@@ -449,6 +477,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
         </View>
       </Sheet>
       {finishModal}
+      {reportModal}
     </View>
   );
 }
