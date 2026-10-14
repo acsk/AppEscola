@@ -19,6 +19,8 @@ export default function ConfirmModal({
   confirmDisabled,
   confirmLabel = "Excluir",
   cancelLabel = "Cancelar",
+  alternateLabel,
+  onAlternate,
   tone = "danger",
   children,
 }: ConfirmModalProps) {
@@ -30,6 +32,9 @@ export default function ConfirmModal({
         footer={
           <>
             <Button variant="secondary" label={cancelLabel} onPress={onCancel} disabled={loading} />
+            {alternateLabel && onAlternate ? (
+              <Button variant="secondary" label={alternateLabel} onPress={onAlternate} disabled={loading} />
+            ) : null}
             <Button
               variant={tone === "danger" ? "danger" : "primary"}
               label={confirmLabel}

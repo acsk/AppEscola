@@ -93,21 +93,27 @@ class QuestionBankController extends Controller
     public function updateClassification(UpdateQuestionClassificationRequest $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $model = $this->findQuestion($request, $question);
+        if ($denied = $this->guardReportDecision($request, $model)) {
+            return $denied;
+        }
         $model = $this->classification->apply($model, $request->validated(), (int) $model->tenant_id);
-        $reviews->releaseForAnswers($model);
+        $message = $this->finishAdminSave($request, $model, $reviews, 'Classificação salva com sucesso.');
         $model->loadCount('issueReports');
 
-        return $this->success(new QuestionBankQuestionResource($model), 'Classificação salva com sucesso.');
+        return $this->success(new QuestionBankQuestionResource($model), $message);
     }
 
     /** POST question-bank/questions/{question}/student-review — encerra o aviso dos alunos ao salvar sem outra alteração. */
     public function resolveStudentReview(Request $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $model = $this->findQuestion($request, $question);
-        $reviews->releaseForAnswers($model);
+        if ($denied = $this->guardReportDecision($request, $model)) {
+            return $denied;
+        }
+        $message = $this->finishAdminSave($request, $model, $reviews, 'Questão liberada para resposta. A contagem de respostas erradas permanece.');
         $model->loadCount('issueReports');
 
-        return $this->success(new QuestionBankQuestionResource($model), 'Questão liberada para resposta. As respostas erradas foram zeradas.');
+        return $this->success(new QuestionBankQuestionResource($model), $message);
     }
 
     /** POST question-bank/questions/revalidation — marca questões já revalidadas para não repetir. */
@@ -124,7 +130,7 @@ class QuestionBankController extends Controller
         $ids = ExamQuestion::query()->inQuestionBank($tenantId)->whereIn('id', $data['ids'])->pluck('id');
         if ($data['revalidated'] && $request->boolean('release')) {
             ExamQuestion::query()->whereIn('id', $ids)->get()->each(
-                fn (ExamQuestion $question) => $reviews->releaseForAnswers($question)
+                fn (ExamQuestion $question) => $reviews->releaseForAnswers($question, false)
             );
         } else {
             ExamQuestion::query()->whereIn('id', $ids)->update([
@@ -137,7 +143,7 @@ class QuestionBankController extends Controller
             'revalidated' => (bool) $data['revalidated'],
         ], $data['revalidated']
             ? ($request->boolean('release')
-                ? 'Questão liberada para resposta. As respostas erradas foram zeradas.'
+                ? 'Questão liberada para resposta. A contagem de respostas erradas permanece.'
                 : 'Questões marcadas como revalidadas.')
             : 'Marca de revalidação removida.');
     }
@@ -204,12 +210,16 @@ class QuestionBankController extends Controller
     /** Edita o conteúdo de questão avulsa (questão de simulado: 409, editar pelo simulado). */
     public function update(SaveStandaloneQuestionRequest $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
-        $model = $this->content->updateStandalone($this->findQuestion($request, $question), $request->validated());
-        $reviews->releaseForAnswers($model);
+        $model = $this->findQuestion($request, $question);
+        if ($denied = $this->guardReportDecision($request, $model)) {
+            return $denied;
+        }
+        $model = $this->content->updateStandalone($model, $request->validated());
+        $message = $this->finishAdminSave($request, $model, $reviews, 'Questão atualizada com sucesso.');
         $model->load('options');
         $model->loadCount('issueReports');
 
-        return $this->success(new QuestionBankQuestionResource($model), 'Questão atualizada com sucesso.');
+        return $this->success(new QuestionBankQuestionResource($model), $message);
     }
 
     public function destroy(Request $request, int $question): JsonResponse
@@ -291,6 +301,30 @@ class QuestionBankController extends Controller
             'image_url' => $uploadSettings->url($directory['disk'], $path),
             'path'      => $path,
         ], 'Imagem enviada com sucesso.');
+    }
+
+    /** Com aviso de aluno, o salvar precisa da confirmação se havia erro. */
+    private function guardReportDecision(Request $request, ExamQuestion $model): ?JsonResponse
+    {
+        if ($model->issueReports()->exists() && ! $request->exists('had_error')) {
+            return $this->error('Confirme se a questão tinha erro para tirar a restrição.', null, 422);
+        }
+
+        return null;
+    }
+
+    private function finishAdminSave(Request $request, ExamQuestion $model, QuestionIssueReviewService $reviews, string $plainMessage): string
+    {
+        if ($model->issueReports()->exists()) {
+            $hadError = $request->boolean('had_error');
+            $reviews->concludeStudentReport($model, $hadError);
+
+            return QuestionIssueReviewService::conclusionMessage($hadError);
+        }
+
+        $reviews->releaseForAnswers($model, false);
+
+        return $plainMessage;
     }
 
     private function authorizeStaff(Request $request): int

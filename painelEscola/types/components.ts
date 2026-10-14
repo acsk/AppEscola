@@ -39,6 +39,9 @@ export type ConfirmModalProps = {
   confirmDisabled?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Segunda ação, ao lado de confirmar. Usada quando o admin escolhe entre dois desfechos. */
+  alternateLabel?: string;
+  onAlternate?: () => void;
   iconName?: IoniconName;
   tone?: "danger" | "primary";
   /** Conteúdo extra abaixo da mensagem (ex.: resumo antes de confirmar) */

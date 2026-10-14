@@ -40,4 +40,18 @@ config.transformer = {
   ),
 };
 
-module.exports = withNativeWind(config, { input: "./global.css" });
+const nativeWindConfig = withNativeWind(config, { input: "./global.css" });
+const upstreamResolve = nativeWindConfig.resolver.resolveRequest;
+
+nativeWindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName.startsWith("lucide-react-native/dist/esm/icons/")) {
+    return {
+      type: "sourceFile",
+      filePath: path.join(__dirname, "node_modules", moduleName),
+    };
+  }
+  if (typeof upstreamResolve === "function") return upstreamResolve(context, moduleName, platform);
+  return context.resolveRequest(context, moduleName, platform);
+};
+
+module.exports = nativeWindConfig;

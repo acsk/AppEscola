@@ -147,6 +147,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [deleting, setDeleting] = useState(false);
   const [imageDragOver, setImageDragOver] = useState(false);
   const [releaseKind, setReleaseKind] = useState<"save" | "revalidate" | "approve" | null>(null);
+  const [issueReportsCount, setIssueReportsCount] = useState(0);
+  const [analysisHint, setAnalysisHint] = useState(false);
   const isFromExam = examQuestion !== null;
 
   const load = useCallback(async () => {
@@ -163,6 +165,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       const classified = formFromQuestion(q);
       setInitialClassification(classified);
       setClassification(classified);
+      setIssueReportsCount(q.issue_reports_count ?? 0);
       setRevalidatedAt(q.revalidated_at ?? null);
       setUpdatedAt(q.updated_at ?? null);
       setSourceExamName(q.source_exam_name ?? "");
@@ -361,6 +364,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         setReview(response.body);
         setReviewHistory((prev) => [response.body, ...prev]);
         setRevalidatedAt(new Date().toISOString());
+        setIssueReportsCount(0);
+        showApiToast(setToast, response, "Questão liberada para resposta.");
         return;
       }
       const payload = action === "correct"
@@ -417,6 +422,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     try {
       const response = await markQuestionsRevalidated([questionId], next, next);
       setRevalidatedAt(next ? new Date().toISOString() : null);
+      if (next) setIssueReportsCount(0);
       showApiToast(setToast, response, next ? "Questão liberada para resposta." : "Marca de revalidação removida.");
     } catch (error) {
       showApiErrorToast(setToast, error, "Não foi possível marcar a revalidação.");
@@ -486,19 +492,21 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   };
 
   /** Questão de simulado: só a classificação é gravada (o conteúdo é do simulado). */
-  const saveExamClassification = async () => {
+  const saveExamClassification = async (hadError?: boolean) => {
     if (questionId === null) return;
     const clientErrors = validateClassification(classification, catalogs.taxonomy);
     if (Object.keys(clientErrors).length) {
       showClientErrors(clientErrors);
       return;
     }
+    const decision = hadError === undefined ? undefined : hadError;
     const patch = diffClassification(initialClassification, classification);
     if (!Object.keys(patch).length) {
       setSaving("save");
       try {
-        const response = await resolveStudentReview(questionId);
+        const response = await resolveStudentReview(questionId, decision);
         showApiToast(setToast, response, "Questão liberada para resposta.");
+        setIssueReportsCount(0);
       } catch (error) {
         showApiErrorToast(setToast, error, "Não foi possível liberar a questão.");
         setSaving(null);
@@ -510,8 +518,9 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
     setSaving("save");
     try {
-      const response = await patchQuestionClassification(questionId, patch);
+      const response = await patchQuestionClassification(questionId, patch, decision);
       showApiToast(setToast, response, "Classificação salva com sucesso.");
+      setIssueReportsCount(0);
       setInitialClassification(classification);
       navigate("questoes-classificar", { questionId, query: listQuery });
     } catch (error) {
@@ -522,10 +531,10 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
   };
 
-  const save = async (mode: "save" | "another") => {
+  const save = async (mode: "save" | "another", hadError?: boolean) => {
     if (aiFilling || uploading || saving !== null) return;
     if (isFromExam) {
-      await saveExamClassification();
+      await saveExamClassification(hadError);
       return;
     }
     const clientErrors = { ...validateContent(content), ...validateClassification(classification, catalogs.taxonomy) };
@@ -539,6 +548,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       const payload = {
         ...contentPayload(content), ...diffClassification(initialClassification, classification),
         source_exam_name: sourceExamName.trim() || null,
+        ...(hadError === undefined ? {} : { had_error: hadError }),
       };
       const response = isEdit
         ? await updateStandaloneQuestion(questionId, payload)
@@ -582,12 +592,12 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     setReleaseKind("save");
   };
 
-  const confirmRelease = async () => {
+  const confirmRelease = async (hadError?: boolean) => {
     if (releasing.current || releaseKind === null) return;
     releasing.current = true;
     const kind = releaseKind;
     try {
-      if (kind === "save") await save("save");
+      if (kind === "save") await save("save", hadError);
       else if (kind === "revalidate") await applyRevalidated(true);
       else if (kind === "approve") await runReview("approve");
     } finally {
@@ -649,14 +659,30 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       : []),
   ];
 
+  const reportedCount = issueReportsCount;
+  const releaseMessage = reportedCount > 0
+    ? `${reportedCount === 1 ? "1 aluno marcou" : `${reportedCount} alunos marcaram`} esta questão com erro. Ela fica liberada para os alunos responderem e as respostas erradas são zeradas. As notas do simulado oficial permanecem.`
+    : "Nenhum aluno marcou erro nesta questão. Ela fica liberada para os alunos responderem e a contagem de respostas erradas permanece. As notas do simulado oficial permanecem.";
+
   const moreItems: ActionsMenuItem[] = isEdit
     ? [
         {
           key: "revalidate",
           label: revalidatedAt ? "Remover marca de revalidada" : "Marcar como revalidada",
           icon: ShieldCheck,
-          description: revalidatedAt ? "A questão deixa de aparecer como revalidada" : "Libera a questão para os alunos responderem",
-          onPress: () => (revalidatedAt ? void applyRevalidated(false) : setReleaseKind("revalidate")),
+          description: revalidatedAt
+            ? "A questão deixa de aparecer como revalidada"
+            : reportedCount > 0
+              ? "A restrição sai ao salvar e confirmar se havia erro"
+              : "Libera a questão e mantém a contagem de erros",
+          onPress: () => {
+            if (!revalidatedAt && reportedCount > 0) {
+              setAnalysisHint(true);
+              return;
+            }
+            if (revalidatedAt) void applyRevalidated(false);
+            else setReleaseKind("revalidate");
+          },
           disabled: markingRevalidated || reviewing || resetting,
         },
         {
@@ -891,7 +917,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           revalidatedAt={revalidatedAt}
           busy={reviewing}
           onValidate={() => void runReview("validate")}
-          onApprove={questionId !== null ? () => setReleaseKind("approve") : undefined}
+          onApprove={questionId !== null ? () => (issueReportsCount > 0 ? setAnalysisHint(true) : setReleaseKind("approve")) : undefined}
         />
       ) : null}
       <Panel title="Classificação">
@@ -947,12 +973,12 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           />
         </View>
 
-        {!loading && !loadError && (examQuestion?.issue_reports_count ?? 0) > 0 ? (
+        {!loading && !loadError && issueReportsCount > 0 ? (
           <View className="border border-warning bg-warning-tint rounded-ds-md" style={{ paddingVertical: 10, paddingHorizontal: 16, marginBottom: 20 }}>
             <Text className="text-ink" style={{ fontSize: 13, lineHeight: 20 }}>
-              {examQuestion?.issue_reports_count === 1
-                ? "1 aluno informou que esta questão tem erro. Ela está sem validação até você salvar, revalidar ou validar manualmente. A questão volta a aceitar respostas e as respostas erradas são zeradas."
-                : `${examQuestion?.issue_reports_count} alunos informaram que esta questão tem erro. Ela está sem validação até você salvar, revalidar ou validar manualmente. A questão volta a aceitar respostas e as respostas erradas são zeradas.`}
+              {issueReportsCount === 1
+                ? "1 aluno informou erro nesta questão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."
+                : `${issueReportsCount} alunos informaram erro nesta questão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro.`}
             </Text>
           </View>
         ) : null}
@@ -1035,15 +1061,37 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       />
 
       <ConfirmModal
-        visible={releaseKind !== null}
+        visible={releaseKind === "save" && reportedCount > 0}
+        title="A questão tinha erro?"
+        message="Analise a questão e deixe a correção pronta antes de confirmar. A restrição sai nesta confirmação. Se havia erro, as respostas erradas são zeradas. Se não havia erro, a contagem permanece. As notas do simulado oficial permanecem."
+        confirmLabel="Havia erro"
+        alternateLabel="Não havia erro"
+        cancelLabel="Cancelar"
+        tone="primary"
+        loading={releaseBusy}
+        onConfirm={() => void confirmRelease(true)}
+        onAlternate={() => void confirmRelease(false)}
+        onCancel={() => { if (!releaseBusy) setReleaseKind(null); }}
+      />
+
+      <ConfirmModal
+        visible={releaseKind !== null && reportedCount === 0}
         title="Liberar a questão para resposta?"
-        message="A questão fica liberada para os alunos responderem e as respostas erradas são zeradas. As notas do simulado oficial permanecem."
+        message={releaseMessage}
         confirmLabel="Liberar"
         cancelLabel="Cancelar"
         tone="primary"
         loading={releaseBusy}
         onConfirm={() => void confirmRelease()}
         onCancel={() => { if (!releaseBusy) setReleaseKind(null); }}
+      />
+
+      <MessageModal
+        visible={analysisHint}
+        type="info"
+        title="Confirme no salvar"
+        message="Analise a questão e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro ou não."
+        onClose={() => setAnalysisHint(false)}
       />
 
       <ConfirmModal

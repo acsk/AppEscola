@@ -17,7 +17,6 @@ use App\Services\ExamAnswerKeyService;
 use App\Services\ExamPublishValidator;
 use App\Services\QuestionClassificationService;
 use App\Services\QuestionContentService;
-use App\Services\QuestionIssueReviewService;
 use App\Services\ExamTypeService;
 use App\Services\TenantUploadSettingsService;
 use App\Traits\ScopedByTenant;
@@ -280,8 +279,6 @@ class ExamQuestionController extends Controller
                 // Remove as antigas e recria
                 app(QuestionContentService::class)->syncOptions($question, $request->options);
             }
-
-            app(QuestionIssueReviewService::class)->resolve($question);
         });
 
         $question->load(self::DETAIL_RELATIONS);

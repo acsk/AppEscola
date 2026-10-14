@@ -66,9 +66,9 @@ export async function approveQuestionsManually(ids: number[]) {
   };
 }
 
-/** Encerra o aviso dos alunos, marca revalidada e zera a contagem de erros. */
-export async function resolveStudentReview(questionId: number) {
-  const { data } = await api.post(`/question-bank/questions/${questionId}/student-review`);
+/** Encerra o aviso do aluno. `hadError` confirma se a questão tinha erro. */
+export async function resolveStudentReview(questionId: number, hadError?: boolean) {
+  const { data } = await api.post(`/question-bank/questions/${questionId}/student-review`, hadError === undefined ? {} : { had_error: hadError });
   return data as { type: string; message: string; body: QuestionBankQuestion };
 }
 
@@ -92,8 +92,8 @@ export async function fetchQuestionBankQuestion(id: number): Promise<QuestionBan
 }
 
 /** Devolve o envelope completo (para o toast usar a mensagem da API). */
-export async function patchQuestionClassification(id: number, patch: ClassificationPatch) {
-  const { data } = await api.patch(`/question-bank/questions/${id}/classification`, patch);
+export async function patchQuestionClassification(id: number, patch: ClassificationPatch, hadError?: boolean) {
+  const { data } = await api.patch(`/question-bank/questions/${id}/classification`, hadError === undefined ? patch : { ...patch, had_error: hadError });
   return data as { type: string; message: string; body: QuestionBankQuestion };
 }
 

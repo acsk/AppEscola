@@ -6,8 +6,9 @@ use App\Models\ExamQuestion;
 use App\Models\QuestionReview;
 
 /**
- * Aviso de erro do aluno: a questão sai da validação até o administrador revisar.
- * Ao concluir, a validação volta, o aviso sai e a contagem de erros do painel zera.
+ * Aviso de erro do aluno: a questão fica sem validação até o administrador analisar.
+ * A restrição só sai no salvar, quando ele confirma se havia erro.
+ * Havia erro: a contagem de erros do painel zera. Não havia: a contagem permanece.
  * As respostas de prática e as notas oficiais do simulado permanecem.
  */
 class QuestionIssueReviewService
@@ -48,29 +49,49 @@ class QuestionIssueReviewService
         }
     }
 
-    public function resolve(ExamQuestion $question): bool
+    /**
+     * Libera uma questão que não tem aviso de aluno.
+     * Com aviso aberto, não altera nada: a restrição espera a confirmação no salvar.
+     */
+    public function releaseForAnswers(ExamQuestion $question, bool $resetErrors = false): bool
     {
-        if (! $question->issueReports()->exists()) {
+        if ($question->issueReports()->exists()) {
             return false;
         }
 
-        $this->releaseForAnswers($question);
+        $this->ensureApproved($question);
+        $fill = ['revalidated_at' => now()];
+        if ($resetErrors) {
+            $fill['errors_reset_at'] = now();
+        }
+        $question->forceFill($fill)->save();
 
-        return true;
+        return $resetErrors;
     }
 
-    /** Libera a questão para o aluno responder e zera a contagem de erros do painel. */
-    public function releaseForAnswers(ExamQuestion $question): void
+    /** Encerra o aviso do aluno depois que o administrador confirma se havia erro. */
+    public function concludeStudentReport(ExamQuestion $question, bool $hadError): void
     {
-        if ($question->issueReports()->exists()) {
-            $question->issueReports()->delete();
+        if (! $question->issueReports()->exists()) {
+            $this->releaseForAnswers($question, false);
+
+            return;
         }
 
+        $question->issueReports()->delete();
         $this->ensureApproved($question);
-        $question->forceFill([
-            'revalidated_at' => now(),
-            'errors_reset_at' => now(),
-        ])->save();
+        $fill = ['revalidated_at' => now()];
+        if ($hadError) {
+            $fill['errors_reset_at'] = now();
+        }
+        $question->forceFill($fill)->save();
+    }
+
+    public static function conclusionMessage(bool $hadError): string
+    {
+        return $hadError
+            ? 'Restrição removida. Havia erro: as respostas erradas foram zeradas.'
+            : 'Restrição removida. Não havia erro: a contagem de respostas erradas permanece.';
     }
 
     private function ensureApproved(ExamQuestion $question): void
