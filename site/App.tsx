@@ -16,9 +16,12 @@ import Benefits from "./src/sections/Benefits";
 import FinalCta from "./src/sections/FinalCta";
 import Faq from "./src/sections/Faq";
 import Footer from "./src/sections/Footer";
+import { useReveal } from "./src/useReveal";
 
 /** Landing page do Cursinho Hub (protótipo "Landing Page Cursinho Hub"). Só web: HTML + CSS, sem primitivas RN. */
 export default function App() {
+  useReveal();
+
   return (
     <div className="lp">
       <Header />

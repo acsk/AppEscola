@@ -78,6 +78,10 @@ body{margin:0;background:#fff}
 .rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}.rise.d3{animation-delay:.28s}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.rise{animation:none}.btn{transition:none}}
+/* entrada ao rolar (src/useReveal.ts) */
+.rv{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.7,.2,1) var(--rv-d,0s),transform .7s cubic-bezier(.2,.7,.2,1) var(--rv-d,0s)}
+.rv:is(.stage,.car,.ai-grid,.fcard){transform:translateY(40px) scale(.98)}
+.rv.in{opacity:1;transform:none}
 .mock{position:relative;padding:8px 0 40px 24px}
 .win{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 24px 64px -16px rgba(16,24,40,.18);overflow:hidden}
 .win-top{display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-bottom:1px solid var(--line);background:#FBFBFC}
