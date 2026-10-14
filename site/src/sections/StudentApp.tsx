@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Icon } from "../components/icons";
 
 /** Telas do carrossel de tablet: título e legenda. */
 const SLIDES = [
@@ -9,6 +10,31 @@ const SLIDES = [
   ["Agenda", "Simulados, aulas e entregas no mesmo calendário."],
   ["Ranking", "A posição na turma e quanto falta para subir."],
 ];
+/** Seções de navegação do app do aluno (bottombar no celular, sidebar no tablet). */
+const NAV = [
+  { label: "Início", icon: "home" },
+  { label: "Questões", icon: "questions" },
+  { label: "Simulados", icon: "clock" },
+  { label: "Financeiro", icon: "wallet" },
+] as const;
+
+function PhoneTabs({ active }: { active: number }) {
+  return (
+    <div className="ph-tab">
+      {NAV.map((n, i) => <span key={n.label} className={i === active ? "on" : undefined}><Icon name={n.icon} size={18} strokeWidth={1.8} />{n.label}</span>)}
+    </div>
+  );
+}
+
+function Rail({ active }: { active: number }) {
+  return (
+    <nav className="sd-rail" aria-hidden="true">
+      <div className="lg">CH</div>
+      {NAV.map((n, i) => <span key={n.label} className={i === active ? "on" : undefined} title={n.label}><Icon name={n.icon} size={20} /></span>)}
+    </nav>
+  );
+}
+
 /** Largura do slide (880px) + gap (40px) do .car-track. */
 const SLIDE_STEP = 920;
 
@@ -48,7 +74,7 @@ export default function StudentApp() {
             <div className="ph-seg"><span>5</span><span className="on">10</span><span>20</span></div>
           </div>
           <div className="ph-cta">Começar 10 questões</div>
-          <div className="ph-tab"><span><i></i>Início</span><span className="on"><i></i>Questões</span><span><i></i>Simulados</span><span><i></i>Financeiro</span></div>
+          <PhoneTabs active={1} />
         </div>
       </div>
       
@@ -69,7 +95,7 @@ export default function StudentApp() {
             <div className="pcard" style={{ fontSize: "12px", color: "#525A65", lineHeight: "1.5" }}>Uma tentativa. Você pode pausar e continuar até o prazo.<div style={{ marginTop: "6px", color: "#056B36", fontWeight: "700" }}>Treinar estes assuntos antes →</div></div>
           </div>
           <div className="ph-cta acc">Iniciar simulado</div>
-          <div className="ph-tab"><span><i></i>Início</span><span><i></i>Questões</span><span className="on"><i></i>Simulados</span><span><i></i>Financeiro</span></div>
+          <PhoneTabs active={2} />
         </div>
       </div>
       
@@ -93,7 +119,7 @@ export default function StudentApp() {
               <div className="prow"><span>Agosto<br /><span className="mo">pago em 05/08</span></span><span className="ptag ok">✓ Recibo</span></div>
             </div>
           </div>
-          <div className="ph-tab"><span><i></i>Início</span><span><i></i>Questões</span><span><i></i>Simulados</span><span className="on"><i></i>Financeiro</span></div>
+          <PhoneTabs active={3} />
         </div>
       </div>
     </div>
@@ -113,7 +139,7 @@ export default function StudentApp() {
           {/* 1 Praticar */}
           <div className={slideClass(0)} role="group" aria-roledescription="slide" aria-label="1 de 6: Praticar">
             <div className="tab-dev"><div className="tsc">
-              <nav className="sd-rail" aria-hidden="true"><div className="lg">CH</div><span><i></i></span><span className="on"><i></i></span><span><i></i></span><span><i></i></span></nav>
+              <Rail active={1} />
               <div className="tw">
                 <div className="th"><b>Praticar · Matemática</b><div className="tprog" style={{ maxWidth: "240px", marginLeft: "16px" }}><i style={{ width: "30%" }}></i></div><span className="tm" style={{ fontWeight: "600" }}>Questão 4 de 10</span><div className="r"><span className="tbtn">Sair</span></div></div>
                 <div className="tb" style={{ alignItems: "center", paddingTop: "34px" }}>
@@ -131,7 +157,7 @@ export default function StudentApp() {
           {/* 2 Simulados */}
           <div className={slideClass(1)} role="group" aria-roledescription="slide" aria-label="2 de 6: Simulados">
             <div className="tab-dev"><div className="tsc">
-              <nav className="sd-rail" aria-hidden="true"><div className="lg">CH</div><span><i></i></span><span><i></i></span><span className="on"><i></i></span><span><i></i></span></nav>
+              <Rail active={2} />
               <div className="tw">
                 <div className="th"><b>Simulados</b><div className="r"><div className="tseg"><span className="on">Abertos</span><span>Concluídos</span></div></div></div>
                 <div className="tb">
@@ -150,7 +176,7 @@ export default function StudentApp() {
           {/* 3 Desempenho */}
           <div className={slideClass(2)} role="group" aria-roledescription="slide" aria-label="3 de 6: Desempenho">
             <div className="tab-dev"><div className="tsc">
-              <nav className="sd-rail" aria-hidden="true"><div className="lg">CH</div><span className="on"><i></i></span><span><i></i></span><span><i></i></span><span><i></i></span></nav>
+              <Rail active={0} />
               <div className="tw">
                 <div className="th"><b>Desempenho</b><div className="r"><div className="tseg"><span className="on">2026</span><span>Últimos 30 dias</span></div></div></div>
                 <div className="tb cols">
@@ -175,7 +201,7 @@ export default function StudentApp() {
           {/* 4 O que estudar */}
           <div className={slideClass(3)} role="group" aria-roledescription="slide" aria-label="4 de 6: O que estudar">
             <div className="tab-dev"><div className="tsc">
-              <nav className="sd-rail" aria-hidden="true"><div className="lg">CH</div><span className="on"><i></i></span><span><i></i></span><span><i></i></span><span><i></i></span></nav>
+              <Rail active={0} />
               <div className="tw">
                 <div className="th"><b>O que estudar</b></div>
                 <div className="tb cols">
@@ -200,7 +226,7 @@ export default function StudentApp() {
           {/* 5 Agenda */}
           <div className={slideClass(4)} role="group" aria-roledescription="slide" aria-label="5 de 6: Agenda">
             <div className="tab-dev"><div className="tsc">
-              <nav className="sd-rail" aria-hidden="true"><div className="lg">CH</div><span className="on"><i></i></span><span><i></i></span><span><i></i></span><span><i></i></span></nav>
+              <Rail active={0} />
               <div className="tw">
                 <div className="th"><b>Agenda · outubro 2026</b></div>
                 <div className="tb cols">
@@ -229,7 +255,7 @@ export default function StudentApp() {
           {/* 6 Ranking */}
           <div className={slideClass(5)} role="group" aria-roledescription="slide" aria-label="6 de 6: Ranking">
             <div className="tab-dev"><div className="tsc">
-              <nav className="sd-rail" aria-hidden="true"><div className="lg">CH</div><span className="on"><i></i></span><span><i></i></span><span><i></i></span><span><i></i></span></nav>
+              <Rail active={0} />
               <div className="tw">
                 <div className="th"><b>Ranking da turma</b><div className="r"><div className="tseg"><span className="on">Desempenho</span><span>Dedicação</span></div></div></div>
                 <div className="tb">

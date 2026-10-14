@@ -53,6 +53,12 @@ body{margin:0;background:#fff}
 .chips{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:32px}
 .fchip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px;font-weight:600;color:var(--ink-2) !important;transition:border-color .15s,color .15s}
 .fchip:hover{border-color:var(--blue);color:var(--blue) !important}
+.clients{padding:8px 0 36px;background:linear-gradient(180deg,#fff 0%,#F7F8FC 100%)}
+.clients-label{margin:0 0 16px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--subtle)}
+.clients-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;list-style:none;margin:0;padding:0}
+.clients-row li{display:flex;align-items:center;justify-content:center;height:76px;min-width:148px;padding:12px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.clients-row img{max-height:44px;max-width:132px;width:auto;object-fit:contain}
+.clients-row li.slot{border-style:dashed;background:#F7F8FA}
 .rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
 .rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}.rise.d3{animation-delay:.28s}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -323,7 +329,7 @@ body{margin:0;background:#fff}
 .ph-cta.acc{background:#FF6A1A;color:#1C0A00;box-shadow:0 6px 16px rgba(255,106,26,.3)}
 .ph-tab{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:1px solid #E2E5E9;padding:7px 0 12px;font-size:9.5px;font-weight:600;color:#636B77;text-align:center;flex:none}
 .ph-tab span.on{color:#056B36}
-.ph-tab i{display:block;width:16px;height:16px;margin:0 auto 3px;border:1.8px solid currentColor;border-radius:5px}
+.ph-tab svg{display:block;margin:0 auto 3px}
 .pcard{background:#fff;border:1px solid #E2E5E9;border-radius:16px;padding:12px 14px}
 .pcard .o{font-size:10px;font-weight:700;letter-spacing:.08em;color:#636B77}
 .pcard b.t{display:block;font-size:15px;font-weight:700;margin-top:2px}
@@ -361,7 +367,6 @@ body{margin:0;background:#fff}
 .sd-rail .lg{width:36px;height:36px;border-radius:10px;background:#5BE394;color:#0F2E1F;display:grid;place-items:center;font-weight:800;font-size:12px;margin-bottom:12px}
 .sd-rail span{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#B4C7BC}
 .sd-rail span.on{background:rgba(255,255,255,.10);color:#5BE394}
-.sd-rail span i{width:18px;height:18px;border:2px solid currentColor;border-radius:5px}
 .sd-tg{align-self:flex-start;display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;border:1px solid #E2E5E9;border-radius:999px;background:#fff;font-size:13px;font-weight:600}
 .sd-tg i{width:8px;height:8px;border-radius:50%;background:#6E56CF}
 .sd-qt{margin:0;font-size:22px;line-height:32px;font-weight:600;letter-spacing:-.01em}
@@ -693,6 +698,7 @@ body{margin:0;background:#fff}
  .faq-a{padding-right:0}
  .fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .legal{flex-direction:column}
+ .clients-row li{flex:1 1 calc(50% - 12px);min-width:0}
  .sticky-cta{display:flex;position:sticky;bottom:0;z-index:40;padding:12px 20px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border-top:1px solid var(--line)}
  .sticky-cta .btn{width:100%}
 }

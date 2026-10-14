@@ -1,6 +1,7 @@
 import "./src/styles.css";
 import Header from "./src/sections/Header";
 import Hero from "./src/sections/Hero";
+import Clients from "./src/sections/Clients";
 import Problem from "./src/sections/Problem";
 import Students from "./src/sections/Students";
 import Classes from "./src/sections/Classes";
@@ -23,6 +24,7 @@ export default function App() {
       <Header />
       <main>
         <Hero />
+        <Clients />
         <Problem />
         <Students />
         <Classes />

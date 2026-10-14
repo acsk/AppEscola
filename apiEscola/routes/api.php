@@ -42,6 +42,7 @@ use App\Http\Controllers\Api\TenantMobileThemeController;
 use App\Http\Controllers\Api\TenantAiSettingsController;
 use App\Http\Controllers\Api\QuestionAiController;
 use App\Http\Controllers\Api\TenantNotificationSettingsController;
+use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StudentNotificationController;
 use App\Http\Controllers\Api\CalendarEventController;
 use App\Http\Controllers\Api\StudentCalendarController;
@@ -72,6 +73,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // Leads do site (público)
 Route::post('/leads', [LeadController::class, 'store'])->middleware('throttle:10,1');
+Route::get('/site/clients', [SiteController::class, 'clients'])->middleware('throttle:60,1');
 
 // Cadastro público (mobile — sem autenticação, com throttle anti-abuso)
 Route::prefix('public/{tenant_slug}')

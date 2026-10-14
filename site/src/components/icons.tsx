@@ -18,6 +18,8 @@ export const ICON = {
   questions: "M4 5h16v14H4zM8 9h8M8 13h5",
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
   chart: "M4 20h16M7 16v-5M12 16V7M17 16v-8",
+  home: "M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6",
+  wallet: "M3 6h18v12H3zM3 10h18M7 15h4",
 } as const;
 
 export function Icon({ name, ...props }: Props & { name: keyof typeof ICON }) {
