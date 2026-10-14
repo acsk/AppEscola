@@ -6,6 +6,7 @@ const SELECTOR = [
   "main section:not(.hero) :is(.eyebrow, .ey, h2, .lead, .hd > p, p.l)",
   // listas e cartões
   ".pts li", ".bi", ".step", ".box", ".faq-i", ".pcol", ".see li",
+  ".pay h3", ".bank", ".fstep", ".pcardx",
   // telas e blocos grandes
   ".stage", ".scatter", ".hub", ".ai-grid", ".sdesk-cap", ".car", ".car-cap",
   ".marq", ".clients .ft", ".fcard", ".final .alt",

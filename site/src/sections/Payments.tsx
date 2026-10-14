@@ -54,6 +54,53 @@ export default function Payments() {
         <div className="row"><span>Inadimplência por aluno</span><span style={{ color: "var(--subtle)" }}>1 pág.</span></div>
       </div>
     </div>
+
+    {/* Bancos, boleto, Pix e baixa automática */}
+    <div className="pay">
+      <div>
+        <span className="eyebrow">Integração bancária</span>
+        <h3>Conectado ao seu banco. Do boleto à baixa, sem planilha.</h3>
+        <p className="lead">Emita boletos e cobranças Pix pela conta do cursinho. Quando o aluno paga, o banco avisa a plataforma e a mensalidade é baixada sozinha.</p>
+        <div className="banks">
+          <div className="bank"><img src="/bancos/cora.svg" alt="Cora" /><span><i></i>Integração disponível</span></div>
+          <div className="bank"><img src="/bancos/asaas.svg" alt="Asaas" /><span><i></i>Integração disponível</span></div>
+        </div>
+        <div className="banks-note">Use a conta que o cursinho já tem em um dos bancos parceiros.</div>
+      </div>
+      <div className="flow" role="list" aria-label="Como uma mensalidade é cobrada e baixada">
+        <div className="fstep" role="listitem"><span className="ic2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4"></path></svg></span><b>Cobrança gerada</b><small>Mensalidade criada pelo contrato, com vencimento e regras.</small></div>
+        <div className="fstep" role="listitem"><span className="ic2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 2h10v20H7zM11 18h2"></path></svg></span><b>Aluno recebe</b><small>Boleto e Pix no app, por e-mail e com lembrete.</small></div>
+        <div className="fstep" role="listitem"><span className="ic2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v9M19 10v9M9 10v9M15 10v9M3 21h18"></path></svg></span><b>Banco confirma</b><small>Cora ou Asaas avisam o pagamento.</small></div>
+        <div className="fstep ok" role="listitem"><span className="ic2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><b>Baixa automática</b><small>Mensalidade marcada como paga e recibo emitido.</small></div>
+      </div>
+    </div>
+
+    <div className="paygrid">
+      <div className="pcardx">
+        <div className="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6v12M7 6v12M11 6v12M13 6v12M17 6v12M20 6v12"></path></svg></div>
+        <h4>Boleto registrado</h4>
+        <p>Emitido pela conta do cursinho, com linha digitável e 2ª via sempre à mão.</p>
+        <div className="tags"><span>2ª via</span><span>Em lote</span></div>
+      </div>
+      <div className="pcardx">
+        <div className="ic g"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 3l9 9-9 9-9-9zM8.5 12h7"></path></svg></div>
+        <h4>Pix</h4>
+        <p>QR Code e Pix copia e cola em cada cobrança. O aluno paga pelo app em segundos.</p>
+        <div className="tags"><span>QR Code</span><span>Copia e cola</span></div>
+      </div>
+      <div className="pcardx">
+        <div className="ic g"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5M8 12l3 3 5-6"></path></svg></div>
+        <h4>Baixa automática</h4>
+        <p>Pagamento confirmado pelo banco vira baixa no sistema, sem conferir extrato.</p>
+        <div className="tags"><span>Conciliação</span><span>Recibo</span></div>
+      </div>
+      <div className="pcardx">
+        <div className="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7M17 15l2 2 3-4"></path></svg></div>
+        <h4>Regras de cobrança</h4>
+        <p>Juros, multa e desconto de pontualidade aplicados conforme o contrato.</p>
+        <div className="tags"><span>Juros e multa</span><span>Desconto</span></div>
+      </div>
+    </div>
   </div>
 </section>
 
