@@ -17,6 +17,7 @@ import ClassificationFields, { SituationFields } from "../../components/banco-qu
 import { RevalidatedMark } from "../../components/banco-questoes/QuestionMarks";
 import OptionsEditor from "../../components/banco-questoes/OptionsEditor";
 import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
+import SimilarSearchPanel from "../../components/banco-questoes/SimilarSearchPanel";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useQuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import {
@@ -910,6 +911,17 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
   const sideColumn = (
     <View style={{ gap: 20 }}>
+      {isEdit ? (
+        <SimilarSearchPanel
+          questionText={isFromExam ? (examQuestion?.question_text ?? "") : content.question_text}
+          subjectId={classification.subject_id}
+          topicId={classification.topic_ids[0] ?? null}
+          imageUrl={isFromExam ? examQuestion?.image_url : content.image_url}
+          options={(isFromExam ? examQuestion?.options ?? [] : content.options).map((option) => ({ option_text: option.option_text }))}
+          ignoreId={questionId}
+          onOpen={(id) => leave(() => navigate("questoes-classificar", { questionId: id, query: listQuery }))}
+        />
+      ) : null}
       {isEdit ? (
         <QuestionReviewCard
           review={review}

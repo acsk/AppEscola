@@ -72,12 +72,32 @@ export async function aiSimilarQuestions(
     difficulty_id?: number | null;
     options_count?: number | null;
     instructions?: string;
+    evitar_semelhantes?: boolean;
+    diversidade?: "baixa" | "media" | "alta";
+    regenerar_semelhantes?: boolean;
+    max_tentativas?: number;
     context?: SimilarFormContext;
   },
   withImage = false
 ) {
   const { data } = await api.post(`/question-bank/questions/${questionId}/ai/similar`, params, { timeout: withImage ? 900000 : 180000 });
-  return data as { type: string; message: string; body: { questions: AiQuestionSuggestion[] } };
+  return data as {
+    type: string;
+    message: string;
+    body: {
+      questions: AiQuestionSuggestion[];
+      originalidade?: {
+        geradas: number;
+        possivel_duplicidade: number;
+        regeneradas: number;
+        revisao: number;
+        aceitas: number;
+        indisponivel: number;
+        tokens_revisao?: number;
+        custo_revisao_usd?: number;
+      };
+    };
+  };
 }
 
 export type QuestionReviewInput = {

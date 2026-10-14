@@ -11,6 +11,7 @@ import { color } from "../../../constants/theme";
 import type { QuestionBankCatalogs } from "../../../hooks/useQuestionBankCatalogs";
 import type { ImportDraftQuestion } from "../../../services/questionImportDrafts";
 import { ISSUE_LABEL, type IssueCode } from "../../../utils/importReview";
+import SimilarSearchPanel from "../SimilarSearchPanel";
 
 export type EditorDraft = ImportDraftQuestion & { imageLoadError: boolean; errors: Record<string, string> };
 
@@ -106,6 +107,17 @@ export default function ReviewQuestionEditor({
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: compact ? 12 : 24, paddingTop: compact ? 12 : 20, paddingBottom: 32 }}>
         {notice}
+        <View className="mb-4">
+          <SimilarSearchPanel
+            questionText={content.question_text}
+            subjectId={draft.classification.subject_id}
+            topicId={draft.classification.topic_ids[0] ?? null}
+            imageUrl={content.image_url}
+            options={content.options.map((option) => ({ option_text: option.option_text }))}
+            compararTexto={content.question_text}
+            onManterCadastrada={onRemove}
+          />
+        </View>
         <View role="status" className="flex-row items-start bg-surface border border-border rounded-ds-md px-4 py-3 mb-4"
           style={{ gap: 12, overflow: "hidden", position: "relative" }}>
           <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, backgroundColor: blockers ? color.warning : color.success }} />

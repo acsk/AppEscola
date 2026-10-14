@@ -94,6 +94,23 @@ return [
             'temperature' => 0.1,
             'max_corrections' => 2,
         ],
+        /** Busca semântica. Limiares são heurísticas, não probabilidade de duplicata. */
+        'embeddings' => [
+            'enabled' => filter_var(env('AI_EMBEDDINGS_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+            'model' => env('OPENROUTER_EMBEDDING_MODEL', 'openai/text-embedding-3-small'),
+            'dimensions' => max(64, (int) env('OPENROUTER_EMBEDDING_DIMENSIONS', 1536)),
+            'strategy' => 'V1',
+            'batch' => 32,
+            'candidate_limit' => 200,
+            'index_batch' => 20,
+            'cost_per_million_tokens' => (float) env('EMBEDDING_COST_PER_MILLION', 0.02),
+            'max_regenerations' => 2,
+            'thresholds' => [
+                'duplicata' => 0.95,
+                'muito_semelhante' => 0.85,
+                'relacionada' => 0.70,
+            ],
+        ],
         'openrouter' => [
             'api_key' => env('OPENROUTER_API_KEY'),
             'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),

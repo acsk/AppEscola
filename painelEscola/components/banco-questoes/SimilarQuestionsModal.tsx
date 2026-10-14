@@ -101,6 +101,11 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
   const [instructionsError, setInstructionsError] = useState<string | undefined>();
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [topicIds, setTopicIds] = useState<number[]>([]);
+  const [avoidSimilar, setAvoidSimilar] = useState(true);
+  const [diversity, setDiversity] = useState<"baixa" | "media" | "alta">("media");
+  const [regenerateSimilar, setRegenerateSimilar] = useState(true);
+  const [maxAttempts, setMaxAttempts] = useState(2);
+  const [originality, setOriginality] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible || !source) return;
@@ -113,6 +118,11 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     setOptionsCount(Math.min(6, Math.max(2, source.optionsCount || 5)));
     setSubjectId(source.context?.subject_id ?? null);
     setTopicIds(source.context?.topic_ids ?? []);
+    setAvoidSimilar(true);
+    setDiversity("media");
+    setRegenerateSimilar(true);
+    setMaxAttempts(2);
+    setOriginality(null);
   }, [visible, source]);
 
   const allTopics = useMemo(
@@ -158,6 +168,10 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
         difficulty_id: difficulty === SAME_DIFFICULTY ? undefined : Number(difficulty),
         options_count: isEssay ? undefined : optionsCount,
         instructions: instructions.trim() || undefined,
+        evitar_semelhantes: avoidSimilar,
+        diversidade: diversity,
+        regenerar_semelhantes: regenerateSimilar,
+        max_tentativas: maxAttempts,
         context: source.context
           ? { ...source.context, subject_id: subjectId, topic_ids: topicIds }
           : undefined,
@@ -183,6 +197,13 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
           manualApproved: false,
         }))
       );
+      const report = response.body.originalidade;
+      const custo = report?.custo_revisao_usd;
+      setOriginality(report
+        ? `${report.geradas} geradas · ${report.possivel_duplicidade} com possível duplicidade · ${report.regeneradas} regeneradas · ${report.revisao} para revisão · ${report.aceitas} aceitas pela checagem automática`
+          + ((report.tokens_revisao ?? 0) > 0 ? ` · revisão ${report.tokens_revisao} tokens` : "")
+          + (custo != null && custo > 0 ? ` · US$ ${custo.toFixed(4)}` : "")
+        : null);
       setStep("review");
     } catch (err) {
       const fieldError = getApiValidationErrors(err).instructions;
@@ -391,6 +412,30 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
             </Text>
           ) : null}
           <FormSelect label="Quantidade de questões" value={quantity} options={QUANTITY_OPTIONS} onChange={(v) => setQuantity(Number(v))} />
+          <FormSelect
+            label="Evitar questões semelhantes"
+            value={avoidSimilar ? "sim" : "nao"}
+            options={[{ value: "sim", label: "Sim" }, { value: "nao", label: "Não" }]}
+            onChange={(v) => setAvoidSimilar(v !== "nao")}
+          />
+          <FormSelect
+            label="Nível de diversidade"
+            value={diversity}
+            options={[{ value: "baixa", label: "Baixo" }, { value: "media", label: "Médio" }, { value: "alta", label: "Alto" }]}
+            onChange={(v) => setDiversity(v as "baixa" | "media" | "alta")}
+          />
+          <FormSelect
+            label="Regenerar questões muito semelhantes"
+            value={regenerateSimilar ? "sim" : "nao"}
+            options={[{ value: "sim", label: "Sim" }, { value: "nao", label: "Não" }]}
+            onChange={(v) => setRegenerateSimilar(v !== "nao")}
+          />
+          <FormSelect
+            label="Máximo de tentativas"
+            value={maxAttempts}
+            options={[{ value: 0, label: "0" }, { value: 1, label: "1" }, { value: 2, label: "2" }]}
+            onChange={(v) => setMaxAttempts(Number(v))}
+          />
           <FormSelect label="Dificuldade" value={difficulty} options={difficultyOptions} onChange={setDifficulty} />
           {!isEssay && (
             <FormSelect
@@ -454,6 +499,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
           <Text className="text-sm text-ink-muted">
             Revise e ajuste cada questão — confira principalmente o gabarito, a IA pode errar. Desmarque as que não quiser incluir.
           </Text>
+          {originality ? <Text className="text-sm text-ink">{originality}</Text> : null}
           {drafts.map((draft, index) => (
             <View
               key={draft.key}

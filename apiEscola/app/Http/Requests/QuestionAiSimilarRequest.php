@@ -19,6 +19,10 @@ class QuestionAiSimilarRequest extends FormRequest
             'difficulty_id' => ['sometimes', 'nullable', 'integer', 'exists:question_difficulties,id'],
             'options_count' => ['sometimes', 'nullable', 'integer', 'between:2,10'],
             'instructions'  => ['sometimes', 'nullable', 'string', 'max:500'],
+            'evitar_semelhantes' => ['sometimes', 'boolean'],
+            'diversidade' => ['sometimes', 'in:baixa,media,alta'],
+            'regenerar_semelhantes' => ['sometimes', 'boolean'],
+            'max_tentativas' => ['sometimes', 'integer', 'between:0,3'],
             // Estado atual do formulário (pode ter edições não salvas): substitui a questão gravada no prompt.
             'context'                       => ['sometimes', 'array'],
             'context.type'                  => ['sometimes', 'in:multiple_choice,essay'],

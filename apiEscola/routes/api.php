@@ -416,6 +416,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
             Route::post('ai/extract-pdf', [QuestionAiController::class, 'extractPdf']);
             Route::post('ai/separate-text', [QuestionAiController::class, 'separateText']);
             Route::post('questions/{question}/ai/similar',   [QuestionAiController::class, 'similar'])->whereNumber('question');
+            Route::post('questions/similar-search', [\App\Http\Controllers\Api\QuestionSimilarityController::class, 'buscar']);
+            Route::post('questions/duplicate-check', [\App\Http\Controllers\Api\QuestionSimilarityController::class, 'verificar']);
+            Route::get('questions/{question}/similar', [\App\Http\Controllers\Api\QuestionSimilarityController::class, 'daQuestao'])->whereNumber('question');
+            Route::post('embeddings/reindex', [\App\Http\Controllers\Api\QuestionSimilarityController::class, 'reindexar']);
+            Route::get('embeddings/metrics', [\App\Http\Controllers\Api\QuestionSimilarityController::class, 'metricas']);
             Route::post('ai/review', [QuestionAiController::class, 'review']);
             Route::post('ai/review/correct', [QuestionAiController::class, 'correct']);
             Route::get('questions/{question}/ai/reviews', [QuestionAiController::class, 'reviews'])->whereNumber('question');

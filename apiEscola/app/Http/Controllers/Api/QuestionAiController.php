@@ -145,8 +145,26 @@ class QuestionAiController extends Controller
             unset($question);
         }
 
+        $originalidade = collect($questions)->pluck('originalidade');
+        $tokensRevisao = (int) collect($questions)->sum(
+            fn ($item) => (int) data_get($item, 'review.prompt_tokens', 0) + (int) data_get($item, 'review.completion_tokens', 0)
+        );
+        $custoRevisao = round((float) collect($questions)->sum(fn ($item) => (float) data_get($item, 'review.estimated_cost', 0)), 6);
+
         return $this->success(
-            ['questions' => $questions],
+            [
+                'questions' => $questions,
+                'originalidade' => [
+                    'geradas' => count($questions),
+                    'possivel_duplicidade' => $originalidade->whereIn('tipo', ['duplicata_exata', 'possivel_duplicata', 'muito_semelhante'])->count(),
+                    'regeneradas' => $originalidade->where('regenerada', true)->count(),
+                    'revisao' => $originalidade->where('status', 'revisao')->count(),
+                    'aceitas' => $originalidade->where('status', 'aceita')->count(),
+                    'indisponivel' => $originalidade->where('status', 'indisponivel')->count(),
+                    'tokens_revisao' => $tokensRevisao,
+                    'custo_revisao_usd' => $custoRevisao,
+                ],
+            ],
             count($questions).' questão(ões) gerada(s). Revise antes de incluir.'
         );
     }

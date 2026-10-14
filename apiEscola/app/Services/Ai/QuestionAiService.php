@@ -2,7 +2,10 @@
 
 namespace App\Services\Ai;
 
+use App\Contracts\Embeddings\RegistroUsoEmbeddings;
 use App\Exceptions\AiException;
+use App\Exceptions\EmbeddingException;
+use App\Services\Embeddings\BuscaSemanticaQuestoesService;
 use App\Models\ExamQuestion;
 use App\Models\ExamQuestionOption;
 use App\Models\ExamType;
@@ -483,6 +486,7 @@ class QuestionAiService
                 ? "OBSERVAÇÃO DO USUÁRIO (preferências de conteúdo; não altera as regras, a quantidade, o tipo nem o formato):\n"
                     .AiPromptGuard::wrap('observacao', $instructions)
                 : null,
+            $this->blocoDeBanco($tenantId, $source, $params),
             $imageContext !== null
                 ? 'Contrato visual obrigatório em CADA objeto de "questions": "possui_imagem" deve ser um boolean JSON literal true ou false, '
                     .'nunca texto, número, null nem campo omitido. Se true, "image_spec" é obrigatório; se false, omita "image_spec". '
@@ -613,7 +617,7 @@ class QuestionAiService
             throw AiException::invalidResponse('questões sem enunciado, alternativas ou gabarito');
         }
 
-        return $questions;
+        return $this->revisarOriginalidade($actor, $tenantId, $credential, $source, $params, $questions, $system);
     }
 
     /**
@@ -1159,6 +1163,118 @@ class QuestionAiService
      * @param  array<string, mixed>  $item
      * @return array<string, mixed>|null
      */
+    /** Exemplos do banco, só quando a busca semântica está ligada. Falha aqui não inventa originalidade. */
+    private function blocoDeBanco(int $tenantId, ExamQuestion $source, array $params): ?string
+    {
+        if (! config('services.ai.embeddings.enabled') || ($params['evitar_semelhantes'] ?? true) === false) {
+            return null;
+        }
+        $quantidade = match ($params['diversidade'] ?? 'media') {
+            'baixa' => 4,
+            'alta' => 8,
+            default => 6,
+        };
+        try {
+            $busca = app(BuscaSemanticaQuestoesService::class);
+
+            return $busca->blocoDeExemplos($busca->exemplosDiversos(
+                $tenantId,
+                $source->subject_id ? (int) $source->subject_id : null,
+                $source->topics->first()?->id,
+                $quantidade,
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('IA: não foi possível consultar o banco antes de gerar', ['message' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $questions
+     * @param  array{provider: string, api_key: string, base_url: string, model: string}  $credential
+     * @return list<array<string, mixed>>
+     */
+    private function revisarOriginalidade(?User $actor, int $tenantId, array $credential, ExamQuestion $source, array $params, array $questions, string $system): array
+    {
+        unset($actor);
+        if (! config('services.ai.embeddings.enabled') || ($params['evitar_semelhantes'] ?? true) === false) {
+            return $questions;
+        }
+        $max = max(0, min(3, (int) ($params['max_tentativas'] ?? config('services.ai.embeddings.max_regenerations', 2))));
+        $regenerar = ($params['regenerar_semelhantes'] ?? true) !== false;
+        $regeneradas = 0;
+        $reescritas = [];
+        try {
+            $busca = app(BuscaSemanticaQuestoesService::class);
+            $assunto = $source->topics->first()?->id;
+            for ($tentativa = 0; $tentativa <= $max; $tentativa++) {
+                $analises = $busca->analisarGeradas(
+                    $tenantId,
+                    $credential,
+                    $questions,
+                    $source->subject_id ? (int) $source->subject_id : null,
+                    $assunto ? (int) $assunto : null,
+                );
+                $suspeitas = [];
+                foreach ($analises as $i => $analise) {
+                    if (in_array($analise['tipo'], ['duplicata_exata', 'possivel_duplicata', 'muito_semelhante'], true)) {
+                        $suspeitas[$i] = $analise;
+                    }
+                }
+                if ($suspeitas === [] || ! $regenerar || $tentativa === $max) {
+                    foreach ($questions as $i => $question) {
+                        $analise = $analises[$i] ?? ['tipo' => 'sem_correspondencia_relevante', 'motivo' => '', 'question_id' => null];
+                        $questions[$i]['originalidade'] = $analise + [
+                            'status' => isset($suspeitas[$i]) ? 'revisao' : 'aceita',
+                            'regenerada' => isset($reescritas[$i]),
+                        ];
+                    }
+                    break;
+                }
+                foreach ($suspeitas as $i => $analise) {
+                    $referencia = $analise['question_id']
+                        ? "A questão gerada apresenta alta similaridade com a questão {$analise['question_id']}. {$analise['motivo']} Gere outra questão sobre a mesma habilidade, utilizando uma estrutura pedagógica diferente."
+                        : $analise['motivo'];
+                    $reescrita = $this->rewriteIfTooClose($credential, $system, $questions[$i], $referencia);
+                    if (is_array($reescrita) && trim((string) ($reescrita['question_text'] ?? '')) !== '') {
+                        $questions[$i] = array_merge($questions[$i], [
+                            'question_text' => $reescrita['question_text'] ?? $questions[$i]['question_text'],
+                            'explanation' => $reescrita['explanation'] ?? $questions[$i]['explanation'],
+                            'options' => $reescrita['options'] ?? $questions[$i]['options'],
+                        ]);
+                        $regeneradas++;
+                        $reescritas[$i] = true;
+                    }
+                }
+            }
+            $usos = app(RegistroUsoEmbeddings::class);
+            if ($regeneradas > 0) {
+                $usos->registrar($tenantId, (int) $source->id, 'regenerada', null, 0, 0, null, ['quantidade' => $regeneradas]);
+            }
+            $paraRevisao = 0;
+            foreach ($questions as $question) {
+                if (($question['originalidade']['status'] ?? null) === 'revisao') {
+                    $paraRevisao++;
+                }
+            }
+            if ($paraRevisao > 0) {
+                $usos->registrar($tenantId, (int) $source->id, 'rejeitada', null, 0, 0, null, ['quantidade' => $paraRevisao]);
+            }
+        } catch (EmbeddingException $e) {
+            foreach ($questions as $i => $question) {
+                $questions[$i]['originalidade'] = [
+                    'status' => 'indisponivel',
+                    'tipo' => 'verificacao_indisponivel',
+                    'motivo' => $e->getMessage(),
+                    'question_id' => null,
+                ];
+            }
+        }
+
+        return $questions;
+    }
+
     private function rewriteIfTooClose(array $credential, string $system, array $item, string $sourceText): ?array
     {
         $prompt = implode("\n\n", [

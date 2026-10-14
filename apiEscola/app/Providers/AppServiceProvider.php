@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Contracts\Embeddings\ProvedorEmbeddings;
+use App\Contracts\Embeddings\RegistroUsoEmbeddings;
+use App\Contracts\Embeddings\RepositorioEmbeddings;
+use App\Services\Embeddings\ProvedorEmbeddingsOpenRouter;
+use App\Services\Embeddings\RegistroUsoEmbeddingsMysql;
+use App\Services\Embeddings\RepositorioEmbeddingsMysql;
 use App\Services\EmailMarketing\EmailMarketingService;
 use App\Services\EmailMarketing\ResendMarketingEmailService;
 use App\Models\Exam;
@@ -16,6 +22,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(RepositorioEmbeddings::class, RepositorioEmbeddingsMysql::class);
+        $this->app->singleton(ProvedorEmbeddings::class, ProvedorEmbeddingsOpenRouter::class);
+        $this->app->singleton(RegistroUsoEmbeddings::class, RegistroUsoEmbeddingsMysql::class);
         $this->app->singleton(ResendMarketingEmailService::class, fn () => new ResendMarketingEmailService());
 
         $this->app->singleton(EmailMarketingService::class, function () {
@@ -44,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
                 'weekday',
                 'period',
                 'slug',
+                'action',
             ];
 
             foreach ($model->getAttributes() as $attribute => $value) {
@@ -55,6 +65,8 @@ class AppServiceProvider extends ServiceProvider
                     in_array($attribute, $excluded, true)
                     || str_contains($attribute, 'token')
                     || str_contains($attribute, 'hash')
+                    || str_contains($attribute, 'embedding')
+                    || $attribute === 'model_name'
                 ) {
                     continue;
                 }

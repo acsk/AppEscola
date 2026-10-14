@@ -14,6 +14,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import SegmentedControl from "../../components/banco-questoes/SegmentedControl";
 import { deleteAiCredential, fetchAiSettings, saveAiCredential } from "../../services/aiSettings";
+import { fetchEmbeddingMetrics } from "../../services/questionSimilarity";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import {
   AI_PROVIDER_LABELS,
@@ -176,6 +177,8 @@ export default function AiSettingsScreen() {
           />
         </View>
 
+        <EmbeddingMetrics />
+
         {isSuperAdmin && (
           <View style={{ gap: 16, marginBottom: 24 }}>
             <Panel
@@ -322,6 +325,44 @@ export default function AiSettingsScreen() {
         message={toast.message}
         onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
+    </View>
+  );
+}
+
+function EmbeddingMetrics() {
+  const [metrics, setMetrics] = useState<Awaited<ReturnType<typeof fetchEmbeddingMetrics>> | null>(null);
+
+  useEffect(() => {
+    void fetchEmbeddingMetrics().then(setMetrics).catch(() => setMetrics(null));
+  }, []);
+
+  if (!metrics) return null;
+
+  const itens = [
+    ["Embeddings gerados", metrics.embeddings_gerados],
+    ["Reutilizados", metrics.embeddings_reutilizados],
+    ["Armazenados", metrics.armazenados],
+    ["Buscas", metrics.buscas],
+    ["Tempo médio da busca", `${metrics.tempo_medio_busca_ms} ms`],
+    ["Duplicatas detectadas", metrics.duplicatas_detectadas],
+    ["Regeneradas", metrics.regeneradas],
+    ["Encaminhadas por semelhança", metrics.rejeitadas_semelhanca],
+    ["Falhas", metrics.falhas],
+    ["Custo de embeddings", `US$ ${metrics.custo_embeddings_usd.toFixed(4)}`],
+  ];
+
+  return (
+    <View style={{ marginBottom: 24 }}>
+      <Panel title="Busca semântica" description="Consumo dos embeddings desta escola. O cron questions:index-embeddings continua a indexação.">
+        <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+          {itens.map(([label, value]) => (
+            <View key={String(label)} style={{ minWidth: 140 }}>
+              <Text className="text-xs text-ink-muted">{label}</Text>
+              <Text className="text-sm font-semibold text-ink">{value}</Text>
+            </View>
+          ))}
+        </View>
+      </Panel>
     </View>
   );
 }
