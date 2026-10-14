@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "../config";
-import aprova from "../../assets/logo-curso/aprova+.png";
+import aprova from "../../assets/logo-curso/aprova.png";
 import elite from "../../assets/logo-curso/elite.png";
 import metaCerta from "../../assets/logo-curso/meta-certa.png";
 
