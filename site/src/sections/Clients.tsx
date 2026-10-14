@@ -1,10 +1,23 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "../config";
+import aprova from "../../assets/logo-curso/aprova+.png";
+import elite from "../../assets/logo-curso/elite.png";
+import metaCerta from "../../assets/logo-curso/meta-certa.png";
 
 type Cliente = { name: string; logo_url: string };
 
-/** Substitua estes arquivos pelas logos fictícias, mantendo o nome. */
-const FICTICIAS = [1, 2, 3, 4, 5].map((n) => ({
+function endereco(asset: string | { uri: string }): string {
+  return typeof asset === "string" ? asset : asset.uri;
+}
+
+const MARCAS = [
+  { src: endereco(aprova), alt: "Aprova+" },
+  { src: endereco(elite), alt: "Elite Preparatórios" },
+  { src: endereco(metaCerta), alt: "Meta Certa" },
+];
+
+/** Dois espaços ainda reservados para as logos que faltam. */
+const VAGAS = [4, 5].map((n) => ({
   src: `/clientes/0${n}.svg`,
   alt: `Espaço para logo ${n}`,
 }));
@@ -36,7 +49,12 @@ export default function Clients() {
               <img src={client.logo_url} alt={client.name} onError={(event) => { event.currentTarget.parentElement?.remove(); }} />
             </li>
           ))}
-          {FICTICIAS.map((logo) => (
+          {MARCAS.map((logo) => (
+            <li key={logo.alt} className="marca">
+              <img src={logo.src} alt={logo.alt} />
+            </li>
+          ))}
+          {VAGAS.map((logo) => (
             <li key={logo.src} className="slot">
               <img src={logo.src} alt={logo.alt} />
             </li>

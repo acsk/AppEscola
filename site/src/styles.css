@@ -58,6 +58,8 @@ body{margin:0;background:#fff}
 .clients-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;list-style:none;margin:0;padding:0}
 .clients-row li{display:flex;align-items:center;justify-content:center;height:76px;min-width:148px;padding:12px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
 .clients-row img{max-height:44px;max-width:132px;width:auto;object-fit:contain}
+.clients-row li.marca{min-width:210px;height:96px;padding:12px 22px}
+.clients-row li.marca img{max-height:68px;max-width:220px}
 .clients-row li.slot{border-style:dashed;background:#F7F8FA}
 .rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
 .rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.16s}.rise.d3{animation-delay:.28s}
