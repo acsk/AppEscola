@@ -1,0 +1,24 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # API, painel e app continuam nos próprios caminhos.
+  RewriteRule ^(apiEscola|painelEscola|mobileEscola)(/|$) - [L]
+
+  # /site e /site/... também saem do build publicado.
+  RewriteRule ^site/?$ site/dist/index.html [END]
+  RewriteCond %{DOCUMENT_ROOT}/site/dist/$1 -f
+  RewriteRule ^site/(.+)$ site/dist/$1 [END]
+  RewriteRule ^site/ site/dist/index.html [END]
+
+  # JS, CSS, favicon e imagens pedidos na raiz do domínio.
+  RewriteCond %{DOCUMENT_ROOT}/site/dist%{REQUEST_URI} -f
+  RewriteRule ^(.*)$ site/dist/$1 [END]
+
+  # A home e as rotas do site principal.
+  RewriteRule ^$ site/dist/index.html [END]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ site/dist/index.html [END]
+</IfModule>
