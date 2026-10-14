@@ -18,6 +18,8 @@ type Props = {
   compact?: boolean;
   disabled?: boolean;
   "aria-label"?: string;
+  /** Ação à direita da barra de formatação (ex.: "Autocompletar com IA"). */
+  toolbarRight?: React.ReactNode;
 };
 
 const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
@@ -44,6 +46,7 @@ export default function RichTextInput({
   compact = false,
   disabled = false,
   "aria-label": ariaLabel,
+  toolbarRight,
 }: Props) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const lastEmitted = useRef<string | null>(null);
@@ -153,8 +156,9 @@ export default function RichTextInput({
         style={compact ? undefined : { borderWidth: 1, borderColor, overflow: "hidden" }}
       >
         {!compact && (
-          <View className="border-b border-border bg-surface-sunken px-1" style={{ minHeight: 34, justifyContent: "center" }}>
+          <View className="flex-row items-center border-b border-border bg-surface-sunken px-1" style={{ minHeight: 34, justifyContent: "space-between" }}>
             {toolbar}
+            {toolbarRight}
           </View>
         )}
         <div

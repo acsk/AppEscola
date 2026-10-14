@@ -135,7 +135,7 @@ class ValidadorQuestaoService
             ->latest('id')
             ->first();
 
-        return QuestionReview::query()->create([
+        return QuestionReview::withoutEvents(fn () => QuestionReview::query()->create([
             'tenant_id' => $tenantId,
             'question_id' => $questionId,
             'source_question_id' => $latest?->source_question_id,
@@ -152,7 +152,7 @@ class ValidadorQuestaoService
             'attempts' => $latest?->attempts ?? 0,
             'content' => ['approved_by' => $userId],
             'validated_at' => now(),
-        ]);
+        ]));
     }
 
     /**

@@ -77,8 +77,12 @@ export async function resetQuestionPractice(questionId: number) {
   return data as { type: string; message: string; body: { id: number; removed_answers: number; practice_reset_at: string | null } };
 }
 
-export async function markQuestionsRevalidated(ids: number[], revalidated: boolean) {
-  const { data } = await api.post("/question-bank/questions/revalidation", { ids, revalidated });
+export async function markQuestionsRevalidated(ids: number[], revalidated: boolean, release = false) {
+  const { data } = await api.post("/question-bank/questions/revalidation", {
+    ids,
+    revalidated,
+    ...(release ? { release: true } : {}),
+  });
   return data as { type: string; message: string; body: { ids: number[]; revalidated: boolean } };
 }
 

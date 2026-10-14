@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
-import { ExternalLink, ImagePlus, Sparkles, Trash2 } from "lucide-react-native";
+import { ActivityIndicator, Image, Platform, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ChevronDown, Copy, ExternalLink, ImagePlus, RotateCcw, ShieldCheck, Sparkles, Trash2, Wand2 } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
+import Badge from "../../components/ui/Badge";
+import ActionsMenu, { type ActionsMenuItem } from "../../components/ui/ActionsMenu";
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
 import RichTextInput from "../../components/ui/RichTextInput";
@@ -11,14 +13,15 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import MessageModal from "../../components/ui/MessageModal";
 import { describeAiError } from "../../utils/aiErrors";
-import SegmentedControl from "../../components/banco-questoes/SegmentedControl";
-import ClassificationFields from "../../components/banco-questoes/ClassificationFields";
+import ClassificationFields, { SituationFields } from "../../components/banco-questoes/ClassificationFields";
+import { RevalidatedMark } from "../../components/banco-questoes/QuestionMarks";
 import OptionsEditor from "../../components/banco-questoes/OptionsEditor";
 import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { useQuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
 import {
   createStandaloneQuestion,
+  deleteStandaloneQuestion,
   fetchQuestionBankQuestion,
   markQuestionsRevalidated,
   resetQuestionPractice,
@@ -29,7 +32,7 @@ import {
 } from "../../services/questionBank";
 import { aiApproveQuestionReview, aiAutofillQuestion, aiCorrectQuestion, aiReviewQuestion, fetchQuestionReviews } from "../../services/questionAi";
 import type { QuestionReview } from "../../types/questionAi";
-import QuestionReviewPanel from "../../components/banco-questoes/QuestionReviewPanel";
+import QuestionReviewCard from "../../components/banco-questoes/QuestionReviewCard";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
 import { prepareImageForUpload } from "../../utils/imageCompression";
@@ -71,6 +74,23 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const AI_MIN_CHARS = 15;
 /** A partir deste tamanho, a tela sugere o preenchimento automático. */
 const AI_HINT_CHARS = 40;
+/** Abaixo desta largura, a coluna lateral (revisão e classificação) desce para baixo do conteúdo. */
+const STACK_BELOW = 1100;
+
+/** "agora", "há 5 min", "há 3 h", "há 2 dias", "em 12/10/2026". */
+function updatedAgo(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const minutes = Math.round((Date.now() - d.getTime()) / 60000);
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days <= 30) return days === 1 ? "há 1 dia" : `há ${days} dias`;
+  return `em ${d.toLocaleDateString("pt-BR")}`;
+}
 
 /**
  * Criação e edição de questões do banco: único lugar para classificar e gerar semelhantes.
@@ -78,7 +98,8 @@ const AI_HINT_CHARS = 40;
  */
 export default function QuestionEditScreen({ navigate, questionId, listQuery = "" }: Props) {
   const isEdit = questionId !== null;
-  const { isMobile, contentPadding } = useResponsiveLayout();
+  const { isMobile, width, contentPadding } = useResponsiveLayout();
+  const stacked = width < STACK_BELOW;
   const catalogs = useQuestionBankCatalogs();
 
   const [initialContent, setInitialContent] = useState<ContentForm>(EMPTY_CONTENT_FORM);
@@ -99,6 +120,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     message: "",
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const releasing = useRef(false);
   const {
     available: aiAvailable, loading: aiStatusLoading, error: aiStatusError,
     reload: loadAiStatus, ensureAvailable,
@@ -120,6 +142,11 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [markingRevalidated, setMarkingRevalidated] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [imageDragOver, setImageDragOver] = useState(false);
+  const [releaseKind, setReleaseKind] = useState<"save" | "revalidate" | "approve" | null>(null);
   const isFromExam = examQuestion !== null;
 
   const load = useCallback(async () => {
@@ -137,6 +164,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setInitialClassification(classified);
       setClassification(classified);
       setRevalidatedAt(q.revalidated_at ?? null);
+      setUpdatedAt(q.updated_at ?? null);
       setSourceExamName(q.source_exam_name ?? "");
       setInitialSourceExamName(q.source_exam_name ?? "");
       const reviews = await fetchQuestionReviews(questionId).catch(() => []);
@@ -332,7 +360,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         const response = await aiApproveQuestionReview(questionId);
         setReview(response.body);
         setReviewHistory((prev) => [response.body, ...prev]);
-        void markQuestionsRevalidated([questionId], true).then(() => setRevalidatedAt(new Date().toISOString())).catch(() => undefined);
+        setRevalidatedAt(new Date().toISOString());
         return;
       }
       const payload = action === "correct"
@@ -383,14 +411,13 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     setClassification((prev) => (prev.year === null ? { ...prev, year: detectedYear } : prev));
   }, [detectedYear, loading]);
 
-  const toggleRevalidated = async () => {
+  const applyRevalidated = async (next: boolean) => {
     if (questionId === null || markingRevalidated) return;
-    const next = !revalidatedAt;
     setMarkingRevalidated(true);
     try {
-      const response = await markQuestionsRevalidated([questionId], next);
+      const response = await markQuestionsRevalidated([questionId], next, next);
       setRevalidatedAt(next ? new Date().toISOString() : null);
-      showApiToast(setToast, response, next ? "Questão marcada como revalidada." : "Marca de revalidação removida.");
+      showApiToast(setToast, response, next ? "Questão liberada para resposta." : "Marca de revalidação removida.");
     } catch (error) {
       showApiErrorToast(setToast, error, "Não foi possível marcar a revalidação.");
     } finally {
@@ -468,18 +495,16 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
     const patch = diffClassification(initialClassification, classification);
     if (!Object.keys(patch).length) {
-      if ((examQuestion?.issue_reports_count ?? 0) > 0) {
-        setSaving("save");
-        try {
-          const response = await resolveStudentReview(questionId);
-          showApiToast(setToast, response, "Revisão concluída.");
-        } catch (error) {
-          showApiErrorToast(setToast, error, "Não foi possível concluir a revisão.");
-          setSaving(null);
-          return;
-        }
+      setSaving("save");
+      try {
+        const response = await resolveStudentReview(questionId);
+        showApiToast(setToast, response, "Questão liberada para resposta.");
+      } catch (error) {
+        showApiErrorToast(setToast, error, "Não foi possível liberar a questão.");
         setSaving(null);
+        return;
       }
+      setSaving(null);
       navigate("questoes-classificar", { questionId, query: listQuery });
       return;
     }
@@ -541,7 +566,147 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     }
   };
 
-  const title = isEdit ? `Editar questão #${questionId}` : "Nova questão";
+  const askSave = () => {
+    if (aiFilling || uploading || saving !== null) return;
+    const clientErrors = isFromExam
+      ? validateClassification(classification, catalogs.taxonomy)
+      : { ...validateContent(content), ...validateClassification(classification, catalogs.taxonomy) };
+    if (Object.keys(clientErrors).length) {
+      showClientErrors(clientErrors);
+      return;
+    }
+    if (!isEdit) {
+      void save("save");
+      return;
+    }
+    setReleaseKind("save");
+  };
+
+  const confirmRelease = async () => {
+    if (releasing.current || releaseKind === null) return;
+    releasing.current = true;
+    const kind = releaseKind;
+    try {
+      if (kind === "save") await save("save");
+      else if (kind === "revalidate") await applyRevalidated(true);
+      else if (kind === "approve") await runReview("approve");
+    } finally {
+      releasing.current = false;
+      setReleaseKind(null);
+    }
+  };
+
+  const releaseBusy = saving !== null || markingRevalidated || reviewing;
+
+  /** Volta ao que está gravado (sem sair da tela). */
+  const discard = () => {
+    setContent(initialContent);
+    setClassification(initialClassification);
+    setSourceExamName(initialSourceExamName);
+    setErrors({});
+  };
+
+  const confirmDeleteQuestion = async () => {
+    if (questionId === null || deleting) return;
+    setDeleting(true);
+    try {
+      const response = await deleteStandaloneQuestion(questionId);
+      showApiToast(setToast, response, "Questão removida com sucesso.");
+      setConfirmDelete(false);
+      setInitialContent(content);
+      setInitialClassification(classification);
+      setInitialSourceExamName(sourceExamName);
+      goToList();
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível excluir a questão.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const busyAny = loading || !!loadError || aiFilling || saving !== null || uploading;
+  const subjectName = catalogs.subjects.find((x) => x.id === classification.subject_id)?.name;
+  const topicNames = catalogs.taxonomy.flatMap((x) => x.topics).filter((t) => classification.topic_ids.includes(t.id)).map((t) => t.name);
+  const description = !isEdit
+    ? "Questão avulsa, sem vínculo com simulado."
+    : [
+        [subjectName, topicNames[0] && `${topicNames[0]}${topicNames.length > 1 ? ` +${topicNames.length - 1}` : ""}`].filter(Boolean).join(" › "),
+        updatedAgo(updatedAt) && `atualizada ${updatedAgo(updatedAt)}`,
+      ].filter(Boolean).join(" · ") || undefined;
+
+  const aiItems: ActionsMenuItem[] = [
+    ...(!isFromExam
+      ? [{ key: "autofill", label: "Autocompletar questão", icon: Sparkles, description: "Sugere alternativas, gabarito, explicação e classificação", onPress: () => void autofill(), disabled: busyAny }]
+      : []),
+    ...(!isFromExam && content.type === "essay"
+      ? [{ key: "convert", label: "Transformar em objetiva", icon: Wand2, description: "Reescreve o comando e cria 5 alternativas", onPress: () => setConfirmConvert(true), disabled: busyAny }]
+      : []),
+    ...(!isFromExam
+      ? [{ key: "correct", label: "Corrigir com IA", icon: Wand2, description: review ? "Corrige o que a revisão pedagógica apontou" : "Valide a questão antes de corrigir", onPress: () => void runReview("correct"), disabled: busyAny || reviewing || !review || review.aprovada }]
+      : []),
+    ...(isEdit
+      ? [{ key: "similar", label: "Gerar questões similares", icon: Copy, description: "Cria variações no mesmo assunto", onPress: () => void openSimilar(), disabled: busyAny }]
+      : []),
+  ];
+
+  const moreItems: ActionsMenuItem[] = isEdit
+    ? [
+        {
+          key: "revalidate",
+          label: revalidatedAt ? "Remover marca de revalidada" : "Marcar como revalidada",
+          icon: ShieldCheck,
+          description: revalidatedAt ? "A questão deixa de aparecer como revalidada" : "Libera a questão para os alunos responderem",
+          onPress: () => (revalidatedAt ? void applyRevalidated(false) : setReleaseKind("revalidate")),
+          disabled: markingRevalidated || reviewing || resetting,
+        },
+        {
+          key: "reset",
+          label: "Resetar como nova",
+          icon: RotateCcw,
+          description: "Os alunos respondem de novo, como questão nova",
+          onPress: () => setConfirmReset(true),
+          disabled: markingRevalidated || reviewing || resetting,
+        },
+        ...(!isFromExam
+          ? [{ key: "delete", label: "Excluir questão…", icon: Trash2, danger: true, separatorBefore: true, onPress: () => setConfirmDelete(true), disabled: deleting || saving !== null }]
+          : []),
+      ]
+    : [];
+
+  /** Objetiva | Dissertativa no cabeçalho do cartão "Conteúdo". */
+  const typeToggle = (
+    <View role="radiogroup" aria-label="Tipo" className="flex-row rounded-ds-md border border-border-strong overflow-hidden">
+      {([["multiple_choice", "Objetiva"], ["essay", "Dissertativa"]] as [QuestionType, string][]).map(([value, label], i) => {
+        const on = content.type === value;
+        return (
+          <TouchableOpacity
+            key={value}
+            role="radio"
+            aria-checked={on}
+            disabled={aiFilling}
+            onPress={() => setField("type", value)}
+            className={`justify-center ${on ? "bg-brand" : "bg-surface"}`}
+            style={{ height: 32, paddingHorizontal: 14, borderLeftWidth: i ? 1 : 0, borderLeftColor: color["border-strong"] }}
+          >
+            <Text className="font-medium" style={{ fontSize: 13, color: on ? color["on-brand"] : color["ink-muted"] }}>{label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const autofillLink = aiAvailable && !isFromExam ? (
+    <TouchableOpacity
+      onPress={() => void autofill()}
+      disabled={busyAny}
+      className="flex-row items-center rounded-ds-sm"
+      style={{ gap: 6, height: 26, paddingHorizontal: 8, opacity: busyAny ? 0.5 : 1 }}
+      aria-label="Autocompletar com IA"
+    >
+      {aiFilling ? <ActivityIndicator size="small" color={color.brand} /> : <Sparkles size={14} color={color.brand} strokeWidth={1.5} />}
+      <Text className="font-medium text-brand" style={{ fontSize: 12 }}>{aiFilling ? "Preenchendo…" : "Autocompletar com IA"}</Text>
+    </TouchableOpacity>
+  ) : null;
 
   const examContentPanel = examQuestion && (
     <Panel
@@ -574,11 +739,15 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         {(examQuestion.options ?? []).map((option, i) => (
           <View
             key={option.id}
-            className={`flex-row rounded-ds-md border px-3 py-2 ${option.is_correct ? "bg-success-tint border-success" : "bg-surface border-border"}`}
-            style={{ gap: 8 }}
+            className={`flex-row items-center rounded-ds-md border ${option.is_correct ? "bg-success-tint border-success" : "bg-surface border-border-strong"}`}
+            style={[
+              { gap: 10, minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 },
+              option.is_correct && Platform.OS === "web" ? ({ boxShadow: `inset 3px 0 0 ${color.success}` } as object) : null,
+            ]}
           >
-            <Text className={`text-sm font-semibold ${option.is_correct ? "text-success" : "text-ink-muted"}`}>{"ABCDEFGHIJ"[i]})</Text>
+            <Text className={`font-mono font-semibold ${option.is_correct ? "text-success" : "text-ink-muted"}`} style={{ fontSize: 14 }}>{"ABCDEFGHIJ"[i]}</Text>
             <RichText className="text-sm text-ink flex-1" value={option.option_text} />
+            {option.is_correct ? <Text className="font-medium text-success" style={{ fontSize: 12 }}>Correta</Text> : null}
           </View>
         ))}
         {!!examQuestion.explanation?.trim() && (
@@ -591,21 +760,65 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     </Panel>
   );
 
-  const contentPanel = (
-    <Panel
-      title="Conteúdo"
-      description="Enunciado, alternativas e gabarito da questão avulsa."
-    >
-      <SegmentedControl<QuestionType>
-        label="Tipo"
-        allowClear={false}
-        options={[
-          { value: "multiple_choice", label: "Objetiva" },
-          { value: "essay", label: "Dissertativa" },
-        ]}
-        value={content.type}
-        onChange={(v) => v && setField("type", v)}
+  const imageField = (
+    <View className="mb-4">
+      {content.image_url ? (
+        <View className="border border-border rounded-ds-md" style={{ gap: 8, padding: 8 }}>
+          <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18 }}>Imagem do enunciado</Text>
+          <Image
+            source={{ uri: content.image_url }}
+            accessibilityLabel="Imagem do enunciado"
+            style={{ width: "100%", height: isMobile ? 180 : 260 }}
+            resizeMode="contain"
+          />
+          <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+            <Button size="sm" icon={ImagePlus} label="Trocar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
+            <Button variant="ai" size="sm" icon={Sparkles} label="Gerar nova imagem com IA" onPress={() => void openRedraw()} disabled={aiFilling || saving !== null || uploading} />
+            <Button size="sm" variant="danger" icon={Trash2} label="Remover imagem" onPress={() => setField("image_url", "")} disabled={aiFilling || saving !== null} />
+          </View>
+        </View>
+      ) : (
+        // Arrastar, colar (com a área em foco) ou enviar.
+        <div
+          tabIndex={0}
+          aria-label="Imagem do enunciado: arraste, cole ou envie"
+          onDragOver={(e) => { e.preventDefault(); setImageDragOver(true); }}
+          onDragLeave={() => setImageDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setImageDragOver(false); void onPickImage(e.dataTransfer.files?.[0]); }}
+          onPaste={(e) => {
+            const pasted = Array.from(e.clipboardData.files ?? []).find((x) => x.type.startsWith("image/"));
+            if (pasted) { e.preventDefault(); void onPickImage(pasted); }
+          }}
+          style={{
+            display: "flex", flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12, padding: "12px 16px",
+            border: `1px dashed ${imageDragOver ? color.brand : color["border-strong"]}`, borderRadius: 4, background: color["surface-sunken"],
+          }}
+        >
+          <ImagePlus size={20} color={color["ink-subtle"]} strokeWidth={1.5} />
+          <Text className="text-ink-muted" style={{ fontSize: 13, lineHeight: 18, flex: 1, minWidth: 200 }}>
+            <Text className="font-medium text-ink">Imagem do enunciado</Text> · arraste, cole ou envie (JPG, PNG, WEBP, GIF até 5 MB)
+          </Text>
+          <Button size="sm" label="Enviar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
+        </div>
+      )}
+      {errors.image_url ? <Text className="text-xs font-medium text-danger" style={{ marginTop: 6 }}>{errors.image_url}</Text> : null}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+        style={{ display: "none" }}
+        aria-hidden
+        onChange={(e) => void onPickImage(e.target.files?.[0])}
       />
+    </View>
+  );
+
+  const aiStatusNote = aiStatusLoading
+    ? "Verificando configuração de IA…"
+    : aiStatusError ?? (!aiAvailable ? "Para usar a IA, cadastre uma chave em Configurações → Integração com IA." : null);
+
+  const contentPanel = (
+    <Panel title="Conteúdo" actions={typeToggle}>
       {content.type === "essay" && (
         <View className="flex-row flex-wrap items-center border border-border rounded-ds-md bg-surface-sunken" style={{ gap: 10, padding: 12, marginBottom: 16 }}>
           <Text className="text-sm text-ink-muted" style={{ flex: 1, minWidth: 220 }}>
@@ -622,23 +835,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         value={content.question_text}
         onChange={(v) => setField("question_text", v)}
         error={errors.question_text}
-        minHeight={140}
+        minHeight={96}
         disabled={aiFilling}
         placeholder="Texto do enunciado (ou envie a imagem abaixo). Pode colar a questão inteira, com as alternativas."
+        toolbarRight={autofillLink}
       />
 
-        <View style={{ gap: 8, marginBottom: 16 }}>
-          <Text className={`text-xs ${aiStatusError ? "text-danger" : "text-ink-muted"}`} aria-live="polite">
-            {aiStatusLoading
-              ? "Verificando configuração de IA…"
-              : aiStatusError
-                ? aiStatusError
-                : !aiAvailable
-                  ? "Para autocompletar, cadastre uma chave em Configurações → Integração com IA."
-                  : "Escreva ao menos 15 caracteres no enunciado e use “Autocompletar com IA” para sugerir alternativas, gabarito, explicação e classificação. Revise antes de salvar."}
-          </Text>
-          {aiStatusError ? <Button size="sm" label="Verificar IA novamente" onPress={() => void loadAiStatus()} /> : null}
+      {aiStatusNote ? (
+        <View className="flex-row flex-wrap items-center" style={{ gap: 8, marginTop: -8, marginBottom: 16 }}>
+          <Text className={`text-xs ${aiStatusError ? "text-danger" : "text-ink-muted"}`} aria-live="polite">{aiStatusNote}</Text>
+          {aiStatusError ? <Button size="sm" variant="ghost" label="Verificar IA novamente" onPress={() => void loadAiStatus()} /> : null}
         </View>
+      ) : null}
 
       {showAiHint && (
         <View
@@ -647,57 +855,17 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           aria-live="polite"
         >
           <Text className="text-sm text-ink" style={{ flex: 1, minWidth: 220 }}>
-            Enunciado pronto. Use “Autocompletar com IA” no topo para preencher alternativas, gabarito, explicação e classificação.
+            Enunciado pronto. Use “Autocompletar com IA” para preencher alternativas, gabarito, explicação e classificação.
           </Text>
           <View className="flex-row" style={{ gap: 8 }}>
             <Button size="sm" variant="ghost" label="Agora não" onPress={() => setAiHintDismissed(true)} />
+            <Button size="sm" variant="ai" icon={Sparkles} label="Autocompletar" onPress={() => void autofill()} disabled={busyAny} />
           </View>
         </View>
       )}
 
-      {/* Imagem do enunciado */}
-      <View className="mb-4">
-        <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
-          Imagem do enunciado
-        </Text>
-        {content.image_url ? (
-          <View className="border border-border rounded-ds-md p-2" style={{ gap: 8 }}>
-            <Image
-              source={{ uri: content.image_url }}
-              accessibilityLabel="Imagem do enunciado"
-              style={{ width: "100%", height: isMobile ? 180 : 260 }}
-              resizeMode="contain"
-            />
-            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-              <Button size="sm" icon={ImagePlus} label="Trocar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
-              <Button variant="ai"
-                size="sm"
-                icon={Sparkles}
-                label="Gerar nova imagem com IA"
-                onPress={() => void openRedraw()}
-                disabled={aiFilling || saving !== null || uploading}
-              />
-              <Button size="sm" variant="danger" icon={Trash2} label="Remover imagem" onPress={() => setField("image_url", "")} disabled={aiFilling || saving !== null} />
-            </View>
-          </View>
-        ) : (
-          <Button icon={ImagePlus} label="Enviar imagem" onPress={() => fileInputRef.current?.click()} loading={uploading} disabled={aiFilling || saving !== null} />
-        )}
-        <Text className="text-xs text-ink-subtle" style={{ marginTop: 6 }}>
-          JPG, PNG, WEBP ou GIF, até 5MB.
-        </Text>
-        {errors.image_url ? <Text className="text-xs font-medium text-danger" style={{ marginTop: 6 }}>{errors.image_url}</Text> : null}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-          style={{ display: "none" }}
-          aria-hidden
-          onChange={(e) => void onPickImage(e.target.files?.[0])}
-        />
-      </View>
+      {imageField}
 
-      {/* Alternativas */}
       {content.type === "multiple_choice" && (
         <OptionsEditor options={content.options} onChange={(options) => setField("options", options)} error={errors.options} disabled={aiFilling} />
       )}
@@ -707,84 +875,85 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         value={content.explanation}
         onChange={(v) => setField("explanation", v)}
         error={errors.explanation}
-        minHeight={96}
+        minHeight={72}
         disabled={aiFilling}
         placeholder="Comentário da resposta (opcional)"
       />
     </Panel>
   );
 
+  const sideColumn = (
+    <View style={{ gap: 20 }}>
+      {isEdit ? (
+        <QuestionReviewCard
+          review={review}
+          history={reviewHistory}
+          revalidatedAt={revalidatedAt}
+          busy={reviewing}
+          onValidate={() => void runReview("validate")}
+          onApprove={questionId !== null ? () => setReleaseKind("approve") : undefined}
+        />
+      ) : null}
+      <Panel title="Classificação">
+        <ClassificationFields form={classification} onChange={changeClassification} catalogs={catalogs} errors={errors} layout="side" />
+      </Panel>
+      <Panel title="Situação na banca">
+        <SituationFields form={classification} onChange={changeClassification} />
+      </Panel>
+    </View>
+  );
+
   return (
     <View className="flex-1">
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 48 }}>
-        <View className="mb-6">
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 32 }}>
+        <View style={{ marginBottom: 20, zIndex: 10 }}>
           <PageHeader
             breadcrumb={[{ label: "Banco de questões", onPress: () => leave(goToList) }, { label: isEdit ? `Questão #${questionId}` : "Nova questão" }]}
-            title={title}
-            description={
-              !isEdit
-                ? "Questão avulsa, sem vínculo com simulado."
-                : isFromExam
-                  ? "Classificação da questão de simulado."
-                  : "Conteúdo e classificação da questão avulsa."
+            title={isEdit ? `Questão #${questionId}` : "Nova questão"}
+            titleAddon={
+              loading || loadError ? null : (
+                <View className="flex-row items-center" style={{ gap: 8 }}>
+                  {revalidatedAt ? <RevalidatedMark iconOnly size={26} /> : null}
+                  <Badge label={isFromExam ? "De simulado" : "Avulsa"} />
+                </View>
+              )
             }
+            description={loading ? undefined : description}
             actions={
-              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-                {!isFromExam && (
-                <Button variant="ai"
-                  icon={Sparkles}
-                  label="Autocompletar com IA"
-                  onPress={() => void autofill()}
-                  loading={aiFilling}
-                  disabled={loading || !!loadError || saving !== null || uploading}
-                />
-                )}
-                {isEdit && (
-                  <Button variant="ai"
-                    icon={Sparkles}
-                    label="Gerar similares com IA"
-                    onPress={() => void openSimilar()}
-                    disabled={loading || !!loadError || aiFilling || saving !== null || uploading}
-                  />
-                )}
-              </View>
+              loading || loadError ? undefined : (
+                <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                  {aiItems.length ? (
+                    <ActionsMenu
+                      items={aiItems}
+                      minWidth={300}
+                      renderTrigger={({ toggle }) => (
+                        <TouchableOpacity
+                          onPress={toggle}
+                          aria-haspopup="menu"
+                          className="flex-row items-center bg-surface border border-border-strong rounded-ds-md"
+                          style={{ gap: 8, height: 36, paddingHorizontal: 14 }}
+                        >
+                          {aiFilling || reviewing ? <ActivityIndicator size="small" color={color.ink} /> : <Sparkles size={16} color={color.ink} strokeWidth={1.5} />}
+                          <Text className="font-medium text-ink" style={{ fontSize: 14 }}>Ferramentas de IA</Text>
+                          <ChevronDown size={16} color={color["ink-muted"]} strokeWidth={1.5} />
+                        </TouchableOpacity>
+                      )}
+                    />
+                  ) : null}
+                  {moreItems.length ? <ActionsMenu items={moreItems} minWidth={280} /> : null}
+                </View>
+              )
             }
           />
         </View>
 
         {!loading && !loadError && (examQuestion?.issue_reports_count ?? 0) > 0 ? (
-          <Text className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            {examQuestion?.issue_reports_count === 1
-              ? "1 aluno informou que esta questão tem erro. Ela está sem validação até você revisar. Ao salvar, a validação volta, o aviso sai e a contagem de erros zera."
-              : `${examQuestion?.issue_reports_count} alunos informaram que esta questão tem erro. Ela está sem validação até você revisar. Ao salvar, a validação volta, o aviso sai e a contagem de erros zera.`}
-          </Text>
-        ) : null}
-
-        {!loading && !loadError ? (
-          <QuestionReviewPanel
-            review={review}
-            history={reviewHistory}
-            busy={reviewing}
-            canCorrect={!isFromExam}
-            onValidate={() => void runReview("validate")}
-            onCorrect={() => void runReview("correct")}
-            onApprove={questionId !== null ? () => void runReview("approve") : undefined}
-          />
-        ) : null}
-
-        {!loading && !loadError && questionId !== null ? (
-          <View className="flex-row flex-wrap" style={{ marginBottom: 12, gap: 8 }}>
-            <Button
-              label={revalidatedAt ? "Revalidada" : "Marcar revalidada"}
-              onPress={() => void toggleRevalidated()}
-              loading={markingRevalidated}
-              disabled={markingRevalidated || reviewing || resetting}
-            />
-            <Button
-              label="Resetar como nova"
-              onPress={() => setConfirmReset(true)}
-              disabled={markingRevalidated || reviewing || resetting}
-            />
+          <View className="border border-warning bg-warning-tint rounded-ds-md" style={{ paddingVertical: 10, paddingHorizontal: 16, marginBottom: 20 }}>
+            <Text className="text-ink" style={{ fontSize: 13, lineHeight: 20 }}>
+              {examQuestion?.issue_reports_count === 1
+                ? "1 aluno informou que esta questão tem erro. Ela está sem validação até você salvar, revalidar ou validar manualmente. A questão volta a aceitar respostas e as respostas erradas são zeradas."
+                : `${examQuestion?.issue_reports_count} alunos informaram que esta questão tem erro. Ela está sem validação até você salvar, revalidar ou validar manualmente. A questão volta a aceitar respostas e as respostas erradas são zeradas.`}
+            </Text>
           </View>
         ) : null}
 
@@ -798,31 +967,35 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
             <Button label="Voltar à lista" onPress={goToList} />
           </View>
         ) : (
-          <>
-            <View style={{ flexDirection: isMobile ? "column" : "row", gap: 24, alignItems: "flex-start" }}>
-              <View style={{ flex: 3, width: isMobile ? "100%" : undefined }}>{isFromExam ? examContentPanel : contentPanel}</View>
-              <View style={{ flex: 2, width: isMobile ? "100%" : undefined, minWidth: isMobile ? undefined : 320 }}>
-                <Panel title="Classificação" description="Disciplina, assuntos, dificuldade, banca e tags.">
-                  <ClassificationFields
-                    form={classification}
-                    onChange={changeClassification}
-                    catalogs={catalogs}
-                    errors={errors}
-                  />
-                </Panel>
-              </View>
-            </View>
-
-            <View className="flex-row flex-wrap justify-end" style={{ gap: 8, marginTop: 24 }}>
-              <Button label="Cancelar" onPress={() => leave(goToList)} disabled={saving !== null || aiFilling} />
-              {!isEdit && (
-                <Button label="Salvar e criar outra" onPress={() => void save("another")} loading={saving === "another"} disabled={saving !== null || aiFilling || uploading} />
-              )}
-              <Button variant="primary" label={isEdit ? "Salvar alterações" : "Salvar questão"} onPress={() => void save("save")} loading={saving === "save"} disabled={saving !== null} />
-            </View>
-          </>
+          <View style={{ flexDirection: stacked ? "column" : "row", gap: 20, alignItems: stacked ? "stretch" : "flex-start" }}>
+            <View style={{ flex: stacked ? undefined : 1, minWidth: 0 }}>{isFromExam ? examContentPanel : contentPanel}</View>
+            <View style={{ width: stacked ? "100%" : 380 }}>{sideColumn}</View>
+          </View>
         )}
       </ScrollView>
+
+      {!loading && !loadError ? (
+        <View
+          className="flex-row flex-wrap items-center bg-surface border-t border-border"
+          style={{ gap: 12, paddingVertical: 12, paddingHorizontal: contentPadding }}
+        >
+          <View className="flex-row items-center" style={{ gap: 8, flex: 1, minWidth: 160 }} aria-live="polite">
+            <View style={{ width: 8, height: 8, backgroundColor: dirty ? color.warning : color.success }} />
+            <Text className="text-ink-muted" style={{ fontSize: 13 }}>{dirty ? "Alterações não salvas" : isEdit ? "Tudo salvo" : "Nova questão"}</Text>
+          </View>
+          <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+            {isEdit ? (
+              dirty ? <Button label="Descartar" onPress={discard} disabled={saving !== null || aiFilling} /> : null
+            ) : (
+              <>
+                <Button label="Cancelar" onPress={() => leave(goToList)} disabled={saving !== null || aiFilling} />
+                <Button label="Salvar e criar outra" onPress={() => void save("another")} loading={saving === "another"} disabled={saving !== null || aiFilling || uploading} />
+              </>
+            )}
+            <Button variant="primary" label={isEdit ? "Salvar alterações" : "Salvar questão"} onPress={askSave} loading={saving === "save"} disabled={saving !== null} />
+          </View>
+        </View>
+      ) : null}
 
       <SimilarQuestionsModal
         visible={similarSource !== null}
@@ -862,6 +1035,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       />
 
       <ConfirmModal
+        visible={releaseKind !== null}
+        title="Liberar a questão para resposta?"
+        message="A questão fica liberada para os alunos responderem e as respostas erradas são zeradas. As notas do simulado oficial permanecem."
+        confirmLabel="Liberar"
+        cancelLabel="Cancelar"
+        tone="primary"
+        loading={releaseBusy}
+        onConfirm={() => void confirmRelease()}
+        onCancel={() => { if (!releaseBusy) setReleaseKind(null); }}
+      />
+
+      <ConfirmModal
         visible={confirmReset}
         title="Resetar como nova?"
         message="As respostas de prática desta questão saem da soma e do ranking. Ela volta como nova por 14 dias e os alunos respondem de novo. As notas do simulado oficial não mudam."
@@ -881,6 +1066,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         cancelLabel="Cancelar"
         onConfirm={() => void convertToObjective()}
         onCancel={() => setConfirmConvert(false)}
+      />
+
+      <ConfirmModal
+        visible={confirmDelete}
+        title="Excluir questão?"
+        message={`Excluir a questão #${questionId ?? ""}? Ela deixa de aparecer no banco de questões.`}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        tone="danger"
+        loading={deleting}
+        onConfirm={() => void confirmDeleteQuestion()}
+        onCancel={() => { if (!deleting) setConfirmDelete(false); }}
       />
 
       <MessageModal

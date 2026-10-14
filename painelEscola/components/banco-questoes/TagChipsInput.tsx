@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { X } from "lucide-react-native";
+import { color } from "../../constants/theme";
 import { foldText } from "../../utils/questionBankQuery";
 import { addTag } from "../../utils/questionClassification";
 
@@ -30,19 +31,19 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
 
   return (
     <View className="mb-3">
-      <Text className="text-xs font-medium text-ink-muted mb-1" nativeID={`tags-${label}`}>
+      <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }} nativeID={`tags-${label}`}>
         {label}
       </Text>
-      <View className="rounded-ds-md border border-border bg-surface px-2 py-1.5 flex-row flex-wrap items-center gap-1.5">
+      <View className="rounded-ds-md border border-border-strong bg-surface flex-row flex-wrap items-center" style={{ gap: 6, minHeight: 40, paddingVertical: 4, paddingHorizontal: 8 }}>
         {value.map((tag) => (
-          <View key={tag} className="flex-row items-center rounded-full bg-brand-tint border border-border pl-2 pr-1 py-0.5">
-            <Text className="text-xs text-brand">{tag}</Text>
+          <View key={tag} className="flex-row items-center rounded-ds-sm bg-surface-sunken border border-border" style={{ gap: 4, height: 26, paddingLeft: 8, paddingRight: 4 }}>
+            <Text className="text-ink-muted font-medium" style={{ fontSize: 13 }}>{tag}</Text>
             <TouchableOpacity
               onPress={() => onChange(value.filter((t) => t !== tag))}
               aria-label={`Remover tag ${tag}`}
-              className="ml-1"
+              style={{ width: 18, height: 18, alignItems: "center", justifyContent: "center" }}
             >
-              <Ionicons name="close" size={12} color="var(--ds-brand-hover)" />
+              <X size={12} color={color["ink-muted"]} strokeWidth={2} />
             </TouchableOpacity>
           </View>
         ))}
@@ -51,11 +52,11 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
           onChangeText={(v) => (v.endsWith(",") ? commit(v.slice(0, -1)) : setText(v))}
           onSubmitEditing={() => commit(text)}
           blurOnSubmit={false}
-          placeholder={value.length ? "" : "Digite e tecle Enter"}
+          placeholder={value.length ? "Nova tag…" : "Digite e tecle Enter"}
           placeholderTextColor="var(--ds-ink-subtle)"
           aria-labelledby={`tags-${label}`}
-          className="text-xs text-ink"
-          style={{ minWidth: 120, flexGrow: 1, height: 28 }}
+          className="text-ink"
+          style={[{ minWidth: 100, flexGrow: 1, height: 30, fontSize: 14 }, { outlineStyle: "none", boxShadow: "none" } as object]}
           maxLength={50}
         />
       </View>
@@ -65,9 +66,10 @@ export default function TagChipsInput({ label = "Tags", value, onChange, suggest
             <TouchableOpacity
               key={name}
               onPress={() => commit(name)}
-              className="rounded-full border border-border px-2 py-0.5"
+              className="rounded-ds-sm"
+              style={{ height: 24, paddingHorizontal: 8, justifyContent: "center", borderWidth: 1, borderStyle: "dashed", borderColor: color["border-strong"] }}
             >
-              <Text className="text-xs text-ink-muted">+ {name}</Text>
+              <Text className="text-ink-muted" style={{ fontSize: 12 }}>+ {name}</Text>
             </TouchableOpacity>
           ))}
         </View>

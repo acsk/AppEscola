@@ -94,7 +94,7 @@ class QuestionBankController extends Controller
     {
         $model = $this->findQuestion($request, $question);
         $model = $this->classification->apply($model, $request->validated(), (int) $model->tenant_id);
-        $reviews->resolve($model);
+        $reviews->releaseForAnswers($model);
         $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model), 'Classificação salva com sucesso.');
@@ -104,31 +104,42 @@ class QuestionBankController extends Controller
     public function resolveStudentReview(Request $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $model = $this->findQuestion($request, $question);
-        $reviews->resolve($model);
+        $reviews->releaseForAnswers($model);
         $model->loadCount('issueReports');
 
-        return $this->success(new QuestionBankQuestionResource($model), 'Revisão concluída. A validação voltou e a contagem de erros foi zerada.');
+        return $this->success(new QuestionBankQuestionResource($model), 'Questão liberada para resposta. As respostas erradas foram zeradas.');
     }
 
     /** POST question-bank/questions/revalidation — marca questões já revalidadas para não repetir. */
-    public function markRevalidated(Request $request): JsonResponse
+    public function markRevalidated(Request $request, QuestionIssueReviewService $reviews): JsonResponse
     {
         $tenantId = $this->authorizeStaff($request);
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1', 'max:500'],
             'ids.*' => ['integer'],
             'revalidated' => ['required', 'boolean'],
+            'release' => ['sometimes', 'boolean'],
         ]);
 
         $ids = ExamQuestion::query()->inQuestionBank($tenantId)->whereIn('id', $data['ids'])->pluck('id');
-        ExamQuestion::query()->whereIn('id', $ids)->update([
-            'revalidated_at' => $data['revalidated'] ? now() : null,
-        ]);
+        if ($data['revalidated'] && $request->boolean('release')) {
+            ExamQuestion::query()->whereIn('id', $ids)->get()->each(
+                fn (ExamQuestion $question) => $reviews->releaseForAnswers($question)
+            );
+        } else {
+            ExamQuestion::query()->whereIn('id', $ids)->update([
+                'revalidated_at' => $data['revalidated'] ? now() : null,
+            ]);
+        }
 
         return $this->success([
             'ids' => $ids->map(fn ($id) => (int) $id)->all(),
             'revalidated' => (bool) $data['revalidated'],
-        ], $data['revalidated'] ? 'Questões marcadas como revalidadas.' : 'Marca de revalidação removida.');
+        ], $data['revalidated']
+            ? ($request->boolean('release')
+                ? 'Questão liberada para resposta. As respostas erradas foram zeradas.'
+                : 'Questões marcadas como revalidadas.')
+            : 'Marca de revalidação removida.');
     }
 
     /** POST question-bank/questions/{question}/practice-reset — descarta a prática e a questão volta como nova. */
@@ -194,7 +205,7 @@ class QuestionBankController extends Controller
     public function update(SaveStandaloneQuestionRequest $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $model = $this->content->updateStandalone($this->findQuestion($request, $question), $request->validated());
-        $reviews->resolve($model);
+        $reviews->releaseForAnswers($model);
         $model->load('options');
         $model->loadCount('issueReports');
 

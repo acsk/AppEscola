@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
-import { Switch, Text, View } from "react-native";
-import { Sparkles, Trash2 } from "lucide-react-native";
+import { Switch, Text, TouchableOpacity, View } from "react-native";
+import { Check, ChevronRight, FileText, Sparkles, Upload } from "lucide-react-native";
+import { color } from "../../constants/theme";
+import TokenSelect from "./TokenSelect";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import FormInput from "../ui/FormInput";
 import ProgressDialog from "../ui/ProgressDialog";
 import MessageModal from "../ui/MessageModal";
 import ConfirmModal from "../ui/ConfirmModal";
-import TopicMultiSelect from "./TopicMultiSelect";
 import SearchableSelect from "../ui/SearchableSelect";
 import ExamTypeLogo from "../ui/ExamTypeLogo";
 import type { QuestionBankCatalogs } from "../../hooks/useQuestionBankCatalogs";
@@ -96,6 +97,21 @@ function withPdfAnswers(items: Draft[], pages: string[], subjectName: (id: numbe
   });
   return { drafts, marked };
 }
+const formatBytes = (bytes: number) =>
+  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+/** "hoje às 18:42", "ontem às 18:42", "12/10 às 18:42". */
+function savedAtLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(new Date()) - day(d)) / 86400000);
+  if (diff === 0) return `hoje às ${time}`;
+  if (diff === 1) return `ontem às ${time}`;
+  return `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às ${time}`;
+}
+
 /** Nome da prova a partir do arquivo: "ifal_2024-1a-fase.pdf" → "IFAL 2024 1A FASE". */
 export function examNameFromFile(fileName: string): string {
   return fileName
@@ -167,6 +183,9 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
   const [confirmClose, setConfirmClose] = useState(false);
   const [deleteDraft, setDeleteDraft] = useState<ImportDraftSummary | null>(null);
   const [deletingDraft, setDeletingDraft] = useState(false);
+  const [showOtherDrafts, setShowOtherDrafts] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const { ensureAvailable } = useQuestionAiStatus();
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
@@ -739,30 +758,196 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
     }
   };
 
-  // Etapa inicial: a prova vira simulado (padrão) e a modalidade é escolhida antes da separação.
-  const examBlock = (
-    <View className="border border-border rounded-ds-md p-3 bg-surface-sunken" style={{ gap: 10 }}>
-      <View className="flex-row items-center" style={{ gap: 8 }}>
-        <Switch accessibilityLabel="Criar simulado com estas questões" value={createExam} disabled={busy}
-          onValueChange={setCreateExam} />
-        <Text className="text-sm font-medium text-ink flex-1">Criar simulado com estas questões</Text>
+  /** Valida e guarda o PDF escolhido (clique ou arrastar). O nome da prova vem do arquivo, sem sobrescrever o digitado. */
+  const pickFile = (selected: File | undefined | null) => {
+    if (!selected) return;
+    if (!selected.name.toLowerCase().endsWith(".pdf") || selected.size > MAX_PDF_BYTES) {
+      setError({ title: "Arquivo inválido", message: "Selecione um PDF de até 20 MB." });
+      setFile(null);
+      return;
+    }
+    setFile(selected);
+    setSourceExamName((current) =>
+      !current.trim() || current === (file ? examNameFromFile(file.name) : "") ? examNameFromFile(selected.name) : current);
+  };
+
+  // Etapa inicial (protótipo "TelaImportarPDF"): 1. Arquivo · 2. Origem · 3. Classificação.
+  const missing = [!file && "arquivo", !sourceExamName.trim() && "nome", createExam && !examTypeSlug && "modalidade", !subjectIds.length && "disciplina"]
+    .filter(Boolean) as string[];
+  const latestDraft = savedImports[0] ?? null;
+  const otherDrafts = savedImports.slice(1);
+  const topicOptions = subjectTopics.map((t) => ({
+    id: t.id, name: t.name,
+    meta: subjectIds.length > 1 ? catalogs.subjects.find((x) => x.id === t.subject_id)?.name : t.questions_count ? `${t.questions_count} questões` : undefined,
+  }));
+  const topicSuggestions = [...subjectTopics].sort((a, b) => (b.questions_count ?? 0) - (a.questions_count ?? 0)).map((t) => ({ id: t.id, name: t.name }));
+
+  const stepHead = (n: number, done: boolean, title: string, note?: string) => (
+    <View className="flex-row items-center" style={{ gap: 8 }}>
+      <View className="rounded-ds-sm items-center justify-center" style={{ width: 20, height: 20, backgroundColor: done ? color.success : color.brand }}>
+        {done ? <Check size={12} color={color["on-brand"]} strokeWidth={2.5} />
+          : <Text className="font-mono font-semibold" style={{ fontSize: 11, color: color["on-brand"] }}>{n}</Text>}
       </View>
-      {createExam && (
-        <View className="flex-row items-end" style={{ gap: 10 }}>
-          <ExamTypeLogo size={38} label={selectedExamType?.label} logoUrl={selectedExamType?.logo_url} />
-          <View className="flex-1">
-            <SearchableSelect label="Modalidade" required modalTitle="Selecionar modalidade"
-              placeholder="IFAL, CPM, ENEM…" value={examTypeSlug} disabled={busy} showSelectedPreview={false}
-              options={catalogs.examTypes.filter((t) => t.slug).map((t) => ({ value: t.slug!, label: t.label }))}
-              onChange={setExamTypeSlug} />
-          </View>
+      <Text className="text-ink font-semibold" style={{ fontSize: 15, lineHeight: 22 }}>{title}</Text>
+      {note ? <Text className="text-ink-subtle" style={{ fontSize: 12 }}>{note}</Text> : null}
+    </View>
+  );
+
+  const draftBanner = latestDraft ? (
+    <View style={{ gap: 6 }}>
+      <View className="flex-row items-center flex-wrap border border-border rounded-ds-md bg-surface-sunken" style={{ gap: 12, paddingVertical: 12, paddingHorizontal: 16 }}>
+        <FileText size={20} color={color["ink-muted"]} strokeWidth={1.5} />
+        <View style={{ flex: 1, minWidth: 220 }}>
+          <Text className="text-ink font-medium" style={{ fontSize: 14, lineHeight: 20 }} numberOfLines={1}>Rascunho em andamento: {latestDraft.source_exam_name}</Text>
+          <Text className="text-ink-muted" style={{ fontSize: 12, lineHeight: 16 }}>
+            {latestDraft.question_count} {latestDraft.question_count === 1 ? "questão" : "questões"} em revisão · salvo {savedAtLabel(latestDraft.updated_at)}
+          </Text>
         </View>
+        <View className="flex-row" style={{ gap: 8 }}>
+          <Button size="sm" variant="ghost" label="Descartar" disabled={busy || listLoading} onPress={() => setDeleteDraft(latestDraft)} />
+          <Button size="sm" label="Continuar revisão" disabled={busy || listLoading} onPress={() => void resumeDraft(latestDraft.id)} />
+        </View>
+      </View>
+      {otherDrafts.length || draftPage < lastDraftPage ? (
+        <TouchableOpacity onPress={() => setShowOtherDrafts((v) => !v)} style={{ alignSelf: "flex-start" }}>
+          <Text className="text-brand font-medium" style={{ fontSize: 13 }}>
+            {showOtherDrafts ? "Ocultar outros rascunhos" : `Outros rascunhos (${otherDrafts.length}${draftPage < lastDraftPage ? "+" : ""})`}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+      {showOtherDrafts ? (
+        <View className="border border-border rounded-ds-md" style={{ paddingHorizontal: 12 }}>
+          {otherDrafts.map((item, i) => (
+            <View key={item.id} className="flex-row items-center" style={{ gap: 8, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: color.border }}>
+              <View style={{ flex: 1 }}>
+                <Text className="text-ink" style={{ fontSize: 13 }} numberOfLines={1}>{item.source_exam_name}</Text>
+                <Text className="text-ink-subtle" style={{ fontSize: 12 }}>{item.question_count} questões · salvo {savedAtLabel(item.updated_at)}</Text>
+              </View>
+              <Button size="sm" variant="ghost" label="Excluir" accessibilityLabel={`Excluir rascunho ${item.source_exam_name}`} disabled={busy || listLoading} onPress={() => setDeleteDraft(item)} />
+              <Button size="sm" label="Continuar" disabled={busy || listLoading} onPress={() => void resumeDraft(item.id)} />
+            </View>
+          ))}
+          {draftPage < lastDraftPage ? (
+            <View style={{ paddingVertical: 8 }}><Button size="sm" variant="ghost" label="Carregar mais rascunhos" disabled={busy || listLoading} onPress={() => void loadMoreDrafts()} /></View>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  ) : null;
+
+  const fileStep = (
+    <View style={{ gap: 12 }}>
+      {stepHead(1, !!file, "Arquivo")}
+      {file ? (
+        <View className="flex-row items-center border border-border-strong rounded-ds-md" style={{ gap: 12, paddingVertical: 12, paddingHorizontal: 16 }}>
+          <View className="bg-surface items-center justify-end" style={{ width: 30, height: 36, borderWidth: 1, borderColor: color["border-strong"], paddingBottom: 4 }}>
+            <Text className="font-mono font-semibold" style={{ fontSize: 8, color: color.danger }}>PDF</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text className="text-ink font-medium" style={{ fontSize: 14, lineHeight: 20 }} numberOfLines={1}>{file.name}</Text>
+            <Text className="font-mono text-ink-subtle" style={{ fontSize: 12, lineHeight: 16 }}>
+              {formatBytes(file.size)} · <Text style={{ color: color.success, fontFamily: undefined }}>pronto para separar</Text>
+            </Text>
+          </View>
+          <Button size="sm" variant="ghost" label="Trocar" disabled={busy} onPress={() => fileRef.current?.click()} />
+        </View>
+      ) : (
+        // Área de soltar o PDF (web): clique ou arraste.
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Selecionar arquivo PDF"
+          onClick={() => !busy && fileRef.current?.click()}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0]); }}
+          style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "24px 16px", textAlign: "center", cursor: "pointer",
+            border: `1.5px dashed ${dragOver ? color.brand : color["border-strong"]}`, borderRadius: 4, background: color["surface-sunken"],
+          }}
+        >
+          <Upload size={28} color={color["ink-subtle"]} strokeWidth={1.5} />
+          <Text className="text-ink font-medium" style={{ fontSize: 15, lineHeight: 22 }}>Arraste o PDF aqui ou clique para selecionar</Text>
+          <View className="flex-row flex-wrap justify-center" style={{ gap: 6, marginTop: 4 }}>
+            {["até 20 MB", "80 páginas", "50 questões", "texto selecionável"].map((l) => (
+              <View key={l} className="bg-surface border border-border rounded-ds-sm" style={{ paddingHorizontal: 6, paddingVertical: 4 }}>
+                <Text className="font-mono text-ink-muted" style={{ fontSize: 12, lineHeight: 12 }}>{l}</Text>
+              </View>
+            ))}
+          </View>
+        </div>
       )}
-      <Text className="text-xs text-ink-subtle">
-        {createExam
-          ? `O simulado "${sourceExamName.trim() || "…"}" entra como rascunho em Simulados. Arquive-o para liberar as questões no app. A modalidade vale para todas as questões e fica bloqueada na revisão.`
-          : "As questões entram apenas no banco, como avulsas."}
-      </Text>
+    </View>
+  );
+
+  const originStep = (
+    <View style={{ gap: 12 }}>
+      {stepHead(2, !!sourceExamName.trim() && (!createExam || !!examTypeSlug), "Origem")}
+      <FormInput label="Nome da prova ou simulado" value={sourceExamName} onChangeText={setSourceExamName} maxLength={255} required
+        editable={!busy} placeholder="Ex.: Simulado CPM 2025 – 1ª aplicação" />
+      <View className="border border-border rounded-ds-md" style={{ gap: 12, paddingVertical: 12, paddingHorizontal: 16 }}>
+        <View className="flex-row items-center" style={{ gap: 12 }}>
+          <Switch accessibilityLabel="Criar simulado com estas questões" value={createExam} disabled={busy} onValueChange={setCreateExam} />
+          <Text className="text-ink font-medium flex-1" style={{ fontSize: 14 }}>Criar simulado com estas questões</Text>
+        </View>
+        <Text className="text-ink-subtle" style={{ fontSize: 12, lineHeight: 16, marginTop: -6, marginLeft: 52 }}>
+          {createExam
+            ? "Fica como rascunho em Simulados. Arquive-o quando quiser liberar as questões para os alunos praticarem no app."
+            : "As questões entram apenas no banco, como avulsas."}
+        </Text>
+        {createExam ? (
+          <View style={{ marginLeft: 52 }}>
+            <View className="flex-row items-end" style={{ gap: 10 }}>
+              <View className="flex-1">
+                <SearchableSelect label="Modalidade" required modalTitle="Selecionar modalidade" placeholder="IFAL, CPM, ENEM…" value={examTypeSlug}
+                  disabled={busy} showSelectedPreview={false}
+                  options={catalogs.examTypes.filter((t) => t.slug).map((t) => ({ value: t.slug!, label: t.label }))} onChange={setExamTypeSlug} />
+              </View>
+              {selectedExamType ? (
+                <View style={{ marginBottom: 16 }}>
+                  <ExamTypeLogo size={38} label={selectedExamType.label} logoUrl={selectedExamType.logo_url} />
+                </View>
+              ) : null}
+            </View>
+            <Text className="text-ink-subtle" style={{ fontSize: 12, marginTop: -8 }}>Vale para todas as questões importadas.</Text>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  const classificationStep = (
+    <View style={{ gap: 12 }}>
+      {stepHead(3, subjectIds.length > 0, "Classificação", "A IA usa para classificar cada questão")}
+      <TokenSelect label="Disciplinas cobradas no PDF" required options={catalogs.subjects.map((x) => ({ id: x.id, name: x.name }))}
+        value={subjectIds} onChange={setSubjectIds} disabled={busy} placeholder="Buscar disciplina (ex.: Matemática)" morePlaceholder="Adicionar outra…" />
+      <TokenSelect label="Assuntos" labelNote="(opcional)" options={topicOptions} value={topicIds} onChange={setTopicIds} loading={topicsLoading}
+        disabled={busy || !subjectIds.length || (!topicsLoading && !subjectTopics.length)}
+        disabledPlaceholder={!subjectIds.length ? "Escolha uma disciplina primeiro" : "As disciplinas escolhidas não têm assuntos cadastrados"}
+        placeholder="Buscar assunto…" morePlaceholder="Adicionar outro…" suggestions={topicSuggestions}
+        hint={subjectIds.length === 1
+          ? "Todas as questões ficam nesta disciplina. Os assuntos escolhidos valem para todas; sem escolha, a IA sugere. Tudo pode ser ajustado na revisão."
+          : "Assuntos escolhidos valem para as questões da sua disciplina; nas demais, a IA sugere. Tudo pode ser ajustado na revisão."} />
+    </View>
+  );
+
+  const howItWorks = (
+    <View className="border border-border rounded-ds-md">
+      <TouchableOpacity onPress={() => setShowHowItWorks((v) => !v)} className="flex-row items-center" style={{ gap: 8, paddingVertical: 10, paddingHorizontal: 16 }}
+        aria-expanded={showHowItWorks}>
+        <ChevronRight size={16} color={color["ink-muted"]} style={{ transform: [{ rotate: showHowItWorks ? "90deg" : "0deg" }] }} />
+        <Text className="text-ink-muted font-medium" style={{ fontSize: 13 }}>Como a importação funciona</Text>
+      </TouchableOpacity>
+      {showHowItWorks ? (
+        <View style={{ paddingLeft: 40, paddingRight: 16, paddingBottom: 12, gap: 4 }}>
+          {[
+            "O texto é extraído no seu navegador; só o texto vai para a IA — nenhuma imagem é enviada ou gerada.",
+            "Questões que dependem de figura ficam marcadas para você recortar a imagem do PDF na revisão.",
+            "PDFs escaneados precisam de OCR antes da importação. Limite de 120 mil caracteres por importação.",
+          ].map((t) => <Text key={t} className="text-ink-muted" style={{ fontSize: 13, lineHeight: 20 }}>•  {t}</Text>)}
+        </View>
+      ) : null}
     </View>
   );
 
@@ -799,95 +984,37 @@ export default function ImportPdfModal({ visible, catalogs, onClose, onCreated, 
         title="Importar PDF com IA"
         onClose={close}
         size="md"
-        compact
         maxHeight="94%"
+        headerContent={
+          <Text className="text-ink-muted" style={{ fontSize: 13, lineHeight: 18, marginTop: 2 }}>
+            A IA separa as questões do PDF. Você revisa cada uma antes de entrar no banco.
+          </Text>
+        }
         footer={
-          <View className="flex-row flex-wrap justify-end" style={{ gap: 8 }}>
-            <Button label="Cancelar" onPress={close} disabled={busy} />
-            <Button variant="ai" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()} disabled={!file || !sourceExamName.trim() || !subjectIds.length || (createExam && !examTypeSlug) || topicsLoading || busy} />
+          <View className="flex-row flex-wrap items-center" style={{ gap: 12 }}>
+            <Text className="text-ink-subtle" style={{ fontSize: 12, flex: 1, minWidth: 160 }}>
+              {missing.length ? <>Falta: <Text className="font-medium" style={{ color: color.warning }}>{missing.join(", ")}</Text></>
+                : "Leva cerca de 1 minuto para 40 questões."}
+            </Text>
+            <View className="flex-row" style={{ gap: 8 }}>
+              <Button label="Cancelar" onPress={close} disabled={busy} />
+              <Button variant="primary" icon={Sparkles} label="Separar questões com IA" onPress={() => void extract()}
+                disabled={missing.length > 0 || topicsLoading || busy} />
+            </View>
           </View>
         }
       >
-        <FormInput label="Nome da prova/simulado de origem" value={sourceExamName} onChangeText={setSourceExamName}
-          maxLength={255} required editable={!busy} />
-          <View style={{ gap: 14 }}>
-            {examBlock}
-            <TopicMultiSelect
-              label="Disciplinas da prova *"
-              searchPlaceholder="Buscar disciplina (ex.: Português, Matemática)..."
-              topics={catalogs.subjects.map((s) => ({ id: s.id, name: s.name, subject_id: s.id }))}
-              value={subjectIds}
-              onChange={setSubjectIds}
-              disabled={busy}
-              disabledHint="Aguarde…"
-            />
-            <Text className="text-xs text-ink-subtle">
-              Escolha as disciplinas cobradas no PDF. A IA classifica cada questão em uma delas e escolhe o assunto.
-            </Text>
-            <TopicMultiSelect
-              label="Assuntos (opcional)"
-              searchPlaceholder="Buscar assunto…"
-              topics={subjectTopics.map((t) => ({
-                id: t.id, name: t.name, subject_id: t.subject_id,
-                subject_name: subjectIds.length > 1 ? catalogs.subjects.find((s) => s.id === t.subject_id)?.name : undefined,
-              }))}
-              value={topicIds}
-              onChange={setTopicIds}
-              loading={topicsLoading}
-              disabled={busy || !subjectIds.length || (!topicsLoading && !subjectTopics.length)}
-              disabledHint={!subjectIds.length ? "Escolha as disciplinas primeiro." : "As disciplinas escolhidas não têm assuntos cadastrados."}
-            />
-            <Text className="text-xs text-ink-subtle">
-              {subjectIds.length === 1
-                ? "Todas as questões ficam nesta disciplina. Os assuntos escolhidos são aplicados a todas; sem escolha, a IA sugere o assunto de cada uma."
-                : "Os assuntos escolhidos são aplicados às questões da disciplina de cada um; nas demais, a IA sugere. Você pode ajustar cada questão na revisão."}
-            </Text>
-            <Text className="text-sm font-medium text-ink">Rascunhos de importação salvos</Text>
-            {listLoading && <Text className="text-sm text-ink-muted">Carregando rascunhos…</Text>}
-            {!!draftListError && <Text className="text-sm text-danger">{draftListError}</Text>}
-            {savedImports.map((item) => (
-              <View key={item.id} className="flex-row items-center" style={{ gap: 8 }}>
-                <View className="flex-1">
-                  <Button label={`Retomar ${item.source_exam_name} (${item.question_count} questões)`}
-                    disabled={busy || listLoading} onPress={() => void resumeDraft(item.id)} />
-                </View>
-                <Button icon={Trash2} variant="danger" label="Excluir" accessibilityLabel={`Excluir rascunho ${item.source_exam_name}`}
-                  disabled={busy || listLoading} onPress={() => setDeleteDraft(item)} />
-              </View>
-            ))}
-            {!listLoading && !draftListError && !savedImports.length &&
-              <Text className="text-sm text-ink-muted">Nenhum rascunho salvo para seu usuário nesta escola.</Text>}
-            {draftPage < lastDraftPage && <Button label="Carregar mais rascunhos" disabled={busy || listLoading}
-              onPress={() => void loadMoreDrafts()} />}
-            <Text className="text-sm text-ink-muted">
-              O texto será extraído do PDF no navegador e enviado à IA para separar as questões.
-              As questões que dependem de imagens serão sinalizadas para anexar manualmente antes de incluir.
-            </Text>
-            <Text className="text-xs text-warning">
-              Até 20 MB, 80 páginas, 120 mil caracteres e 50 questões por importação. PDFs escaneados precisam de OCR prévio.
-              A identificação de imagens pelo texto é uma sugestão: confira o PDF original e ajuste as marcações.
-              Apenas o texto será enviado ao provedor; nenhuma imagem será gerada pela IA.
-            </Text>
-            <Button label="Selecionar arquivo PDF" onPress={() => fileRef.current?.click()} disabled={busy} />
-            {file && <Text className="text-sm text-ink">{file.name}</Text>}
-            <input ref={fileRef} type="file" accept="application/pdf,.pdf" style={{ display: "none" }}
-              onChange={(event) => {
-                const selected = event.target.files?.[0];
-                if (!selected) return;
-                if (!selected.name.toLowerCase().endsWith(".pdf") || selected.size > MAX_PDF_BYTES) {
-                  setError({ title: "Arquivo inválido", message: "Selecione um PDF de até 20 MB." });
-                  setFile(null);
-                } else {
-                  setFile(selected);
-                  // Preenche o nome com o do arquivo; não sobrescreve um nome digitado pelo usuário.
-                  setSourceExamName((current) =>
-                    !current.trim() || current === (file ? examNameFromFile(file.name) : "")
-                      ? examNameFromFile(selected.name)
-                      : current);
-                }
-                event.target.value = "";
-              }} />
-          </View>
+        <View style={{ gap: 20 }}>
+          {listLoading && !savedImports.length ? <Text className="text-ink-subtle" style={{ fontSize: 13 }}>Procurando rascunhos…</Text> : null}
+          {draftListError ? <Text className="text-danger" style={{ fontSize: 13 }}>{draftListError}</Text> : null}
+          {draftBanner}
+          {fileStep}
+          {originStep}
+          {classificationStep}
+          {howItWorks}
+        </View>
+        <input ref={fileRef} type="file" accept="application/pdf,.pdf" style={{ display: "none" }}
+          onChange={(event) => { pickFile(event.target.files?.[0]); event.target.value = ""; }} />
       </Modal>
       {visible && drafts.length > 0 && (
         <ImportReviewWorkspace

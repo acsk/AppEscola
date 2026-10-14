@@ -54,21 +54,29 @@ class QuestionIssueReviewService
             return false;
         }
 
-        $question->issueReports()->delete();
-        $this->restoreValidation($question);
-        $question->forceFill([
-            'revalidated_at' => now(),
-            'errors_reset_at' => now(),
-        ])->save();
+        $this->releaseForAnswers($question);
 
         return true;
     }
 
-    private function restoreValidation(ExamQuestion $question): void
+    /** Libera a questão para o aluno responder e zera a contagem de erros do painel. */
+    public function releaseForAnswers(ExamQuestion $question): void
+    {
+        if ($question->issueReports()->exists()) {
+            $question->issueReports()->delete();
+        }
+
+        $this->ensureApproved($question);
+        $question->forceFill([
+            'revalidated_at' => now(),
+            'errors_reset_at' => now(),
+        ])->save();
+    }
+
+    private function ensureApproved(ExamQuestion $question): void
     {
         $latest = QuestionReview::query()->where('question_id', $question->id)->latest('id')->first();
-        $source = is_array($latest?->content) ? ($latest->content['source'] ?? null) : null;
-        if ($latest === null || $latest->status !== QuestionReview::PENDENTE || $source !== 'student_issue') {
+        if (in_array($latest?->status, [QuestionReview::APROVADA, QuestionReview::APROVADA_MANUAL], true)) {
             return;
         }
 
@@ -76,16 +84,16 @@ class QuestionIssueReviewService
             QuestionReview::query()->create([
                 'tenant_id' => $question->tenant_id,
                 'question_id' => $question->id,
-                'source_question_id' => $latest->source_question_id,
-                'content_hash' => $latest->content_hash,
-                'generation_model' => $latest->generation_model,
-                'gabarito_original' => $latest->gabarito_original,
-                'gabarito_revisor' => $latest->gabarito_revisor,
+                'source_question_id' => $latest?->source_question_id,
+                'content_hash' => $latest?->content_hash ?? hash('sha256', 'release:'.$question->id),
+                'generation_model' => $latest?->generation_model,
+                'gabarito_original' => $latest?->gabarito_original,
+                'gabarito_revisor' => $latest?->gabarito_revisor,
                 'result' => QuestionReview::APROVADA_MANUAL,
                 'status' => QuestionReview::APROVADA_MANUAL,
                 'problems' => [],
                 'recommendation' => 'aprovada_manual',
-                'explanation' => 'Revalidada pelo administrador depois do aviso de erro do aluno.',
+                'explanation' => 'Liberada para resposta pelo administrador.',
                 'attempts' => 0,
                 'content' => ['source' => 'admin_revalidation'],
                 'validated_at' => now(),

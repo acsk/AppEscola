@@ -42,25 +42,27 @@ export function StudentReviewMark({ label = "Sem validação" }: { label?: strin
   );
 }
 
-/** Marca de revalidada em destaque: quadrado `success` com "R" e a palavra ao lado. */
-export function RevalidatedMark({ label = "Revalidada" }: { label?: string }) {
+/** Marca de revalidada em destaque: quadrado `success` com "R" e, opcionalmente, a palavra ao lado. */
+export function RevalidatedMark({ label = "Revalidada", iconOnly = false, size = 24 }: { label?: string; iconOnly?: boolean; size?: number }) {
   return (
-    <View className="flex-row items-center" style={{ gap: 8 }} aria-label={label}>
+    <View className="flex-row items-center" style={{ gap: 8 }} role={iconOnly ? "img" : undefined} aria-label={label} {...(iconOnly ? { title: label } : {})}>
       <View
         aria-hidden
         className="rounded-ds-sm items-center justify-center"
         style={[
-          { width: 24, height: 24, backgroundColor: color.success },
+          { width: size, height: size, backgroundColor: color.success },
           Platform.OS === "web" ? ({ boxShadow: `0 0 0 2px ${color["success-tint"]}` } as object) : { borderWidth: 2, borderColor: color["success-tint"] },
         ]}
       >
-        <Text className="font-mono" style={{ fontSize: 13, lineHeight: 14, fontWeight: "700", color: color.surface }}>
+        <Text className="font-mono" style={{ fontSize: Math.round(size * 0.48), lineHeight: Math.round(size * 0.54), fontWeight: "700", color: color.surface }}>
           R
         </Text>
       </View>
-      <Text className="font-medium" style={{ fontSize: 13, color: color.success }} numberOfLines={1}>
-        {label}
-      </Text>
+      {iconOnly ? null : (
+        <Text className="font-medium" style={{ fontSize: 13, color: color.success }} numberOfLines={1}>
+          {label}
+        </Text>
+      )}
     </View>
   );
 }

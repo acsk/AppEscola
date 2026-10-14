@@ -20,6 +20,7 @@ use App\Services\Ai\QuestionAiService;
 use App\Services\Ai\QuestionImageService;
 use App\Services\Ai\ValidadorQuestaoService;
 use App\Services\ExamAccessService;
+use App\Services\QuestionIssueReviewService;
 use App\Support\QuestionRichText;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -257,10 +258,11 @@ class QuestionAiController extends Controller
     public function approveReview(Request $request, int $question): JsonResponse
     {
         $tenantId = $this->authorizeStaff($request);
-        ExamQuestion::query()->inQuestionBank($tenantId)->findOrFail($question);
+        $model = ExamQuestion::query()->inQuestionBank($tenantId)->findOrFail($question);
         $review = $this->validador->aprovarManualmente($tenantId, $question, $request->user()?->id);
+        app(QuestionIssueReviewService::class)->releaseForAnswers($model);
 
-        return $this->success($this->validador->present($review), 'Questão aprovada manualmente.');
+        return $this->success($this->validador->present($review), 'Questão liberada para resposta. As respostas erradas foram zeradas.');
     }
 
     /** GET /question-bank/questions/{question}/ai/reviews */

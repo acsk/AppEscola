@@ -9,12 +9,14 @@ type Props = {
   breadcrumb?: BreadcrumbItem[];
   /** Linha de identificação abaixo do título (código, status, datas). */
   meta?: React.ReactNode;
+  /** Ao lado do título (selo, status curto). */
+  titleAddon?: React.ReactNode;
   /** Ações principais da página, à direita (no máximo um `primary`). */
   actions?: React.ReactNode;
 };
 
 /** Cabeçalho de página: trilha, título (estilo `display`), descrição e ações. Fica sobre `bg`. */
-export default function PageHeader({ title, description, breadcrumb, meta, actions }: Props) {
+export default function PageHeader({ title, description, breadcrumb, meta, titleAddon, actions }: Props) {
   const { isMobile } = useResponsiveLayout();
   return (
     <View
@@ -27,14 +29,17 @@ export default function PageHeader({ title, description, breadcrumb, meta, actio
     >
       <View style={{ flexShrink: 1 }}>
         {breadcrumb && breadcrumb.length > 0 && <ScreenBreadcrumb items={breadcrumb} inline />}
-        <Text
-          role="heading"
-          aria-level={1}
-          className="font-semibold text-ink"
-          style={{ fontSize: isMobile ? 24 : 28, lineHeight: isMobile ? 32 : 36, letterSpacing: -0.28, marginTop: breadcrumb?.length ? 8 : 0 }}
-        >
-          {title}
-        </Text>
+        <View className="flex-row flex-wrap items-center" style={{ gap: 12, marginTop: breadcrumb?.length ? 8 : 0 }}>
+          <Text
+            role="heading"
+            aria-level={1}
+            className="font-semibold text-ink"
+            style={{ fontSize: isMobile ? 24 : 28, lineHeight: isMobile ? 32 : 36, letterSpacing: -0.28 }}
+          >
+            {title}
+          </Text>
+          {titleAddon}
+        </View>
         {meta ? <View style={{ marginTop: 4 }}>{meta}</View> : null}
         {!!description && (
           <Text className="text-sm text-ink-muted" style={{ marginTop: 2, lineHeight: 22 }}>

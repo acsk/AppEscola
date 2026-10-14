@@ -1029,7 +1029,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                               ) : row.is_annulled || row.is_outdated ? (
                                 <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
                               ) : row.revalidated_at ? (
-                                <RevalidatedMark />
+                                <RevalidatedMark iconOnly />
                               ) : (
                                 <Text className="text-ink-subtle" style={{ fontSize: 13 }}>
                                   Regular
