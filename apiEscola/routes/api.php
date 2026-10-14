@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\PaymentProviderController;
 use App\Http\Controllers\Api\PaymentProvidersController;
 use App\Http\Controllers\Api\PublicRegistrationController;
@@ -68,6 +69,9 @@ Route::post('/webhooks/asaas', [AsaasWebhookController::class, 'handle'])
 
 // Autenticação (pública)
 Route::post('/login', [AuthController::class, 'login']);
+
+// Leads do site (público)
+Route::post('/leads', [LeadController::class, 'store'])->middleware('throttle:10,1');
 
 // Cadastro público (mobile — sem autenticação, com throttle anti-abuso)
 Route::prefix('public/{tenant_slug}')

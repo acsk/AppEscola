@@ -54,6 +54,7 @@ class AppServiceProvider extends ServiceProvider
                 'period',
                 'slug',
                 'action',
+                'user_agent',
             ];
 
             foreach ($model->getAttributes() as $attribute => $value) {
