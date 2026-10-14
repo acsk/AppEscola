@@ -17,7 +17,7 @@ const MARCAS = [
 ];
 
 /** Dois espaços ainda reservados para as logos que faltam. */
-const VAGAS = [4, 5].map((n) => ({
+const VAGAS = [2].map((n) => ({
   src: `/clientes/0${n}.svg`,
   alt: `Espaço para logo ${n}`,
 }));
@@ -45,7 +45,7 @@ export default function Clients() {
         <p className="clients-label">Clientes</p>
         <ul className="clients-row">
           {clients.map((client) => (
-            <li key={client.logo_url}>
+            <li key={client.logo_url} className="marca">
               <img src={client.logo_url} alt={client.name} onError={(event) => { event.currentTarget.parentElement?.remove(); }} />
             </li>
           ))}
@@ -54,11 +54,11 @@ export default function Clients() {
               <img src={logo.src} alt={logo.alt} />
             </li>
           ))}
-          {VAGAS.map((logo) => (
+          {/* {VAGAS.map((logo) => (
             <li key={logo.src} className="slot">
               <img src={logo.src} alt={logo.alt} />
             </li>
-          ))}
+          ))} */}
         </ul>
       </div>
     </section>
