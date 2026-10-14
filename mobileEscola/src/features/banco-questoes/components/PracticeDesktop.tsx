@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QuestionShield } from '../../../components/QuestionShield';
 import RichText from '../../../components/RichText';
 import type { AttemptQuestion, PracticeFeedback } from '../../../services/practice.service';
 import { PracticeQuestionView } from './PracticeQuestionView';
@@ -156,7 +157,7 @@ export function PracticeDesktop(props: Props) {
         {cardHead('message', 'Resolução comentada')}
         {feedback ? (
           feedback.explanation
-            ? <Txt tone="muted" style={{ fontSize: 14, lineHeight: 21 }}><RichText value={feedback.explanation} /></Txt>
+            ? <QuestionShield><Txt tone="muted" style={{ fontSize: 14, lineHeight: 21 }}><RichText value={feedback.explanation} /></Txt></QuestionShield>
             : <Txt tone="subtle" style={{ fontSize: 14 }}>O professor ainda não comentou esta questão.</Txt>
         ) : (
           <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: space[3], borderRadius: 10, backgroundColor: p.surfaceSunken }}>
@@ -292,7 +293,13 @@ export function PracticeDesktop(props: Props) {
       {/* Imagem ampliada */}
       <Modal visible={!!zoom} transparent animationType="fade" onRequestClose={() => setZoom(null)}>
         <Pressable accessibilityLabel="Fechar imagem" onPress={() => setZoom(null)} style={{ flex: 1, backgroundColor: p.scrim, alignItems: 'center', justifyContent: 'center', padding: space[8] }}>
-          {zoom ? <Image source={{ uri: zoom }} resizeMode="contain" accessibilityLabel="Imagem do enunciado ampliada" style={{ width: '100%', height: '100%', maxWidth: 1100, borderRadius: radius.md, backgroundColor: p.surface }} /> : null}
+          {zoom ? (
+            <QuestionShield pointerEvents="box-none" style={{ width: '100%', height: '100%', maxWidth: 1100 }}>
+              <View pointerEvents="none" style={{ width: '100%', height: '100%' }}>
+                <Image source={{ uri: zoom }} resizeMode="contain" accessibilityLabel="Imagem do enunciado ampliada" style={{ width: '100%', height: '100%', borderRadius: radius.md, backgroundColor: p.surface }} />
+              </View>
+            </QuestionShield>
+          ) : null}
           <View style={{ position: 'absolute', top: space[4], right: space[4] }}><IconButton icon="x" label="Fechar imagem" variant="outline" style={{ backgroundColor: p.surface }} onPress={() => setZoom(null)} /></View>
         </Pressable>
       </Modal>

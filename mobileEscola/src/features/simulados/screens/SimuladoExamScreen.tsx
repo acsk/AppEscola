@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { QuestionShield } from '../../../components/QuestionShield';
 import RichText from '../../../components/RichText';
 import ConfirmModal from '../../../components/ConfirmModal';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -48,8 +49,12 @@ function QuestionImage({ uri }: { uri: string }) {
     Image.getSize(uri, (w, h) => { if (w > 0) setHeight((maxWidth * h) / w); }, () => setError(true));
   }, [uri, maxWidth]);
   if (error) return null;
-  return <Image source={{ uri }} resizeMode="contain" onError={() => setError(true)} accessibilityLabel="Imagem da questão"
-    style={{ width: '100%', height, borderRadius: radius.md }} />;
+  return (
+    <View pointerEvents="none">
+      <Image source={{ uri }} resizeMode="contain" onError={() => setError(true)} accessibilityLabel="Imagem da questão"
+        style={{ width: '100%', height, borderRadius: radius.md }} />
+    </View>
+  );
 }
 
 /** Responder simulado (protótipo "TelaResponderQuestao"): uma questão por vez, mapa da sessão e entrega no fim. */
@@ -383,14 +388,14 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   const alternativas = (
     <>
       {q.type === 'multiple_choice' ? (
-        <View accessibilityRole="radiogroup" style={{ gap: 10 }}>
+        <QuestionShield accessibilityRole="radiogroup" style={{ gap: 10 }}>
           {q.options.map((op, i) => (
             <AnswerOption key={op.id} letter={LETTERS[i] ?? String(i + 1)} state={resposta.optionId === op.id ? 'selected' : 'default'}
               onPress={() => setResposta(q.id, { ...resposta, optionId: op.id, textAnswer: op.triggers_text_input || q.allow_text_answer ? resposta.textAnswer : undefined })}>
               <Txt><RichText value={op.option_text} /></Txt>
             </AnswerOption>
           ))}
-        </View>
+        </QuestionShield>
       ) : null}
       {exigeTexto ? (
         <TextInput
@@ -441,8 +446,10 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
                 <Tag label={q.type === 'essay' ? 'Discursiva' : 'Objetiva'} />
                 <Tag label={`${q.points} ${q.points === 1 ? 'ponto' : 'pontos'}`} />
               </View>
-              <Txt variant="reading" style={{ fontSize: 18, lineHeight: 29 }}><RichText value={q.question_text} /></Txt>
-              {q.image_url ? <QuestionImage uri={q.image_url} /> : null}
+              <QuestionShield style={{ gap: 18 }}>
+                <Txt variant="reading" style={{ fontSize: 18, lineHeight: 29 }}><RichText value={q.question_text} /></Txt>
+                {q.image_url ? <QuestionImage uri={q.image_url} /> : null}
+              </QuestionShield>
               {alternativas}
               {erroMsg ? <Notice tone="danger" title="Confira antes de entregar" text={erroMsg} /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: 6 }}>
@@ -509,8 +516,10 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
             <Tag label={q.type === 'essay' ? 'Discursiva' : 'Objetiva'} />
             <Tag label={`${q.points} ${q.points === 1 ? 'ponto' : 'pontos'}`} />
           </View>
-          <Txt variant="reading"><RichText value={q.question_text} /></Txt>
-          {q.image_url ? <QuestionImage uri={q.image_url} /> : null}
+          <QuestionShield style={{ gap: 18 }}>
+            <Txt variant="reading"><RichText value={q.question_text} /></Txt>
+            {q.image_url ? <QuestionImage uri={q.image_url} /> : null}
+          </QuestionShield>
 
           {alternativas}
 

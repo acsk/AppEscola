@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, View } from 'react-native';
+import { QuestionShield } from '../../../components/QuestionShield';
 import RichText from '../../../components/RichText';
 import type { PracticeFeedback, PracticeQuestion } from '../../../services/practice.service';
 import { AnswerOption, Card, Icon, IconButton, NewPill, Tag, Txt, radius, space, subjectColor, usePalette, type AnswerState } from '../../../ui';
@@ -44,7 +45,7 @@ export function PracticeQuestionView({
   };
 
   return (
-    <View style={{ gap: 18 }}>
+    <QuestionShield style={{ gap: 18 }}>
       {feedback && feedback.is_correct !== null ? (
         <View accessibilityRole="alert" style={{
           flexDirection: 'row', gap: space[3], alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: space[4], borderRadius: radius.md,
@@ -78,8 +79,10 @@ export function PracticeQuestionView({
       {question.question_text ? <Txt variant="reading" style={textScale !== 1 ? { fontSize: 17 * textScale, lineHeight: 27 * textScale } : undefined}><RichText value={question.question_text} /></Txt> : null}
       {question.image_url ? (
         <View style={{ position: 'relative', alignSelf: 'stretch', backgroundColor: p.surface, borderWidth: 1, borderColor: p.line, borderRadius: radius.md, padding: space[2] }}>
-          <Image source={{ uri: question.image_url }} resizeMode="contain" accessibilityLabel="Imagem do enunciado"
-            style={{ width: '100%', height: 220 * Math.min(textScale, 1.3), borderRadius: radius.sm }} />
+          <View pointerEvents="none">
+            <Image source={{ uri: question.image_url }} resizeMode="contain" accessibilityLabel="Imagem do enunciado"
+              style={{ width: '100%', height: 220 * Math.min(textScale, 1.3), borderRadius: radius.sm }} />
+          </View>
           {onZoomImage ? (
             <View style={{ position: 'absolute', top: 8, right: 8 }}>
               <IconButton icon="zoom" label="Ampliar imagem" variant="outline" onPress={() => onZoomImage(question.image_url as string)} />
@@ -110,6 +113,6 @@ export function PracticeQuestionView({
           <Txt tone="muted" style={{ lineHeight: 23 }}><RichText value={feedback.explanation} /></Txt>
         </Card>
       ) : null}
-    </View>
+    </QuestionShield>
   );
 }

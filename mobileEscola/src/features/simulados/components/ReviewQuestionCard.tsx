@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
+import { QuestionShield } from '../../../components/QuestionShield';
 import RichText from '../../../components/RichText';
 import type { ReviewQuestion } from '../../../services/simulados.service';
 import { AnswerOption, Card, Tag, Txt, radius, space, usePalette, type AnswerState, type TagTone, type IconName } from '../../../ui';
@@ -15,8 +16,10 @@ export function QuestionImage({ uri, maxWidth }: { uri: string; maxWidth: number
   }, [uri, maxWidth]);
   if (error) return null;
   return (
-    <Image source={{ uri }} resizeMode="contain" onError={() => setError(true)} accessibilityLabel="Imagem da questão"
-      style={{ width: '100%', height, borderRadius: radius.md }} />
+    <View pointerEvents="none">
+      <Image source={{ uri }} resizeMode="contain" onError={() => setError(true)} accessibilityLabel="Imagem da questão"
+        style={{ width: '100%', height, borderRadius: radius.md }} />
+    </View>
   );
 }
 
@@ -57,15 +60,19 @@ export function ReviewQuestionCard({
         <Txt variant="titleSm">Questão {index + 1}</Txt>
         {status ? <Tag tone={status.tone} icon={status.icon} label={status.label} /> : null}
       </View>
-      <Txt variant="reading"><RichText value={question.question_text} /></Txt>
-      {question.image_url ? <QuestionImage uri={question.image_url} maxWidth={imageWidth} /> : null}
+      <QuestionShield style={{ gap: space[3] }}>
+        <Txt variant="reading"><RichText value={question.question_text} /></Txt>
+        {question.image_url ? <QuestionImage uri={question.image_url} maxWidth={imageWidth} /> : null}
+      </QuestionShield>
       {question.type === 'multiple_choice' ? (
         <View style={{ gap: 10 }}>
           {question.options.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((option, i) => (
-            <AnswerOption key={option.id} letter={LETTERS[i] ?? String(i + 1)} state={stateFor(option)}
-              note={!released && option.selected ? 'Sua resposta' : undefined}>
-              <Txt><RichText value={option.option_text} /></Txt>
-            </AnswerOption>
+            <QuestionShield key={option.id}>
+              <AnswerOption letter={LETTERS[i] ?? String(i + 1)} state={stateFor(option)}
+                note={!released && option.selected ? 'Sua resposta' : undefined}>
+                <Txt><RichText value={option.option_text} /></Txt>
+              </AnswerOption>
+            </QuestionShield>
           ))}
           {question.student_answer?.text_answer ? (
             <View style={{ padding: space[3], borderRadius: radius.md, backgroundColor: p.surfaceSunken }}>

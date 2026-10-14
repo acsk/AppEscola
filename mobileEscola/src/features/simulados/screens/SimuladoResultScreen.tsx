@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { QuestionShield } from '../../../components/QuestionShield';
 import RichText from '../../../components/RichText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SimuladosStackParamList } from '../../../navigation/stacks/SimuladosStack';
@@ -128,18 +129,20 @@ export function SimuladoResultScreen({ route, navigation }: Props) {
             {q.subject ? <Tag tone="outline" dot={subjectColor(p, q.subject.id)} label={q.subject.name} /> : null}
             <Tag label={q.type === 'essay' ? 'Discursiva' : 'Objetiva'} />
           </View>
-          <Txt variant="reading"><RichText value={q.question_text} /></Txt>
-          {q.image_url ? <QuestionImage uri={q.image_url} maxWidth={Math.max(0, Math.min(width, layout.readingMax) - space[4] * 2)} /> : null}
+          <QuestionShield style={{ gap: 18 }}>
+            <Txt variant="reading"><RichText value={q.question_text} /></Txt>
+            {q.image_url ? <QuestionImage uri={q.image_url} maxWidth={Math.max(0, Math.min(width, layout.readingMax) - space[4] * 2)} /> : null}
+          </QuestionShield>
 
           {q.type === 'multiple_choice' ? (
-            <View style={{ gap: 10 }}>
+            <QuestionShield style={{ gap: 10 }}>
               {opcoes.map((op, i) => (
                 <AnswerOption key={op.id} letter={LETTERS[i] ?? String(i + 1)} state={stateFor(op)} note={pendente && op.selected ? 'Sua resposta' : undefined}>
                   <Txt><RichText value={op.option_text} /></Txt>
                 </AnswerOption>
               ))}
               {!answered ? <Txt variant="bodySm" tone="subtle">Você não marcou nenhuma alternativa.</Txt> : null}
-            </View>
+            </QuestionShield>
           ) : (
             <Card style={{ gap: 4 }}>
               <Txt variant="caption" tone="subtle">Sua resposta</Txt>

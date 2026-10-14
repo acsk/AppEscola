@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { Image, Platform, Pressable, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import { Button, Card, Icon, IconButton, Tag, Txt, type IconName, type TagTone } from './primitives';
 import { ProgressBar } from './data';
 import { usePalette } from './theme';
@@ -713,7 +713,8 @@ export function SessionList({ items, onSelect }: { items: (SessionItem & { index
                 ) : null}
                 {q.flagged ? <Icon name="flag" size={14} color={p.accentInk} /> : null}
               </View>
-              <Text numberOfLines={1} style={{ ...font.regular, fontSize: 13, lineHeight: 18, color: p.inkSubtle }}>{q.text}</Text>
+              <Text selectable={false} numberOfLines={1} {...(Platform.OS === 'web' ? { dataSet: { questionLock: 'true' } } : {})}
+                style={{ ...font.regular, fontSize: 13, lineHeight: 18, color: p.inkSubtle, userSelect: 'none' }}>{q.text}</Text>
             </View>
           </Pressable>
         );
