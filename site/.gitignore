@@ -1,0 +1,55 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies (apenas na raiz do projeto)
+/node_modules/
+
+# Expo
+.expo/
+web-build/
+expo-env.d.ts
+
+# dist: commitar para deploy, mas ignorar node_modules da raiz do projeto
+# dist/assets/node_modules contém as fontes dos ícones — deve ser commitado
+# fonts/: pasta com fontes de ícones (Ionicons, Feather) — deve ser commitada
+# dist/fonts/: idem, para produção
+# dist/_expo/static/: bundles web (como mobileEscola) — commitar junto com dist/index.html após web:build
+deploy-site-dist.zip
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

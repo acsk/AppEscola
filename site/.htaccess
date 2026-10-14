@@ -1,0 +1,16 @@
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Se a requisição já está dentro de /dist, não redireciona
+  RewriteCond %{REQUEST_URI} ^/dist/ [NC]
+  RewriteRule ^ - [L]
+
+  # Arquivos físicos (js, css, png etc.) dentro de dist servidos diretamente
+  RewriteCond %{DOCUMENT_ROOT}/dist%{REQUEST_URI} -f
+  RewriteRule ^(.*)$ dist/$1 [L]
+
+  # Tudo o mais → dist/index.html (SPA)
+  RewriteRule ^ dist/index.html [L]
+</IfModule>

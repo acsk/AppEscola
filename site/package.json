@@ -1,0 +1,31 @@
+{
+  "name": "siteescola",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --web",
+    "web": "expo start --web",
+    "web:build": "expo export --platform web",
+    "web:pack": "bash scripts/pack-dist.sh",
+    "preweb:build": "node scripts/increment-version.js patch",
+    "bump:patch": "node scripts/increment-version.js patch",
+    "bump:minor": "node scripts/increment-version.js minor",
+    "bump:major": "node scripts/increment-version.js major"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
+    "expo": "~54.0.33",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "@types/react-dom": "~19.1.7",
+    "babel-preset-expo": "~54.0.10",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
