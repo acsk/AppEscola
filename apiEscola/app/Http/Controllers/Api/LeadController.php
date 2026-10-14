@@ -18,9 +18,11 @@ class LeadController extends Controller
 
         Lead::query()->create([
             'name' => $request->string('name')->toString(),
+            'role' => $request->input('role'),
             'email' => $request->string('email')->toString(),
             'phone' => $request->string('phone')->toString(),
             'institution' => $request->string('institution')->toString(),
+            'students_range' => $request->input('students_range'),
             'message' => $request->input('message'),
             'source' => 'site',
             'ip' => $request->ip(),
