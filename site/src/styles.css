@@ -649,7 +649,6 @@ body{margin:0;background:#fff}
 @media (max-width:1080px){
  .wrap{padding:0 28px}
  .nav{display:none}.burger{display:inline-flex}
- .hdr .act .btn-s{display:none}
  .hero .grid{grid-template-columns:1fr;gap:48px}
  .h1{font-size:50px}
  .mock{padding:8px 16px 40px 16px}

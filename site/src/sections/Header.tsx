@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Icon } from "../components/icons";
-import { PAINEL_URL } from "../config";
 
 const LINKS = [
   { href: "#alunos", label: "Funcionalidades" },
@@ -23,7 +22,6 @@ export default function Header() {
           {LINKS.map((l) => <a key={l.href} href={l.href}>{l.label}</a>)}
         </nav>
         <div className="act">
-          <a className="btn btn-s btn-sm" href={PAINEL_URL}>Entrar</a>
           <a className="btn btn-p btn-sm" href="#demo">Agendar demonstração</a>
           <button type="button" className="burger" aria-label={open ? "Fechar menu" : "Abrir menu"} aria-expanded={open} aria-controls="menu-movel" onClick={() => setOpen((v) => !v)}>
             <Icon name={open ? "close" : "menu"} size={20} strokeWidth={1.8} />
@@ -33,7 +31,6 @@ export default function Header() {
       {open ? (
         <nav className="mnav" id="menu-movel" aria-label="Menu móvel">
           {LINKS.map((l) => <a key={l.href} href={l.href} onClick={close}>{l.label}</a>)}
-          <a href={PAINEL_URL} onClick={close}>Entrar</a>
           <a className="btn btn-p" href="#demo" onClick={close}>Agendar demonstração</a>
         </nav>
       ) : null}
