@@ -6,7 +6,7 @@ import RichText from '../../../components/RichText';
 import type { AttemptQuestion, PracticeFeedback } from '../../../services/practice.service';
 import { PracticeQuestionView } from './PracticeQuestionView';
 import {
-  Button, Card, Icon, IconButton, Kbd, ProgressBar, SegmentedControl, SessionList, Tag, Txt, font, layout, radius, space, subjectColor,
+  Button, Card, Icon, IconButton, Kbd, NewPill, ProgressBar, SegmentedControl, SessionList, Tag, Txt, font, layout, radius, shadow, space, subjectColor,
   useLayoutMode, usePalette, type IconName, type SessionItemStatus,
 } from '../../../ui';
 
@@ -55,6 +55,7 @@ const plain = (html: string | null | undefined) => (html ?? '').replace(/<[^>]+>
 
 /**
  * Praticar no desktop (protótipo "DesktopPraticar"): sessão à esquerda, questão no meio, ajuda à direita.
+ * Só a questão rola; a barra Anterior · Pular · Responder fica fixa no rodapé da coluna.
  * Abaixo de 1360px a coluna da direita vira a aba "Ajuda" na coluna da questão.
  */
 export function PracticeDesktop(props: Props) {
@@ -144,8 +145,6 @@ export function PracticeDesktop(props: Props) {
 
   const help = current ? (
     <View style={{ gap: 14 }}>
-      <Button block variant={reported ? 'secondary' : 'accent'} icon="warning" label={reported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={reported} onPress={onReportError}
-        style={reported ? undefined : { backgroundColor: '#F5A018', borderColor: '#E09010' }} />
       <Card style={{ gap: 10 }}>
         {cardHead('alert', 'Sobre esta questão')}
         {row('Turma que acerta', current.class_rate != null ? `${current.class_rate}%` : 'Poucos dados')}
@@ -180,40 +179,57 @@ export function PracticeDesktop(props: Props) {
     </View>
   ) : null;
 
+  const tool = (icon: IconName, label: string, on: boolean, onPress: () => void, disabled?: boolean) => (
+    <IconButton icon={icon} label={label} iconSize={20} color={on ? p.accentInk : p.inkMuted} disabled={disabled} onPress={onPress}
+      accessibilityState={{ selected: on, disabled: !!disabled }}
+      style={{ width: 36, height: 36, borderRadius: radius.sm, backgroundColor: on ? p.accentSoft : undefined }} />
+  );
+
+  // Cabeçalho numa linha: número, origem, disciplina, assunto, dificuldade, "Nova" e as ferramentas.
   const question = current ? (
-    <View style={{ gap: space[4] }}>
+    <View style={{ gap: space[3] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3] }}>
-        <View style={{ gap: 2, flexShrink: 1 }}>
-          <Txt variant="caption" tone="subtle" style={{ fontSize: 13, ...font.extrabold, letterSpacing: 0.52, textTransform: 'uppercase' }}>Questão {index + 1} de {questions.length}</Txt>
-          <Txt variant="bodySm" tone="subtle" numberOfLines={1}>{[`#${current.id}`, origin].filter(Boolean).join(' · ')}</Txt>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, flexShrink: 1, minWidth: 0 }}>
+          <Txt variant="caption" style={{ fontSize: 13, ...font.extrabold, color: p.ink }}>Questão {index + 1} de {questions.length}</Txt>
+          <Txt variant="caption" tone="subtle" numberOfLines={1} style={{ fontSize: 13, ...font.medium }}>{[`#${current.id}`, origin].filter(Boolean).join(' · ')}</Txt>
+          {current.subject ? <Tag tone="outline" dot={subjectColor(p, current.subject.id)} label={current.subject.name} /> : null}
+          {current.topics[0] ? <Tag label={current.topics[0]} /> : null}
+          {current.difficulty ? <Tag label={current.difficulty} /> : null}
+          {current.is_new && !feedback ? <NewPill label="Nova" /> : null}
         </View>
         <View style={{ flexDirection: 'row', gap: 2 }}>
-          <IconButton icon="flag" label={isFlagged ? 'Desmarcar revisão' : 'Marcar para revisar'} color={isFlagged ? p.accentInk : undefined}
-            style={isFlagged ? { backgroundColor: p.accentSoft } : undefined} onPress={onToggleFlag} />
-          <IconButton icon="bookmark" label={saved ? 'Remover das salvas' : 'Salvar questão'} color={saved ? p.brandInk : undefined} onPress={onToggleSave} />
+          {tool('flag', isFlagged ? 'Desmarcar revisão' : 'Marcar para revisar', isFlagged, onToggleFlag)}
+          {tool('bookmark', saved ? 'Remover das salvas' : 'Salvar questão', saved, onToggleSave)}
+          {tool('alert', reported ? 'Erro enviado ao administrador' : 'Reportar erro', reported, onReportError, reported)}
         </View>
       </View>
       <PracticeQuestionView question={current} selectedId={answers[current.id] ?? null} onSelect={(optionId) => onSelect(current.id, optionId)}
         feedback={feedback} disabled={busy} isNew={!!current.is_new && !feedback} hideHeader hideExplanation={isWide}
         eliminated={eliminated[current.id] ?? []} onEliminate={toggleEliminated} textScale={bigText ? 1.2 : 1} onZoomImage={setZoom} />
       {error}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: 6, paddingTop: space[4], borderTopWidth: 1, borderTopColor: p.line }}>
+    </View>
+  ) : <Txt tone="subtle">Esta sessão não tem questões disponíveis no momento.</Txt>;
+
+  // Barra fixa no rodapé da coluna da questão: sempre à vista, a questão rola por trás.
+  const actionBar = current ? (
+    <View accessibilityRole="toolbar" accessibilityLabel="Navegação da questão"
+      style={{ backgroundColor: p.surface, borderTopWidth: 1, borderTopColor: p.line, ...shadow.sheet }}>
+      <View style={{ width: '100%', maxWidth: layout.readingMax, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: space[2], paddingVertical: space[3], paddingHorizontal: space[8] }}>
         <Button variant="ghost" icon="arrow-left" label="Anterior" disabled={index === 0} onPress={() => onGoTo(index - 1)} />
         {canSkip ? <Button variant="ghost" label="Pular" onPress={() => onGoTo(index + 1)} /> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: space[2] }}>
+          <Kbd>A</Kbd><Txt variant="caption" tone="subtle">–</Txt><Kbd>{lastLetter}</Kbd>
+          <Txt variant="caption" tone="subtle" style={{ ...font.medium }}> marcar</Txt>
+          <View style={{ width: 6 }} />
+          <Kbd>Enter</Kbd>
+          <Txt variant="caption" tone="subtle" style={{ ...font.medium }}>{feedback ? ' próxima' : ' responder'}</Txt>
+        </View>
         <View style={{ flex: 1 }} />
-        {primary?.disabled ? <Txt variant="bodySm" tone="subtle" style={{ ...font.semibold }}>Escolha uma alternativa</Txt> : null}
         {primary ? <Button size="lg" icon={primary.icon} iconRight={primary.iconRight ?? (primary.icon ? undefined : 'arrow-right')} label={primary.label}
           loading={primary.loading} disabled={primary.disabled} onPress={primary.onPress} /> : null}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <Kbd>A</Kbd><Txt variant="bodySm" tone="subtle">–</Txt><Kbd>{lastLetter}</Kbd><Txt variant="bodySm" tone="subtle"> marcar   </Txt>
-        <Kbd>X</Kbd><Txt variant="bodySm" tone="subtle"> riscar   </Txt>
-        <Kbd>Enter</Kbd><Txt variant="bodySm" tone="subtle">{feedback ? ' próxima   ' : ' responder   '}</Txt>
-        <Kbd>R</Kbd><Txt variant="bodySm" tone="subtle"> revisar depois   </Txt>
-        <Kbd>←</Kbd><Kbd>→</Kbd><Txt variant="bodySm" tone="subtle"> navegar</Txt>
-      </View>
     </View>
-  ) : <Txt tone="subtle">Esta sessão não tem questões disponíveis no momento.</Txt>;
+  ) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
@@ -258,7 +274,7 @@ export function PracticeDesktop(props: Props) {
               <Tag icon="x" label={`${wrong} ${wrong === 1 ? 'errada' : 'erradas'}`} />
               <Tag tone="outline" icon="flag" label={`${flagged.length} para revisar`} />
             </View>
-            <SegmentedControl label="Filtrar lista" options={['Todas', 'A fazer', 'Revisar']} value={['all', 'open', 'review'].indexOf(filter)}
+            <SegmentedControl label="Filtrar lista" options={['Todas', 'A responder', 'Revisar']} value={['all', 'open', 'review'].indexOf(filter)}
               onChange={(i) => setFilter((['all', 'open', 'review'] as const)[i])} />
           </View>
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: space[2] }}>
@@ -270,17 +286,20 @@ export function PracticeDesktop(props: Props) {
           </View>
         </View>
 
-        {/* Meio: a questão (e a aba Ajuda abaixo de 1360px) */}
-        <ScrollView style={{ flex: 1, minWidth: 0 }} keyboardShouldPersistTaps="handled">
-          <View style={{ width: '100%', maxWidth: layout.readingMax, alignSelf: 'center', paddingTop: 28, paddingHorizontal: space[8], paddingBottom: 40, gap: space[4] }}>
-            {!isWide ? (
-              <View style={{ maxWidth: 280 }}>
-                <SegmentedControl label="Questão ou ajuda" options={['Questão', 'Ajuda']} value={tab === 'question' ? 0 : 1} onChange={(i) => setTab(i ? 'help' : 'question')} />
-              </View>
-            ) : null}
-            {isWide || tab === 'question' ? question : help}
-          </View>
-        </ScrollView>
+        {/* Meio: a questão (e a aba Ajuda abaixo de 1360px); só ela rola, a barra de ações fica fixa */}
+        <View style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+          <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+            <View style={{ width: '100%', maxWidth: layout.readingMax, alignSelf: 'center', paddingTop: space[4], paddingHorizontal: space[8], paddingBottom: space[6], gap: space[3] }}>
+              {!isWide ? (
+                <View style={{ maxWidth: 280 }}>
+                  <SegmentedControl label="Questão ou ajuda" options={['Questão', 'Ajuda']} value={tab === 'question' ? 0 : 1} onChange={(i) => setTab(i ? 'help' : 'question')} />
+                </View>
+              ) : null}
+              {isWide || tab === 'question' ? question : help}
+            </View>
+          </ScrollView>
+          {actionBar}
+        </View>
 
         {/* Direita: ajuda e ferramentas */}
         {isWide ? (

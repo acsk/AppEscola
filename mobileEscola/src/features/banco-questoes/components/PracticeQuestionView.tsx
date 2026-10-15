@@ -28,6 +28,7 @@ type Props = {
   onEliminate?: (optionId: number) => void;
   textScale?: number;
   onZoomImage?: (uri: string) => void;
+  /** Praticar no desktop: código, origem e tags vão para a linha de cabeçalho da tela; alternativas compactas (48px). */
   hideHeader?: boolean;
   hideExplanation?: boolean;
 };
@@ -68,20 +69,20 @@ export function PracticeQuestionView({
         </View>
       ) : null}
 
-      <View style={{ gap: space[2] }}>
-        {hideHeader ? null : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {hideHeader ? null : <View style={{ gap: space[2] }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="clipboard" size={14} color={p.inkSubtle} />
           <Txt variant="caption" tone="subtle" style={{ flexShrink: 1 }} numberOfLines={2}>
             Questão #{question.id}{examName ? ` · ${examName}` : ''}
           </Txt>
-        </View>}
+        </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {question.subject ? <Tag tone="outline" dot={subjectColor(p, question.subject.id)} label={question.subject.name} /> : null}
           {question.topics.slice(0, 2).map((t) => <Tag key={t} label={t} />)}
           {question.difficulty ? <Tag label={question.difficulty} /> : null}
           {isNew ? <NewPill label="Nova" /> : null}
         </View>
-      </View>
+      </View>}
 
       {question.question_text ? <Txt variant="reading" style={textScale !== 1 ? { fontSize: 17 * textScale, lineHeight: 27 * textScale } : undefined}><RichText value={question.question_text} /></Txt> : null}
       {question.image_url ? (
@@ -98,9 +99,9 @@ export function PracticeQuestionView({
         </View>
       ) : null}
 
-      <View accessibilityRole="radiogroup" style={{ gap: 10 }}>
+      <View accessibilityRole="radiogroup" style={{ gap: hideHeader ? space[2] : 10 }}>
         {question.options.map((option, index) => (
-          <AnswerOption key={option.id} letter={LETTERS[index] ?? String(index + 1)} state={stateFor(option.id)}
+          <AnswerOption key={option.id} letter={LETTERS[index] ?? String(index + 1)} state={stateFor(option.id)} compact={hideHeader}
             eliminated={eliminated.includes(option.id)} onEliminate={!locked && onEliminate ? () => onEliminate(option.id) : undefined}
             onPress={locked ? undefined : () => onSelect?.(option.id)}>
             <Txt style={[

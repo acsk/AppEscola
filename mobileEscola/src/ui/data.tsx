@@ -128,11 +128,13 @@ const OPT_NOTE: Partial<Record<AnswerState, string>> = { correct: 'Sua resposta 
 
 /** Alternativa: default · selected (antes de confirmar) · correct · incorrect · missed (a certa, não marcada) · dimmed. */
 export function AnswerOption({
-  letter, state = 'default', note, onPress, children, eliminated, onEliminate, textScale = 1,
+  letter, state = 'default', note, onPress, children, eliminated, onEliminate, textScale = 1, compact,
 }: {
   letter: string; state?: AnswerState; note?: string | null; onPress?: () => void; children: React.ReactNode;
   /** "Riscar alternativa": o aluno elimina as que sabe que estão erradas, como no papel. */
   eliminated?: boolean; onEliminate?: () => void; textScale?: number;
+  /** Altura mínima de 48px e letra centralizada (praticar no desktop). */
+  compact?: boolean;
 }) {
   const p = usePalette();
   const s = {
@@ -150,11 +152,12 @@ export function AnswerOption({
     <Pressable accessibilityRole="radio" accessibilityState={{ checked: state === 'selected' || state === 'correct' || state === 'incorrect', disabled: locked }}
       accessibilityLabel={`Alternativa ${letter}`} disabled={locked} onPress={onPress}
       style={{
-        flexDirection: 'row', gap: space[3], alignItems: 'flex-start', paddingVertical: 14, paddingLeft: space[3], paddingRight: onEliminate ? 52 : space[4],
+        flexDirection: 'row', gap: space[3], alignItems: compact ? 'center' : 'flex-start', paddingVertical: compact ? 10 : 14, minHeight: compact ? 48 : undefined,
+        paddingLeft: space[3], paddingRight: onEliminate ? 52 : space[4],
         borderRadius: radius.md, borderWidth: 1.5, borderStyle: s.dashed ? 'dashed' : 'solid', borderColor: s.border, backgroundColor: s.bg,
       }}>
       <View style={{
-        width: 28, height: 28, marginTop: -3, borderRadius: 14, borderWidth: 1.5, borderColor: s.letterBorder, borderStyle: out ? 'dashed' : 'solid',
+        width: 28, height: 28, marginTop: compact ? 0 : -3, borderRadius: 14, borderWidth: 1.5, borderColor: s.letterBorder, borderStyle: out ? 'dashed' : 'solid',
         backgroundColor: s.letterBg, alignItems: 'center', justifyContent: 'center',
       }}>
         {state === 'correct' || state === 'missed' ? <Icon name="check" size={16} strokeWidth={3} color={s.letterFg} />
