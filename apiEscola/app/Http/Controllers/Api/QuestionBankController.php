@@ -209,7 +209,7 @@ class QuestionBankController extends Controller
         return $this->created(new QuestionBankQuestionResource($question), 'Questão criada com sucesso.');
     }
 
-    /** Edita o conteúdo de questão avulsa (questão de simulado: 409, editar pelo simulado). */
+    /** Edita o conteúdo de questão avulsa ou de simulado já arquivado. */
     public function update(SaveStandaloneQuestionRequest $request, int $question, QuestionIssueReviewService $reviews): JsonResponse
     {
         $model = $this->findQuestion($request, $question);

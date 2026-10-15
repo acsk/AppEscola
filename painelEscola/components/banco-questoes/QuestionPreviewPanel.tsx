@@ -90,7 +90,7 @@ export default function QuestionPreviewPanel({ question, onClose, onOpenFull, on
           #{q.id}
         </Text>
         {official ? (
-          <OfficialBadge label="Simulado oficial · bloqueada" title={`Questão do simulado oficial "${q.exam!.title}": edição bloqueada.`} />
+          <OfficialBadge label="Simulado arquivado" title={`Questão do simulado arquivado "${q.exam!.title}". O conteúdo pode ser editado no banco.`} />
         ) : (
           <Badge label="Avulsa" tone="neutral" />
         )}
@@ -170,8 +170,8 @@ export default function QuestionPreviewPanel({ question, onClose, onOpenFull, on
       <View className="flex-row flex-wrap border-t border-border bg-surface-sunken" style={{ gap: 8, paddingVertical: 12, paddingHorizontal: 16 }}>
         {official ? (
           <>
-            <Button size="sm" variant="primary" label="Abrir simulado" onPress={() => onOpenExam(q.exam!.id)} />
-            <Button size="sm" label="Classificar" onPress={() => onOpenFull(q.id)} />
+            <Button size="sm" variant="primary" label="Editar" onPress={() => onEdit(q.id)} />
+            <Button size="sm" label="Abrir simulado" onPress={() => onOpenExam(q.exam!.id)} />
           </>
         ) : (
           <>

@@ -26,7 +26,7 @@ export const QUESTION_BANK_ORIGINS = [
   { key: "avulsa", label: "Avulsas" },
   { key: "avulsa_livre", label: "Avulsas fora de simulados do banco" },
   { key: "simulado_banco", label: "Em simulados do banco" },
-  { key: "simulado", label: "De simulados oficiais (bloqueadas)" },
+  { key: "simulado", label: "De simulados oficiais arquivados" },
 ] as const;
 
 export type QuestionBankOrigin = (typeof QUESTION_BANK_ORIGINS)[number]["key"];

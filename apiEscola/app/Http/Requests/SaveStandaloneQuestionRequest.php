@@ -71,8 +71,10 @@ class SaveStandaloneQuestionRequest extends FormRequest
             if (trim(QuestionRichText::plain($text)) === '' && trim((string) $image) === '') {
                 $validator->errors()->add('question_text', 'Informe o texto do enunciado, a imagem, ou ambos.');
             }
-            // Questão de simulado nesta rota recebe o 409 do serviço, não erro de validação.
-            if ($current === null || $current->exam_id === null) {
+            // Simulado ainda não arquivado não é editado por aqui. Arquivado segue a mesma classificação da avulsa.
+            $archivedExam = $current?->exam_id !== null
+                && $current->exam()->whereHas('examStatus', fn ($query) => $query->where('slug', 'archived'))->exists();
+            if ($current === null || $current->exam_id === null || $archivedExam) {
                 QuestionClassificationRequirement::validate($validator, $this->all(), $current);
             }
 

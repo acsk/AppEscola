@@ -14,8 +14,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Conteúdo de questões (enunciado, alternativas, gabarito, explicação).
- * No banco de questões só as avulsas (exam_id nulo) são criadas/editadas/excluídas aqui;
- * o conteúdo de questão de simulado continua sendo editado pelo simulado.
+ * No banco de questões as avulsas são criadas, editadas e excluídas aqui.
+ * Questão de simulado arquivado também tem o conteúdo editado aqui; a exclusão continua pelo simulado.
+ * Simulado ainda não arquivado não entra no banco.
  */
 class QuestionContentService
 {
@@ -68,7 +69,7 @@ class QuestionContentService
 
     public function updateStandalone(ExamQuestion $question, array $data): ExamQuestion
     {
-        $this->assertStandalone($question);
+        $this->assertContentEditable($question);
 
         return DB::transaction(function () use ($question, $data) {
             $question->fill($this->contentAttributes($data))->save();
@@ -148,10 +149,25 @@ class QuestionContentService
             : $this->classification->apply($question, $classification, $tenantId);
     }
 
+    /** Avulsa, ou questão de simulado já arquivado. Publicado e rascunho continuam só no simulado. */
+    private function assertContentEditable(ExamQuestion $question): void
+    {
+        if ($question->exam_id === null) {
+            return;
+        }
+
+        $archived = $question->exam()->whereHas('examStatus', fn ($query) => $query->where('slug', 'archived'))->exists();
+        if ($archived) {
+            return;
+        }
+
+        throw QuestionBankException::conflict('Esta questão pertence a um simulado que ainda não foi arquivado. Edite o conteúdo pelo simulado.');
+    }
+
     private function assertStandalone(ExamQuestion $question): void
     {
         if ($question->exam_id !== null) {
-            throw QuestionBankException::conflict('Esta questão pertence a um simulado. Edite o conteúdo pelo simulado.');
+            throw QuestionBankException::conflict('Esta questão pertence a um simulado e não pode ser excluída pelo banco.');
         }
     }
 

@@ -3,14 +3,14 @@ import { Lock } from "lucide-react-native";
 import { color } from "../../constants/theme";
 
 /**
- * Selo "Oficial": questão de simulado oficial, com edição bloqueada (protótipo "TelaBancoQuestoes").
+ * Selo "Oficial": questão de simulado oficial já arquivado. O conteúdo é editado no banco.
  * Fundo `warning`, texto em `surface`, cadeado com traço mais forte para ler em 12px.
  */
 export function OfficialBadge({ label = "Oficial", title }: { label?: string; title?: string }) {
   return (
     <View
       role="img"
-      aria-label={title ?? "Questão de simulado oficial — edição bloqueada"}
+      aria-label={title ?? "Questão de simulado oficial arquivado"}
       className="flex-row items-center rounded-ds-sm"
       style={{ alignSelf: "flex-start", gap: 4, height: 20, paddingLeft: 5, paddingRight: 6, backgroundColor: color.warning }}
     >

@@ -968,7 +968,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                               #{row.id}
                             </Text>
                             {row.exam ? (
-                              <OfficialBadge title={`Questão do simulado oficial "${row.exam.title}": conteúdo não editável e não entra em simulados do banco.`} />
+                              <OfficialBadge title={`Questão do simulado arquivado "${row.exam.title}". O conteúdo pode ser editado aqui e não entra em outros simulados do banco.`} />
                             ) : null}
                           </View>
                           <View style={{ flex: 1, minWidth: 240, paddingHorizontal: 12, paddingVertical: density === "compacta" ? 6 : 10 }}>
@@ -1136,10 +1136,10 @@ export default function QuestionBankScreen({ navigate }: Props) {
           <View style={{ gap: 6 }}>
             {menuRow.exam && (
               <View className="flex-row items-start gap-3 px-3 py-2 rounded-ds-md bg-warning-tint mb-1">
-                <Ionicons name="lock-closed" size={28} color="var(--ds-warning)" />
+                <Ionicons name="archive-outline" size={28} color="var(--ds-warning)" />
                 <Text className="text-xs text-ink flex-1">
-                  Questão do simulado oficial "{menuRow.exam.title}". O conteúdo não pode ser editado aqui (só a classificação) e
-                  ela não pode ser incluída em simulados do banco.
+                  Questão do simulado arquivado "{menuRow.exam.title}". O conteúdo pode ser editado aqui.
+                  Ela não pode ser excluída nem incluída em outros simulados do banco.
                 </Text>
               </View>
             )}

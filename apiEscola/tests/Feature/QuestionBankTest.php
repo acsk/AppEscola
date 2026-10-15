@@ -537,11 +537,17 @@ class QuestionBankTest extends TestCase
             'title' => 'Simulado A',
             'exam_status_id' => DB::table('exam_statuses')->where('slug', 'archived')->value('id'),
         ]);
-        $examQuestion = $this->question(['exam_id' => $exam->id]);
-        $this->putJson("/api/question-bank/questions/{$examQuestion->id}", ['question_text' => 'x'])
+        [$math, $algebra] = $this->subjectWithTopics('História', ['Brasil']);
+        $examQuestion = $this->question(['exam_id' => $exam->id, 'subject_id' => $math->id]);
+        $examQuestion->topics()->sync([$algebra->id]);
+        $this->putJson("/api/question-bank/questions/{$examQuestion->id}", ['question_text' => 'Texto revisado no banco', 'options' => [
+            ['option_text' => 'Certa', 'is_correct' => true],
+            ['option_text' => 'Errada', 'is_correct' => false],
+        ]])->assertOk()->assertJsonPath('body.question_text', 'Texto revisado no banco');
+        $this->assertSame($exam->id, $examQuestion->fresh()->exam_id);
+        $this->deleteJson("/api/question-bank/questions/{$examQuestion->id}")
             ->assertStatus(409)
-            ->assertJsonPath('message', 'Esta questão pertence a um simulado. Edite o conteúdo pelo simulado.');
-        $this->deleteJson("/api/question-bank/questions/{$examQuestion->id}")->assertStatus(409);
+            ->assertJsonPath('message', 'Esta questão pertence a um simulado e não pode ser excluída pelo banco.');
 
         $this->deleteJson("/api/question-bank/questions/{$id}")->assertOk();
         $this->assertSoftDeleted('exam_questions', ['id' => $id]);

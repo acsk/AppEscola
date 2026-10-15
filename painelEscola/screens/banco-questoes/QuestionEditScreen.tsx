@@ -7,8 +7,6 @@ import ActionsMenu, { type ActionsMenuItem } from "../../components/ui/ActionsMe
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
 import RichTextInput from "../../components/ui/RichTextInput";
-import FormInput from "../../components/ui/FormInput";
-import RichText from "../../components/ui/RichText";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import MessageModal from "../../components/ui/MessageModal";
@@ -26,8 +24,6 @@ import {
   fetchQuestionBankQuestion,
   markQuestionsRevalidated,
   resetQuestionPractice,
-  patchQuestionClassification,
-  resolveStudentReview,
   updateStandaloneQuestion,
   uploadQuestionBankImage,
 } from "../../services/questionBank";
@@ -379,7 +375,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setReview(response.body);
       if (response.body.id) setReviewHistory((prev) => [response.body, ...prev.filter((item) => item.id !== response.body.id)]);
       const question = response.body.question;
-      if (question && !isFromExam) {
+      if (question) {
         setContent((prev) => ({
           ...prev,
           question_text: question.question_text || prev.question_text,
@@ -498,54 +494,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     });
   };
 
-  /** Questão de simulado: só a classificação é gravada (o conteúdo é do simulado). */
-  const saveExamClassification = async (hadError?: boolean) => {
-    if (questionId === null) return;
-    const clientErrors = validateClassification(classification, catalogs.taxonomy);
-    if (Object.keys(clientErrors).length) {
-      showClientErrors(clientErrors);
-      return;
-    }
-    const decision = hadError === undefined ? undefined : hadError;
-    const patch = diffClassification(initialClassification, classification);
-    if (!Object.keys(patch).length) {
-      setSaving("save");
-      try {
-        const response = await resolveStudentReview(questionId, decision);
-        showApiToast(setToast, response, "Questão liberada para resposta.");
-        setIssueReportsCount(0);
-        setIssueReporters([]);
-      } catch (error) {
-        showApiErrorToast(setToast, error, "Não foi possível liberar a questão.");
-        setSaving(null);
-        return;
-      }
-      setSaving(null);
-      navigate("questoes-classificar", { questionId, query: listQuery });
-      return;
-    }
-    setSaving("save");
-    try {
-      const response = await patchQuestionClassification(questionId, patch, decision);
-      showApiToast(setToast, response, "Classificação salva com sucesso.");
-        setIssueReportsCount(0);
-        setIssueReporters([]);
-      setInitialClassification(classification);
-      navigate("questoes-classificar", { questionId, query: listQuery });
-    } catch (error) {
-      setErrors(getApiValidationErrors(error));
-      showApiErrorToast(setToast, error, "Não foi possível salvar a classificação.");
-    } finally {
-      setSaving(null);
-    }
-  };
-
   const save = async (mode: "save" | "another", hadError?: boolean) => {
     if (aiFilling || uploading || saving !== null) return;
-    if (isFromExam) {
-      await saveExamClassification(hadError);
-      return;
-    }
     const clientErrors = { ...validateContent(content), ...validateClassification(classification, catalogs.taxonomy) };
     if (Object.keys(clientErrors).length) {
       showClientErrors(clientErrors);
@@ -587,9 +537,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
 
   const askSave = () => {
     if (aiFilling || uploading || saving !== null) return;
-    const clientErrors = isFromExam
-      ? validateClassification(classification, catalogs.taxonomy)
-      : { ...validateContent(content), ...validateClassification(classification, catalogs.taxonomy) };
+    const clientErrors = { ...validateContent(content), ...validateClassification(classification, catalogs.taxonomy) };
     if (Object.keys(clientErrors).length) {
       showClientErrors(clientErrors);
       return;
@@ -649,20 +597,17 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const description = !isEdit
     ? "Questão avulsa, sem vínculo com simulado."
     : [
+        isFromExam ? `Simulado arquivado${examQuestion?.exam?.title ? `: ${examQuestion.exam.title}` : ""}` : null,
         [subjectName, topicNames[0] && `${topicNames[0]}${topicNames.length > 1 ? ` +${topicNames.length - 1}` : ""}`].filter(Boolean).join(" › "),
         updatedAgo(updatedAt) && `atualizada ${updatedAgo(updatedAt)}`,
       ].filter(Boolean).join(" · ") || undefined;
 
   const aiItems: ActionsMenuItem[] = [
-    ...(!isFromExam
-      ? [{ key: "autofill", label: "Autocompletar questão", icon: Sparkles, description: "Sugere alternativas, gabarito, explicação e classificação", onPress: () => void autofill(), disabled: busyAny }]
-      : []),
-    ...(!isFromExam && content.type === "essay"
+    { key: "autofill", label: "Autocompletar questão", icon: Sparkles, description: "Sugere alternativas, gabarito, explicação e classificação", onPress: () => void autofill(), disabled: busyAny },
+    ...(content.type === "essay"
       ? [{ key: "convert", label: "Transformar em objetiva", icon: Wand2, description: "Reescreve o comando e cria 5 alternativas", onPress: () => setConfirmConvert(true), disabled: busyAny }]
       : []),
-    ...(!isFromExam
-      ? [{ key: "correct", label: "Corrigir com IA", icon: Wand2, description: review ? "Corrige o que a revisão pedagógica apontou" : "Valide a questão antes de corrigir", onPress: () => void runReview("correct"), disabled: busyAny || reviewing || !review || review.aprovada }]
-      : []),
+    { key: "correct", label: "Corrigir com IA", icon: Wand2, description: review ? "Corrige o que a revisão pedagógica apontou" : "Valide a questão antes de corrigir", onPress: () => void runReview("correct"), disabled: busyAny || reviewing || !review || review.aprovada },
     ...(isEdit
       ? [{ key: "similar", label: "Gerar questões similares", icon: Copy, description: "Cria variações no mesmo assunto", onPress: () => void openSimilar(), disabled: busyAny }]
       : []),
@@ -730,7 +675,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     </View>
   );
 
-  const autofillLink = aiAvailable && !isFromExam ? (
+  const autofillLink = aiAvailable ? (
     <TouchableOpacity
       onPress={() => void autofill()}
       disabled={busyAny}
@@ -742,58 +687,6 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       <Text className="font-medium text-brand" style={{ fontSize: 12 }}>{aiFilling ? "Preenchendo…" : "Autocompletar com IA"}</Text>
     </TouchableOpacity>
   ) : null;
-
-  const examContentPanel = examQuestion && (
-    <Panel
-      title="Conteúdo"
-      description={`Questão do simulado "${examQuestion.exam?.title ?? ""}". O conteúdo é editado pelo simulado; aqui você altera a classificação.`}
-      actions={
-        examQuestion.exam ? (
-          <Button
-            size="sm"
-            icon={ExternalLink}
-            label="Abrir simulado"
-            onPress={() => leave(() => navigate("simulados-form", { examId: examQuestion.exam!.id }))}
-          />
-        ) : undefined
-      }
-    >
-      <View style={{ gap: 12 }}>
-        <FormInput
-          label="Nome da prova/simulado de origem"
-          value={examQuestion.exam?.title || examQuestion.source_exam_name || ""}
-          editable={false}
-        />
-        <Text className="text-xs text-ink-subtle" style={{ marginTop: -8 }}>
-          Definido pelo simulado. Não pode ser alterado nesta tela.
-        </Text>
-        {!!examQuestion.question_text?.trim() && <RichText className="text-sm text-ink leading-6" selectable value={examQuestion.question_text} />}
-        {!!examQuestion.image_url && (
-          <Image source={{ uri: examQuestion.image_url }} accessibilityLabel="Imagem do enunciado" style={{ width: "100%", height: isMobile ? 180 : 260 }} resizeMode="contain" />
-        )}
-        {(examQuestion.options ?? []).map((option, i) => (
-          <View
-            key={option.id}
-            className={`flex-row items-center rounded-ds-md border ${option.is_correct ? "bg-success-tint border-success" : "bg-surface border-border-strong"}`}
-            style={[
-              { gap: 10, minHeight: 44, paddingVertical: 8, paddingHorizontal: 12 },
-              option.is_correct && Platform.OS === "web" ? ({ boxShadow: `inset 3px 0 0 ${color.success}` } as object) : null,
-            ]}
-          >
-            <Text className={`font-mono font-semibold ${option.is_correct ? "text-success" : "text-ink-muted"}`} style={{ fontSize: 14 }}>{"ABCDEFGHIJ"[i]}</Text>
-            <RichText className="text-sm text-ink flex-1" value={option.option_text} />
-            {option.is_correct ? <Text className="font-medium text-success" style={{ fontSize: 12 }}>Correta</Text> : null}
-          </View>
-        ))}
-        {!!examQuestion.explanation?.trim() && (
-          <View style={{ gap: 4 }}>
-            <Text className="text-xs font-medium text-ink-muted">Explicação</Text>
-            <RichText className="text-sm text-ink leading-6" selectable value={examQuestion.explanation} />
-          </View>
-        )}
-      </View>
-    </Panel>
-  );
 
   const imageField = (
     <View className="mb-4">
@@ -853,7 +746,18 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     : aiStatusError ?? (!aiAvailable ? "Para usar a IA, cadastre uma chave em Configurações → Integração com IA." : null);
 
   const contentPanel = (
-    <Panel title="Conteúdo" actions={typeToggle}>
+    <Panel
+      title="Conteúdo"
+      description={isFromExam ? `Questão do simulado arquivado "${examQuestion?.exam?.title ?? ""}". A edição aqui altera o simulado.` : undefined}
+      actions={
+        <View className="flex-row items-center" style={{ gap: 8 }}>
+          {isFromExam && examQuestion?.exam ? (
+            <Button size="sm" icon={ExternalLink} label="Abrir simulado" onPress={() => leave(() => navigate("simulados-form", { examId: examQuestion.exam!.id }))} />
+          ) : null}
+          {typeToggle}
+        </View>
+      }
+    >
       {content.type === "essay" && (
         <View className="flex-row flex-wrap items-center border border-border rounded-ds-md bg-surface-sunken" style={{ gap: 10, padding: 12, marginBottom: 16 }}>
           <Text className="text-sm text-ink-muted" style={{ flex: 1, minWidth: 220 }}>
@@ -921,11 +825,11 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     <View style={{ gap: 20 }}>
       {isEdit ? (
         <SimilarSearchPanel
-          questionText={isFromExam ? (examQuestion?.question_text ?? "") : content.question_text}
+          questionText={content.question_text}
           subjectId={classification.subject_id}
           topicId={classification.topic_ids[0] ?? null}
-          imageUrl={isFromExam ? examQuestion?.image_url : content.image_url}
-          options={(isFromExam ? examQuestion?.options ?? [] : content.options).map((option) => ({ option_text: option.option_text }))}
+          imageUrl={content.image_url}
+          options={content.options.map((option) => ({ option_text: option.option_text }))}
           ignoreId={questionId}
           onOpen={(id) => leave(() => navigate("questoes-classificar", { questionId: id, query: listQuery }))}
         />
@@ -1032,7 +936,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           </View>
         ) : (
           <View style={{ flexDirection: stacked ? "column" : "row", gap: 20, alignItems: stacked ? "stretch" : "flex-start" }}>
-            <View style={{ flex: stacked ? undefined : 1, minWidth: 0 }}>{isFromExam ? examContentPanel : contentPanel}</View>
+            <View style={{ flex: stacked ? undefined : 1, minWidth: 0 }}>{contentPanel}</View>
             <View style={{ width: stacked ? "100%" : 380 }}>{sideColumn}</View>
           </View>
         )}
