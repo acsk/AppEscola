@@ -70,7 +70,7 @@ export function AlunoDrawer() {
 
   return (
     <>
-      <Modal visible={shouldRender} transparent animationType="none" onRequestClose={close}>
+      <Modal visible={shouldRender && !confirmLogoutVisible} transparent animationType="none" onRequestClose={close}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: p.scrim, opacity: backdropOpacity }]}>
             <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Fechar menu" />

@@ -16,11 +16,14 @@ export type SideNavItem = {
  * Navegação lateral do tablet/desktop (protótipo "SideNav"): completa (248px) ou rail (72px, só ícones).
  * Cor só no ícone do item ativo; o fundo do ativo é neutro.
  */
+const NAV_DANGER = '#FF9A90';
+
 export function SideNav({
-  items, activeKey, onSelect, collapsed, brand, logoUrl, user,
+  items, activeKey, onSelect, collapsed, brand, logoUrl, user, onLogout,
 }: {
   items: SideNavItem[]; activeKey: string | null; onSelect: (key: string) => void; collapsed?: boolean;
   brand: string; logoUrl?: string | null; user?: { initials: string; name: string; meta?: string | null; photoUrl?: string | null };
+  onLogout?: () => void;
 }) {
   const p = usePalette();
   return (
@@ -73,6 +76,17 @@ export function SideNav({
             </View>
           ) : null}
         </View>
+      ) : null}
+      {onLogout ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Sair" onPress={onLogout}
+          style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => ({
+            flexDirection: 'row', alignItems: 'center', gap: space[3], height: 40, borderRadius: radius.sm, marginTop: space[1],
+            paddingHorizontal: collapsed ? 0 : space[3], justifyContent: collapsed ? 'center' : 'flex-start',
+            backgroundColor: hovered || pressed ? p.navActive : 'transparent',
+          }) as never}>
+          <Icon name="logout" size={20} color={NAV_DANGER} />
+          {!collapsed ? <Text numberOfLines={1} style={[type.label, { color: NAV_DANGER, flex: 1 }]}>Sair</Text> : null}
+        </Pressable>
       ) : null}
     </View>
   );

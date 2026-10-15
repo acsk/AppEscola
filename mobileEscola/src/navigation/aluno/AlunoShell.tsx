@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
+import ConfirmModal from '../../components/ConfirmModal';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantTheme } from '../../context/TenantThemeContext';
 import { useRootNavigationState } from '../useRootNavigationState';
@@ -15,7 +16,8 @@ import { usePendingSimuladosCount } from '../../features/simulados/hooks';
 export function AlunoShell({ children }: { children: React.ReactNode }) {
   const p = usePalette();
   const { mode } = useLayoutMode();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const { tenantName, logoUrl } = useTenantTheme();
   const state = useRootNavigationState() as never;
   const newQuestions = useNewQuestionsCount(mode !== 'mobile');
@@ -45,8 +47,24 @@ export function AlunoShell({ children }: { children: React.ReactNode }) {
           initials: userInitials(user?.name), name: user?.name ?? 'Aluno', meta: enrollment ? `Matrícula ${enrollment}` : null,
           photoUrl: (user as { photo_url?: string | null } | null)?.photo_url ?? null,
         }}
+        onLogout={() => setConfirmLogout(true)}
       />
       <View style={{ flex: 1, minWidth: 0 }}>{children}</View>
+      <ConfirmModal
+        visible={confirmLogout}
+        title="Sair"
+        message="Deseja sair do aplicativo?"
+        confirmLabel="Sair"
+        cancelLabel="Cancelar"
+        confirmDestructive
+        icon="log-out-outline"
+        iconColor={p.danger}
+        onConfirm={() => {
+          setConfirmLogout(false);
+          void signOut();
+        }}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </View>
   );
 }
