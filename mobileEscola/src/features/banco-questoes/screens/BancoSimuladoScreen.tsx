@@ -200,7 +200,10 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
     if (questionId == null) return;
     setReported((prev) => ({ ...prev, [questionId]: true }));
     toggleIssue.mutate({ questionId, reported: true }, {
-      onError: () => setReported((prev) => ({ ...prev, [questionId]: false })),
+      onError: (cause) => {
+        setReported((prev) => ({ ...prev, [questionId]: false }));
+        setError(getApiErrorMessage(cause, 'Não foi possível enviar o erro da questão. Tente de novo.'));
+      },
     });
   };
   const toggleFlag = () => setFlagged((prev) => (prev.includes(index + 1) ? prev.filter((n) => n !== index + 1) : [...prev, index + 1]));
