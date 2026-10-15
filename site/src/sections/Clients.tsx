@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "../config";
 import aprova from "../../assets/logo-curso/aprova.png";
-import conectivo from "../../assets/logo-curso/conectivo.png";
+
 import elite from "../../assets/logo-curso/elite.png";
 import metaCerta from "../../assets/logo-curso/meta-certa.png";
 
@@ -13,7 +13,7 @@ function endereco(asset: string | { uri: string }): string {
 
 /** Logos fixas, exibidas mesmo se a API não responder. */
 const MARCAS: Marca[] = [
-  { name: "Conectivo Cursos", src: endereco(conectivo) },
+ 
   { name: "Aprova+", src: endereco(aprova) },
   { name: "Elite Preparatórios", src: endereco(elite) },
   { name: "Meta Certa", src: endereco(metaCerta) },

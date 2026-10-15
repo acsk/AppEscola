@@ -22,6 +22,14 @@ export type QuestionBankOption = {
   order: number;
 };
 
+export type QuestionIssueReporter = {
+  student_id: number;
+  name: string;
+  enrollment_number?: string | null;
+  reported_at?: string | null;
+  note?: string | null;
+};
+
 export type QuestionBankQuestion = {
   id: number;
   origin: "avulsa" | "simulado";
@@ -46,6 +54,8 @@ export type QuestionBankQuestion = {
   exam_type: { id: number; label: string } | null;
   revalidated_at?: string | null;
   issue_reports_count?: number;
+  /** Alunos que marcaram a questão para revisão e ainda aguardam o administrador. */
+  issue_reporters?: QuestionIssueReporter[];
   /** Respostas erradas na prática e em simulados oficiais. */
   wrong_count?: number;
   answer_count?: number;

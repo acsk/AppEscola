@@ -84,7 +84,7 @@ class QuestionBankController extends Controller
     public function show(Request $request, int $question): JsonResponse
     {
         $model = $this->findQuestion($request, $question);
-        $model->load(array_merge(QuestionClassificationService::RELATIONS, ['options']));
+        $model->load(array_merge(QuestionClassificationService::RELATIONS, ['options', 'issueReports.student:id,name,enrollment_number']));
         $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model));
@@ -98,6 +98,7 @@ class QuestionBankController extends Controller
         }
         $model = $this->classification->apply($model, $request->validated(), (int) $model->tenant_id);
         $message = $this->finishAdminSave($request, $model, $reviews, 'Classificação salva com sucesso.');
+        $model->load(['issueReports.student:id,name,enrollment_number']);
         $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model), $message);
@@ -111,6 +112,7 @@ class QuestionBankController extends Controller
             return $denied;
         }
         $message = $this->finishAdminSave($request, $model, $reviews, 'Questão liberada para resposta. A contagem de respostas erradas permanece.');
+        $model->load(['issueReports.student:id,name,enrollment_number']);
         $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model), $message);
@@ -216,7 +218,7 @@ class QuestionBankController extends Controller
         }
         $model = $this->content->updateStandalone($model, $request->validated());
         $message = $this->finishAdminSave($request, $model, $reviews, 'Questão atualizada com sucesso.');
-        $model->load('options');
+        $model->load(['options', 'issueReports.student:id,name,enrollment_number']);
         $model->loadCount('issueReports');
 
         return $this->success(new QuestionBankQuestionResource($model), $message);
@@ -317,7 +319,7 @@ class QuestionBankController extends Controller
     {
         if ($model->issueReports()->exists()) {
             $hadError = $request->boolean('had_error');
-            $reviews->concludeStudentReport($model, $hadError);
+            $reviews->concludeStudentReport($model, $hadError, $request->user());
 
             return QuestionIssueReviewService::conclusionMessage($hadError);
         }

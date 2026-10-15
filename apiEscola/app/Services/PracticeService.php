@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  */
 class PracticeService
 {
-    private const QUESTION_RELATIONS = ['options', 'subject:id,name', 'topics:id,name', 'difficulty:id,name', 'examType:id,label', 'exam:id,title'];
+    private const QUESTION_RELATIONS = ['options', 'subject:id,name', 'topics:id,name', 'difficulty:id,name', 'examType:id,label', 'exam:id,title', 'issueReviews:id,exam_question_id,reviewer_name,had_error,reviewed_at'];
 
     public function __construct(
         private readonly QuestionSetService $sets,
@@ -501,6 +501,13 @@ class PracticeService
             'options'          => $question->options
                 ->filter(fn ($o) => trim((string) $o->option_text) !== '')
                 ->map(fn ($o) => ['id' => $o->id, 'option_text' => $o->option_text])->values(),
+            'reviews'          => $question->relationLoaded('issueReviews')
+                ? $question->issueReviews->map(fn ($review) => [
+                    'reviewed_at' => $review->reviewed_at?->toIso8601String(),
+                    'reviewer_name' => $review->reviewer_name,
+                    'had_error' => (bool) $review->had_error,
+                ])->values()
+                : [],
         ];
     }
 

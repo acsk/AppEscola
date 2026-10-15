@@ -43,6 +43,15 @@ class QuestionBankQuestionResource extends JsonResource
             'exam_type_id' => $this->exam_type_id,
             'exam_type' => $this->examType ? ['id' => $this->examType->id, 'label' => $this->examType->label] : null,
             'issue_reports_count' => $this->when(isset($this->issue_reports_count), (int) $this->issue_reports_count),
+            'issue_reporters' => $this->when($this->relationLoaded('issueReports'), fn () => $this->issueReports
+                ->sortBy('id')
+                ->map(fn ($report) => [
+                    'student_id' => (int) $report->student_id,
+                    'name' => $report->student?->name ?: 'Aluno removido',
+                    'enrollment_number' => $report->student?->enrollment_number,
+                    'reported_at' => $report->created_at?->toIso8601String(),
+                    'note' => $report->note,
+                ])->values()),
             'wrong_count' => $this->when(isset($this->wrong_count), (int) $this->wrong_count),
             'answer_count' => $this->when(isset($this->answer_count), (int) $this->answer_count),
             'error_rate' => $this->when(

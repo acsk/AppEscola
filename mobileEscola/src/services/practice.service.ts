@@ -9,11 +9,19 @@ export interface PracticeOption {
   option_text: string;
 }
 
+export interface QuestionReviewEvent {
+  reviewed_at: string | null;
+  reviewer_name: string;
+  had_error: boolean;
+}
+
 export interface PracticeQuestion {
   id: number;
   question_text: string | null;
   image_url: string | null;
   source_exam_name: string | null;
+  /** Revisões do administrador depois que alunos marcaram a questão. */
+  reviews?: QuestionReviewEvent[];
   /** Simulado da escola de onde a questão veio (já arquivado). */
   exam_title?: string | null;
   subject: { id: number; name: string } | null;

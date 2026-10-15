@@ -96,6 +96,11 @@ class ExamQuestion extends Model
         return $this->hasMany(QuestionIssueReport::class, 'exam_question_id');
     }
 
+    public function issueReviews(): HasMany
+    {
+        return $this->hasMany(QuestionIssueReview::class, 'exam_question_id')->orderByDesc('reviewed_at')->orderByDesc('id');
+    }
+
     public function embeddings(): HasMany
     {
         return $this->hasMany(QuestionEmbedding::class, 'exam_question_id');

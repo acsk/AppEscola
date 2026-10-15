@@ -7,6 +7,13 @@ import { AnswerOption, Card, Icon, IconButton, NewPill, Tag, Txt, radius, space,
 
 const LETTERS = 'ABCDEFGHIJ';
 
+function formatReviewWhen(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 type Props = {
   question: PracticeQuestion;
   selectedId: number | null;
@@ -103,6 +110,22 @@ export function PracticeQuestionView({
           </AnswerOption>
         ))}
       </View>
+
+      {question.reviews && question.reviews.length > 0 ? (
+        <Card style={{ gap: 8 }}>
+          <Txt variant="titleSm" style={{ fontSize: 15, lineHeight: 20 }}>Histórico de revisão</Txt>
+          {question.reviews.map((review, index) => (
+            <View key={`${review.reviewed_at ?? 'revisao'}-${index}`} style={{ gap: 2 }}>
+              <Txt variant="bodySm" tone="muted">
+                {`Revisada em ${formatReviewWhen(review.reviewed_at)} por ${review.reviewer_name}.`}
+              </Txt>
+              <Txt variant="bodySm" tone="subtle">
+                {review.had_error ? 'Havia erro e a questão foi corrigida.' : 'Não havia erro.'}
+              </Txt>
+            </View>
+          ))}
+        </Card>
+      ) : null}
 
       {feedback?.explanation && !hideExplanation ? (
         <Card style={{ gap: 6 }}>

@@ -14,7 +14,7 @@ import ToastBanner from "../../components/ui/ToastBanner";
 import MessageModal from "../../components/ui/MessageModal";
 import { describeAiError } from "../../utils/aiErrors";
 import ClassificationFields, { SituationFields } from "../../components/banco-questoes/ClassificationFields";
-import { RevalidatedMark } from "../../components/banco-questoes/QuestionMarks";
+import { reporterDetail, RevalidatedMark } from "../../components/banco-questoes/QuestionMarks";
 import OptionsEditor from "../../components/banco-questoes/OptionsEditor";
 import SimilarQuestionsModal, { type SimilarSource } from "../../components/banco-questoes/SimilarQuestionsModal";
 import SimilarSearchPanel from "../../components/banco-questoes/SimilarSearchPanel";
@@ -60,7 +60,7 @@ import { imageQuestionContent } from "../../utils/questionImageReview";
 import RedrawImageModal from "../../components/banco-questoes/RedrawImageModal";
 import { plainRichText } from "../../utils/richText";
 import { color } from "../../constants/theme";
-import type { QuestionBankQuestion } from "../../types/questionBank";
+import type { QuestionBankQuestion, QuestionIssueReporter } from "../../types/questionBank";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -149,6 +149,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [imageDragOver, setImageDragOver] = useState(false);
   const [releaseKind, setReleaseKind] = useState<"save" | "revalidate" | "approve" | null>(null);
   const [issueReportsCount, setIssueReportsCount] = useState(0);
+  const [issueReporters, setIssueReporters] = useState<QuestionIssueReporter[]>([]);
   const [analysisHint, setAnalysisHint] = useState(false);
   const isFromExam = examQuestion !== null;
 
@@ -167,6 +168,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setInitialClassification(classified);
       setClassification(classified);
       setIssueReportsCount(q.issue_reports_count ?? 0);
+      setIssueReporters(q.issue_reporters ?? []);
       setRevalidatedAt(q.revalidated_at ?? null);
       setUpdatedAt(q.updated_at ?? null);
       setSourceExamName(q.source_exam_name ?? "");
@@ -366,6 +368,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         setReviewHistory((prev) => [response.body, ...prev]);
         setRevalidatedAt(new Date().toISOString());
         setIssueReportsCount(0);
+        setIssueReporters([]);
         showApiToast(setToast, response, "Questão liberada para resposta.");
         return;
       }
@@ -423,7 +426,10 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     try {
       const response = await markQuestionsRevalidated([questionId], next, next);
       setRevalidatedAt(next ? new Date().toISOString() : null);
-      if (next) setIssueReportsCount(0);
+      if (next) {
+        setIssueReportsCount(0);
+        setIssueReporters([]);
+      }
       showApiToast(setToast, response, next ? "Questão liberada para resposta." : "Marca de revalidação removida.");
     } catch (error) {
       showApiErrorToast(setToast, error, "Não foi possível marcar a revalidação.");
@@ -508,6 +514,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         const response = await resolveStudentReview(questionId, decision);
         showApiToast(setToast, response, "Questão liberada para resposta.");
         setIssueReportsCount(0);
+        setIssueReporters([]);
       } catch (error) {
         showApiErrorToast(setToast, error, "Não foi possível liberar a questão.");
         setSaving(null);
@@ -521,7 +528,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
     try {
       const response = await patchQuestionClassification(questionId, patch, decision);
       showApiToast(setToast, response, "Classificação salva com sucesso.");
-      setIssueReportsCount(0);
+        setIssueReportsCount(0);
+        setIssueReporters([]);
       setInitialClassification(classification);
       navigate("questoes-classificar", { questionId, query: listQuery });
     } catch (error) {
@@ -986,12 +994,30 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         </View>
 
         {!loading && !loadError && issueReportsCount > 0 ? (
-          <View className="border border-warning bg-warning-tint rounded-ds-md" style={{ paddingVertical: 10, paddingHorizontal: 16, marginBottom: 20 }}>
+          <View className="border border-warning bg-warning-tint rounded-ds-md" style={{ paddingVertical: 10, paddingHorizontal: 16, marginBottom: 20, gap: 8 }}>
             <Text className="text-ink" style={{ fontSize: 13, lineHeight: 20 }}>
-              {issueReportsCount === 1
-                ? "1 aluno informou erro nesta questão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."
-                : `${issueReportsCount} alunos informaram erro nesta questão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro.`}
+              {issueReporters.length === 1
+                ? "Este aluno marcou a questão para revisão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."
+                : issueReporters.length > 1
+                  ? "Estes alunos marcaram a questão para revisão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."
+                  : "Alunos marcaram esta questão para revisão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."}
             </Text>
+            {issueReporters.length > 0 ? (
+              <View style={{ gap: 4 }}>
+                {issueReporters.map((reporter) => (
+                  <View key={reporter.student_id} style={{ gap: 2 }}>
+                    <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18 }}>
+                      {reporterDetail(reporter)}
+                    </Text>
+                    {reporter.note ? (
+                      <Text className="text-ink-muted" style={{ fontSize: 13, lineHeight: 18 }}>
+                        {reporter.note}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
 

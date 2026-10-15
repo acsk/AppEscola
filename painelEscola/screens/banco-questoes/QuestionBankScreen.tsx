@@ -100,7 +100,13 @@ const LIST_HASH = "#/questoes";
 const DENSITY_KEY = "questoes_densidade";
 const SEARCH_DEBOUNCE_MS = 300;
 
-const COL = { select: 44, number: 88, difficulty: 140, errors: 104, board: 104, status: 132, actions: 40 };
+const COL = { select: 44, number: 88, difficulty: 140, errors: 104, board: 104, status: 168, actions: 40 };
+
+function reporterLabel(reporters: { name: string }[]): string {
+  if (reporters.length === 0) return "Sem validação";
+  if (reporters.length === 1) return reporters[0].name;
+  return `${reporters.length} alunos`;
+}
 /** Com a pré-visualização aberta: colunas mais estreitas, sem banca e situação. */
 const COL_NARROW = { ...COL, number: 84, difficulty: 128, errors: 92 };
 /** Largura mínima da janela para abrir a pré-visualização ao lado da lista (abaixo disso, a linha abre a página da questão). */
@@ -1025,7 +1031,10 @@ export default function QuestionBankScreen({ navigate }: Props) {
                           {!narrow && (
                             <View style={{ width: col.status, paddingHorizontal: 12 }}>
                               {(row.issue_reports_count ?? 0) > 0 ? (
-                                <StudentReviewMark />
+                                <StudentReviewMark
+                                  label={reporterLabel(row.issue_reporters ?? [])}
+                                  names={(row.issue_reporters ?? []).map((reporter) => reporter.name)}
+                                />
                               ) : row.is_annulled || row.is_outdated ? (
                                 <QuestionStatusBadge isAnnulled={row.is_annulled} isOutdated={row.is_outdated} />
                               ) : row.revalidated_at ? (

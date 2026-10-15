@@ -22,10 +22,27 @@ export function OfficialBadge({ label = "Oficial", title }: { label?: string; ti
   );
 }
 
+export function formatReportedAt(iso?: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+export function reporterDetail(reporter: { name: string; enrollment_number?: string | null; reported_at?: string | null }): string {
+  const when = formatReportedAt(reporter.reported_at);
+  const enrollment = reporter.enrollment_number ? `matrícula ${reporter.enrollment_number}` : "";
+  return [reporter.name, enrollment, when].filter(Boolean).join(" · ");
+}
+
 /** Aluno informou erro. A questão fica sem validação até o administrador revisar. */
-export function StudentReviewMark({ label = "Sem validação" }: { label?: string }) {
+export function StudentReviewMark({ label = "Sem validação", names = [] }: { label?: string; names?: string[] }) {
+  const who = names.filter(Boolean);
+  const aria = who.length
+    ? `Marcada para revisão por ${who.join(", ")}`
+    : "Questão sem validação: aluno informou erro";
   return (
-    <View className="flex-row items-center" style={{ gap: 8 }} aria-label="Questão sem validação: aluno informou erro">
+    <View className="flex-row items-center" style={{ gap: 8, flex: 1, minWidth: 0 }} aria-label={aria}>
       <View
         aria-hidden
         className="rounded-ds-sm items-center justify-center"
@@ -35,7 +52,7 @@ export function StudentReviewMark({ label = "Sem validação" }: { label?: strin
           !
         </Text>
       </View>
-      <Text className="font-medium" style={{ fontSize: 13, color: color.warning }} numberOfLines={1}>
+      <Text className="font-medium" style={{ fontSize: 13, color: color.warning, flexShrink: 1 }} numberOfLines={2}>
         {label}
       </Text>
     </View>

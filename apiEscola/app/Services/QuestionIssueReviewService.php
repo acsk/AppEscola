@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\ExamQuestion;
+use App\Models\QuestionIssueReview;
 use App\Models\QuestionReview;
+use App\Models\User;
 
 /**
  * Aviso de erro do aluno: a questão fica sem validação até o administrador analisar.
@@ -70,7 +72,7 @@ class QuestionIssueReviewService
     }
 
     /** Encerra o aviso do aluno depois que o administrador confirma se havia erro. */
-    public function concludeStudentReport(ExamQuestion $question, bool $hadError): void
+    public function concludeStudentReport(ExamQuestion $question, bool $hadError, ?User $reviewer = null): void
     {
         if (! $question->issueReports()->exists()) {
             $this->releaseForAnswers($question, false);
@@ -78,7 +80,18 @@ class QuestionIssueReviewService
             return;
         }
 
+        $reviewerName = trim((string) ($reviewer?->name ?? ''));
+        QuestionIssueReview::query()->create([
+            'tenant_id' => $question->tenant_id,
+            'exam_question_id' => $question->id,
+            'reviewed_by' => $reviewer?->id,
+            'reviewer_name' => $reviewerName !== '' ? $reviewerName : 'Administrador',
+            'had_error' => $hadError,
+            'reviewed_at' => now(),
+        ]);
+
         $question->issueReports()->delete();
+        $question->unsetRelation('issueReports');
         $this->ensureApproved($question);
         $fill = ['revalidated_at' => now()];
         if ($hadError) {

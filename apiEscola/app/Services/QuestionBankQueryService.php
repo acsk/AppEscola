@@ -57,6 +57,7 @@ class QuestionBankQueryService
         $page = $query->select('exam_questions.*')
             ->selectRaw('COALESCE(qe.wrong_count, 0) as wrong_count, COALESCE(qe.answer_count, 0) as answer_count')
             ->with(QuestionClassificationService::RELATIONS)
+            ->with(['issueReports.student:id,name,enrollment_number'])
             ->withCount('issueReports')
             ->paginate($perPage, ['*'], 'page', max(1, (int) ($params['page'] ?? 1)));
 

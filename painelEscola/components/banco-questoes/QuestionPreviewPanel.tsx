@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Platform, Text, TouchableOpacity, View } from "react-native";
 import { ExternalLink, Plus, X } from "lucide-react-native";
-import { OfficialBadge } from "./QuestionMarks";
+import { OfficialBadge, reporterDetail } from "./QuestionMarks";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
@@ -158,6 +158,12 @@ export default function QuestionPreviewPanel({ question, onClose, onOpenFull, on
           />
           <Fact label="Banca · ano" value={[q.board?.name, q.year].filter(Boolean).join(" · ") || "—"} />
           <Fact label="Situação" value={situation} />
+          {(q.issue_reporters ?? []).length > 0 ? (
+            <Fact
+              label="Revisão"
+              value={(q.issue_reporters ?? []).map((reporter) => [reporterDetail(reporter), reporter.note].filter(Boolean).join(" — ")).join("\n")}
+            />
+          ) : null}
         </View>
       </View>
 
