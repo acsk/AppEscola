@@ -189,8 +189,14 @@ class StudentPracticeController extends Controller
         $model = $this->attempt($request, $attempt);
         $data = $request->validate([
             'question_id' => ['required', 'integer'],
-            'option_id'   => ['required', 'integer'],
+            // null desmarca a alternativa (só enquanto a questão não foi corrigida).
+            'option_id'   => ['present', 'nullable', 'integer'],
         ], [], ['question_id' => 'questão', 'option_id' => 'alternativa']);
+        if ($data['option_id'] === null) {
+            $this->practice->clearAnswerInAttempt($model, (int) $data['question_id']);
+
+            return $this->success($this->practice->attemptSummary($model), 'Resposta removida.');
+        }
         $this->practice->answerInAttempt($model, (int) $data['question_id'], (int) $data['option_id']);
         // Sessão com correção a cada questão: devolve a correção junto.
         $feedback = $this->practice->feedbackInAttempt($model, (int) $data['question_id']);

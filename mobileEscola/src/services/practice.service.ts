@@ -255,7 +255,8 @@ export async function fetchPracticeAttempt(attemptId: number): Promise<PracticeA
   return data.body;
 }
 
-export async function answerInPracticeAttempt(attemptId: number, questionId: number, optionId: number): Promise<PracticeAttemptSummary & { feedback?: PracticeFeedback }> {
+/** Grava a alternativa marcada; `optionId` null desmarca (só antes da correção). */
+export async function answerInPracticeAttempt(attemptId: number, questionId: number, optionId: number | null): Promise<PracticeAttemptSummary & { feedback?: PracticeFeedback }> {
   const { data } = await api.post<Envelope<PracticeAttemptSummary & { feedback?: PracticeFeedback }>>(`/api/aluno/practice-attempts/${attemptId}/answer`, {
     question_id: questionId,
     option_id: optionId,

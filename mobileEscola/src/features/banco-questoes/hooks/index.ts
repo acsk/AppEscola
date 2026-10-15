@@ -93,7 +93,7 @@ export function useStartQuestionSet() {
 export function useAnswerInAttempt(attemptId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ questionId, optionId }: { questionId: number; optionId: number }) =>
+    mutationFn: ({ questionId, optionId }: { questionId: number; optionId: number | null }) =>
       answerInPracticeAttempt(attemptId, questionId, optionId),
     // Com a correção na hora, recarrega a sessão ("Seu acerto no assunto" e afins).
     onSuccess: (res) => { if (res.feedback) queryClient.invalidateQueries({ queryKey: bancoKeys.attempt(attemptId) }); },

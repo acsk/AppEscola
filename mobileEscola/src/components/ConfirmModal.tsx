@@ -20,6 +20,8 @@ interface Props {
   confirmDestructive?: boolean;
   icon?: React.ComponentProps<typeof Ionicons>['name'];
   iconColor?: string;
+  /** Fundo do círculo. Sem ele, o fundo é uma versão clara da cor do ícone. */
+  iconBackground?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -33,6 +35,7 @@ export default function ConfirmModal({
   confirmDestructive = false,
   icon = 'alert-circle-outline',
   iconColor = '#F59E0B',
+  iconBackground,
   onConfirm,
   onCancel,
 }: Props) {
@@ -50,7 +53,7 @@ export default function ConfirmModal({
       <View style={[s.overlay, { pointerEvents: 'box-none' }]}>
         <View style={s.card}>
           {/* Ícone */}
-          <View style={[s.iconCircle, { backgroundColor: iconColor + '1A' }]}>
+          <View style={[s.iconCircle, { backgroundColor: iconBackground ?? iconColor + '1A' }]}>
             <Ionicons name={icon} size={32} color={iconColor} />
           </View>
 

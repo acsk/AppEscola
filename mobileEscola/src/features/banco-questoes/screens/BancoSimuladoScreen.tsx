@@ -132,14 +132,23 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const currentFeedback = current ? (feedbacks[current.id] ?? null) : null;
   const isLast = index >= questions.length - 1;
 
-  /** Correção no final: grava assim que marca. A cada questão: só marca; grava ao confirmar. */
+  /**
+   * Correção no final: grava assim que marca. A cada questão: só marca; grava ao confirmar.
+   * Tocar de novo na alternativa marcada desmarca (na correção no final, apaga a resposta na API).
+   */
   const select = (questionId: number, optionId: number) => {
     if (finished || feedbacks[questionId]) return;
     const previous = answers[questionId];
-    setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
+    const next = previous === optionId ? null : optionId;
+    setAnswers((prev) => {
+      const updated = { ...prev };
+      if (next == null) delete updated[questionId];
+      else updated[questionId] = next;
+      return updated;
+    });
     setError(null);
     if (eachMode) return;
-    answer.mutate({ questionId, optionId }, {
+    answer.mutate({ questionId, optionId: next }, {
       onError: (cause) => {
         setAnswers((prev) => {
           const next = { ...prev };
@@ -316,6 +325,8 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       confirmLabel="Enviar"
       cancelLabel="Cancelar"
       icon="warning-outline"
+      iconColor="#111111"
+      iconBackground="#F5C400"
       onConfirm={confirmReport}
       onCancel={() => setReportQuestionId(null)}
     />

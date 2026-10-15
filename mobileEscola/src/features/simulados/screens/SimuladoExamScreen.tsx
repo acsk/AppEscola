@@ -232,6 +232,15 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
   }
 
   const setResposta = (questionId: number, resp: Resposta) => setRespostas((prev) => ({ ...prev, [questionId]: resp }));
+  /** Marca a alternativa; tocar de novo na marcada desmarca. */
+  const marcarAlternativa = (q: Question, op: Question['options'][number]) => {
+    const atualResp = respostas[q.id] ?? {};
+    if (atualResp.optionId === op.id) {
+      setResposta(q.id, { ...atualResp, optionId: undefined, textAnswer: q.allow_text_answer ? atualResp.textAnswer : undefined });
+      return;
+    }
+    setResposta(q.id, { ...atualResp, optionId: op.id, textAnswer: op.triggers_text_input || q.allow_text_answer ? atualResp.textAnswer : undefined });
+  };
   const irPara = (index: number) => {
     setAtual(Math.max(0, Math.min(questoes.length - 1, index)));
     (scrollRef.current as unknown as { scrollTo?: (o: { y: number; animated: boolean }) => void })?.scrollTo?.({ y: 0, animated: false });
@@ -272,7 +281,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
       else if (q.type === 'multiple_choice') {
         const idx = LETTERS.indexOf(event.key.toUpperCase());
         const op = q.options[idx];
-        if (idx >= 0 && op) setResposta(q.id, { ...respostas[q.id], optionId: op.id, textAnswer: op.triggers_text_input || q.allow_text_answer ? respostas[q.id]?.textAnswer : undefined });
+        if (idx >= 0 && op) marcarAlternativa(q, op);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -391,7 +400,7 @@ export function SimuladoExamScreen({ route, navigation }: Props) {
         <QuestionShield accessibilityRole="radiogroup" style={{ gap: 10 }}>
           {q.options.map((op, i) => (
             <AnswerOption key={op.id} letter={LETTERS[i] ?? String(i + 1)} state={resposta.optionId === op.id ? 'selected' : 'default'}
-              onPress={() => setResposta(q.id, { ...resposta, optionId: op.id, textAnswer: op.triggers_text_input || q.allow_text_answer ? resposta.textAnswer : undefined })}>
+              onPress={() => marcarAlternativa(q, op)}>
               <Txt><RichText value={op.option_text} /></Txt>
             </AnswerOption>
           ))}

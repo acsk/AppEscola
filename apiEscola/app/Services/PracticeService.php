@@ -381,6 +381,19 @@ class PracticeService
         }
     }
 
+    /** Desmarca a alternativa de uma questão ainda não corrigida (simulado com correção no final). */
+    public function clearAnswerInAttempt(PracticeAttempt $attempt, int $questionId): void
+    {
+        if ($attempt->isFinished()) {
+            throw QuestionBankException::conflict('Este simulado já foi finalizado.');
+        }
+        $answer = $attempt->answers()->where('exam_question_id', $questionId);
+        if ($attempt->correctsEachQuestion() && $answer->exists()) {
+            throw QuestionBankException::conflict('Esta questão já foi respondida e corrigida.');
+        }
+        $answer->delete();
+    }
+
     /** Grava a alternativa escolhida. Devolve null se a questão não pertence à tentativa. */
     private function storeAttemptAnswer(PracticeAttempt $attempt, int $questionId, int $optionId): ?PracticeAnswer
     {

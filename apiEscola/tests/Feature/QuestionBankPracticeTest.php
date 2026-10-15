@@ -365,6 +365,13 @@ class QuestionBankPracticeTest extends TestCase
             ->assertOk()->assertJsonPath('body.answered_count', 1)->assertJsonPath('body.correct_count', null);
         $this->postJson("/api/aluno/practice-attempts/{$attemptId}/answer", ['question_id' => $b->id, 'option_id' => $this->wrong($b)])->assertOk();
 
+        // Tocar de novo na alternativa marcada desmarca (option_id null) enquanto não há correção.
+        $this->postJson("/api/aluno/practice-attempts/{$attemptId}/answer", ['question_id' => $b->id, 'option_id' => null])
+            ->assertOk()->assertJsonPath('body.answered_count', 1);
+        $this->postJson("/api/aluno/practice-attempts/{$attemptId}/answer", ['question_id' => $b->id])->assertStatus(422);
+        $this->postJson("/api/aluno/practice-attempts/{$attemptId}/answer", ['question_id' => $b->id, 'option_id' => $this->wrong($b)])
+            ->assertOk()->assertJsonPath('body.answered_count', 2);
+
         // Respostas de simulado em andamento não entram no desempenho (não revelam a correção).
         $this->assertSame(0, $this->getJson('/api/aluno/practice/summary')->json('body.answered'));
 
@@ -376,6 +383,8 @@ class QuestionBankPracticeTest extends TestCase
         $this->assertSame(2, $this->getJson('/api/aluno/practice/summary')->json('body.answered'));
 
         $this->postJson("/api/aluno/practice-attempts/{$attemptId}/answer", ['question_id' => $a->id, 'option_id' => $this->wrong($a)])
+            ->assertStatus(409);
+        $this->postJson("/api/aluno/practice-attempts/{$attemptId}/answer", ['question_id' => $a->id, 'option_id' => null])
             ->assertStatus(409);
 
         $this->actingAsStudent($this->student('OUTRO ALUNO'));

@@ -106,7 +106,7 @@ export function BancoPraticarScreen({ route }: Props) {
             <Text style={styles.emptyText}>Nenhuma questão disponível com esses filtros. Escolha outra disciplina ou assunto.</Text>
           </View>
         ) : (
-          <PracticeQuestionView question={question} selectedId={selected} onSelect={setSelected} feedback={feedback}
+          <PracticeQuestionView question={question} selectedId={selected} onSelect={(optionId) => setSelected((prev) => (prev === optionId ? null : optionId))} feedback={feedback}
             disabled={answer.isPending} />
         )}
         {error && question ? <Text style={styles.errorInline}>{error}</Text> : null}
