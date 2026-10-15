@@ -179,16 +179,17 @@ export function PracticeDesktop(props: Props) {
     </View>
   ) : null;
 
-  const tool = (icon: IconName, label: string, on: boolean, onPress: () => void, opts?: { disabled?: boolean; danger?: boolean }) => (
+  const tool = (icon: IconName, label: string, on: boolean, onPress: () => void, opts?: { disabled?: boolean; highlight?: boolean }) => (
     <IconButton icon={icon} label={label} iconSize={20} disabled={opts?.disabled} onPress={onPress}
-      color={on ? (opts?.danger ? p.dangerInk : p.accentInk) : p.inkMuted}
+      color={opts?.highlight ? '#111111' : on ? p.accentInk : p.inkMuted}
       accessibilityState={{ selected: on, disabled: !!opts?.disabled }}
       // Na web, o rótulo aparece ao passar o mouse.
       {...({ title: label } as object)}
       style={{
         width: 36, height: 36, borderRadius: radius.sm,
-        backgroundColor: on ? (opts?.danger ? p.dangerSoft : p.accentSoft) : undefined,
-        borderWidth: on ? 1 : 0, borderColor: opts?.danger ? p.danger : p.accent,
+        backgroundColor: opts?.highlight ? '#F5C400' : on ? p.accentSoft : undefined,
+        borderWidth: opts?.highlight || on ? 1 : 0,
+        borderColor: opts?.highlight ? '#E0B000' : p.accent,
       }} />
   );
 
@@ -208,7 +209,7 @@ export function PracticeDesktop(props: Props) {
           {reported ? <View style={{ marginRight: space[1] }}><Tag tone="danger" icon="check" label="Erro enviado" /></View> : null}
           {tool('flag', isFlagged ? 'Desmarcar revisão' : 'Marcar para revisar', isFlagged, onToggleFlag)}
           {tool('bookmark', saved ? 'Remover das salvas' : 'Salvar questão', saved, onToggleSave)}
-          {tool('alert', reported ? 'Erro enviado ao administrador' : 'Reportar erro na questão', reported, onReportError, { disabled: reported, danger: true })}
+          {tool('alert', reported ? 'Erro enviado ao administrador' : 'Reportar erro na questão', reported, onReportError, { disabled: reported, highlight: true })}
         </View>
       </View>
       <PracticeQuestionView question={current} selectedId={answers[current.id] ?? null} onSelect={(optionId) => onSelect(current.id, optionId)}
