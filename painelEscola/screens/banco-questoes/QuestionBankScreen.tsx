@@ -74,6 +74,7 @@ import {
   Minus,
   Plus,
   Rows3,
+  FileText,
   Search,
   Sparkles,
   Tag,
@@ -87,6 +88,7 @@ import QuestionSetsModal from "../../components/banco-questoes/question-sets/Que
 import QuestionSetDetailModal from "../../components/banco-questoes/question-sets/QuestionSetDetailModal";
 import AddToQuestionSetDialog from "../../components/banco-questoes/question-sets/AddToQuestionSetDialog";
 import PracticeRankingModal from "../../components/banco-questoes/question-sets/PracticeRankingModal";
+import MissedQuestionsBriefModal from "../../components/banco-questoes/MissedQuestionsBriefModal";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import Button from "../../components/ui/Button";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -147,6 +149,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const [approving, setApproving] = useState(false);
   const [addedSetId, setAddedSetId] = useState<number | null>(null);
   const [rankingOpen, setRankingOpen] = useState(false);
+  const [missedOpen, setMissedOpen] = useState(false);
   const [resumeImportId, setResumeImportId] = useState<string | null>(null);
   /** Importar PDF usa IA: confere a chave antes de abrir. */
   const openImportPdf = async (draftId: string | null = null) => {
@@ -617,6 +620,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     { key: "taxonomia", label: "Taxonomia (disciplinas e assuntos)", icon: Tag, onPress: () => navigate("questoes-taxonomia") },
                     { key: "sets", label: "Simulados do banco", icon: Folder, onPress: () => setQuestionSetsOpen(true) },
                     { key: "ranking", label: "Ranking de erros", icon: Trophy, onPress: () => setRankingOpen(true) },
+                    { key: "missed", label: "Resumo dos erros", icon: FileText, onPress: () => setMissedOpen(true) },
                     { key: "importados", label: "Simulados importados", icon: Archive, onPress: () => setImportedExamsOpen(true), separatorBefore: true },
                   ]}
                 />
@@ -1210,6 +1214,18 @@ export default function QuestionBankScreen({ navigate }: Props) {
       <QuestionSetDetailModal setId={addedSetId} onClose={() => setAddedSetId(null)} onChanged={() => {}} setToast={setToast} />
 
       <PracticeRankingModal visible={rankingOpen} onClose={() => setRankingOpen(false)} taxonomy={catalogs.taxonomy} />
+
+      <MissedQuestionsBriefModal
+        visible={missedOpen}
+        catalogs={catalogs}
+        onClose={() => setMissedOpen(false)}
+        onCreated={(count) => {
+          setToast({ visible: true, type: "success", message: `${count} questão(ões) incluída(s) no banco.` });
+          void load();
+        }}
+        setToast={setToast}
+        ensureAi={ensureAvailable}
+      />
 
       <ImportPdfModal
         visible={importPdfOpen}

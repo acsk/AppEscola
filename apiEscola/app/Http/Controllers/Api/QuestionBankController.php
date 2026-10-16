@@ -18,7 +18,10 @@ use App\Services\ExamAccessService;
 use App\Services\QuestionBankQueryService;
 use App\Services\QuestionClassificationService;
 use App\Services\QuestionContentService;
+use App\Services\MissedQuestionBriefService;
 use App\Services\QuestionIssueReviewService;
+use App\Models\Student;
+use Illuminate\Validation\Rule;
 use App\Services\TenantUploadSettingsService;
 use App\Models\Tenant;
 use App\Traits\ScopedByTenant;
@@ -63,6 +66,39 @@ class QuestionBankController extends Controller
     public function years(Request $request): JsonResponse
     {
         return $this->success($this->queries->years($this->authorizeStaff($request)));
+    }
+
+    /** GET question-bank/missed-brief — questões mais erradas e resumo para gerar novas. */
+    public function missedBrief(Request $request, MissedQuestionBriefService $missed): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validate([
+            'scope' => ['required', Rule::in(['collective', 'student'])],
+            'student_id' => ['required_if:scope,student', 'nullable', 'integer'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
+            'min_answers' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $student = null;
+        if ($data['scope'] === 'student') {
+            $found = Student::query()->where('tenant_id', $tenantId)->find($data['student_id']);
+            if ($found === null) {
+                abort(404, 'Aluno não encontrado.');
+            }
+            $student = [
+                'id' => (int) $found->id,
+                'name' => (string) $found->name,
+                'enrollment_number' => $found->enrollment_number,
+            ];
+        }
+
+        return $this->success($missed->build(
+            $tenantId,
+            $data['scope'],
+            $student,
+            (int) ($data['limit'] ?? MissedQuestionBriefService::DEFAULT_LIMIT),
+            (int) ($data['min_answers'] ?? MissedQuestionBriefService::DEFAULT_MIN_ANSWERS),
+        ));
     }
 
     /** GET question-bank/exam-options?search=&ids=1,2 — simulados oficiais com questões no banco (filtro). */

@@ -382,6 +382,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::delete('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'destroy'])->whereUuid('draft');
         Route::post('import-drafts/{draft}/questions/{key}/include', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'includeQuestion'])->whereUuid('draft');
         Route::get('questions',                          [QuestionBankController::class, 'index']);
+        Route::get('missed-brief',                       [QuestionBankController::class, 'missedBrief']);
         Route::get('questions/ids',                      [QuestionBankController::class, 'ids']);
         Route::post('questions',                         [QuestionBankController::class, 'store']);
         Route::post('questions/upload-image',            [QuestionBankController::class, 'uploadImage']);

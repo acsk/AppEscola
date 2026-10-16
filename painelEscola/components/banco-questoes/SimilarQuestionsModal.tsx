@@ -47,6 +47,8 @@ export type SimilarSource = {
   imageUrl?: string | null;
   /** Estado atual do formulário: a IA usa ele, não a versão salva. */
   context?: SimilarFormContext;
+  /** Observação inicial, por exemplo o resumo da habilidade mais errada. */
+  initialInstructions?: string;
 };
 
 type Draft = {
@@ -113,7 +115,7 @@ export default function SimilarQuestionsModal({ visible, source, catalogs, onClo
     setDrafts([]);
     setError(null);
     setDifficulty(SAME_DIFFICULTY);
-    setInstructions("");
+    setInstructions((source.initialInstructions ?? "").slice(0, MAX_INSTRUCTIONS));
     setInstructionsError(undefined);
     setOptionsCount(Math.min(6, Math.max(2, source.optionsCount || 5)));
     setSubjectId(source.context?.subject_id ?? null);
