@@ -88,6 +88,8 @@ export type AttemptQuestion = PracticeQuestion & {
   saved?: boolean;
   /** O aluno marcou que esta questão tem um erro. */
   issue_reported?: boolean;
+  /** O professor revisou o aviso e não editou a questão depois: não pode ser informada de novo. */
+  issue_report_locked?: boolean;
   is_new?: boolean;
   year?: number | null;
   /** % da escola que acerta (null com poucas respostas). */

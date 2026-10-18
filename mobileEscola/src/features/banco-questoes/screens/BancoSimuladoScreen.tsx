@@ -6,10 +6,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import ConfirmModal from '../../../components/ConfirmModal';
 import { getApiErrorMessage } from '../../../lib/apiError';
-import type { PracticeFeedback } from '../../../services/practice.service';
+import type { AttemptQuestion, PracticeFeedback } from '../../../services/practice.service';
 import { useAnswerInAttempt, useFinishAttempt, usePracticeAttempt, useStartQuestionSet, useToggleQuestionIssue, useToggleSavedQuestion } from '../hooks';
 import { PracticeQuestionView } from '../components/PracticeQuestionView';
 import { PracticeDesktop } from '../components/PracticeDesktop';
+import { ReviewedBadge } from '../components/ReviewedBadge';
 import { formatPercent } from '../lib/format';
 import { font,
   BottomBar, Button, Card, Icon, IconButton, Kbd, Notice, Overline, ProgressBar, QuestionNavigator, ScreenBody, Sheet, Txt,
@@ -19,6 +20,11 @@ import { font,
 type Props = NativeStackScreenProps<QuestoesStackParamList, 'BancoSimulado'>;
 
 const LETTERS = 'ABCDEFGHIJ';
+
+/** O professor revisou o aviso de erro e não editou a questão depois: o aluno não pode avisar de novo. */
+function isReportLocked(question: AttemptQuestion): boolean {
+  return question.issue_report_locked ?? !!question.reviews?.length;
+}
 const timerKey = (attemptId: number) => `banco_sessao_tempo_${attemptId}`;
 
 function formatClock(total: number) {
@@ -173,7 +179,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   function doFinish() {
     setConfirmFinish(false);
     setMapOpen(false);
-    finish.mutate(undefined, {
+    finish.mutate([], {
       onSuccess: () => {
         setIndex(0);
         if (attemptId != null) AsyncStorage.removeItem(timerKey(attemptId)).catch(() => undefined);
@@ -191,7 +197,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
     });
   };
   const askReport = () => {
-    if (!current || reported[current.id]) return;
+    if (!current || reported[current.id] || isReportLocked(current)) return;
     setReportQuestionId(current.id);
   };
   const confirmReport = () => {
@@ -208,13 +214,19 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   };
   const toggleFlag = () => setFlagged((prev) => (prev.includes(index + 1) ? prev.filter((n) => n !== index + 1) : [...prev, index + 1]));
 
+  const answeredCount = questions.filter((q) => (eachMode ? !!feedbacks[q.id] : answers[q.id] != null)).length;
+
+  /** Sair com todas as questões já corrigidas encerra a sessão; senão ela fica em "Continuar de onde parei". */
   const leave = () => {
-    if (attemptId != null && elapsed != null) AsyncStorage.setItem(timerKey(attemptId), String(elapsed)).catch(() => undefined);
+    if (eachMode && !finished && questions.length > 0 && answeredCount === questions.length) {
+      finish.mutate([]);
+      if (attemptId != null) AsyncStorage.removeItem(timerKey(attemptId)).catch(() => undefined);
+    } else if (attemptId != null && elapsed != null) {
+      AsyncStorage.setItem(timerKey(attemptId), String(elapsed)).catch(() => undefined);
+    }
     if (navigation.canGoBack()) navigation.goBack();
     else navigation.navigate('BancoQuestoes');
   };
-
-  const answeredCount = questions.filter((q) => (eachMode ? !!feedbacks[q.id] : answers[q.id] != null)).length;
   const waitingConfirm = !!current && eachMode && !finished && answers[current.id] != null && !currentFeedback;
 
   /** Ação principal: confirmar → próxima → finalizar. */
@@ -286,6 +298,13 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const wrongIdx = questions.map((q, i) => (feedbacks[q.id] && !feedbacks[q.id].is_correct ? i + 1 : 0)).filter(Boolean);
   const isSaved = current ? !!saved[current.id] : false;
   const isReported = current ? !!reported[current.id] : false;
+  const isReviewed = current ? isReportLocked(current) : false;
+  const reportButton = !current ? null : isReviewed ? <ReviewedBadge /> : (
+    <Button block variant={isReported ? 'secondary' : 'accent'} icon="warning"
+      label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'}
+      disabled={isReported} onPress={askReport}
+      style={isReported ? undefined : { backgroundColor: '#F5A018', borderColor: '#E09010' }} />
+  );
   const lastLetter = LETTERS[Math.max(0, (current?.options.length ?? 4) - 1)];
 
   const resultCard = finished ? (
@@ -347,7 +366,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
       <>
         <PracticeDesktop attemptId={attemptId} title={title} questions={questions} index={index} onGoTo={goTo}
           answers={answers} feedbacks={feedbacks} onSelect={select} flagged={flagged} onToggleFlag={toggleFlag}
-          saved={isSaved} onToggleSave={toggleSave} reported={isReported} onReportError={askReport} primary={primary} canSkip={canSkip} onLeave={leave}
+          saved={isSaved} onToggleSave={toggleSave} reported={isReported} reviewed={isReviewed} onReportError={askReport} primary={primary} canSkip={canSkip} onLeave={leave}
           onFinish={() => setConfirmFinish(true)} finishing={finish.isPending} elapsed={elapsed} remaining={remaining}
           busy={finish.isPending || answer.isPending} error={errorNotice} />
         {finishModal}
@@ -407,10 +426,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
               </View>
             </View>
             <View style={{ width: layout.asideW, gap: space[4] }}>
-              {current ? (
-                <Button block variant={isReported ? 'secondary' : 'accent'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport}
-                  style={isReported ? undefined : { backgroundColor: '#F5A018', borderColor: '#E09010' }} />
-              ) : null}
+              {reportButton}
               <Card style={{ gap: 14 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <Txt variant="titleSm">Questões</Txt>
@@ -443,7 +459,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: insets.top + space[2], paddingHorizontal: space[2], paddingBottom: space[2] }}>
-        <IconButton icon="x" label={finished ? 'Sair' : practicing ? 'Encerrar sessão' : 'Pausar e sair'} onPress={leave} />
+        <IconButton icon="x" label={finished ? 'Sair' : 'Pausar e sair'} onPress={leave} />
         <View style={{ flex: 1, gap: 6 }}>
           <Text style={[type.bodySm, { color: p.inkSubtle, textAlign: 'center' }]}>
             <Text style={{ color: p.ink, ...font.bold }}>Questão {index + 1}</Text> de {questions.length}
@@ -452,16 +468,15 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
           <ProgressBar value={finished ? index + 1 : answeredCount} max={questions.length || 1} size="sm" label="Progresso" />
         </View>
         <IconButton icon="bookmark" label={isSaved ? 'Remover das salvas' : 'Salvar questão'} color={isSaved ? p.brandInk : undefined} onPress={toggleSave} />
-        {!practicing ? <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} /> : null}
+        {practicing
+          ? <Button variant="secondary" size="sm" label="Encerrar" loading={finish.isPending} onPress={() => setConfirmFinish(true)} />
+          : <IconButton icon="grid" label="Mapa das questões" onPress={() => setMapOpen(true)} />}
       </View>
 
       <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled">
         <ScreenBody gap={18} style={{ paddingTop: space[3], width: '100%', maxWidth: layout.readingMax, alignSelf: 'center' }}>
           {index === 0 ? resultCard : null}
-          {current ? (
-            <Button block variant={isReported ? 'secondary' : 'accent'} icon="warning" label={isReported ? 'Erro enviado ao administrador' : 'Informar erro na questão'} disabled={isReported} onPress={askReport}
-              style={isReported ? undefined : { backgroundColor: '#F5A018', borderColor: '#E09010' }} />
-          ) : null}
+          {reportButton}
           {questionView}
           {errorNotice}
         </ScreenBody>

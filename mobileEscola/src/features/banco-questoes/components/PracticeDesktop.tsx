@@ -5,6 +5,7 @@ import { QuestionShield } from '../../../components/QuestionShield';
 import RichText from '../../../components/RichText';
 import type { AttemptQuestion, PracticeFeedback } from '../../../services/practice.service';
 import { PracticeQuestionView } from './PracticeQuestionView';
+import { ReviewedBadge } from './ReviewedBadge';
 import {
   Button, Card, Icon, IconButton, Kbd, NewPill, ProgressBar, SegmentedControl, SessionList, Tag, Txt, font, layout, radius, shadow, space, subjectColor,
   useLayoutMode, usePalette, type IconName, type SessionItemStatus,
@@ -32,6 +33,8 @@ type Props = {
   onToggleSave: () => void;
   /** Aluno já enviou o erro desta questão ao administrador. */
   reported: boolean;
+  /** O professor já revisou o aviso de erro: não pode ser informado de novo. */
+  reviewed?: boolean;
   onReportError: () => void;
   primary: PracticePrimary | null;
   canSkip: boolean;
@@ -60,7 +63,7 @@ const plain = (html: string | null | undefined) => (html ?? '').replace(/<[^>]+>
  */
 export function PracticeDesktop(props: Props) {
   const {
-    attemptId, title, questions, index, onGoTo, answers, feedbacks, onSelect, flagged, onToggleFlag, saved, onToggleSave, reported, onReportError,
+    attemptId, title, questions, index, onGoTo, answers, feedbacks, onSelect, flagged, onToggleFlag, saved, onToggleSave, reported, reviewed, onReportError,
     primary, canSkip, onLeave, onFinish, finishing, elapsed, remaining, busy, error,
   } = props;
   const p = usePalette();
@@ -209,7 +212,9 @@ export function PracticeDesktop(props: Props) {
           {reported ? <View style={{ marginRight: space[1] }}><Tag tone="danger" icon="check" label="Erro enviado" /></View> : null}
           {tool('flag', isFlagged ? 'Desmarcar revisão' : 'Marcar para revisar', isFlagged, onToggleFlag)}
           {tool('bookmark', saved ? 'Remover das salvas' : 'Salvar questão', saved, onToggleSave)}
-          {tool('alert', reported ? 'Erro enviado ao administrador' : 'Reportar erro na questão', reported, onReportError, { disabled: reported, highlight: true })}
+          {reviewed
+            ? <ReviewedBadge iconOnly />
+            : tool('alert', reported ? 'Erro enviado ao administrador' : 'Reportar erro na questão', reported, onReportError, { disabled: reported, highlight: true })}
         </View>
       </View>
       <PracticeQuestionView question={current} selectedId={answers[current.id] ?? null} onSelect={(optionId) => onSelect(current.id, optionId)}

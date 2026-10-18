@@ -240,6 +240,7 @@ class PracticeService
                     'selected_option_id' => $answer?->option_id,
                     'saved'              => $saved->has($question->id),
                     'issue_reported'     => $reported->has($question->id),
+                    'issue_report_locked' => QuestionIssueReviewService::isReportLocked($question),
                     'is_new'             => $newIds->has($question->id),
                     'year'               => $question->year,
                     // "Sobre esta questão" (Praticar no desktop): % da escola que acerta e o seu acerto no assunto.

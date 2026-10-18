@@ -72,7 +72,7 @@ class QuestionContentService
         $this->assertContentEditable($question);
 
         return DB::transaction(function () use ($question, $data) {
-            $question->fill($this->contentAttributes($data))->save();
+            $question->fill($this->contentAttributes($data) + ['content_edited_at' => now()])->save();
             $this->linkRedrawnImage($question);
 
             if ($question->type === 'essay') {

@@ -6,6 +6,7 @@ use App\Models\ExamQuestion;
 use App\Models\QuestionIssueReview;
 use App\Models\QuestionReview;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 
 /**
  * Aviso de erro do aluno: a questão fica sem validação até o administrador analisar.
@@ -98,6 +99,20 @@ class QuestionIssueReviewService
             $fill['errors_reset_at'] = now();
         }
         $question->forceFill($fill)->save();
+    }
+
+    /** Revisada pelo administrador e sem edição de conteúdo depois disso: o aluno não pode avisar erro de novo. */
+    public static function isReportLocked(ExamQuestion $question): bool
+    {
+        $reviewedAt = $question->relationLoaded('issueReviews')
+            ? $question->issueReviews->max('reviewed_at')
+            : $question->issueReviews()->max('reviewed_at');
+        if ($reviewedAt === null) {
+            return false;
+        }
+        $editedAt = $question->content_edited_at;
+
+        return $editedAt === null || $editedAt->lte(Carbon::parse($reviewedAt));
     }
 
     public static function conclusionMessage(bool $hadError): string

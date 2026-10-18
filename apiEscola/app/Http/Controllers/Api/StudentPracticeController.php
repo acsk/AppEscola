@@ -98,12 +98,15 @@ class StudentPracticeController extends Controller
         if (! $this->practice->practicableFor($student)->whereKey($question)->exists()) {
             return $this->error('Questão indisponível.', null, 404);
         }
+        $model = ExamQuestion::query()->whereKey($question)->first();
+        if ($model && QuestionIssueReviewService::isReportLocked($model)) {
+            return $this->error('Esta questão já foi revisada pelo professor e não pode receber novo aviso de erro.', null, 422);
+        }
         $note = trim((string) $request->input('note', ''));
         QuestionIssueReport::query()->updateOrCreate(
             ['student_id' => $student->id, 'exam_question_id' => $question],
             ['tenant_id' => $student->tenant_id, 'note' => $note !== '' ? mb_substr($note, 0, 280) : null]
         );
-        $model = ExamQuestion::query()->whereKey($question)->first();
         if ($model) {
             $reviews->suspendForStudentReport($model);
         }
