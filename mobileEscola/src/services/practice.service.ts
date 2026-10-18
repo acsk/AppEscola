@@ -107,6 +107,8 @@ export interface PracticeAttemptPayload {
 export interface PracticeSummary {
   /** Sessão em andamento (atalho "Continuar sessão"). */
   open_session?: PracticeAttemptSummary | null;
+  /** Questões com aviso de erro dos alunos em análise pelo professor (fora da prática até a revisão). */
+  questions_under_review?: number;
   answered: number;
   correct: number;
   accuracy: number | null;

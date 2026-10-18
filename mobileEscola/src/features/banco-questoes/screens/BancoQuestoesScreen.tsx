@@ -121,6 +121,13 @@ export function BancoQuestoesScreen() {
       onPress={() => navigation.navigate('BancoSimulado', { attemptId: open.id, title: open.title ?? undefined })} />
   ) : null;
 
+  const underReview = summary.data?.questions_under_review ?? 0;
+  const reviewNotice = underReview > 0 ? (
+    <Notice tone="info" icon="clock"
+      title={underReview === 1 ? '1 questão em análise pelo professor' : `${underReview} questões em análise pelo professor`}
+      text="Alunos informaram que elas têm erro. O professor está analisando e, em breve, elas voltam para você responder." />
+  ) : null;
+
   const tiles = [
     <SubjectTile key="all" icon="grid" subject="Todas as matérias" count={total} newCount={totalNew} selected={!subjectIds.length}
       onPress={() => { setSubjectIds([]); setTopicIds([]); }} />,
@@ -248,6 +255,7 @@ export function BancoQuestoesScreen() {
             <View style={{ flex: 1, minWidth: 0, gap: 28 }}>
               {banner}
               {continueAction}
+              {reviewNotice}
               {steps}
               {setsSection}
             </View>
@@ -294,6 +302,7 @@ export function BancoQuestoesScreen() {
         <ScreenBody gap={22} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
           {banner}
           {continueAction}
+          {reviewNotice}
           {steps}
           <View style={{ flexDirection: 'row', gap: space[3] }}>
             <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="target" label="O que estudar" onPress={() => navigation.navigate('Aprendizagem')} /></View>

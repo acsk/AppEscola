@@ -484,6 +484,7 @@ class PracticeService
 
         return [
             'open_session' => $this->openSession($student),
+            'questions_under_review' => $this->questionsUnderReview($student),
             'answered'    => $answered,
             'correct'     => $correct,
             'accuracy'    => $answered > 0 ? round($correct / $answered * 100, 1) : null,
@@ -497,6 +498,15 @@ class PracticeService
                     'finished_at' => $a->finished_at?->toIso8601String(),
                 ])->values(),
         ];
+    }
+
+    /** Questões das disciplinas do aluno com aviso de erro em análise: saem da prática até o administrador revisar. */
+    private function questionsUnderReview(Student $student): int
+    {
+        return $this->onlyClassSubjects(
+            ExamQuestion::query()->answerable((int) $student->tenant_id)->whereHas('issueReports'),
+            $student,
+        )->count();
     }
 
     /** Questão para o aluno: sem indicar a alternativa correta. */
