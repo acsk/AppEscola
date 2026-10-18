@@ -337,7 +337,7 @@ class PracticePerformanceService
 
     private function rankingRows(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $courseId = null): Collection
     {
-        $query = PracticeAnswer::query()->counted()
+        $query = PracticeAnswer::query()->counted()->excludingQuestionsUnderReview()
             ->where('practice_answers.tenant_id', $tenantId)
             ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
             ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
@@ -590,10 +590,10 @@ class PracticePerformanceService
         return $grouped;
     }
 
-    /** Respostas contadas da escola, já filtradas por disciplina/assunto. Sem filtro de período. */
+    /** Respostas contadas da escola, já filtradas por disciplina/assunto. Sem filtro de período nem questões em análise por erro. */
     private function scopedAnswers(int $tenantId, ?int $subjectId, ?int $topicId, ?Carbon $before): Builder
     {
-        return PracticeAnswer::query()->counted()
+        return PracticeAnswer::query()->counted()->excludingQuestionsUnderReview()
             ->where('practice_answers.tenant_id', $tenantId)
             ->when($before, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $before))
             ->join('exam_questions as eq', 'eq.id', '=', 'practice_answers.exam_question_id')

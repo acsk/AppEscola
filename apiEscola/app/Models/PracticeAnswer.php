@@ -40,6 +40,13 @@ class PracticeAnswer extends Model
                 ->where(fn ($w) => $w->whereNotNull('pat.finished_at')->orWhere('pat.correction_mode', 'each'))));
     }
 
+    /** Sem as questões com aviso de erro de aluno ainda em análise (voltam quando o administrador conclui a revisão). */
+    public function scopeExcludingQuestionsUnderReview(Builder $query): Builder
+    {
+        return $query->whereNotExists(fn ($e) => $e->select(DB::raw(1))->from('question_issue_reports as qir')
+            ->whereColumn('qir.exam_question_id', 'practice_answers.exam_question_id'));
+    }
+
     public function attempt(): BelongsTo
     {
         return $this->belongsTo(PracticeAttempt::class, 'practice_attempt_id');
