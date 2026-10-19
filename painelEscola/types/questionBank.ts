@@ -54,6 +54,10 @@ export type QuestionBankQuestion = {
   exam_type: { id: number; label: string } | null;
   revalidated_at?: string | null;
   issue_reports_count?: number;
+  /** Alunos diferentes que precisam avisar erro para a questão ir para análise (configuração da escola). */
+  issue_report_threshold?: number;
+  /** Atingiu o mínimo de avisos: está fora da prática até o administrador revisar. */
+  issue_under_review?: boolean;
   /** Alunos que marcaram a questão para revisão e ainda aguardam o administrador. */
   issue_reporters?: QuestionIssueReporter[];
   /** Respostas erradas na prática e em simulados oficiais. */

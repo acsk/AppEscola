@@ -381,6 +381,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
         Route::put('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'update'])->whereUuid('draft');
         Route::delete('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'destroy'])->whereUuid('draft');
         Route::post('import-drafts/{draft}/questions/{key}/include', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'includeQuestion'])->whereUuid('draft');
+        Route::get('settings',                           [\App\Http\Controllers\Api\QuestionBankSettingsController::class, 'show']);
+        Route::put('settings',                           [\App\Http\Controllers\Api\QuestionBankSettingsController::class, 'update']);
         Route::get('questions',                          [QuestionBankController::class, 'index']);
         Route::get('missed-brief',                       [QuestionBankController::class, 'missedBrief']);
         Route::get('questions/ids',                      [QuestionBankController::class, 'ids']);

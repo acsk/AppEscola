@@ -35,24 +35,28 @@ export function reporterDetail(reporter: { name: string; enrollment_number?: str
   return [reporter.name, enrollment, when].filter(Boolean).join(" · ");
 }
 
-/** Aluno informou erro. A questão fica sem validação até o administrador revisar. */
-export function StudentReviewMark({ label = "Sem validação", names = [] }: { label?: string; names?: string[] }) {
+/**
+ * Aluno informou erro. Em análise (mínimo de avisos atingido), a questão fica sem validação até o administrador revisar.
+ * `pending`: avisos abaixo do mínimo; a questão continua liberada (marca neutra).
+ */
+export function StudentReviewMark({ label = "Sem validação", names = [], pending = false }: { label?: string; names?: string[]; pending?: boolean }) {
   const who = names.filter(Boolean);
+  const tone = pending ? color["ink-subtle"] : color.warning;
   const aria = who.length
-    ? `Marcada para revisão por ${who.join(", ")}`
+    ? `${pending ? "Aviso de erro" : "Marcada para revisão"} por ${who.join(", ")}`
     : "Questão sem validação: aluno informou erro";
   return (
     <View className="flex-row items-center" style={{ gap: 8, flex: 1, minWidth: 0 }} aria-label={aria}>
       <View
         aria-hidden
         className="rounded-ds-sm items-center justify-center"
-        style={{ width: 24, height: 24, backgroundColor: color.warning }}
+        style={{ width: 24, height: 24, backgroundColor: tone }}
       >
         <Text className="font-mono" style={{ fontSize: 13, lineHeight: 14, fontWeight: "700", color: color.surface }}>
           !
         </Text>
       </View>
-      <Text className="font-medium" style={{ fontSize: 13, color: color.warning, flexShrink: 1 }} numberOfLines={2}>
+      <Text className="font-medium" style={{ fontSize: 13, color: tone, flexShrink: 1 }} numberOfLines={2}>
         {label}
       </Text>
     </View>

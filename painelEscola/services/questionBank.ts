@@ -66,6 +66,23 @@ export async function approveQuestionsManually(ids: number[]) {
   };
 }
 
+export type QuestionBankSettings = {
+  issue_report_threshold: number;
+  issue_report_threshold_default: number;
+  issue_report_threshold_min: number;
+  issue_report_threshold_max: number;
+};
+
+export async function fetchQuestionBankSettings(): Promise<QuestionBankSettings> {
+  const { data } = await api.get("/question-bank/settings");
+  return data.body;
+}
+
+export async function updateQuestionBankSettings(issueReportThreshold: number) {
+  const { data } = await api.put("/question-bank/settings", { issue_report_threshold: issueReportThreshold });
+  return data as { type: string; message: string; body: QuestionBankSettings };
+}
+
 /** Encerra o aviso do aluno. `hadError` confirma se a questão tinha erro. */
 export async function resolveStudentReview(questionId: number, hadError?: boolean) {
   const { data } = await api.post(`/question-bank/questions/${questionId}/student-review`, hadError === undefined ? {} : { had_error: hadError });

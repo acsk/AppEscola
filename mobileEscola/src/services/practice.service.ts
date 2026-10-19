@@ -363,8 +363,8 @@ export async function setQuestionSaved(questionId: number, saved: boolean): Prom
   else await api.delete(`/api/aluno/practice/questions/${questionId}/save`);
 }
 
-export async function setQuestionIssue(questionId: number, reported: boolean): Promise<void> {
-  if (reported) await api.post(`/api/aluno/practice/questions/${questionId}/issue`);
+export async function setQuestionIssue(questionId: number, reported: boolean, note?: string): Promise<void> {
+  if (reported) await api.post(`/api/aluno/practice/questions/${questionId}/issue`, { note });
   else await api.delete(`/api/aluno/practice/questions/${questionId}/issue`);
 }
 

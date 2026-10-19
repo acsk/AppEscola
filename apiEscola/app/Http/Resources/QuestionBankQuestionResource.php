@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\QuestionIssueReviewService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -43,6 +44,8 @@ class QuestionBankQuestionResource extends JsonResource
             'exam_type_id' => $this->exam_type_id,
             'exam_type' => $this->examType ? ['id' => $this->examType->id, 'label' => $this->examType->label] : null,
             'issue_reports_count' => $this->when(isset($this->issue_reports_count), (int) $this->issue_reports_count),
+            'issue_report_threshold' => $this->when(isset($this->issue_reports_count), fn () => QuestionIssueReviewService::reportThreshold((int) $this->tenant_id)),
+            'issue_under_review' => $this->when(isset($this->issue_reports_count), fn () => (int) $this->issue_reports_count >= QuestionIssueReviewService::reportThreshold((int) $this->tenant_id)),
             'issue_reporters' => $this->when($this->relationLoaded('issueReports'), fn () => $this->issueReports
                 ->sortBy('id')
                 ->map(fn ($report) => [

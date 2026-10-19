@@ -277,11 +277,12 @@ class QuestionAiController extends Controller
     {
         $tenantId = $this->authorizeStaff($request);
         $model = ExamQuestion::query()->inQuestionBank($tenantId)->findOrFail($question);
-        if ($model->issueReports()->exists()) {
+        $issueReviews = app(QuestionIssueReviewService::class);
+        if ($issueReviews->isUnderReview($model)) {
             return $this->error('A restrição sai ao salvar a questão e confirmar se havia erro.', null, 422);
         }
         $review = $this->validador->aprovarManualmente($tenantId, $question, $request->user()?->id);
-        app(QuestionIssueReviewService::class)->releaseForAnswers($model, false);
+        $issueReviews->releaseForAnswers($model, false);
 
         return $this->success($this->validador->present($review), 'Questão liberada para resposta. A contagem de respostas erradas permanece.');
     }

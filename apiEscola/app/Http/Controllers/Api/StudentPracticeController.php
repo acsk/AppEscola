@@ -102,16 +102,27 @@ class StudentPracticeController extends Controller
         if ($model && QuestionIssueReviewService::isReportLocked($model)) {
             return $this->error('Esta questão já foi revisada pelo professor e não pode receber novo aviso de erro.', null, 422);
         }
-        $note = trim((string) $request->input('note', ''));
+        $request->merge(['note' => trim((string) $request->input('note', ''))]);
+        $note = $request->validate(
+            ['note' => ['required', 'string', 'min:10', 'max:280']],
+            [
+                'note.required' => 'Descreva o que está errado na questão.',
+                'note.min' => 'Descreva o erro com pelo menos 10 caracteres.',
+                'note.max' => 'A descrição pode ter no máximo 280 caracteres.',
+            ],
+        )['note'];
         QuestionIssueReport::query()->updateOrCreate(
             ['student_id' => $student->id, 'exam_question_id' => $question],
-            ['tenant_id' => $student->tenant_id, 'note' => $note !== '' ? mb_substr($note, 0, 280) : null]
+            ['tenant_id' => $student->tenant_id, 'note' => $note]
         );
-        if ($model) {
-            $reviews->suspendForStudentReport($model);
-        }
+        $underReview = $model ? $reviews->registerStudentReport($model) : false;
 
-        return $this->success(['reported' => true], 'Erro enviado ao administrador. A questão ficou sem validação.');
+        return $this->success(
+            ['reported' => true, 'under_review' => $underReview],
+            $underReview
+                ? 'Erro enviado ao professor. A questão saiu da prática e está em análise.'
+                : 'Erro enviado ao professor. Obrigado por avisar!'
+        );
     }
 
     public function clearIssue(Request $request, int $question): JsonResponse

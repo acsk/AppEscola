@@ -500,11 +500,14 @@ class PracticeService
         ];
     }
 
-    /** Questões das disciplinas do aluno com aviso de erro em análise: saem da prática até o administrador revisar. */
+    /** Questões das disciplinas do aluno em análise (avisos de alunos diferentes no mínimo da escola): saem da prática até a revisão. */
     private function questionsUnderReview(Student $student): int
     {
+        $tenantId = (int) $student->tenant_id;
+
         return $this->onlyClassSubjects(
-            ExamQuestion::query()->answerable((int) $student->tenant_id)->whereHas('issueReports'),
+            ExamQuestion::query()->answerable($tenantId)
+                ->whereHas('issueReports', null, '>=', QuestionIssueReviewService::reportThreshold($tenantId)),
             $student,
         )->count();
     }

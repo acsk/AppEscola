@@ -144,7 +144,7 @@ export function useNewQuestionsCount(enabled = true): number {
 
 export function useToggleQuestionIssue() {
   return useMutation({
-    mutationFn: ({ questionId, reported }: { questionId: number; reported: boolean }) => setQuestionIssue(questionId, reported),
+    mutationFn: ({ questionId, reported, note }: { questionId: number; reported: boolean; note?: string }) => setQuestionIssue(questionId, reported, note),
   });
 }
 

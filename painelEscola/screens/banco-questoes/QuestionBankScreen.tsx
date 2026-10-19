@@ -76,6 +76,7 @@ import {
   Rows3,
   FileText,
   Search,
+  Settings,
   Sparkles,
   Tag,
   Trophy,
@@ -89,6 +90,7 @@ import QuestionSetDetailModal from "../../components/banco-questoes/question-set
 import AddToQuestionSetDialog from "../../components/banco-questoes/question-sets/AddToQuestionSetDialog";
 import PracticeRankingModal from "../../components/banco-questoes/question-sets/PracticeRankingModal";
 import MissedQuestionsBriefModal from "../../components/banco-questoes/MissedQuestionsBriefModal";
+import QuestionBankSettingsModal from "../../components/banco-questoes/QuestionBankSettingsModal";
 import { useQuestionAiStatus } from "../../hooks/useQuestionAiStatus";
 import Button from "../../components/ui/Button";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -149,6 +151,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
   const [approving, setApproving] = useState(false);
   const [addedSetId, setAddedSetId] = useState<number | null>(null);
   const [rankingOpen, setRankingOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [missedOpen, setMissedOpen] = useState(false);
   const [resumeImportId, setResumeImportId] = useState<string | null>(null);
   /** Importar PDF usa IA: confere a chave antes de abrir. */
@@ -622,6 +625,7 @@ export default function QuestionBankScreen({ navigate }: Props) {
                     { key: "ranking", label: "Ranking de erros", icon: Trophy, onPress: () => setRankingOpen(true) },
                     { key: "missed", label: "Resumo dos erros", icon: FileText, onPress: () => setMissedOpen(true) },
                     { key: "importados", label: "Simulados importados", icon: Archive, onPress: () => setImportedExamsOpen(true), separatorBefore: true },
+                    { key: "configuracoes", label: "Configurações (avisos de erro)", icon: Settings, onPress: () => setSettingsOpen(true), separatorBefore: true },
                   ]}
                 />
                 <Button variant="ai" icon={Sparkles} label="Importar PDF com IA" onPress={() => void openImportPdf()} />
@@ -1036,7 +1040,10 @@ export default function QuestionBankScreen({ navigate }: Props) {
                             <View style={{ width: col.status, paddingHorizontal: 12 }}>
                               {(row.issue_reports_count ?? 0) > 0 ? (
                                 <StudentReviewMark
-                                  label={reporterLabel(row.issue_reporters ?? [])}
+                                  pending={row.issue_under_review === false}
+                                  label={row.issue_under_review === false
+                                    ? `${row.issue_reports_count} de ${row.issue_report_threshold} avisos`
+                                    : reporterLabel(row.issue_reporters ?? [])}
                                   names={(row.issue_reporters ?? []).map((reporter) => reporter.name)}
                                 />
                               ) : row.is_annulled || row.is_outdated ? (
@@ -1214,6 +1221,8 @@ export default function QuestionBankScreen({ navigate }: Props) {
       <QuestionSetDetailModal setId={addedSetId} onClose={() => setAddedSetId(null)} onChanged={() => {}} setToast={setToast} />
 
       <PracticeRankingModal visible={rankingOpen} onClose={() => setRankingOpen(false)} taxonomy={catalogs.taxonomy} />
+
+      <QuestionBankSettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} setToast={setToast} onSaved={() => void load()} />
 
       <MissedQuestionsBriefModal
         visible={missedOpen}

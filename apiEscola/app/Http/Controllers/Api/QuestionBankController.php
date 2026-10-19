@@ -341,19 +341,23 @@ class QuestionBankController extends Controller
         ], 'Imagem enviada com sucesso.');
     }
 
-    /** Com aviso de aluno, o salvar precisa da confirmação se havia erro. */
+    /** Questão em análise: o salvar precisa da confirmação se havia erro. */
     private function guardReportDecision(Request $request, ExamQuestion $model): ?JsonResponse
     {
-        if ($model->issueReports()->exists() && ! $request->exists('had_error')) {
+        if (! $request->exists('had_error') && app(QuestionIssueReviewService::class)->isUnderReview($model)) {
             return $this->error('Confirme se a questão tinha erro para tirar a restrição.', null, 422);
         }
 
         return null;
     }
 
+    /** Em análise, ou com avisos abaixo do mínimo e a confirmação enviada, encerra os avisos dos alunos. */
     private function finishAdminSave(Request $request, ExamQuestion $model, QuestionIssueReviewService $reviews, string $plainMessage): string
     {
-        if ($model->issueReports()->exists()) {
+        $model->unsetRelation('issueReports');
+        unset($model->issue_reports_count);
+        $concludes = $reviews->isUnderReview($model) || ($request->exists('had_error') && $model->issueReports()->exists());
+        if ($concludes) {
             $hadError = $request->boolean('had_error');
             $reviews->concludeStudentReport($model, $hadError, $request->user());
 

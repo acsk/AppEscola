@@ -146,6 +146,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
   const [releaseKind, setReleaseKind] = useState<"save" | "revalidate" | "approve" | null>(null);
   const [issueReportsCount, setIssueReportsCount] = useState(0);
   const [issueReporters, setIssueReporters] = useState<QuestionIssueReporter[]>([]);
+  const [issueThreshold, setIssueThreshold] = useState(1);
+  const [issueUnderReview, setIssueUnderReview] = useState(false);
   const [analysisHint, setAnalysisHint] = useState(false);
   const isFromExam = examQuestion !== null;
 
@@ -165,6 +167,8 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
       setClassification(classified);
       setIssueReportsCount(q.issue_reports_count ?? 0);
       setIssueReporters(q.issue_reporters ?? []);
+      setIssueThreshold(q.issue_report_threshold ?? 1);
+      setIssueUnderReview(q.issue_under_review ?? (q.issue_reports_count ?? 0) > 0);
       setRevalidatedAt(q.revalidated_at ?? null);
       setUpdatedAt(q.updated_at ?? null);
       setSourceExamName(q.source_exam_name ?? "");
@@ -841,7 +845,7 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
           revalidatedAt={revalidatedAt}
           busy={reviewing}
           onValidate={() => void runReview("validate")}
-          onApprove={questionId !== null ? () => (issueReportsCount > 0 ? setAnalysisHint(true) : setReleaseKind("approve")) : undefined}
+          onApprove={questionId !== null ? () => (issueUnderReview ? setAnalysisHint(true) : setReleaseKind("approve")) : undefined}
         />
       ) : null}
       <Panel title="Classificação">
@@ -898,13 +902,11 @@ export default function QuestionEditScreen({ navigate, questionId, listQuery = "
         </View>
 
         {!loading && !loadError && issueReportsCount > 0 ? (
-          <View className="border border-warning bg-warning-tint rounded-ds-md" style={{ paddingVertical: 10, paddingHorizontal: 16, marginBottom: 20, gap: 8 }}>
+          <View className={issueUnderReview ? "border border-warning bg-warning-tint rounded-ds-md" : "border border-border bg-surface-sunken rounded-ds-md"} style={{ paddingVertical: 10, paddingHorizontal: 16, marginBottom: 20, gap: 8 }}>
             <Text className="text-ink" style={{ fontSize: 13, lineHeight: 20 }}>
-              {issueReporters.length === 1
-                ? "Este aluno marcou a questão para revisão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."
-                : issueReporters.length > 1
-                  ? "Estes alunos marcaram a questão para revisão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."
-                  : "Alunos marcaram esta questão para revisão. Ela está sem validação. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro."}
+              {issueUnderReview
+                ? `${issueReportsCount === 1 ? "1 aluno marcou" : `${issueReportsCount} alunos marcaram`} a questão com erro e ela está em análise: fora da prática e do ranking. Analise o enunciado e corrija se houver erro. A restrição sai ao salvar, quando você confirma se havia erro.`
+                : `${issueReportsCount} de ${issueThreshold} avisos para a questão ir para análise. Ela continua liberada para os alunos. Se quiser revisar agora, salve e confirme se havia erro.`}
             </Text>
             {issueReporters.length > 0 ? (
               <View style={{ gap: 4 }}>

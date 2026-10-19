@@ -5,17 +5,79 @@ namespace App\Services;
 use App\Models\ExamQuestion;
 use App\Models\QuestionIssueReview;
 use App\Models\QuestionReview;
+use App\Models\TenantSetting;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 
 /**
- * Aviso de erro do aluno: a questão fica sem validação até o administrador analisar.
+ * Aviso de erro do aluno: com o mínimo de alunos diferentes configurado pela escola, a questão
+ * vai para análise e fica sem validação até o administrador analisar.
  * A restrição só sai no salvar, quando ele confirma se havia erro.
  * Havia erro: a contagem de erros do painel zera. Não havia: a contagem permanece.
  * As respostas de prática e as notas oficiais do simulado permanecem.
  */
 class QuestionIssueReviewService
 {
+    public const SETTINGS_MODULE = 'question_bank';
+
+    public const KEY_REPORT_THRESHOLD = 'issue_report_threshold';
+
+    public const THRESHOLD_MIN = 1;
+
+    public const THRESHOLD_MAX = 50;
+
+    /** @var array<int, int> */
+    private static array $thresholds = [];
+
+    /** Alunos diferentes que precisam avisar erro para a questão ir para análise. */
+    public static function reportThreshold(int $tenantId): int
+    {
+        if (! isset(self::$thresholds[$tenantId])) {
+            $row = TenantSetting::query()->where('tenant_id', $tenantId)
+                ->where('module', self::SETTINGS_MODULE)->where('key', self::KEY_REPORT_THRESHOLD)->first();
+            $value = $row ? (int) $row->getTypedValue() : (int) config('practice.issue_report_threshold', 3);
+            self::$thresholds[$tenantId] = max(self::THRESHOLD_MIN, min(self::THRESHOLD_MAX, $value));
+        }
+
+        return self::$thresholds[$tenantId];
+    }
+
+    public static function updateReportThreshold(int $tenantId, int $threshold): int
+    {
+        $threshold = max(self::THRESHOLD_MIN, min(self::THRESHOLD_MAX, $threshold));
+        TenantSetting::updateOrCreate(
+            ['tenant_id' => $tenantId, 'module' => self::SETTINGS_MODULE, 'key' => self::KEY_REPORT_THRESHOLD],
+            [
+                'value' => TenantSetting::wrapValue($threshold),
+                'description' => 'Alunos diferentes que precisam avisar erro para a questão ir para análise.',
+            ],
+        );
+        unset(self::$thresholds[$tenantId]);
+
+        return $threshold;
+    }
+
+    /** Questão com avisos suficientes de alunos diferentes: está em análise (fora da prática e do ranking). */
+    public function isUnderReview(ExamQuestion $question): bool
+    {
+        $count = isset($question->issue_reports_count)
+            ? (int) $question->issue_reports_count
+            : $question->issueReports()->count();
+
+        return $count >= self::reportThreshold((int) $question->tenant_id);
+    }
+
+    /** Depois de um novo aviso: ao atingir o mínimo de alunos, a questão vai para análise. */
+    public function registerStudentReport(ExamQuestion $question): bool
+    {
+        if (! $this->isUnderReview($question)) {
+            return false;
+        }
+        $this->suspendForStudentReport($question);
+
+        return true;
+    }
+
     public function suspendForStudentReport(ExamQuestion $question): void
     {
         $latest = QuestionReview::query()->where('question_id', $question->id)->latest('id')->first();
@@ -53,12 +115,12 @@ class QuestionIssueReviewService
     }
 
     /**
-     * Libera uma questão que não tem aviso de aluno.
-     * Com aviso aberto, não altera nada: a restrição espera a confirmação no salvar.
+     * Libera uma questão que não está em análise.
+     * Em análise, não altera nada: a restrição espera a confirmação no salvar.
      */
     public function releaseForAnswers(ExamQuestion $question, bool $resetErrors = false): bool
     {
-        if ($question->issueReports()->exists()) {
+        if ($this->isUnderReview($question)) {
             return false;
         }
 

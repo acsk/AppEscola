@@ -11,6 +11,7 @@ import { useAnswerInAttempt, useFinishAttempt, usePracticeAttempt, useStartQuest
 import { PracticeQuestionView } from '../components/PracticeQuestionView';
 import { PracticeDesktop } from '../components/PracticeDesktop';
 import { ReviewedBadge } from '../components/ReviewedBadge';
+import { ReportIssueSheet } from '../components/ReportIssueSheet';
 import { formatPercent } from '../lib/format';
 import { font,
   BottomBar, Button, Card, Icon, IconButton, Kbd, Notice, Overline, ProgressBar, QuestionNavigator, ScreenBody, Sheet, Txt,
@@ -61,6 +62,7 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   const [mapOpen, setMapOpen] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [reportQuestionId, setReportQuestionId] = useState<number | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -198,18 +200,19 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
   };
   const askReport = () => {
     if (!current || reported[current.id] || isReportLocked(current)) return;
+    setReportError(null);
     setReportQuestionId(current.id);
   };
-  const confirmReport = () => {
+  const confirmReport = (note: string) => {
     const questionId = reportQuestionId;
-    setReportQuestionId(null);
     if (questionId == null) return;
-    setReported((prev) => ({ ...prev, [questionId]: true }));
-    toggleIssue.mutate({ questionId, reported: true }, {
-      onError: (cause) => {
-        setReported((prev) => ({ ...prev, [questionId]: false }));
-        setError(getApiErrorMessage(cause, 'Não foi possível enviar o erro da questão. Tente de novo.'));
+    setReportError(null);
+    toggleIssue.mutate({ questionId, reported: true, note }, {
+      onSuccess: () => {
+        setReported((prev) => ({ ...prev, [questionId]: true }));
+        setReportQuestionId(null);
       },
+      onError: (cause) => setReportError(getApiErrorMessage(cause, 'Não foi possível enviar o erro da questão. Tente de novo.')),
     });
   };
   const toggleFlag = () => setFlagged((prev) => (prev.includes(index + 1) ? prev.filter((n) => n !== index + 1) : [...prev, index + 1]));
@@ -340,16 +343,11 @@ export function BancoSimuladoScreen({ route, navigation }: Props) {
     />
   );
   const reportModal = (
-    <ConfirmModal
+    <ReportIssueSheet
       visible={reportQuestionId != null}
-      title="Enviar erro para o administrador?"
-      message="Você informa que esta questão tem erro e precisa ser revalidada. Ela fica sem validação até o administrador revisar."
-      confirmLabel="Enviar"
-      cancelLabel="Cancelar"
-      icon="warning-outline"
-      iconColor="#111111"
-      iconBackground="#F5C400"
-      onConfirm={confirmReport}
+      sending={toggleIssue.isPending}
+      error={reportError}
+      onSubmit={confirmReport}
       onCancel={() => setReportQuestionId(null)}
     />
   );
