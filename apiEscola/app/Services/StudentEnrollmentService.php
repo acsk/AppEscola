@@ -134,6 +134,26 @@ class StudentEnrollmentService
     }
 
     /**
+     * Disciplinas da grade horária das turmas do curso.
+     *
+     * @return Collection<int, int>
+     */
+    public function subjectIdsForCourse(int $tenantId, int $courseId): Collection
+    {
+        return DB::table('class_schedules')
+            ->join('school_classes', 'school_classes.id', '=', 'class_schedules.school_class_id')
+            ->where('school_classes.course_id', $courseId)
+            ->where('class_schedules.tenant_id', $tenantId)
+            ->whereNull('class_schedules.deleted_at')
+            ->whereNull('school_classes.deleted_at')
+            ->whereNotNull('class_schedules.subject_id')
+            ->distinct()
+            ->pluck('class_schedules.subject_id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+    }
+
+    /**
      * Disciplinas da grade horária das turmas ativas do aluno.
      *
      * @return Collection<int, int>

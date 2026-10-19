@@ -477,8 +477,8 @@ class PracticeService
     }
 
     /**
-     * Primeira tentativa de cada questão do aluno (mesma regra do ranking): respostas contadas,
-     * sem questões em análise nem excluídas. Cada linha tem exam_question_id e is_correct; use o alias practice_answers.
+     * Primeira tentativa de cada questão do aluno (mesma regra do ranking): respostas contadas, só de questões
+     * disponíveis hoje para ele e fora de análise. Cada linha tem exam_question_id e is_correct; use o alias practice_answers.
      */
     public function firstAttempts(Student $student): QueryBuilder
     {
@@ -486,8 +486,7 @@ class PracticeService
         $numbered = PracticeAnswer::query()->counted()
             ->excludingQuestionsUnderReview(QuestionIssueReviewService::reportThreshold($tenantId))
             ->where('practice_answers.student_id', $student->id)
-            ->join('exam_questions as first_eq', 'first_eq.id', '=', 'practice_answers.exam_question_id')
-            ->whereNull('first_eq.deleted_at')
+            ->whereIn('practice_answers.exam_question_id', $this->practicableFor($student)->select('exam_questions.id'))
             ->select('practice_answers.exam_question_id', 'practice_answers.is_correct')
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.exam_question_id ORDER BY practice_answers.answered_at ASC, practice_answers.id ASC) as tentativa');
 

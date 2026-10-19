@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ExamQuestion;
 use App\Models\PracticeAnswer;
 use App\Models\Student;
 use App\Models\Subject;
@@ -336,7 +337,7 @@ class PracticePerformanceService
 
     private function rankingRows(int $tenantId, ?Carbon $since, ?Carbon $until, ?int $courseId = null): Collection
     {
-        $query = PracticeAnswer::query()->counted()->excludingQuestionsUnderReview(QuestionIssueReviewService::reportThreshold($tenantId))
+        $query = $this->onlyAvailableQuestions(PracticeAnswer::query()->counted(), $tenantId, $courseId)
             ->where('practice_answers.tenant_id', $tenantId)
             ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
             ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until))
@@ -352,6 +353,24 @@ class PracticePerformanceService
             ->orderByDesc('questions')->orderByDesc('correct')->orderBy('s.id');
 
         return $this->limitToCourse($query, $tenantId, $courseId, 's.id')->get();
+    }
+
+    /**
+     * Só questões disponíveis hoje para praticar (aprovadas, válidas, das disciplinas do curso) e fora de análise.
+     * Questão que saiu da prática deixa de contar, para o total nunca passar do que o aluno tem disponível.
+     */
+    private function onlyAvailableQuestions(Builder $query, int $tenantId, ?int $courseId): Builder
+    {
+        $available = ExamQuestion::query()->practiceAvailable($tenantId)->select('exam_questions.id');
+        if ($courseId) {
+            $subjectIds = $this->enrollments->subjectIdsForCourse($tenantId, $courseId);
+            $subjectIds->isEmpty()
+                ? $available->whereRaw('0 = 1')
+                : $available->whereIn('exam_questions.subject_id', $subjectIds->all());
+        }
+
+        return $query->excludingQuestionsUnderReview(QuestionIssueReviewService::reportThreshold($tenantId))
+            ->whereIn('practice_answers.exam_question_id', $available);
     }
 
     /** Restringe aos alunos matriculados no curso. Sem curso, a consulta segue como está (foto legada da escola). */
@@ -520,7 +539,7 @@ class PracticePerformanceService
         }
         $noPeriodo = $checks === [] ? '1 = 1' : implode(' AND ', $checks);
 
-        $marked = $this->scopedAnswers($tenantId, $subjectId, $topicId, $before)
+        $marked = $this->scopedAnswers($tenantId, $subjectId, $topicId, $before, $courseId)
             ->select('practice_answers.student_id', 'practice_answers.is_correct', 'practice_answers.answered_at')
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.student_id, practice_answers.exam_question_id ORDER BY practice_answers.answered_at ASC, practice_answers.id ASC) as tentativa')
             ->selectRaw("CASE WHEN {$noPeriodo} THEN 1 ELSE 0 END as no_periodo", $bindings);
@@ -572,7 +591,7 @@ class PracticePerformanceService
 
         $grouped = [];
         foreach ($this->limitToCourse(
-            $this->scopedAnswers($tenantId, $subjectId, $topicId, $before)
+            $this->scopedAnswers($tenantId, $subjectId, $topicId, $before, $courseId)
                 ->when($since, fn (Builder $q) => $q->where('practice_answers.answered_at', '>=', $since))
                 ->when($until, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $until)),
             $tenantId,
@@ -589,10 +608,10 @@ class PracticePerformanceService
         return $grouped;
     }
 
-    /** Respostas contadas da escola, já filtradas por disciplina/assunto. Sem filtro de período nem questões em análise por erro. */
-    private function scopedAnswers(int $tenantId, ?int $subjectId, ?int $topicId, ?Carbon $before): Builder
+    /** Respostas contadas da escola, só de questões disponíveis do curso, já filtradas por disciplina/assunto. Sem filtro de período. */
+    private function scopedAnswers(int $tenantId, ?int $subjectId, ?int $topicId, ?Carbon $before, ?int $courseId = null): Builder
     {
-        return PracticeAnswer::query()->counted()->excludingQuestionsUnderReview(QuestionIssueReviewService::reportThreshold($tenantId))
+        return $this->onlyAvailableQuestions(PracticeAnswer::query()->counted(), $tenantId, $courseId)
             ->where('practice_answers.tenant_id', $tenantId)
             ->when($before, fn (Builder $q) => $q->where('practice_answers.answered_at', '<', $before))
             ->join('exam_questions as eq', 'eq.id', '=', 'practice_answers.exam_question_id')
