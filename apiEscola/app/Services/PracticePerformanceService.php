@@ -55,8 +55,7 @@ class PracticePerformanceService
 
     public function performance(Student $student): array
     {
-        $answers = fn () => PracticeAnswer::query()->counted()
-            ->where('practice_answers.student_id', $student->id)
+        $answers = fn () => $this->practice->firstAttempts($student)
             ->join('exam_questions as eq', 'eq.id', '=', 'practice_answers.exam_question_id');
 
         $bySubject = $answers()

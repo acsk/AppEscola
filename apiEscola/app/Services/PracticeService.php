@@ -13,6 +13,7 @@ use App\Models\QuestionSet;
 use App\Models\Student;
 use App\Models\Subject;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -475,12 +476,32 @@ class PracticeService
         app(LearningReviewService::class)->record($answer);
     }
 
-    /** Resumo para o Desempenho (o detalhe por disciplina/assunto fica em PracticePerformanceService). */
+    /**
+     * Primeira tentativa de cada questão do aluno (mesma regra do ranking): respostas contadas,
+     * sem questões em análise nem excluídas. Cada linha tem exam_question_id e is_correct; use o alias practice_answers.
+     */
+    public function firstAttempts(Student $student): QueryBuilder
+    {
+        $tenantId = (int) $student->tenant_id;
+        $numbered = PracticeAnswer::query()->counted()
+            ->excludingQuestionsUnderReview(QuestionIssueReviewService::reportThreshold($tenantId))
+            ->where('practice_answers.student_id', $student->id)
+            ->join('exam_questions as first_eq', 'first_eq.id', '=', 'practice_answers.exam_question_id')
+            ->whereNull('first_eq.deleted_at')
+            ->select('practice_answers.exam_question_id', 'practice_answers.is_correct')
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.exam_question_id ORDER BY practice_answers.answered_at ASC, practice_answers.id ASC) as tentativa');
+
+        return DB::query()->fromSub($numbered, 'practice_answers')->where('practice_answers.tentativa', 1);
+    }
+
+    /** Resumo para o Desempenho: questões diferentes e acerto na primeira tentativa, como no ranking. */
     public function summary(Student $student): array
     {
-        $answers = PracticeAnswer::query()->counted()->where('practice_answers.student_id', $student->id);
-        $answered = (clone $answers)->count();
-        $correct = (clone $answers)->where('practice_answers.is_correct', true)->count();
+        $totals = $this->firstAttempts($student)
+            ->selectRaw('count(*) as answered, sum(case when practice_answers.is_correct then 1 else 0 end) as correct')
+            ->first();
+        $answered = (int) ($totals->answered ?? 0);
+        $correct = (int) ($totals->correct ?? 0);
 
         return [
             'open_session' => $this->openSession($student),
