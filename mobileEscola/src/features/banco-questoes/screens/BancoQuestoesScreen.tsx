@@ -76,7 +76,8 @@ export function BancoQuestoesScreen() {
 
   const subjectName = subjectIds.length ? subjects.filter((s) => subjectIds.includes(s.id)).map((s) => s.name).join(', ') : 'Todas as matérias';
   const topicName = topicIds.length ? topics.filter((t) => topicIds.includes(t.id)).map((t) => t.name).join(', ') : 'Todos os assuntos';
-  const title = `${subjectName} · ${topicName}`;
+  const fullTitle = `${subjectName} · ${topicName}`;
+  const title = fullTitle.length > 120 ? `${fullTitle.slice(0, 117).trimEnd()}...` : fullTitle;
 
   // "7 de Português e 5 de Matemática"
   const newBreakdown = useMemo(() => {

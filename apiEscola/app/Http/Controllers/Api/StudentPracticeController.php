@@ -16,6 +16,7 @@ use App\Services\PracticeService;
 use App\Services\StudentEnrollmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -141,11 +142,13 @@ class StudentPracticeController extends Controller
             'quantity'        => ['nullable', 'integer', 'min:1', 'max:500'],
             'correction_mode' => ['required', Rule::in(['each', 'end'])],
             'timed'           => ['sometimes', 'boolean'],
-            'title'           => ['nullable', 'string', 'max:120'],
+            'title'           => ['nullable', 'string', 'max:2000'],
         ], [], ['quantity' => 'quantidade', 'correction_mode' => 'correção']);
+        // O título é montado no app a partir dos filtros; nunca deve impedir a sessão de começar.
+        $title = Str::limit(trim((string) ($data['title'] ?? '')), 117) ?: 'Sessão de prática';
         $attempt = $this->practice->startSession(
             $student, array_filter($filters, fn ($v) => $v !== null && $v !== []), $data['quantity'] ?? null, $data['correction_mode'],
-            $request->boolean('timed') ? 90 : null, $data['title'] ?? 'Sessão de prática', $this->catalog
+            $request->boolean('timed') ? 90 : null, $title, $this->catalog
         );
 
         return $this->created($this->practice->attemptPayload($attempt), "Sessão com {$attempt->question_count} questão(ões) pronta.");
