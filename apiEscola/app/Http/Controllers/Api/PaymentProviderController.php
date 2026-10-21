@@ -375,6 +375,12 @@ class PaymentProviderController extends Controller
             $baseUrl = $existing?->base_url;
         }
 
+        // O token identifica a escola no webhook: não pode ser compartilhado entre credenciais.
+        if ($webhookToken !== null && $webhookToken !== ''
+            && $credentialService->webhookTokenInUseElsewhere($webhookToken, $tenant, $environment)) {
+            return $this->error('Este token de webhook já está em uso. Gere um token exclusivo para esta escola.', null, 422);
+        }
+
         $credential = $credentialService->persist(
             $tenant,
             $environment,

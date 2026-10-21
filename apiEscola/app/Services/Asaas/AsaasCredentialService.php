@@ -41,6 +41,23 @@ class AsaasCredentialService
             ->first();
     }
 
+    public function webhookTokenInUseElsewhere(string $token, Tenant $tenant, string $environment): bool
+    {
+        $token = trim($token);
+
+        if ($token === '') {
+            return false;
+        }
+
+        return TenantAsaasCredential::query()
+            ->where('webhook_token_hash', TenantAsaasCredential::hashWebhookToken($token))
+            ->where(function ($query) use ($tenant, $environment) {
+                $query->where('tenant_id', '!=', $tenant->id)
+                    ->orWhere('environment', '!=', $this->normalizeEnvironment($environment));
+            })
+            ->exists();
+    }
+
     public function isConfiguredForTenant(Tenant $tenant, string $environment): bool
     {
         return $this->findForTenant($tenant, $environment) !== null

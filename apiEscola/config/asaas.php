@@ -18,6 +18,13 @@ return [
 
     'webhook_token' => env('ASAAS_WEBHOOK_TOKEN'),
 
+    /*
+    | Token global legado. Desligado por padrão: o webhook exige o token da credencial
+    | de cada escola. Quando ligado, só altera faturas de escolas sem credencial própria
+    | e sempre após confirmar a cobrança na API do Asaas com a chave global.
+    */
+    'webhook_allow_global_token' => (bool) env('ASAAS_WEBHOOK_ALLOW_GLOBAL_TOKEN', false),
+
     'timeout' => (int) env('ASAAS_TIMEOUT', 25),
 
     'retry' => [

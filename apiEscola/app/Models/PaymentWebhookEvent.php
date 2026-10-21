@@ -17,6 +17,7 @@ class PaymentWebhookEvent extends Model
 
     protected $fillable = [
         'provider',
+        'tenant_id',
         'idempotency_key',
         'event_type',
         'external_payment_id',
@@ -31,6 +32,11 @@ class PaymentWebhookEvent extends Model
         'payload' => 'array',
         'processed_at' => 'datetime',
     ];
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     public function invoice(): BelongsTo
     {

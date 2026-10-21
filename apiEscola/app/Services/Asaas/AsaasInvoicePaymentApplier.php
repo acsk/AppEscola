@@ -38,7 +38,10 @@ class AsaasInvoicePaymentApplier
         }
 
         return DB::transaction(function () use ($invoice, $payment, $asaasStatus, $localStatus, $eventType): bool {
-            $invoice = Invoice::query()->lockForUpdate()->find($invoice->id);
+            $invoice = Invoice::query()
+                ->where('tenant_id', $invoice->tenant_id)
+                ->lockForUpdate()
+                ->find($invoice->id);
 
             if (! $invoice) {
                 return false;
