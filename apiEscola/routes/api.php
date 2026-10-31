@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Bi\BiMetaController;
+use App\Http\Controllers\Api\Bi\BiOverviewController;
 use App\Http\Controllers\Api\ClassScheduleController;
 use App\Http\Controllers\Api\CourseBundleController;
 use App\Http\Controllers\Api\CoursePlanController;
@@ -127,6 +129,13 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])-
     // Auth
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/dashboard', [AdminDashboardController::class, 'show']);
+
+    // Inteligência Educacional (BI)
+    Route::prefix('bi')->group(function () {
+        Route::get('meta', [BiMetaController::class, 'show']);
+        Route::get('metrics', [BiMetaController::class, 'metrics']);
+        Route::get('overview', [BiOverviewController::class, 'show']);
+    });
     Route::match(['post', 'put', 'patch'], '/me/password', [AuthController::class, 'updatePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
 

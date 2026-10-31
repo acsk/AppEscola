@@ -24,6 +24,8 @@ export type SidebarProps = {
   canManageAi?: boolean;
   canManageExams?: boolean;
   canSendNotifications?: boolean;
+  /** Seções liberadas da Inteligência Educacional (vindas de /bi/meta). */
+  biSections?: { key: string; label: string }[];
   isMobile?: boolean;
   onClose?: () => void;
   apiVersion?: string;

@@ -188,7 +188,7 @@ export default function MobileThemeSettingsScreen() {
   const isSuperAdmin = user?.role === "super_admin";
   const canEdit =
     isSuperAdmin ||
-    ["admin", "manager", "financial"].includes(String(user?.role ?? ""));
+    ["admin", "coordenador", "manager", "financial"].includes(String(user?.role ?? ""));
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

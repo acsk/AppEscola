@@ -777,7 +777,7 @@ export default function ContractChargesModal({
 }: Props) {
   const { user } = useAuth();
   const canRequestDebug =
-    user?.role === "super_admin" || user?.role === "admin" || user?.role === "financial";
+    user?.role === "super_admin" || user?.role === "admin" || user?.role === "coordenador" || user?.role === "financial";
 
   const [preview, setPreview] = useState<ContractChargesPreview | null>(null);
   const [loading, setLoading] = useState(false);

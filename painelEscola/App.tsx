@@ -49,6 +49,8 @@ import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 import { ClassStudentsReportScreen, FinanceReportScreen } from "./screens/relatorios";
+import { BiOverviewScreen } from "./screens/inteligencia";
+import { fetchBiMeta, type BiSection } from "./services/biService";
 
 import type { NavState } from "./types/navigation";
 import { canManageExams as roleCanManageExams } from "./utils/permissions";
@@ -261,6 +263,10 @@ function hashToNav(hash: string): NavState {
     return { screen: "configuracoes-cobranca" };
   }
 
+  if (seg0 === "inteligencia") {
+    return { screen: "bi-overview" };
+  }
+
   if (seg0 === "relatorios") {
     if (seg1 === "financeiro") return { screen: "relatorios-financeiro" };
     if (seg1 === "turmas") return { screen: "relatorios-turmas" };
@@ -355,6 +361,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "configuracoes-tema-mobile") return "#/configuracoes/tema-mobile";
   if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
+  if (nav.screen === "bi-overview") return "#/inteligencia/visao-geral";
   if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
   if (nav.screen === "relatorios-financeiro") return "#/relatorios/financeiro";
   return `#/${nav.screen}`;
@@ -390,6 +397,18 @@ function AppContent() {
     message: "Sem comunicação com o servidor no momento.",
   });
   const isMobile = width < 768;
+  const [biSections, setBiSections] = useState<BiSection[]>([]);
+
+  // Menu "Inteligência Educacional": só as seções que a API libera para o papel e o plano do tenant.
+  useEffect(() => {
+    if (!user || !["super_admin", "admin", "coordenador", "professor"].includes(user.role)) {
+      setBiSections([]);
+      return;
+    }
+    fetchBiMeta()
+      .then((meta) => setBiSections(meta.sections.filter((section) => section.available)))
+      .catch(() => setBiSections([]));
+  }, [user?.id, user?.role]);
 
   const [nav, setNav] = useState<NavState>(() => {
     if (typeof window !== "undefined" && window.location.hash) {
@@ -697,11 +716,12 @@ function AppContent() {
   };
 
   const canManageTenants = user?.role === "super_admin";
-  const canManageUsers = user?.role === "super_admin" || user?.role === "admin";
+  const canManageUsers = user?.role === "super_admin" || user?.role === "admin" || user?.role === "coordenador";
   const canManageExams = roleCanManageExams(user?.role);
   const canSendNotifications =
     user?.role === "super_admin" ||
     user?.role === "admin" ||
+    user?.role === "coordenador" ||
     user?.role === "professor";
 
   // determina item ativo na sidebar (sem sub-rota)
@@ -719,6 +739,8 @@ function AppContent() {
     ? "notificacoes"
     : nav.screen.startsWith("calendario")
     ? "calendario"
+    : nav.screen.startsWith("bi-")
+    ? nav.screen
     : nav.screen === "relatorios-financeiro"
     ? "relatorios-financeiro"
     : nav.screen.startsWith("relatorios")
@@ -1019,6 +1041,7 @@ function AppContent() {
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
+      case "bi-overview": return <BiOverviewScreen navigate={navigate} />;
       case "relatorios-turmas": return <ClassStudentsReportScreen navigate={navigate} />;
       case "relatorios-financeiro": return <FinanceReportScreen navigate={navigate} />;
       default: return <DashboardScreen navigate={navigate} />;
@@ -1037,6 +1060,7 @@ function AppContent() {
             canManageAi={canManageUsers}
             canManageExams={canManageExams}
             canSendNotifications={canSendNotifications}
+            biSections={biSections}
             apiVersion={apiVersion}
           />
         )}
@@ -1058,6 +1082,7 @@ function AppContent() {
               canManageAi={canManageUsers}
               canManageExams={canManageExams}
               canSendNotifications={canSendNotifications}
+              biSections={biSections}
               apiVersion={apiVersion}
               isMobile
               onClose={() => setIsSidebarOpen(false)}

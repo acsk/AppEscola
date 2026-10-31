@@ -188,7 +188,7 @@ class TenantBillingSettingsController extends Controller
         $userRole = strtolower((string) ($user->role ?? ''));
         $isSameTenant = (int) $user->tenant_id === (int) $tenant->id;
 
-        if ($isSameTenant && in_array($userRole, ['admin', 'manager', 'financial'], true)) {
+        if ($isSameTenant && in_array($userRole, ['admin', 'coordenador', 'manager', 'financial'], true)) {
             return;
         }
 

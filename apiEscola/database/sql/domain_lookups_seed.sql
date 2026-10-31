@@ -11,6 +11,7 @@ INSERT IGNORE INTO domain_user_roles (slug, name) VALUES
 ('admin', 'Administrador'),
 ('secretaria', 'Secretaria'),
 ('professor', 'Professor'),
+('coordenador', 'Coordenação'),
 ('aluno', 'Aluno'),
 ('responsavel', 'Responsável');
 

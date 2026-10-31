@@ -12,7 +12,7 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 class ExamAccessService
 {
     /** Papéis que podem ver gabarito e gerenciar simulados no painel. */
-    public const STAFF_ROLES = ['super_admin', 'admin', 'secretaria', 'professor'];
+    public const STAFF_ROLES = ['super_admin', 'admin', 'coordenador', 'secretaria', 'professor'];
 
     public function __construct(
         private readonly StudentEnrollmentService $enrollmentService,

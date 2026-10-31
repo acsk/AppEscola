@@ -36,6 +36,15 @@ const tokens = require("./designTokens") as {
     | "nav-ink"
     | "nav-ink-muted"
     | "nav-label"
+    | "data-1"
+    | "data-2"
+    | "data-3"
+    | "seq-1"
+    | "seq-2"
+    | "seq-3"
+    | "seq-4"
+    | "seq-5"
+    | "on-seq-strong"
     | "overlay",
     string
   >;

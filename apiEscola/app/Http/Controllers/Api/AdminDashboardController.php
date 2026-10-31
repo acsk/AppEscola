@@ -14,7 +14,7 @@ class AdminDashboardController extends Controller
 
     private const STAFF_ROLES = [
         'super_admin',
-        'admin',
+        'admin', 'coordenador',
         'manager',
         'financial',
         'secretaria',

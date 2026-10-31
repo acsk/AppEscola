@@ -5,6 +5,7 @@
 export const EXAM_MANAGER_ROLES = [
   "super_admin",
   "admin",
+  "coordenador",
   "secretaria",
   "professor",
 ] as const;
@@ -27,6 +28,8 @@ export function roleLabel(role?: string | null): string {
       return "Secretaria";
     case "professor":
       return "Professor";
+    case "coordenador":
+      return "Coordenação";
     case "financeiro":
       return "Financeiro";
     case "aluno":

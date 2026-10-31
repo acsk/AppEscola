@@ -268,7 +268,7 @@ class CalendarEventController extends Controller
 
     private function denyUnlessStaff(Request $request): ?JsonResponse
     {
-        if (! in_array($request->user()->role, ['admin', 'super_admin', 'professor'], true)) {
+        if (! in_array($request->user()->role, ['admin', 'coordenador', 'super_admin', 'professor'], true)) {
             return $this->forbidden('Sem permissão para gerenciar o calendário.');
         }
 

@@ -134,7 +134,7 @@ class SubjectTopicController extends Controller
 
     private function isAdmin(Request $request): bool
     {
-        return in_array($request->user()->role, ['admin', 'super_admin'], true);
+        return in_array($request->user()->role, ['admin', 'coordenador', 'super_admin'], true);
     }
 
     private function subject(Request $request, int $id): Subject

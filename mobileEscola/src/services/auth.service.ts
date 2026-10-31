@@ -1,6 +1,6 @@
 import { api } from './api';
 
-export type UserRole = 'admin' | 'super_admin' | 'professor' | 'aluno';
+export type UserRole = 'admin' | 'coordenador' | 'super_admin' | 'professor' | 'aluno';
 
 export interface AuthTenant {
   id: number;

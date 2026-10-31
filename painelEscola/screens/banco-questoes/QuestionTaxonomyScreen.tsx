@@ -74,7 +74,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   const [toDelete, setToDelete] = useState<DeleteState | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { user } = useAuth();
-  const canImport = user?.role === "admin" || user?.role === "super_admin";
+  const canImport = user?.role === "admin" || user?.role === "coordenador" || user?.role === "super_admin";
   const [confirmImport, setConfirmImport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [topicImport, setTopicImport] = useState<{ subject: SubjectRow; sources: DefaultTopicsSource[]; source: string } | null>(null);

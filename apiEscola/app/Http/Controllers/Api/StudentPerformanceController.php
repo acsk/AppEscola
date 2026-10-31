@@ -58,7 +58,7 @@ class StudentPerformanceController extends Controller
 
         $user = $request->user();
 
-        if (! in_array($user->role, ['admin', 'super_admin', 'professor'], true)) {
+        if (! in_array($user->role, ['admin', 'coordenador', 'super_admin', 'professor'], true)) {
             return $this->forbidden('Sem permissão para visualizar o desempenho deste aluno.');
         }
 
@@ -81,7 +81,7 @@ class StudentPerformanceController extends Controller
 
         $user = $request->user();
 
-        if (! in_array($user->role, ['admin', 'super_admin', 'professor', 'secretaria'], true)) {
+        if (! in_array($user->role, ['admin', 'coordenador', 'super_admin', 'professor', 'secretaria'], true)) {
             return $this->forbidden('Sem permissão para visualizar o histórico deste aluno.');
         }
 

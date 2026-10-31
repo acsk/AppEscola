@@ -8,6 +8,7 @@ import {
   Calculator,
   Calendar,
   ChartColumn,
+  ChartLine,
   Check,
   ClipboardCheck,
   ClipboardList,
@@ -50,6 +51,11 @@ const formatBuildDateTime = (isoDate: string): string => {
 
 type SidebarItem = { id: string; label: string; icon: LucideIcon };
 
+/** Seção do BI (chave da API) → tela do painel. Seção sem tela aqui não aparece no menu. */
+const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
+  overview: { id: "bi-overview", icon: ChartLine },
+};
+
 /** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */
 type SidebarSection = { label?: string; items: SidebarItem[] };
 
@@ -61,6 +67,7 @@ export default function Sidebar({
   canManageAi = false,
   canManageExams = false,
   canSendNotifications = false,
+  biSections = [],
   isMobile = false,
   onClose,
   apiVersion = "-",
@@ -97,6 +104,16 @@ export default function Sidebar({
         { id: "matriculas", label: "Matrículas", icon: ClipboardList },
       ],
     },
+    ...(biSections.length
+      ? [
+          {
+            label: "Inteligência Educacional",
+            items: biSections
+              .filter((section) => BI_SCREENS[section.key])
+              .map((section) => ({ id: BI_SCREENS[section.key].id, label: section.label, icon: BI_SCREENS[section.key].icon })),
+          },
+        ]
+      : []),
     {
       label: "Relatórios",
       items: [

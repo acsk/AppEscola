@@ -91,7 +91,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
     message: "",
   });
   const isEditingOwnUser = isEdit && !!userId && user?.id === userId;
-  const canTeach = form.role === "professor" || form.role === "admin";
+  const canTeach = form.role === "professor" || form.role === "admin" || form.role === "coordenador";
 
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
@@ -247,7 +247,7 @@ export default function UserFormScreen({ navigate, userId }: Props) {
       ...prev,
       role: nextRole,
       tenant_id: nextRole === "super_admin" ? "" : prev.tenant_id,
-      subject_ids: nextRole === "professor" || nextRole === "admin" ? prev.subject_ids : [],
+      subject_ids: nextRole === "professor" || nextRole === "admin" || nextRole === "coordenador" ? prev.subject_ids : [],
     }));
     setErrors((prev) => ({ ...prev, role: "", tenant_id: "" }));
   };

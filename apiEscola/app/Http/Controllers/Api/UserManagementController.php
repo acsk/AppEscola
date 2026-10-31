@@ -40,7 +40,7 @@ class UserManagementController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, ['super_admin', 'admin'], true)) {
+        if (! $user || ! in_array($user->role, ['super_admin', 'admin', 'coordenador'], true)) {
             abort(403, 'Acesso negado.');
         }
     }

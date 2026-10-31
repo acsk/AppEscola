@@ -226,6 +226,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           { data: subjectsRaw },
           { data: teachersProfessorRaw },
           { data: teachersAdminRaw },
+          { data: teachersCoordRaw },
         ] = await Promise.all([
           api.get("/courses", { params: { status: "active", per_page: 200 } }),
           api.get("/subjects", { params: { status: "active", per_page: 200 } }),
@@ -235,6 +236,9 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
           api.get("/users", {
             params: { role: "admin", per_page: 200 },
           }),
+          api.get("/users", {
+            params: { role: "coordenador", per_page: 200 },
+          }),
         ]);
 
         const coursesData = extractList(coursesRaw);
@@ -242,6 +246,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
         const teachersData = [
           ...extractList(teachersProfessorRaw),
           ...extractList(teachersAdminRaw),
+          ...extractList(teachersCoordRaw),
         ];
 
         setCourses(Array.isArray(coursesData) ? coursesData : []);
@@ -301,7 +306,7 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
       }
 
       try {
-        const [{ data: teachersProfessorRaw }, { data: teachersAdminRaw }] = await Promise.all([
+        const [{ data: teachersProfessorRaw }, { data: teachersAdminRaw }, { data: teachersCoordRaw }] = await Promise.all([
           api.get("/users", {
             params: {
               role: "professor",
@@ -316,11 +321,19 @@ export default function SchoolClassFormScreen({ classId, navigate }: Props) {
               per_page: 200,
             },
           }),
+          api.get("/users", {
+            params: {
+              role: "coordenador",
+              subject_id: Number(scheduleForm.subject_id),
+              per_page: 200,
+            },
+          }),
         ]);
 
         const teachersData = [
           ...extractList(teachersProfessorRaw),
           ...extractList(teachersAdminRaw),
+          ...extractList(teachersCoordRaw),
         ];
 
         const selectedSubjectId = Number(scheduleForm.subject_id);

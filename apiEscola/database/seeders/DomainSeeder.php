@@ -23,6 +23,7 @@ class DomainSeeder extends Seeder
             ['slug' => 'admin',       'name' => 'Administrador'],
             ['slug' => 'secretaria',  'name' => 'Secretaria'],
             ['slug' => 'professor',   'name' => 'Professor'],
+            ['slug' => 'coordenador', 'name' => 'Coordenação'],
             ['slug' => 'aluno',       'name' => 'Aluno'],
             ['slug' => 'responsavel', 'name' => 'Responsável'],
         ]);

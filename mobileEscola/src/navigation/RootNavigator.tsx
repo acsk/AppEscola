@@ -104,6 +104,7 @@ export function RootNavigator() {
 
     switch (user.role) {
       case 'admin':
+      case 'coordenador':
       case 'super_admin':
         return <AdminStack />;
       case 'professor':

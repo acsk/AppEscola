@@ -164,7 +164,7 @@ class TenantMobileThemeController extends Controller
         $userRole = strtolower((string) ($user->role ?? ''));
         $isSameTenant = (int) $user->tenant_id === (int) $tenant->id;
 
-        if ($isSameTenant && in_array($userRole, ['admin', 'manager', 'financial'], true)) {
+        if ($isSameTenant && in_array($userRole, ['admin', 'coordenador', 'manager', 'financial'], true)) {
             return;
         }
 
@@ -177,7 +177,7 @@ class TenantMobileThemeController extends Controller
     {
         $role = strtolower((string) ($request->user()->role ?? ''));
 
-        if (! in_array($role, ['admin', 'super_admin', 'professor', 'manager', 'financial'], true)) {
+        if (! in_array($role, ['admin', 'coordenador', 'super_admin', 'professor', 'manager', 'financial'], true)) {
             return $this->forbidden('Sem permissão para acessar o tema do app mobile.');
         }
 

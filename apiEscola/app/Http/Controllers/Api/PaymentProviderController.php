@@ -32,7 +32,7 @@ class PaymentProviderController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, ['super_admin', 'admin'], true)) {
+        if (! $user || ! in_array($user->role, ['super_admin', 'admin', 'coordenador'], true)) {
             throw new AccessDeniedHttpException('Acesso permitido apenas para admin ou super admin.');
         }
 
@@ -49,7 +49,7 @@ class PaymentProviderController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, ['super_admin', 'admin'], true)) {
+        if (! $user || ! in_array($user->role, ['super_admin', 'admin', 'coordenador'], true)) {
             throw new AccessDeniedHttpException('Acesso permitido apenas para admin ou super admin.');
         }
 

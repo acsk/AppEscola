@@ -487,7 +487,7 @@ class OfficialAssessmentController extends Controller
     private function denyUnlessStaff(Request $request): void
     {
         $role = $request->user()?->role;
-        if (! in_array($role, ['admin', 'super_admin', 'secretaria', 'professor'], true)) {
+        if (! in_array($role, ['admin', 'coordenador', 'super_admin', 'secretaria', 'professor'], true)) {
             abort(403, 'Sem permissão para gerenciar avaliações oficiais.');
         }
     }

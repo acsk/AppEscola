@@ -40,6 +40,15 @@ const palette = {
     "danger-tint": "#fbe9e7",
     "on-danger": "#ffffff", // texto/ícone sobre fundo danger (botões de excluir)
     "danger-hover": "#8f1e15",
+    "data-1": "#2f63b8", // séries de gráfico: 1ª série
+    "data-2": "#c46a1a", // 2ª série
+    "data-3": "#0b8f6f", // 3ª série
+    "seq-1": "#e6edf8", // escala sequencial (mapa de calor), do menor ao maior
+    "seq-2": "#bcd0ef",
+    "seq-3": "#86a9e0",
+    "seq-4": "#3e70be",
+    "seq-5": "#24518f",
+    "on-seq-strong": "#ffffff", // texto sobre seq-4 e seq-5
     overlay: "rgba(17,23,34,0.45)", // véu atrás de modais
     "shadow-overlay": "0 8px 24px rgba(17,23,34,0.14), 0 1px 2px rgba(17,23,34,0.08)",
   },
@@ -75,6 +84,15 @@ const palette = {
     "danger-tint": "#2e1614",
     "on-danger": "#1a0b09",
     "danger-hover": "#f5a198",
+    "data-1": "#7aa7f0",
+    "data-2": "#e8a05a",
+    "data-3": "#4fc7a5",
+    "seq-1": "#1c2a40",
+    "seq-2": "#24426c",
+    "seq-3": "#335f9b",
+    "seq-4": "#5b8bd0",
+    "seq-5": "#9dbfee",
+    "on-seq-strong": "#0e1116",
     overlay: "rgba(0,0,0,0.6)",
     "shadow-overlay": "0 8px 24px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)",
   },
