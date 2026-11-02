@@ -15,7 +15,7 @@ class PracticeFirstAttempts
 {
     /**
      * Primeiras tentativas respondidas no período.
-     * Colunas: student_id, exam_question_id, subject_id, is_correct, answered_at.
+     * Colunas: student_id, exam_question_id, subject_id, option_id, is_correct, answered_at.
      */
     public function query(StudentUniverse $universe, ?BiFilters $filters = null): Builder
     {
@@ -27,7 +27,7 @@ class PracticeFirstAttempts
             ->where('practice_answers.tenant_id', $universe->scope->tenantId)
             ->whereIn('practice_answers.student_id', $universe->query())
             ->when($filters->examTypeId !== null, fn ($q) => $q->where('q.exam_type_id', $filters->examTypeId))
-            ->select('practice_answers.student_id', 'practice_answers.exam_question_id', 'practice_answers.is_correct', 'practice_answers.answered_at', 'q.subject_id')
+            ->select('practice_answers.student_id', 'practice_answers.exam_question_id', 'practice_answers.option_id', 'practice_answers.is_correct', 'practice_answers.answered_at', 'q.subject_id')
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.student_id, practice_answers.exam_question_id ORDER BY practice_answers.answered_at, practice_answers.id) as tentativa')
             ->toBase();
 

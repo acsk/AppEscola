@@ -85,6 +85,12 @@ class StudentUniverse
         return $names;
     }
 
+    /** Aluno × turma do recorte; aluno em duas turmas aparece nas duas. Colunas: student_id, school_class_id, class_name. */
+    public function classMemberships(): Builder
+    {
+        return $this->memberships()->select('m.student_id', 'm.school_class_id', 'sc.name as class_name')->distinct();
+    }
+
     /** Matrícula × turma (principal e adicionais) já filtradas pelo recorte. */
     private function memberships(): Builder
     {

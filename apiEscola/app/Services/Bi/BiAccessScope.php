@@ -14,6 +14,7 @@ class BiAccessScope
     /** @param  list<int>|null  $classIds  null = sem restrição de turma */
     private function __construct(
         public readonly int $tenantId,
+        public readonly int $userId,
         public readonly string $role,
         public readonly ?array $classIds,
     ) {
@@ -27,10 +28,10 @@ class BiAccessScope
     public static function for(User $user, int $tenantId): self
     {
         if (in_array($user->role, config('bi.tenant_wide_roles', []), true)) {
-            return new self($tenantId, $user->role, null);
+            return new self($tenantId, $user->id, $user->role, null);
         }
 
-        return new self($tenantId, $user->role, self::teacherClassIds($user->id, $tenantId));
+        return new self($tenantId, $user->id, $user->role, self::teacherClassIds($user->id, $tenantId));
     }
 
     public function isTenantWide(): bool
@@ -41,6 +42,38 @@ class BiAccessScope
     public function allowsClass(int $schoolClassId): bool
     {
         return $this->classIds === null || in_array($schoolClassId, $this->classIds, true);
+    }
+
+    /**
+     * Disciplinas que o professor leciona nas suas turmas ou às quais está vinculado; null = todas.
+     *
+     * @return list<int>|null
+     */
+    public function subjectIds(): ?array
+    {
+        if ($this->isTenantWide()) {
+            return null;
+        }
+
+        $fromSchedules = DB::table('class_schedules')
+            ->where('tenant_id', $this->tenantId)
+            ->whereNull('deleted_at')
+            ->whereIn('school_class_id', $this->classIds ?: [0])
+            ->whereNotNull('subject_id')
+            ->pluck('subject_id');
+        $linked = DB::table('subject_user')
+            ->where('tenant_id', $this->tenantId)
+            ->where('user_id', $this->userId)
+            ->pluck('subject_id');
+
+        return $fromSchedules->merge($linked)->map(fn ($id) => (int) $id)->unique()->values()->all();
+    }
+
+    public function allowsSubject(int $subjectId): bool
+    {
+        $ids = $this->subjectIds();
+
+        return $ids === null || in_array($subjectId, $ids, true);
     }
 
     /**

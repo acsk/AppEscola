@@ -6,6 +6,7 @@ use App\Models\PracticeAnswer;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
+use App\Services\Bi\Sources\AnswerStream;
 use App\Services\Bi\Sources\AssessmentResults;
 use App\Services\Bi\Sources\AttendanceRecords;
 use App\Services\Bi\Sources\PracticeFirstAttempts;
@@ -32,6 +33,7 @@ class OverviewService
         private readonly AssessmentResults $assessments,
         private readonly PracticeFirstAttempts $practice,
         private readonly AttendanceRecords $attendance,
+        private readonly AnswerStream $answers,
     ) {
     }
 
@@ -318,34 +320,16 @@ class OverviewService
     private function subjectsDifficulty(StudentUniverse $universe): array
     {
         $minSample = (int) $this->catalog->definition('subjects.difficulty_rank')['min_sample'];
-        $online = $this->assessments->firstOnlineAttempts($universe);
-        $practice = $this->practice->query($universe);
-        $subjectFilter = $universe->filters->subjectId;
+        $answers = $this->answers->query($universe);
 
-        $onlineAnswers = fn (bool $withTopic) => DB::table('exam_answers as ans')
-            ->joinSub($online, 'fa', 'fa.attempt_id', '=', 'ans.attempt_id')
-            ->join('exam_questions as q', 'q.id', '=', 'ans.question_id')
-            ->whereNotNull('q.subject_id')
-            ->where('q.is_annulled', false)
-            ->whereNotNull('ans.is_correct')
-            ->when($subjectFilter !== null, fn ($q) => $q->where('q.subject_id', $subjectFilter))
-            ->when($withTopic, fn ($q) => $q->join('exam_question_topic as t', 't.exam_question_id', '=', 'q.id'))
-            ->select('q.subject_id', 'ans.is_correct')
-            ->when($withTopic, fn ($q) => $q->addSelect('t.subject_topic_id as topic_id'));
+        $aggregate = function (bool $withTopic) use ($answers) {
+            $groups = $withTopic ? ['r.subject_id', 't.subject_topic_id'] : ['r.subject_id'];
 
-        $practiceAnswers = fn (bool $withTopic) => (clone $practice)
-            ->whereNotNull('pa.subject_id')
-            ->when($withTopic, fn ($q) => $q->join('exam_question_topic as t', 't.exam_question_id', '=', 'pa.exam_question_id'))
-            ->select('pa.subject_id', 'pa.is_correct')
-            ->when($withTopic, fn ($q) => $q->addSelect('t.subject_topic_id as topic_id'));
-
-        $aggregate = function (bool $withTopic) use ($onlineAnswers, $practiceAnswers) {
-            $groups = $withTopic ? ['r.subject_id', 'r.topic_id'] : ['r.subject_id'];
-
-            return DB::query()
-                ->fromSub($onlineAnswers($withTopic)->unionAll($practiceAnswers($withTopic)), 'r')
+            return (clone $answers)
+                ->when($withTopic, fn ($q) => $q->join('exam_question_topic as t', 't.exam_question_id', '=', 'r.question_id'))
                 ->groupBy($groups)
-                ->select($groups)
+                ->select('r.subject_id')
+                ->when($withTopic, fn ($q) => $q->addSelect('t.subject_topic_id as topic_id'))
                 ->selectRaw('COUNT(*) as answers')
                 ->selectRaw('SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) as correct')
                 ->get();

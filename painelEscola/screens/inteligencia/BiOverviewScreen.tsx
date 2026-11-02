@@ -204,7 +204,7 @@ export default function BiOverviewScreen({ navigate }: Props) {
             <View style={{ flex: width >= 1100 ? 1 : undefined, width: width >= 1100 ? undefined : "100%", minWidth: 0 }}>
               <Panel title="Disciplinas com maior dificuldade" description="% de acertos · simulados online e banco, 1ª tentativa.">
                 {data.subjects_difficulty.length ? (
-                  <DifficultyBars items={data.subjects_difficulty} goal={goal} />
+                  <DifficultyBars items={data.subjects_difficulty} goal={goal} onSelect={(id) => navigate("bi-subjects", { subjectId: id })} />
                 ) : (
                   <EmptyState text={`Nenhuma disciplina com ao menos ${definitions["subjects.difficulty_rank"]?.min_sample ?? 20} respostas no período.`} />
                 )}

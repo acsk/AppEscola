@@ -49,7 +49,7 @@ import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 import { ClassStudentsReportScreen, FinanceReportScreen } from "./screens/relatorios";
-import { BiOverviewScreen } from "./screens/inteligencia";
+import { BiOverviewScreen, BiSubjectsScreen } from "./screens/inteligencia";
 import { fetchBiMeta, type BiSection } from "./services/biService";
 
 import type { NavState } from "./types/navigation";
@@ -264,6 +264,10 @@ function hashToNav(hash: string): NavState {
   }
 
   if (seg0 === "inteligencia") {
+    if (seg1 === "disciplinas") {
+      const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
+      return { screen: "bi-subjects", params: isNaN(id) ? undefined : { subjectId: id } };
+    }
     return { screen: "bi-overview" };
   }
 
@@ -362,6 +366,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   if (nav.screen === "bi-overview") return "#/inteligencia/visao-geral";
+  if (nav.screen === "bi-subjects") {
+    const id = nav.params?.subjectId;
+    return id ? `#/inteligencia/disciplinas/${id}` : "#/inteligencia/disciplinas";
+  }
   if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
   if (nav.screen === "relatorios-financeiro") return "#/relatorios/financeiro";
   return `#/${nav.screen}`;
@@ -1042,6 +1050,8 @@ function AppContent() {
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       case "bi-overview": return <BiOverviewScreen navigate={navigate} />;
+      case "bi-subjects":
+        return <BiSubjectsScreen navigate={navigate} subjectId={nav.params?.subjectId ? Number(nav.params.subjectId) : null} />;
       case "relatorios-turmas": return <ClassStudentsReportScreen navigate={navigate} />;
       case "relatorios-financeiro": return <FinanceReportScreen navigate={navigate} />;
       default: return <DashboardScreen navigate={navigate} />;

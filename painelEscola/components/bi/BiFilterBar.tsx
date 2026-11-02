@@ -46,13 +46,17 @@ type Props = {
   filters: BiFilters;
   preset: PeriodPreset;
   onChange: (filters: BiFilters, preset: PeriodPreset) => void;
+  /** Esconde o filtro de disciplina (telas em que ela vem da aba). */
+  hideSubject?: boolean;
+  /** Filtros próprios da tela, ao lado dos globais. */
+  extra?: React.ReactNode;
 };
 
 /**
  * Filtros globais do BI: período, curso, turma, disciplina e concurso à vista; ano letivo, professor,
  * modalidade e datas em "Mais filtros". As opções já vêm recortadas pelo escopo do usuário (/bi/meta).
  */
-export default function BiFilterBar({ meta, filters, preset, onChange }: Props) {
+export default function BiFilterBar({ meta, filters, preset, onChange, hideSubject = false, extra }: Props) {
   const { isMobile } = useResponsiveLayout();
   const [moreOpen, setMoreOpen] = useState(false);
   const [draft, setDraft] = useState<BiFilters>(filters);
@@ -75,7 +79,7 @@ export default function BiFilterBar({ meta, filters, preset, onChange }: Props) 
   const chips: { key: keyof BiFilters; label: string }[] = [];
   if (filters.course_id) chips.push({ key: "course_id", label: `Curso: ${name(options?.courses, filters.course_id)}` });
   if (filters.school_class_id) chips.push({ key: "school_class_id", label: `Turma: ${name(options?.school_classes, filters.school_class_id)}` });
-  if (filters.subject_id) chips.push({ key: "subject_id", label: `Disciplina: ${name(options?.subjects, filters.subject_id)}` });
+  if (filters.subject_id && !hideSubject) chips.push({ key: "subject_id", label: `Disciplina: ${name(options?.subjects, filters.subject_id)}` });
   if (filters.exam_type_id) chips.push({ key: "exam_type_id", label: `Concurso: ${name(options?.exam_types, filters.exam_type_id)}` });
   if (filters.school_year) chips.push({ key: "school_year", label: `Ano letivo: ${filters.school_year}` });
   if (filters.teacher_id) chips.push({ key: "teacher_id", label: `Professor: ${name(options?.teachers, filters.teacher_id)}` });
@@ -121,6 +125,7 @@ export default function BiFilterBar({ meta, filters, preset, onChange }: Props) 
             onChange={(v) => set({ school_class_id: idOrNull(v) })}
           />
         </View>
+        {hideSubject ? null : (
         <View style={field}>
           <SearchableSelect
             label="Disciplina"
@@ -130,6 +135,7 @@ export default function BiFilterBar({ meta, filters, preset, onChange }: Props) 
             onChange={(v) => set({ subject_id: idOrNull(v) })}
           />
         </View>
+        )}
         <View style={field}>
           <SearchableSelect
             label="Concurso"
@@ -139,6 +145,7 @@ export default function BiFilterBar({ meta, filters, preset, onChange }: Props) 
             onChange={(v) => set({ exam_type_id: idOrNull(v) })}
           />
         </View>
+        {extra ? <View style={field}>{extra}</View> : null}
         <View style={{ flexGrow: 1 }} />
         <View style={{ marginBottom: 8 }}>
           <Button

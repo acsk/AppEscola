@@ -7,7 +7,6 @@ use App\Models\ExamType;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 
 /** Contexto inicial das telas do BI: recursos do plano, escopo do usuário e opções de filtro já recortadas. */
 class BiMetaService
@@ -22,7 +21,7 @@ class BiMetaService
         ['key' => 'students', 'label' => 'Evolução dos alunos', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
         ['key' => 'performance', 'label' => 'Desempenho acadêmico', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
         ['key' => 'classes', 'label' => 'Análise de turmas', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
-        ['key' => 'subjects', 'label' => 'Disciplinas e assuntos', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
+        ['key' => 'subjects', 'label' => 'Disciplinas e assuntos', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'engagement', 'label' => 'Frequência e engajamento', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
         ['key' => 'assessments', 'label' => 'Análise de simulados', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
         ['key' => 'exam_prep', 'label' => 'Preparação para concursos', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
@@ -82,7 +81,7 @@ class BiMetaService
 
         $subjects = Subject::query()
             ->where('tenant_id', $scope->tenantId)
-            ->when(! $scope->isTenantWide(), fn ($q) => $q->whereIn('id', $this->teacherSubjectIds($user->id, $scope)))
+            ->when(! $scope->isTenantWide(), fn ($q) => $q->whereIn('id', $scope->subjectIds() ?: [0]))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -118,23 +117,5 @@ class BiMetaService
                 ['value' => BiFilters::MODALITY_PRESENCIAL, 'label' => 'Presencial'],
             ],
         ];
-    }
-
-    /** Disciplinas que o professor leciona nas suas turmas ou às quais está vinculado. @return list<int> */
-    private function teacherSubjectIds(int $userId, BiAccessScope $scope): array
-    {
-        $fromSchedules = DB::table('class_schedules')
-            ->where('tenant_id', $scope->tenantId)
-            ->whereNull('deleted_at')
-            ->whereIn('school_class_id', $scope->classIds ?? [])
-            ->whereNotNull('subject_id')
-            ->pluck('subject_id');
-
-        $linked = DB::table('subject_user')
-            ->where('tenant_id', $scope->tenantId)
-            ->where('user_id', $userId)
-            ->pluck('subject_id');
-
-        return $fromSchedules->merge($linked)->map(fn ($id) => (int) $id)->unique()->values()->all();
     }
 }

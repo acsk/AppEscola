@@ -4,6 +4,7 @@ import {
   Archive,
   Bell,
   BookOpen,
+  BookOpenCheck,
   Building2,
   Calculator,
   Calendar,
@@ -54,6 +55,7 @@ type SidebarItem = { id: string; label: string; icon: LucideIcon };
 /** Seção do BI (chave da API) → tela do painel. Seção sem tela aqui não aparece no menu. */
 const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   overview: { id: "bi-overview", icon: ChartLine },
+  subjects: { id: "bi-subjects", icon: BookOpenCheck },
 };
 
 /** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */

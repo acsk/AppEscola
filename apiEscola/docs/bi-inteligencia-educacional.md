@@ -332,4 +332,11 @@ Fórmulas propostas para a Fase 2 (documentadas e configuráveis; pesos renormal
 - **Coordenação = admin (31/10/2026):** `coordenador` incluído em todas as checagens de papel da API (16 arquivos), do painel e do mobile. Teste: `tests/Feature/CoordenadorRoleTest.php`.
 - **Fase 1 · Visão geral (tela 01) — concluído:** `GET /bi/overview` (`OverviewService` + fontes em `Services/Bi/Sources`: `StudentUniverse`, `AssessmentResults`, `PracticeFirstAttempts`, `AttendanceRecords`), cache de 10 min por tenant/escopo/filtros. Painel: `screens/inteligencia/BiOverviewScreen.tsx`, `components/bi/*`, tokens `data-*`/`seq-*`. Teste: `tests/Feature/BiOverviewTest.php`.
 - Fora desta entrega (fases seguintes): sparklines dos indicadores, exportação PDF/Excel, matriz de perfis e resumo com IA da tela 01.
-- Próximo: tela 04 (Disciplinas e assuntos), depois índices + `student_activity_days`.
+- **Fase 1 · Disciplinas e assuntos (tela 04) — concluído (02/11/2026):** fonte única `Sources/AnswerStream` (respostas de simulados online na 1ª tentativa concluída + banco na 1ª tentativa, com a alternativa marcada; a Visão geral passou a usá-la), `SubjectAnalyticsService` e `BiSubjectController`:
+  - `GET /bi/subjects` — disciplinas com respostas no recorte (abas);
+  - `GET /bi/subjects/{subject}` — 4 indicadores (`subject.*`), mapa de calor turma × assunto (plano advanced; célula < 20 respostas = null) e ranking de assuntos com variação em p.p.;
+  - `GET /bi/subjects/{subject}/topics/{topic}/errors` — questões com maior taxa de erro e distribuição por alternativa (`limit` 1–20).
+  - Parâmetro `source` = `both|online|practice`. Professor só acessa disciplinas que leciona (`BiAccessScope::subjectIds()`). Aluno em duas turmas conta nas duas no mapa de calor.
+  - Painel: `screens/inteligencia/BiSubjectsScreen.tsx`, `components/bi/Heatmap.tsx`, `components/bi/RecurringErrors.tsx`; rota `#/inteligencia/disciplinas[/id]`; as barras de dificuldade da Visão geral abrem a disciplina. Teste: `tests/Feature/BiSubjectTest.php`.
+  - Fora desta entrega: "Relatório da disciplina" e "Gerar lista de revisão" (fase de relatórios/exportação), ordem dos assuntos por peso no edital (não há esse dado; hoje é por volume de respostas) e o texto interpretativo do padrão de erro (hoje é um resumo factual do distrator principal; a versão com IA fica para a fase de IA).
+- Próximo: índices (`exam_attempts`, `official_assessment_grades`, `practice_answers`) + coleta `student_activity_days`, depois as demais telas da Fase 1.

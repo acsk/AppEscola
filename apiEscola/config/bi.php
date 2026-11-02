@@ -22,6 +22,9 @@ return [
     /** Avaliações mínimas do aluno para entrar em média individual ou evolução. */
     'min_student_results' => 2,
 
+    /** Respostas mínimas do aluno numa disciplina para contar como "avaliado". */
+    'min_subject_student_answers' => 10,
+
     /** Janela de "atividade recente", terminando no fim do período. */
     'recent_activity_days' => 14,
 

@@ -109,3 +109,94 @@ export async function fetchBiOverview(filters: BiFilters): Promise<BiOverview> {
   const { data } = await api.get("/bi/overview", { params: cleanBiFilters(filters) });
   return getApiResponseBody(data) as BiOverview;
 }
+
+/** Fonte das respostas na tela Disciplinas e assuntos. */
+export type BiAnswerSource = "both" | "online" | "practice";
+
+export type BiSubjectSummary = { subject_id: number; name: string; answers: number };
+
+export type BiHeatmap = {
+  topics: { topic_id: number; name: string }[];
+  rows: {
+    school_class_id: number;
+    name: string;
+    answers: number;
+    cells: { topic_id: number; value: number | null; answers: number; below_goal: boolean }[];
+  }[];
+  truncated: boolean;
+};
+
+export type BiTopicRank = {
+  topic_id: number;
+  name: string;
+  accuracy: number;
+  below_goal: boolean;
+  previous: number | null;
+  delta_pp: number | null;
+  answers: number;
+  students: number;
+};
+
+export type BiSubjectAnalytics = {
+  meta: {
+    period: { from: string; to: string };
+    previous_period: { from: string; to: string };
+    source: BiAnswerSource;
+    goal_pct: number;
+    topic_min_sample: number;
+    min_subject_student_answers: number;
+    generated_at: string;
+  };
+  subject: { id: number; name: string };
+  metrics: BiMetric[];
+  heatmap_available: boolean;
+  heatmap: BiHeatmap | null;
+  ranking: { items: BiTopicRank[]; insufficient: { topic_id: number; name: string; answers: number }[] };
+};
+
+export type BiRecurringError = {
+  question_id: number;
+  code: string;
+  source_label: string;
+  text: string;
+  answers: number;
+  students: number;
+  error_rate: number;
+  options: { option_id: number; letter: string; text: string; is_correct: boolean; count: number; pct: number }[];
+  other: number;
+  main_distractor: { option_id: number; letter: string; pct: number } | null;
+};
+
+export type BiTopicErrors = {
+  topic: { id: number; name: string };
+  source: BiAnswerSource;
+  min_answers: number;
+  total: number;
+  items: BiRecurringError[];
+};
+
+/** A disciplina vem da aba (rota), não do filtro global. */
+const subjectParams = (filters: BiFilters, source: BiAnswerSource) => ({ ...cleanBiFilters({ ...filters, subject_id: null }), source });
+
+export async function fetchBiSubjects(filters: BiFilters, source: BiAnswerSource): Promise<BiSubjectSummary[]> {
+  const { data } = await api.get("/bi/subjects", { params: subjectParams(filters, source) });
+  return ((getApiResponseBody(data) as { subjects: BiSubjectSummary[] })?.subjects ?? []);
+}
+
+export async function fetchBiSubject(subjectId: number, filters: BiFilters, source: BiAnswerSource): Promise<BiSubjectAnalytics> {
+  const { data } = await api.get(`/bi/subjects/${subjectId}`, { params: subjectParams(filters, source) });
+  return getApiResponseBody(data) as BiSubjectAnalytics;
+}
+
+export async function fetchBiTopicErrors(
+  subjectId: number,
+  topicId: number,
+  filters: BiFilters,
+  source: BiAnswerSource,
+  limit = 5
+): Promise<BiTopicErrors> {
+  const { data } = await api.get(`/bi/subjects/${subjectId}/topics/${topicId}/errors`, {
+    params: { ...subjectParams(filters, source), limit },
+  });
+  return getApiResponseBody(data) as BiTopicErrors;
+}

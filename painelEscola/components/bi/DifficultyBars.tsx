@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { color } from "../../constants/theme";
 import { fmtNumber } from "./format";
 import type { BiSubjectDifficulty } from "../../services/biService";
@@ -7,14 +7,23 @@ import type { BiSubjectDifficulty } from "../../services/biService";
 type Props = {
   items: BiSubjectDifficulty[];
   goal: number;
+  /** Abre a disciplina em "Disciplinas e assuntos". */
+  onSelect?: (subjectId: number) => void;
 };
 
 /** Barras horizontais de aproveitamento por disciplina, com a meta tracejada e o assunto mais crítico. */
-export default function DifficultyBars({ items, goal }: Props) {
+export default function DifficultyBars({ items, goal, onSelect }: Props) {
   return (
     <View style={{ gap: 14 }}>
       {items.map((item) => (
-        <View key={item.subject_id} style={{ gap: 6 }} aria-label={`${item.name}: ${fmtNumber(item.accuracy, 0)}% de acertos em ${item.answers} respostas`}>
+        <Pressable
+          key={item.subject_id}
+          disabled={!onSelect}
+          onPress={() => onSelect?.(item.subject_id)}
+          accessibilityRole={onSelect ? "link" : undefined}
+          style={{ gap: 6 }}
+          aria-label={`${item.name}: ${fmtNumber(item.accuracy, 0)}% de acertos em ${item.answers} respostas${onSelect ? ". Abrir disciplina" : ""}`}
+        >
           <View className="flex-row" style={{ justifyContent: "space-between", alignItems: "flex-end", gap: 10 }}>
             <View style={{ flexShrink: 1 }}>
               <Text className="text-ink" style={{ fontSize: 13, lineHeight: 18 }}>
@@ -37,7 +46,7 @@ export default function DifficultyBars({ items, goal }: Props) {
             <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${item.accuracy}%`, backgroundColor: color["data-1"], borderTopRightRadius: 2, borderBottomRightRadius: 2 }} />
             <View style={{ position: "absolute", top: -4, bottom: -4, left: `${goal}%`, borderLeftWidth: 1, borderStyle: "dashed", borderColor: color["ink-muted"] }} />
           </View>
-        </View>
+        </Pressable>
       ))}
       <View className="flex-row items-center" style={{ gap: 6, marginTop: 4 }}>
         <View style={{ height: 12, borderLeftWidth: 1, borderStyle: "dashed", borderColor: color["ink-muted"] }} />
