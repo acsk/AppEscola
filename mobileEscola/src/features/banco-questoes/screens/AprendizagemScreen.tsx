@@ -22,7 +22,7 @@ const pct = (v: number | null | undefined, d = 0) => (v == null ? '—' : format
 /**
  * Minha aprendizagem (protótipo "DesktopMinhaAprendizagem", substitui "O que estudar"):
  * quatro números, diagnóstico por assunto numa tabela agrupada por disciplina e, ao lado,
- * o plano de reforço com um único CTA e a evolução (últimos 30 dias contra os 30 anteriores).
+ * o plano de reforço com um único CTA e a evolução (mês vigente contra o mês anterior).
  * Conta só a primeira tentativa de cada questão.
  */
 export function AprendizagemScreen() {
@@ -180,7 +180,7 @@ export function AprendizagemScreen() {
       <Overline>Evolução</Overline>
       {comparison ? (
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          {[['Últimos 30 dias', comparison.current], ['30 dias anteriores', comparison.previous]].map(([label, c]) => {
+          {[['Este mês', comparison.current], ['Mês anterior', comparison.previous]].map(([label, c]) => {
             const data = c as typeof comparison.current;
             return (
               <View key={label as string} style={{ flex: 1, gap: 2, padding: 12, borderRadius: 10, backgroundColor: p.surfaceSunken }}>

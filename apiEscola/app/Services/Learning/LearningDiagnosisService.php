@@ -91,7 +91,7 @@ class LearningDiagnosisService
     }
 
     /**
-     * Aproveitamento mês a mês (primeira tentativa) e a comparação dos últimos 30 dias com os 30 anteriores.
+     * Aproveitamento mês a mês (primeira tentativa) e a comparação do mês vigente com o mês anterior inteiro.
      *
      * @return array{months: list<array<string, mixed>>, comparison: array<string, mixed>}
      */
@@ -207,8 +207,8 @@ class LearningDiagnosisService
     private function comparePeriods(Student $student): array
     {
         $now = now(PracticePerformanceService::RANKING_TIMEZONE);
-        $currentStart = $now->copy()->subDays(30)->utc();
-        $previousStart = $now->copy()->subDays(60)->utc();
+        $currentStart = $now->copy()->startOfMonth()->utc();
+        $previousStart = $now->copy()->startOfMonth()->subMonthNoOverflow()->utc();
 
         return [
             'current' => $this->window($student, $currentStart, null),

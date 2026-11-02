@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import { fetchStudentPerformance, type PerformanceMonthlyEvolution } from '../../../services/performance.service';
 import { usePracticePerformance, usePracticeRanking, usePracticeSummary, useStartPracticeSession } from '../../banco-questoes/hooks';
+import { currentMonthName } from '../../banco-questoes/lib/format';
 import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import {
   AppBar, Button, Card, Chip, EmptyState, Icon, IconButton, MonthBars, Notice, Overline, PageBody, PageHeader, QuickAction, RankMovement, ScreenBody,
@@ -191,7 +192,7 @@ export function PerformanceScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
                       <Text style={{ ...font.extrabold, fontSize: 32, lineHeight: 40, color: p.ink }}>{me ? `${me.position}º` : '—'}</Text>
                       {me ? <RankMovement movement={me.movement} status={me.movement_status} referenceAt={me.movement_reference_at} /> : null}
-                      <Txt tone="muted" style={{ fontSize: 14 }}>{me ? `de ${ranking.data?.participants ?? 0} alunos${ranking.data?.course_name ? ` do ${ranking.data.course_name}` : ''} neste mês` : 'Responda questões para entrar'}</Txt>
+                      <Txt tone="muted" style={{ fontSize: 14 }}>{me ? `de ${ranking.data?.participants ?? 0} alunos${ranking.data?.course_name ? ` do ${ranking.data.course_name}` : ''} em ${currentMonthName()}` : 'Responda questões para entrar'}</Txt>
                     </View>
                     <View style={{ alignSelf: 'flex-start', marginLeft: -12 }}><Button variant="ghost" size="sm" iconRight="arrow-right" label="Ver ranking" onPress={openRanking} /></View>
                   </Card>

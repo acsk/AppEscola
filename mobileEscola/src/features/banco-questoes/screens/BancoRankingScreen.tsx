@@ -6,7 +6,7 @@ import type { QuestoesStackParamList } from '../../../navigation/stacks/Questoes
 import { getApiErrorMessage } from '../../../lib/apiError';
 import type { PracticeRanking, RankingCriterion, RankingPeriod, RankingRow } from '../../../services/practice.service';
 import { usePracticeFilters, usePracticeRanking } from '../hooks';
-import { rankingWeekRange } from '../lib/format';
+import { currentMonthName, rankingMonthRange, rankingWeekRange } from '../lib/format';
 import {
   AppBar, BottomBar, Button, Card, Chip, IconButton, Notice, PageBody, PageHeader, RankHead, RankLine, RankMovement, RankRow, ScreenBody,
   SegmentedControl, SelectButton, Txt, font, space, useLayoutMode, usePalette,
@@ -16,7 +16,7 @@ type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoRanking'>;
 type Mode = Extract<RankingCriterion, 'wilson' | 'dedication'>;
 
 const PERIODS: { id: RankingPeriod; label: string }[] = [
-  { id: 'week', label: 'Esta semana' }, { id: 'last_week', label: 'Semana passada' }, { id: 'month', label: 'Este mês' }, { id: 'all', label: 'Geral' },
+  { id: 'week', label: 'Esta semana' }, { id: 'last_week', label: 'Semana passada' }, { id: 'month', label: currentMonthName().replace(/^./, (c) => c.toUpperCase()) }, { id: 'all', label: 'Geral' },
 ];
 const MODES: { id: Mode; label: string }[] = [{ id: 'wilson', label: 'Desempenho' }, { id: 'dedication', label: 'Dedicação' }];
 /** Linhas iniciais: celular mostra top 3 + você + o próximo; desktop, os 10 primeiros. */
@@ -72,6 +72,7 @@ export function BancoRankingScreen() {
   const above: RankingRow | null = me && me.position > 1 ? rows.find((r) => r.position === me.position - 1) ?? null : null;
   const points = (v?: number | null) => (performance ? fmt1(v ?? 0) : String(Math.round(v ?? 0)));
   const weekRange = data ? rankingWeekRange(data) : null;
+  const monthRange = data ? rankingMonthRange(data) : null;
   const courses = data?.courses ?? [];
   const courseLabel = data?.course_name ? ` · ${data.course_name}` : '';
   const subjects = filters.data?.subjects ?? [];
@@ -121,7 +122,7 @@ export function BancoRankingScreen() {
           ? 'Os pontos vão de 0 a 100 e valorizam quem acerta muito e responde bastante: acertar 24 de 29 vale mais do que 2 de 2. Só conta a primeira tentativa de cada questão neste período; repetir não soma. A seta compara com o fechamento de ontem. NEW entrou depois disso.'
           : 'Pontos de 0 a 100: acertar muito e responder bastante vale mais. Só conta a primeira tentativa de cada questão.'
           : 'A dedicação soma questões novas e dias com estudo. Repetir uma questão não soma ponto. A seta compara com o fechamento de ontem. NEW entrou depois disso.'}
-      {period === 'week' ? ' A semana reinicia toda segunda-feira às 00h.' : ''}
+      {period === 'week' ? ' A semana reinicia toda segunda-feira às 00h.' : period === 'month' ? ' Conta só o mês vigente: o ranking reinicia todo dia 1º às 00h.' : ''}
     </Txt>
   );
 
@@ -175,6 +176,7 @@ export function BancoRankingScreen() {
               <>
                 {meCard}
                 {weekRange ? <Txt variant="overline" tone="subtle">{closed ? 'Resultado final' : 'Semana'} · {weekRange}</Txt> : null}
+                {monthRange ? <Txt variant="overline" tone="subtle">Mês de {currentMonthName()} · {monthRange}</Txt> : null}
                 {rows.length ? (
                   <Card padding="none" style={{ paddingVertical: 4, paddingHorizontal: 8 }}>
                     <RankHead labels={performance ? ['Questões', 'Acertos', 'Aproveit.', 'Pontos'] : ['Questões', 'Dias', 'Sequência', 'Pontos']} />
@@ -238,6 +240,7 @@ export function BancoRankingScreen() {
           {state ?? (
             <>
               {meCard}
+              {monthRange ? <Txt variant="overline" tone="subtle">Mês de {currentMonthName()} · {monthRange}</Txt> : null}
               {rows.length ? (
                 <Card padding="none" style={{ padding: 6 }}>
                   {short.map(row)}
