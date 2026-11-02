@@ -6,6 +6,7 @@ use App\Models\PracticeAnswer;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\SubjectTopic;
+use App\Services\Bi\Sources\AnswerFacts;
 use App\Services\Bi\Sources\AnswerStream;
 use App\Services\Bi\Sources\AssessmentResults;
 use App\Services\Bi\Sources\AttendanceRecords;
@@ -32,6 +33,7 @@ class OverviewService
         private readonly AttendanceRecords $attendance,
         private readonly AnswerStream $answers,
         private readonly StudentSignals $signals,
+        private readonly AnswerFacts $facts,
     ) {
     }
 
@@ -124,6 +126,8 @@ class OverviewService
                 'evolution_threshold_pp' => (float) config('bi.evolution_threshold_pp', 5),
                 'min_student_results' => $minResults,
                 'generated_at' => now(PracticePerformanceService::RANKING_TIMEZONE)->toIso8601String(),
+                // Respostas lidas de bi_answer_facts: consolidadas até esta hora (null = cálculo ao vivo).
+                'answers_as_of' => $this->facts->refreshedAt($scope->tenantId)?->setTimezone(PracticePerformanceService::RANKING_TIMEZONE)->toIso8601String(),
             ],
             'metrics' => $metrics,
             'monthly' => $this->assessments->monthly($now['rows'], $filters),
@@ -140,7 +144,7 @@ class OverviewService
         $threshold = (float) config('bi.evolution_threshold_pp', 5);
 
         return [
-            'active' => DB::query()->fromSub($universe->query(), 'u')->count(),
+            'active' => $universe->count(),
             'recent' => $this->recentlyActive($universe),
             'participants' => $rows->where('modality', AssessmentResults::ONLINE)->pluck('student_id')->unique()->count(),
             'rows' => $rows,
@@ -183,49 +187,66 @@ class OverviewService
         [$from, $until] = $window->utcRange();
         $tenantId = $universe->scope->tenantId;
 
+        $ids = $universe->ids() ?: [0];
+
         $practice = PracticeAnswer::query()->counted()
             ->where('practice_answers.tenant_id', $tenantId)
             ->where('practice_answers.answered_at', '>=', $from)
             ->where('practice_answers.answered_at', '<', $until)
-            ->select('practice_answers.student_id')
-            ->toBase();
+            ->whereIn('practice_answers.student_id', $ids)
+            ->distinct()
+            ->pluck('practice_answers.student_id');
         $exams = DB::table('exam_attempts')
             ->where('tenant_id', $tenantId)
             ->whereNull('deleted_at')
             ->where('finished_at', '>=', $from)
             ->where('finished_at', '<', $until)
-            ->select('student_id');
+            ->whereIn('student_id', $ids)
+            ->distinct()
+            ->pluck('student_id');
         $presence = DB::table('student_attendances')
             ->where('tenant_id', $tenantId)
             ->whereNull('deleted_at')
             ->whereBetween('attendance_date', $window->dateRange())
             ->whereIn('status', ['present', 'late'])
-            ->select('student_id');
-
-        return DB::query()
-            ->fromSub($practice->union($exams)->union($presence), 'act')
-            ->whereIn('act.student_id', $universe->query())
+            ->whereIn('student_id', $ids)
             ->distinct()
-            ->count('act.student_id');
+            ->pluck('student_id');
+
+        return $practice->merge($exams)->merge($presence)->map(fn ($id) => (int) $id)->unique()->count();
     }
 
     /** Disciplinas com menor taxa de acerto (simulados online + banco, 1ª tentativa) e o assunto mais crítico de cada uma. */
     private function subjectsDifficulty(StudentUniverse $universe): array
     {
         $minSample = (int) $this->catalog->definition('subjects.difficulty_rank')['min_sample'];
-        $answers = $this->answers->query($universe);
+        // Uma leitura agregada por questão (poucos milhares de linhas); disciplina e assunto saem dela.
+        $byQuestion = $this->answers->query($universe)
+            ->groupBy('r.question_id', 'r.subject_id')
+            ->select('r.question_id', 'r.subject_id')
+            ->selectRaw('COUNT(*) as answers')
+            ->selectRaw('SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) as correct')
+            ->get();
+        $topicOf = DB::table('exam_question_topic')
+            ->whereIn('exam_question_id', $byQuestion->pluck('question_id')->all() ?: [0])
+            ->get(['exam_question_id', 'subject_topic_id'])
+            ->groupBy('exam_question_id');
 
-        $aggregate = function (bool $withTopic) use ($answers) {
-            $groups = $withTopic ? ['r.subject_id', 't.subject_topic_id'] : ['r.subject_id'];
+        $aggregate = function (bool $withTopic) use ($byQuestion, $topicOf) {
+            $rows = $withTopic
+                ? $byQuestion->flatMap(fn ($q) => $topicOf->get($q->question_id, collect())->map(fn ($t) => (object) [
+                    'subject_id' => $q->subject_id, 'topic_id' => $t->subject_topic_id, 'answers' => $q->answers, 'correct' => $q->correct,
+                ]))
+                : $byQuestion;
 
-            return (clone $answers)
-                ->when($withTopic, fn ($q) => $q->join('exam_question_topic as t', 't.exam_question_id', '=', 'r.question_id'))
-                ->groupBy($groups)
-                ->select('r.subject_id')
-                ->when($withTopic, fn ($q) => $q->addSelect('t.subject_topic_id as topic_id'))
-                ->selectRaw('COUNT(*) as answers')
-                ->selectRaw('SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) as correct')
-                ->get();
+            return $rows->groupBy(fn ($r) => $withTopic ? $r->subject_id.':'.$r->topic_id : $r->subject_id)
+                ->map(fn (Collection $g) => (object) [
+                    'subject_id' => $g->first()->subject_id,
+                    'topic_id' => $withTopic ? $g->first()->topic_id : null,
+                    'answers' => (int) $g->sum('answers'),
+                    'correct' => (int) $g->sum('correct'),
+                ])
+                ->values();
         };
 
         $subjects = $aggregate(false)

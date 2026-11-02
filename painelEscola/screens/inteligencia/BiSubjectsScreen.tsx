@@ -184,7 +184,7 @@ export default function BiSubjectsScreen({ navigate, subjectId: initialSubjectId
         }
       />
 
-      <BiMetaBar plan={meta?.features.plan} generatedAt={data?.meta.generated_at} extra={SOURCE_NOTE[source]} />
+      <BiMetaBar plan={meta?.features.plan} generatedAt={data?.meta.generated_at} answersAsOf={data?.meta.answers_as_of} extra={SOURCE_NOTE[source]} />
 
       {subjects && subjects.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="border-b border-border" contentContainerStyle={{ gap: 24 }}>

@@ -70,7 +70,7 @@ class AcademicPerformanceService
             ->where('oa.max_score', '>', 0)
             ->whereBetween('oa.assessment_date', $filters->dateRange())
             ->where(fn ($q) => $q->where('g.is_absent', true)->orWhereNotNull('g.grade'))
-            ->whereIn('g.student_id', $universe->query())
+            ->whereIn('g.student_id', $universe->ids() ?: [0])
             ->when($classIds !== null, fn ($q) => $q->whereIn('oa.school_class_id', $classIds ?: [0]))
             ->when($filters->subjectId !== null, fn ($q) => $q->where('g.subject_id', $filters->subjectId))
             ->when($filters->examTypeId !== null, fn ($q) => $q->where('oa.exam_type_id', $filters->examTypeId))

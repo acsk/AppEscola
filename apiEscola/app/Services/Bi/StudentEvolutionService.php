@@ -86,7 +86,7 @@ class StudentEvolutionService
     /** O aluno está no recorte do usuário (turmas do escopo e filtros)? */
     public function inScope(BiAccessScope $scope, BiFilters $filters, int $studentId): bool
     {
-        return DB::query()->fromSub((new StudentUniverse($scope, $filters))->query(), 'u')->where('u.student_id', $studentId)->exists();
+        return in_array($studentId, (new StudentUniverse($scope, $filters))->ids(), true);
     }
 
     /** @return array<string, mixed> */

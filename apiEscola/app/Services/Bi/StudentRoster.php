@@ -45,7 +45,7 @@ class StudentRoster
         $practice = $this->practice->byStudent($universe);
         $attendance = $this->attendance->byStudent($universe);
 
-        $ids = DB::query()->fromSub($universe->query(), 'u')->pluck('student_id')->map(fn ($id) => (int) $id);
+        $ids = collect($universe->ids());
         $names = DB::table('students')->whereIn('id', $ids->all() ?: [0])->pluck('name', 'id');
         $classes = $universe->classNamesByStudent($ids->all());
         $byStudent = $rows->groupBy('student_id');

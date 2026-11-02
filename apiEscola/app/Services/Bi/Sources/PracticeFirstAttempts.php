@@ -14,29 +14,54 @@ use Illuminate\Support\Facades\DB;
  */
 class PracticeFirstAttempts
 {
+    public function __construct(private readonly AnswerFacts $facts)
+    {
+    }
+
     /**
      * Primeiras tentativas respondidas no período.
-     * Colunas: student_id, exam_question_id, subject_id, option_id, is_correct, answered_at.
+     * Colunas: student_id, exam_question_id, subject_id, exam_type_id, option_id, is_correct, answered_at.
+     * Lê de bi_answer_facts quando o tenant já tem fatos gerados; senão calcula ao vivo.
      */
     public function query(StudentUniverse $universe, ?BiFilters $filters = null): Builder
     {
         $filters ??= $universe->filters;
         [$from, $until] = $filters->utcRange();
+        $tenantId = $universe->scope->tenantId;
 
-        $numbered = PracticeAnswer::query()->counted()
+        $source = $this->facts->ready($tenantId)
+            ? DB::table('bi_answer_facts')
+                ->where('tenant_id', $tenantId)
+                ->where('source', AnswerFacts::SOURCE_PRACTICE)
+                ->whereIn('student_id', $universe->ids() ?: [0])
+                ->where('answered_at', '>=', $from)
+                ->where('answered_at', '<', $until)
+                ->select('student_id', 'question_id as exam_question_id', 'subject_id', 'exam_type_id', 'option_id', 'is_correct', 'answered_at')
+            : DB::query()->fromSub($this->numbered($tenantId, $universe->ids()), 'n')
+                ->where('n.tentativa', 1)
+                ->where('n.answered_at', '>=', $from)
+                ->where('n.answered_at', '<', $until);
+
+        return DB::query()->fromSub($source, 'pa')
+            ->when($filters->examTypeId !== null, fn ($q) => $q->where('pa.exam_type_id', $filters->examTypeId))
+            ->when($filters->subjectId !== null, fn ($q) => $q->where('pa.subject_id', $filters->subjectId));
+    }
+
+    /**
+     * Respostas que contam numeradas por aluno × questão em toda a história (tentativa 1 = primeira).
+     * Mesma régua do app; usada ao vivo e na geração de bi_answer_facts.
+     *
+     * @param  list<int>|null  $studentIds  null = todos os alunos do tenant
+     */
+    public function numbered(int $tenantId, ?array $studentIds = null): Builder
+    {
+        return PracticeAnswer::query()->counted()
             ->join('exam_questions as q', 'q.id', '=', 'practice_answers.exam_question_id')
-            ->where('practice_answers.tenant_id', $universe->scope->tenantId)
-            ->whereIn('practice_answers.student_id', $universe->query())
-            ->when($filters->examTypeId !== null, fn ($q) => $q->where('q.exam_type_id', $filters->examTypeId))
-            ->select('practice_answers.student_id', 'practice_answers.exam_question_id', 'practice_answers.option_id', 'practice_answers.is_correct', 'practice_answers.answered_at', 'q.subject_id')
+            ->where('practice_answers.tenant_id', $tenantId)
+            ->when($studentIds !== null, fn ($q) => $q->whereIn('practice_answers.student_id', $studentIds ?: [0]))
+            ->select('practice_answers.student_id', 'practice_answers.exam_question_id', 'q.subject_id', 'q.exam_type_id', 'practice_answers.option_id', 'practice_answers.is_correct', 'practice_answers.answered_at')
             ->selectRaw('ROW_NUMBER() OVER (PARTITION BY practice_answers.student_id, practice_answers.exam_question_id ORDER BY practice_answers.answered_at, practice_answers.id) as tentativa')
             ->toBase();
-
-        return DB::query()->fromSub($numbered, 'pa')
-            ->where('pa.tentativa', 1)
-            ->where('pa.answered_at', '>=', $from)
-            ->where('pa.answered_at', '<', $until)
-            ->when($filters->subjectId !== null, fn ($q) => $q->where('pa.subject_id', $filters->subjectId));
     }
 
     /** @return array{answers: int, correct: int, students: int} */

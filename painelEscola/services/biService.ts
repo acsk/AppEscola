@@ -81,6 +81,7 @@ export type BiOverview = {
     goal_pct: number;
     evolution_threshold_pp: number;
     generated_at: string;
+    answers_as_of?: string | null;
   };
   metrics: BiMetric[];
   monthly: BiMonthlyPoint[];
@@ -146,6 +147,7 @@ export type BiSubjectAnalytics = {
     topic_min_sample: number;
     min_subject_student_answers: number;
     generated_at: string;
+    answers_as_of?: string | null;
   };
   subject: { id: number; name: string };
   metrics: BiMetric[];

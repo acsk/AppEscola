@@ -23,7 +23,7 @@ class AttendanceRecords
             ->whereNull('sa.deleted_at')
             ->whereBetween('sa.attendance_date', $filters->dateRange())
             ->whereIn('sa.status', ['present', 'late', 'absent'])
-            ->whereIn('sa.student_id', $universe->query())
+            ->whereIn('sa.student_id', $universe->ids() ?: [0])
             ->when($classIds !== null, fn ($q) => $q->whereIn('sa.school_class_id', $classIds ?: [0]));
     }
 

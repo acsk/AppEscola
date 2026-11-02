@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Índices das consultas da Inteligência Educacional: 1ª tentativa por aluno × simulado,
- * tentativas concluídas no período e 1ª tentativa por aluno × questão no banco.
+ * tentativas concluídas no período, 1ª tentativa por aluno × questão no banco e chamadas por período.
  */
 return new class extends Migration
 {
@@ -17,6 +17,9 @@ return new class extends Migration
         ],
         'practice_answers' => [
             'practice_answers_bi_first_attempt_idx' => ['tenant_id', 'student_id', 'exam_question_id', 'answered_at'],
+        ],
+        'student_attendances' => [
+            'student_attendances_bi_period_idx' => ['tenant_id', 'attendance_date'],
         ],
     ];
 

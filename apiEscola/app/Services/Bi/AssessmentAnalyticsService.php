@@ -170,7 +170,7 @@ class AssessmentAnalyticsService
             'rows' => $rows,
             'count' => $rows->map(fn ($r) => $r->modality.':'.$r->assessment_id)->unique()->count(),
             'participants' => $rows->where('modality', AssessmentResults::ONLINE)->pluck('student_id')->unique()->count(),
-            'active' => DB::query()->fromSub($universe->query(), 'u')->count(),
+            'active' => $universe->count(),
         ];
     }
 
@@ -367,7 +367,7 @@ class AssessmentAnalyticsService
             ->where('oa.max_score', '>', 0)
             ->where('g.is_absent', false)
             ->whereNotNull('g.grade')
-            ->whereIn('g.student_id', $universe->query())
+            ->whereIn('g.student_id', $universe->ids() ?: [0])
             ->when($universe->filters->subjectId !== null, fn ($q) => $q->where('g.subject_id', $universe->filters->subjectId))
             ->groupBy('g.subject_id', 's.name')
             ->select('g.subject_id', 's.name')
@@ -431,7 +431,7 @@ class AssessmentAnalyticsService
 
         $perStudent = DB::table('official_assessment_grades as g')
             ->whereIn('g.official_assessment_id', $assessmentIds)
-            ->whereIn('g.student_id', $universe->query())
+            ->whereIn('g.student_id', $universe->ids() ?: [0])
             ->groupBy('g.official_assessment_id', 'g.student_id')
             ->select('g.official_assessment_id')
             ->havingRaw('MIN(g.is_absent) = 1');

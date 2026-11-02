@@ -51,19 +51,8 @@ class AssessmentResults
         $filters ??= $universe->filters;
         [$from, $until] = $filters->utcRange();
 
-        $numbered = DB::table('exam_attempts as ea')
-            ->join('exam_attempt_statuses as st', 'st.id', '=', 'ea.attempt_status_id')
-            ->join('exams as ex', 'ex.id', '=', 'ea.exam_id')
-            ->where('ea.tenant_id', $universe->scope->tenantId)
-            ->where('st.slug', 'completed')
-            ->whereNotNull('ea.finished_at')
-            ->whereNotNull('ea.percentage')
-            ->whereNull('ea.deleted_at')
-            ->whereNull('ex.deleted_at')
-            ->whereIn('ea.student_id', $universe->query())
-            ->when($filters->examTypeId !== null, fn ($q) => $q->where('ex.exam_type_id', $filters->examTypeId))
-            ->select('ea.id as attempt_id', 'ea.student_id', 'ea.exam_id', 'ex.exam_type_id', 'ea.finished_at', 'ea.percentage')
-            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY ea.student_id, ea.exam_id ORDER BY ea.finished_at, ea.id) as tentativa');
+        $numbered = $this->numberedAttempts($universe->scope->tenantId, $universe->ids())
+            ->when($filters->examTypeId !== null, fn ($q) => $q->where('ex.exam_type_id', $filters->examTypeId));
 
         return DB::query()->fromSub($numbered, 'a')
             ->where('a.tentativa', 1)
@@ -98,6 +87,28 @@ class AssessmentResults
 
             return $point;
         }, $months));
+    }
+
+    /**
+     * Tentativas concluídas numeradas por aluno × simulado em toda a história (tentativa 1 = primeira).
+     * Colunas: attempt_id, student_id, exam_id, exam_type_id, finished_at, percentage, tentativa.
+     *
+     * @param  list<int>|null  $studentIds  null = todos os alunos do tenant
+     */
+    public function numberedAttempts(int $tenantId, ?array $studentIds = null): Builder
+    {
+        return DB::table('exam_attempts as ea')
+            ->join('exam_attempt_statuses as st', 'st.id', '=', 'ea.attempt_status_id')
+            ->join('exams as ex', 'ex.id', '=', 'ea.exam_id')
+            ->where('ea.tenant_id', $tenantId)
+            ->where('st.slug', 'completed')
+            ->whereNotNull('ea.finished_at')
+            ->whereNotNull('ea.percentage')
+            ->whereNull('ea.deleted_at')
+            ->whereNull('ex.deleted_at')
+            ->when($studentIds !== null, fn ($q) => $q->whereIn('ea.student_id', $studentIds ?: [0]))
+            ->select('ea.id as attempt_id', 'ea.student_id', 'ea.exam_id', 'ex.exam_type_id', 'ea.finished_at', 'ea.percentage')
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY ea.student_id, ea.exam_id ORDER BY ea.finished_at, ea.id) as tentativa');
     }
 
     private function online(StudentUniverse $universe, BiFilters $filters): Collection
@@ -154,7 +165,7 @@ class AssessmentResults
             ->whereBetween('oa.assessment_date', [$from, $to])
             ->where('g.is_absent', false)
             ->whereNotNull('g.grade')
-            ->whereIn('g.student_id', $universe->query())
+            ->whereIn('g.student_id', $universe->ids() ?: [0])
             ->when($classIds !== null, fn ($q) => $q->whereIn('oa.school_class_id', $classIds ?: [0]))
             ->when($filters->subjectId !== null, fn ($q) => $q->where('g.subject_id', $filters->subjectId))
             ->when($filters->examTypeId !== null, fn ($q) => $q->where('oa.exam_type_id', $filters->examTypeId))

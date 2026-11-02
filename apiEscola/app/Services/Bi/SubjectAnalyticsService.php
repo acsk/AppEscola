@@ -4,6 +4,7 @@ namespace App\Services\Bi;
 
 use App\Models\Subject;
 use App\Models\SubjectTopic;
+use App\Services\Bi\Sources\AnswerFacts;
 use App\Services\Bi\Sources\AnswerStream;
 use App\Services\Bi\Sources\StudentUniverse;
 use App\Services\PracticePerformanceService;
@@ -26,6 +27,7 @@ class SubjectAnalyticsService
         private readonly MetricCatalog $catalog,
         private readonly AnswerStream $answers,
         private readonly BiFeatureGate $gate,
+        private readonly AnswerFacts $facts,
     ) {
     }
 
@@ -76,8 +78,9 @@ class SubjectAnalyticsService
 
         $now = $this->totals($current, $source);
         $before = $this->totals($previous, $source);
-        $topicsNow = $this->topicStats($current, $subject->id, $source);
-        $topicsBefore = $this->topicStats($previous, $subject->id, $source);
+        $studentTopicsNow = $this->studentTopicRows($current, $subject->id, $source);
+        $topicsNow = $this->topicStats($studentTopicsNow);
+        $topicsBefore = $this->topicStats($this->studentTopicRows($previous, $subject->id, $source));
 
         $minTopic = (int) $this->catalog->definition('subject.accuracy')['min_sample'];
         $goal = (float) config('bi.goal_pct', 70);
@@ -137,11 +140,13 @@ class SubjectAnalyticsService
                 'topic_min_sample' => $minTopic,
                 'min_subject_student_answers' => (int) config('bi.min_subject_student_answers', 10),
                 'generated_at' => now(PracticePerformanceService::RANKING_TIMEZONE)->toIso8601String(),
+                // Respostas lidas de bi_answer_facts: consolidadas até esta hora (null = cálculo ao vivo).
+                'answers_as_of' => $this->facts->refreshedAt($scope->tenantId)?->setTimezone(PracticePerformanceService::RANKING_TIMEZONE)->toIso8601String(),
             ],
             'subject' => ['id' => $subject->id, 'name' => $subject->name],
             'metrics' => $metrics,
             'heatmap_available' => $heatmapAvailable,
-            'heatmap' => $heatmapAvailable ? $this->heatmap($current, $subject->id, $source, $topicsNow, $minTopic, $goal) : null,
+            'heatmap' => $heatmapAvailable ? $this->heatmap($current, $studentTopicsNow, $topicsNow, $minTopic, $goal) : null,
             'ranking' => $this->ranking($topicsNow, $topicsBefore, $minTopic, $goal),
         ];
     }
@@ -232,7 +237,7 @@ class SubjectAnalyticsService
             'correct' => (int) $row->correct,
             'students' => (int) $row->students,
             'evaluated' => (int) $row->evaluated,
-            'active' => DB::query()->fromSub($universe->query(), 'u')->count(),
+            'active' => $universe->count(),
         ];
     }
 
@@ -246,25 +251,41 @@ class SubjectAnalyticsService
             ->when($topicId !== null, fn ($q) => $q->where('st.id', $topicId));
     }
 
-    /** @return Collection<int, object{topic_id: int, name: string, answers: int, correct: int, students: int}> */
-    private function topicStats(StudentUniverse $universe, int $subjectId, string $source): Collection
+    /**
+     * Respostas agregadas por aluno × assunto da disciplina (no máximo alunos × assuntos linhas).
+     * Ranking e mapa de calor saem daqui, sem reler as respostas.
+     *
+     * @return Collection<int, object{student_id: int, topic_id: int, name: string, answers: int, correct: int}>
+     */
+    private function studentTopicRows(StudentUniverse $universe, int $subjectId, string $source): Collection
     {
         return $this->topicAnswers($universe, null, $source)
             ->where('st.subject_id', $subjectId)
-            ->groupBy('st.id', 'st.name')
-            ->select('st.id as topic_id', 'st.name')
+            ->groupBy('r.student_id', 'st.id', 'st.name')
+            ->select('r.student_id', 'st.id as topic_id', 'st.name')
             ->selectRaw('COUNT(*) as answers')
             ->selectRaw('SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) as correct')
-            ->selectRaw('COUNT(DISTINCT r.student_id) as students')
             ->get()
-            ->map(fn ($t) => (object) [
-                'topic_id' => (int) $t->topic_id,
-                'name' => $t->name,
-                'answers' => (int) $t->answers,
-                'correct' => (int) $t->correct,
-                'students' => (int) $t->students,
-            ])
-            ->keyBy('topic_id');
+            ->map(fn ($r) => (object) [
+                'student_id' => (int) $r->student_id,
+                'topic_id' => (int) $r->topic_id,
+                'name' => $r->name,
+                'answers' => (int) $r->answers,
+                'correct' => (int) $r->correct,
+            ]);
+    }
+
+    /** @return Collection<int, object{topic_id: int, name: string, answers: int, correct: int, students: int}> */
+    private function topicStats(Collection $studentTopics): Collection
+    {
+        return $studentTopics->groupBy('topic_id')
+            ->map(fn (Collection $rows) => (object) [
+                'topic_id' => $rows->first()->topic_id,
+                'name' => $rows->first()->name,
+                'answers' => (int) $rows->sum('answers'),
+                'correct' => (int) $rows->sum('correct'),
+                'students' => $rows->count(),
+            ]);
     }
 
     /** Assuntos com amostra suficiente, do menor aproveitamento para o maior, com a variação em p.p. */
@@ -302,23 +323,30 @@ class SubjectAnalyticsService
     }
 
     /** Turmas × assuntos mais respondidos; célula sem amostra mínima vem com value null (nunca zero). */
-    private function heatmap(StudentUniverse $universe, int $subjectId, string $source, Collection $topics, int $minSample, float $goal): array
+    private function heatmap(StudentUniverse $universe, Collection $studentTopics, Collection $topics, int $minSample, float $goal): array
     {
         $columns = $topics->sortByDesc('answers')->take(self::HEATMAP_TOPICS)->values();
         if ($columns->isEmpty()) {
             return ['topics' => [], 'rows' => [], 'truncated' => false];
         }
 
-        $cells = $this->topicAnswers($universe, null, $source)
-            ->where('st.subject_id', $subjectId)
-            ->whereIn('st.id', $columns->pluck('topic_id'))
-            ->joinSub($universe->classMemberships(), 'cm', 'cm.student_id', '=', 'r.student_id')
-            ->groupBy('cm.school_class_id', 'cm.class_name', 'st.id')
-            ->select('cm.school_class_id', 'cm.class_name', 'st.id as topic_id')
-            ->selectRaw('COUNT(*) as answers')
-            ->selectRaw('SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) as correct')
-            ->get()
-            ->groupBy('school_class_id');
+        // Aluno × assunto distribuído pelas turmas do aluno (aluno em duas turmas conta nas duas).
+        $columnIds = $columns->pluck('topic_id')->flip();
+        $classesOf = $universe->classMemberships()->get()->groupBy('student_id');
+        $cells = collect();
+        foreach ($studentTopics as $row) {
+            if (! $columnIds->has($row->topic_id)) {
+                continue;
+            }
+            foreach ($classesOf->get($row->student_id, collect()) as $member) {
+                $key = $member->school_class_id.':'.$row->topic_id;
+                $cell = $cells->get($key) ?? (object) ['school_class_id' => (int) $member->school_class_id, 'class_name' => $member->class_name, 'topic_id' => $row->topic_id, 'answers' => 0, 'correct' => 0];
+                $cell->answers += $row->answers;
+                $cell->correct += $row->correct;
+                $cells->put($key, $cell);
+            }
+        }
+        $cells = $cells->values()->groupBy('school_class_id');
 
         $rows = $cells
             ->map(function (Collection $list, $classId) use ($columns, $minSample, $goal) {

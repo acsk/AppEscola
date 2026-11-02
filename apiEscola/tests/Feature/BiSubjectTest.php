@@ -18,6 +18,7 @@ use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AssertsBiFactsParity;
 use Tests\TestCase;
 
 /**
@@ -30,6 +31,7 @@ use Tests\TestCase;
 class BiSubjectTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsBiFactsParity;
 
     protected bool $dropViews = true;
 
@@ -220,6 +222,20 @@ class BiSubjectTest extends TestCase
 
         $foreignTopic = SubjectTopic::create(['tenant_id' => $this->tenant->id, 'subject_id' => $this->history->id, 'name' => 'Brasil Colônia']);
         $this->getJson("/api/bi/subjects/{$this->math->id}/topics/{$foreignTopic->id}/errors".self::QUERY)->assertNotFound();
+    }
+
+    public function test_facts_match_live_calculation(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $base = "/api/bi/subjects/{$this->math->id}".self::QUERY;
+
+        $this->assertFactsMatchLive([
+            '/api/bi/subjects'.self::QUERY,
+            $base,
+            $base.'&source=online',
+            $base.'&source=practice',
+            "/api/bi/subjects/{$this->math->id}/topics/{$this->fractions->id}/errors".self::QUERY,
+        ]);
     }
 
     public function test_teacher_is_limited_to_their_classes_and_subjects(): void

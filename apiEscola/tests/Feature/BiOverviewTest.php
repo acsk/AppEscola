@@ -17,6 +17,7 @@ use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AssertsBiFactsParity;
 use Tests\TestCase;
 
 /**
@@ -29,6 +30,7 @@ use Tests\TestCase;
 class BiOverviewTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsBiFactsParity;
 
     protected bool $dropViews = true;
 
@@ -200,6 +202,17 @@ class BiOverviewTest extends TestCase
 
         $classB = $this->getJson(self::PERIOD.'&school_class_id='.$this->classB->id)->assertOk()->json('body');
         $this->assertSame(1.0, (float) $this->metric($classB, 'students.active')['value']);
+    }
+
+    public function test_facts_match_live_calculation(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'admin']));
+
+        $this->assertFactsMatchLive([
+            self::PERIOD,
+            self::PERIOD.'&school_class_id='.$this->classA->id,
+            self::PERIOD.'&subject_id='.$this->math->id,
+        ]);
     }
 
     public function test_filters_are_validated_against_the_tenant(): void

@@ -100,7 +100,7 @@ export default function BiOverviewScreen({ navigate }: Props) {
         actions={<Button icon={RefreshCw} label="Atualizar" onPress={load} loading={loading} />}
       />
 
-      <BiMetaBar plan={meta?.features.plan} generatedAt={data?.meta.generated_at} extra="Fontes: simulados, banco de questões e frequência" />
+      <BiMetaBar plan={meta?.features.plan} generatedAt={data?.meta.generated_at} answersAsOf={data?.meta.answers_as_of} extra="Fontes: simulados, banco de questões e frequência" />
 
       <BiFilterBar
         meta={meta}

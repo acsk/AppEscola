@@ -17,6 +17,9 @@ class StudentUniverse
     /** @var list<int>|null|false false = ainda não calculado */
     private array|null|false $classIds = false;
 
+    /** @var list<int>|null */
+    private ?array $ids = null;
+
     public function __construct(
         public readonly BiAccessScope $scope,
         public readonly BiFilters $filters,
@@ -51,6 +54,22 @@ class StudentUniverse
         }
 
         return $this->classIds = $ids;
+    }
+
+    /**
+     * Ids dos alunos do recorte, calculados uma vez. As fontes filtram por esta lista: repetir a subconsulta
+     * de matrículas dentro de cada consulta grande deixava o MySQL 2 a 6 vezes mais lento.
+     *
+     * @return list<int>
+     */
+    public function ids(): array
+    {
+        return $this->ids ??= $this->query()->pluck('m.student_id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    public function count(): int
+    {
+        return count($this->ids());
     }
 
     /** Subconsulta com uma coluna `student_id`, sem repetição. */

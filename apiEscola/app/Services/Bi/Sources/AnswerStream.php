@@ -23,6 +23,7 @@ class AnswerStream
     public function __construct(
         private readonly AssessmentResults $assessments,
         private readonly PracticeFirstAttempts $practice,
+        private readonly AnswerFacts $facts,
     ) {
     }
 
@@ -34,6 +35,10 @@ class AnswerStream
     public function query(StudentUniverse $universe, ?BiFilters $filters = null, string $source = self::SOURCE_BOTH): Builder
     {
         $filters ??= $universe->filters;
+        if ($this->facts->ready($universe->scope->tenantId)) {
+            return $this->fromFacts($universe, $filters, $source);
+        }
+
         $parts = [];
 
         if ($source !== self::SOURCE_PRACTICE) {
@@ -61,5 +66,29 @@ class AnswerStream
         }
 
         return DB::query()->fromSub($union, 'r');
+    }
+
+    /** Mesmas colunas e regras, lidas de bi_answer_facts (1ª tentativa já resolvida). */
+    private function fromFacts(StudentUniverse $universe, BiFilters $filters, string $source): Builder
+    {
+        [$from, $until] = $filters->utcRange();
+
+        $facts = DB::table('bi_answer_facts as f')
+            ->where('f.tenant_id', $universe->scope->tenantId)
+            ->whereIn('f.student_id', $universe->ids() ?: [0])
+            ->where('f.answered_at', '>=', $from)
+            ->where('f.answered_at', '<', $until)
+            ->whereNotNull('f.subject_id')
+            // Origem sempre explícita: a chave primária é (tenant, origem, data), então cada origem é uma faixa contínua.
+            ->whereIn('f.source', match ($source) {
+                self::SOURCE_ONLINE => [AnswerFacts::SOURCE_ONLINE],
+                self::SOURCE_PRACTICE => [AnswerFacts::SOURCE_PRACTICE],
+                default => [AnswerFacts::SOURCE_ONLINE, AnswerFacts::SOURCE_PRACTICE],
+            })
+            ->when($filters->subjectId !== null, fn ($q) => $q->where('f.subject_id', $filters->subjectId))
+            ->when($filters->examTypeId !== null, fn ($q) => $q->where('f.exam_type_id', $filters->examTypeId))
+            ->select('f.source', 'f.student_id', 'f.question_id', 'f.subject_id', 'f.option_id', 'f.is_correct');
+
+        return DB::query()->fromSub($facts, 'r');
     }
 }

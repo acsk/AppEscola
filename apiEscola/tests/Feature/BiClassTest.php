@@ -16,6 +16,7 @@ use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AssertsBiFactsParity;
 use Tests\TestCase;
 
 /**
@@ -26,6 +27,7 @@ use Tests\TestCase;
 class BiClassTest extends TestCase
 {
     use RefreshDatabase;
+    use AssertsBiFactsParity;
 
     protected bool $dropViews = true;
 
@@ -151,6 +153,16 @@ class BiClassTest extends TestCase
         $caio = $byId[$this->students['caio']->id];
         $this->assertSame(50.0, (float) $caio['attendance']['value']);
         $this->assertSame(['low_attendance'], array_column($caio['reasons'], 'code'));
+    }
+
+    public function test_facts_match_live_calculation(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $this->assertFactsMatchLive([
+            '/api/bi/classes'.self::QUERY,
+            "/api/bi/classes/{$this->classA->id}".self::QUERY,
+        ]);
     }
 
     public function test_teacher_scope_and_not_found(): void
