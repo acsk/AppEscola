@@ -12,7 +12,6 @@ use App\Services\Bi\Sources\AttendanceRecords;
 use App\Services\Bi\Sources\PracticeFirstAttempts;
 use App\Services\Bi\Sources\StudentUniverse;
 use App\Services\PracticePerformanceService;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +19,6 @@ use Illuminate\Support\Facades\DB;
 /** Dashboard executivo (Visão geral): indicadores, evolução mensal, disciplinas críticas e alunos em atenção. */
 class OverviewService
 {
-    private const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-
     private const SUPPORT_LIST_LIMIT = 10;
 
     private const DIFFICULTY_LIMIT = 5;
@@ -128,7 +125,7 @@ class OverviewService
                 'generated_at' => now(PracticePerformanceService::RANKING_TIMEZONE)->toIso8601String(),
             ],
             'metrics' => $metrics,
-            'monthly' => $this->monthly($now['rows'], $filters),
+            'monthly' => $this->assessments->monthly($now['rows'], $filters),
             'subjects_difficulty' => $this->subjectsDifficulty($current),
             'needs_support' => $this->supportList($current, $now['support']),
         ];
@@ -289,31 +286,6 @@ class OverviewService
             ->whereIn('act.student_id', $universe->query())
             ->distinct()
             ->count('act.student_id');
-    }
-
-    /** Média mensal por modalidade; mês sem avaliação fica null (lacuna, não zero). */
-    private function monthly(Collection $rows, BiFilters $filters): array
-    {
-        $months = [];
-        $cursor = $filters->from->copy()->startOfMonth();
-        while ($cursor->lte($filters->to)) {
-            $months[$cursor->format('Y-m')] = $cursor->copy();
-            $cursor->addMonth();
-        }
-
-        return array_values(array_map(function (Carbon $month) use ($rows) {
-            $key = $month->format('Y-m');
-            $point = ['month' => $key, 'label' => self::MONTHS[$month->month - 1]];
-            foreach ([AssessmentResults::ONLINE, AssessmentResults::PRESENCIAL] as $modality) {
-                $inMonth = $rows->filter(fn ($r) => $r->modality === $modality && str_starts_with($r->at, $key));
-                $point[$modality] = [
-                    'value' => $inMonth->isEmpty() ? null : round((float) $inMonth->avg('pct'), 1),
-                    'students' => $inMonth->pluck('student_id')->unique()->count(),
-                ];
-            }
-
-            return $point;
-        }, $months));
     }
 
     /** Disciplinas com menor taxa de acerto (simulados online + banco, 1ª tentativa) e o assunto mais crítico de cada uma. */

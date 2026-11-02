@@ -56,6 +56,7 @@ type SidebarItem = { id: string; label: string; icon: LucideIcon };
 const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   overview: { id: "bi-overview", icon: ChartLine },
   subjects: { id: "bi-subjects", icon: BookOpenCheck },
+  assessments: { id: "bi-assessments", icon: ClipboardCheck },
 };
 
 /** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */

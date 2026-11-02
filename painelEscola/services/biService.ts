@@ -200,3 +200,72 @@ export async function fetchBiTopicErrors(
   });
   return getApiResponseBody(data) as BiTopicErrors;
 }
+
+export type BiModality = "online" | "presencial";
+
+export type BiAssessmentItem = {
+  modality: BiModality;
+  assessment_id: number;
+  title: string;
+  school_class: string | null;
+  exam_type: string | null;
+  date: string;
+  participants: number;
+  absent: number | null;
+  avg: number | null;
+  median: number | null;
+  below_goal: number;
+  sufficient: boolean;
+};
+
+export type BiAssessments = {
+  meta: {
+    period: { from: string; to: string };
+    previous_period: { from: string; to: string };
+    goal_pct: number;
+    min_sample: number;
+    generated_at: string;
+  };
+  metrics: BiMetric[];
+  monthly: BiMonthlyPoint[];
+  items: { total: number; items: BiAssessmentItem[] };
+};
+
+export type BiAssessmentDetail = {
+  meta: { period: { from: string; to: string }; goal_pct: number; min_sample: number; generated_at: string };
+  assessment: {
+    modality: BiModality;
+    id: number;
+    title: string;
+    exam_type: string | null;
+    date: string | null;
+    date_to: string | null;
+    school_class: string | null;
+    max_score: number | null;
+  };
+  stats: {
+    participants: number;
+    absent: number | null;
+    sufficient: boolean;
+    avg: number | null;
+    median: number | null;
+    min: number | null;
+    max: number | null;
+    at_goal_pct: number | null;
+  };
+  histogram: { from: number; to: number; count: number }[];
+  classes: { school_class_id: number; name: string; participants: number; avg: number | null; median: number | null }[];
+  subjects: { subject_id: number; name: string; questions: number | null; participants: number; pct: number }[];
+  topics: { topic_id: number; name: string; subject: string; answers: number; accuracy: number }[];
+  students: { total: number; items: { student_id: number; name: string; classes: string[]; pct: number; below_goal: boolean }[] };
+};
+
+export async function fetchBiAssessments(filters: BiFilters): Promise<BiAssessments> {
+  const { data } = await api.get("/bi/assessments", { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiAssessments;
+}
+
+export async function fetchBiAssessment(modality: BiModality, id: number, filters: BiFilters): Promise<BiAssessmentDetail> {
+  const { data } = await api.get(`/bi/assessments/${modality}/${id}`, { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiAssessmentDetail;
+}

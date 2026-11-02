@@ -49,7 +49,7 @@ import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 import { ClassStudentsReportScreen, FinanceReportScreen } from "./screens/relatorios";
-import { BiOverviewScreen, BiSubjectsScreen } from "./screens/inteligencia";
+import { BiAssessmentDetailScreen, BiAssessmentsScreen, BiOverviewScreen, BiSubjectsScreen } from "./screens/inteligencia";
 import { fetchBiMeta, type BiSection } from "./services/biService";
 
 import type { NavState } from "./types/navigation";
@@ -264,6 +264,14 @@ function hashToNav(hash: string): NavState {
   }
 
   if (seg0 === "inteligencia") {
+    if (seg1 === "simulados") {
+      const [, , modality, rawId] = path.split("/").filter(Boolean);
+      const id = parseInt(rawId ?? "", 10);
+      if ((modality === "online" || modality === "presencial") && !isNaN(id)) {
+        return { screen: "bi-assessment", params: { modality, assessmentId: id } };
+      }
+      return { screen: "bi-assessments" };
+    }
     if (seg1 === "disciplinas") {
       const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
       return { screen: "bi-subjects", params: isNaN(id) ? undefined : { subjectId: id } };
@@ -366,6 +374,8 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   if (nav.screen === "bi-overview") return "#/inteligencia/visao-geral";
+  if (nav.screen === "bi-assessments") return "#/inteligencia/simulados";
+  if (nav.screen === "bi-assessment") return `#/inteligencia/simulados/${nav.params?.modality}/${nav.params?.assessmentId}`;
   if (nav.screen === "bi-subjects") {
     const id = nav.params?.subjectId;
     return id ? `#/inteligencia/disciplinas/${id}` : "#/inteligencia/disciplinas";
@@ -747,6 +757,8 @@ function AppContent() {
     ? "notificacoes"
     : nav.screen.startsWith("calendario")
     ? "calendario"
+    : nav.screen === "bi-assessment"
+    ? "bi-assessments"
     : nav.screen.startsWith("bi-")
     ? nav.screen
     : nav.screen === "relatorios-financeiro"
@@ -1050,6 +1062,17 @@ function AppContent() {
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       case "bi-overview": return <BiOverviewScreen navigate={navigate} />;
+      case "bi-assessments": return <BiAssessmentsScreen navigate={navigate} />;
+      case "bi-assessment":
+        return (
+          <BiAssessmentDetailScreen
+            key={`${nav.params?.modality}:${nav.params?.assessmentId}`}
+            navigate={navigate}
+            modality={nav.params?.modality === "presencial" ? "presencial" : "online"}
+            assessmentId={Number(nav.params?.assessmentId)}
+            filters={nav.params?.filters as any}
+          />
+        );
       case "bi-subjects":
         return <BiSubjectsScreen navigate={navigate} subjectId={nav.params?.subjectId ? Number(nav.params.subjectId) : null} />;
       case "relatorios-turmas": return <ClassStudentsReportScreen navigate={navigate} />;

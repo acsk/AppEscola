@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Bi\BiAssessmentController;
 use App\Http\Controllers\Api\Bi\BiMetaController;
 use App\Http\Controllers\Api\Bi\BiOverviewController;
 use App\Http\Controllers\Api\Bi\BiSubjectController;
@@ -136,6 +137,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
         Route::get('meta', [BiMetaController::class, 'show']);
         Route::get('metrics', [BiMetaController::class, 'metrics']);
         Route::get('overview', [BiOverviewController::class, 'show']);
+        Route::get('assessments', [BiAssessmentController::class, 'index']);
+        Route::get('assessments/{modality}/{assessment}', [BiAssessmentController::class, 'show'])
+            ->whereIn('modality', ['online', 'presencial'])
+            ->whereNumber('assessment');
         Route::get('subjects', [BiSubjectController::class, 'index']);
         Route::get('subjects/{subject}', [BiSubjectController::class, 'show'])->whereNumber('subject');
         Route::get('subjects/{subject}/topics/{topic}/errors', [BiSubjectController::class, 'errors'])

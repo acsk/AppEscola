@@ -22,6 +22,8 @@ class AssessmentResults
 
     public const PRESENCIAL = BiFilters::MODALITY_PRESENCIAL;
 
+    private const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
     /**
      * @return Collection<int, object{student_id: int, modality: string, assessment_id: int, exam_type_id: int|null, at: string, pct: float}>
      */
@@ -67,6 +69,35 @@ class AssessmentResults
             ->where('a.tentativa', 1)
             ->where('a.finished_at', '>=', $from)
             ->where('a.finished_at', '<', $until);
+    }
+
+    /**
+     * Média mensal por modalidade (meses sem avaliação = null, não zero).
+     *
+     * @return list<array{month: string, label: string, online: array, presencial: array}>
+     */
+    public function monthly(Collection $rows, BiFilters $filters): array
+    {
+        $months = [];
+        $cursor = $filters->from->copy()->startOfMonth();
+        while ($cursor->lte($filters->to)) {
+            $months[$cursor->format('Y-m')] = $cursor->copy();
+            $cursor->addMonth();
+        }
+
+        return array_values(array_map(function (Carbon $month) use ($rows) {
+            $key = $month->format('Y-m');
+            $point = ['month' => $key, 'label' => self::MONTHS[$month->month - 1]];
+            foreach ([self::ONLINE, self::PRESENCIAL] as $modality) {
+                $inMonth = $rows->filter(fn ($r) => $r->modality === $modality && str_starts_with($r->at, $key));
+                $point[$modality] = [
+                    'value' => $inMonth->isEmpty() ? null : round((float) $inMonth->avg('pct'), 1),
+                    'students' => $inMonth->pluck('student_id')->unique()->count(),
+                ];
+            }
+
+            return $point;
+        }, $months));
     }
 
     private function online(StudentUniverse $universe, BiFilters $filters): Collection

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { RefreshCw } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
@@ -9,6 +9,7 @@ import MetricCard from "../../components/bi/MetricCard";
 import LineChart from "../../components/bi/LineChart";
 import DifficultyBars from "../../components/bi/DifficultyBars";
 import BiMetaBar from "../../components/bi/BiMetaBar";
+import SegmentedControl from "../../components/bi/SegmentedControl";
 import BiFilterBar, { presetRange, type PeriodPreset } from "../../components/bi/BiFilterBar";
 import { fmtNumber } from "../../components/bi/format";
 import { color } from "../../constants/theme";
@@ -165,22 +166,12 @@ export default function BiOverviewScreen({ navigate }: Props) {
                 title="Evolução do aproveitamento nas avaliações"
                 description="Média mensal em % da nota máxima · online usa a 1ª tentativa concluída."
                 actions={
-                  <View className="flex-row border border-border-strong rounded-ds-sm overflow-hidden" role="group" aria-label="Modalidade">
-                    {(["online", "presencial"] as Modality[]).map((m, i) => (
-                      <Pressable
-                        key={m}
-                        onPress={() => setModality(m)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: modality === m }}
-                        className={modality === m ? "bg-surface-sunken" : "bg-surface"}
-                        style={{ height: 30, paddingHorizontal: 12, justifyContent: "center", borderLeftWidth: i ? 1 : 0, borderColor: color.border }}
-                      >
-                        <Text className={`font-medium ${modality === m ? "text-ink" : "text-ink-muted"}`} style={{ fontSize: 13 }}>
-                          {m === "online" ? "Online" : "Presencial"}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
+                  <SegmentedControl
+                    accessibilityLabel="Modalidade"
+                    value={modality}
+                    options={[{ value: "online", label: "Online" }, { value: "presencial", label: "Presencial" }]}
+                    onChange={setModality}
+                  />
                 }
               >
                 {hasMonthly ? (
