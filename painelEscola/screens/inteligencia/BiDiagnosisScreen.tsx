@@ -81,6 +81,7 @@ function StudentPicker({ navigate }: { navigate: Props["navigate"] }) {
         breadcrumb={[{ label: "Inteligência Educacional", onPress: () => navigate("bi-overview") }, { label: "Diagnóstico 360°" }]}
         title="Diagnóstico Pedagógico 360°"
         description="Escolha um aluno para ver Aprendizagem, Engajamento e Preparação comparados com a turma."
+        actions={<Button label="Perfis de aprendizagem" onPress={() => navigate("bi-profiles")} />}
       />
       <Panel flush>
         <View className="border-b border-border" style={{ padding: 16 }}>

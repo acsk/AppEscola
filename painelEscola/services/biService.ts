@@ -508,3 +508,31 @@ export async function fetchBiDiagnosis(studentId: number, filters: BiFilters): P
   const { data } = await api.get(`/bi/students/${studentId}/diagnosis`, { params: cleanBiFilters(filters) });
   return getApiResponseBody(data) as BiDiagnosis;
 }
+
+export type BiQuadrant = "A1" | "A2" | "B1" | "B2";
+
+export type BiProfiles = {
+  meta: {
+    period: { from: string; to: string };
+    criteria: { goal_pct: number; dedication_days_per_week: number; min_assessments: number; min_questions: number };
+    generated_at: string;
+  };
+  summary: { total: number; classified: number; unclassified: number };
+  quadrants: { key: BiQuadrant; count: number; label: string; dedication: string; hint: string }[];
+  points: {
+    student_id: number;
+    name: string;
+    classes: string[];
+    performance: number;
+    dedication: number;
+    questions: number;
+    assessments: number;
+    quadrant: BiQuadrant;
+    distance_pp: number;
+  }[];
+};
+
+export async function fetchBiProfiles(filters: BiFilters): Promise<BiProfiles> {
+  const { data } = await api.get("/bi/profiles", { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiProfiles;
+}

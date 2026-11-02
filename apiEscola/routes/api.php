@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Bi\BiMetaController;
 use App\Http\Controllers\Api\Bi\BiOverviewController;
 use App\Http\Controllers\Api\Bi\BiPerformanceController;
 use App\Http\Controllers\Api\Bi\BiPriorityTopicsController;
+use App\Http\Controllers\Api\Bi\BiProfileController;
 use App\Http\Controllers\Api\Bi\BiStudentController;
 use App\Http\Controllers\Api\Bi\BiSubjectController;
 use App\Http\Controllers\Api\ClassScheduleController;
@@ -153,6 +154,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
         Route::get('classes', [BiClassController::class, 'index']);
         Route::get('classes/{schoolClass}', [BiClassController::class, 'show'])->whereNumber('schoolClass');
         Route::get('performance', [BiPerformanceController::class, 'show']);
+        Route::get('profiles', [BiProfileController::class, 'show']);
         Route::get('students', [BiStudentController::class, 'index']);
         Route::get('students/{student}/evolution', [BiStudentController::class, 'evolution'])->whereNumber('student');
         Route::get('students/{student}/diagnosis', [BiStudentController::class, 'diagnosis'])->whereNumber('student');

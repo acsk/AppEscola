@@ -58,6 +58,7 @@ import {
   BiOverviewScreen,
   BiPerformanceScreen,
   BiPrioritiesScreen,
+  BiProfilesScreen,
   BiStudentEvolutionScreen,
   BiStudentsScreen,
   BiSubjectsScreen,
@@ -284,6 +285,7 @@ function hashToNav(hash: string): NavState {
       const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
       return { screen: "bi-diagnosis", params: isNaN(id) ? undefined : { studentId: id } };
     }
+    if (seg1 === "perfis") return { screen: "bi-profiles" };
     if (seg1 === "desempenho") return { screen: "bi-performance" };
     if (seg1 === "prioritarios") return { screen: "bi-priorities" };
     if (seg1 === "turmas") {
@@ -403,6 +405,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "bi-students") return "#/inteligencia/alunos";
   if (nav.screen === "bi-student") return `#/inteligencia/alunos/${nav.params?.studentId}`;
   if (nav.screen === "bi-performance") return "#/inteligencia/desempenho";
+  if (nav.screen === "bi-profiles") return "#/inteligencia/perfis";
   if (nav.screen === "bi-diagnosis") {
     const id = nav.params?.studentId;
     return id ? `#/inteligencia/diagnostico/${id}` : "#/inteligencia/diagnostico";
@@ -801,6 +804,8 @@ function AppContent() {
     ? "bi-students"
     : nav.screen === "bi-priorities"
     ? "bi-overview"
+    : nav.screen === "bi-profiles"
+    ? "bi-diagnosis"
     : nav.screen.startsWith("bi-")
     ? nav.screen
     : nav.screen === "relatorios-financeiro"
@@ -1125,6 +1130,7 @@ function AppContent() {
           />
         );
       case "bi-priorities": return <BiPrioritiesScreen navigate={navigate} />;
+      case "bi-profiles": return <BiProfilesScreen navigate={navigate} />;
       case "bi-classes": return <BiClassesScreen navigate={navigate} />;
       case "bi-class":
         return (
