@@ -480,7 +480,7 @@ class AssessmentAnalyticsService
 
     private function remember(string $name, BiAccessScope $scope, BiFilters $filters, array $extra, callable $compute): array
     {
-        $key = 'bi:'.$name.':'.$scope->tenantId.':'.md5(json_encode([$scope->classIds, $filters->toArray(), $extra]));
+        $key = 'bi:'.$name.':'.$scope->tenantId.':'.BiCriteria::signature().':'.md5(json_encode([$scope->classIds, $filters->toArray(), $extra]));
 
         return Cache::remember($key, (int) config('bi.cache_ttl_seconds', 600), $compute);
     }

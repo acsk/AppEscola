@@ -4,9 +4,11 @@ use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Bi\BiAssessmentController;
 use App\Http\Controllers\Api\Bi\BiClassController;
+use App\Http\Controllers\Api\Bi\BiCriteriaController;
 use App\Http\Controllers\Api\Bi\BiMetaController;
 use App\Http\Controllers\Api\Bi\BiOverviewController;
 use App\Http\Controllers\Api\Bi\BiPerformanceController;
+use App\Http\Controllers\Api\Bi\BiPriorityTopicsController;
 use App\Http\Controllers\Api\Bi\BiStudentController;
 use App\Http\Controllers\Api\Bi\BiSubjectController;
 use App\Http\Controllers\Api\ClassScheduleController;
@@ -140,6 +142,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
         Route::get('meta', [BiMetaController::class, 'show']);
         Route::get('metrics', [BiMetaController::class, 'metrics']);
         Route::get('overview', [BiOverviewController::class, 'show']);
+        Route::get('criteria', [BiCriteriaController::class, 'show']);
+        Route::put('criteria', [BiCriteriaController::class, 'update']);
+        Route::get('priorities/{examType}', [BiPriorityTopicsController::class, 'show'])->whereNumber('examType');
+        Route::put('priorities/{examType}', [BiPriorityTopicsController::class, 'update'])->whereNumber('examType');
         Route::get('assessments', [BiAssessmentController::class, 'index']);
         Route::get('assessments/{modality}/{assessment}', [BiAssessmentController::class, 'show'])
             ->whereIn('modality', ['online', 'presencial'])

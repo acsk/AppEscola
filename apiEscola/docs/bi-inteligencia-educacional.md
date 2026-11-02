@@ -370,5 +370,41 @@ Fórmulas propostas para a Fase 2 (documentadas e configuráveis; pesos renormal
   - Depois (sem cache de resposta, cache do MySQL quente → frio): Visão geral 5,6–11,7 s; Disciplinas 3,3–3,6 s; Turmas 2,9–4,0 s; Alunos 1,6 s; Simulados 1,4–2,1 s; Desempenho 2,2–2,5 s; detalhes de turma/avaliação < 1,6 s. Geração completa dos fatos: 59 s; incremental de 30 alunos: 0,8–2,1 s.
   - **Critério de 1,5 s ainda não atingido neste volume e ambiente.** O banco do teste (~600 MB nas tabelas principais) não cabe nos 128 MB de buffer pool; medir em produção com `innodb_buffer_pool_size` adequado antes de otimizar mais. Próximas opções, se necessário: agregados diários por aluno × disciplina/assunto e pré-aquecimento do cache dos filtros padrão.
   - Paridade garantida por teste: `tests/Concerns/AssertsBiFactsParity.php` (mesmos números ao vivo e via fatos em Visão geral, Disciplinas, Turmas e Alunos) e `tests/Feature/BiAnswerFactsTest.php` (completa, incremental, sessão que passa a contar, tenant desativado).
-- Pendente de aceite: conferir o acerto no banco por aluno contra `aluno/learning/overview` e revisão visual com dados reais (375 px / tablet / desktop, claro e escuro).
+- Acerto do banco por aluno no BI = `aluno/learning/overview` (ao vivo e via fatos): `tests/Feature/BiAppConsistencyTest.php`.
+- Pendente de aceite: revisão visual com dados reais (375 px / tablet / desktop, claro e escuro) e medição em produção.
 - Próximo: Fase 2 (Diagnóstico 360° e Perfis — telas 02 e 03), precedida de proposta curta das tabelas novas.
+
+---
+
+## 15. Proposta da Fase 2 — Diagnóstico 360° (tela 02) e Perfis (tela 03)
+
+**O que as telas pedem**
+- Três índices de 0 a 100 por aluno, com valor da turma, variação, radar e histórico mensal: **Aprendizagem**, **Engajamento**, **Preparação**.
+- Domínio por assunto (disciplina × assuntos prioritários) comparado à turma.
+- Matriz **desempenho × dedicação** com quatro quadrantes (A1/A2/B1/B2), limiares configuráveis, amostra mínima e "sem classificação".
+- Ações: relatório individual (PDF), registrar intervenção, validar diagnóstico (rascunho da IA), recomendações com "criar plano".
+
+**Fórmulas (já previstas em §11, pesos renormalizados quando falta componente; índice nulo com menos de 2 componentes suficientes)**
+- Aprendizagem = 60% média das avaliações comparáveis + 40% acerto de 1ª tentativa no banco.
+- Engajamento = 40% frequência + 30% regularidade (dias ativos/semana ÷ meta de dias) + 30% participação nos simulados.
+- Preparação = 50% domínio nos assuntos prioritários + 30% cobertura dos prioritários + 20% tendência nos simulados do concurso.
+- Dedicação (eixo da matriz) = dias ativos por semana: união de `student_activity_days` (uso do app, só a partir do deploy) com dias de resposta no banco, simulado concluído e presença (histórico completo).
+
+**Dados novos (decisões pendentes)**
+1. Critérios configuráveis (meta de aproveitamento, dias ativos/semana para "dedicação alta", amostra mínima): em `tenant_settings` (módulo `bi`) ou em tabela `bi_goals` por curso/concurso/disciplina.
+2. Conteúdos prioritários por concurso (base da Preparação): `bi_priority_topics` (concurso × assunto, peso) + `courses.target_exam_type_id`, com tela de cadastro; ou provisório com todos os assuntos das disciplinas respondidas.
+3. Ações persistentes (intervenções, validação do diagnóstico, planos, IA) dependem de `pedagogical_interventions` (Fase 3) e do módulo de IA (Fase 5).
+
+**Cálculo:** a partir de `bi_answer_facts`, `AssessmentResults`, frequência e dias ativos, no mesmo padrão de amostra mínima/`null`; histórico mensal calculado por mês (sem snapshot nesta fase).
+
+**Decisões (02/11/2026)**
+- Critérios por escola em `tenant_settings` (módulo `bi`), editados em "Configurar critérios"; metas por curso/disciplina só se forem necessárias.
+- Preparação com cadastro: `bi_priority_topics` (concurso × assunto, peso) + `courses.target_exam_type_id` + tela de cadastro; até cadastrar, usa todos os assuntos das disciplinas e avisa que é provisório.
+- Fase 2 só de análise: índices, radar, histórico, domínio por assunto, matriz de perfis e recomendações por regra (sem gravar). Intervenções/planos na Fase 3, IA na Fase 5, PDF na fase de relatórios; botões ocultos até existirem.
+- Ordem: (1) critérios por escola, (2) assuntos prioritários, (3) Diagnóstico 360°, (4) Perfis.
+
+**Andamento da Fase 2**
+- **Passo 1 · Critérios por escola — concluído:** `BiCriteria` (tenant_settings, módulo `bi`: `goal_pct`, `evolution_threshold_pp`, `attendance_alert_below`, `dedication_days_per_week`, `profile_min_assessments`, `profile_min_questions`; padrões em `config/bi.php`). `BiController::scope` aplica os critérios da escola em `config('bi.*')` a cada requisição (padrões originais guardados em `bi._defaults` para processos longos) e as chaves de cache incluem `BiCriteria::signature()`. `GET/PUT /bi/criteria` (só coordenação altera). Painel: botão "Critérios" na Visão geral (`components/bi/BiCriteriaModal`). Teste: `tests/Feature/BiCriteriaTest.php`.
+- **Passo 2 · Assuntos prioritários — concluído:** migration `2026_11_02_000004` (`bi_priority_topics` + `courses.target_exam_type_id`, com rollback), `PriorityTopics` (`forExamType`, `save`, `resolve` com fallback provisório), `GET/PUT /bi/priorities/{examType}`. Curso aceita/devolve `target_exam_type_id` (campo opcional; contrato aditivo, mobile não consome). Painel: "Concurso alvo" no cadastro de curso e tela `#/inteligencia/prioritarios` (link nos critérios). Teste: `tests/Feature/BiPriorityTopicsTest.php`.
+- Próximo: passo 3 (Diagnóstico 360°: índices Aprendizagem/Engajamento/Preparação, radar, histórico, domínio por assunto, recomendações por regra).
+

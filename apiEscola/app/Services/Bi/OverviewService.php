@@ -40,7 +40,7 @@ class OverviewService
     /** @return array<string, mixed> */
     public function build(BiAccessScope $scope, BiFilters $filters): array
     {
-        $key = 'bi:overview:'.$scope->tenantId.':'.md5(json_encode([$scope->classIds, $filters->toArray()]));
+        $key = 'bi:overview:'.$scope->tenantId.':'.BiCriteria::signature().':'.md5(json_encode([$scope->classIds, $filters->toArray()]));
 
         return Cache::remember($key, (int) config('bi.cache_ttl_seconds', 600), fn () => $this->compute($scope, $filters));
     }

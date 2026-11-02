@@ -19,6 +19,7 @@ class Course extends Model
         'name',
         'description',
         'status',
+        'target_exam_type_id',
         'created_by',
         'updated_by',
         'deleted_by',

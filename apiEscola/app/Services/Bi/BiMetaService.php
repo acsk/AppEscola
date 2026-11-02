@@ -58,6 +58,8 @@ class BiMetaService
                 'to' => $defaults->to->toDateString(),
                 'goal_pct' => (float) config('bi.goal_pct', 70),
                 'evolution_threshold_pp' => (float) config('bi.evolution_threshold_pp', 5),
+                // Critérios da escola já aplicados (BiController::scope).
+                'criteria' => array_map(fn (string $key) => config("bi.{$key}"), array_combine(array_keys(BiCriteria::FIELDS), array_keys(BiCriteria::FIELDS))),
             ],
             'filter_options' => $this->filterOptions($user, $scope),
         ];

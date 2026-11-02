@@ -22,6 +22,13 @@ return [
     /** Avaliações mínimas do aluno para entrar em média individual ou evolução. */
     'min_student_results' => 2,
 
+    /** Perfis: dias ativos por semana a partir dos quais a dedicação é "alta". */
+    'dedication_days_per_week' => 3,
+
+    /** Perfis: amostra mínima para classificar o aluno (avaliações e questões no período). */
+    'profile_min_assessments' => 3,
+    'profile_min_questions' => 50,
+
     /** Respostas mínimas do aluno numa disciplina para contar como "avaliado". */
     'min_subject_student_answers' => 10,
 

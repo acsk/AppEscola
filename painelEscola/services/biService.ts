@@ -413,3 +413,44 @@ export async function fetchBiPerformance(filters: BiFilters): Promise<BiPerforma
   const { data } = await api.get("/bi/performance", { params: cleanBiFilters(filters) });
   return getApiResponseBody(data) as BiPerformance;
 }
+
+export type BiCriteria = {
+  goal_pct: number;
+  evolution_threshold_pp: number;
+  attendance_alert_below: number;
+  dedication_days_per_week: number;
+  profile_min_assessments: number;
+  profile_min_questions: number;
+};
+
+export type BiCriteriaPayload = {
+  criteria: BiCriteria;
+  limits: Record<keyof BiCriteria, { min: number; max: number; integer: boolean }>;
+};
+
+export async function fetchBiCriteria(): Promise<BiCriteriaPayload> {
+  const { data } = await api.get("/bi/criteria");
+  return getApiResponseBody(data) as BiCriteriaPayload;
+}
+
+export async function saveBiCriteria(values: Partial<BiCriteria>): Promise<BiCriteriaPayload> {
+  const { data } = await api.put("/bi/criteria", values);
+  return getApiResponseBody(data) as BiCriteriaPayload;
+}
+
+export type BiPriorityTopics = {
+  exam_type_id: number;
+  configured: boolean;
+  courses: { id: number; name: string }[];
+  subjects: { subject_id: number; name: string; topics: { topic_id: number; name: string; weight: number }[] }[];
+};
+
+export async function fetchBiPriorities(examTypeId: number): Promise<BiPriorityTopics> {
+  const { data } = await api.get(`/bi/priorities/${examTypeId}`);
+  return getApiResponseBody(data) as BiPriorityTopics;
+}
+
+export async function saveBiPriorities(examTypeId: number, topics: { topic_id: number; weight: number }[]): Promise<BiPriorityTopics> {
+  const { data } = await api.put(`/bi/priorities/${examTypeId}`, { topics });
+  return getApiResponseBody(data) as BiPriorityTopics;
+}

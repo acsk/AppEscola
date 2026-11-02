@@ -10,6 +10,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import { parseApiErrors } from "../../utils/apiErrors";
+import { fetchActiveExamTypes } from "../../services/questionBank";
+import type { ExamTypeSummary } from "../../types/questionBank";
 import FormInput from "../../components/ui/FormInput";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -42,6 +44,8 @@ type CourseForm = {
   name: string;
   description: string;
   status: string;
+  /** Concurso que o curso prepara ("" = nenhum); usado no índice de Preparação do BI. */
+  target_exam_type_id: string;
 };
 
 type Plan = {
@@ -63,7 +67,7 @@ type PlanForm = {
   status: string;
 };
 
-const EMPTY_COURSE: CourseForm = { name: "", description: "", status: "active" };
+const EMPTY_COURSE: CourseForm = { name: "", description: "", status: "active", target_exam_type_id: "" };
 const EMPTY_PLAN: PlanForm = {
   name: "",
   billing_cycle: "monthly",
@@ -111,6 +115,11 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
   const [deletePlanId, setDeletePlanId] = useState<number | null>(null);
   const [deletingPlan, setDeletingPlan] = useState(false);
 
+  const [examTypes, setExamTypes] = useState<ExamTypeSummary[]>([]);
+  useEffect(() => {
+    fetchActiveExamTypes().then(setExamTypes).catch(() => setExamTypes([]));
+  }, []);
+
   // Load course data if editing
   useEffect(() => {
     if (!isEdit) return;
@@ -123,6 +132,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           name: c.name ?? "",
           description: c.description ?? "",
           status: c.status ?? "active",
+          target_exam_type_id: c.target_exam_type_id ? String(c.target_exam_type_id) : "",
         });
       } catch {}
       setLoading(false);
@@ -165,6 +175,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
       const payload: Record<string, any> = {
         name: form.name,
         status: form.status,
+        target_exam_type_id: form.target_exam_type_id ? Number(form.target_exam_type_id) : null,
       };
       if (form.description.trim()) payload.description = form.description;
 
@@ -175,6 +186,7 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
           name: updated.name ?? form.name,
           description: updated.description ?? "",
           status: updated.status ?? form.status,
+          target_exam_type_id: updated.target_exam_type_id ? String(updated.target_exam_type_id) : "",
         });
         setToast({
           visible: true,
@@ -395,6 +407,35 @@ export default function CourseFormScreen({ courseId, navigate }: Props) {
                   </option>
                 ))}
               </select>
+            </View>
+
+            <View className="mt-4">
+              <Text className="text-xs font-medium text-ink-muted mb-1.5">
+                Concurso alvo
+              </Text>
+              <select
+                value={form.target_exam_type_id}
+                onChange={(e: any) => setForm({ ...form, target_exam_type_id: e.target.value })}
+                style={{
+                  width: "100%",
+                  border: `1px solid ${errors.target_exam_type_id ? "var(--ds-danger)" : "var(--ds-border)"}`,
+                  borderRadius: 4,
+                  padding: "9px 12px",
+                  fontSize: 14,
+                  color: "var(--ds-ink)",
+                  backgroundColor: "var(--ds-surface)",
+                }}
+              >
+                <option value="">Nenhum</option>
+                {examTypes.map((t) => (
+                  <option key={t.id} value={String(t.id)}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <Text className="text-xs text-ink-subtle mt-1">
+                Define quais assuntos são prioritários para os alunos do curso na Inteligência Educacional.
+              </Text>
             </View>
           </View>
 

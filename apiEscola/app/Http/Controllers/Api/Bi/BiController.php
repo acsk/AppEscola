@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Bi;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Bi\BiFilterRequest;
 use App\Services\Bi\BiAccessScope;
+use App\Services\Bi\BiCriteria;
 use App\Services\Bi\BiFeatureGate;
 use App\Services\Bi\BiFilters;
 use App\Traits\ScopedByTenant;
@@ -40,6 +41,9 @@ abstract class BiController extends Controller
                 403,
             ));
         }
+
+        // Critérios da escola (meta, limiares) valem para todos os cálculos desta requisição.
+        app(BiCriteria::class)->apply($tenantId);
 
         return BiAccessScope::for($user, $tenantId);
     }

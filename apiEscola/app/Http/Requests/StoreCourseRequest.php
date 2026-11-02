@@ -18,6 +18,8 @@ class StoreCourseRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            // Concurso que o curso prepara (base do índice de Preparação do BI).
+            'target_exam_type_id' => ['nullable', 'integer', Rule::exists('exam_types', 'id')],
         ];
     }
 }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
-import { RefreshCw } from "lucide-react-native";
+import { RefreshCw, SlidersHorizontal } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
@@ -11,6 +11,7 @@ import DifficultyBars from "../../components/bi/DifficultyBars";
 import { overviewTiles } from "../../components/bi/overviewTiles";
 import BiMetaBar from "../../components/bi/BiMetaBar";
 import SegmentedControl from "../../components/bi/SegmentedControl";
+import BiCriteriaModal from "../../components/bi/BiCriteriaModal";
 import BiFilterBar, { presetRange, type PeriodPreset } from "../../components/bi/BiFilterBar";
 import { fmtNumber } from "../../components/bi/format";
 import { color } from "../../constants/theme";
@@ -53,6 +54,7 @@ export default function BiOverviewScreen({ navigate }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modality, setModality] = useState<Modality>("online");
+  const [criteriaOpen, setCriteriaOpen] = useState(false);
 
   useEffect(() => {
     fetchBiMeta().then(setMeta).catch(() => setMeta(null));
@@ -97,7 +99,12 @@ export default function BiOverviewScreen({ navigate }: Props) {
         breadcrumb={[{ label: "Inteligência Educacional" }, { label: "Visão geral" }]}
         title="Visão geral"
         description="Indicadores consolidados do período, comparados ao período anterior de mesma duração."
-        actions={<Button icon={RefreshCw} label="Atualizar" onPress={load} loading={loading} />}
+        actions={
+          <View className="flex-row" style={{ gap: 8 }}>
+            {meta?.scope.tenant_wide ? <Button icon={SlidersHorizontal} label="Critérios" onPress={() => setCriteriaOpen(true)} /> : null}
+            <Button icon={RefreshCw} label="Atualizar" onPress={load} loading={loading} />
+          </View>
+        }
       />
 
       <BiMetaBar plan={meta?.features.plan} generatedAt={data?.meta.generated_at} answersAsOf={data?.meta.answers_as_of} extra="Fontes: simulados, banco de questões e frequência" />
@@ -240,6 +247,15 @@ export default function BiOverviewScreen({ navigate }: Props) {
           </Panel>
         </View>
       ) : null}
+      <BiCriteriaModal
+        visible={criteriaOpen}
+        onClose={() => setCriteriaOpen(false)}
+        onOpenPriorities={() => navigate("bi-priorities")}
+        onSaved={() => {
+          fetchBiMeta().then(setMeta).catch(() => undefined);
+          load();
+        }}
+      />
     </ScrollView>
   );
 }

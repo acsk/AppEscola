@@ -428,7 +428,7 @@ class SubjectAnalyticsService
     /** Cache por tenant + escopo (turmas e disciplinas do professor) + filtros. */
     private function remember(string $name, BiAccessScope $scope, BiFilters $filters, array $extra, callable $compute): array
     {
-        $key = 'bi:'.$name.':'.$scope->tenantId.':'.md5(json_encode([
+        $key = 'bi:'.$name.':'.$scope->tenantId.':'.BiCriteria::signature().':'.md5(json_encode([
             $scope->classIds,
             $scope->isTenantWide() ? null : $scope->userId,
             $filters->toArray(),
