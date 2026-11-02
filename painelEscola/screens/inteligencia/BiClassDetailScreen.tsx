@@ -4,12 +4,12 @@ import { RefreshCw } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
-import Badge from "../../components/ui/Badge";
 import MetricCard from "../../components/bi/MetricCard";
 import LineChart from "../../components/bi/LineChart";
 import DifficultyBars from "../../components/bi/DifficultyBars";
 import SegmentedControl from "../../components/bi/SegmentedControl";
 import { overviewTiles } from "../../components/bi/overviewTiles";
+import StudentRosterTable from "../../components/bi/StudentRosterTable";
 import { presetRange } from "../../components/bi/BiFilterBar";
 import { fmtDate, fmtNumber } from "../../components/bi/format";
 import { color } from "../../constants/theme";
@@ -32,8 +32,6 @@ type Props = {
   /** Filtros da lista de origem; sem eles (ex.: link direto), últimos 90 dias. */
   filters?: BiFilters;
 };
-
-const REASON_TONE = { below_goal: "danger", declining: "danger", low_attendance: "warning" } as const;
 
 /** Inteligência Educacional › Análise de turmas › turma: indicadores da visão geral recortados + alunos. */
 export default function BiClassDetailScreen({ navigate, schoolClassId, filters: initialFilters }: Props) {
@@ -83,9 +81,6 @@ export default function BiClassDetailScreen({ navigate, schoolClassId, filters: 
   );
   const sc = detail?.school_class;
   const students = detail?.students.items ?? [];
-
-  const value = (v: { value: number | null; n: number }) =>
-    v.value === null ? (v.n ? `— (n=${v.n})` : "—") : `${fmtNumber(v.value, 0)}%${v.value < goal ? " ▾" : ""}`;
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, gap: 24 }}>
@@ -187,45 +182,12 @@ export default function BiClassDetailScreen({ navigate, schoolClassId, filters: 
             flush
           >
             {students.length ? (
-              <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }}>
-                <View style={{ minWidth: 980, width: "100%" }} role="table" aria-label="Alunos da turma">
-                  <View className="flex-row bg-surface-sunken border-b border-border" style={{ paddingVertical: 10, paddingHorizontal: 16, gap: 12 }}>
-                    <Text className="font-medium text-ink-muted" style={{ fontSize: 12, flex: 1, minWidth: 160 }}>Aluno</Text>
-                    {["Online", "Presencial", "Banco", "Frequência"].map((label) => (
-                      <Text key={label} className="font-medium text-ink-muted" style={{ fontSize: 12, width: 84, textAlign: "right" }}>{label}</Text>
-                    ))}
-                    <Text className="font-medium text-ink-muted" style={{ fontSize: 12, width: 84, textAlign: "right" }}>Evolução</Text>
-                    <Text className="font-medium text-ink-muted" style={{ fontSize: 12, width: 220 }}>Atenção</Text>
-                    <View style={{ width: 132 }} />
-                  </View>
-                  {students.map((s, i) => (
-                    <View key={s.student_id} className={`flex-row items-center ${i < students.length - 1 ? "border-b border-border" : ""}`} style={{ paddingVertical: 10, paddingHorizontal: 16, gap: 12 }}>
-                      <Text className="text-ink" style={{ fontSize: 14, flex: 1, minWidth: 160 }} numberOfLines={1}>{s.name}</Text>
-                      {[s.online, s.presencial, s.practice, s.attendance].map((cell, k) => (
-                        <Text key={k} className={`font-mono ${cell.value === null ? "text-ink-subtle" : "text-ink"}`} style={{ fontSize: 12, width: 84, textAlign: "right" }}>
-                          {value(cell)}
-                        </Text>
-                      ))}
-                      <Text
-                        className={`font-mono ${s.evolution_pp === null ? "text-ink-subtle" : s.evolution_pp < 0 ? "text-danger" : "text-success"}`}
-                        style={{ fontSize: 12, width: 84, textAlign: "right" }}
-                      >
-                        {s.evolution_pp === null ? "—" : `${s.evolution_pp < 0 ? "▼ −" : "▲ +"}${fmtNumber(Math.abs(s.evolution_pp), 1)} pp`}
-                      </Text>
-                      <View style={{ width: 220, gap: 4 }}>
-                        {s.reasons.length ? (
-                          s.reasons.map((r) => <Badge key={r.code} label={r.label} tone={REASON_TONE[r.code]} dot />)
-                        ) : (
-                          <Text className="text-ink-subtle" style={{ fontSize: 12 }}>—</Text>
-                        )}
-                      </View>
-                      <View style={{ width: 132, alignItems: "flex-end" }}>
-                        <Button size="sm" label="Ver desempenho" onPress={() => navigate("alunos-performance", { studentId: s.student_id })} />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </ScrollView>
+              <StudentRosterTable
+                students={students}
+                goal={goal}
+                ariaLabel="Alunos da turma"
+                action={{ label: "Ver evolução", onPress: (id) => navigate("bi-student", { studentId: id, filters }) }}
+              />
             ) : (
               <View style={{ padding: 24 }}>
                 <EmptyState text="Nenhum aluno ativo na turma no período." />

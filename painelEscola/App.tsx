@@ -55,6 +55,9 @@ import {
   BiClassDetailScreen,
   BiClassesScreen,
   BiOverviewScreen,
+  BiPerformanceScreen,
+  BiStudentEvolutionScreen,
+  BiStudentsScreen,
   BiSubjectsScreen,
 } from "./screens/inteligencia";
 import { fetchBiMeta, type BiSection } from "./services/biService";
@@ -271,6 +274,11 @@ function hashToNav(hash: string): NavState {
   }
 
   if (seg0 === "inteligencia") {
+    if (seg1 === "alunos") {
+      const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
+      return isNaN(id) ? { screen: "bi-students" } : { screen: "bi-student", params: { studentId: id } };
+    }
+    if (seg1 === "desempenho") return { screen: "bi-performance" };
     if (seg1 === "turmas") {
       const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
       return isNaN(id) ? { screen: "bi-classes" } : { screen: "bi-class", params: { schoolClassId: id } };
@@ -385,6 +393,9 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   if (nav.screen === "bi-overview") return "#/inteligencia/visao-geral";
+  if (nav.screen === "bi-students") return "#/inteligencia/alunos";
+  if (nav.screen === "bi-student") return `#/inteligencia/alunos/${nav.params?.studentId}`;
+  if (nav.screen === "bi-performance") return "#/inteligencia/desempenho";
   if (nav.screen === "bi-classes") return "#/inteligencia/turmas";
   if (nav.screen === "bi-class") return `#/inteligencia/turmas/${nav.params?.schoolClassId}`;
   if (nav.screen === "bi-assessments") return "#/inteligencia/simulados";
@@ -774,6 +785,8 @@ function AppContent() {
     ? "bi-assessments"
     : nav.screen === "bi-class"
     ? "bi-classes"
+    : nav.screen === "bi-student"
+    ? "bi-students"
     : nav.screen.startsWith("bi-")
     ? nav.screen
     : nav.screen === "relatorios-financeiro"
@@ -1077,6 +1090,17 @@ function AppContent() {
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       case "bi-overview": return <BiOverviewScreen navigate={navigate} />;
+      case "bi-students": return <BiStudentsScreen navigate={navigate} />;
+      case "bi-student":
+        return (
+          <BiStudentEvolutionScreen
+            key={String(nav.params?.studentId)}
+            navigate={navigate}
+            studentId={Number(nav.params?.studentId)}
+            filters={nav.params?.filters as any}
+          />
+        );
+      case "bi-performance": return <BiPerformanceScreen navigate={navigate} />;
       case "bi-classes": return <BiClassesScreen navigate={navigate} />;
       case "bi-class":
         return (

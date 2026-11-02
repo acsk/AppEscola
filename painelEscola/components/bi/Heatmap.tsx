@@ -8,7 +8,12 @@ type Props = {
   heatmap: BiHeatmap;
   goal: number;
   minSample: number;
-  subjectName: string;
+  /** Descrição da tabela para leitores de tela. */
+  tableLabel: string;
+  /** O que a contagem de cada célula representa. */
+  countLabel?: string;
+  /** Complemento do valor no tooltip (ex.: "de acertos", "de média"). */
+  valueLabel?: string;
 };
 
 const STEPS = ["seq-1", "seq-2", "seq-3", "seq-4", "seq-5"] as const;
@@ -32,14 +37,14 @@ const hatch =
  * Mapa de calor turmas × assuntos: escala sequencial de um só tom, número na célula, ▾ abaixo da meta
  * (a cor nunca é a única pista) e célula hachurada quando a amostra é insuficiente — nunca zero.
  */
-export default function Heatmap({ heatmap, goal, minSample, subjectName }: Props) {
+export default function Heatmap({ heatmap, goal, minSample, tableLabel, countLabel = "respostas", valueLabel = "de acertos" }: Props) {
   const [hover, setHover] = useState<string | null>(null);
   const { topics, rows } = heatmap;
 
   return (
     <View style={{ gap: 12 }}>
       <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ flexGrow: 1 }}>
-        <View style={{ minWidth: LABEL_WIDTH + topics.length * (CELL_WIDTH + GAP), flexGrow: 1 }} role="table" aria-label={`Acertos em ${subjectName} por turma e assunto`}>
+        <View style={{ minWidth: LABEL_WIDTH + topics.length * (CELL_WIDTH + GAP), flexGrow: 1 }} role="table" aria-label={tableLabel}>
           <View className="flex-row" role="row" style={{ alignItems: "flex-end", marginBottom: 6 }}>
             <Text role="columnheader" className="font-medium text-ink" style={{ width: LABEL_WIDTH, fontSize: 13 }}>
               Turma
@@ -67,8 +72,8 @@ export default function Heatmap({ heatmap, goal, minSample, subjectName }: Props
                 const topicName = topics[i]?.name ?? "";
                 const tip =
                   cell.value === null
-                    ? `${row.name} · ${topicName}: amostra insuficiente (${cell.answers} de ${minSample} respostas)`
-                    : `${row.name} · ${topicName}: ${fmtNumber(cell.value, 1)}% de acertos em ${cell.answers.toLocaleString("pt-BR")} respostas${cell.below_goal ? " · abaixo da meta" : ""}`;
+                    ? `${row.name} · ${topicName}: amostra insuficiente (${cell.answers} de ${minSample} ${countLabel})`
+                    : `${row.name} · ${topicName}: ${fmtNumber(cell.value, 1)}% ${valueLabel} em ${cell.answers.toLocaleString("pt-BR")} ${countLabel}${cell.below_goal ? " · abaixo da meta" : ""}`;
                 const strong = cell.value !== null && cell.value >= 60;
 
                 return (
@@ -137,7 +142,7 @@ export default function Heatmap({ heatmap, goal, minSample, subjectName }: Props
         <View className="flex-row items-center" style={{ gap: 6 }}>
           <View className="border border-border" style={[{ width: 16, height: 10, backgroundColor: color.surface }, hatch]} />
           <Text className="text-ink-muted" style={{ fontSize: 12 }}>
-            {`amostra insuficiente (< ${minSample} respostas, não conta como zero)`}
+            {`amostra insuficiente (< ${minSample} ${countLabel}, não conta como zero)`}
           </Text>
         </View>
       </View>

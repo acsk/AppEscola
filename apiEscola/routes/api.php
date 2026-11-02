@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\Bi\BiAssessmentController;
 use App\Http\Controllers\Api\Bi\BiClassController;
 use App\Http\Controllers\Api\Bi\BiMetaController;
 use App\Http\Controllers\Api\Bi\BiOverviewController;
+use App\Http\Controllers\Api\Bi\BiPerformanceController;
+use App\Http\Controllers\Api\Bi\BiStudentController;
 use App\Http\Controllers\Api\Bi\BiSubjectController;
 use App\Http\Controllers\Api\ClassScheduleController;
 use App\Http\Controllers\Api\CourseBundleController;
@@ -144,6 +146,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
             ->whereNumber('assessment');
         Route::get('classes', [BiClassController::class, 'index']);
         Route::get('classes/{schoolClass}', [BiClassController::class, 'show'])->whereNumber('schoolClass');
+        Route::get('performance', [BiPerformanceController::class, 'show']);
+        Route::get('students', [BiStudentController::class, 'index']);
+        Route::get('students/{student}/evolution', [BiStudentController::class, 'evolution'])->whereNumber('student');
         Route::get('subjects', [BiSubjectController::class, 'index']);
         Route::get('subjects/{subject}', [BiSubjectController::class, 'show'])->whereNumber('subject');
         Route::get('subjects/{subject}/topics/{topic}/errors', [BiSubjectController::class, 'errors'])

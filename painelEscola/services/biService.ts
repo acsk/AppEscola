@@ -286,8 +286,6 @@ export type BiClassComparison = {
   }[];
 };
 
-type BiSampledValue = { value: number | null; n: number };
-
 export type BiClassDetail = {
   meta: {
     period: { from: string; to: string };
@@ -301,16 +299,7 @@ export type BiClassDetail = {
   students: {
     total: number;
     needs_support: number;
-    items: {
-      student_id: number;
-      name: string;
-      online: BiSampledValue;
-      presencial: BiSampledValue;
-      practice: BiSampledValue;
-      attendance: BiSampledValue;
-      evolution_pp: number | null;
-      reasons: BiSupportReason[];
-    }[];
+    items: BiStudentRow[];
   };
 };
 
@@ -322,4 +311,103 @@ export async function fetchBiClasses(filters: BiFilters): Promise<BiClassCompari
 export async function fetchBiClass(schoolClassId: number, filters: BiFilters): Promise<BiClassDetail> {
   const { data } = await api.get(`/bi/classes/${schoolClassId}`, { params: cleanBiFilters({ ...filters, school_class_id: null }) });
   return getApiResponseBody(data) as BiClassDetail;
+}
+
+export type BiStudentRow = {
+  student_id: number;
+  name: string;
+  classes: string[];
+  online: { value: number | null; n: number };
+  presencial: { value: number | null; n: number };
+  practice: { value: number | null; n: number };
+  attendance: { value: number | null; n: number };
+  evolution_pp: number | null;
+  reasons: BiSupportReason[];
+};
+
+export type BiStudentListFilter = "all" | "attention" | "improving" | "declining";
+
+type BiThresholds = { min_student_results: number; min_practice_answers: number; min_attendance_records: number };
+
+export type BiStudentList = {
+  meta: { period: { from: string; to: string }; goal_pct: number; evolution_threshold_pp: number; generated_at: string } & BiThresholds;
+  summary: { total: number; attention: number; improving: number; declining: number; with_evolution: number };
+  items: BiStudentRow[];
+  pagination: { page: number; per_page: number; total: number; last_page: number };
+};
+
+export type BiTopicTrend = {
+  topic_id: number;
+  name: string;
+  subject: string;
+  answers: number;
+  accuracy: number;
+  previous: number | null;
+  delta_pp: number | null;
+};
+
+export type BiStudentEvolution = {
+  meta: {
+    period: { from: string; to: string };
+    previous_period: { from: string; to: string };
+    goal_pct: number;
+    evolution_threshold_pp: number;
+    min_answers: number;
+    generated_at: string;
+  } & BiThresholds;
+  student: BiStudentRow | null;
+  peers: { students: number; classes: string[] };
+  series: {
+    modality: BiModality;
+    exam_type_id: number | null;
+    exam_type: string | null;
+    points: { assessment_id: number; title: string; date: string; pct: number; peers_avg: number | null; peers_n: number }[];
+  }[];
+  subjects: { subject_id: number; name: string; answers: number; accuracy: number | null; peers_accuracy: number | null; peers_answers: number }[];
+  topics: { critical: BiTopicTrend[]; improving: BiTopicTrend[] };
+};
+
+export type BiPerformance = {
+  meta: { period: { from: string; to: string }; previous_period: { from: string; to: string }; goal_pct: number; min_sample: number; generated_at: string };
+  metrics: BiMetric[];
+  subjects: {
+    subject_id: number;
+    name: string;
+    grades: number;
+    students: number;
+    avg: number | null;
+    below_goal: boolean;
+    at_goal_pct: number | null;
+    absences: number;
+    absence_rate: number;
+    previous: number | null;
+    delta_pp: number | null;
+  }[];
+  matrix: BiHeatmap;
+};
+
+export async function fetchBiStudents(
+  filters: BiFilters,
+  options: { filter: BiStudentListFilter; search?: string; page: number; perPage?: number }
+): Promise<BiStudentList> {
+  const { data } = await api.get("/bi/students", {
+    params: {
+      ...cleanBiFilters(filters),
+      filter: options.filter,
+      ...(options.search ? { search: options.search } : {}),
+      page: options.page,
+      per_page: options.perPage ?? 25,
+    },
+  });
+  return getApiResponseBody(data) as BiStudentList;
+}
+
+export async function fetchBiStudentEvolution(studentId: number, filters: BiFilters): Promise<BiStudentEvolution> {
+  const { data } = await api.get(`/bi/students/${studentId}/evolution`, { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiStudentEvolution;
+}
+
+export async function fetchBiPerformance(filters: BiFilters): Promise<BiPerformance> {
+  const { data } = await api.get("/bi/performance", { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiPerformance;
 }

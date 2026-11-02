@@ -267,7 +267,7 @@ export default function BiSubjectsScreen({ navigate, subjectId: initialSubjectId
               description={`% de acertos em ${data.subject.name} · assuntos mais respondidos no período.`}
             >
               {data.heatmap && data.heatmap.rows.length ? (
-                <Heatmap heatmap={data.heatmap} goal={goal} minSample={minSample} subjectName={data.subject.name} />
+                <Heatmap heatmap={data.heatmap} goal={goal} minSample={minSample} tableLabel={`Acertos em ${data.subject.name} por turma e assunto`} />
               ) : (
                 <EmptyState text="Nenhuma questão desta disciplina está classificada por assunto no período." />
               )}

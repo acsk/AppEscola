@@ -23,6 +23,7 @@ class ClassAnalyticsService
         private readonly PracticeFirstAttempts $practice,
         private readonly AttendanceRecords $attendance,
         private readonly StudentSignals $signals,
+        private readonly StudentRoster $roster,
     ) {
     }
 
@@ -80,48 +81,7 @@ class ClassAnalyticsService
 
         return $this->remember('class', $scope, $filters, function () use ($scope, $filters, $schoolClassId) {
             $universe = new StudentUniverse($scope, $filters);
-            $rows = $this->assessments->rows($universe);
-            $evolution = $this->signals->evolution($rows);
-            $reasons = $this->signals->supportReasons($universe, $rows, $evolution);
-            $practice = $this->practice->byStudent($universe);
-            $attendance = $this->attendance->byStudent($universe);
-            $minResults = (int) config('bi.min_student_results', 2);
-            $minPractice = (int) $this->catalog->definition('practice.first_accuracy')['min_sample'];
-            $minAttendance = (int) $this->catalog->definition('attendance.rate')['min_sample'];
-
-            $ids = DB::query()->fromSub($universe->query(), 'u')->pluck('student_id')->map(fn ($id) => (int) $id);
-            $names = DB::table('students')->whereIn('id', $ids->all() ?: [0])->pluck('name', 'id');
-            $byStudent = $rows->groupBy('student_id');
-
-            $avg = function (?Collection $results, string $modality) use ($minResults) {
-                $list = ($results ?? collect())->where('modality', $modality);
-
-                return ['value' => $list->count() >= $minResults ? round((float) $list->avg('pct'), 1) : null, 'n' => $list->count()];
-            };
-
-            $students = $ids->map(function (int $id) use ($names, $byStudent, $avg, $practice, $attendance, $evolution, $reasons, $minPractice, $minAttendance) {
-                $p = $practice->get($id);
-                $a = $attendance->get($id);
-
-                return [
-                    'student_id' => $id,
-                    'name' => $names[$id] ?? 'Aluno',
-                    'online' => $avg($byStudent->get($id), AssessmentResults::ONLINE),
-                    'presencial' => $avg($byStudent->get($id), AssessmentResults::PRESENCIAL),
-                    'practice' => [
-                        'value' => $p && $p->answers >= $minPractice ? round($p->correct / $p->answers * 100, 1) : null,
-                        'n' => (int) ($p->answers ?? 0),
-                    ],
-                    'attendance' => [
-                        'value' => $a && $a->records >= $minAttendance ? round($a->present / $a->records * 100, 1) : null,
-                        'n' => (int) ($a->records ?? 0),
-                    ],
-                    'evolution_pp' => isset($evolution[$id]) ? round($evolution[$id], 1) : null,
-                    'reasons' => $reasons[$id] ?? [],
-                ];
-            })
-                ->sortBy([fn ($x, $y) => count($y['reasons']) <=> count($x['reasons']), fn ($x, $y) => strnatcasecmp($x['name'], $y['name'])])
-                ->values();
+            $students = collect($this->roster->build($universe));
 
             $class = DB::table('school_classes as sc')
                 ->leftJoin('courses as c', 'c.id', '=', 'sc.course_id')
@@ -132,9 +92,7 @@ class ClassAnalyticsService
                 'meta' => [
                     'period' => ['from' => $filters->from->toDateString(), 'to' => $filters->to->toDateString()],
                     'goal_pct' => (float) config('bi.goal_pct', 70),
-                    'min_student_results' => $minResults,
-                    'min_practice_answers' => $minPractice,
-                    'min_attendance_records' => $minAttendance,
+                    ...$this->roster->thresholds(),
                     'generated_at' => now(PracticePerformanceService::RANKING_TIMEZONE)->toIso8601String(),
                 ],
                 'school_class' => [

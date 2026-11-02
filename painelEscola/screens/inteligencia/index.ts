@@ -4,3 +4,6 @@ export { default as BiAssessmentsScreen } from "./BiAssessmentsScreen";
 export { default as BiAssessmentDetailScreen } from "./BiAssessmentDetailScreen";
 export { default as BiClassesScreen } from "./BiClassesScreen";
 export { default as BiClassDetailScreen } from "./BiClassDetailScreen";
+export { default as BiStudentsScreen } from "./BiStudentsScreen";
+export { default as BiStudentEvolutionScreen } from "./BiStudentEvolutionScreen";
+export { default as BiPerformanceScreen } from "./BiPerformanceScreen";

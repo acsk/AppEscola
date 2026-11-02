@@ -18,8 +18,8 @@ class BiMetaService
     public const SECTIONS = [
         ['key' => 'overview', 'label' => 'Visão geral', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'diagnosis', 'label' => 'Diagnóstico pedagógico 360°', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
-        ['key' => 'students', 'label' => 'Evolução dos alunos', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
-        ['key' => 'performance', 'label' => 'Desempenho acadêmico', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
+        ['key' => 'students', 'label' => 'Evolução dos alunos', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
+        ['key' => 'performance', 'label' => 'Desempenho acadêmico', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'classes', 'label' => 'Análise de turmas', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'subjects', 'label' => 'Disciplinas e assuntos', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'engagement', 'label' => 'Frequência e engajamento', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
