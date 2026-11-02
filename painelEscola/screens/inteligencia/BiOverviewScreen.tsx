@@ -8,6 +8,7 @@ import Badge from "../../components/ui/Badge";
 import MetricCard from "../../components/bi/MetricCard";
 import LineChart from "../../components/bi/LineChart";
 import DifficultyBars from "../../components/bi/DifficultyBars";
+import { overviewTiles } from "../../components/bi/overviewTiles";
 import BiMetaBar from "../../components/bi/BiMetaBar";
 import SegmentedControl from "../../components/bi/SegmentedControl";
 import BiFilterBar, { presetRange, type PeriodPreset } from "../../components/bi/BiFilterBar";
@@ -86,24 +87,9 @@ export default function BiOverviewScreen({ navigate }: Props) {
     [data, modality]
   );
   const hasMonthly = points.some((p) => p.value !== null);
-  const improving = metric("students.improving");
   const support = data?.needs_support;
 
-  const tiles = [
-    { key: "students.active", label: "Alunos ativos" },
-    { key: "students.recent_activity", label: "Atividade recente", unit: "%", hint: "nos últimos 14 dias" },
-    { key: "exams.participation", label: "Participação nos simulados", unit: "%" },
-    { key: "assessments.avg_pct", label: "Média geral dos simulados", unit: "%" },
-    { key: "practice.first_accuracy", label: "Acertos no banco de questões", unit: "%" },
-    { key: "attendance.rate", label: "Frequência média", unit: "%" },
-    {
-      key: "students.improving",
-      label: "Evolução positiva",
-      unit: "%",
-      hint: improving?.sample.with_sample !== undefined ? `de ${improving.sample.with_sample} com amostra` : undefined,
-    },
-    { key: "students.needs_support", label: "Precisam de reforço", goodWhen: "down" as const },
-  ];
+  const tiles = overviewTiles(metric);
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, gap: 24 }}>

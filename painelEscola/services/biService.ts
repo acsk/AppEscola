@@ -269,3 +269,57 @@ export async function fetchBiAssessment(modality: BiModality, id: number, filter
   const { data } = await api.get(`/bi/assessments/${modality}/${id}`, { params: cleanBiFilters(filters) });
   return getApiResponseBody(data) as BiAssessmentDetail;
 }
+
+export type BiClassComparison = {
+  meta: {
+    period: { from: string; to: string };
+    previous_period: { from: string; to: string };
+    goal_pct: number;
+    generated_at: string;
+  };
+  items: {
+    school_class_id: number;
+    name: string;
+    course: string | null;
+    year: number | null;
+    metrics: Record<"students" | "avg_online" | "avg_presencial" | "practice" | "attendance" | "participation" | "needs_support", BiMetric>;
+  }[];
+};
+
+type BiSampledValue = { value: number | null; n: number };
+
+export type BiClassDetail = {
+  meta: {
+    period: { from: string; to: string };
+    goal_pct: number;
+    min_student_results: number;
+    min_practice_answers: number;
+    min_attendance_records: number;
+    generated_at: string;
+  };
+  school_class: { id: number; name: string; course: string | null; year: number | null; status: string; teachers: string[] };
+  students: {
+    total: number;
+    needs_support: number;
+    items: {
+      student_id: number;
+      name: string;
+      online: BiSampledValue;
+      presencial: BiSampledValue;
+      practice: BiSampledValue;
+      attendance: BiSampledValue;
+      evolution_pp: number | null;
+      reasons: BiSupportReason[];
+    }[];
+  };
+};
+
+export async function fetchBiClasses(filters: BiFilters): Promise<BiClassComparison> {
+  const { data } = await api.get("/bi/classes", { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiClassComparison;
+}
+
+export async function fetchBiClass(schoolClassId: number, filters: BiFilters): Promise<BiClassDetail> {
+  const { data } = await api.get(`/bi/classes/${schoolClassId}`, { params: cleanBiFilters({ ...filters, school_class_id: null }) });
+  return getApiResponseBody(data) as BiClassDetail;
+}

@@ -95,6 +95,21 @@ class BiFilters
         );
     }
 
+    public function withSchoolClass(int $schoolClassId): self
+    {
+        return new self(
+            from: $this->from,
+            to: $this->to,
+            schoolYear: $this->schoolYear,
+            courseId: $this->courseId,
+            schoolClassId: $schoolClassId,
+            subjectId: $this->subjectId,
+            teacherId: $this->teacherId,
+            examTypeId: $this->examTypeId,
+            modality: $this->modality,
+        );
+    }
+
     /** Início inclusivo e fim exclusivo, em UTC, para colunas timestamp. @return array{0: Carbon, 1: Carbon} */
     public function utcRange(): array
     {

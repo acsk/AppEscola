@@ -49,7 +49,14 @@ import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 import { ClassStudentsReportScreen, FinanceReportScreen } from "./screens/relatorios";
-import { BiAssessmentDetailScreen, BiAssessmentsScreen, BiOverviewScreen, BiSubjectsScreen } from "./screens/inteligencia";
+import {
+  BiAssessmentDetailScreen,
+  BiAssessmentsScreen,
+  BiClassDetailScreen,
+  BiClassesScreen,
+  BiOverviewScreen,
+  BiSubjectsScreen,
+} from "./screens/inteligencia";
 import { fetchBiMeta, type BiSection } from "./services/biService";
 
 import type { NavState } from "./types/navigation";
@@ -264,6 +271,10 @@ function hashToNav(hash: string): NavState {
   }
 
   if (seg0 === "inteligencia") {
+    if (seg1 === "turmas") {
+      const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
+      return isNaN(id) ? { screen: "bi-classes" } : { screen: "bi-class", params: { schoolClassId: id } };
+    }
     if (seg1 === "simulados") {
       const [, , modality, rawId] = path.split("/").filter(Boolean);
       const id = parseInt(rawId ?? "", 10);
@@ -374,6 +385,8 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   if (nav.screen === "bi-overview") return "#/inteligencia/visao-geral";
+  if (nav.screen === "bi-classes") return "#/inteligencia/turmas";
+  if (nav.screen === "bi-class") return `#/inteligencia/turmas/${nav.params?.schoolClassId}`;
   if (nav.screen === "bi-assessments") return "#/inteligencia/simulados";
   if (nav.screen === "bi-assessment") return `#/inteligencia/simulados/${nav.params?.modality}/${nav.params?.assessmentId}`;
   if (nav.screen === "bi-subjects") {
@@ -759,6 +772,8 @@ function AppContent() {
     ? "calendario"
     : nav.screen === "bi-assessment"
     ? "bi-assessments"
+    : nav.screen === "bi-class"
+    ? "bi-classes"
     : nav.screen.startsWith("bi-")
     ? nav.screen
     : nav.screen === "relatorios-financeiro"
@@ -1062,6 +1077,16 @@ function AppContent() {
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       case "bi-overview": return <BiOverviewScreen navigate={navigate} />;
+      case "bi-classes": return <BiClassesScreen navigate={navigate} />;
+      case "bi-class":
+        return (
+          <BiClassDetailScreen
+            key={String(nav.params?.schoolClassId)}
+            navigate={navigate}
+            schoolClassId={Number(nav.params?.schoolClassId)}
+            filters={nav.params?.filters as any}
+          />
+        );
       case "bi-assessments": return <BiAssessmentsScreen navigate={navigate} />;
       case "bi-assessment":
         return (

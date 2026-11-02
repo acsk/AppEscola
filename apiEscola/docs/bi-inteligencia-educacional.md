@@ -350,4 +350,11 @@ Fórmulas propostas para a Fase 2 (documentadas e configuráveis; pesos renormal
   - A série mensal passou para `AssessmentResults::monthly()` (usada também pela Visão geral).
   - Painel: `BiAssessmentsScreen`, `BiAssessmentDetailScreen`, `components/bi/ScoreHistogram`, `PctBars`, `SegmentedControl`; rotas `#/inteligencia/simulados` e `#/inteligencia/simulados/{modalidade}/{id}`. Teste: `tests/Feature/BiAssessmentTest.php`.
   - Fora desta entrega: questões com mais erro dentro do simulado (já existe `ExamQuestionErrorsReportService`; integrar depois) e comparação entre simulados do mesmo concurso.
-- Próximo: Análise de turmas (`/bi/classes`), depois Evolução dos alunos e Desempenho acadêmico.
+- **Fase 1 · Análise de turmas — concluído (02/11/2026):** `ClassAnalyticsService` + `BiClassController`:
+  - `GET /bi/classes` — comparação entre as turmas do recorte: alunos, média online, média presencial, acerto no banco, frequência (chamadas da própria turma), participação online e alunos em atenção; cada célula é um indicador do catálogo (amostra mínima + variação vs. período anterior);
+  - `GET /bi/classes/{id}` — dados da turma (curso, ano, professores) e alunos com médias individuais por modalidade, banco, frequência, evolução (p.p.) e motivos de atenção, em atenção primeiro.
+  - Os cards, a evolução mensal e as disciplinas do detalhe vêm de `/bi/overview?school_class_id=…`, então a turma usa exatamente o cálculo da Visão geral.
+  - Regras de atenção e evolução por aluno extraídas para `StudentSignals` (Visão geral e turmas usam a mesma classe).
+  - Painel: `BiClassesScreen`, `BiClassDetailScreen`, `components/bi/MetricCell`, `components/bi/overviewTiles`; rotas `#/inteligencia/turmas[/id]`. Teste: `tests/Feature/BiClassTest.php`.
+  - Fora desta entrega: mapa de calor assunto × avaliação da turma (o mapa turma × assunto já está em Disciplinas e assuntos) e a coluna "desde" dos alunos em atenção (exige histórico de alertas, Fase 3).
+- Próximo: Evolução dos alunos (`/bi/students`, `/bi/students/{id}/evolution`) e Desempenho acadêmico.

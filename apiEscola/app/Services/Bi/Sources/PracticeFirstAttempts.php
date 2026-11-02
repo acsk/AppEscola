@@ -5,6 +5,7 @@ namespace App\Services\Bi\Sources;
 use App\Models\PracticeAnswer;
 use App\Services\Bi\BiFilters;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -52,5 +53,17 @@ class PracticeFirstAttempts
             'correct' => (int) ($row->correct ?? 0),
             'students' => (int) ($row->students ?? 0),
         ];
+    }
+
+    /** Respostas e acertos por aluno. @return Collection<int, object{student_id: int, answers: int, correct: int}> */
+    public function byStudent(StudentUniverse $universe, ?BiFilters $filters = null): Collection
+    {
+        return $this->query($universe, $filters)
+            ->groupBy('pa.student_id')
+            ->select('pa.student_id')
+            ->selectRaw('COUNT(*) as answers')
+            ->selectRaw('SUM(CASE WHEN pa.is_correct = 1 THEN 1 ELSE 0 END) as correct')
+            ->get()
+            ->keyBy('student_id');
     }
 }

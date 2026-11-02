@@ -55,6 +55,7 @@ type SidebarItem = { id: string; label: string; icon: LucideIcon };
 /** Seção do BI (chave da API) → tela do painel. Seção sem tela aqui não aparece no menu. */
 const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   overview: { id: "bi-overview", icon: ChartLine },
+  classes: { id: "bi-classes", icon: LayoutGrid },
   subjects: { id: "bi-subjects", icon: BookOpenCheck },
   assessments: { id: "bi-assessments", icon: ClipboardCheck },
 };
