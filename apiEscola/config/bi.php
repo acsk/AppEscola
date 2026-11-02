@@ -35,4 +35,10 @@ return [
     'max_period_days' => 731,
 
     'cache_ttl_seconds' => 600,
+
+    /** Coleta de dias de uso do app pelo aluno (student_activity_days). */
+    'activity_tracking' => (bool) env('BI_ACTIVITY_TRACKING', true),
+
+    /** Intervalo mínimo entre registros do mesmo aluno; cada registro soma 1 em `touches`. */
+    'activity_touch_minutes' => 15,
 ];

@@ -125,7 +125,7 @@ Route::prefix('domains')->group(function () {
 });
 
 // Rotas autenticadas via Sanctum
-Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class])->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \App\Http\Middleware\RecordStudentActivity::class])->group(function () {
 
     // Auth
     Route::get('/me', [AuthController::class, 'me']);
