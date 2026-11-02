@@ -31,7 +31,7 @@ class PracticePerformanceService
 
     /**
      * week = semana corrente (segunda 00:00 até agora); last_week = semana anterior fechada.
-     * 7d = últimos 7 dias; month = últimos 30 dias; all = geral.
+     * 7d = últimos 7 dias; month = mês vigente (dia 1º 00:00 até agora); all = geral.
      */
     public const PERIODS = ['week', 'last_week', '7d', 'month', 'all'];
 
@@ -393,7 +393,7 @@ class PracticePerformanceService
             'week'      => [$weekStart, null],
             'last_week' => [$weekStart->copy()->subWeek(), $weekStart],
             '7d'        => [now()->subDays(7), null],
-            'month'     => [now()->subDays(30), null],
+            'month'     => [now(self::RANKING_TIMEZONE)->startOfMonth()->utc(), null],
             default     => [null, null],
         };
     }

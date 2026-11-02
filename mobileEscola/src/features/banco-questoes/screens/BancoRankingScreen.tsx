@@ -16,7 +16,7 @@ type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoRanking'>;
 type Mode = Extract<RankingCriterion, 'wilson' | 'dedication'>;
 
 const PERIODS: { id: RankingPeriod; label: string }[] = [
-  { id: 'week', label: 'Esta semana' }, { id: 'last_week', label: 'Semana passada' }, { id: 'month', label: '30 dias' }, { id: 'all', label: 'Geral' },
+  { id: 'week', label: 'Esta semana' }, { id: 'last_week', label: 'Semana passada' }, { id: 'month', label: 'Este mês' }, { id: 'all', label: 'Geral' },
 ];
 const MODES: { id: Mode; label: string }[] = [{ id: 'wilson', label: 'Desempenho' }, { id: 'dedication', label: 'Dedicação' }];
 /** Linhas iniciais: celular mostra top 3 + você + o próximo; desktop, os 10 primeiros. */
