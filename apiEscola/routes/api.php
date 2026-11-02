@@ -155,6 +155,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
         Route::get('performance', [BiPerformanceController::class, 'show']);
         Route::get('students', [BiStudentController::class, 'index']);
         Route::get('students/{student}/evolution', [BiStudentController::class, 'evolution'])->whereNumber('student');
+        Route::get('students/{student}/diagnosis', [BiStudentController::class, 'diagnosis'])->whereNumber('student');
         Route::get('subjects', [BiSubjectController::class, 'index']);
         Route::get('subjects/{subject}', [BiSubjectController::class, 'show'])->whereNumber('subject');
         Route::get('subjects/{subject}/topics/{topic}/errors', [BiSubjectController::class, 'errors'])

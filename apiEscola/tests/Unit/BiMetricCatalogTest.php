@@ -14,7 +14,7 @@ class BiMetricCatalogTest extends TestCase
             foreach (['name', 'description', 'formula', 'sources', 'unit', 'min_sample', 'missing', 'filters', 'plan'] as $field) {
                 $this->assertArrayHasKey($field, $metric, "{$metric['key']} sem {$field}");
             }
-            $this->assertContains($metric['unit'], [MetricCatalog::UNIT_PCT, MetricCatalog::UNIT_COUNT]);
+            $this->assertContains($metric['unit'], [MetricCatalog::UNIT_PCT, MetricCatalog::UNIT_COUNT, MetricCatalog::UNIT_SCORE]);
         }
     }
 
@@ -87,5 +87,14 @@ class BiMetricCatalogTest extends TestCase
 
         $this->assertSame('2026-09-01 03:00:00', $from->format('Y-m-d H:i:s'));
         $this->assertSame('2026-09-02 03:00:00', $until->format('Y-m-d H:i:s'));
+    }
+
+    public function test_index_varies_in_absolute_points(): void
+    {
+        $metric = (new MetricCatalog)->make('index.learning', 66, 2, [], 62, 2);
+
+        $this->assertSame(4.0, $metric['delta']);
+        $this->assertSame('pts', $metric['delta_unit']);
+        $this->assertSame('up', $metric['trend']);
     }
 }

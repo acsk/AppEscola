@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Bi;
 use App\Http\Requests\Bi\BiFilterRequest;
 use App\Http\Requests\Bi\BiStudentRequest;
 use App\Services\Bi\BiFeatureGate;
+use App\Services\Bi\Diagnosis\StudentDiagnosisService;
 use App\Services\Bi\StudentEvolutionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -13,8 +14,11 @@ class BiStudentController extends BiController
 {
     private const PER_PAGE = 25;
 
-    public function __construct(BiFeatureGate $gate, private readonly StudentEvolutionService $evolution)
-    {
+    public function __construct(
+        BiFeatureGate $gate,
+        private readonly StudentEvolutionService $evolution,
+        private readonly StudentDiagnosisService $diagnosis,
+    ) {
         parent::__construct($gate);
     }
 
@@ -50,5 +54,24 @@ class BiStudentController extends BiController
         }
 
         return $this->success($this->evolution->evolution($scope, $filters, $student), 'Evolução do aluno carregada.');
+    }
+
+    /** Diagnóstico 360°: índices de Aprendizagem, Engajamento e Preparação × turma, histórico, domínio e recomendações. */
+    public function diagnosis(BiFilterRequest $request, int $student): JsonResponse
+    {
+        $scope = $this->scope($request, BiFeatureGate::PLAN_ADVANCED);
+        $filters = $this->filters($request, $scope);
+
+        $exists = DB::table('students')->where('tenant_id', $scope->tenantId)->whereNull('deleted_at')->where('id', $student)->exists();
+        if (! $exists) {
+            return $this->error('Aluno não encontrado.', null, 404);
+        }
+
+        $class = $this->diagnosis->referenceClass($scope, $filters, $student);
+        if ($class === null) {
+            return $this->forbidden('Aluno fora do seu escopo de acesso ou sem matrícula ativa no período.');
+        }
+
+        return $this->success($this->diagnosis->build($scope, $filters, $student, $class), 'Diagnóstico carregado.');
     }
 }

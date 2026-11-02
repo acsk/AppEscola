@@ -38,7 +38,7 @@ export type BiMetricDefinition = {
   description: string;
   formula: string;
   sources: string[];
-  unit: "pct" | "count";
+  unit: "pct" | "count" | "score";
   min_sample: number;
   missing: string;
   plan: "basic" | "advanced";
@@ -47,10 +47,10 @@ export type BiMetricDefinition = {
 export type BiMetric = {
   key: string;
   value: number | null;
-  unit: "pct" | "count";
+  unit: "pct" | "count" | "score";
   previous: number | null;
   delta: number | null;
-  delta_unit: "pp" | "percent" | null;
+  delta_unit: "pp" | "pts" | "percent" | null;
   trend: "up" | "down" | "stable" | null;
   sample: Record<string, number> & { size: number };
   min_sample: number;
@@ -122,7 +122,8 @@ export type BiHeatmap = {
     school_class_id: number;
     name: string;
     answers: number;
-    cells: { topic_id: number; value: number | null; answers: number; below_goal: boolean }[];
+    /** label: nome do item da célula quando as colunas são posições (ex.: assunto 1 de cada disciplina). */
+    cells: { topic_id: number; value: number | null; answers: number; below_goal: boolean; label?: string; extra?: string }[];
   }[];
   truncated: boolean;
 };
@@ -453,4 +454,57 @@ export async function fetchBiPriorities(examTypeId: number): Promise<BiPriorityT
 export async function saveBiPriorities(examTypeId: number, topics: { topic_id: number; weight: number }[]): Promise<BiPriorityTopics> {
   const { data } = await api.put(`/bi/priorities/${examTypeId}`, { topics });
   return getApiResponseBody(data) as BiPriorityTopics;
+}
+
+export type BiIndexComponent = {
+  key: string;
+  label: string;
+  value: number | null;
+  raw: number | null;
+  n: number;
+  min_sample: number;
+  weight: number;
+  sufficient: boolean;
+};
+
+export type BiDimension = BiMetric & { class_avg: number | null; components: BiIndexComponent[] };
+
+export type BiDimensionKey = "learning" | "engagement" | "preparation";
+
+export type BiDiagnosis = {
+  meta: {
+    period: { from: string; to: string };
+    previous_period: { from: string; to: string };
+    goal_pct: number;
+    min_topic_answers: number;
+    exam_type: { id: number; label: string } | null;
+    priorities_provisional: boolean;
+    generated_at: string;
+  };
+  student: {
+    id: number;
+    name: string;
+    school_class: { id: number; name: string };
+    course: string | null;
+    reasons: BiSupportReason[];
+    active_days_per_week: number;
+    questions: number;
+    assessments: number;
+    assessments_avg: number | null;
+  };
+  class: { students: number };
+  dimensions: Record<BiDimensionKey, BiDimension>;
+  highlight: { subject: string; accuracy: number; topics: string[] } | null;
+  history: ({ month: string; label: string } & Record<BiDimensionKey, number | null>)[];
+  domain: {
+    subject_id: number;
+    name: string;
+    topics: { topic_id: number; name: string; weight: number; value: number | null; answers: number; below_goal: boolean; class_value: number | null }[];
+  }[];
+  recommendations: { type: string; category: string; title: string; reason: string }[];
+};
+
+export async function fetchBiDiagnosis(studentId: number, filters: BiFilters): Promise<BiDiagnosis> {
+  const { data } = await api.get(`/bi/students/${studentId}/diagnosis`, { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiDiagnosis;
 }

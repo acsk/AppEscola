@@ -7,13 +7,16 @@ use InvalidArgumentException;
 /**
  * Catálogo de métricas (config/bi_metrics.php) e montagem padronizada de cada valor.
  * Regras centralizadas aqui: amostra insuficiente vira null (nunca zero),
- * percentual varia em p.p. e contagem em %.
+ * percentual varia em p.p., índice (0–100) em pontos e contagem em %.
  */
 class MetricCatalog
 {
     public const UNIT_PCT = 'pct';
 
     public const UNIT_COUNT = 'count';
+
+    /** Índice de 0 a 100: varia em pontos absolutos. */
+    public const UNIT_SCORE = 'score';
 
     /** Variação abaixo disto é tratada como estável. */
     private const STABLE_DELTA = 0.5;
@@ -69,7 +72,11 @@ class MetricCatalog
             'unit' => $unit,
             'previous' => $prior,
             'delta' => $delta,
-            'delta_unit' => $delta === null ? null : ($unit === self::UNIT_PCT ? 'pp' : 'percent'),
+            'delta_unit' => $delta === null ? null : match ($unit) {
+                self::UNIT_PCT => 'pp',
+                self::UNIT_SCORE => 'pts',
+                default => 'percent',
+            },
             'trend' => $this->trend($delta),
             'sample' => $sample + ['size' => $sampleSize],
             'min_sample' => $minSample,
@@ -82,7 +89,7 @@ class MetricCatalog
         if ($current === null || $previous === null) {
             return null;
         }
-        if ($unit === self::UNIT_PCT) {
+        if ($unit === self::UNIT_PCT || $unit === self::UNIT_SCORE) {
             return round($current - $previous, 1);
         }
         if ($previous == 0.0) {

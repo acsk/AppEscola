@@ -8,3 +8,4 @@ export { default as BiStudentsScreen } from "./BiStudentsScreen";
 export { default as BiStudentEvolutionScreen } from "./BiStudentEvolutionScreen";
 export { default as BiPerformanceScreen } from "./BiPerformanceScreen";
 export { default as BiPrioritiesScreen } from "./BiPrioritiesScreen";
+export { default as BiDiagnosisScreen } from "./BiDiagnosisScreen";

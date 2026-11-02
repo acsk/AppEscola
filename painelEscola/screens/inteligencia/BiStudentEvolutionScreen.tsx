@@ -91,6 +91,7 @@ export default function BiStudentEvolutionScreen({ navigate, studentId, filters:
         }
         actions={
           <View className="flex-row" style={{ gap: 8 }}>
+            <Button label="Diagnóstico 360°" onPress={() => navigate("bi-diagnosis", { studentId, filters })} />
             <Button label="Desempenho completo" onPress={() => navigate("alunos-performance", { studentId })} />
             <Button icon={RefreshCw} label="Atualizar" onPress={load} loading={loading} />
           </View>

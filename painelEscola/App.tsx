@@ -54,6 +54,7 @@ import {
   BiAssessmentsScreen,
   BiClassDetailScreen,
   BiClassesScreen,
+  BiDiagnosisScreen,
   BiOverviewScreen,
   BiPerformanceScreen,
   BiPrioritiesScreen,
@@ -279,6 +280,10 @@ function hashToNav(hash: string): NavState {
       const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
       return isNaN(id) ? { screen: "bi-students" } : { screen: "bi-student", params: { studentId: id } };
     }
+    if (seg1 === "diagnostico") {
+      const id = parseInt(path.split("/").filter(Boolean)[2] ?? "", 10);
+      return { screen: "bi-diagnosis", params: isNaN(id) ? undefined : { studentId: id } };
+    }
     if (seg1 === "desempenho") return { screen: "bi-performance" };
     if (seg1 === "prioritarios") return { screen: "bi-priorities" };
     if (seg1 === "turmas") {
@@ -398,6 +403,10 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "bi-students") return "#/inteligencia/alunos";
   if (nav.screen === "bi-student") return `#/inteligencia/alunos/${nav.params?.studentId}`;
   if (nav.screen === "bi-performance") return "#/inteligencia/desempenho";
+  if (nav.screen === "bi-diagnosis") {
+    const id = nav.params?.studentId;
+    return id ? `#/inteligencia/diagnostico/${id}` : "#/inteligencia/diagnostico";
+  }
   if (nav.screen === "bi-priorities") return "#/inteligencia/prioritarios";
   if (nav.screen === "bi-classes") return "#/inteligencia/turmas";
   if (nav.screen === "bi-class") return `#/inteligencia/turmas/${nav.params?.schoolClassId}`;
@@ -1106,6 +1115,15 @@ function AppContent() {
           />
         );
       case "bi-performance": return <BiPerformanceScreen navigate={navigate} />;
+      case "bi-diagnosis":
+        return (
+          <BiDiagnosisScreen
+            key={String(nav.params?.studentId ?? "")}
+            navigate={navigate}
+            studentId={nav.params?.studentId ? Number(nav.params.studentId) : null}
+            filters={nav.params?.filters as any}
+          />
+        );
       case "bi-priorities": return <BiPrioritiesScreen navigate={navigate} />;
       case "bi-classes": return <BiClassesScreen navigate={navigate} />;
       case "bi-class":

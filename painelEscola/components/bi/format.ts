@@ -15,6 +15,7 @@ export const fmtMetricDelta = (metric: BiMetric | undefined) => {
   if (!metric || metric.delta === null) return null;
   const abs = Math.abs(metric.delta);
   if (metric.delta_unit === "pp") return `${fmtNumber(abs, 1)} pp`;
+  if (metric.delta_unit === "pts") return `${fmtNumber(abs, 0)} pts`;
   if (metric.unit === "count" && metric.previous !== null && metric.value !== null) {
     return fmtNumber(Math.abs(metric.value - metric.previous), 0);
   }

@@ -69,11 +69,12 @@ export default function Heatmap({ heatmap, goal, minSample, tableLabel, countLab
               </Text>
               {row.cells.map((cell, i) => {
                 const id = `${row.school_class_id}:${cell.topic_id}`;
-                const topicName = topics[i]?.name ?? "";
+                const topicName = cell.label ?? topics[i]?.name ?? "";
                 const tip =
-                  cell.value === null
+                  (cell.value === null
                     ? `${row.name} · ${topicName}: amostra insuficiente (${cell.answers} de ${minSample} ${countLabel})`
-                    : `${row.name} · ${topicName}: ${fmtNumber(cell.value, 1)}% ${valueLabel} em ${cell.answers.toLocaleString("pt-BR")} ${countLabel}${cell.below_goal ? " · abaixo da meta" : ""}`;
+                    : `${row.name} · ${topicName}: ${fmtNumber(cell.value, 1)}% ${valueLabel} em ${cell.answers.toLocaleString("pt-BR")} ${countLabel}${cell.below_goal ? " · abaixo da meta" : ""}`) +
+                  (cell.extra ? ` · ${cell.extra}` : "");
                 const strong = cell.value !== null && cell.value >= 60;
 
                 return (

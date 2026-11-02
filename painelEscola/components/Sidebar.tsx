@@ -21,6 +21,7 @@ import {
   Landmark,
   GraduationCap,
   LayoutGrid,
+  Radar,
   TrendingUp,
   Library,
   Link2,
@@ -57,6 +58,7 @@ type SidebarItem = { id: string; label: string; icon: LucideIcon };
 /** Seção do BI (chave da API) → tela do painel. Seção sem tela aqui não aparece no menu. */
 const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   overview: { id: "bi-overview", icon: ChartLine },
+  diagnosis: { id: "bi-diagnosis", icon: Radar },
   students: { id: "bi-students", icon: TrendingUp },
   performance: { id: "bi-performance", icon: GraduationCap },
   classes: { id: "bi-classes", icon: LayoutGrid },
