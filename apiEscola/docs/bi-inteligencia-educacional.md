@@ -411,5 +411,30 @@ Fórmulas propostas para a Fase 2 (documentadas e configuráveis; pesos renormal
   - Fora desta entrega (conforme decisão): relatório PDF, registrar intervenção, "em acompanhamento", rascunho da IA e "criar plano".
 - **Passo 4 · Perfis — concluído:** `Diagnosis\ProfileMatrixService` + `GET /bi/profiles` (plano avançado). Aproveitamento = índice de Aprendizagem; dedicação = dias ativos/semana; classificado só com `profile_min_assessments` avaliações e `profile_min_questions` questões no período (critérios da escola). Quadrantes: A/B pela meta, 1/2 pela dedicação (A1 alto × alta, A2 alto × baixa, B1 baixo × alta, B2 baixo × baixa); lista ordenada pelo maior afastamento da meta. Painel: `BiProfilesScreen` + `components/bi/ScatterMatrix`; rota `#/inteligencia/perfis` (atalho no Diagnóstico 360°; "Configurar critérios" abre o modal da escola). Teste: `tests/Feature/BiProfileTest.php`.
   - Fora desta entrega: abas "Alunos"/"Cruzamentos", "Exportar" e "Criar intervenção em grupo" (Fase 3 / relatórios).
-- **Fase 2 concluída.** Próximo: Fase 3 — intervenções pedagógicas e Acompanhamento (tela 05), precedida de proposta curta das tabelas (`pedagogical_interventions`, `pedagogical_intervention_students`).
+- **Fase 2 concluída.** Fase 3 em §16.
+
+---
+
+## 16. Proposta da Fase 3 — Acompanhamento pedagógico (tela 05)
+
+**O que a tela pede:** sugestões a avaliar (geradas pelos indicadores de atenção), intervenções individuais e em grupo com motivo, tipo, responsável e data de reavaliação; abas Sugestões / Em andamento / Reavaliação / Concluídas; fluxo em 8 etapas (indicador → motivo → avaliação da coordenação → intervenção definida → responsável e prazo → acompanhar progresso → nova avaliação → comparar antes e depois); progresso parcial; efetividade por tipo (antes × depois no assunto-alvo, com aviso "resultado observado, não causal"). Também acende "Registrar intervenção" (Diagnóstico 360°) e "Criar intervenção em grupo" (Perfis).
+
+**Tabelas novas (migration reversível)**
+- `pedagogical_interventions`: tenant, tipo (`practice_list`, `reinforcement_class`, `diagnostic_assessment`, `individual_follow_up`, `guardian_contact`, `other`), título, alvo (disciplina/assunto opcionais), motivo (`below_goal`, `declining`, `low_attendance`, `no_evolution`, `manual`) + detalhe, situação (`planned`, `in_progress`, `reassessment`, `completed`, `cancelled`), responsável (usuário da escola), turma de referência, início, data de reavaliação, criado por, concluída em; soft delete.
+- `pedagogical_intervention_students`: intervenção × aluno, com "antes" e "depois" por aluno (em grupo, cada aluno tem o seu).
+- `pedagogical_intervention_events`: linha do tempo (criada, avaliada, definida, progresso, nota, reavaliada, concluída, cancelada), autor, data e dados estruturados.
+- Sugestões não são gravadas: saem de `StudentSignals` (alunos em atenção sem intervenção aberta). Descartar uma sugestão grava um evento de descarte (decisão pendente).
+
+**Fora desta fase:** PDF do histórico (fase de relatórios), IA (Fase 5), notificações por push.
+
+**Decisões (02/11/2026)**
+- Admin/coordenação criam e gerenciam qualquer intervenção; professor cria para alunos das próprias turmas e atualiza as que estão sob sua responsabilidade; responsável pode ser qualquer usuário da equipe (inclusive secretaria, que vê só as atribuídas a ela).
+- "Antes" e "depois" automáticos: acerto no assunto-alvo (senão disciplina; senão média nas avaliações) nos 60 dias antes do início × do início até a reavaliação, gravado ao concluir; sem amostra mínima, "—". Nota livre do responsável continua possível.
+- Sugestões podem ser descartadas com motivo: somem por 30 dias e voltam se o indicador continuar; o descarte fica registrado.
+
+**Andamento da Fase 3**
+- **Acompanhamento pedagógico — concluído (02/11/2026):** migration `2026_11_02_000005` (`pedagogical_interventions`, `pedagogical_intervention_students`, `pedagogical_intervention_events`, com rollback e índices de nome curto), modelos `PedagogicalIntervention*`, `Interventions\InterventionMeasure` (antes/depois no alvo com amostra mínima; usa `BiAccessScope::system`) e `Interventions\InterventionService`. Rotas em `/bi/interventions` (resumo, sugestões, descarte, efetividade, opções, lista por aba, detalhe, criar, editar/situação, concluir com reavaliação, notas/progresso), plano avançado. Secretaria entra só nessas rotas (`bi.intervention_only_roles`) e vê apenas as atribuídas. Fluxo de 8 etapas derivado da situação e da linha do tempo.
+  - Painel: `BiFollowUpScreen` (`#/inteligencia/acompanhamento`), `components/bi/InterventionFormModal`; "Registrar intervenção" no Diagnóstico 360° (alvo sugerido = assunto mais fraco) e "Criar intervenção em grupo" nos Perfis; menu da secretaria mostra só "Acompanhamento pedagógico". Teste: `tests/Feature/BiInterventionTest.php`.
+  - Fora desta entrega: "Histórico (PDF)" (fase de relatórios), notificações, edição de alunos de uma intervenção já criada.
+- Próximo (Fase 3): "Frequência e engajamento" e "Efetividade do ensino"; depois a fase de relatórios (tela 06).
 

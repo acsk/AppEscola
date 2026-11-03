@@ -34,6 +34,12 @@ class BiAccessScope
         return new self($tenantId, $user->id, $user->role, self::teacherClassIds($user->id, $tenantId));
     }
 
+    /** Escopo interno (tarefas do sistema, ex.: medir o antes/depois de uma intervenção): tenant inteiro. */
+    public static function system(int $tenantId): self
+    {
+        return new self($tenantId, 0, 'system', null);
+    }
+
     public function isTenantWide(): bool
     {
         return $this->classIds === null;

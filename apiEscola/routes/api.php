@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Bi\BiAssessmentController;
 use App\Http\Controllers\Api\Bi\BiClassController;
 use App\Http\Controllers\Api\Bi\BiCriteriaController;
+use App\Http\Controllers\Api\Bi\BiInterventionController;
 use App\Http\Controllers\Api\Bi\BiMetaController;
 use App\Http\Controllers\Api\Bi\BiOverviewController;
 use App\Http\Controllers\Api\Bi\BiPerformanceController;
@@ -155,6 +156,19 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
         Route::get('classes/{schoolClass}', [BiClassController::class, 'show'])->whereNumber('schoolClass');
         Route::get('performance', [BiPerformanceController::class, 'show']);
         Route::get('profiles', [BiProfileController::class, 'show']);
+        Route::prefix('interventions')->group(function () {
+            Route::get('summary', [BiInterventionController::class, 'summary']);
+            Route::get('suggestions', [BiInterventionController::class, 'suggestions']);
+            Route::post('suggestions/{student}/dismiss', [BiInterventionController::class, 'dismiss'])->whereNumber('student');
+            Route::get('effectiveness', [BiInterventionController::class, 'effectiveness']);
+            Route::get('options', [BiInterventionController::class, 'options']);
+            Route::get('/', [BiInterventionController::class, 'index']);
+            Route::post('/', [BiInterventionController::class, 'store']);
+            Route::get('{intervention}', [BiInterventionController::class, 'show'])->whereNumber('intervention');
+            Route::put('{intervention}', [BiInterventionController::class, 'update'])->whereNumber('intervention');
+            Route::post('{intervention}/complete', [BiInterventionController::class, 'complete'])->whereNumber('intervention');
+            Route::post('{intervention}/events', [BiInterventionController::class, 'event'])->whereNumber('intervention');
+        });
         Route::get('students', [BiStudentController::class, 'index']);
         Route::get('students/{student}/evolution', [BiStudentController::class, 'evolution'])->whereNumber('student');
         Route::get('students/{student}/diagnosis', [BiStudentController::class, 'diagnosis'])->whereNumber('student');

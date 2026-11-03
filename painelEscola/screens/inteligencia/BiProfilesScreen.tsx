@@ -6,6 +6,7 @@ import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
 import BiMetaBar from "../../components/bi/BiMetaBar";
 import BiCriteriaModal from "../../components/bi/BiCriteriaModal";
+import InterventionFormModal, { type InterventionPreset } from "../../components/bi/InterventionFormModal";
 import ScatterMatrix from "../../components/bi/ScatterMatrix";
 import BiFilterBar, { presetRange, type PeriodPreset } from "../../components/bi/BiFilterBar";
 import { fmtNumber } from "../../components/bi/format";
@@ -31,6 +32,7 @@ export default function BiProfilesScreen({ navigate }: Props) {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<BiQuadrant>("B1");
   const [criteriaOpen, setCriteriaOpen] = useState(false);
+  const [groupPreset, setGroupPreset] = useState<InterventionPreset | null>(null);
 
   useEffect(() => {
     fetchBiMeta().then(setMeta).catch(() => setMeta(null));
@@ -181,6 +183,23 @@ export default function BiProfilesScreen({ navigate }: Props) {
             <Panel
               title={quadrant ? `${quadrant.label} · ${quadrant.dedication}` : "Alunos"}
               description={`${rows.length} aluno(s) · ordenados pelo maior afastamento da meta.${rows.length > TABLE_LIMIT ? ` Mostrando ${TABLE_LIMIT}.` : ""}`}
+              actions={
+                rows.length ? (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    label="Criar intervenção em grupo"
+                    onPress={() =>
+                      setGroupPreset({
+                        students: rows.slice(0, 200).map((p) => ({ id: p.student_id, name: p.name })),
+                        reasonCode: selected.startsWith("B") ? "below_goal" : "manual",
+                        reasonDetail: quadrant ? `Perfil ${quadrant.key}: ${quadrant.label.toLowerCase()} · ${quadrant.dedication}` : undefined,
+                        type: selected.startsWith("B") ? "reinforcement_class" : "individual_follow_up",
+                      })
+                    }
+                  />
+                ) : null
+              }
               flush
             >
               {rows.length ? (
@@ -229,6 +248,12 @@ export default function BiProfilesScreen({ navigate }: Props) {
         onClose={() => setCriteriaOpen(false)}
         onOpenPriorities={() => navigate("bi-priorities")}
         onSaved={load}
+      />
+      <InterventionFormModal
+        visible={groupPreset !== null}
+        preset={groupPreset ?? undefined}
+        onClose={() => setGroupPreset(null)}
+        onCreated={() => navigate("bi-follow-up")}
       />
     </ScrollView>
   );

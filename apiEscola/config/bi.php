@@ -4,6 +4,13 @@ return [
     /** Papéis com acesso ao BI pedagógico. Professor vê apenas as próprias turmas. */
     'roles' => ['super_admin', 'admin', 'coordenador', 'professor'],
 
+    /** Papéis sem acesso ao BI que veem/conduzem só as intervenções atribuídas a eles (Acompanhamento). */
+    'intervention_only_roles' => ['secretaria'],
+
+    /** Acompanhamento: janela do "antes" (dias antes do início) e prazo de descarte de sugestão. */
+    'intervention_baseline_days' => 60,
+    'suggestion_dismiss_days' => 30,
+
     /** Papéis com visão do tenant inteiro (os demais ficam restritos às turmas que lecionam). */
     'tenant_wide_roles' => ['super_admin', 'admin', 'coordenador'],
 

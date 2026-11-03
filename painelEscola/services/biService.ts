@@ -536,3 +536,130 @@ export async function fetchBiProfiles(filters: BiFilters): Promise<BiProfiles> {
   const { data } = await api.get("/bi/profiles", { params: cleanBiFilters(filters) });
   return getApiResponseBody(data) as BiProfiles;
 }
+
+export type BiInterventionStatus = "planned" | "in_progress" | "reassessment" | "completed" | "cancelled";
+
+export type BiInterventionCard = {
+  id: number;
+  code: string;
+  kind: "individual" | "group";
+  type: string;
+  type_label: string;
+  title: string;
+  reason: { code: string; label: string; detail: string | null };
+  status: BiInterventionStatus;
+  who: string;
+  student_id: number | null;
+  school_class: string | null;
+  target: string | null;
+  responsible: { id: number; name: string } | null;
+  starts_on: string;
+  reassess_on: string | null;
+  overdue: boolean;
+};
+
+type BiMeasured = { pct: number | null; n: number };
+
+export type BiInterventionDetail = BiInterventionCard & {
+  target: { label: string; scope: "topic" | "subject" | "assessments" };
+  students: { student_id: number; name: string; baseline: BiMeasured; current: BiMeasured | null; result: BiMeasured | null }[];
+  steps: { key: string; label: string; state: "done" | "current" | "pending"; detail: string | null }[];
+  events: { id: number; type: string; description: string | null; data: Record<string, any> | null; user: string | null; occurred_at: string }[];
+  can_manage: boolean;
+};
+
+export type BiInterventionSummary = {
+  suggestions: number;
+  active: number;
+  active_individual: number;
+  active_group: number;
+  reassessment: number;
+  completed: number;
+};
+
+export type BiInterventionOptions = {
+  types: { value: string; label: string }[];
+  reasons: { value: string; label: string }[];
+  responsibles: { id: number; name: string; role: string }[];
+  can_create: boolean;
+};
+
+export type BiSuggestion = { student_id: number; name: string; classes: string[]; reasons: BiSupportReason[] };
+
+export type BiEffectiveness = {
+  goal_pct: number;
+  completed: number;
+  items: { type: string; label: string; interventions: number; students: number; before: number | null; after: number | null; delta_pp: number | null }[];
+};
+
+export type BiInterventionInput = {
+  student_ids?: number[];
+  type?: string;
+  title?: string | null;
+  reason_code?: string;
+  reason_detail?: string | null;
+  subject_id?: number | null;
+  subject_topic_id?: number | null;
+  school_class_id?: number | null;
+  responsible_user_id?: number | null;
+  starts_on?: string;
+  reassess_on?: string | null;
+  status?: BiInterventionStatus;
+  note?: string | null;
+};
+
+const iv = "/bi/interventions";
+
+export async function fetchInterventionSummary(filters: BiFilters): Promise<BiInterventionSummary> {
+  const { data } = await api.get(`${iv}/summary`, { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiInterventionSummary;
+}
+
+export async function fetchInterventionSuggestions(filters: BiFilters): Promise<{ total: number; items: BiSuggestion[] }> {
+  const { data } = await api.get(`${iv}/suggestions`, { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as { total: number; items: BiSuggestion[] };
+}
+
+export async function fetchInterventions(tab: "active" | "reassessment" | "completed"): Promise<BiInterventionCard[]> {
+  const { data } = await api.get(iv, { params: { tab } });
+  return ((getApiResponseBody(data) as { items: BiInterventionCard[] })?.items ?? []);
+}
+
+export async function fetchIntervention(id: number): Promise<BiInterventionDetail> {
+  const { data } = await api.get(`${iv}/${id}`);
+  return getApiResponseBody(data) as BiInterventionDetail;
+}
+
+export async function fetchInterventionOptions(): Promise<BiInterventionOptions> {
+  const { data } = await api.get(`${iv}/options`);
+  return getApiResponseBody(data) as BiInterventionOptions;
+}
+
+export async function fetchInterventionEffectiveness(filters: BiFilters): Promise<BiEffectiveness> {
+  const { data } = await api.get(`${iv}/effectiveness`, { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiEffectiveness;
+}
+
+export async function createIntervention(input: BiInterventionInput): Promise<BiInterventionDetail> {
+  const { data } = await api.post(iv, input);
+  return getApiResponseBody(data) as BiInterventionDetail;
+}
+
+export async function updateIntervention(id: number, input: BiInterventionInput): Promise<BiInterventionDetail> {
+  const { data } = await api.put(`${iv}/${id}`, input);
+  return getApiResponseBody(data) as BiInterventionDetail;
+}
+
+export async function completeIntervention(id: number, note?: string): Promise<BiInterventionDetail> {
+  const { data } = await api.post(`${iv}/${id}/complete`, { note: note || null });
+  return getApiResponseBody(data) as BiInterventionDetail;
+}
+
+export async function addInterventionEvent(id: number, type: "note" | "progress", description: string): Promise<BiInterventionDetail> {
+  const { data } = await api.post(`${iv}/${id}/events`, { type, description });
+  return getApiResponseBody(data) as BiInterventionDetail;
+}
+
+export async function dismissSuggestion(studentId: number, reason: string): Promise<void> {
+  await api.post(`${iv}/suggestions/${studentId}/dismiss`, { reason });
+}

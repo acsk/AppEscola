@@ -11,6 +11,7 @@ import RadarChart from "../../components/bi/RadarChart";
 import MultiLineChart from "../../components/bi/MultiLineChart";
 import Heatmap from "../../components/bi/Heatmap";
 import SegmentedControl from "../../components/bi/SegmentedControl";
+import InterventionFormModal, { type InterventionPreset } from "../../components/bi/InterventionFormModal";
 import { presetRange, type PeriodPreset } from "../../components/bi/BiFilterBar";
 import { fmtDate, fmtMetricDelta, fmtNumber } from "../../components/bi/format";
 import { color } from "../../constants/theme";
@@ -126,6 +127,7 @@ function DiagnosisDetail({ navigate, studentId, initialFilters }: { navigate: Pr
   const [data, setData] = useState<BiDiagnosis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [intervention, setIntervention] = useState<InterventionPreset | null>(null);
 
   useEffect(() => {
     fetchBiMetrics()
@@ -192,6 +194,26 @@ function DiagnosisDetail({ navigate, studentId, initialFilters }: { navigate: Pr
         actions={
           <View className="flex-row" style={{ gap: 8 }}>
             <Button label="Evolução do aluno" onPress={() => navigate("bi-student", { studentId, filters })} />
+            {data && student ? (
+              <Button
+                variant="primary"
+                label="Registrar intervenção"
+                onPress={() => {
+                  // Alvo sugerido: o assunto com menor acerto abaixo da meta no domínio.
+                  const weakest = data.domain
+                    .flatMap((s) => s.topics.filter((t) => t.below_goal && t.value !== null).map((t) => ({ subjectId: s.subject_id, ...t })))
+                    .sort((a, b) => (a.value as number) - (b.value as number))[0];
+                  setIntervention({
+                    students: [{ id: student.id, name: student.name }],
+                    reasonCode: student.reasons[0]?.code ?? (weakest ? "below_goal" : "manual"),
+                    reasonDetail: weakest ? `${weakest.name} ${fmtNumber(weakest.value as number, 0)}% · meta ${fmtNumber(data.meta.goal_pct, 0)}%` : student.reasons.map((r) => r.detail).join(" · "),
+                    subjectId: weakest?.subjectId ?? null,
+                    topicId: weakest?.topic_id ?? null,
+                    schoolClassId: student.school_class.id,
+                  });
+                }}
+              />
+            ) : null}
             <Button icon={RefreshCw} label="Atualizar" onPress={load} loading={loading} />
           </View>
         }
@@ -333,6 +355,12 @@ function DiagnosisDetail({ navigate, studentId, initialFilters }: { navigate: Pr
           </View>
         </View>
       ) : null}
+      <InterventionFormModal
+        visible={intervention !== null}
+        preset={intervention ?? undefined}
+        onClose={() => setIntervention(null)}
+        onCreated={() => navigate("bi-follow-up")}
+      />
     </ScrollView>
   );
 }

@@ -25,7 +25,7 @@ class BiMetaService
         ['key' => 'engagement', 'label' => 'Frequência e engajamento', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
         ['key' => 'assessments', 'label' => 'Análise de simulados', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'exam_prep', 'label' => 'Preparação para concursos', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
-        ['key' => 'follow_up', 'label' => 'Acompanhamento pedagógico', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
+        ['key' => 'follow_up', 'label' => 'Acompanhamento pedagógico', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => true],
         ['key' => 'effectiveness', 'label' => 'Efetividade do ensino', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
         ['key' => 'reports', 'label' => 'Relatórios e indicadores', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => false],
         ['key' => 'ai_insights', 'label' => 'Insights com IA', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
