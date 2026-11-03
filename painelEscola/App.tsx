@@ -58,10 +58,12 @@ import {
   BiEffectivenessScreen,
   BiEngagementScreen,
   BiFollowUpScreen,
+  BiOutcomesScreen,
   BiOverviewScreen,
   BiPerformanceScreen,
   BiPrioritiesScreen,
   BiProfilesScreen,
+  BiReportsScreen,
   BiStudentEvolutionScreen,
   BiStudentsScreen,
   BiSubjectsScreen,
@@ -292,6 +294,8 @@ function hashToNav(hash: string): NavState {
     if (seg1 === "acompanhamento") return { screen: "bi-follow-up" };
     if (seg1 === "engajamento") return { screen: "bi-engagement" };
     if (seg1 === "efetividade") return { screen: "bi-effectiveness" };
+    if (seg1 === "relatorios") return { screen: "bi-reports" };
+    if (seg1 === "aprovacoes") return { screen: "bi-outcomes" };
     if (seg1 === "desempenho") return { screen: "bi-performance" };
     if (seg1 === "prioritarios") return { screen: "bi-priorities" };
     if (seg1 === "turmas") {
@@ -415,6 +419,8 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "bi-follow-up") return "#/inteligencia/acompanhamento";
   if (nav.screen === "bi-engagement") return "#/inteligencia/engajamento";
   if (nav.screen === "bi-effectiveness") return "#/inteligencia/efetividade";
+  if (nav.screen === "bi-reports") return "#/inteligencia/relatorios";
+  if (nav.screen === "bi-outcomes") return "#/inteligencia/aprovacoes";
   if (nav.screen === "bi-diagnosis") {
     const id = nav.params?.studentId;
     return id ? `#/inteligencia/diagnostico/${id}` : "#/inteligencia/diagnostico";
@@ -820,6 +826,8 @@ function AppContent() {
     ? "bi-overview"
     : nav.screen === "bi-profiles"
     ? "bi-diagnosis"
+    : nav.screen === "bi-outcomes"
+    ? "bi-reports"
     : nav.screen.startsWith("bi-")
     ? nav.screen
     : nav.screen === "relatorios-financeiro"
@@ -1148,6 +1156,8 @@ function AppContent() {
       case "bi-follow-up": return <BiFollowUpScreen navigate={navigate} />;
       case "bi-engagement": return <BiEngagementScreen navigate={navigate} />;
       case "bi-effectiveness": return <BiEffectivenessScreen navigate={navigate} />;
+      case "bi-reports": return <BiReportsScreen navigate={navigate} />;
+      case "bi-outcomes": return <BiOutcomesScreen navigate={navigate} />;
       case "bi-classes": return <BiClassesScreen navigate={navigate} />;
       case "bi-class":
         return (

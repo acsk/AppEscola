@@ -20,6 +20,7 @@ import {
   FileText,
   House,
   Landmark,
+  FileBarChart,
   GraduationCap,
   LayoutGrid,
   Radar,
@@ -69,6 +70,7 @@ const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   follow_up: { id: "bi-follow-up", icon: ClipboardList },
   engagement: { id: "bi-engagement", icon: CalendarCheck },
   effectiveness: { id: "bi-effectiveness", icon: Target },
+  reports: { id: "bi-reports", icon: FileBarChart },
 };
 
 /** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */

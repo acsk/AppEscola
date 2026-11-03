@@ -440,3 +440,33 @@ Fórmulas propostas para a Fase 2 (documentadas e configuráveis; pesos renormal
 - **Efetividade do ensino — concluído (03/11/2026).** Decisão: recorte turma × disciplina, professor só como contexto (sem ranking de professores). `TeachingEffectivenessService` + `GET /bi/effectiveness` (plano avançado): por turma × disciplina, acerto (`subject.accuracy`) e notas presenciais (`grades.avg`) atual × anterior, % de alunos que evoluíram (amostra mínima nos dois períodos; limiar da escola), assunto que mais melhorou e que mais piorou; resumo de quantos pares melhoraram/pioraram. Professor vê só as próprias turmas. Painel: `BiEffectivenessScreen` (`#/inteligencia/efetividade`) com aviso de leitura responsável. Teste: `tests/Feature/BiEffectivenessTest.php`.
 - **Fase 3 concluída.** Próximo: fase de relatórios e indicadores (tela 06), precedida de proposta curta (exportação PDF/Excel, `bi_export_logs` para LGPD).
 
+---
+
+## 17. Proposta da Fase 4 — Relatórios e indicadores (tela 06)
+
+**O que a tela pede:** cinco relatórios (Individual · PDF; Turma, Disciplina e Institucional · PDF/XLSX; Resultados 2027 · PDF para campanha), cada um com período, filtros, fontes e página de metodologia obrigatória; escolha de indicadores e apresentação (identidade visual, gráficos, resumo executivo revisado por pessoa); "Salvar modelo"; prévia; exportações recentes (auditoria).
+
+**Regras de LGPD (aplicadas na API, não no painel)**
+- Relatórios institucional e de resultados: só agregados; grupos com menos de 10 alunos ocultos; percentuais sempre calculados pelo banco.
+- Individual e turma identificam alunos: só para quem tem o aluno/turma no escopo.
+- Toda exportação gravada em `bi_export_logs` (tenant, usuário, tipo, formato, filtros, total de linhas, data); a lista "Exportações recentes" lê dessa tabela.
+
+**Dados novos (decisões pendentes)**
+- `bi_export_logs` (auditoria) — necessária.
+- `bi_report_templates` (modelos salvos: tipo + filtros + indicadores + opções) — opcional.
+- `student_exam_outcomes` (aprovações comprovadas, com evidência e consentimento) — previsto para esta fase no §3.2; pode ficar para depois.
+
+**Geração dos arquivos (decisão pendente):** a API monta os dados do relatório já com as regras acima e registra a exportação; o arquivo é desenhado no painel com o padrão atual (`jsPDF` + cabeçalho da escola) ou gerado no servidor.
+
+**Decisões (03/11/2026)**
+- PDF desenhado no painel (jsPDF + cabeçalho da escola); XLSX no painel com SheetJS (`xlsx`). A API entrega os dados já com as regras de LGPD.
+- Auditoria no próprio pedido de dados: `GET /bi/reports/{tipo}?export=pdf|xlsx` grava `bi_export_logs` antes de devolver os dados; a prévia (sem `export`) não grava.
+- Entram nesta fase: modelos salvos (`bi_report_templates`), aprovações comprovadas (`student_exam_outcomes`, com evidência e consentimento) e resumo executivo (texto escrito por pessoa, sem IA).
+- Institucional e Resultados: só coordenação/admin; grupos com menos de 10 alunos ocultos.
+
+**Andamento da Fase 4**
+- **Relatórios e indicadores — concluído (03/11/2026):** migration `2026_11_03_000001` (`bi_export_logs`, `bi_report_templates`, `student_exam_outcomes`, com rollback). `Reports\BiReportService` monta os dados reaproveitando os serviços das telas: Individual (evolução + Diagnóstico 360° no plano avançado + intervenções), Turma (visão geral recortada + alunos), Disciplina (`SubjectAnalyticsService`), Institucional (agregados; sem listas de alunos; turmas com menos de `bi.report_min_group` = 10 alunos ocultas) e Resultados (evolução média, % com evolução positiva, avaliações, questões, participação, evolução por disciplina 1ª × 2ª metade, intervenções, aprovações agregadas, metodologia). Recorte agregado com menos de 10 alunos → 422 `report_sample_too_small`.
+  - Rotas: `GET /bi/reports/{individual|class|subject|institutional|results}` (com `export=pdf|xlsx` grava a auditoria; formatos por relatório validados), `GET /bi/exports`, `GET/POST/DELETE /bi/report-templates` (pessoais; só a coordenação compartilha), `GET/POST/PUT/DELETE /bi/exam-outcomes` (só coordenação; consentimento com data). Institucional e Resultados só para a coordenação.
+  - Painel: `BiReportsScreen` (`#/inteligencia/relatorios`: cartões, indicadores, apresentação, resumo executivo, LGPD, prévia com números reais, modelos, exportações recentes, catálogo de métricas) e `BiOutcomesScreen` (`#/inteligencia/aprovacoes`). `utils/biReports.ts` monta um documento único por relatório e gera PDF (jsPDF + cabeçalho da escola + gráfico de linhas + página de metodologia obrigatória) e XLSX (SheetJS 0.20.3 do CDN oficial: uma aba por tabela, resumo e metodologia). Teste: `tests/Feature/BiReportTest.php`.
+  - Não verificado: a geração dos arquivos (PDF/XLSX) no navegador com dados reais.
+

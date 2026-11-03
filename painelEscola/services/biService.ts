@@ -719,3 +719,107 @@ export async function fetchBiTeachingEffectiveness(filters: BiFilters): Promise<
   const { data } = await api.get("/bi/effectiveness", { params: cleanBiFilters(filters) });
   return getApiResponseBody(data) as BiEffectivenessTeaching;
 }
+
+export type BiReportType = "individual" | "class" | "subject" | "institutional" | "results";
+
+type BiReportEnvelope = { report: BiReportType; period: { from: string; to: string }; filters: Record<string, any>; goal_pct: number; generated_at: string; export_id?: number };
+
+export type BiResultsReport = BiReportEnvelope & {
+  sample: { active_students: number; students_with_evolution: number; min_group: number };
+  headline: {
+    evolution_pp: number | null;
+    improving_pct: number | null;
+    assessments_taken: number;
+    online_exams: number;
+    questions_answered: number;
+    participation_pct: number | null;
+  };
+  halves: { start: { from: string; to: string }; end: { from: string; to: string } };
+  monthly: BiMonthlyPoint[];
+  subjects: { subject_id: number; name: string; suppressed: boolean; start: number | null; end: number | null; delta_pp: number | null }[];
+  interventions: BiEffectiveness | null;
+  approvals: { total: number; with_consent: number; by_exam: { label: string; approved: number; classified: number }[] };
+  methodology: string[];
+};
+
+export type BiInstitutionalReport = BiReportEnvelope & {
+  overview: Omit<BiOverview, "needs_support"> & { needs_support: { total: number } };
+  assessments: { metrics: BiMetric[]; monthly: BiMonthlyPoint[]; total: number };
+  classes: { items: ((BiClassComparison["items"][number] & { suppressed: false }) | { name: string; course: string | null; suppressed: true })[] };
+  engagement: Omit<BiEngagement, "lowest"> | null;
+  interventions: { summary: BiInterventionSummary; effectiveness: BiEffectiveness } | null;
+};
+
+export type BiIndividualReport = BiReportEnvelope & {
+  evolution: BiStudentEvolution;
+  diagnosis: BiDiagnosis | null;
+  interventions: Pick<BiInterventionDetail, "code" | "title" | "type_label" | "status" | "reason" | "target" | "starts_on" | "reassess_on" | "students" | "responsible">[];
+};
+
+export type BiClassReport = BiReportEnvelope & { overview: BiOverview; detail: BiClassDetail };
+
+export type BiSubjectReport = BiReportEnvelope & { analytics: BiSubjectAnalytics };
+
+export type BiAnyReport = BiResultsReport | BiInstitutionalReport | BiIndividualReport | BiClassReport | BiSubjectReport;
+
+export type BiReportTarget = { student_id?: number; report_class_id?: number; report_subject_id?: number };
+
+/** Dados do relatório; com `exportFormat`, a API registra a exportação (auditoria) antes de responder. */
+export async function fetchBiReport(type: BiReportType, filters: BiFilters, target: BiReportTarget, exportFormat?: "pdf" | "xlsx"): Promise<BiAnyReport> {
+  const { data } = await api.get(`/bi/reports/${type}`, {
+    params: { ...cleanBiFilters(filters), ...target, ...(exportFormat ? { export: exportFormat } : {}) },
+  });
+  return getApiResponseBody(data) as BiAnyReport;
+}
+
+export type BiExportLog = { id: number; report: BiReportType; format: "pdf" | "xlsx"; subject_label: string | null; exported_at_iso: string; user: string | null };
+
+export async function fetchBiExports(): Promise<BiExportLog[]> {
+  const { data } = await api.get("/bi/exports");
+  return ((getApiResponseBody(data) as { items: BiExportLog[] })?.items ?? []);
+}
+
+export type BiReportTemplate = { id: number; name: string; report: BiReportType; config: Record<string, any>; shared: boolean; owner: string | null; mine: boolean };
+
+export async function fetchBiReportTemplates(): Promise<BiReportTemplate[]> {
+  const { data } = await api.get("/bi/report-templates");
+  return ((getApiResponseBody(data) as { items: BiReportTemplate[] })?.items ?? []);
+}
+
+export async function saveBiReportTemplate(input: { name: string; report: BiReportType; config: Record<string, any>; shared: boolean }): Promise<void> {
+  await api.post("/bi/report-templates", input);
+}
+
+export async function deleteBiReportTemplate(id: number): Promise<void> {
+  await api.delete(`/bi/report-templates/${id}`);
+}
+
+export type BiExamOutcome = {
+  id: number;
+  student_id: number;
+  student: string;
+  exam_type_id: number | null;
+  exam_type: string | null;
+  exam_name: string;
+  year: number;
+  result: "approved" | "classified" | "not_approved";
+  position: number | null;
+  evidence_url: string | null;
+  evidence_note: string | null;
+  consent_publish: boolean | 0 | 1;
+  consent_at: string | null;
+};
+
+export async function fetchBiExamOutcomes(year?: number): Promise<BiExamOutcome[]> {
+  const { data } = await api.get("/bi/exam-outcomes", { params: year ? { year } : {} });
+  return ((getApiResponseBody(data) as { items: BiExamOutcome[] })?.items ?? []);
+}
+
+export async function saveBiExamOutcome(input: Partial<BiExamOutcome>, id?: number): Promise<void> {
+  if (id) await api.put(`/bi/exam-outcomes/${id}`, input);
+  else await api.post("/bi/exam-outcomes", input);
+}
+
+export async function deleteBiExamOutcome(id: number): Promise<void> {
+  await api.delete(`/bi/exam-outcomes/${id}`);
+}

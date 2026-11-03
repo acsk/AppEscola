@@ -11,6 +11,9 @@ return [
     'intervention_baseline_days' => 60,
     'suggestion_dismiss_days' => 30,
 
+    /** Relatórios agregados: grupos com menos alunos que isto são ocultados (LGPD). */
+    'report_min_group' => 10,
+
     /** Papéis com visão do tenant inteiro (os demais ficam restritos às turmas que lecionam). */
     'tenant_wide_roles' => ['super_admin', 'admin', 'coordenador'],
 

@@ -32,6 +32,8 @@ export const PDF_COLOR = {
   success: token("success"),
   warning: token("warning"),
   danger: token("danger"),
+  /** Séries de gráfico (data-1..3, tema claro). */
+  series: [token("data-1"), token("data-2"), token("data-3")] as Rgb[],
 } as const;
 
 /** Escala tipográfica (pt) equivalente aos estilos do sistema. */
