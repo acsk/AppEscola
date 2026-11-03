@@ -142,6 +142,7 @@ export default function Sidebar({
     {
       label: "Financeiro",
       items: [
+        { id: "financeiro-visao-geral", label: "Visão geral", icon: ChartLine },
         { id: "cobrancas", label: "Gestão de pagamentos", icon: CreditCard },
         { id: "bancos_crud", label: "Bancos", icon: Landmark },
         { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },

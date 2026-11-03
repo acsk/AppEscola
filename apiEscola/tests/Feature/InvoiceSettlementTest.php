@@ -8,11 +8,13 @@ use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDomainLookups;
 use Tests\TestCase;
 
 class InvoiceSettlementTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDomainLookups;
 
     public function test_mark_as_paid_requires_payment_method(): void
     {

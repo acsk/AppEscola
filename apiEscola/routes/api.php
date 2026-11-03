@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\DomainController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\GuardianController;
+use App\Http\Controllers\Api\FinanceDashboardController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\SchoolClassController;
 use App\Http\Controllers\Api\StudentController;
@@ -326,6 +327,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
     Route::apiResource('payment-providers', PaymentProvidersController::class);
 
     // Cobranças
+    // Financeiro · Visão geral
+    Route::get('finance/dashboard', [FinanceDashboardController::class, 'show']);
+
     Route::get('invoices/summary', [InvoiceController::class, 'summary']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);

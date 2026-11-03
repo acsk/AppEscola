@@ -49,6 +49,7 @@ import { NotificationsScreen } from "./screens/notificacoes";
 import { CalendarScreen } from "./screens/calendario";
 import FirstAccessPasswordScreen from "./screens/FirstAccessPasswordScreen";
 import { ClassStudentsReportScreen, FinanceReportScreen } from "./screens/relatorios";
+import FinanceOverviewScreen from "./screens/financeiro/FinanceOverviewScreen";
 import {
   BiAssessmentDetailScreen,
   BiAssessmentsScreen,
@@ -319,6 +320,10 @@ function hashToNav(hash: string): NavState {
     return { screen: "bi-overview" };
   }
 
+  if (seg0 === "financeiro") {
+    return { screen: "financeiro-visao-geral" };
+  }
+
   if (seg0 === "relatorios") {
     if (seg1 === "financeiro") return { screen: "relatorios-financeiro" };
     if (seg1 === "turmas") return { screen: "relatorios-turmas" };
@@ -437,6 +442,7 @@ function navToHash(nav: NavState): string {
     const id = nav.params?.subjectId;
     return id ? `#/inteligencia/disciplinas/${id}` : "#/inteligencia/disciplinas";
   }
+  if (nav.screen === "financeiro-visao-geral") return "#/financeiro/visao-geral";
   if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
   if (nav.screen === "relatorios-financeiro") return "#/relatorios/financeiro";
   return `#/${nav.screen}`;
@@ -1057,6 +1063,7 @@ function AppContent() {
       case "matriculas": return <EnrollmentsScreen navigate={navigate} />;
       case "matriculas-form": return <EnrollmentFormScreen navigate={navigate} />;
       case "matriculas-detail": return <EnrollmentDetailScreen navigate={navigate} enrollmentId={nav.params?.enrollmentId} />;
+      case "financeiro-visao-geral": return <FinanceOverviewScreen navigate={navigate} />;
       case "cobrancas": return <InvoicesScreen />;
       case "bancos_crud": return <PaymentProvidersCrudScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;

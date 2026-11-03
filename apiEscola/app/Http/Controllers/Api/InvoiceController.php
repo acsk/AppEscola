@@ -11,7 +11,11 @@ use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceSettlementService;
+use App\Services\PaymentGatewayFactory;
+use App\Support\FinancePermissions;
 use App\Traits\ScopedByTenant;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -19,9 +23,32 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use RuntimeException;
 
-class InvoiceController extends Controller
+class InvoiceController extends Controller implements HasMiddleware
 {
     use ScopedByTenant;
+
+    /**
+     * Roda antes dos Form Requests: papel sem permissão recebe 403, não 422.
+     */
+    public static function middleware(): array
+    {
+        return [
+            new Middleware(self::requireAbility(FinancePermissions::VIEW), only: ['index', 'summary', 'show']),
+            new Middleware(self::requireAbility(FinancePermissions::MANAGE_INVOICES), only: ['store', 'update', 'destroy', 'cancel', 'generateCoraCharge']),
+            new Middleware(self::requireAbility(FinancePermissions::SETTLE), only: ['markAsPaid']),
+        ];
+    }
+
+    private static function requireAbility(string $ability): \Closure
+    {
+        return function (Request $request, \Closure $next) use ($ability) {
+            if (! FinancePermissions::allows($request->user(), $ability)) {
+                abort(403, 'Sem permissão para acessar o financeiro.');
+            }
+
+            return $next($request);
+        };
+    }
 
     public function __construct(
         private readonly InvoiceLifecycleService $lifecycle,
