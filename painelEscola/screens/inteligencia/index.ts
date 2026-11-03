@@ -15,3 +15,4 @@ export { default as BiEngagementScreen } from "./BiEngagementScreen";
 export { default as BiEffectivenessScreen } from "./BiEffectivenessScreen";
 export { default as BiReportsScreen } from "./BiReportsScreen";
 export { default as BiOutcomesScreen } from "./BiOutcomesScreen";
+export { default as BiInsightsScreen } from "./BiInsightsScreen";

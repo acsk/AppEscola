@@ -10,6 +10,7 @@ import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import SearchableSelect from "../../components/ui/SearchableSelect";
 import { presetRange, type PeriodPreset } from "../../components/bi/BiFilterBar";
+import AiDraftPanel from "../../components/bi/AiDraftPanel";
 import { fmtDate } from "../../components/bi/format";
 import { color } from "../../constants/theme";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
@@ -296,6 +297,14 @@ export default function BiReportsScreen({ navigate }: Props) {
                   onChangeText={setSummary}
                   multiline
                   placeholder="Opcional. Entra no início do PDF, antes dos indicadores."
+                />
+              ) : null}
+              {aggregated ? (
+                <AiDraftPanel
+                  title="Resumo executivo com IA"
+                  target={{ kind: "report_summary", report: type as "institutional" | "results" }}
+                  filters={filters}
+                  onValidated={(text) => setSummary(text)}
                 />
               ) : null}
 

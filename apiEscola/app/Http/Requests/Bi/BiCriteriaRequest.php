@@ -19,6 +19,7 @@ class BiCriteriaRequest extends FormRequest
         foreach (BiCriteria::FIELDS as $key => [$min, $max, $integer]) {
             $rules[$key] = ['sometimes', $integer ? 'integer' : 'numeric', "between:{$min},{$max}"];
         }
+        $rules['ai_enabled'] = ['sometimes', 'boolean'];
 
         return $rules;
     }

@@ -470,3 +470,27 @@ Fórmulas propostas para a Fase 2 (documentadas e configuráveis; pesos renormal
   - Painel: `BiReportsScreen` (`#/inteligencia/relatorios`: cartões, indicadores, apresentação, resumo executivo, LGPD, prévia com números reais, modelos, exportações recentes, catálogo de métricas) e `BiOutcomesScreen` (`#/inteligencia/aprovacoes`). `utils/biReports.ts` monta um documento único por relatório e gera PDF (jsPDF + cabeçalho da escola + gráfico de linhas + página de metodologia obrigatória) e XLSX (SheetJS 0.20.3 do CDN oficial: uma aba por tabela, resumo e metodologia). Teste: `tests/Feature/BiReportTest.php`.
   - Não verificado: a geração dos arquivos (PDF/XLSX) no navegador com dados reais.
 
+---
+
+## 18. Proposta da Fase 5 — Insights com IA
+
+**Onde a IA aparece nos mockups:** "Rascunho da IA" no Diagnóstico 360° (texto com destaques e etiquetas de evidência como `aprendizagem.idx=62`, botões Editar / Validar diagnóstico), resumo executivo dos relatórios e o item de menu "Insights com IA".
+
+**Princípios**
+- A IA só redige a partir dos números já calculados pelo BI (enviados como dados estruturados); não calcula nem inventa indicadores. Cada afirmação cita a métrica de origem (etiquetas de evidência), e o texto é validado contra os dados enviados.
+- Rascunho nunca vai para documento sem validação de uma pessoa (quem validou e quando ficam registrados).
+- Usa a chave de IA da escola (Configurações → IA) e o liga/desliga `bi.ai_enabled` por escola (hoje desligado por padrão).
+
+**Dados novos:** `bi_ai_drafts` (tenant, tipo: diagnóstico do aluno / resumo de relatório / insight da escola, alvo, período, texto gerado, texto editado, evidências, modelo, situação rascunho/validado/descartado, quem gerou, quem validou e quando).
+
+**Decisões (03/11/2026)**
+- Privacidade: ao provedor de IA vão só os números já calculados, sem nome, CPF ou qualquer identificador de aluno (nomes de turma, disciplina e assunto não são dados pessoais). O texto volta falando "o aluno"; o painel mostra o nome.
+- Escopo: rascunho do Diagnóstico 360°, rascunho do resumo executivo (Institucional e Resultados) e tela "Insights com IA" (observações da escola, cada uma com evidência e link para a tela correspondente).
+- Ativação: a coordenação liga "Usar IA para rascunhos" no modal de Critérios, só disponível com chave de IA da escola; cada geração fica registrada (quem, quando, modelo).
+
+**Andamento da Fase 5**
+- **Insights com IA — concluído (03/11/2026):** migration `2026_11_03_000002` (`bi_ai_drafts`, com rollback) e `Ai\BiAiService`: monta os fatos sem identificação de aluno (Diagnóstico 360°, Resultados/Institucional, visão da escola com turmas de 10+ alunos), envia ao provedor da escola (`AiChatClient::json`, regras no prompt de sistema), mantém só evidências que existem nos fatos, sinaliza números do texto que não batem com os fatos e grava o rascunho com autor e modelo. Rotas: `GET /bi/ai/status`, `GET /bi/ai/drafts/latest`, `POST /bi/ai/drafts` (limite de 20 por minuto), `PUT /bi/ai/drafts/{id}` (editar texto → volta a rascunho; validar; descartar). Plano avançado + `bi.ai_enabled` (a coordenação liga nos Critérios, só com chave) + escopo (diagnóstico: aluno no escopo; resumo e insights: coordenação).
+  - Painel: `components/bi/AiDraftPanel` (evidências como etiquetas `chave=valor`, aviso de números não conferidos, editar/validar/descartar) no Diagnóstico 360°, no resumo executivo dos relatórios (texto validado preenche o resumo) e na tela `BiInsightsScreen` (`#/inteligencia/insights`, links por área). Opção "Usar IA para rascunhos" no modal de Critérios. Teste: `tests/Feature/BiAiTest.php` (inclui verificação de que o nome do aluno não vai para o provedor).
+  - Não verificado: qualidade dos textos com um provedor real (os testes simulam a resposta).
+- **Todas as fases do plano entregues.** Pendências gerais: deploy (8 migrations do BI + `bi:refresh-facts --full`), revisão visual e dos arquivos gerados com dados reais, medição de desempenho em produção.
+

@@ -426,6 +426,7 @@ export type BiCriteria = {
 
 export type BiCriteriaPayload = {
   criteria: BiCriteria;
+  ai: BiAiStatus;
   limits: Record<keyof BiCriteria, { min: number; max: number; integer: boolean }>;
 };
 
@@ -434,7 +435,7 @@ export async function fetchBiCriteria(): Promise<BiCriteriaPayload> {
   return getApiResponseBody(data) as BiCriteriaPayload;
 }
 
-export async function saveBiCriteria(values: Partial<BiCriteria>): Promise<BiCriteriaPayload> {
+export async function saveBiCriteria(values: Partial<BiCriteria> & { ai_enabled?: boolean }): Promise<BiCriteriaPayload> {
   const { data } = await api.put("/bi/criteria", values);
   return getApiResponseBody(data) as BiCriteriaPayload;
 }
@@ -823,3 +824,52 @@ export async function saveBiExamOutcome(input: Partial<BiExamOutcome>, id?: numb
 export async function deleteBiExamOutcome(id: number): Promise<void> {
   await api.delete(`/bi/exam-outcomes/${id}`);
 }
+
+export type BiAiStatus = { enabled: boolean; available: boolean; reason: "plan" | "no_key" | "disabled" | null };
+
+export type BiAiKind = "diagnosis" | "report_summary" | "school_insights";
+
+export type BiAiDraft = {
+  id: number;
+  kind: BiAiKind;
+  target_key: string;
+  period: { from: string; to: string };
+  content: {
+    paragraphs?: { text: string; evidence: string[] }[];
+    insights?: { title: string; text: string; area: "geral" | "avaliacoes" | "disciplinas" | "turmas" | "engajamento" | "intervencoes"; evidence: string[] }[];
+  };
+  facts: Record<string, unknown>;
+  unverified: string[];
+  edited_text: string | null;
+  model: string | null;
+  status: "draft" | "validated" | "discarded";
+  generated_by: string | null;
+  validated_by: string | null;
+  validated_at: string | null;
+  created_at: string;
+};
+
+export type BiAiTarget = { kind: BiAiKind; student_id?: number; report?: "institutional" | "results" };
+
+export async function fetchBiAiStatus(): Promise<BiAiStatus> {
+  const { data } = await api.get("/bi/ai/status");
+  return getApiResponseBody(data) as BiAiStatus;
+}
+
+export async function fetchBiAiLatest(target: BiAiTarget, filters: BiFilters): Promise<BiAiDraft | null> {
+  const { data } = await api.get("/bi/ai/drafts/latest", { params: { ...cleanBiFilters(filters), ...target } });
+  return ((getApiResponseBody(data) as { draft: BiAiDraft | null })?.draft ?? null);
+}
+
+export async function generateBiAiDraft(target: BiAiTarget, filters: BiFilters): Promise<BiAiDraft> {
+  const { data } = await api.post("/bi/ai/drafts", null, { params: { ...cleanBiFilters(filters), ...target } });
+  return getApiResponseBody(data) as BiAiDraft;
+}
+
+export async function updateBiAiDraft(id: number, change: { text?: string | null; status?: "validated" | "discarded" }): Promise<BiAiDraft> {
+  const { data } = await api.put(`/bi/ai/drafts/${id}`, change);
+  return getApiResponseBody(data) as BiAiDraft;
+}
+
+/** Texto final do rascunho: o editado pela pessoa ou os parágrafos gerados. */
+export const aiDraftText = (d: BiAiDraft) => d.edited_text ?? (d.content.paragraphs ?? []).map((p) => p.text).join("\n\n");

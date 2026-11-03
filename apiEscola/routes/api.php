@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Bi\BiAiController;
 use App\Http\Controllers\Api\Bi\BiAssessmentController;
 use App\Http\Controllers\Api\Bi\BiClassController;
 use App\Http\Controllers\Api\Bi\BiCriteriaController;
@@ -163,6 +164,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
         Route::get('profiles', [BiProfileController::class, 'show']);
         Route::get('engagement', [BiEngagementController::class, 'show']);
         Route::get('effectiveness', [BiEffectivenessController::class, 'show']);
+        Route::get('ai/status', [BiAiController::class, 'status']);
+        Route::get('ai/drafts/latest', [BiAiController::class, 'latest']);
+        Route::post('ai/drafts', [BiAiController::class, 'generate'])->middleware('throttle:20,1');
+        Route::put('ai/drafts/{draft}', [BiAiController::class, 'update'])->whereNumber('draft');
         Route::get('reports/{report}', [BiReportController::class, 'show'])->whereIn('report', ['individual', 'class', 'subject', 'institutional', 'results']);
         Route::get('exports', [BiReportController::class, 'exports']);
         Route::get('report-templates', [BiReportTemplateController::class, 'index']);

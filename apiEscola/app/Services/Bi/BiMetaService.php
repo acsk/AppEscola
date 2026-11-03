@@ -28,7 +28,7 @@ class BiMetaService
         ['key' => 'follow_up', 'label' => 'Acompanhamento pedagógico', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => true],
         ['key' => 'effectiveness', 'label' => 'Efetividade do ensino', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => true],
         ['key' => 'reports', 'label' => 'Relatórios e indicadores', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
-        ['key' => 'ai_insights', 'label' => 'Insights com IA', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
+        ['key' => 'ai_insights', 'label' => 'Insights com IA', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => true],
     ];
 
     public function __construct(private readonly BiFeatureGate $gate)

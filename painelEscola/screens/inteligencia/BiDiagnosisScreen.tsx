@@ -12,6 +12,7 @@ import MultiLineChart from "../../components/bi/MultiLineChart";
 import Heatmap from "../../components/bi/Heatmap";
 import SegmentedControl from "../../components/bi/SegmentedControl";
 import InterventionFormModal, { type InterventionPreset } from "../../components/bi/InterventionFormModal";
+import AiDraftPanel from "../../components/bi/AiDraftPanel";
 import { presetRange, type PeriodPreset } from "../../components/bi/BiFilterBar";
 import { fmtDate, fmtMetricDelta, fmtNumber } from "../../components/bi/format";
 import { color } from "../../constants/theme";
@@ -337,6 +338,9 @@ function DiagnosisDetail({ navigate, studentId, initialFilters }: { navigate: Pr
               </Panel>
             </View>
             <View style={{ flex: wide ? 2 : undefined, width: wide ? undefined : "100%", minWidth: 0 }}>
+              <View style={{ marginBottom: 24 }}>
+                <AiDraftPanel title="Diagnóstico pedagógico" target={{ kind: "diagnosis", student_id: studentId }} filters={filters} />
+              </View>
               <Panel title="Recomendações" description="Sugestões por regra, com o dado que gerou cada uma. A decisão é da coordenação.">
                 {data.recommendations.length ? (
                   <View style={{ gap: 14 }}>

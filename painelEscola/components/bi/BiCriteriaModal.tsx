@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import FormInput from "../ui/FormInput";
@@ -34,6 +34,7 @@ export default function BiCriteriaModal({ visible, onClose, onSaved, onOpenPrior
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -41,6 +42,7 @@ export default function BiCriteriaModal({ visible, onClose, onSaved, onOpenPrior
     fetchBiCriteria()
       .then((p) => {
         setPayload(p);
+        setAiEnabled(p.ai.enabled);
         setDraft(Object.fromEntries(FIELDS.map((f) => [f.key, toText(p.criteria[f.key])])));
       })
       .catch((err) => setError(getApiResponseMessage(err?.response?.data, "Não foi possível carregar os critérios.")));
@@ -60,7 +62,10 @@ export default function BiCriteriaModal({ visible, onClose, onSaved, onOpenPrior
     setSaving(true);
     setError("");
     try {
-      await saveBiCriteria(Object.fromEntries(FIELDS.map((f) => [f.key, toNumber(draft[f.key])])));
+      await saveBiCriteria({
+        ...Object.fromEntries(FIELDS.map((f) => [f.key, toNumber(draft[f.key])])),
+        ...(payload?.ai.available ? { ai_enabled: aiEnabled } : {}),
+      });
       onSaved();
       onClose();
     } catch (err: any) {
@@ -106,6 +111,28 @@ export default function BiCriteriaModal({ visible, onClose, onSaved, onOpenPrior
               <Text className="text-ink-subtle" style={{ fontSize: 11, marginTop: -6, marginBottom: 8 }}>{f.hint}</Text>
             </View>
           ))}
+          {payload ? (
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: aiEnabled, disabled: !payload.ai.available }}
+              disabled={!payload.ai.available}
+              onPress={() => setAiEnabled((v) => !v)}
+              className="flex-row border-t border-border"
+              style={{ gap: 10, paddingTop: 12, marginTop: 4, alignItems: "flex-start", opacity: payload.ai.available ? 1 : 0.6 }}
+            >
+              <View style={{ width: 18, height: 18, borderRadius: 3, marginTop: 1, borderWidth: 1, borderColor: color["border-strong"], backgroundColor: aiEnabled ? color.brand : color.surface }} />
+              <View style={{ flex: 1 }}>
+                <Text className="text-ink font-medium" style={{ fontSize: 13 }}>Usar IA para rascunhos</Text>
+                <Text className="text-ink-subtle" style={{ fontSize: 11, lineHeight: 16 }}>
+                  {payload.ai.available
+                    ? "Diagnóstico 360°, resumo executivo e insights. Só números vão para o provedor de IA (nenhum nome ou identificador); todo rascunho precisa ser validado por uma pessoa."
+                    : payload.ai.reason === "plan"
+                      ? "Disponível no plano avançado."
+                      : "Cadastre uma chave em Configurações → Integração com IA para liberar."}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
           {error ? <Text className="text-danger" style={{ fontSize: 13 }}>{error}</Text> : null}
           {onOpenPriorities ? (
             <View className="border-t border-border" style={{ paddingTop: 12, marginTop: 4, gap: 6, alignItems: "flex-start" }}>

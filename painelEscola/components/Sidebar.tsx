@@ -71,6 +71,7 @@ const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   engagement: { id: "bi-engagement", icon: CalendarCheck },
   effectiveness: { id: "bi-effectiveness", icon: Target },
   reports: { id: "bi-reports", icon: FileBarChart },
+  ai_insights: { id: "bi-insights", icon: Sparkles },
 };
 
 /** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */
