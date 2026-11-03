@@ -55,6 +55,7 @@ import {
   BiClassDetailScreen,
   BiClassesScreen,
   BiDiagnosisScreen,
+  BiEngagementScreen,
   BiFollowUpScreen,
   BiOverviewScreen,
   BiPerformanceScreen,
@@ -288,6 +289,7 @@ function hashToNav(hash: string): NavState {
     }
     if (seg1 === "perfis") return { screen: "bi-profiles" };
     if (seg1 === "acompanhamento") return { screen: "bi-follow-up" };
+    if (seg1 === "engajamento") return { screen: "bi-engagement" };
     if (seg1 === "desempenho") return { screen: "bi-performance" };
     if (seg1 === "prioritarios") return { screen: "bi-priorities" };
     if (seg1 === "turmas") {
@@ -409,6 +411,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "bi-performance") return "#/inteligencia/desempenho";
   if (nav.screen === "bi-profiles") return "#/inteligencia/perfis";
   if (nav.screen === "bi-follow-up") return "#/inteligencia/acompanhamento";
+  if (nav.screen === "bi-engagement") return "#/inteligencia/engajamento";
   if (nav.screen === "bi-diagnosis") {
     const id = nav.params?.studentId;
     return id ? `#/inteligencia/diagnostico/${id}` : "#/inteligencia/diagnostico";
@@ -1140,6 +1143,7 @@ function AppContent() {
       case "bi-priorities": return <BiPrioritiesScreen navigate={navigate} />;
       case "bi-profiles": return <BiProfilesScreen navigate={navigate} />;
       case "bi-follow-up": return <BiFollowUpScreen navigate={navigate} />;
+      case "bi-engagement": return <BiEngagementScreen navigate={navigate} />;
       case "bi-classes": return <BiClassesScreen navigate={navigate} />;
       case "bi-class":
         return (

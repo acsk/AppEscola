@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\Bi\BiAssessmentController;
 use App\Http\Controllers\Api\Bi\BiClassController;
 use App\Http\Controllers\Api\Bi\BiCriteriaController;
+use App\Http\Controllers\Api\Bi\BiEngagementController;
 use App\Http\Controllers\Api\Bi\BiInterventionController;
 use App\Http\Controllers\Api\Bi\BiMetaController;
 use App\Http\Controllers\Api\Bi\BiOverviewController;
@@ -156,6 +157,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
         Route::get('classes/{schoolClass}', [BiClassController::class, 'show'])->whereNumber('schoolClass');
         Route::get('performance', [BiPerformanceController::class, 'show']);
         Route::get('profiles', [BiProfileController::class, 'show']);
+        Route::get('engagement', [BiEngagementController::class, 'show']);
         Route::prefix('interventions')->group(function () {
             Route::get('summary', [BiInterventionController::class, 'summary']);
             Route::get('suggestions', [BiInterventionController::class, 'suggestions']);

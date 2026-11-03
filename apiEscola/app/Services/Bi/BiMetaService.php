@@ -22,7 +22,7 @@ class BiMetaService
         ['key' => 'performance', 'label' => 'Desempenho acadêmico', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'classes', 'label' => 'Análise de turmas', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'subjects', 'label' => 'Disciplinas e assuntos', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
-        ['key' => 'engagement', 'label' => 'Frequência e engajamento', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
+        ['key' => 'engagement', 'label' => 'Frequência e engajamento', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => true],
         ['key' => 'assessments', 'label' => 'Análise de simulados', 'plan' => BiFeatureGate::PLAN_BASIC, 'implemented' => true],
         ['key' => 'exam_prep', 'label' => 'Preparação para concursos', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => false],
         ['key' => 'follow_up', 'label' => 'Acompanhamento pedagógico', 'plan' => BiFeatureGate::PLAN_ADVANCED, 'implemented' => true],

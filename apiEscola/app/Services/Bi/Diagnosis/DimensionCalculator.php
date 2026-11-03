@@ -11,6 +11,7 @@ use App\Services\Bi\Sources\PracticeFirstAttempts;
 use App\Services\Bi\Sources\StudentUniverse;
 use App\Services\Bi\StudentSignals;
 use App\Services\PracticePerformanceService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -141,11 +142,12 @@ class DimensionCalculator
     {
         $sufficient = array_filter($components, fn ($c) => $c['sufficient']);
         $weight = array_sum(array_column($sufficient, 'weight'));
+        // Combina os valores exatos (o arredondamento é só para exibir cada componente).
         $value = count($sufficient) >= self::MIN_COMPONENTS && $weight > 0
-            ? round(array_sum(array_map(fn ($c) => $c['value'] * $c['weight'], $sufficient)) / $weight, 1)
+            ? round(array_sum(array_map(fn ($c) => $c['exact'] * $c['weight'], $sufficient)) / $weight, 1)
             : null;
 
-        return ['value' => $value, 'components' => $components];
+        return ['value' => $value, 'components' => array_map(fn ($c) => array_diff_key($c, ['exact' => true]), $components)];
     }
 
     private function component(string $key, string $label, ?float $value, int $n, int $min, float $weight, int|float|null $raw = null): array
@@ -156,6 +158,7 @@ class DimensionCalculator
             'key' => $key,
             'label' => $label,
             'value' => $sufficient ? round($value, 1) : null,
+            'exact' => $sufficient ? $value : null,
             'raw' => $raw,
             'n' => $n,
             'min_sample' => $min,
@@ -193,11 +196,25 @@ class DimensionCalculator
 
     /**
      * Dias distintos com atividade por aluno: uso do app, resposta no banco, simulado concluído ou presença.
-     * Datas no fuso da escola.
      *
      * @return array<int, int>
      */
     private function activeDays(StudentUniverse $universe): array
+    {
+        return DB::query()->fromSub($this->activityDays($universe), 'd')
+            ->groupBy('d.student_id')
+            ->select('d.student_id')
+            ->selectRaw('COUNT(DISTINCT d.day) as days')
+            ->pluck('days', 'student_id')
+            ->map(fn ($n) => (int) $n)
+            ->all();
+    }
+
+    /**
+     * Pares (aluno, dia) com atividade, sem repetição. Datas no fuso da escola.
+     * Colunas: student_id, day.
+     */
+    public function activityDays(StudentUniverse $universe): Builder
     {
         $tenantId = $universe->scope->tenantId;
         $ids = $universe->ids() ?: [0];
@@ -223,12 +240,6 @@ class DimensionCalculator
             ->whereBetween('attendance_date', [$fromDate, $toDate])->whereIn('status', ['present', 'late'])
             ->select('student_id', 'attendance_date as day');
 
-        return DB::query()->fromSub($app->union($practice)->union($exams)->union($presence), 'd')
-            ->groupBy('d.student_id')
-            ->select('d.student_id')
-            ->selectRaw('COUNT(DISTINCT d.day) as days')
-            ->pluck('days', 'student_id')
-            ->map(fn ($n) => (int) $n)
-            ->all();
+        return $app->union($practice)->union($exams)->union($presence);
     }
 }

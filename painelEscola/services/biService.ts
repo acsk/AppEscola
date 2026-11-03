@@ -663,3 +663,35 @@ export async function addInterventionEvent(id: number, type: "note" | "progress"
 export async function dismissSuggestion(studentId: number, reason: string): Promise<void> {
   await api.post(`${iv}/suggestions/${studentId}/dismiss`, { reason });
 }
+
+export type BiEngagement = {
+  meta: {
+    period: { from: string; to: string };
+    previous_period: { from: string; to: string };
+    dedication_days_per_week: number;
+    attendance_alert_below: number;
+    generated_at: string;
+  };
+  metrics: BiMetric[];
+  weekly: { week: string; label: string; attendance: number | null; attendance_records: number; active_share: number | null; active_students: number }[];
+  distribution: { label: string; from: number; to: number; count: number }[];
+  classes: {
+    school_class_id: number;
+    name: string;
+    students: number;
+    attendance: number | null;
+    active_days_per_week: number;
+    participation: number | null;
+    engagement: number | null;
+    no_activity: number;
+  }[];
+  lowest: {
+    no_activity: number;
+    items: { student_id: number; name: string; classes: string[]; engagement: number; components: Omit<BiIndexComponent, "min_sample" | "weight">[] }[];
+  };
+};
+
+export async function fetchBiEngagement(filters: BiFilters): Promise<BiEngagement> {
+  const { data } = await api.get("/bi/engagement", { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiEngagement;
+}

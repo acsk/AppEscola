@@ -9,6 +9,7 @@ import {
   Calculator,
   Calendar,
   ChartColumn,
+  CalendarCheck,
   ChartLine,
   Check,
   ClipboardCheck,
@@ -65,6 +66,7 @@ const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   subjects: { id: "bi-subjects", icon: BookOpenCheck },
   assessments: { id: "bi-assessments", icon: ClipboardCheck },
   follow_up: { id: "bi-follow-up", icon: ClipboardList },
+  engagement: { id: "bi-engagement", icon: CalendarCheck },
 };
 
 /** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */
