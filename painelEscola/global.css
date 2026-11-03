@@ -100,7 +100,8 @@ body:not(#_) [data-field-shell] input:focus-visible {
 }
 
 /* Sidebar invertida: foco em `nav-accent` (legível no fundo escuro). */
-body:not(#_) [data-nav] [role="link"]:focus-visible {
+body:not(#_) [data-nav] [role="link"]:focus-visible,
+body:not(#_) [data-nav] [role="button"]:focus-visible {
   outline-color: var(--ds-nav-accent);
 }
 
@@ -111,3 +112,14 @@ body:not(#_) [data-nav] [role="link"]:focus-visible {
   pointer-events: none;
 }
 .ds-rich-text-input b { font-weight: 600; }
+
+body:not(#_) [data-nav-search]:focus-within {
+  outline: 2px solid var(--ds-nav-accent);
+  outline-offset: 1px;
+}
+body:not(#_) [data-nav-search] input:focus-visible {
+  box-shadow: none;
+}
+[data-nav] * {
+  scrollbar-color: var(--ds-nav-divider) transparent;
+}

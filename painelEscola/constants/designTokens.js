@@ -114,7 +114,7 @@ const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 24, 6: 32, 8: 48 };
 const size = {
   "control-sm": 32,
   "control-md": 38,
-  "sidebar-width": 240,
+  "sidebar-width": 256,
   "topbar-height": 56,
   "content-max": 1120,
 };

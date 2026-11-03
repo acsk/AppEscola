@@ -494,3 +494,13 @@ Fórmulas propostas para a Fase 2 (documentadas e configuráveis; pesos renormal
   - Não verificado: qualidade dos textos com um provedor real (os testes simulam a resposta).
 - **Todas as fases do plano entregues.** Pendências gerais: deploy (8 migrations do BI + `bi:refresh-facts --full`), revisão visual e dos arquivos gerados com dados reais, medição de desempenho em produção.
 
+---
+
+## 19. Deploy do BI (checklist)
+
+1. Código: atualizar a API e o painel (no painel, `npm install` antes do build — dependência `xlsx` do CDN da SheetJS).
+2. Banco: `php artisan migrate --force` (faça backup antes). Migrations do BI: `2026_10_31_000001` (papel coordenador), `2026_11_02_000001` a `000005` (índices, dias de atividade, fatos, prioritários, intervenções) e `2026_11_03_000001` a `000002` (relatórios, rascunhos de IA). Conferir com `php artisan migrate:status`.
+3. Fatos: `php artisan bi:refresh-facts --full` uma vez; depois o agendador (`schedule:run`) atualiza a cada 10 min e regera às 03:30.
+4. IA (opcional): chave da escola em Configurações → Integração com IA; ligar "Usar IA para rascunhos" em Visão geral → Critérios.
+5. Sintoma conhecido: IA "ligada" mas gerar rascunho falha → falta a migration `2026_11_03_000002` (tabela `bi_ai_drafts`).
+

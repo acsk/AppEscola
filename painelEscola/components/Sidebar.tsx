@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { View, Text, TouchableOpacity, Pressable, ScrollView, TextInput, useWindowDimensions } from "react-native";
 import {
   Archive,
   Bell,
@@ -12,6 +12,8 @@ import {
   CalendarCheck,
   ChartLine,
   Check,
+  ChevronRight,
+  Search,
   ClipboardCheck,
   ClipboardList,
   Copy,
@@ -74,7 +76,7 @@ const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   ai_insights: { id: "bi-insights", icon: Sparkles },
 };
 
-/** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */
+/** Seções em sanfona; itens sem rótulo permanecem visíveis. */
 type SidebarSection = { label?: string; items: SidebarItem[] };
 
 export default function Sidebar({
@@ -94,6 +96,11 @@ export default function Sidebar({
   const [internalActive, setInternalActive] = useState("dashboard");
   const [versionCopied, setVersionCopied] = useState(false);
   const activeItem = externalActive ?? internalActive;
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<TextInput>(null);
+  const menuId = useId();
+  const normalize = (value: string) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const normalizedQuery = normalize(query.trim());
 
   const sections: SidebarSection[] = [
     { items: [{ id: "dashboard", label: "Dashboard", icon: House }] },
@@ -133,6 +140,14 @@ export default function Sidebar({
         ]
       : []),
     {
+      label: "Financeiro",
+      items: [
+        { id: "cobrancas", label: "Gestão de pagamentos", icon: CreditCard },
+        { id: "bancos_crud", label: "Bancos", icon: Landmark },
+        { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
+      ],
+    },
+    {
       label: "Relatórios",
       items: [
         { id: "relatorios-turmas", label: "Turmas (alunos)", icon: ChartColumn },
@@ -150,14 +165,6 @@ export default function Sidebar({
           },
         ]
       : []),
-    {
-      label: "Financeiro",
-      items: [
-        { id: "cobrancas", label: "Gestão de pagamentos", icon: CreditCard },
-        { id: "bancos_crud", label: "Bancos", icon: Landmark },
-        { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
-      ],
-    },
     {
       label: "Configurações",
       items: [
@@ -178,6 +185,39 @@ export default function Sidebar({
         ]
       : []),
   ].filter((section) => section.items.length > 0);
+
+  const activeSection = sections.find((section) => section.items.some((item) => item.id === activeItem))?.label ?? null;
+  const [openSection, setOpenSection] = useState<string | null>(activeSection);
+
+  useEffect(() => {
+    setOpenSection(activeSection);
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey ||
+          target?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const visibleSections = sections.map((section) => ({
+    ...section,
+    items: normalizedQuery && !normalize(section.label ?? "").includes(normalizedQuery)
+      ? section.items.filter((item) => normalize(item.label).includes(normalizedQuery))
+      : section.items,
+  })).filter((section) => section.items.length > 0);
+
+  const highlightLabel = (label: string) => {
+    const index = normalizedQuery ? normalize(label).indexOf(normalizedQuery) : -1;
+    if (index < 0) return label;
+    return <>{label.slice(0, index)}<Text style={{ color: color["nav-ink"], fontWeight: "600", borderBottomWidth: 2, borderBottomColor: color["nav-accent"] }}>{label.slice(index, index + normalizedQuery.length)}</Text>{label.slice(index + normalizedQuery.length)}</>;
+  };
 
   const handlePress = (id: string) => {
     setInternalActive(id);
@@ -205,6 +245,8 @@ export default function Sidebar({
         key={item.id}
         onPress={() => handlePress(item.id)}
         role="link"
+        {...{ title: item.label }}
+        aria-label={item.label}
         aria-current={isActive ? "page" : undefined}
         style={(state) => ({
           // Layout todo em style: com style em função, o NativeWind descarta o className do Pressable.
@@ -212,8 +254,8 @@ export default function Sidebar({
           alignItems: "center",
           paddingHorizontal: 12,
           borderRadius: 4,
-          height: 34,
-          gap: 12,
+          height: 32,
+          gap: 10,
           // `hovered` existe no RN Web (não está nos tipos do RN).
           backgroundColor: isActive
             ? color["nav-active"]
@@ -227,8 +269,8 @@ export default function Sidebar({
           <View style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, backgroundColor: color["nav-accent"] }} />
         )}
         <Icon icon={item.icon} color={isActive ? color["nav-ink"] : color["nav-ink-muted"]} />
-        <Text className={`text-sm flex-1 ${isActive ? "font-medium text-nav-ink" : "text-nav-ink-muted"}`} numberOfLines={1}>
-          {item.label}
+        <Text className={`flex-1 ${isActive ? "font-medium text-nav-ink" : "text-nav-ink-muted"}`} style={{ fontSize: 13, lineHeight: 18 }} numberOfLines={1}>
+          {highlightLabel(item.label)}
         </Text>
       </Pressable>
     );
@@ -279,30 +321,71 @@ export default function Sidebar({
         )}
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }} aria-label="Navegação principal">
-        {sections.map((section, index) => (
-          <View
-            key={section.label ?? `secao-${index}`}
-            className={index === 0 ? "" : "border-t border-nav-divider"}
-            style={{ paddingVertical: 12 }}
-          >
-            {section.label && (
-              <Text
-                className="font-semibold text-nav-label uppercase px-4"
-                style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.9, paddingTop: 4, paddingBottom: 8 }}
-              >
-                {section.label}
-              </Text>
-            )}
-            <View className="px-2" style={{ gap: 2 }}>
-              {section.items.map(renderItem)}
+      <View className="flex-row items-center rounded-ds-md border border-nav-divider bg-nav-hover" style={{ height: 32, marginHorizontal: 12, marginTop: 12, marginBottom: 4 }} data-nav-search>
+        <View pointerEvents="none" style={{ position: "absolute", left: 10 }}>
+          <Icon icon={Search} color={color["nav-label"]} />
+        </View>
+        <TextInput
+          ref={searchRef}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Buscar no menu"
+          placeholderTextColor={color["nav-label"]}
+          aria-label="Buscar no menu"
+          onKeyPress={({ nativeEvent }) => { if (nativeEvent.key === "Escape") setQuery(""); }}
+          style={{ flex: 1, minWidth: 0, height: "100%", paddingLeft: 30, paddingRight: 28, fontSize: 13, color: color["nav-ink"] }}
+        />
+        {!!query && <Pressable aria-label="Limpar busca" role="button" onPress={() => { setQuery(""); searchRef.current?.focus(); }} style={{ position: "absolute", right: 2, width: 28, height: 28, alignItems: "center", justifyContent: "center" }}><Icon icon={X} color={color["nav-label"]} /></Pressable>}
+        {!query && <Text aria-hidden className="font-mono text-nav-label border border-nav-divider rounded-ds-sm" style={{ position: "absolute", right: 8, width: 18, height: 18, textAlign: "center", fontSize: 11, lineHeight: 16 }}>/</Text>}
+      </View>
+
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 4, paddingBottom: 16 }} role="navigation" aria-label="Principal">
+        {visibleSections.map((section, index) => {
+          const isOpen = !section.label || !!normalizedQuery || openSection === section.label;
+          const listId = `${menuId}-${sections.findIndex((entry) => entry.label === section.label)}`;
+          return (
+            <View
+              key={section.label ?? "principal"}
+              className={index === 0 ? "" : "border-t border-nav-divider"}
+              style={{ paddingTop: section.label ? 2 : 8, paddingBottom: isOpen ? 8 : 2 }}
+            >
+              {section.label && (normalizedQuery ? (
+                <Text className="font-semibold text-nav-label uppercase px-4" style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.88, paddingTop: 4, paddingBottom: 8 }}>{section.label}</Text>
+              ) : (
+                <Pressable
+                  role="button"
+                  aria-expanded={isOpen}
+                  aria-controls={listId}
+                  aria-label={section.label}
+                  onPress={() => setOpenSection(isOpen ? null : section.label!)}
+                  style={(state) => ({
+                    flexDirection: "row", alignItems: "center", gap: 8, height: 36,
+                    marginHorizontal: 8, paddingHorizontal: 8, borderRadius: 4,
+                    backgroundColor: (state as { hovered?: boolean }).hovered ? color["nav-hover"] : "transparent",
+                  })}
+                >
+                  <Text className="font-semibold uppercase flex-1" numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, letterSpacing: 0.72, color: isOpen ? color["nav-ink"] : color["nav-ink-muted"] }}>
+                    {section.label}
+                  </Text>
+                  {!isOpen && activeSection === section.label && <View aria-label="Página atual nesta seção" style={{ width: 6, height: 6, backgroundColor: color["nav-accent"] }} />}
+                  <View style={{ transform: [{ rotate: isOpen ? "90deg" : "0deg" }] }}>
+                    <Icon icon={ChevronRight} color={isOpen ? color["nav-ink"] : color["nav-ink-muted"]} />
+                  </View>
+                </Pressable>
+              ))}
+              <View nativeID={listId} className="px-2" style={{ display: isOpen ? "flex" : "none", gap: 1, paddingTop: section.label ? 2 : 0 }}>
+                {section.items.map(renderItem)}
+              </View>
             </View>
-          </View>
-        ))}
-        <Text className="font-mono text-nav-label px-4" style={{ fontSize: 11, lineHeight: 14 }}>
+          );
+        })}
+        {visibleSections.length === 0 && <Text role="status" className="text-nav-label" style={{ margin: 16, fontSize: 13, lineHeight: 18 }}>Nada encontrado para “{query}”.</Text>}
+      </ScrollView>
+      <View className="border-t border-nav-divider" style={{ paddingVertical: 12, paddingHorizontal: 16 }}>
+        <Text className="font-mono text-nav-label" style={{ fontSize: 11, lineHeight: 14 }}>
           Build {buildDate}
         </Text>
-      </ScrollView>
+      </View>
     </View>
   );
 }
