@@ -12,3 +12,4 @@ export { default as BiDiagnosisScreen } from "./BiDiagnosisScreen";
 export { default as BiProfilesScreen } from "./BiProfilesScreen";
 export { default as BiFollowUpScreen } from "./BiFollowUpScreen";
 export { default as BiEngagementScreen } from "./BiEngagementScreen";
+export { default as BiEffectivenessScreen } from "./BiEffectivenessScreen";

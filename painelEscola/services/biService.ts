@@ -695,3 +695,27 @@ export async function fetchBiEngagement(filters: BiFilters): Promise<BiEngagemen
   const { data } = await api.get("/bi/engagement", { params: cleanBiFilters(filters) });
   return getApiResponseBody(data) as BiEngagement;
 }
+
+type BiTopicMove = { topic_id: number; name: string; now: number; delta_pp: number } | null;
+
+export type BiEffectivenessTeaching = {
+  meta: { period: { from: string; to: string }; previous_period: { from: string; to: string }; evolution_threshold_pp: number; min_student_answers: number; generated_at: string };
+  summary: { pairs: number; comparable: number; improved: number; declined: number };
+  items: {
+    school_class_id: number;
+    class: string;
+    subject_id: number;
+    subject: string;
+    teachers: string[];
+    accuracy: BiMetric;
+    grades: BiMetric;
+    students: { comparable: number; improved: number; declined: number; improved_pct: number | null };
+    best_topic: BiTopicMove;
+    worst_topic: BiTopicMove;
+  }[];
+};
+
+export async function fetchBiTeachingEffectiveness(filters: BiFilters): Promise<BiEffectivenessTeaching> {
+  const { data } = await api.get("/bi/effectiveness", { params: cleanBiFilters(filters) });
+  return getApiResponseBody(data) as BiEffectivenessTeaching;
+}

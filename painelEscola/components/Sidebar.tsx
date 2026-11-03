@@ -23,6 +23,7 @@ import {
   GraduationCap,
   LayoutGrid,
   Radar,
+  Target,
   TrendingUp,
   Library,
   Link2,
@@ -67,6 +68,7 @@ const BI_SCREENS: Record<string, { id: string; icon: LucideIcon }> = {
   assessments: { id: "bi-assessments", icon: ClipboardCheck },
   follow_up: { id: "bi-follow-up", icon: ClipboardList },
   engagement: { id: "bi-engagement", icon: CalendarCheck },
+  effectiveness: { id: "bi-effectiveness", icon: Target },
 };
 
 /** Seção plana: rótulo em caixa alta (opcional) e itens — sem acordeões, contadores ou cor por seção. */

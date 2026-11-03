@@ -56,7 +56,7 @@ class BiMetaTest extends TestCase
             ->assertJsonPath('body.defaults.goal_pct', 70);
         $this->assertCount(13, $response->json('body.sections'));
         $available = collect($response->json('body.sections'))->where('available', true)->pluck('key')->all();
-        $this->assertSame(['overview', 'diagnosis', 'students', 'performance', 'classes', 'subjects', 'engagement', 'assessments', 'follow_up'], $available);
+        $this->assertSame(['overview', 'diagnosis', 'students', 'performance', 'classes', 'subjects', 'engagement', 'assessments', 'follow_up', 'effectiveness'], $available);
     }
 
     public function test_coordinator_has_tenant_wide_scope(): void
