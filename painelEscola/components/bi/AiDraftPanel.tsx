@@ -12,6 +12,7 @@ import {
   fetchBiAiLatest,
   fetchBiAiStatus,
   generateBiAiDraft,
+  saveBiCriteria,
   updateBiAiDraft,
   type BiAiDraft,
   type BiAiStatus,
@@ -106,7 +107,28 @@ export default function AiDraftPanel({ title, target, filters, onValidated, onOp
         {loading ? (
           <ActivityIndicator color={color.brand} />
         ) : !status?.enabled && !draft ? (
-          <Text className="text-ink-subtle" style={{ fontSize: 13 }}>{`IA desligada para esta escola. ${status?.reason ? STATUS_LABEL[status.reason] : ""}`}</Text>
+          <View style={{ gap: 10, alignItems: "flex-start" }}>
+            <Text className="text-ink-subtle" style={{ fontSize: 13 }}>{`IA desligada para esta escola. ${status?.reason ? STATUS_LABEL[status.reason] : ""}`}</Text>
+            {status?.available && status.reason === "disabled" ? (
+              <Button
+                size="sm"
+                label="Ligar IA para esta escola"
+                loading={busy}
+                onPress={async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    await saveBiCriteria({ ai_enabled: true });
+                    await load();
+                  } catch (err: any) {
+                    setError(getApiResponseMessage(err?.response?.data, "Somente a coordenação pode ligar a IA."));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            ) : null}
+          </View>
         ) : !draft ? (
           <Text className="text-ink-muted" style={{ fontSize: 13 }}>
             {isInsights
