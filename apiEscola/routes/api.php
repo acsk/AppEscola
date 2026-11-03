@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\TenantAccessController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AsaasWebhookController;
@@ -225,6 +226,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
     })->where('path', '.*');
 
     // Tenants (somente super_admin)
+    Route::post('tenants/{tenant}/access', [TenantAccessController::class, 'store']);
     Route::apiResource('tenants', TenantController::class);
     Route::get('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'show']);
     Route::put('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'update']);
