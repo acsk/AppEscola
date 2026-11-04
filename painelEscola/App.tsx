@@ -161,6 +161,10 @@ const SCREEN_SLUGS = [
   "relatorios-turmas",
 ];
 
+/** Telas do super admin fora de uma instituição (o resto é do tenant). */
+const isPlatformScreen = (screen: string) =>
+  screen.startsWith("saas-") || screen.startsWith("tenants") || screen.startsWith("users") || screen === "tipos-prova";
+
 function hashToNav(hash: string): NavState {
   const [path, query = ""] = hash.replace(/^#\/?/, "").split("?");
   const [seg0, seg1] = path.split("/").filter(Boolean);
@@ -528,14 +532,14 @@ function AppContent() {
       setBiSections([{ key: "follow_up", label: "Acompanhamento pedagógico", plan: "advanced", available: true }]);
       return;
     }
-    if (!user || !["super_admin", "admin", "coordenador", "professor"].includes(user.role)) {
+    if (!user || !["super_admin", "admin", "coordenador", "professor"].includes(user.role) || (user.role === "super_admin" && !user.selected_tenant_id)) {
       setBiSections([]);
       return;
     }
     fetchBiMeta()
       .then((meta) => setBiSections(meta.sections.filter((section) => section.available)))
       .catch(() => setBiSections([]));
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, user?.selected_tenant_id]);
 
   // Status da instituição, módulos do plano e alertas de limite (aviso no topo e menu). O backend valida tudo.
   const [entitlements, setEntitlements] = useState<TenantEntitlements | null>(null);
@@ -575,7 +579,8 @@ function AppContent() {
 
   // Super admin sem tenant em acesso começa pela lista de tenants (o dashboard depende de um tenant).
   useEffect(() => {
-    if (user?.role === "super_admin" && !user.selected_tenant_id && nav.screen === "dashboard") {
+    // Telas de instituição precisam de um tenant: fora do acesso assistido, o super admin fica na plataforma.
+    if (user?.role === "super_admin" && !user.selected_tenant_id && !isPlatformScreen(nav.screen)) {
       navigate("saas-dashboard");
     }
   }, [user?.role, user?.selected_tenant_id, nav.screen]);
@@ -1293,6 +1298,7 @@ function AppContent() {
             canViewFinance={canViewFinance}
             biSections={biSections}
             features={entitlements?.features ?? null}
+            platformMode={user?.role === "super_admin" && !user.selected_tenant_id}
             apiVersion={apiVersion}
           />
         )}
@@ -1317,6 +1323,7 @@ function AppContent() {
               canViewFinance={canViewFinance}
               biSections={biSections}
               features={entitlements?.features ?? null}
+              platformMode={user?.role === "super_admin" && !user.selected_tenant_id}
               apiVersion={apiVersion}
               isMobile
               onClose={() => setIsSidebarOpen(false)}

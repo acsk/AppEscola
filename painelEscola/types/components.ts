@@ -29,6 +29,8 @@ export type SidebarProps = {
   biSections?: { key: string; label: string }[];
   /** Funcionalidades do plano do tenant (GET /tenant/entitlements); null = mostra tudo. */
   features?: Record<string, boolean> | null;
+  /** Super admin fora de uma instituição: mostra só o menu da plataforma. */
+  platformMode?: boolean;
   isMobile?: boolean;
   onClose?: () => void;
   apiVersion?: string;

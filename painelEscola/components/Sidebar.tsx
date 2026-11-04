@@ -100,6 +100,7 @@ export default function Sidebar({
   canViewFinance = false,
   biSections = [],
   features = null,
+  platformMode = false,
   isMobile = false,
   onClose,
   apiVersion = "-",
@@ -117,7 +118,35 @@ export default function Sidebar({
   /** Módulo liberado no plano do tenant (null = sem dados: mostra tudo; o backend valida de qualquer forma). */
   const has = (key: string) => !features || features[key] !== false;
 
-  const sections: SidebarSection[] = [
+  // Super admin fora de uma instituição: só o que é da plataforma. Dentro (acesso assistido): o menu da instituição.
+  const platformSections: SidebarSection[] = [
+    {
+      items: [
+        { id: "saas-dashboard", label: "Visão geral", icon: Gauge },
+        { id: "tenants", label: "Instituições", icon: Building2 },
+      ],
+    },
+    {
+      label: "Comercial",
+      items: [
+        { id: "saas-plans", label: "Planos SaaS", icon: BadgeDollarSign },
+        { id: "saas-subscriptions", label: "Assinaturas", icon: Repeat },
+      ],
+    },
+    {
+      label: "Funcionalidades",
+      items: [{ id: "saas-features", label: "Feature flags", icon: ToggleRight }],
+    },
+    {
+      label: "Administração",
+      items: [
+        { id: "users", label: "Usuários", icon: UserCog },
+        { id: "tipos-prova", label: "Tipos de prova", icon: Tags },
+      ],
+    },
+  ];
+
+  const tenantSections: SidebarSection[] = [
     { items: [{ id: "dashboard", label: "Dashboard", icon: House }] },
     {
       label: "Pessoas",
@@ -203,30 +232,9 @@ export default function Sidebar({
         ...(canManageAi ? [{ id: "configuracoes-ia", label: "Integração com IA", icon: Sparkles }] : []),
       ],
     },
-    ...(canManageTenants
-      ? [
-          {
-            label: "Plataforma",
-            items: [
-              { id: "saas-dashboard", label: "Visão geral SaaS", icon: Gauge },
-              { id: "tenants", label: "Instituições", icon: Building2 },
-              { id: "tipos-prova", label: "Tipos de prova", icon: Tags },
-            ],
-          },
-          {
-            label: "Comercial",
-            items: [
-              { id: "saas-plans", label: "Planos SaaS", icon: BadgeDollarSign },
-              { id: "saas-subscriptions", label: "Assinaturas", icon: Repeat },
-            ],
-          },
-          {
-            label: "Funcionalidades",
-            items: [{ id: "saas-features", label: "Feature flags", icon: ToggleRight }],
-          },
-        ]
-      : []),
-  ].filter((section) => section.items.length > 0);
+  ];
+
+  const sections = (platformMode ? platformSections : tenantSections).filter((section) => section.items.length > 0);
 
   const activeSection = sections.find((section) => section.items.some((item) => item.id === activeItem))?.label ?? null;
   const [openSection, setOpenSection] = useState<string | null>(activeSection);
