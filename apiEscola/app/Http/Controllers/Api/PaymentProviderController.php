@@ -18,6 +18,7 @@ use App\Services\Cora\CoraTokenService;
 use App\Services\Gateways\CoraPaymentGateway;
 use App\Services\PaymentProviderRegistry;
 use App\Services\TenantBillingSettingsService;
+use App\Support\BusinessDate;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
@@ -1457,7 +1458,8 @@ class PaymentProviderController extends Controller
         }
 
         // Atualizar status da fatura baseado na resposta da Cora
-        $paidAt = $result['paid_at'] ? new \DateTime($result['paid_at']) : now();
+        // BusinessDate::moment converte para o fuso da aplicação (new DateTime gravava o horário de Brasília como UTC).
+        $paidAt = $result['paid_at'] ? BusinessDate::moment((string) $result['paid_at']) : now();
 
         $invoice->update([
             'status' => 'paid',

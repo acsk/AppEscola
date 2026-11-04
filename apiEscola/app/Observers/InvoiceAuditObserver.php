@@ -16,22 +16,27 @@ class InvoiceAuditObserver
     /** Origem forçada enquanto um processamento automático roda (ex.: webhook Cora num comando). */
     private static ?string $forcedSource = null;
 
+    /** Motivo registrado nas mudanças feitas dentro de asSource (ex.: correção em lote). */
+    private static ?string $forcedReason = null;
+
     /**
-     * Executa $callback registrando as mudanças com a origem informada.
+     * Executa $callback registrando as mudanças com a origem (e, se informado, o motivo) dados.
      *
      * @template T
      * @param  callable(): T  $callback
      * @return T
      */
-    public static function asSource(string $source, callable $callback): mixed
+    public static function asSource(string $source, callable $callback, ?string $reason = null): mixed
     {
-        $previous = self::$forcedSource;
+        [$previousSource, $previousReason] = [self::$forcedSource, self::$forcedReason];
         self::$forcedSource = $source;
+        self::$forcedReason = $reason;
 
         try {
             return $callback();
         } finally {
-            self::$forcedSource = $previous;
+            self::$forcedSource = $previousSource;
+            self::$forcedReason = $previousReason;
         }
     }
 
@@ -85,7 +90,7 @@ class InvoiceAuditObserver
         }
 
         $reason = $invoice->wasChanged('edit_reason') ? $invoice->edit_reason : null;
-        $this->record($invoice, $this->actionFor($changes), $changes, $reason);
+        $this->record($invoice, $this->actionFor($changes), $changes, $reason ?? self::$forcedReason);
     }
 
     public function deleted(Invoice $invoice): void

@@ -5,6 +5,7 @@ namespace App\Console\Commands\Cora;
 use App\Models\Tenant;
 use App\Models\TenantCoraCredential;
 use App\Services\Cora\CoraBankStatementSyncService;
+use App\Services\Reconciliation\BankReconciliationService;
 use App\Support\BusinessDate;
 use Illuminate\Console\Command;
 use Throwable;
@@ -38,6 +39,10 @@ class SyncCoraBankStatementCommand extends Command
 
         $failed = 0;
         foreach (Tenant::query()->whereIn('id', $tenantIds)->get() as $tenant) {
+            if (BankReconciliationService::operatingSince((int) $tenant->id) === null) {
+                $this->line("Tenant {$tenant->id}: nenhuma cobrança Cora gerada pelo sistema; nada a buscar.");
+                continue;
+            }
             try {
                 $result = $start !== null
                     ? $sync->sync($tenant, $environment, $start, $end)->only(['created', 'auto_reconciled', 'divergent'])

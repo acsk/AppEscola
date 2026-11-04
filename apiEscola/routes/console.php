@@ -22,3 +22,7 @@ Schedule::command('cora:process-webhook-events')->everyMinute()->withoutOverlapp
 Schedule::command('cora:sync-paid-invoices --environment=prod')
     ->dailyAt('06:15')
     ->withoutOverlapping();
+// Extrato Cora para a conciliação bancária: busca só o que falta (somente leitura na Cora) e concilia pelo ID do pagamento.
+Schedule::command('cora:sync-bank-statement --environment=prod')
+    ->cron('20 */3 * * *')
+    ->withoutOverlapping();
