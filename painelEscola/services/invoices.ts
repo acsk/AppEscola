@@ -57,3 +57,22 @@ export async function fetchInvoiceSituations(params: Record<string, string | num
   const { data } = await api.get("/invoices/situations", { params });
   return data.body ?? data;
 }
+
+export type InvoiceAuditAction = "created" | "updated" | "paid" | "cancelled" | "charge_generated" | "deleted" | "restored";
+
+export type InvoiceAuditEntry = {
+  id: number;
+  action: InvoiceAuditAction;
+  source: "user" | "system" | "webhook";
+  user: { id: number; name: string } | null;
+  /** Feito durante um acesso de suporte do super admin. */
+  support_access: boolean;
+  changes: Record<string, { from: string | number | null; to: string | number | null }>;
+  reason: string | null;
+  created_at: string;
+};
+
+export async function fetchInvoiceAudit(invoiceId: number): Promise<InvoiceAuditEntry[]> {
+  const { data } = await api.get(`/invoices/${invoiceId}/audit`);
+  return (data.body ?? data).items ?? [];
+}

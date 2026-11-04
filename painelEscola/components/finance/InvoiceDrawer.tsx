@@ -13,6 +13,8 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
 import type { Invoice } from "../../types/invoices";
 import { SITUATION_LABEL, SITUATION_TONE, dueHint, invoiceOrigin, rowSituation } from "./receivables";
+import { AUDIT_ACTION_LABEL, auditAuthor, auditChangeLines } from "./invoiceAudit";
+import { fetchInvoiceAudit, type InvoiceAuditEntry } from "../../services/invoices";
 
 export type InvoiceDrawerAction = "settle" | "edit" | "generate_charge" | "cancel";
 
@@ -49,13 +51,20 @@ export default function InvoiceDrawer({ invoice, onClose, onAction }: Props) {
   const [detail, setDetail] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [audit, setAudit] = useState<InvoiceAuditEntry[] | null>(null);
+  const [auditError, setAuditError] = useState(false);
 
   useEffect(() => {
     if (!invoice) return;
     setTab("details");
     setDetail(invoice);
     setLoading(true);
+    setAudit(null);
+    setAuditError(false);
     let active = true;
+    fetchInvoiceAudit(invoice.id)
+      .then((items) => active && setAudit(items))
+      .catch(() => active && setAuditError(true));
     api
       .get(`/invoices/${invoice.id}`)
       .then(({ data }) => {
@@ -76,6 +85,7 @@ export default function InvoiceDrawer({ invoice, onClose, onAction }: Props) {
   const open = situation === "open" || situation === "overdue";
   const paid = situation === "paid";
   const enrollment = detail.enrollment;
+  const paidEntry = audit?.find((entry) => entry.action === "paid") ?? null;
 
   const copy = async (key: string, text?: string | null) => {
     if (!text || typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
@@ -128,7 +138,7 @@ export default function InvoiceDrawer({ invoice, onClose, onAction }: Props) {
         className="bg-surface border-l border-border"
         role="dialog"
         aria-label={`Cobrança #${detail.id}`}
-        style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: isMobile ? "100%" : 560, maxWidth: "100%" }}
+        style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: isMobile ? "100%" : 620, maxWidth: "100%" }}
       >
         <View style={{ paddingHorizontal: 24, paddingTop: 20, gap: 6 }}>
           <View className="flex-row items-start" style={{ gap: 12 }}>
@@ -159,7 +169,7 @@ export default function InvoiceDrawer({ invoice, onClose, onAction }: Props) {
               onChange={setTab}
               items={[
                 { id: "details", label: "Detalhes" },
-                { id: "payments", label: "Pagamentos", count: paid ? 1 : 0 },
+                { id: "payments", label: "Pagamentos", count: paid ? 1 : undefined },
                 { id: "communication", label: "Comunicação" },
                 { id: "audit", label: "Auditoria" },
               ]}
@@ -185,7 +195,7 @@ export default function InvoiceDrawer({ invoice, onClose, onAction }: Props) {
 
               {section(
                 "Valores",
-                <View className="border border-border rounded-ds-sm" style={{ paddingHorizontal: 12 }}>
+                <View className="border border-border rounded-ds-sm" style={{ paddingHorizontal: 12, paddingVertical: 4 }}>
                   <DefinitionRows
                     rows={[
                       { label: "Valor da cobrança", value: money(detail.amount) },
@@ -227,6 +237,7 @@ export default function InvoiceDrawer({ invoice, onClose, onAction }: Props) {
                         { label: "Forma", value: paymentMethodLabel(detail.payment_method), text: true },
                         { label: "Identificador", value: detail.payment_reference ?? "—", muted: !detail.payment_reference },
                         { label: "Valor", value: money(detail.amount) },
+                        ...(paidEntry ? [{ label: "Registrado por", value: auditAuthor(paidEntry), text: true }] : []),
                       ]}
                     />
                   </View>
@@ -239,22 +250,46 @@ export default function InvoiceDrawer({ invoice, onClose, onAction }: Props) {
             : null}
 
           {tab === "audit" ? (
-            <>
-              <View className="border border-border rounded-ds-sm" style={{ paddingHorizontal: 12 }}>
-                <DefinitionRows
-                  rows={[
-                    { label: "Criada em", value: fmtDateTime(detail.created_at) },
-                    { label: "Criada por", value: detail.created_by_user?.name ?? "Sistema", text: true },
-                    { label: "Última alteração", value: fmtDateTime(detail.updated_at) },
-                    { label: "Alterada por", value: detail.updated_by_user?.name ?? "Sistema", text: true },
-                    ...(detail.edit_reason ? [{ label: "Motivo da última edição", value: detail.edit_reason, text: true }] : []),
-                  ]}
-                />
+            auditError ? (
+              <Text className="text-sm text-danger">Não foi possível carregar o histórico desta cobrança.</Text>
+            ) : audit === null ? (
+              <ActivityIndicator color={color.brand} />
+            ) : (
+              <View style={{ gap: 0 }}>
+                {audit.map((entry, index) => (
+                  <View key={entry.id} className="flex-row" style={{ gap: 12 }}>
+                    <View style={{ alignItems: "center", width: 12 }}>
+                      <View style={{ width: 9, height: 9, marginTop: 5, backgroundColor: entry.action === "paid" ? color.success : entry.action === "cancelled" || entry.action === "deleted" ? color.danger : color.brand }} />
+                      {index < audit.length - 1 ? <View style={{ flex: 1, width: 1, backgroundColor: color.border, marginTop: 4 }} /> : null}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0, paddingBottom: 18, gap: 2 }}>
+                      <Text className="text-sm font-semibold text-ink">{AUDIT_ACTION_LABEL[entry.action] ?? entry.action}</Text>
+                      <Text className="text-xs text-ink-muted">{`${fmtDateTime(entry.created_at)} · ${auditAuthor(entry)}`}</Text>
+                      {auditChangeLines(entry).map((line) => (
+                        <Text key={line} className="text-xs font-mono text-ink" style={{ lineHeight: 18 }}>{line}</Text>
+                      ))}
+                      {entry.reason ? <Text className="text-xs text-ink-muted" style={{ fontStyle: "italic" }}>{`Motivo: ${entry.reason}`}</Text> : null}
+                    </View>
+                  </View>
+                ))}
+                {/* Cobranças anteriores à auditoria só têm criação e última alteração. */}
+                <View className="border border-border rounded-ds-sm" style={{ paddingHorizontal: 12, marginTop: audit.length ? 8 : 0 }}>
+                  <DefinitionRows
+                    rows={[
+                      { label: "Criada em", value: fmtDateTime(detail.created_at) },
+                      { label: "Criada por", value: detail.created_by_user?.name ?? "Sistema", text: true },
+                      { label: "Última alteração", value: fmtDateTime(detail.updated_at) },
+                      { label: "Alterada por", value: detail.updated_by_user?.name ?? "Sistema", text: true },
+                    ]}
+                  />
+                </View>
+                {!audit.length ? (
+                  <Text className="text-ink-subtle" style={{ fontSize: 12, lineHeight: 18, marginTop: 8 }}>
+                    Esta cobrança é anterior ao histórico detalhado; só a criação e a última alteração estão registradas.
+                  </Text>
+                ) : null}
               </View>
-              <Text className="text-ink-subtle" style={{ fontSize: 12, lineHeight: 18 }}>
-                O histórico completo, alteração por alteração, ainda não é registrado pelo sistema.
-              </Text>
-            </>
+            )
           ) : null}
         </ScrollView>
 

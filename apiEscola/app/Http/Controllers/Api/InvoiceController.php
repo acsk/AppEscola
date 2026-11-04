@@ -9,6 +9,7 @@ use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
+use App\Models\InvoiceAuditLog;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceListQuery;
 use App\Services\InvoiceSettlementService;
@@ -35,7 +36,7 @@ class InvoiceController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware(self::requireAbility(FinancePermissions::VIEW), only: ['index', 'summary', 'situations', 'show']),
+            new Middleware(self::requireAbility(FinancePermissions::VIEW), only: ['index', 'summary', 'situations', 'show', 'audit']),
             new Middleware(self::requireAbility(FinancePermissions::MANAGE_INVOICES), only: ['store', 'update', 'destroy', 'cancel', 'generateCoraCharge']),
             new Middleware(self::requireAbility(FinancePermissions::SETTLE), only: ['markAsPaid']),
         ];
@@ -205,6 +206,34 @@ class InvoiceController extends Controller implements HasMiddleware
         $invoice->load(['student', 'guardian', 'enrollment', 'createdByUser', 'updatedByUser']);
 
         return response()->json(new InvoiceResource($invoice));
+    }
+
+    /**
+     * Histórico da cobrança (mais recente primeiro): ação, campos alterados, quem fez e por qual origem.
+     */
+    public function audit(Request $request, Invoice $invoice): JsonResponse
+    {
+        $this->authorizeTenant($request, $invoice->tenant_id);
+
+        $items = InvoiceAuditLog::query()
+            ->with('user:id,name')
+            ->where('invoice_id', $invoice->id)
+            ->where('tenant_id', $invoice->tenant_id)
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->map(fn (InvoiceAuditLog $log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'source' => $log->source,
+                'user' => $log->user ? ['id' => $log->user->id, 'name' => $log->user->name] : null,
+                'support_access' => $log->support_access_id !== null,
+                'changes' => $log->changes ?? (object) [],
+                'reason' => $log->reason,
+                'created_at' => $log->created_at?->toIso8601String(),
+            ]);
+
+        return $this->success(['items' => $items], 'Histórico da cobrança carregado com sucesso.');
     }
 
     #[OA\Put(

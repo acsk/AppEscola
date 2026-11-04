@@ -338,6 +338,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::get('invoices/summary', [InvoiceController::class, 'summary']);
     Route::get('invoices/situations', [InvoiceController::class, 'situations']);
     Route::apiResource('invoices', InvoiceController::class);
+    Route::get('invoices/{invoice}/audit', [InvoiceController::class, 'audit']);
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
     Route::post('invoices/{invoice}/generate-cora-charge', [InvoiceController::class, 'generateCoraCharge']);

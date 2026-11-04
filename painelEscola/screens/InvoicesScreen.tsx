@@ -949,13 +949,13 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         >
           <View
             className="bg-surface rounded-ds-md overflow-hidden border border-border"
-            style={{ width: "100%", minWidth: tableMinWidth ?? 1180 }}
+            style={{ width: "100%", minWidth: tableMinWidth ?? 1060 }}
           >
             <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
               <Text className={TABLE_HEADER_CELL} style={{ flex: 1.6, minWidth: 180 }}>
                 Aluno / cobrança
               </Text>
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.1, minWidth: 130 }}>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.1, minWidth: 120 }}>
                 Responsável
               </Text>
               <Text className={TABLE_HEADER_CELL} style={{ flex: 1.4, minWidth: 160 }}>
@@ -987,7 +987,7 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
                       {studentSubline(item)}
                     </Text>
                   </View>
-                  <Text className={TABLE_CELL} style={{ flex: 1.1, minWidth: 130, paddingRight: 10 }} numberOfLines={1}>
+                  <Text className={TABLE_CELL} style={{ flex: 1.1, minWidth: 120, paddingRight: 10 }} numberOfLines={1}>
                     {item.guardian?.name ?? "o próprio aluno"}
                   </Text>
                   <View style={{ flex: 1.4, minWidth: 160, paddingRight: 10 }}>

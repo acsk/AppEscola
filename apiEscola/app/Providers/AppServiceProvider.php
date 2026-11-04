@@ -11,7 +11,9 @@ use App\Services\Embeddings\RepositorioEmbeddingsMysql;
 use App\Services\EmailMarketing\EmailMarketingService;
 use App\Services\EmailMarketing\ResendMarketingEmailService;
 use App\Models\Exam;
+use App\Models\Invoice;
 use App\Observers\ExamObserver;
+use App\Observers\InvoiceAuditObserver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 
@@ -40,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Exam::observe(ExamObserver::class);
+        Invoice::observe(InvoiceAuditObserver::class);
 
         Model::saving(function (Model $model): void {
             // Campos técnicos/funcionais que não devem ser forçados para caixa alta.
