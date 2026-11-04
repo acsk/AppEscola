@@ -43,13 +43,14 @@ use App\Http\Controllers\Api\StudentExamController;
 use App\Http\Controllers\Api\StudentPerformanceController;
 use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantBillingSettingsController;
-use App\Http\Controllers\Api\TenantCoraSettingsController;
+use App\Http\Controllers\Api\Cora\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\TenantAccessController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AsaasWebhookController;
-use App\Http\Controllers\Api\CoraWebhookController;
+use App\Http\Controllers\Api\Cora\CoraIntegrationController;
+use App\Http\Controllers\Api\Cora\CoraWebhookController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\PaymentProviderController;
@@ -339,6 +340,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     // Cobranças
     // Financeiro · Visão geral
     Route::get('finance/dashboard', [FinanceDashboardController::class, 'show']);
+    Route::get('finance/cora/overview', [CoraIntegrationController::class, 'show']);
+    Route::get('finance/cora/events', [CoraIntegrationController::class, 'events']);
+    Route::post('finance/cora/events/{event}/retry', [CoraIntegrationController::class, 'retry'])->whereNumber('event');
+    Route::post('finance/cora/invoices/{invoice}/consult', [CoraIntegrationController::class, 'consultInvoice'])->whereNumber('invoice');
 
     Route::get('invoices/summary', [InvoiceController::class, 'summary']);
     Route::get('invoices/situations', [InvoiceController::class, 'situations']);

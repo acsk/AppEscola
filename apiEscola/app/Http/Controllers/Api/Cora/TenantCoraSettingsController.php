@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Cora;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\TenantCoraCredential;
-use App\Services\CoraCredentialService;
-use App\Services\CoraTokenService;
+use App\Services\Cora\CoraCredentialService;
+use App\Services\Cora\CoraTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Client\ConnectionException;

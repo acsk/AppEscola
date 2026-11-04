@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Enrollment;
-use App\Services\CoraEnrollmentInvoiceSyncService;
+use App\Services\Cora\CoraEnrollmentInvoiceSyncService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;

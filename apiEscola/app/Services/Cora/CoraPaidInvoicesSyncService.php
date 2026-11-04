@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Cora;
 
 use App\Models\Invoice;
 use App\Models\Tenant;
+use App\Services\InvoicePaymentSettingsResolver;
+use App\Services\PaymentGatewayFactory;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -326,6 +328,7 @@ class CoraPaidInvoicesSyncService
             $external['occurrence_date'] ?? null,
             data_get($external, 'payment.paid_at'),
             data_get($external, 'payment_date'),
+            data_get($external, 'paidAt'),
             data_get($external, 'payments.0.finalized_at'),
             data_get($external, 'payments.0.created_at'),
         ];

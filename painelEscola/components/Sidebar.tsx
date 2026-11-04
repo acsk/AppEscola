@@ -36,6 +36,7 @@ import {
   UserCog,
   UserRound,
   Users,
+  Webhook,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -147,6 +148,7 @@ export default function Sidebar({
             items: [
               { id: "financeiro-visao-geral", label: "Visão geral", icon: ChartLine },
               { id: "cobrancas", label: "Contas a receber", icon: CreditCard },
+              { id: "financeiro-cora", label: "Integração Cora", icon: Webhook },
               { id: "bancos_crud", label: "Bancos", icon: Landmark },
               { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
             ],

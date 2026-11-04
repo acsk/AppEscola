@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Cora;
 
 use App\Models\Enrollment;
 use App\Models\Invoice;
 use App\Models\Tenant;
+use App\Services\EnrollmentContractChargesService;
+use App\Services\PaymentGatewayFactory;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;

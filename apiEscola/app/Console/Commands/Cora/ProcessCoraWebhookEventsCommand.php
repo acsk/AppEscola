@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Cora;
 
 use App\Services\Cora\CoraWebhookProcessor;
 use Illuminate\Console\Command;

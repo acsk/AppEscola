@@ -6,7 +6,7 @@ use App\Models\Enrollment;
 use App\Models\Guardian;
 use App\Models\Invoice;
 use App\Models\Student;
-use App\Services\CoraEnrollmentInvoiceSyncService;
+use App\Services\Cora\CoraEnrollmentInvoiceSyncService;
 use App\Services\PaymentGatewayFactory;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;

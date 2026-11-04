@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Cora;
 
 use App\Models\CoraWebhookEndpoint;
 use App\Models\Tenant;

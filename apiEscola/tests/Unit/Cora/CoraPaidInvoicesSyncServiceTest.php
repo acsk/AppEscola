@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\Cora;
 
 use App\Models\Invoice;
 use App\Models\Tenant;
-use App\Services\CoraPaidInvoicesSyncService;
+use App\Services\Cora\CoraPaidInvoicesSyncService;
 use App\Services\InvoicePaymentSettingsResolver;
 use App\Services\PaymentGatewayFactory;
 use Mockery;

@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\Cora;
 
 use App\Models\CoraWebhookEndpoint;
 use App\Models\CoraWebhookEvent;

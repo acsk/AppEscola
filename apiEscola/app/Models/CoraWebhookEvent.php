@@ -25,6 +25,9 @@ class CoraWebhookEvent extends Model
         'last_error',
         'duplicates',
         'anomaly',
+        'manual_retries',
+        'last_retried_by',
+        'last_retried_at',
         'received_at',
     ];
 
@@ -33,10 +36,21 @@ class CoraWebhookEvent extends Model
         'locked_until' => 'datetime',
         'processed_at' => 'datetime',
         'received_at' => 'datetime',
+        'last_retried_at' => 'datetime',
     ];
 
     public function endpoint(): BelongsTo
     {
         return $this->belongsTo(CoraWebhookEndpoint::class, 'endpoint_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
+    }
+
+    public function retriedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'last_retried_by');
     }
 }

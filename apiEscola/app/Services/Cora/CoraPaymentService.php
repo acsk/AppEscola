@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Cora;
 
 use App\Contracts\PaymentGatewayContract;
 use App\Models\Invoice;

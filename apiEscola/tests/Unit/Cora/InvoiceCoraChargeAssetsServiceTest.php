@@ -1,8 +1,8 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\Cora;
 
-use App\Services\InvoiceCoraChargeAssetsService;
+use App\Services\Cora\InvoiceCoraChargeAssetsService;
 use Tests\TestCase;
 
 class InvoiceCoraChargeAssetsServiceTest extends TestCase

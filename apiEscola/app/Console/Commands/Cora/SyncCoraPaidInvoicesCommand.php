@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Cora;
 
-use App\Services\CoraPaidInvoicesSyncService;
+use App\Services\Cora\CoraPaidInvoicesSyncService;
 use Illuminate\Console\Command;
 
 class SyncCoraPaidInvoicesCommand extends Command

@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Cora;
 
 use App\Models\Enrollment;
 use App\Models\Guardian;
 use App\Models\Invoice;
 use App\Models\Tenant;
-use App\Services\CoraTokenService;
+use App\Services\Cora\CoraTokenService;
 use App\Services\InvoicePaymentSettingsResolver;
 use App\Services\PaymentGatewayFactory;
 use App\Services\TenantBillingSettingsService;

@@ -1,9 +1,9 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\Cora;
 
 use App\Models\Invoice;
-use App\Services\CoraTokenService;
+use App\Services\Cora\CoraTokenService;
 use App\Services\Gateways\CoraPaymentGateway;
 use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;

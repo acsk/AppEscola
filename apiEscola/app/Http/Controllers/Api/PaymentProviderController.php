@@ -10,10 +10,11 @@ use App\Models\TenantAsaasCredential;
 use App\Models\TenantCoraCredential;
 use App\Services\Asaas\AsaasCredentialService;
 use App\Services\Asaas\AsaasHttpClient;
-use App\Services\InvoiceCoraChargeAssetsService;
+use App\Services\Cora\InvoiceCoraChargeAssetsService;
 use App\Services\PaymentGatewayFactory;
-use App\Services\CoraCredentialService;
-use App\Services\CoraTokenService;
+use App\Services\Cora\CoraCredentialService;
+use App\Services\Cora\CoraPaidInvoicesSyncService;
+use App\Services\Cora\CoraTokenService;
 use App\Services\Gateways\CoraPaymentGateway;
 use App\Services\PaymentProviderRegistry;
 use App\Services\TenantBillingSettingsService;
@@ -21,7 +22,6 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -1227,7 +1227,7 @@ class PaymentProviderController extends Controller
         return 'prod';
     }
 
-    public function chargeStatus(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse
+    public function chargeStatus(Request $request, Invoice $invoice, CoraPaidInvoicesSyncService $sync): JsonResponse
     {
         $this->ensureCanAccessInvoice($request, $invoice);
 
@@ -1247,12 +1247,10 @@ class PaymentProviderController extends Controller
             return $this->error('Tenant da fatura não encontrado para consulta no provedor.', null, 422);
         }
 
+        // Mesmo serviço do webhook e da tela Integração Cora: consulta fora da transação, confere o ID
+        // devolvido, trava a cobrança e só então aplica (nunca reabre título pago; paid_at no fuso certo).
         try {
-            $externalInvoice = $factory->resolve('cora')->getInvoiceById(
-                $invoice->tenant,
-                (string) $invoice->cora_charge_id,
-                $environment
-            );
+            $sync->syncOne($invoice, $environment, 'charge-status');
         } catch (ConnectionException|RequestException $e) {
             $status = $e instanceof RequestException ? ($e->response?->status() ?? 502) : 502;
             $providerCode = $e instanceof RequestException ? (string) ($e->response?->json('code') ?? '') : '';
@@ -1301,34 +1299,6 @@ class PaymentProviderController extends Controller
             return $this->error($e->getMessage(), null, 422);
         }
 
-        $providerStatus = strtoupper(trim((string) ($externalInvoice['status'] ?? $invoice->cora_status ?? '')));
-        $providerPaidAt = $this->extractProviderPaidAt($externalInvoice);
-        $localStatus = $this->mapProviderStatusToInvoiceStatus($providerStatus, $invoice->status);
-
-        $existingPayload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
-
-        $updates = [
-            'cora_status' => $providerStatus !== '' ? $providerStatus : $invoice->cora_status,
-            'cora_payload' => array_merge($existingPayload, [
-                'latest_status_snapshot' => $externalInvoice,
-                'last_status_check' => [
-                    'environment' => $environment,
-                    'checked_at' => now()->toISOString(),
-                ],
-            ]),
-            'cora_last_synced_at' => now(),
-        ];
-
-        if ($localStatus === 'paid') {
-            $updates['status'] = 'paid';
-            $updates['paid_at'] = $providerPaidAt ?? $invoice->paid_at ?? now();
-        } elseif ($localStatus === 'cancelled' && $invoice->status !== 'paid') {
-            $updates['status'] = 'cancelled';
-        } elseif ($localStatus === 'pending' && ! in_array($invoice->status, ['paid', 'cancelled'], true)) {
-            $updates['status'] = 'pending';
-        }
-
-        $invoice->update($updates);
         $invoice->refresh();
 
         Log::info('PaymentProviderController chargeStatus synced', [
@@ -1336,7 +1306,7 @@ class PaymentProviderController extends Controller
             'tenant_id' => $invoice->tenant_id,
             'environment' => $environment,
             'cora_charge_id' => $invoice->cora_charge_id,
-            'provider_status' => $providerStatus,
+            'provider_status' => $invoice->cora_status,
             'local_status' => $invoice->status,
             'paid_at' => $invoice->paid_at?->toISOString(),
         ]);
@@ -1346,36 +1316,6 @@ class PaymentProviderController extends Controller
             'status' => $invoice->cora_status,
             'paid_at' => $invoice->paid_at?->toISOString(),
         ], 'Status da cobrança carregado com sucesso.');
-    }
-
-    /**
-     * @param array<string, mixed> $externalInvoice
-     */
-    private function extractProviderPaidAt(array $externalInvoice): ?Carbon
-    {
-        $candidates = [
-            $externalInvoice['paid_at'] ?? null,
-            $externalInvoice['occurrence_date'] ?? null,
-            data_get($externalInvoice, 'payment.paid_at'),
-            data_get($externalInvoice, 'payment_date'),
-            data_get($externalInvoice, 'paidAt'),
-            data_get($externalInvoice, 'payments.0.finalized_at'),
-            data_get($externalInvoice, 'payments.0.created_at'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (! is_string($candidate) || trim($candidate) === '') {
-                continue;
-            }
-
-            try {
-                return Carbon::parse($candidate);
-            } catch (\Throwable) {
-                continue;
-            }
-        }
-
-        return null;
     }
 
     private function isCoraBoletoCipBlock(RequestException $e): bool
@@ -1431,25 +1371,6 @@ class PaymentProviderController extends Controller
         }
 
         return $providerError !== '' ? $providerError : $fallback;
-    }
-
-    private function mapProviderStatusToInvoiceStatus(string $providerStatus, string $currentStatus): string
-    {
-        $normalized = strtoupper(trim($providerStatus));
-
-        if (in_array($normalized, ['PAID', 'IN_PAYMENT', 'COMPLETED', 'RECEIVED'], true)) {
-            return 'paid';
-        }
-
-        if (in_array($normalized, ['CANCELLED', 'CANCELED', 'VOIDED', 'EXPIRED'], true)) {
-            return 'cancelled';
-        }
-
-        if (in_array($normalized, ['OPEN', 'PENDING', 'PROCESSING', 'CREATED'], true)) {
-            return 'pending';
-        }
-
-        return $currentStatus;
     }
 
     public function payCharge(Request $request, Invoice $invoice, PaymentGatewayFactory $factory): JsonResponse

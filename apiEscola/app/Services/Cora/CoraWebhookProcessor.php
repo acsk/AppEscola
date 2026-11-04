@@ -5,7 +5,6 @@ namespace App\Services\Cora;
 use App\Models\CoraWebhookEvent;
 use App\Models\Invoice;
 use App\Observers\InvoiceAuditObserver;
-use App\Services\CoraPaidInvoicesSyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -71,16 +70,37 @@ class CoraWebhookProcessor
     }
 
     /**
-     * Libera um evento em falha ou em revisão para nova tentativa imediata (ação manual).
+     * Reprocessamento manual de um evento em falha ou em revisão: registra quem pediu e processa
+     * na hora, com as mesmas regras do automático (a baixa ainda depende da consulta na Cora).
+     * Devolve o status final, ou null se o evento não podia ser reprocessado.
      */
-    public function retry(CoraWebhookEvent $event): void
+    public function retry(CoraWebhookEvent $event, ?int $userId = null): ?string
     {
-        $event->forceFill([
-            'status' => 'pending',
-            'attempts' => 0,
-            'available_at' => now(),
-            'locked_until' => null,
-        ])->save();
+        $released = CoraWebhookEvent::query()
+            ->whereKey($event->id)
+            ->whereIn('status', ['failed', 'needs_review'])
+            ->update([
+                'status' => 'pending',
+                'attempts' => 0,
+                'available_at' => now(),
+                'locked_until' => null,
+                'manual_retries' => DB::raw('manual_retries + 1'),
+                'last_retried_by' => $userId,
+                'last_retried_at' => now(),
+                'updated_at' => now(),
+            ]) === 1;
+
+        if (! $released) {
+            return null;
+        }
+
+        Log::info('Webhook Cora: reprocessamento manual.', [
+            'event_row' => $event->id,
+            'tenant_id' => $event->tenant_id,
+            'user_id' => $userId,
+        ]);
+
+        return $this->process($event->id);
     }
 
     private function claim(int $eventId): bool
