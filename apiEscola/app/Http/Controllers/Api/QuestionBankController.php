@@ -239,6 +239,7 @@ class QuestionBankController extends Controller
     public function store(SaveStandaloneQuestionRequest $request): JsonResponse
     {
         $tenantId = $this->authorizeStaff($request);
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanAdd($tenantId, 'questions');
         $question = $this->content->createStandalone($tenantId, $request->validated());
         $question->load('options');
 

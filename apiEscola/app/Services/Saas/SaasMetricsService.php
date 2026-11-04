@@ -11,6 +11,8 @@ use App\Models\Tenant;
 use App\Models\TenantAiCredential;
 use App\Models\TenantAsaasCredential;
 use App\Models\TenantCoraCredential;
+use App\Models\TenantSubscription;
+use App\Models\TenantSubscriptionEvent;
 use App\Models\User;
 use App\Support\BusinessDate;
 use Illuminate\Support\Carbon;
@@ -85,6 +87,59 @@ class SaasMetricsService
             'exam_attempts' => $scope(ExamAttempt::query())->whereNotNull('finished_at')->where('finished_at', '>=', $from)->count(),
             'months' => $series,
             'top_tenants' => $this->topTenants($tenantIds, $from),
+            'revenue' => $this->revenue($tenantIds, $from, $today),
+        ];
+    }
+
+    /**
+     * Receita das assinaturas SaaS (nunca das mensalidades escolares). MRR = soma mensal equivalente das ativas e
+     * em atraso, com desconto; a série mensal usa o preço atual de cada assinatura (estimativa).
+     *
+     * @return array<string, mixed>
+     */
+    private function revenue(?array $tenantIds, Carbon $from, Carbon $today): array
+    {
+        $subs = TenantSubscription::query()->with('plan:id,name')
+            ->when($tenantIds !== null, fn ($q) => $q->whereIn('tenant_id', $tenantIds))
+            ->get();
+        $paying = $subs->filter(fn (TenantSubscription $s) => $s->monthlyRevenue() > 0 || in_array($s->status, [TenantSubscription::ACTIVE, TenantSubscription::PAST_DUE], true));
+        $mrr = round($subs->sum(fn (TenantSubscription $s) => $s->monthlyRevenue()), 2);
+        $monthStart = $today->copy()->startOfMonth();
+        $canceledThisMonth = TenantSubscriptionEvent::query()->where('type', 'canceled')->where('created_at', '>=', $monthStart)
+            ->when($tenantIds !== null, fn ($q) => $q->whereIn('tenant_id', $tenantIds))->distinct()->count('tenant_id');
+        $base = $paying->count() + $canceledThisMonth;
+
+        $series = [];
+        for ($cursor = $from->copy(); $cursor->lte($monthStart); $cursor->addMonth()) {
+            $end = $cursor->copy()->endOfMonth();
+            $value = $subs->filter(fn (TenantSubscription $s) => $s->started_at && $s->started_at->lte($end)
+                && (! $s->trial_ends_at || $s->trial_ends_at->lte($end))
+                && (! $s->canceled_at || $s->canceled_at->gt($end))
+                && $s->status !== TenantSubscription::EXPIRED)
+                ->sum(function (TenantSubscription $s) {
+                    $net = (float) $s->price * (1 - (float) $s->discount_percent / 100);
+
+                    return $s->billing_cycle === 'yearly' ? $net / 12 : $net;
+                });
+            $series[] = ['month' => $cursor->format('Y-m'), 'label' => self::MONTHS[(int) $cursor->month].'/'.$cursor->format('y'), 'mrr' => round($value, 2)];
+        }
+
+        return [
+            'mrr' => number_format($mrr, 2, '.', ''),
+            'arr' => number_format($mrr * 12, 2, '.', ''),
+            'arpa' => number_format($paying->count() ? $mrr / $paying->count() : 0, 2, '.', ''),
+            'active_subscriptions' => $paying->count(),
+            'trialing' => $subs->where('status', TenantSubscription::TRIALING)->count(),
+            'past_due' => $subs->where('status', TenantSubscription::PAST_DUE)->count(),
+            'legacy_tenants' => Tenant::query()->when($tenantIds !== null, fn ($q) => $q->whereIn('id', $tenantIds))->doesntHave('subscription')->count(),
+            'canceled_this_month' => $canceledThisMonth,
+            'churn_rate' => $base ? round($canceledThisMonth / $base * 100, 1) : 0.0,
+            'mrr_months' => $series,
+            'by_plan' => $subs->groupBy('saas_plan_id')->map(fn ($group) => [
+                'plan' => $group->first()->plan?->name ?? '—',
+                'tenants' => $group->count(),
+                'mrr' => number_format($group->sum(fn (TenantSubscription $s) => $s->monthlyRevenue()), 2, '.', ''),
+            ])->values()->all(),
         ];
     }
 

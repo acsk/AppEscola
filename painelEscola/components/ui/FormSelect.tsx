@@ -15,6 +15,8 @@ type Props = {
   disabled?: boolean;
   /** Menos margem e label alinhado a outros campos densos */
   dense?: boolean;
+  /** Esconde o rótulo visual (continua no aria-label), ex.: select dentro de linha de tabela. */
+  hideLabel?: boolean;
 };
 
 export default function FormSelect({
@@ -27,13 +29,16 @@ export default function FormSelect({
   required,
   disabled = false,
   dense = false,
+  hideLabel = false,
 }: Props) {
   return (
-    <View className={dense ? "mb-2" : "mb-4"}>
-      <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
-        {label}
-        {required && <Text className="text-danger"> *</Text>}
-      </Text>
+    <View className={hideLabel ? "" : dense ? "mb-2" : "mb-4"}>
+      {!hideLabel && (
+        <Text className="font-medium text-ink" style={{ fontSize: 13, lineHeight: 18, marginBottom: 6 }}>
+          {label}
+          {required && <Text className="text-danger"> *</Text>}
+        </Text>
+      )}
       {/* Renderização nativa para web */}
       <select
         value={value as string}

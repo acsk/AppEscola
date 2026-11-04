@@ -46,6 +46,11 @@ use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\Cora\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\Saas\SaasController;
+use App\Http\Controllers\Api\Saas\SaasFeatureController;
+use App\Http\Controllers\Api\Saas\SaasPlanController;
+use App\Http\Controllers\Api\Saas\SaasSubscriptionController;
+use App\Http\Controllers\Api\Saas\SaasTenantEntitlementController;
+use App\Http\Controllers\Api\TenantEntitlementController;
 use App\Http\Controllers\Api\TenantAccessController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
@@ -153,14 +158,14 @@ Route::prefix('domains')->group(function () {
 });
 
 // Rotas autenticadas via Sanctum
-Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::class, \App\Http\Middleware\IdentifyTenant::class, \App\Http\Middleware\RecordStudentActivity::class])->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::class, \App\Http\Middleware\TrackSupportAccess::class, \App\Http\Middleware\IdentifyTenant::class, \App\Http\Middleware\RecordStudentActivity::class])->group(function () {
 
     // Auth
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/dashboard', [AdminDashboardController::class, 'show']);
 
     // Inteligência Educacional (BI)
-    Route::prefix('bi')->group(function () {
+    Route::prefix('bi')->middleware('feature:bi')->group(function () {
         Route::get('meta', [BiMetaController::class, 'show']);
         Route::get('metrics', [BiMetaController::class, 'metrics']);
         Route::get('overview', [BiOverviewController::class, 'show']);
@@ -180,7 +185,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
         Route::get('effectiveness', [BiEffectivenessController::class, 'show']);
         Route::get('ai/status', [BiAiController::class, 'status']);
         Route::get('ai/drafts/latest', [BiAiController::class, 'latest']);
-        Route::post('ai/drafts', [BiAiController::class, 'generate'])->middleware('throttle:20,1');
+        Route::post('ai/drafts', [BiAiController::class, 'generate'])->middleware(['throttle:20,1', 'feature:ai_insights']);
         Route::put('ai/drafts/{draft}', [BiAiController::class, 'update'])->whereNumber('draft');
         Route::get('reports/{report}', [BiReportController::class, 'show'])->whereIn('report', ['individual', 'class', 'subject', 'institutional', 'results']);
         Route::get('exports', [BiReportController::class, 'exports']);
@@ -245,6 +250,35 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::apiResource('tenants', TenantController::class);
     Route::get('saas/dashboard', [SaasController::class, 'dashboard']);
     Route::get('saas/tenants/{tenant}/overview', [SaasController::class, 'tenantOverview']);
+
+    // Super Admin SaaS — fase 2 (planos, assinaturas, feature flags, quotas, auditoria)
+    Route::prefix('saas')->middleware('super_admin')->group(function () {
+        Route::get('plans', [SaasPlanController::class, 'index']);
+        Route::post('plans', [SaasPlanController::class, 'store']);
+        Route::put('plans/{plan}', [SaasPlanController::class, 'update'])->whereNumber('plan');
+        Route::delete('plans/{plan}', [SaasPlanController::class, 'destroy'])->whereNumber('plan');
+        Route::get('features', [SaasFeatureController::class, 'index']);
+        Route::put('features/{feature:key}', [SaasFeatureController::class, 'update']);
+        Route::get('subscriptions', [SaasSubscriptionController::class, 'index']);
+        Route::get('tenants/{tenant}/subscription', [SaasSubscriptionController::class, 'show']);
+        Route::post('tenants/{tenant}/subscription', [SaasSubscriptionController::class, 'store']);
+        Route::post('tenants/{tenant}/subscription/change-plan', [SaasSubscriptionController::class, 'changePlan']);
+        Route::post('tenants/{tenant}/subscription/renew', [SaasSubscriptionController::class, 'renew']);
+        Route::post('tenants/{tenant}/subscription/cancel', [SaasSubscriptionController::class, 'cancel']);
+        Route::post('tenants/{tenant}/subscription/reactivate', [SaasSubscriptionController::class, 'reactivate']);
+        Route::post('tenants/{tenant}/subscription/extend-trial', [SaasSubscriptionController::class, 'extendTrial']);
+        Route::put('tenants/{tenant}/subscription/discount', [SaasSubscriptionController::class, 'discount']);
+        Route::get('tenants/{tenant}/features', [SaasTenantEntitlementController::class, 'features']);
+        Route::put('tenants/{tenant}/features/{feature:key}', [SaasTenantEntitlementController::class, 'setFeature'])->withoutScopedBindings();
+        Route::delete('tenants/{tenant}/features/{feature:key}', [SaasTenantEntitlementController::class, 'clearFeature'])->withoutScopedBindings();
+        Route::get('tenants/{tenant}/quotas', [SaasTenantEntitlementController::class, 'quotas']);
+        Route::put('tenants/{tenant}/quotas/{resource}', [SaasTenantEntitlementController::class, 'setQuota']);
+        Route::delete('tenants/{tenant}/quotas/{resource}', [SaasTenantEntitlementController::class, 'clearQuota']);
+        Route::get('tenants/{tenant}/audit', [SaasTenantEntitlementController::class, 'audit']);
+    });
+
+    // Tenant logado: status, funcionalidades e alertas de limite
+    Route::get('tenant/entitlements', [TenantEntitlementController::class, 'show']);
     Route::get('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'show']);
     Route::put('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'update']);
     Route::post('tenants/{tenant}/upload-photo', [TenantController::class, 'uploadPhoto']);
@@ -261,8 +295,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
 
     // Tema / cores do app mobile por tenant (painel)
     Route::get('tenant-mobile-theme',        [TenantMobileThemeController::class, 'show']);
-    Route::put('tenant-mobile-theme',        [TenantMobileThemeController::class, 'update']);
-    Route::post('tenant-mobile-theme/reset', [TenantMobileThemeController::class, 'reset']);
+    Route::put('tenant-mobile-theme',        [TenantMobileThemeController::class, 'update'])->middleware('feature:visual_customization');
+    Route::post('tenant-mobile-theme/reset', [TenantMobileThemeController::class, 'reset'])->middleware('feature:visual_customization');
 
     // Chaves de IA do tenant (criptografadas). Super admin usa as chaves do .env.
     Route::get('ai-settings',               [TenantAiSettingsController::class, 'index']);
@@ -346,53 +380,56 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::apiResource('payment-providers', PaymentProvidersController::class);
 
     // Cobranças
-    // Financeiro · Visão geral
-    Route::get('finance/dashboard', [FinanceDashboardController::class, 'show']);
-    Route::get('finance/cora/overview', [CoraIntegrationController::class, 'show']);
-    Route::get('finance/cora/events', [CoraIntegrationController::class, 'events']);
-    Route::post('finance/cora/events/{event}/retry', [CoraIntegrationController::class, 'retry'])->whereNumber('event');
-    Route::post('finance/cora/invoices/{invoice}/consult', [CoraIntegrationController::class, 'consultInvoice'])->whereNumber('invoice');
-    Route::get('finance/reconciliation/summary', [BankReconciliationController::class, 'summary']);
-    Route::get('finance/reconciliation/entries', [BankReconciliationController::class, 'entries']);
-    Route::post('finance/reconciliation/sync', [BankReconciliationController::class, 'sync']);
-    Route::get('finance/reconciliation/entries/{entry}/candidates', [BankReconciliationController::class, 'candidates'])->whereNumber('entry');
-    Route::get('finance/reconciliation/entries/{entry}/history', [BankReconciliationController::class, 'history'])->whereNumber('entry');
-    Route::post('finance/reconciliation/entries/{entry}/reconcile', [BankReconciliationController::class, 'reconcile'])->whereNumber('entry');
-    Route::post('finance/reconciliation/entries/{entry}/ignore', [BankReconciliationController::class, 'ignore'])->whereNumber('entry');
-    Route::post('finance/reconciliation/entries/{entry}/divergent', [BankReconciliationController::class, 'markDivergent'])->whereNumber('entry');
-    Route::post('finance/reconciliation/entries/{entry}/undo', [BankReconciliationController::class, 'undo'])->whereNumber('entry');
-    Route::get('finance/reconciliation/entries/{entry}/expense-candidates', [BankReconciliationController::class, 'expenseCandidates'])->whereNumber('entry');
-    Route::post('finance/reconciliation/entries/{entry}/reconcile-expense', [BankReconciliationController::class, 'reconcileExpense'])->whereNumber('entry');
+    // Financeiro (módulo do plano: feature finance)
+    Route::middleware('feature:finance')->group(function () {
+        // Financeiro · Visão geral
+        Route::get('finance/dashboard', [FinanceDashboardController::class, 'show']);
+        Route::get('finance/cora/overview', [CoraIntegrationController::class, 'show']);
+        Route::get('finance/cora/events', [CoraIntegrationController::class, 'events']);
+        Route::post('finance/cora/events/{event}/retry', [CoraIntegrationController::class, 'retry'])->whereNumber('event');
+        Route::post('finance/cora/invoices/{invoice}/consult', [CoraIntegrationController::class, 'consultInvoice'])->whereNumber('invoice');
+        Route::get('finance/reconciliation/summary', [BankReconciliationController::class, 'summary'])->middleware('feature:bank_reconciliation');
+        Route::get('finance/reconciliation/entries', [BankReconciliationController::class, 'entries'])->middleware('feature:bank_reconciliation');
+        Route::post('finance/reconciliation/sync', [BankReconciliationController::class, 'sync'])->middleware('feature:bank_reconciliation');
+        Route::get('finance/reconciliation/entries/{entry}/candidates', [BankReconciliationController::class, 'candidates'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
+        Route::get('finance/reconciliation/entries/{entry}/history', [BankReconciliationController::class, 'history'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
+        Route::post('finance/reconciliation/entries/{entry}/reconcile', [BankReconciliationController::class, 'reconcile'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
+        Route::post('finance/reconciliation/entries/{entry}/ignore', [BankReconciliationController::class, 'ignore'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
+        Route::post('finance/reconciliation/entries/{entry}/divergent', [BankReconciliationController::class, 'markDivergent'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
+        Route::post('finance/reconciliation/entries/{entry}/undo', [BankReconciliationController::class, 'undo'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
+        Route::get('finance/reconciliation/entries/{entry}/expense-candidates', [BankReconciliationController::class, 'expenseCandidates'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
+        Route::post('finance/reconciliation/entries/{entry}/reconcile-expense', [BankReconciliationController::class, 'reconcileExpense'])->whereNumber('entry')->middleware('feature:bank_reconciliation');
 
-    Route::get('finance/cash-flow', [CashFlowController::class, 'show']);
-    Route::get('finance/reports/consolidated', [CashFlowController::class, 'consolidated']);
-    Route::get('finance/settings', [FinanceSettingsController::class, 'show']);
+        Route::get('finance/cash-flow', [CashFlowController::class, 'show']);
+        Route::get('finance/reports/consolidated', [CashFlowController::class, 'consolidated']);
+        Route::get('finance/settings', [FinanceSettingsController::class, 'show']);
 
-    // Contas a pagar (registrar pagamento não movimenta a conta bancária).
-    Route::get('finance/payables/summary', [ExpenseController::class, 'summary']);
-    Route::get('finance/payables/options', [ExpenseController::class, 'options']);
-    Route::get('finance/payables/expenses', [ExpenseController::class, 'index']);
-    Route::post('finance/payables/expenses', [ExpenseController::class, 'store']);
-    Route::post('finance/payables/expenses/batch', [ExpenseController::class, 'batch']);
-    Route::get('finance/payables/expenses/{expense}', [ExpenseController::class, 'show'])->whereNumber('expense');
-    Route::put('finance/payables/expenses/{expense}', [ExpenseController::class, 'update'])->whereNumber('expense');
-    Route::post('finance/payables/expenses/{expense}/submit', [ExpenseController::class, 'submit'])->whereNumber('expense');
-    Route::post('finance/payables/expenses/{expense}/approve', [ExpenseController::class, 'approve'])->whereNumber('expense');
-    Route::post('finance/payables/expenses/{expense}/pay', [ExpenseController::class, 'pay'])->whereNumber('expense');
-    Route::post('finance/payables/expenses/{expense}/reopen', [ExpenseController::class, 'reopen'])->whereNumber('expense');
-    Route::post('finance/payables/expenses/{expense}/cancel', [ExpenseController::class, 'cancel'])->whereNumber('expense');
-    Route::post('finance/payables/expenses/{expense}/attachments', [ExpenseController::class, 'storeAttachment'])->whereNumber('expense');
-    Route::get('finance/payables/expenses/{expense}/attachments/{attachment}', [ExpenseController::class, 'downloadAttachment'])->whereNumber(['expense', 'attachment']);
-    Route::delete('finance/payables/expenses/{expense}/attachments/{attachment}', [ExpenseController::class, 'destroyAttachment'])->whereNumber(['expense', 'attachment']);
-    Route::get('finance/payables/suppliers', [PayablesCatalogController::class, 'suppliers']);
-    Route::post('finance/payables/suppliers', [PayablesCatalogController::class, 'storeSupplier']);
-    Route::put('finance/payables/suppliers/{supplier}', [PayablesCatalogController::class, 'updateSupplier'])->whereNumber('supplier');
-    Route::get('finance/payables/categories', [PayablesCatalogController::class, 'categories']);
-    Route::get('finance/payables/cost-centers', [PayablesCatalogController::class, 'costCenters']);
-    Route::post('finance/payables/categories', [PayablesCatalogController::class, 'storeCategory']);
-    Route::put('finance/payables/categories/{category}', [PayablesCatalogController::class, 'updateCategory'])->whereNumber('category');
-    Route::post('finance/payables/cost-centers', [PayablesCatalogController::class, 'storeCostCenter']);
-    Route::put('finance/payables/cost-centers/{costCenter}', [PayablesCatalogController::class, 'updateCostCenter'])->whereNumber('costCenter');
+        // Contas a pagar (registrar pagamento não movimenta a conta bancária).
+        Route::get('finance/payables/summary', [ExpenseController::class, 'summary']);
+        Route::get('finance/payables/options', [ExpenseController::class, 'options']);
+        Route::get('finance/payables/expenses', [ExpenseController::class, 'index']);
+        Route::post('finance/payables/expenses', [ExpenseController::class, 'store']);
+        Route::post('finance/payables/expenses/batch', [ExpenseController::class, 'batch']);
+        Route::get('finance/payables/expenses/{expense}', [ExpenseController::class, 'show'])->whereNumber('expense');
+        Route::put('finance/payables/expenses/{expense}', [ExpenseController::class, 'update'])->whereNumber('expense');
+        Route::post('finance/payables/expenses/{expense}/submit', [ExpenseController::class, 'submit'])->whereNumber('expense');
+        Route::post('finance/payables/expenses/{expense}/approve', [ExpenseController::class, 'approve'])->whereNumber('expense');
+        Route::post('finance/payables/expenses/{expense}/pay', [ExpenseController::class, 'pay'])->whereNumber('expense');
+        Route::post('finance/payables/expenses/{expense}/reopen', [ExpenseController::class, 'reopen'])->whereNumber('expense');
+        Route::post('finance/payables/expenses/{expense}/cancel', [ExpenseController::class, 'cancel'])->whereNumber('expense');
+        Route::post('finance/payables/expenses/{expense}/attachments', [ExpenseController::class, 'storeAttachment'])->whereNumber('expense');
+        Route::get('finance/payables/expenses/{expense}/attachments/{attachment}', [ExpenseController::class, 'downloadAttachment'])->whereNumber(['expense', 'attachment']);
+        Route::delete('finance/payables/expenses/{expense}/attachments/{attachment}', [ExpenseController::class, 'destroyAttachment'])->whereNumber(['expense', 'attachment']);
+        Route::get('finance/payables/suppliers', [PayablesCatalogController::class, 'suppliers']);
+        Route::post('finance/payables/suppliers', [PayablesCatalogController::class, 'storeSupplier']);
+        Route::put('finance/payables/suppliers/{supplier}', [PayablesCatalogController::class, 'updateSupplier'])->whereNumber('supplier');
+        Route::get('finance/payables/categories', [PayablesCatalogController::class, 'categories']);
+        Route::get('finance/payables/cost-centers', [PayablesCatalogController::class, 'costCenters']);
+        Route::post('finance/payables/categories', [PayablesCatalogController::class, 'storeCategory']);
+        Route::put('finance/payables/categories/{category}', [PayablesCatalogController::class, 'updateCategory'])->whereNumber('category');
+        Route::post('finance/payables/cost-centers', [PayablesCatalogController::class, 'storeCostCenter']);
+        Route::put('finance/payables/cost-centers/{costCenter}', [PayablesCatalogController::class, 'updateCostCenter'])->whereNumber('costCenter');
+    });
 
     Route::get('invoices/summary', [InvoiceController::class, 'summary']);
     Route::get('invoices/situations', [InvoiceController::class, 'situations']);
@@ -437,8 +474,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::get('notifications/settings',                 [TenantNotificationSettingsController::class, 'show']);
     Route::put('notifications/settings',                 [TenantNotificationSettingsController::class, 'update']);
     Route::get('notifications/types',                    [NotificationBroadcastController::class, 'types']);
-    Route::post('notifications/preview',                 [NotificationBroadcastController::class, 'preview']);
-    Route::post('notifications/send',                    [NotificationBroadcastController::class, 'send']);
+    Route::post('notifications/preview',                 [NotificationBroadcastController::class, 'preview'])->middleware('feature:communication');
+    Route::post('notifications/send',                    [NotificationBroadcastController::class, 'send'])->middleware('feature:communication');
     Route::get('notifications/broadcasts',               [NotificationBroadcastController::class, 'index']);
     Route::get('notifications/broadcasts/{broadcast}',   [NotificationBroadcastController::class, 'show']);
 
@@ -497,10 +534,12 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::get('students/{student}/report-card', [OfficialAssessmentController::class, 'studentReportCard']);
 
     // Simulados
-    Route::apiResource('exams', ExamController::class);
-    Route::get('exams/{exam}/stats',           [ExamController::class, 'stats']);
-    Route::get('exams/{exam}/delivery-report', [ExamController::class, 'deliveryReport']);
-    Route::get('exams/{exam}/question-errors-report', [ExamController::class, 'questionErrorsReport']);
+    Route::middleware('feature:exams')->group(function () {
+        Route::apiResource('exams', ExamController::class);
+        Route::get('exams/{exam}/stats',           [ExamController::class, 'stats']);
+        Route::get('exams/{exam}/delivery-report', [ExamController::class, 'deliveryReport']);
+        Route::get('exams/{exam}/question-errors-report', [ExamController::class, 'questionErrorsReport']);
+    });
 
     // Domínios de simulados (lookup tables)
     Route::get('exam-statuses', fn () => response()->json(\App\Models\ExamStatus::orderBy('order')->get(['id', 'slug', 'label'])));
@@ -515,7 +554,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::delete('admin/exam-types/{examType}/logo', [ExamTypeController::class, 'destroyLogo']);
 
     // Banco de questões (avulsas e de simulados): listagem e classificação
-    Route::prefix('question-bank')->group(function () {
+    Route::prefix('question-bank')->middleware('feature:question_bank')->group(function () {
         Route::get('import-drafts', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'index']);
         Route::post('import-drafts', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'store']);
         Route::get('import-drafts/{draft}', [\App\Http\Controllers\Api\QuestionImportDraftController::class, 'show'])->whereUuid('draft');
@@ -535,7 +574,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
         Route::post('imported-exams/{exam}/questions',   [QuestionBankController::class, 'appendToImportedExam'])->whereNumber('exam');
 
         // Simulados do banco de questões (importados de PDF ou montados pelo admin; separados dos oficiais)
-        Route::get('practice-ranking',                           [QuestionBankPracticeController::class, 'ranking']);
+        Route::get('practice-ranking',                           [QuestionBankPracticeController::class, 'ranking'])->middleware('feature:ranking');
         Route::get('question-sets',                              [QuestionSetController::class, 'index']);
         Route::post('question-sets',                             [QuestionSetController::class, 'store']);
         Route::post('question-sets/generate',                    [QuestionSetController::class, 'generate']);
@@ -559,7 +598,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
 
         // IA: sugestões; rascunhos de imagens ficam auditados até a aprovação.
         Route::get('ai/status', [QuestionAiController::class, 'status']);
-        Route::middleware('throttle:30,1')->group(function () {
+        Route::middleware(['throttle:30,1', 'feature:ai'])->group(function () {
             Route::post('ai/autofill',                       [QuestionAiController::class, 'autofill']);
             Route::post('ai/classify',                       [QuestionAiController::class, 'classify']);
             Route::post('ai/extract',                        [QuestionAiController::class, 'extract']);

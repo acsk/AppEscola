@@ -31,3 +31,8 @@ Schedule::command('finance:generate-recurring-expenses')
     ->dailyAt('05:30')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping();
+// Super Admin SaaS: teste vencido → expirada; vencimento passado → em atraso (não suspende o tenant).
+Schedule::command('saas:expire-subscriptions')
+    ->dailyAt('00:20')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();

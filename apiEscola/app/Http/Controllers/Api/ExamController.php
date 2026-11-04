@@ -65,6 +65,9 @@ class ExamController extends Controller
         $this->examAccess->assertCanManageExams($request->user());
 
         $tenantId = $this->getTenantId($request);
+        if ($tenantId) {
+            app(\App\Services\Saas\TenantQuotaService::class)->assertCanAdd($tenantId, 'exams');
+        }
 
         $data = $request->validated();
         $courseIds = $data['course_ids'] ?? [];

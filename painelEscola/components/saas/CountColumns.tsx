@@ -5,7 +5,8 @@ import { color } from "../../constants/theme";
 export type CountPoint = { key: string; label: string; value: number };
 
 /** Colunas de uma série (contagens por mês), em `brand`; valor no hover/foco e no rótulo acessível. */
-export default function CountColumns({ points, unit, height = 160 }: { points: CountPoint[]; unit: string; height?: number }) {
+export default function CountColumns({ points, unit, height = 160, format }: { points: CountPoint[]; unit: string; height?: number; format?: (value: number) => string }) {
+  const show = (v: number) => (format ? format(v) : `${v.toLocaleString("pt-BR")} ${unit}`);
   const [hovered, setHovered] = useState<string | null>(null);
   const max = Math.max(0, ...points.map((p) => p.value));
   const scale = (v: number) => (max > 0 ? Math.max(v > 0 ? 2 : 0, (v / max) * height) : 0);
@@ -14,7 +15,7 @@ export default function CountColumns({ points, unit, height = 160 }: { points: C
   return (
     <View style={{ gap: 8 }}>
       <Text className="font-mono text-ink-muted" style={{ fontSize: 12, minHeight: 16 }}>
-        {active ? `${active.label}: ${active.value.toLocaleString("pt-BR")} ${unit}` : `Máximo: ${max.toLocaleString("pt-BR")} ${unit}`}
+        {active ? `${active.label}: ${show(active.value)}` : `Máximo: ${show(max)}`}
       </Text>
       <View className="flex-row border-b border-border" style={{ height, alignItems: "flex-end", gap: 4 }}>
         {points.map((p) => (
@@ -24,7 +25,7 @@ export default function CountColumns({ points, unit, height = 160 }: { points: C
             onHoverOut={() => setHovered(null)}
             onFocus={() => setHovered(p.key)}
             onBlur={() => setHovered(null)}
-            aria-label={`${p.label}: ${p.value} ${unit}`}
+            aria-label={`${p.label}: ${show(p.value)}`}
             style={{ flex: 1, height: "100%", justifyContent: "flex-end", alignItems: "center" }}
           >
             <View style={{ width: "70%", maxWidth: 28, height: scale(p.value), backgroundColor: hovered && hovered !== p.key ? color["border-strong"] : color.brand, borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />

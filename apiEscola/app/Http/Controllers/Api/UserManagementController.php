@@ -274,6 +274,14 @@ class UserManagementController extends Controller
         $validated = $this->validateStore($request);
         $data = $this->normalizeStoreData($request, $validated);
 
+        if (! empty($data['tenant_id']) && ! in_array($data['role'], ['aluno', 'responsavel', 'super_admin'], true)) {
+            $quotas = app(\App\Services\Saas\TenantQuotaService::class);
+            $quotas->assertCanAdd((int) $data['tenant_id'], 'users');
+            if ($data['role'] === 'professor') {
+                $quotas->assertCanAdd((int) $data['tenant_id'], 'teachers');
+            }
+        }
+
         $user = DB::transaction(function () use ($data) {
             $user = User::create([
                 'tenant_id'                => $data['tenant_id'] ?? null,
@@ -337,6 +345,11 @@ class UserManagementController extends Controller
         DB::transaction(function () use ($user, $data) {
             $user->update($data);
             $this->syncProfessorSubjects($user, $data);
+
+            // Bloqueado: derruba as sessões abertas (painel e app) na hora.
+            if ($user->status !== 'active') {
+                $user->tokens()->delete();
+            }
         });
 
         return $this->success(new UserResource($user->fresh()->load('subjects:id,name,status')));

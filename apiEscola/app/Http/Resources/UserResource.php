@@ -41,6 +41,7 @@ class UserResource extends JsonResource
                     'phone' => $this->tenant->phone,
                     'whatsapp' => $this->tenant->whatsapp,
                     'photo_url' => $this->tenant->photo_url,
+                    'status' => $this->tenant->status,
                     'address' => $this->formatTenantAddress($this->tenant),
                 ],
             ),

@@ -45,6 +45,11 @@ import { QuestionBankScreen, QuestionClassifyScreen, QuestionEditScreen, Questio
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import SaasDashboardScreen from "./screens/saas/SaasDashboardScreen";
 import TenantDetailScreen from "./screens/saas/TenantDetailScreen";
+import SaasPlansScreen from "./screens/saas/SaasPlansScreen";
+import SaasSubscriptionsScreen from "./screens/saas/SaasSubscriptionsScreen";
+import SaasFeaturesScreen from "./screens/saas/SaasFeaturesScreen";
+import TenantStatusBanner from "./components/saas/TenantStatusBanner";
+import { fetchTenantEntitlements, type TenantEntitlements } from "./services/saas";
 import { UsersScreen, UserFormScreen } from "./screens/users";
 import { AiSettingsScreen, BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/configuracoes";
 import { NotificationsScreen } from "./screens/notificacoes";
@@ -268,13 +273,21 @@ function hashToNav(hash: string): NavState {
     return { screen: "avaliacoes-oficiais" };
   }
 
-  if (seg0 === "plataforma") return { screen: "saas-dashboard" };
+  if (seg0 === "plataforma") {
+    if (seg1 === "planos") return { screen: "saas-plans" };
+    if (seg1 === "assinaturas") return { screen: "saas-subscriptions" };
+    if (seg1 === "funcionalidades") return { screen: "saas-features" };
+    return { screen: "saas-dashboard" };
+  }
 
   if (seg0 === "tenants") {
     if (!seg1) return { screen: "tenants" };
     if (seg1 === "novo") return { screen: "tenants-form", params: { tenantId: null } };
     const id = parseInt(seg1, 10);
-    if (!isNaN(id) && path.split("/").filter(Boolean)[2] === "detalhes") return { screen: "tenants-detail", params: { tenantId: id } };
+    if (!isNaN(id) && path.split("/").filter(Boolean)[2] === "detalhes") {
+      const tab = path.split("/").filter(Boolean)[3];
+      return { screen: "tenants-detail", params: { tenantId: id, ...(tab ? { tab } : {}) } };
+    }
     if (!isNaN(id)) return { screen: "tenants-form", params: { tenantId: id } };
     return { screen: "tenants" };
   }
@@ -425,7 +438,10 @@ function navToHash(nav: NavState): string {
     return id != null ? `#/turmas/${id}/frequencia` : "#/turmas";
   }
   if (nav.screen === "saas-dashboard") return "#/plataforma";
-  if (nav.screen === "tenants-detail") return `#/tenants/${nav.params?.tenantId}/detalhes`;
+  if (nav.screen === "tenants-detail") return `#/tenants/${nav.params?.tenantId}/detalhes${nav.params?.tab ? `/${nav.params.tab}` : ""}`;
+  if (nav.screen === "saas-plans") return "#/plataforma/planos";
+  if (nav.screen === "saas-subscriptions") return "#/plataforma/assinaturas";
+  if (nav.screen === "saas-features") return "#/plataforma/funcionalidades";
   if (nav.screen === "tenants-form") {
     const id = nav.params?.tenantId;
     return id != null ? `#/tenants/${id}` : "#/tenants/novo";
@@ -520,6 +536,26 @@ function AppContent() {
       .then((meta) => setBiSections(meta.sections.filter((section) => section.available)))
       .catch(() => setBiSections([]));
   }, [user?.id, user?.role]);
+
+  // Status da instituição, módulos do plano e alertas de limite (aviso no topo e menu). O backend valida tudo.
+  const [entitlements, setEntitlements] = useState<TenantEntitlements | null>(null);
+  useEffect(() => {
+    if (!user || (user.role === "super_admin" && !user.selected_tenant_id)) {
+      setEntitlements(null);
+      return;
+    }
+    let active = true;
+    const load = () =>
+      fetchTenantEntitlements()
+        .then((data) => active && setEntitlements(data))
+        .catch(() => undefined);
+    load();
+    const timer = setInterval(load, 5 * 60 * 1000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [user?.id, user?.role, user?.selected_tenant_id]);
 
   const [nav, setNav] = useState<NavState>(() => {
     if (typeof window !== "undefined" && window.location.hash) {
@@ -920,7 +956,7 @@ function AppContent() {
   }
 
   const renderScreen = () => {
-    if (!canManageTenants && (nav.screen.startsWith("tenants") || nav.screen === "saas-dashboard" || nav.screen === "tipos-prova")) {
+    if (!canManageTenants && (nav.screen.startsWith("tenants") || nav.screen.startsWith("saas-") || nav.screen === "tipos-prova")) {
       return (
         <View className="flex-1 items-center justify-center px-6">
           <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
@@ -1177,7 +1213,10 @@ function AppContent() {
         );
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
-      case "tenants-detail": return <TenantDetailScreen key={String(nav.params?.tenantId)} navigate={navigate} tenantId={Number(nav.params?.tenantId)} />;
+      case "tenants-detail": return <TenantDetailScreen key={String(nav.params?.tenantId)} navigate={navigate} tenantId={Number(nav.params?.tenantId)} initialTab={nav.params?.tab ? String(nav.params.tab) : undefined} />;
+      case "saas-plans": return <SaasPlansScreen />;
+      case "saas-subscriptions": return <SaasSubscriptionsScreen navigate={navigate} />;
+      case "saas-features": return <SaasFeaturesScreen />;
       case "saas-dashboard": return <SaasDashboardScreen navigate={navigate} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
@@ -1253,6 +1292,7 @@ function AppContent() {
             canSendNotifications={canSendNotifications}
             canViewFinance={canViewFinance}
             biSections={biSections}
+            features={entitlements?.features ?? null}
             apiVersion={apiVersion}
           />
         )}
@@ -1276,6 +1316,7 @@ function AppContent() {
               canSendNotifications={canSendNotifications}
               canViewFinance={canViewFinance}
               biSections={biSections}
+              features={entitlements?.features ?? null}
               apiVersion={apiVersion}
               isMobile
               onClose={() => setIsSidebarOpen(false)}
@@ -1284,6 +1325,7 @@ function AppContent() {
         )}
         <View className="flex-1 flex-col overflow-hidden">
           <Header onOpenMenu={isMobile ? () => setIsSidebarOpen(true) : undefined} isMobile={isMobile} />
+          <TenantStatusBanner entitlements={entitlements} />
           {renderScreen()}
         </View>
       </View>

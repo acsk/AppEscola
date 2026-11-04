@@ -57,6 +57,9 @@ class CourseController extends Controller
     public function store(StoreCourseRequest $request): JsonResponse
     {
         $tenantId = $this->getTenantId($request);
+        if ($tenantId) {
+            app(\App\Services\Saas\TenantQuotaService::class)->assertCanAdd($tenantId, 'courses');
+        }
 
         $course = Course::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
 

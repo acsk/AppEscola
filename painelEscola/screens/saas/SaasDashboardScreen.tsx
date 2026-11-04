@@ -13,7 +13,7 @@ import CountColumns from "../../components/saas/CountColumns";
 import { color } from "../../constants/theme";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { getApiErrorMessage } from "../../utils/apiErrors";
-import { fetchSaasDashboard, fmtInt, TENANT_STATUS_LABEL, tenantStatusTone, type SaasDashboard } from "../../services/saas";
+import { fetchSaasDashboard, fmtBrl, fmtInt, TENANT_STATUS_LABEL, tenantStatusTone, type SaasDashboard } from "../../services/saas";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -118,6 +118,47 @@ export default function SaasDashboardScreen({ navigate }: Props) {
             ))}
           </View>
 
+          <Panel
+            title="Receita SaaS"
+            description={`Assinaturas da plataforma (não inclui mensalidades das escolas). ${fmtInt(data.revenue.legacy_tenants)} instituições sem assinatura.`}
+            actions={<Button size="sm" label="Assinaturas" onPress={() => navigate("saas-subscriptions")} />}
+          >
+            <View style={{ gap: 20 }}>
+              <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                {[
+                  <StatTile key="mrr" label="MRR" value={fmtBrl(data.revenue.mrr)} hint={`${fmtInt(data.revenue.active_subscriptions)} assinaturas pagantes`} />,
+                  <StatTile key="arr" label="ARR estimado" value={fmtBrl(data.revenue.arr)} hint="MRR × 12" />,
+                  <StatTile key="arpa" label="Receita média por tenant" value={fmtBrl(data.revenue.arpa)} hint={`${fmtInt(data.revenue.trialing)} em teste · ${fmtInt(data.revenue.past_due)} em atraso`} />,
+                  <StatTile key="churn" label="Cancelamento no mês" value={`${data.revenue.churn_rate.toLocaleString("pt-BR")}%`} hint={`${fmtInt(data.revenue.canceled_this_month)} cancelamentos`} />,
+                ].map((tile, i) => (
+                  <View key={i} style={{ flexBasis: isMobile ? "100%" : 200, flexGrow: 1 }}>
+                    {tile}
+                  </View>
+                ))}
+              </View>
+              <View className="flex-row flex-wrap" style={{ gap: 24 }}>
+                <View style={{ flex: 2, minWidth: isMobile ? "100%" : 380, gap: 8 }}>
+                  <Text className="text-sm font-medium text-ink">Evolução do MRR</Text>
+                  <CountColumns unit="" format={fmtBrl} points={data.revenue.mrr_months.map((m) => ({ key: m.month, label: m.label, value: m.mrr }))} />
+                  <Text className="text-xs text-ink-subtle">Estimativa com o valor atual de cada assinatura.</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: isMobile ? "100%" : 240, gap: 8 }}>
+                  <Text className="text-sm font-medium text-ink">Por plano</Text>
+                  {data.revenue.by_plan.length === 0 ? (
+                    <Text className="text-sm text-ink-muted">Nenhuma assinatura contratada.</Text>
+                  ) : (
+                    data.revenue.by_plan.map((p) => (
+                      <View key={p.plan} className="flex-row justify-between border-b border-border" style={{ paddingVertical: 8, gap: 8 }}>
+                        <Text className="text-sm text-ink" style={{ flex: 1 }} numberOfLines={1}>{`${p.plan} (${p.tenants})`}</Text>
+                        <Text className="text-sm font-mono text-ink">{fmtBrl(p.mrr)}</Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </View>
+            </View>
+          </Panel>
+
           <View className="flex-row flex-wrap" style={{ gap: 16 }}>
             <View style={{ flex: 1, minWidth: isMobile ? "100%" : 380 }}>
               <Panel title="Novos tenants por mês" description={`${fmtInt(data.months.reduce((s, m) => s + m.new_tenants, 0))} no período`}>
@@ -189,7 +230,7 @@ export default function SaasDashboardScreen({ navigate }: Props) {
           </View>
 
           <Text className="text-xs text-ink-subtle">
-            Indicadores atualizados a cada 5 minutos. Receita SaaS (MRR, ARR, churn) aparece aqui quando as assinaturas da plataforma forem ativadas.
+            Indicadores atualizados a cada 5 minutos.
           </Text>
         </>
       ) : null}

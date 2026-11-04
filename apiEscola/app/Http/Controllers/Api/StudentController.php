@@ -103,6 +103,9 @@ class StudentController extends Controller
     public function store(StoreStudentRequest $request, StudentAppAccessService $appAccess): JsonResponse
     {
         $tenantId = $this->getTenantId($request);
+        if ($tenantId && ($request->validated()['status'] ?? 'active') === 'active') {
+            app(\App\Services\Saas\TenantQuotaService::class)->assertCanAdd($tenantId, 'students');
+        }
 
         $student = DB::transaction(function () use ($request, $tenantId, $appAccess) {
             $studentData = collect($request->validated())

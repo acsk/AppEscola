@@ -37,6 +37,10 @@ class LearningGenerationService
         if ($open) {
             return $open;
         }
+        // Limite mensal do plano: não enfileira além da cota (a geração automática só pula este ciclo).
+        if (! app(\App\Services\Saas\TenantQuotaService::class)->allows($tenantId, 'ai_question_generations')) {
+            return null;
+        }
 
         return QuestionGenerationJob::query()->create([
             'tenant_id' => $tenantId,

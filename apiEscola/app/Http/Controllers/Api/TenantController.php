@@ -162,6 +162,7 @@ class TenantController extends Controller
         $this->ensureSuperAdmin($request);
 
         $data = $request->validated();
+        $previousStatus = $tenant->status;
 
         $tenantData = collect($data)->except([
             'admin_password',
@@ -206,6 +207,11 @@ class TenantController extends Controller
                 $admin->update($adminData);
             }
         });
+
+        if (array_key_exists('status', $data) && $data['status'] && $data['status'] !== $previousStatus) {
+            \App\Http\Middleware\EnforceAccountStatus::forgetTenantStatus($tenant->id);
+            app(\App\Services\Saas\SaasAuditService::class)->log($request->user(), $tenant->id, 'tenant.status', "Status da instituição: {$previousStatus} → {$data['status']}");
+        }
 
         return new TenantResource($tenant->fresh());
     }

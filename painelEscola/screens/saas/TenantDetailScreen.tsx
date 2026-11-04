@@ -15,7 +15,8 @@ import Pagination from "../../components/ui/Pagination";
 import DataTableRow from "../../components/ui/DataTableRow";
 import { TABLE_CONTAINER, TABLE_HEADER_CELL, TABLE_HEADER_ROW, TABLE_HEADER_ROW_STYLE } from "../../components/ui/dataTableStyles";
 import SupportAccessModal from "../../components/tenants/SupportAccessModal";
-import SupportAccessHistory from "../../components/tenants/SupportAccessHistory";
+import TenantSubscriptionTab from "../../components/saas/TenantSubscriptionTab";
+import { TenantAuditTab, TenantFeaturesTab, TenantQuotasTab } from "../../components/saas/TenantEntitlementTabs";
 import { color } from "../../constants/theme";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { getApiErrorMessage, showApiErrorToast, showApiToast, type ApiToastState } from "../../utils/apiErrors";
@@ -24,9 +25,12 @@ import { fetchTenantOverview, fmtInt, TENANT_STATUS_LABEL, tenantStatusTone, typ
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
   tenantId: number;
+  initialTab?: string;
 };
 
-type TabId = "overview" | "users" | "integrations" | "audit";
+type TabId = "overview" | "users" | "subscription" | "features" | "usage" | "integrations" | "audit";
+
+const TAB_IDS: TabId[] = ["overview", "users", "subscription", "features", "usage", "integrations", "audit"];
 
 type Tenant = {
   id: number;
@@ -63,9 +67,10 @@ const fmtDate = (iso?: string | null, withTime = false) => {
 };
 
 /** Plataforma › Instituições › detalhe: dados, uso, usuários, integrações e auditoria de um tenant. */
-export default function TenantDetailScreen({ navigate, tenantId }: Props) {
+export default function TenantDetailScreen({ navigate, tenantId, initialTab }: Props) {
   const { contentPadding, isMobile } = useResponsiveLayout();
-  const [tab, setTab] = useState<TabId>("overview");
+  const [tab, setTab] = useState<TabId>(TAB_IDS.includes(initialTab as TabId) ? (initialTab as TabId) : "overview");
+  const [planVersion, setPlanVersion] = useState(0);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [overview, setOverview] = useState<TenantOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,6 +159,9 @@ export default function TenantDetailScreen({ navigate, tenantId }: Props) {
               items={[
                 { id: "overview", label: "Visão geral" },
                 { id: "users", label: "Usuários", count: overview.counts.users },
+                { id: "subscription", label: "Assinatura" },
+                { id: "features", label: "Funcionalidades" },
+                { id: "usage", label: "Consumo" },
                 {
                   id: "integrations",
                   label: "Integrações",
@@ -166,7 +174,10 @@ export default function TenantDetailScreen({ navigate, tenantId }: Props) {
             {tab === "overview" ? <OverviewTab tenant={tenant} overview={overview} isMobile={isMobile} /> : null}
             {tab === "users" ? <UsersTab tenantId={tenantId} isMobile={isMobile} setToast={setToast} /> : null}
             {tab === "integrations" ? <IntegrationsTab overview={overview} /> : null}
-            {tab === "audit" ? <SupportAccessHistory tenantId={tenantId} /> : null}
+            {tab === "subscription" ? <TenantSubscriptionTab tenantId={tenantId} isMobile={isMobile} setToast={setToast} onChanged={() => setPlanVersion((v) => v + 1)} /> : null}
+            {tab === "features" ? <TenantFeaturesTab key={planVersion} tenantId={tenantId} isMobile={isMobile} setToast={setToast} /> : null}
+            {tab === "usage" ? <TenantQuotasTab key={planVersion} tenantId={tenantId} isMobile={isMobile} setToast={setToast} /> : null}
+            {tab === "audit" ? <TenantAuditTab tenantId={tenantId} isMobile={isMobile} /> : null}
           </>
         ) : null}
       </ScrollView>
@@ -180,7 +191,7 @@ export default function TenantDetailScreen({ navigate, tenantId }: Props) {
         title={statusTarget === "suspended" ? "Suspender instituição" : "Reativar instituição"}
         message={
           statusTarget === "suspended"
-            ? `${tenant?.name} ficará com status Suspenso e não poderá receber acesso assistido. Os dados são preservados.`
+            ? `Alunos e responsáveis de ${tenant?.name} perdem o acesso ao app na hora. A equipe continua entrando, mas só consulta (sem incluir, editar ou excluir). Os dados são preservados.`
             : `${tenant?.name} volta ao status Ativo.`
         }
         confirmLabel={statusTarget === "suspended" ? "Suspender" : "Reativar"}
@@ -236,7 +247,7 @@ function OverviewTab({ tenant, overview, isMobile }: { tenant: Tenant; overview:
                 { label: "E-mail do administrador", value: overview.owner?.email ?? "—", text: true, muted: !overview.owner },
                 { label: "Criado em", value: fmtDate(tenant.created_at) },
                 { label: "Última atividade", value: overview.last_activity_at ? fmtDate(overview.last_activity_at, true) : "Sem registro", muted: !overview.last_activity_at },
-                { label: "Plano e assinatura", value: "Disponível com as assinaturas SaaS", text: true, muted: true },
+                { label: "Plano e assinatura", value: "Ver aba Assinatura", text: true, muted: true },
               ]}
             />
           </Panel>

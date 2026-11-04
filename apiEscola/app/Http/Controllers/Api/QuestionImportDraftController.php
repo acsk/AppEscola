@@ -55,6 +55,7 @@ class QuestionImportDraftController extends Controller
     public function store(SaveQuestionImportDraftRequest $request): JsonResponse
     {
         $this->scoped($request);
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanAdd($this->requireTenantId($request), 'document_processing');
         $draft = QuestionImportDraft::create($request->validated() + [
             'tenant_id' => $this->requireTenantId($request), 'user_id' => $request->user()->id, 'revision' => 1,
         ]);

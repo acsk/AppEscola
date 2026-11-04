@@ -43,6 +43,9 @@ import {
   Settings2,
   FileChartColumn,
   Gauge,
+  BadgeDollarSign,
+  Repeat,
+  ToggleRight,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -96,6 +99,7 @@ export default function Sidebar({
   canSendNotifications = false,
   canViewFinance = false,
   biSections = [],
+  features = null,
   isMobile = false,
   onClose,
   apiVersion = "-",
@@ -109,6 +113,9 @@ export default function Sidebar({
   const menuId = useId();
   const normalize = (value: string) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const normalizedQuery = normalize(query.trim());
+
+  /** Módulo liberado no plano do tenant (null = sem dados: mostra tudo; o backend valida de qualquer forma). */
+  const has = (key: string) => !features || features[key] !== false;
 
   const sections: SidebarSection[] = [
     { items: [{ id: "dashboard", label: "Dashboard", icon: House }] },
@@ -128,8 +135,8 @@ export default function Sidebar({
         { id: "cursos", label: "Cursos", icon: BookOpen },
         ...(canManageExams
           ? [
-              { id: "simulados", label: "Simulados", icon: FileText },
-              { id: "questoes", label: "Banco de questões", icon: FileQuestionMark },
+              ...(has("exams") ? [{ id: "simulados", label: "Simulados", icon: FileText }] : []),
+              ...(has("question_bank") ? [{ id: "questoes", label: "Banco de questões", icon: FileQuestionMark }] : []),
             ]
           : []),
         { id: "avaliacoes-oficiais", label: "Avaliações presenciais", icon: ClipboardCheck },
@@ -137,7 +144,7 @@ export default function Sidebar({
         { id: "matriculas", label: "Matrículas", icon: ClipboardList },
       ],
     },
-    ...(biSections.length
+    ...(biSections.length && has("bi")
       ? [
           {
             label: "Inteligência Educacional",
@@ -152,13 +159,17 @@ export default function Sidebar({
           {
             label: "Financeiro",
             items: [
-              { id: "financeiro-visao-geral", label: "Visão geral", icon: ChartLine },
+              ...(has("finance") ? [{ id: "financeiro-visao-geral", label: "Visão geral", icon: ChartLine }] : []),
               { id: "cobrancas", label: "Contas a receber", icon: CreditCard },
-              { id: "financeiro-conciliacao", label: "Conciliação bancária", icon: ArrowLeftRight },
-              { id: "financeiro-contas-a-pagar", label: "Contas a pagar", icon: ReceiptText },
-              { id: "financeiro-fluxo-de-caixa", label: "Fluxo de caixa", icon: ChartNoAxesColumn },
-              { id: "financeiro-relatorios", label: "Relatórios financeiros", icon: FileChartColumn },
-              { id: "financeiro-cora", label: "Integração Cora", icon: Webhook },
+              ...(has("finance") && has("bank_reconciliation") ? [{ id: "financeiro-conciliacao", label: "Conciliação bancária", icon: ArrowLeftRight }] : []),
+              ...(has("finance")
+                ? [
+                    { id: "financeiro-contas-a-pagar", label: "Contas a pagar", icon: ReceiptText },
+                    { id: "financeiro-fluxo-de-caixa", label: "Fluxo de caixa", icon: ChartNoAxesColumn },
+                    { id: "financeiro-relatorios", label: "Relatórios financeiros", icon: FileChartColumn },
+                    { id: "financeiro-cora", label: "Integração Cora", icon: Webhook },
+                  ]
+                : []),
               { id: "bancos_crud", label: "Bancos", icon: Landmark },
               { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
               { id: "financeiro-configuracoes", label: "Configurações financeiras", icon: Settings2 },
@@ -178,7 +189,7 @@ export default function Sidebar({
           {
             label: "Comunicação",
             items: [
-              { id: "notificacoes", label: "Notificações", icon: Bell },
+              ...(has("communication") ? [{ id: "notificacoes", label: "Notificações", icon: Bell }] : []),
               { id: "calendario", label: "Calendário", icon: Calendar },
             ],
           },
@@ -188,7 +199,7 @@ export default function Sidebar({
       label: "Configurações",
       items: [
         { id: "configuracoes-cobranca", label: "Regras de cobrança", icon: Calculator },
-        { id: "configuracoes-tema-mobile", label: "Tema do app mobile", icon: Palette },
+        ...(has("visual_customization") ? [{ id: "configuracoes-tema-mobile", label: "Tema do app mobile", icon: Palette }] : []),
         ...(canManageAi ? [{ id: "configuracoes-ia", label: "Integração com IA", icon: Sparkles }] : []),
       ],
     },
@@ -201,6 +212,17 @@ export default function Sidebar({
               { id: "tenants", label: "Instituições", icon: Building2 },
               { id: "tipos-prova", label: "Tipos de prova", icon: Tags },
             ],
+          },
+          {
+            label: "Comercial",
+            items: [
+              { id: "saas-plans", label: "Planos SaaS", icon: BadgeDollarSign },
+              { id: "saas-subscriptions", label: "Assinaturas", icon: Repeat },
+            ],
+          },
+          {
+            label: "Funcionalidades",
+            items: [{ id: "saas-features", label: "Feature flags", icon: ToggleRight }],
           },
         ]
       : []),

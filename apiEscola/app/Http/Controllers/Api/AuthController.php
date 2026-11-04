@@ -59,6 +59,13 @@ class AuthController extends Controller
             return response()->json(['message' => 'Usuário inativo.'], 403);
         }
 
+        // Tenant suspenso: aluno e responsável não entram; a equipe entra em modo somente leitura.
+        if (in_array($user->role, \App\Http\Middleware\EnforceAccountStatus::STUDENT_ROLES, true)
+            && $user->tenant_id
+            && \App\Http\Middleware\EnforceAccountStatus::tenantStatus((int) $user->tenant_id) === 'suspended') {
+            return response()->json(['code' => 'tenant_suspended', 'message' => \App\Http\Middleware\EnforceAccountStatus::SUSPENDED_STUDENT_MESSAGE], 403);
+        }
+
         $selectedTenantId = null;
         $abilities = ['*'];
 

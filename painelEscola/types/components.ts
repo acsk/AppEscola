@@ -27,6 +27,8 @@ export type SidebarProps = {
   canViewFinance?: boolean;
   /** Seções liberadas da Inteligência Educacional (vindas de /bi/meta). */
   biSections?: { key: string; label: string }[];
+  /** Funcionalidades do plano do tenant (GET /tenant/entitlements); null = mostra tudo. */
+  features?: Record<string, boolean> | null;
   isMobile?: boolean;
   onClose?: () => void;
   apiVersion?: string;

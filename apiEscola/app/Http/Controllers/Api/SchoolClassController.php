@@ -63,6 +63,9 @@ class SchoolClassController extends Controller
     public function store(StoreSchoolClassRequest $request): JsonResponse
     {
         $tenantId = $this->getTenantId($request);
+        if ($tenantId) {
+            app(\App\Services\Saas\TenantQuotaService::class)->assertCanAdd($tenantId, 'classes');
+        }
 
         $schoolClass = SchoolClass::create(array_merge($request->validated(), ['tenant_id' => $tenantId]));
         $schoolClass->load(['course', 'schedules.subject', 'schedules.teacher', 'schedules.teachers']);
