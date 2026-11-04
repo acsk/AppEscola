@@ -46,6 +46,22 @@ class SaasOperationsController extends Controller
         return $this->success($this->reports->report($type, $from->startOfDay(), $to), 'Relatório carregado com sucesso.');
     }
 
+    public function aiUsage(Request $request, \App\Services\Saas\AiCostReportService $ai): JsonResponse
+    {
+        $data = $request->validate([
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            'tenant_id' => ['nullable', 'integer'],
+        ]);
+        $to = isset($data['date_to']) ? Carbon::parse($data['date_to']) : BusinessDate::today();
+        $from = isset($data['date_from']) ? Carbon::parse($data['date_from']) : $to->copy()->startOfMonth();
+        if ($from->diffInDays($to) > 366) {
+            return $this->validationError(['date_to' => ['O período pode ter no máximo 1 ano.']], 'O período pode ter no máximo 1 ano.');
+        }
+
+        return $this->success($ai->build($from->startOfDay(), $to, isset($data['tenant_id']) ? (int) $data['tenant_id'] : null), 'Consumo de IA carregado com sucesso.');
+    }
+
     public function audit(Request $request): JsonResponse
     {
         $data = $request->validate([

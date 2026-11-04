@@ -38,6 +38,8 @@ class SaasReportService
                 'exams' => $count('exams', fn ($q) => $q->whereNull('deleted_at')),
                 'ai_question_generations' => $count('question_generation_jobs', fn ($q) => $q->where('created_at', '>=', $monthStart)),
                 'document_processing' => $count('question_import_drafts', fn ($q) => $q->where('created_at', '>=', $monthStart)),
+                'ai_requests' => $count('ai_usage_logs', fn ($q) => $q->where('created_at', '>=', $monthStart)),
+                'storage_mb' => DB::table('tenant_storage_usages')->pluck('bytes', 'tenant_id')->map(fn ($b) => (int) ceil($b / 1048576)),
             ];
             $answers30 = $count('practice_answers', fn ($q) => $q->where('answered_at', '>=', $since30));
             $lastSeen = DB::table('student_activity_days')->select('tenant_id', DB::raw('max(last_seen_at) as at'))->groupBy('tenant_id')->pluck('at', 'tenant_id');

@@ -91,6 +91,7 @@ class ExamQuestionController extends Controller
         ]);
 
         $tenant = $exam->tenant()->firstOrFail();
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanStore((int) $tenant->id, $request->file('image'));
         $questionSegment = $request->integer('question_id') ?: 'draft';
         $directoryConfig = $uploadSettings->buildExamQuestionDirectory($tenant, $exam->id, $questionSegment);
         $path = $request->file('image')->store($directoryConfig['directory'], $directoryConfig['disk']);

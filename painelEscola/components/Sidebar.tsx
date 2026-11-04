@@ -146,6 +146,7 @@ export default function Sidebar({
       items: [
         { id: "saas-monitoring", label: "Saúde da plataforma", icon: Activity },
         { id: "saas-usage", label: "Consumo por instituição", icon: ChartPie },
+        { id: "saas-ai", label: "Custos de IA", icon: Sparkles },
       ],
     },
     {

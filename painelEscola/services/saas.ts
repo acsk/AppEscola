@@ -309,3 +309,25 @@ export async function fetchGlobalAudit(params: { group?: string; search?: string
 
 export const fmtDateTime = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+
+// ── Fase 4: consumo e custo de IA ─────────────────────────────────────────────
+
+export type AiUsageRow = { requests: number; errors: number; prompt_tokens: number; completion_tokens: number; cost_usd: number; unpriced: number };
+
+export type AiUsageReport = {
+  period: { from: string; to: string };
+  alert_threshold_usd: number;
+  totals: AiUsageRow;
+  embeddings: { calls: number; tokens: number; cost_usd: number };
+  by_tenant: (AiUsageRow & { tenant: { id: number; name: string } | null; month_requests: number; month_limit: number | null; month_cost_usd: number; high_cost: boolean })[];
+  by_feature: (AiUsageRow & { feature: string })[];
+  by_model: (AiUsageRow & { provider: string; model: string | null; source: string | null })[];
+  daily: { day: string; requests: number; cost_usd: number }[];
+  outputs: { questions_generated: number; documents_processed: number; classifications: number };
+};
+
+export async function fetchAiUsage(dateFrom: string, dateTo: string, tenantId?: number): Promise<AiUsageReport> {
+  return body((await api.get("/saas/ai-usage", { params: { date_from: dateFrom || undefined, date_to: dateTo || undefined, tenant_id: tenantId } })).data);
+}
+
+export const fmtUsd = (value: number) => `US$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2 })}`;

@@ -36,3 +36,8 @@ Schedule::command('saas:expire-subscriptions')
     ->dailyAt('00:20')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping();
+// Super Admin SaaS: armazenamento por tenant (só lê os discos).
+Schedule::command('saas:measure-storage')
+    ->dailyAt('02:40')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();

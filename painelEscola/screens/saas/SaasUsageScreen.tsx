@@ -23,8 +23,9 @@ const COLUMNS: { key: string; label: string }[] = [
   { key: "classes", label: "Turmas" },
   { key: "questions", label: "Questões" },
   { key: "exams", label: "Simulados" },
-  { key: "ai_question_generations", label: "IA (mês)" },
-  { key: "document_processing", label: "Documentos (mês)" },
+  { key: "ai_requests", label: "IA (mês)" },
+  { key: "document_processing", label: "Docs (mês)" },
+  { key: "storage_mb", label: "Arquivos (MB)" },
 ];
 
 const FILTERS = [
@@ -34,7 +35,13 @@ const FILTERS = [
 ];
 
 function Cell({ value }: { value?: UsageResource }) {
-  if (!value) return <Text className="text-sm text-ink-subtle">—</Text>;
+  if (!value) {
+    return (
+      <View style={{ alignItems: "flex-end" }}>
+        <Text className="text-sm text-ink-subtle">—</Text>
+      </View>
+    );
+  }
   const tone = value.percent == null ? "text-ink" : value.percent >= 95 ? "text-danger" : value.percent >= 80 ? "text-warning" : "text-ink";
   return (
     <View style={{ alignItems: "flex-end" }}>
@@ -142,7 +149,7 @@ export default function SaasUsageScreen({ navigate }: Props) {
           )}
         </View>
       </ScrollView>
-      <Text className="text-xs text-ink-subtle">Armazenamento e requisições de IA por instituição ainda não são medidos.</Text>
+      <Text className="text-xs text-ink-subtle">IA (mês): requisições aos provedores no mês. Armazenamento: medido uma vez por dia; uploads de hoje entram na próxima medição.</Text>
     </ScrollView>
   );
 }

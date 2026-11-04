@@ -281,6 +281,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         // Fase 3: monitoramento, relatórios, auditoria global e administradores globais
         Route::get('monitoring', [SaasOperationsController::class, 'monitoring']);
         Route::get('usage', [SaasOperationsController::class, 'usage']);
+        Route::get('ai-usage', [SaasOperationsController::class, 'aiUsage']);
         Route::get('reports/{type}', [SaasOperationsController::class, 'report']);
         Route::get('audit', [SaasOperationsController::class, 'audit']);
         Route::get('admins', [GlobalAdminController::class, 'index']);

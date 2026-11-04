@@ -53,6 +53,7 @@ import SaasMonitoringScreen from "./screens/saas/SaasMonitoringScreen";
 import SaasUsageScreen from "./screens/saas/SaasUsageScreen";
 import SaasReportsScreen from "./screens/saas/SaasReportsScreen";
 import SaasAuditScreen from "./screens/saas/SaasAuditScreen";
+import SaasAiUsageScreen from "./screens/saas/SaasAiUsageScreen";
 import TenantStatusBanner from "./components/saas/TenantStatusBanner";
 import { fetchTenantEntitlements, type TenantEntitlements } from "./services/saas";
 import { UsersScreen, UserFormScreen } from "./screens/users";
@@ -288,6 +289,7 @@ function hashToNav(hash: string): NavState {
     if (seg1 === "funcionalidades") return { screen: "saas-features" };
     if (seg1 === "monitoramento") return { screen: "saas-monitoring" };
     if (seg1 === "consumo") return { screen: "saas-usage" };
+    if (seg1 === "ia") return { screen: "saas-ai" };
     if (seg1 === "relatorios") return { screen: "saas-reports" };
     if (seg1 === "administradores") return { screen: "saas-admins" };
     if (seg1 === "auditoria") return { screen: "saas-audit" };
@@ -458,6 +460,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "saas-features") return "#/plataforma/funcionalidades";
   if (nav.screen === "saas-monitoring") return "#/plataforma/monitoramento";
   if (nav.screen === "saas-usage") return "#/plataforma/consumo";
+  if (nav.screen === "saas-ai") return "#/plataforma/ia";
   if (nav.screen === "saas-reports") return "#/plataforma/relatorios";
   if (nav.screen === "saas-admins") return "#/plataforma/administradores";
   if (nav.screen === "saas-audit") return "#/plataforma/auditoria";
@@ -1239,6 +1242,7 @@ function AppContent() {
       case "saas-features": return <SaasFeaturesScreen />;
       case "saas-monitoring": return <SaasMonitoringScreen />;
       case "saas-usage": return <SaasUsageScreen navigate={navigate} />;
+      case "saas-ai": return <SaasAiUsageScreen navigate={navigate} />;
       case "saas-reports": return <SaasReportsScreen />;
       case "saas-admins": return <GlobalAdminsScreen />;
       case "saas-audit": return <SaasAuditScreen navigate={navigate} />;

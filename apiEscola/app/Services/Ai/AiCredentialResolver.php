@@ -18,14 +18,14 @@ class AiCredentialResolver
      */
     public function resolve(?User $user, ?int $tenantId, ?string $requiredProvider = null): ?array
     {
+        $credential = null;
         if ($user?->isSuperAdmin()) {
             $credential = $this->fromEnv($requiredProvider);
-            if ($credential !== null) {
-                return $credential;
-            }
         }
+        $credential ??= $tenantId ? $this->fromTenant($tenantId, $requiredProvider) : null;
 
-        return $tenantId ? $this->fromTenant($tenantId, $requiredProvider) : null;
+        // Contexto da medição de consumo (AiUsageMeter): quem usou e para qual tenant.
+        return $credential === null ? null : $credential + ['tenant_id' => $tenantId, 'user_id' => $user?->id];
     }
 
     /** Resumo seguro (sem chave) para o painel saber se pode exibir os botões de IA. */

@@ -332,6 +332,7 @@ class QuestionBankController extends Controller
             'image'       => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120'],
         ]);
 
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanStore($tenantId, $request->file('image'));
         $tenant = Tenant::findOrFail($tenantId);
         $directory = $uploadSettings->buildQuestionBankDirectory($tenant, $request->integer('question_id') ?: 'draft');
         $path = $request->file('image')->store($directory['directory'], $directory['disk']);

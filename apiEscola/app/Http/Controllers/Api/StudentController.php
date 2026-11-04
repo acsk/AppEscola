@@ -233,6 +233,7 @@ class StudentController extends Controller
         ]);
 
         $tenant = $student->tenant()->firstOrFail();
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanStore((int) $tenant->id, $request->file('photo'));
         $directoryConfig = $uploadSettings->buildStudentPhotoDirectory($tenant, $student->id);
         $path = $request->file('photo')->store($directoryConfig['directory'], $directoryConfig['disk']);
         $photoUrl = $uploadSettings->url($directoryConfig['disk'], $path);

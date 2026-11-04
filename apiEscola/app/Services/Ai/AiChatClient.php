@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Exceptions\AiException;
+use App\Services\Saas\AiUsageMeter;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\Log;
  */
 class AiChatClient
 {
+    public function __construct(private readonly AiUsageMeter $meter)
+    {
+    }
+
     /**
      * @param  array{provider: string, api_key: string, base_url: string, model: string}  $credential
      * @return array<string, mixed>
@@ -97,8 +102,31 @@ class AiChatClient
         ];
     }
 
-    /** Shared transport: credentials and provider error bodies never enter logs. */
+    /** Shared transport: credentials and provider error bodies never enter logs. Chamadas (POST) são medidas por tenant. */
     public function request(array $credential, string $endpoint, ?array $payload = null): array
+    {
+        if ($payload === null) {
+            return $this->send($credential, $endpoint, null);
+        }
+
+        $this->meter->assertAllowed($credential);
+        if ($credential['provider'] === 'openrouter' && $endpoint === 'chat/completions') {
+            // Pede ao OpenRouter o custo real da chamada (vem em usage.cost).
+            $payload['usage'] = ['include' => true];
+        }
+        $startedAt = microtime(true);
+        try {
+            $data = $this->send($credential, $endpoint, $payload);
+        } catch (\Throwable $e) {
+            $this->meter->record($credential, $endpoint, null, $startedAt, $e);
+            throw $e;
+        }
+        $this->meter->record($credential, $endpoint, $data, $startedAt);
+
+        return $data;
+    }
+
+    private function send(array $credential, string $endpoint, ?array $payload): array
     {
         $headers = [];
         if ($credential['provider'] === 'openrouter') {

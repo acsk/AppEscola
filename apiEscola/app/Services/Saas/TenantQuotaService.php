@@ -2,6 +2,7 @@
 
 namespace App\Services\Saas;
 
+use App\Models\AiUsageLog;
 use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamQuestion;
@@ -9,9 +10,11 @@ use App\Models\QuestionGenerationJob;
 use App\Models\QuestionImportDraft;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\TenantStorageUsage;
 use App\Models\User;
 use App\Support\BusinessDate;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\UploadedFile;
 
 /**
  * Consumo × limite contratado. Ao atingir o limite só bloqueia o que expande o uso (cadastrar mais);
@@ -30,6 +33,8 @@ class TenantQuotaService
         'exams' => ['Simulados', 'simulados', false],
         'ai_question_generations' => ['Gerações de questões com IA (mês)', 'gerações', true],
         'document_processing' => ['Processamentos de documentos (mês)', 'documentos', true],
+        'ai_requests' => ['Requisições de IA (mês)', 'requisições', true],
+        'storage_mb' => ['Armazenamento (MB)', 'MB', false],
     ];
 
     public const WARNING_PERCENT = 80;
@@ -53,6 +58,9 @@ class TenantQuotaService
             'exams' => Exam::query()->where('tenant_id', $tenantId)->count(),
             'ai_question_generations' => QuestionGenerationJob::query()->where('tenant_id', $tenantId)->where('created_at', '>=', $monthStart)->count(),
             'document_processing' => QuestionImportDraft::query()->where('tenant_id', $tenantId)->where('created_at', '>=', $monthStart)->count(),
+            'ai_requests' => AiUsageLog::query()->where('tenant_id', $tenantId)->where('created_at', '>=', $monthStart)->count(),
+            // Medido uma vez por dia (saas:measure-storage); uploads do dia ainda não entram.
+            'storage_mb' => (int) ceil((int) TenantStorageUsage::query()->where('tenant_id', $tenantId)->value('bytes') / 1048576),
             default => 0,
         };
     }
@@ -111,6 +119,14 @@ class TenantQuotaService
             'message' => "Limite do plano atingido: {$usage} de {$limit} {$unit}. Os dados existentes continuam disponíveis; para cadastrar mais, fale com o suporte para ampliar o plano.",
             'body' => ['code' => 'quota_exceeded', 'resource' => $resource, 'label' => $label, 'usage' => $usage, 'limit' => $limit],
         ], 422));
+    }
+
+    /** Upload: bloqueia se o arquivo passaria do limite de armazenamento do plano. */
+    public function assertCanStore(int $tenantId, ?UploadedFile $file): void
+    {
+        if ($file) {
+            $this->assertCanAdd($tenantId, 'storage_mb', (int) ceil($file->getSize() / 1048576));
+        }
     }
 
     private function level(?float $percent): string

@@ -160,6 +160,7 @@ class ExpenseService
             throw new RuntimeException('Despesa cancelada não recebe comprovante.');
         }
 
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanStore((int) $expense->tenant_id, $file);
         $extension = strtolower($file->getClientOriginalExtension() ?: ($file->guessExtension() ?? 'bin'));
         $path = $file->storeAs("expenses/{$expense->tenant_id}/{$expense->id}", Str::uuid() . '.' . $extension, 'local');
         if ($path === false) {

@@ -221,6 +221,7 @@ class SupportMaterialController extends Controller
             $fileType = 'document';
         }
 
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanStore((int) $exam->tenant_id, $file);
         $directoryConfig = $uploadSettings->buildSupportMaterialDirectory($exam->tenant_id, $exam->id);
         $path = $file->store($directoryConfig['directory'], $directoryConfig['disk']);
         $contentUrl = $uploadSettings->url($directoryConfig['disk'], $path);

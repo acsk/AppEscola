@@ -139,6 +139,7 @@ class PastExamController extends Controller
 
         $data = $this->pastExamService->validateRelations($data, $tenantId);
         $file = $request->file('file');
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanStore($tenantId, $file);
 
         $directoryConfig = $uploadSettings->buildPastExamDirectory($tenantId);
         $path = $file->store($directoryConfig['directory'], $directoryConfig['disk']);
@@ -179,6 +180,7 @@ class PastExamController extends Controller
         $this->pastExamService->assertBelongsToTenant($pastExam, $tenantId);
 
         $file = $request->file('file');
+        app(\App\Services\Saas\TenantQuotaService::class)->assertCanStore($tenantId, $file);
         $directoryConfig = $uploadSettings->buildPastExamDirectory($tenantId);
         $path = $file->store($directoryConfig['directory'], $directoryConfig['disk']);
         $contentUrl = $uploadSettings->url($directoryConfig['disk'], $path);

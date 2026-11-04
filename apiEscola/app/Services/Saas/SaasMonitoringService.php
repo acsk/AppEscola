@@ -90,7 +90,17 @@ class SaasMonitoringService
             $incidents->push(['source' => 'IA', 'title' => 'Geração de questões falhou', 'detail' => $this->firstLine($job->error), 'tenant' => $tenantNames[$job->tenant_id] ?? null, 'at' => Carbon::parse($job->created_at)->toISOString()]);
         }
 
-        $failed = fn (array $counts) => (int) ($counts['failed'] ?? 0);
+        // IA: chamadas aos provedores e consumo elevado no mês
+        $aiCalls = $this->countByStatus('ai_usage_logs', 'created_at', $week);
+        $alertUsd = (float) config('saas.ai_cost_alert_usd', 20);
+        $highCost = DB::table('ai_usage_logs')->where('created_at', '>=', now()->startOfMonth())->whereNotNull('tenant_id')
+            ->selectRaw('tenant_id, sum(coalesce(provider_cost_usd, estimated_cost_usd, 0)) as cost, max(created_at) as last_at')
+            ->groupBy('tenant_id')->havingRaw('sum(coalesce(provider_cost_usd, estimated_cost_usd, 0)) >= ?', [$alertUsd])->get();
+        foreach ($highCost as $row) {
+            $incidents->push(['source' => 'IA · custo', 'title' => 'Consumo de IA elevado no mês', 'detail' => sprintf('US$ %s até agora (alerta a partir de US$ %s)', number_format((float) $row->cost, 2, ',', '.'), number_format($alertUsd, 2, ',', '.')), 'tenant' => $tenantNames[$row->tenant_id] ?? null, 'at' => Carbon::parse($row->last_at)->toISOString()]);
+        }
+
+        $failed = fn (array $counts) => (int) ($counts['failed'] ?? $counts['error'] ?? 0);
 
         return [
             'checked_at' => now()->toISOString(),
@@ -106,6 +116,7 @@ class SaasMonitoringService
                 ['key' => 'cora_webhooks', 'name' => 'Cora · avisos de pagamento', 'counts' => $coraWebhooks, 'failed' => $failed($coraWebhooks), 'last_success_at' => null],
                 ['key' => 'cora_statement', 'name' => 'Cora · extrato bancário', 'counts' => $coraSyncs, 'failed' => $failed($coraSyncs), 'last_success_at' => $lastSync ? Carbon::parse($lastSync)->toISOString() : null],
                 ['key' => 'asaas_webhooks', 'name' => 'Asaas · avisos de pagamento', 'counts' => $asaas, 'failed' => $failed($asaas), 'last_success_at' => null],
+                ['key' => 'ai_calls', 'name' => 'IA · chamadas aos provedores', 'counts' => $aiCalls, 'failed' => $failed($aiCalls), 'last_success_at' => null],
                 ['key' => 'ai_generation', 'name' => 'IA · geração de questões', 'counts' => $ai, 'failed' => $failed($ai), 'last_success_at' => null],
             ],
             'incidents' => $incidents->sortByDesc('at')->take(20)->values()->all(),
