@@ -141,7 +141,7 @@ Route::prefix('domains')->group(function () {
 });
 
 // Rotas autenticadas via Sanctum
-Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \App\Http\Middleware\RecordStudentActivity::class])->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::class, \App\Http\Middleware\IdentifyTenant::class, \App\Http\Middleware\RecordStudentActivity::class])->group(function () {
 
     // Auth
     Route::get('/me', [AuthController::class, 'me']);
@@ -227,6 +227,9 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
 
     // Tenants (somente super_admin)
     Route::post('tenants/{tenant}/access', [TenantAccessController::class, 'store']);
+    Route::get('support-access/reasons', [TenantAccessController::class, 'reasons']);
+    Route::get('support-access/history', [TenantAccessController::class, 'history']);
+    Route::post('support-access/end', [TenantAccessController::class, 'end']);
     Route::apiResource('tenants', TenantController::class);
     Route::get('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'show']);
     Route::put('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'update']);

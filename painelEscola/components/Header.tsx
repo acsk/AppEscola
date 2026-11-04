@@ -18,6 +18,9 @@ export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
   const { logout, leaveTenant, user } = useAuth();
   const [leaving, setLeaving] = useState(false);
   const accessingTenant = user?.role === "super_admin" && !!user.selected_tenant_id;
+  const accessUntil = user?.support_access_expires_at
+    ? new Date(user.support_access_expires_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : null;
   const initials = user?.name
     ? user.name
         .split(" ")
@@ -49,7 +52,8 @@ export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
         >
           <Icon icon={Building2} size={16} color={color.warning} />
           <Text className="text-sm text-ink flex-1" style={{ minWidth: 180 }}>
-            Acessando <Text className="font-semibold">{user?.selected_tenant_name ?? `tenant #${user?.selected_tenant_id}`}</Text> como super admin
+            Acesso de suporte a <Text className="font-semibold">{user?.selected_tenant_name ?? `tenant #${user?.selected_tenant_id}`}</Text>
+            {accessUntil ? ` até ${accessUntil}` : ""} · as alterações ficam registradas
           </Text>
           <TouchableOpacity
             onPress={async () => {
@@ -60,7 +64,7 @@ export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
             className="border border-border-strong bg-surface rounded-ds-md px-3 py-1.5"
             activeOpacity={0.7}
           >
-            <Text className="text-sm font-medium text-ink">{leaving ? "Voltando..." : "Voltar ao Super Admin"}</Text>
+            <Text className="text-sm font-medium text-ink">{leaving ? "Encerrando..." : "Encerrar acesso"}</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import api from "../services/api";
 import appJson from "../app.json";
-import type { AuthContextValue, AuthUser } from "../types/auth";
+import type { AuthContextValue, AuthUser, SupportAccessRequest } from "../types/auth";
 
 export type { AuthUser } from "../types/auth";
 
@@ -57,6 +57,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const lastKnownTokenRef = useRef<string | null>(null);
   const lastKnownUserRef = useRef<string | null>(null);
 
+  /**
+   * Troca a sessão gravada e atualiza as referências da checagem de integridade; sem isso a troca
+   * (entrar/sair do acesso a um tenant) parecia adulteração e derrubava a sessão para o login.
+   */
+  const writeSession = (token: string, serializedUser: string) => {
+    localStorage.setItem("auth_token", token);
+    localStorage.setItem("auth_user", serializedUser);
+    lastKnownTokenRef.current = token;
+    lastKnownUserRef.current = serializedUser;
+  };
+
   useEffect(() => {
     if (typeof localStorage !== "undefined") {
       const storedAppVersion = localStorage.getItem(STORAGE_APP_VERSION_KEY);
@@ -106,8 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (backup) {
         localStorage.removeItem(STORAGE_SUPPORT_BACKUP_KEY);
         localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
-        localStorage.setItem("auth_token", backup.token);
-        localStorage.setItem("auth_user", backup.user);
+        writeSession(backup.token, backup.user);
         reloadAt("#/tenants");
         return;
       }
@@ -215,12 +225,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const enterTenant = async (tenantId: number) => {
+  const enterTenant = async (tenantId: number, request: SupportAccessRequest) => {
     const currentToken = localStorage.getItem("auth_token");
     const currentUser = localStorage.getItem("auth_user");
     if (!currentToken || !currentUser || user?.role !== "super_admin") return;
 
-    const { data } = await api.post(`/tenants/${tenantId}/access`);
+    const { data } = await api.post(`/tenants/${tenantId}/access`, request);
     const body = data?.body ?? data;
     const tenantUser: AuthUser = {
       ...(JSON.parse(currentUser) as AuthUser),
@@ -230,9 +240,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     localStorage.setItem(STORAGE_SUPPORT_BACKUP_KEY, JSON.stringify({ token: currentToken, user: currentUser }));
-    localStorage.setItem("auth_token", body.token);
-    localStorage.setItem("auth_user", JSON.stringify(tenantUser));
     persistSelectedTenantId(body.tenant.id);
+    writeSession(body.token, JSON.stringify(tenantUser));
     reloadAt("#/dashboard");
   };
 
@@ -240,22 +249,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const backup = readSupportBackup();
     if (!backup) return;
     try {
-      // Revoga o token do acesso; o do super admin continua válido.
-      await api.post("/logout");
+      // Encerra o acesso (registra o fim e revoga o token dele); o token do super admin continua válido.
+      await api.post("/support-access/end");
     } catch {}
     localStorage.removeItem(STORAGE_SUPPORT_BACKUP_KEY);
     localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
-    localStorage.setItem("auth_token", backup.token);
-    localStorage.setItem("auth_user", backup.user);
+    writeSession(backup.token, backup.user);
     reloadAt("#/tenants");
   };
 
   const logout = async () => {
-    try {
-      await api.post("/logout");
-    } catch {}
-    // Saindo durante um acesso a tenant: encerra também a sessão do super admin.
     const backup = readSupportBackup();
+    try {
+      // Durante um acesso a tenant, sair também encerra o acesso (fica registrado).
+      await api.post(backup ? "/support-access/end" : "/logout");
+    } catch {}
+    // E encerra a sessão do super admin guardada.
     if (backup) {
       localStorage.removeItem(STORAGE_SUPPORT_BACKUP_KEY);
       localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
