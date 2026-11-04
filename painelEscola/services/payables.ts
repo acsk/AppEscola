@@ -179,3 +179,16 @@ export async function saveSupplier(input: SupplierInput, id?: number): Promise<{
   const { data } = id ? await api.put(`/finance/payables/suppliers/${id}`, input) : await api.post("/finance/payables/suppliers", input);
   return { supplier: data.body, message: data.message };
 }
+
+export type CatalogItem = { id: number; name: string; active: boolean; system_managed: boolean; expenses_count: number };
+export type CatalogKind = "categories" | "cost-centers";
+
+export async function fetchCatalog(kind: CatalogKind): Promise<CatalogItem[]> {
+  const { data } = await api.get(`/finance/payables/${kind}`);
+  return (data.body ?? data).items ?? [];
+}
+
+export async function saveCatalogItem(kind: CatalogKind, input: { name: string; active?: boolean }, id?: number): Promise<string> {
+  const { data } = id ? await api.put(`/finance/payables/${kind}/${id}`, input) : await api.post(`/finance/payables/${kind}`, input);
+  return data.message;
+}

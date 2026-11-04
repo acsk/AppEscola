@@ -41,6 +41,39 @@ final class FinancePermissions
     /** Secretaria cadastra despesas, mas não aprova. */
     private const APPROVE_PAYABLES_ROLES = ['super_admin', 'admin', 'manager', 'financial'];
 
+    /** Rótulos das permissões, na ordem da tela de Configurações financeiras. */
+    public const LABELS = [
+        self::VIEW => 'Ver dashboard, cobranças e conciliação',
+        self::MANAGE_INVOICES => 'Criar e editar cobranças',
+        self::SETTLE => 'Registrar baixa manual e conciliar',
+        self::MANAGE_PAYABLES => 'Gerenciar contas a pagar',
+        self::APPROVE_PAYABLES => 'Aprovar despesas',
+        self::EXPORT => 'Exportar dados',
+        self::CONFIGURE => 'Configurar financeiro e integração bancária',
+    ];
+
+    /** Papéis exibidos na matriz de permissões (inclui os que não têm acesso, para ficar explícito). */
+    public const ROLES = ['super_admin', 'admin', 'manager', 'financial', 'secretaria', 'coordenador', 'professor'];
+
+    /**
+     * Matriz papel × permissão gerada a partir deste mapa: a tela nunca diverge do que a API aplica.
+     *
+     * @return array<int, array{ability: string, label: string, roles: array<string, bool>}>
+     */
+    public static function matrix(): array
+    {
+        $byRole = [];
+        foreach (self::ROLES as $role) {
+            $byRole[$role] = self::forUser(new User(['role' => $role]));
+        }
+
+        return array_map(fn (string $ability) => [
+            'ability' => $ability,
+            'label' => self::LABELS[$ability],
+            'roles' => array_map(fn (array $abilities) => in_array($ability, $abilities, true), $byRole),
+        ], array_keys(self::LABELS));
+    }
+
     public static function allows(?User $user, string $ability): bool
     {
         return in_array($ability, self::forUser($user), true);

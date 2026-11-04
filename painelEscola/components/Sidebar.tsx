@@ -40,6 +40,7 @@ import {
   ArrowLeftRight,
   ReceiptText,
   ChartNoAxesColumn,
+  Settings2,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -157,6 +158,7 @@ export default function Sidebar({
               { id: "financeiro-cora", label: "Integração Cora", icon: Webhook },
               { id: "bancos_crud", label: "Bancos", icon: Landmark },
               { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
+              { id: "financeiro-configuracoes", label: "Configurações financeiras", icon: Settings2 },
             ],
           },
         ]

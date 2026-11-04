@@ -54,6 +54,7 @@ import CoraIntegrationScreen from "./screens/financeiro/CoraIntegrationScreen";
 import BankReconciliationScreen from "./screens/financeiro/BankReconciliationScreen";
 import PayablesScreen from "./screens/financeiro/PayablesScreen";
 import CashFlowScreen from "./screens/financeiro/CashFlowScreen";
+import FinanceSettingsScreen from "./screens/financeiro/FinanceSettingsScreen";
 import {
   BiAssessmentDetailScreen,
   BiAssessmentsScreen,
@@ -329,6 +330,7 @@ function hashToNav(hash: string): NavState {
     if (seg1 === "conciliacao") return { screen: "financeiro-conciliacao" };
     if (seg1 === "contas-a-pagar") return { screen: "financeiro-contas-a-pagar" };
     if (seg1 === "fluxo-de-caixa") return { screen: "financeiro-fluxo-de-caixa" };
+    if (seg1 === "configuracoes") return { screen: "financeiro-configuracoes" };
     return { screen: "financeiro-visao-geral" };
   }
 
@@ -455,6 +457,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "financeiro-conciliacao") return "#/financeiro/conciliacao";
   if (nav.screen === "financeiro-contas-a-pagar") return "#/financeiro/contas-a-pagar";
   if (nav.screen === "financeiro-fluxo-de-caixa") return "#/financeiro/fluxo-de-caixa";
+  if (nav.screen === "financeiro-configuracoes") return "#/financeiro/configuracoes";
   if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
   if (nav.screen === "relatorios-financeiro") return "#/relatorios/financeiro";
   return `#/${nav.screen}`;
@@ -1088,6 +1091,7 @@ function AppContent() {
       case "financeiro-conciliacao": return <BankReconciliationScreen navigate={navigate} />;
       case "financeiro-contas-a-pagar": return <PayablesScreen navigate={navigate} />;
       case "financeiro-fluxo-de-caixa": return <CashFlowScreen navigate={navigate} />;
+      case "financeiro-configuracoes": return <FinanceSettingsScreen navigate={navigate} />;
       case "cobrancas": return <InvoicesScreen />;
       case "bancos_crud": return <PaymentProvidersCrudScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;

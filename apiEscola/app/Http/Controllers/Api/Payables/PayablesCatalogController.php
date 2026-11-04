@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\Payables;
 
 use App\Http\Controllers\Controller;
 use App\Models\CostCenter;
+use App\Models\Expense;
 use App\Models\FinanceCategory;
 use App\Models\Supplier;
+use App\Services\Payables\PayablesCatalog;
 use App\Support\FinancePermissions;
 use App\Traits\AuthorizesFinance;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +22,10 @@ use Illuminate\Validation\Rule;
 class PayablesCatalogController extends Controller
 {
     use AuthorizesFinance;
+
+    public function __construct(private readonly PayablesCatalog $catalog)
+    {
+    }
 
     public function suppliers(Request $request): JsonResponse
     {
@@ -75,6 +81,17 @@ class PayablesCatalogController extends Controller
         return $this->success($this->presentSupplier($model), 'Fornecedor atualizado.');
     }
 
+    /** Lista completa (inclui inativas), com quantas despesas usam cada uma. */
+    public function categories(Request $request): JsonResponse
+    {
+        return $this->listNamed($request, FinanceCategory::class, 'category_id', 'Categorias carregadas com sucesso.');
+    }
+
+    public function costCenters(Request $request): JsonResponse
+    {
+        return $this->listNamed($request, CostCenter::class, 'cost_center_id', 'Centros de custo carregados com sucesso.');
+    }
+
     public function storeCategory(Request $request): JsonResponse
     {
         return $this->storeNamed($request, FinanceCategory::class, 'finance_categories', 'Categoria cadastrada.');
@@ -93,6 +110,31 @@ class PayablesCatalogController extends Controller
     public function updateCostCenter(Request $request, int $costCenter): JsonResponse
     {
         return $this->updateNamed($request, CostCenter::class, 'cost_centers', $costCenter, 'Centro de custo atualizado.', 'Centro de custo não encontrado.');
+    }
+
+    /** @param  class-string<Model>  $model */
+    private function listNamed(Request $request, string $model, string $expenseColumn, string $message): JsonResponse
+    {
+        $tenantId = $this->authorizeFinance($request, FinancePermissions::VIEW);
+        if ($tenantId instanceof JsonResponse) {
+            return $tenantId;
+        }
+
+        $this->catalog->ensureDefaults($tenantId);
+
+        $usage = Expense::query()->where('tenant_id', $tenantId)->whereNotNull($expenseColumn)
+            ->selectRaw("{$expenseColumn} as ref, COUNT(*) as total")->groupBy($expenseColumn)->pluck('total', 'ref');
+
+        $items = $model::query()->where('tenant_id', $tenantId)->orderBy('name')->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'name' => $r->name,
+                'active' => (bool) $r->active,
+                'system_managed' => ($r->system_key ?? null) !== null,
+                'expenses_count' => (int) ($usage[$r->id] ?? 0),
+            ]);
+
+        return $this->success(['items' => $items->all()], $message);
     }
 
     /** @param  class-string<Model>  $model */

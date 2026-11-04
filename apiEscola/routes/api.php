@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\Cora\CoraIntegrationController;
 use App\Http\Controllers\Api\BankReconciliationController;
 use App\Http\Controllers\Api\CashFlowController;
+use App\Http\Controllers\Api\FinanceSettingsController;
 use App\Http\Controllers\Api\Payables\ExpenseController;
 use App\Http\Controllers\Api\Payables\PayablesCatalogController;
 use App\Http\Controllers\Api\Cora\CoraWebhookController;
@@ -361,6 +362,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::post('finance/reconciliation/entries/{entry}/reconcile-expense', [BankReconciliationController::class, 'reconcileExpense'])->whereNumber('entry');
 
     Route::get('finance/cash-flow', [CashFlowController::class, 'show']);
+    Route::get('finance/settings', [FinanceSettingsController::class, 'show']);
 
     // Contas a pagar (registrar pagamento não movimenta a conta bancária).
     Route::get('finance/payables/summary', [ExpenseController::class, 'summary']);
@@ -380,6 +382,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::get('finance/payables/suppliers', [PayablesCatalogController::class, 'suppliers']);
     Route::post('finance/payables/suppliers', [PayablesCatalogController::class, 'storeSupplier']);
     Route::put('finance/payables/suppliers/{supplier}', [PayablesCatalogController::class, 'updateSupplier'])->whereNumber('supplier');
+    Route::get('finance/payables/categories', [PayablesCatalogController::class, 'categories']);
+    Route::get('finance/payables/cost-centers', [PayablesCatalogController::class, 'costCenters']);
     Route::post('finance/payables/categories', [PayablesCatalogController::class, 'storeCategory']);
     Route::put('finance/payables/categories/{category}', [PayablesCatalogController::class, 'updateCategory'])->whereNumber('category');
     Route::post('finance/payables/cost-centers', [PayablesCatalogController::class, 'storeCostCenter']);
