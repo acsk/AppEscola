@@ -121,7 +121,10 @@ class BankReconciliationController extends Controller
         return $this->success(['items' => $items], 'Histórico carregado com sucesso.');
     }
 
-    /** Busca o extrato na Cora (somente leitura) e tenta a conciliação automática do que é novo. */
+    /**
+     * Busca o extrato na Cora (somente leitura) e tenta a conciliação automática. Sem datas: tudo o que
+     * ainda não foi importado desde a primeira cobrança gerada pelo sistema. Com datas: só o período.
+     */
     public function sync(Request $request): JsonResponse
     {
         $tenantId = $this->authorizeTenant($request, FinancePermissions::SETTLE);
@@ -134,16 +137,27 @@ class BankReconciliationController extends Controller
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
 
-        $to = isset($validated['date_to']) ? Carbon::parse($validated['date_to']) : BusinessDate::today();
-        $from = isset($validated['date_from']) ? Carbon::parse($validated['date_from']) : $to->copy()->subDays(6);
-
         $tenant = Tenant::query()->find($tenantId);
         if (! $tenant) {
             return $this->error('Instituição não encontrada.', null, 404);
         }
 
         try {
-            $run = $this->statementSync->sync($tenant, $this->environment(), $from, $to, $request->user()?->id);
+            if (isset($validated['date_from']) || isset($validated['date_to'])) {
+                $to = isset($validated['date_to']) ? Carbon::parse($validated['date_to']) : BusinessDate::today();
+                $from = isset($validated['date_from']) ? Carbon::parse($validated['date_from']) : $to->copy()->subDays(6);
+                $run = $this->statementSync->sync($tenant, $this->environment(), $from, $to, $request->user()?->id);
+                $result = [
+                    'created' => $run->created,
+                    'auto_reconciled' => $run->auto_reconciled,
+                    'divergent' => $run->divergent,
+                    'period_start' => $run->period_start?->toDateString(),
+                    'period_end' => $run->period_end?->toDateString(),
+                    'complete' => true,
+                ];
+            } else {
+                $result = $this->statementSync->syncPending($tenant, $this->environment(), $request->user()?->id);
+            }
         } catch (ConnectionException|RequestException $e) {
             Log::warning('Conciliação bancária: falha ao buscar extrato.', [
                 'tenant_id' => $tenantId,
@@ -160,15 +174,15 @@ class BankReconciliationController extends Controller
             return $this->error($e->getMessage(), null, 422);
         }
 
-        return $this->success([
-            'created' => $run->created,
-            'auto_reconciled' => $run->auto_reconciled,
-            'divergent' => $run->divergent,
-            'period_start' => $run->period_start?->toDateString(),
-            'period_end' => $run->period_end?->toDateString(),
-        ], $run->created > 0
-            ? "Extrato sincronizado: {$run->created} movimentação(ões) nova(s), {$run->auto_reconciled} conciliada(s) automaticamente."
-            : 'Extrato sincronizado: nenhuma movimentação nova.');
+        $period = Carbon::parse($result['period_start'])->format('d/m/Y') . ' a ' . Carbon::parse($result['period_end'])->format('d/m/Y');
+        $message = $result['created'] > 0 || $result['auto_reconciled'] > 0
+            ? "Extrato sincronizado ({$period}): {$result['created']} movimentação(ões) nova(s), {$result['auto_reconciled']} conciliada(s) automaticamente."
+            : "Extrato sincronizado ({$period}): nenhuma movimentação nova.";
+        if (! $result['complete']) {
+            $message .= ' Ainda há períodos anteriores a buscar: clique em "Sincronizar agora" de novo.';
+        }
+
+        return $this->success($result, $message);
     }
 
     public function reconcile(Request $request, int $entry): JsonResponse

@@ -323,31 +323,7 @@ class CoraPaidInvoicesSyncService
      */
     private function extractPaidAt(array $external): ?Carbon
     {
-        $candidates = [
-            $external['paid_at'] ?? null,
-            $external['occurrence_date'] ?? null,
-            data_get($external, 'payment.paid_at'),
-            data_get($external, 'payment_date'),
-            data_get($external, 'paidAt'),
-            data_get($external, 'payments.0.finalized_at'),
-            data_get($external, 'payments.0.created_at'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (! is_string($candidate) || trim($candidate) === '') {
-                continue;
-            }
-
-            try {
-                // A Cora manda o horário com fuso (-03:00); converte para o fuso da aplicação antes de gravar,
-                // senão o banco guarda o horário de Brasília como se fosse UTC (3 h de diferença).
-                return Carbon::parse($candidate)->setTimezone(config('app.timezone'));
-            } catch (Throwable) {
-                continue;
-            }
-        }
-
-        return null;
+        return CoraPaymentDate::fromInvoice($external);
     }
 
     /**

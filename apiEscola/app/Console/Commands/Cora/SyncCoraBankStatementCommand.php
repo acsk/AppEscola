@@ -15,16 +15,19 @@ class SyncCoraBankStatementCommand extends Command
     protected $signature = 'cora:sync-bank-statement
                             {--tenant= : Filtrar por tenant_id}
                             {--environment=prod : Ambiente Cora (prod ou stage)}
-                            {--days=3 : Dias para trás a partir de hoje (máx. 92)}';
+                            {--days= : Só os últimos N dias (máx. 92). Sem isto, busca tudo o que ainda não foi importado}';
 
     protected $description = 'Traz o extrato da conta Cora para a conciliação bancária';
 
     public function handle(CoraBankStatementSyncService $sync): int
     {
         $environment = $this->option('environment') === 'stage' ? 'stage' : 'prod';
-        $days = min(max((int) $this->option('days'), 1), CoraBankStatementSyncService::MAX_PERIOD_DAYS);
+        $daysOption = $this->option('days');
+        $days = $daysOption !== null && $daysOption !== ''
+            ? min(max((int) $daysOption, 1), CoraBankStatementSyncService::MAX_PERIOD_DAYS)
+            : null;
         $end = BusinessDate::today();
-        $start = $end->copy()->subDays($days - 1);
+        $start = $days !== null ? $end->copy()->subDays($days - 1) : null;
 
         $tenantIds = TenantCoraCredential::query()
             ->where('environment', $environment)
@@ -36,8 +39,10 @@ class SyncCoraBankStatementCommand extends Command
         $failed = 0;
         foreach (Tenant::query()->whereIn('id', $tenantIds)->get() as $tenant) {
             try {
-                $run = $sync->sync($tenant, $environment, $start, $end);
-                $this->info("Tenant {$tenant->id}: {$run->created} nova(s), {$run->auto_reconciled} conciliada(s), {$run->divergent} divergente(s).");
+                $result = $start !== null
+                    ? $sync->sync($tenant, $environment, $start, $end)->only(['created', 'auto_reconciled', 'divergent'])
+                    : $sync->syncPending($tenant, $environment);
+                $this->info("Tenant {$tenant->id}: {$result['created']} nova(s), {$result['auto_reconciled']} conciliada(s), {$result['divergent']} divergente(s).");
             } catch (Throwable $e) {
                 $failed++;
                 $this->error("Tenant {$tenant->id}: {$e->getMessage()}");

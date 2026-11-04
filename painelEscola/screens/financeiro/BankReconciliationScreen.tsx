@@ -141,7 +141,8 @@ export default function BankReconciliationScreen({ navigate }: Props) {
     setSyncing(true);
     setFeedback(null);
     try {
-      setFeedback({ tone: "success", text: await syncBankStatement({ date_from: dateFrom, date_to: dateTo }) });
+      // Busca tudo o que ainda não foi importado; o filtro de datas só muda o que é exibido.
+      setFeedback({ tone: "success", text: await syncBankStatement({}) });
       reload();
     } catch (err: any) {
       setFeedback({ tone: "danger", text: getApiResponseMessage(err?.response?.data, "Não foi possível sincronizar o extrato.") });

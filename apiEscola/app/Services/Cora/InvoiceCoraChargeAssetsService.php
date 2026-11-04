@@ -163,28 +163,7 @@ class InvoiceCoraChargeAssetsService
      */
     private function extractPaidAtFromExternal(array $externalInvoice): ?\Illuminate\Support\Carbon
     {
-        $candidates = [
-            $externalInvoice['paid_at'] ?? null,
-            $externalInvoice['occurrence_date'] ?? null,
-            data_get($externalInvoice, 'payment.paid_at'),
-            data_get($externalInvoice, 'payment_date'),
-            data_get($externalInvoice, 'payments.0.finalized_at'),
-            data_get($externalInvoice, 'payments.0.created_at'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (! is_string($candidate) || trim($candidate) === '') {
-                continue;
-            }
-
-            try {
-                return \Illuminate\Support\Carbon::parse($candidate);
-            } catch (\Throwable) {
-                continue;
-            }
-        }
-
-        return null;
+        return CoraPaymentDate::fromInvoice($externalInvoice);
     }
 
     public function paymentAssetsFromInvoice(Invoice $invoice): array

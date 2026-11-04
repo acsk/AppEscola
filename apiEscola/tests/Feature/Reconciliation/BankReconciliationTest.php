@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -437,6 +438,44 @@ class BankReconciliationTest extends TestCase
 
         $professor = User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'professor', 'status' => 'active']);
         $this->actingAs($professor)->getJson('/api/finance/reconciliation/entries')->assertForbidden();
+    }
+
+    public function test_sync_without_dates_fetches_everything_not_yet_imported(): void
+    {
+        Carbon::setTestNow('2026-11-04 15:00:00');
+        $this->coraInvoice('inv_base');
+        Http::fake([self::STATEMENT_URL => Http::response($this->statement([]))]);
+
+        // Caso real: só 05/10 a 04/11 tinha sido buscado; setembro ficou de fora.
+        BankStatementSync::create([
+            'tenant_id' => $this->tenant->id, 'environment' => 'stage', 'source' => 'cora',
+            'period_start' => '2026-10-05', 'period_end' => '2026-11-04', 'status' => 'success',
+            'started_at' => '2026-11-04 14:00:00', 'finished_at' => '2026-11-04 14:01:00',
+        ]);
+
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync')
+            ->assertOk()
+            ->assertJsonPath('body.period_start', '2026-06-01')
+            ->assertJsonPath('body.period_end', '2026-11-04')
+            ->assertJsonPath('body.complete', true);
+
+        // Blocos de até 92 dias, desde a primeira cobrança gerada pelo sistema.
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'start=2026-06-01') && str_contains($r->url(), 'end=2026-08-31'));
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'start=2026-09-01') && str_contains($r->url(), 'end=2026-11-04'));
+
+        // Depois disso só falta hoje (pode ter entrado movimentação depois da busca).
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync')
+            ->assertOk()
+            ->assertJsonPath('body.period_start', '2026-11-04');
+
+        // No dia seguinte, busca a partir de ontem.
+        Carbon::setTestNow('2026-11-05 09:00:00');
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync')
+            ->assertOk()
+            ->assertJsonPath('body.period_start', '2026-11-04')
+            ->assertJsonPath('body.period_end', '2026-11-05');
+
+        Carbon::setTestNow();
     }
 
     public function test_sync_refused_by_cora_is_recorded_without_changes(): void

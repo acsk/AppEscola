@@ -7,6 +7,7 @@ use App\Models\BankStatementSync;
 use App\Models\Tenant;
 use App\Services\Gateways\CoraPaymentGateway;
 use App\Services\Reconciliation\BankReconciliationService;
+use App\Support\BusinessDate;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -25,10 +26,92 @@ class CoraBankStatementSyncService
 
     private const MAX_PAGES = 50;
 
+    /** Blocos de 92 dias por clique (~1 ano); o que faltar vem no próximo. */
+    private const MAX_CHUNKS = 4;
+
     public function __construct(
         private readonly CoraPaymentGateway $gateway,
         private readonly BankReconciliationService $reconciliation,
     ) {
+    }
+
+    /**
+     * Busca tudo o que ainda não foi importado: do primeiro dia sem sincronização bem-sucedida (a partir da
+     * primeira cobrança gerada pelo sistema) até hoje, em blocos de até 92 dias. O filtro de datas da tela
+     * não interfere: ele só muda o que é exibido.
+     *
+     * @return array{created: int, auto_reconciled: int, divergent: int, period_start: string, period_end: string, complete: bool}
+     */
+    public function syncPending(Tenant $tenant, string $environment, ?int $userId = null): array
+    {
+        $since = BankReconciliationService::operatingSince((int) $tenant->id);
+        if ($since === null) {
+            throw new RuntimeException('Nenhuma cobrança foi gerada na Cora por este sistema ainda; não há o que conciliar.');
+        }
+
+        $today = BusinessDate::today();
+        $start = $this->firstUncoveredDay((int) $tenant->id, $environment, $since);
+        if ($start->gt($today)) {
+            $start = $today->copy();
+        }
+
+        $summary = ['created' => 0, 'auto_reconciled' => 0, 'divergent' => 0, 'period_start' => $start->toDateString(), 'period_end' => $start->toDateString()];
+        $chunkStart = $start->copy();
+
+        for ($chunk = 0; $chunk < self::MAX_CHUNKS && $chunkStart->lte($today); $chunk++) {
+            $chunkEnd = $chunkStart->copy()->addDays(self::MAX_PERIOD_DAYS - 1);
+            if ($chunkEnd->gt($today)) {
+                $chunkEnd = $today->copy();
+            }
+
+            $run = $this->sync($tenant, $environment, $chunkStart, $chunkEnd, $userId);
+            $summary['created'] += $run->created;
+            $summary['auto_reconciled'] += $run->auto_reconciled;
+            $summary['divergent'] += $run->divergent;
+            $summary['period_end'] = $chunkEnd->toDateString();
+
+            $chunkStart = $chunkEnd->copy()->addDay();
+        }
+
+        return $summary + ['complete' => $chunkStart->gt($today)];
+    }
+
+    /**
+     * Primeiro dia ainda não coberto por sincronizações bem-sucedidas. O dia em que a busca rodou só conta
+     * até a véspera, porque podem entrar movimentações depois do horário da busca.
+     */
+    private function firstUncoveredDay(int $tenantId, string $environment, Carbon $since): Carbon
+    {
+        $tz = config('app.business_timezone', 'America/Sao_Paulo');
+        $cursor = $since->copy();
+
+        $runs = BankStatementSync::query()
+            ->where('tenant_id', $tenantId)
+            ->where('environment', $environment)
+            ->where('status', 'success')
+            ->whereDate('period_end', '>=', $since->toDateString())
+            ->orderBy('period_start')
+            ->get(['period_start', 'period_end', 'finished_at']);
+
+        foreach ($runs as $run) {
+            if ($run->period_start->gt($cursor)) {
+                break;
+            }
+
+            $coveredUntil = $run->period_end->copy();
+            if ($run->finished_at) {
+                $dayBeforeRun = Carbon::parse($run->finished_at->copy()->setTimezone($tz)->toDateString())->subDay();
+                if ($dayBeforeRun->lt($coveredUntil)) {
+                    $coveredUntil = $dayBeforeRun;
+                }
+            }
+
+            if ($coveredUntil->gte($cursor)) {
+                $cursor = $coveredUntil->copy()->addDay();
+            }
+        }
+
+        return $cursor;
     }
 
     public function sync(Tenant $tenant, string $environment, Carbon $start, Carbon $end, ?int $userId = null): BankStatementSync

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Enrollment;
 use App\Models\Invoice;
 use App\Models\Tenant;
+use App\Services\Cora\CoraPaymentDate;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
@@ -546,28 +547,7 @@ class InvoiceLifecycleService
      */
     private function extractPaidAtFromProviderPayload(array $external): ?\Illuminate\Support\Carbon
     {
-        $candidates = [
-            $external['paid_at'] ?? null,
-            $external['occurrence_date'] ?? null,
-            data_get($external, 'payment.paid_at'),
-            data_get($external, 'payment_date'),
-            data_get($external, 'payments.0.finalized_at'),
-            data_get($external, 'payments.0.created_at'),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (! is_string($candidate) || trim($candidate) === '') {
-                continue;
-            }
-
-            try {
-                return \Illuminate\Support\Carbon::parse($candidate);
-            } catch (\Throwable) {
-                continue;
-            }
-        }
-
-        return null;
+        return CoraPaymentDate::fromInvoice($external);
     }
 
     private function assertGatewayChargeCancelledOnProvider(Tenant $tenant, string $chargeId, string $environment): void

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Support\BusinessDate;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -129,7 +130,8 @@ class InvoiceSettlementService
 
         $paidAt = $data['paid_at'] ?? now();
         if (! $paidAt instanceof Carbon) {
-            $paidAt = Carbon::parse($paidAt);
+            // "2026-08-12" informado no painel é o dia em Brasília, não meia-noite UTC.
+            $paidAt = BusinessDate::moment((string) $paidAt);
         }
 
         $invoice->update([
