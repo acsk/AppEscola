@@ -26,6 +26,28 @@ const persistSelectedTenantId = (tenantId: number | null | undefined) => {
   }
 };
 
+/** Sessão do super admin guardada enquanto ele acessa um tenant (token próprio emitido pela API). */
+const STORAGE_SUPPORT_BACKUP_KEY = "support_backup";
+
+type SupportBackup = { token: string; user: string };
+
+const readSupportBackup = (): SupportBackup | null => {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_SUPPORT_BACKUP_KEY) ?? "null");
+    return parsed?.token && parsed?.user ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Troca de sessão recarrega a página: menu e telas abertas não ficam com o usuário anterior. */
+const reloadAt = (hash: string) => {
+  if (typeof window === "undefined") return;
+  window.location.hash = hash;
+  window.location.reload();
+};
+
 const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -79,6 +101,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
 
     const handleExpiry = () => {
+      // Acesso ao tenant expirou: volta para a sessão do super admin em vez de pedir login.
+      const backup = readSupportBackup();
+      if (backup) {
+        localStorage.removeItem(STORAGE_SUPPORT_BACKUP_KEY);
+        localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
+        localStorage.setItem("auth_token", backup.token);
+        localStorage.setItem("auth_user", backup.user);
+        reloadAt("#/tenants");
+        return;
+      }
       if (typeof localStorage !== "undefined") {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
@@ -140,17 +172,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string, tenantId?: number | null) => {
-    const payload: Record<string, any> = { login: email, password };
-    if (tenantId != null) payload.tenant_id = tenantId;
-
-    const { data } = await api.post("/login", payload);
+  const login = async (email: string, password: string) => {
+    const { data } = await api.post("/login", { login: email, password });
     const body = data?.body ?? data;
     const authUser: AuthUser = {
       ...body?.user,
-      selected_tenant_id:
-        body?.selected_tenant_id ??
-        (tenantId != null && tenantId > 0 ? tenantId : null),
+      selected_tenant_id: body?.selected_tenant_id ?? null,
     };
     const mustReset = !!(body?.password_change_required || authUser?.password_change_required);
 
@@ -188,10 +215,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const enterTenant = async (tenantId: number) => {
+    const currentToken = localStorage.getItem("auth_token");
+    const currentUser = localStorage.getItem("auth_user");
+    if (!currentToken || !currentUser || user?.role !== "super_admin") return;
+
+    const { data } = await api.post(`/tenants/${tenantId}/access`);
+    const body = data?.body ?? data;
+    const tenantUser: AuthUser = {
+      ...(JSON.parse(currentUser) as AuthUser),
+      selected_tenant_id: body.tenant.id,
+      selected_tenant_name: body.tenant.name,
+      support_access_expires_at: body.expires_at,
+    };
+
+    localStorage.setItem(STORAGE_SUPPORT_BACKUP_KEY, JSON.stringify({ token: currentToken, user: currentUser }));
+    localStorage.setItem("auth_token", body.token);
+    localStorage.setItem("auth_user", JSON.stringify(tenantUser));
+    persistSelectedTenantId(body.tenant.id);
+    reloadAt("#/dashboard");
+  };
+
+  const leaveTenant = async () => {
+    const backup = readSupportBackup();
+    if (!backup) return;
+    try {
+      // Revoga o token do acesso; o do super admin continua válido.
+      await api.post("/logout");
+    } catch {}
+    localStorage.removeItem(STORAGE_SUPPORT_BACKUP_KEY);
+    localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
+    localStorage.setItem("auth_token", backup.token);
+    localStorage.setItem("auth_user", backup.user);
+    reloadAt("#/tenants");
+  };
+
   const logout = async () => {
     try {
       await api.post("/logout");
     } catch {}
+    // Saindo durante um acesso a tenant: encerra também a sessão do super admin.
+    const backup = readSupportBackup();
+    if (backup) {
+      localStorage.removeItem(STORAGE_SUPPORT_BACKUP_KEY);
+      localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
+      localStorage.setItem("auth_token", backup.token);
+      try {
+        await api.post("/logout");
+      } catch {}
+    }
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_user");
     localStorage.removeItem(STORAGE_SELECTED_TENANT_KEY);
@@ -204,7 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, mustChangePassword, login, completeFirstAccess, logout }}
+      value={{ user, isLoading, mustChangePassword, login, completeFirstAccess, logout, enterTenant, leaveTenant }}
     >
       {children}
     </AuthContext.Provider>

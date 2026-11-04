@@ -12,7 +12,7 @@ import {
   type TextInputProps,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Building2, ChevronRight, CircleCheck, Eye, EyeOff, Lock, Mail, TriangleAlert, type LucideIcon } from "lucide-react-native";
+import { CircleCheck, Eye, EyeOff, Lock, Mail, TriangleAlert, type LucideIcon } from "lucide-react-native";
 import { useAuth } from "../contexts/AuthContext";
 import Button from "../components/ui/Button";
 import Icon from "../components/ui/Icon";
@@ -253,9 +253,7 @@ export default function LoginScreen() {
     ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenantId, setTenantId] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const [superAdminOpen, setSuperAdminOpen] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
   const { width: windowWidth } = useWindowDimensions();
   const showSidePanel = windowWidth >= SIDE_PANEL_MIN_WIDTH;
@@ -437,9 +435,7 @@ export default function LoginScreen() {
   const resetForm = () => {
     setEmail("");
     setPassword("");
-    setTenantId("");
     setShowPass(false);
-    setSuperAdminOpen(false);
     setError("");
     setDebugInfo(null);
     setDebugCopied(false);
@@ -629,15 +625,7 @@ export default function LoginScreen() {
     setDebugCopied(false);
     showVerification("Autenticando...");
     try {
-      const tenantIdValue = tenantId.trim();
-      const parsedTenantId = tenantIdValue ? Number(tenantIdValue) : null;
-      if (tenantIdValue && (!Number.isInteger(Number(tenantIdValue)) || Number(tenantIdValue) <= 0)) {
-        showVerification("Tenant ID inválido", "error");
-        setError("Tenant ID deve ser um número inteiro válido.");
-        setLoading(false);
-        return;
-      }
-      await login(email, password, parsedTenantId);
+      await login(email, password);
       showVerification("Login autorizado", "success");
     } catch (e: any) {
       showVerification("Credenciais inválidas", "error");
@@ -887,56 +875,6 @@ export default function LoginScreen() {
               fullWidth
               style={{ height: 44 }}
             />
-
-            {/* Acesso de super admin: entra direto num tenant */}
-            <View className="border-t border-border" style={{ paddingTop: 16 }}>
-              <Pressable
-                onPress={() => setSuperAdminOpen(!superAdminOpen)}
-                role="button"
-                aria-expanded={superAdminOpen}
-                aria-controls="login-super-admin"
-                testID="login-super-admin-toggle"
-                className="flex-row items-center self-start"
-                style={{ gap: 8 }}
-              >
-                <View style={{ transform: [{ rotate: superAdminOpen ? "90deg" : "0deg" }] }}>
-                  <Icon icon={ChevronRight} size={16} color={color["ink-muted"]} />
-                </View>
-                <Text className="font-medium text-ink-muted" style={{ fontSize: 13, lineHeight: 18 }}>
-                  Acesso de super admin
-                </Text>
-              </Pressable>
-              {superAdminOpen && (
-                <View nativeID="login-super-admin" style={{ marginTop: 12 }}>
-                  <LoginField
-                    label="ID da organização (tenant)"
-                    icon={Building2}
-                    mono
-                    value={tenantId}
-                    onChangeText={(v) => {
-                      setTenantId(v.replace(/\D/g, ""));
-                      setError("");
-                    }}
-                    nativeID="login-tenant-id-input"
-                    testID="login-tenant-id-input"
-                    keyboardType="numeric"
-                    autoCapitalize="none"
-                    autoComplete="off"
-                    textContentType="none"
-                    importantForAutofill="no"
-                    autoCorrect={false}
-                    placeholder="Ex.: 2"
-                    aria-describedby="login-tenant-hint"
-                    onSubmitEditing={handleLogin}
-                    hint={
-                      <Text nativeID="login-tenant-hint" className="text-ink-subtle" style={{ fontSize: 12, lineHeight: 16 }}>
-                        Opcional. Entra diretamente na organização informada.
-                      </Text>
-                    }
-                  />
-                </View>
-              )}
-            </View>
 
             {/* Acesso de demonstração (só em localhost) */}
             {isLocalhost && (

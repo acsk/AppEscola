@@ -73,7 +73,7 @@ import {
 import { fetchBiMeta, type BiSection } from "./services/biService";
 
 import type { NavState } from "./types/navigation";
-import { canManageExams as roleCanManageExams } from "./utils/permissions";
+import { canManageExams as roleCanManageExams, canViewFinance as roleCanViewFinance } from "./utils/permissions";
 
 const CURRENT_BUILD_VERSION = String((buildInfo as any)?.version ?? "-");
 
@@ -512,6 +512,13 @@ function AppContent() {
     }
   };
 
+  // Super admin sem tenant em acesso começa pela lista de tenants (o dashboard depende de um tenant).
+  useEffect(() => {
+    if (user?.role === "super_admin" && !user.selected_tenant_id && nav.screen === "dashboard") {
+      navigate("tenants");
+    }
+  }, [user?.role, user?.selected_tenant_id, nav.screen]);
+
   // Sync nav when user presses browser back/forward
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -804,6 +811,7 @@ function AppContent() {
   const canManageTenants = user?.role === "super_admin";
   const canManageUsers = user?.role === "super_admin" || user?.role === "admin" || user?.role === "coordenador";
   const canManageExams = roleCanManageExams(user?.role);
+  const canViewFinance = roleCanViewFinance(user?.role);
   const canSendNotifications =
     user?.role === "super_admin" ||
     user?.role === "admin" ||
@@ -1210,6 +1218,7 @@ function AppContent() {
             canManageAi={canManageUsers}
             canManageExams={canManageExams}
             canSendNotifications={canSendNotifications}
+            canViewFinance={canViewFinance}
             biSections={biSections}
             apiVersion={apiVersion}
           />
@@ -1232,6 +1241,7 @@ function AppContent() {
               canManageAi={canManageUsers}
               canManageExams={canManageExams}
               canSendNotifications={canSendNotifications}
+              canViewFinance={canViewFinance}
               biSections={biSections}
               apiVersion={apiVersion}
               isMobile

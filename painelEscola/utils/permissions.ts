@@ -17,6 +17,17 @@ export function canManageExams(role?: string | null): boolean {
   return (EXAM_MANAGER_ROLES as readonly string[]).includes(role);
 }
 
+/**
+ * Papéis que acessam o financeiro (cobranças, visão geral, relatório financeiro).
+ * Espelha FinancePermissions::STAFF_ROLES da API; professor e coordenação ficam de fora por padrão.
+ */
+export const FINANCE_ROLES = ["super_admin", "admin", "manager", "financial", "secretaria"] as const;
+
+export function canViewFinance(role?: string | null): boolean {
+  if (!role) return false;
+  return (FINANCE_ROLES as readonly string[]).includes(role);
+}
+
 /** Nome do papel para exibição (o painel mostra o papel, não o e-mail). */
 export function roleLabel(role?: string | null): string {
   switch (role) {

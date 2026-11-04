@@ -7,9 +7,8 @@ use App\Models\User;
 /**
  * Mapa central papel → permissões do módulo financeiro.
  *
- * Os papéis com acesso replicam o STAFF_ROLES já usado nos relatórios para não
- * remover acesso de quem usa o painel hoje. Aluno e responsável nunca acessam.
- * Para restringir um papel, altere apenas este mapa.
+ * Por padrão só administração, financeiro e secretaria acessam; professor, coordenação,
+ * aluno e responsável não. Para liberar ou restringir um papel, altere apenas este mapa.
  */
 final class FinancePermissions
 {
@@ -26,14 +25,12 @@ final class FinancePermissions
     private const STAFF_ROLES = [
         'super_admin',
         'admin',
-        'coordenador',
         'manager',
         'financial',
         'secretaria',
-        'professor',
     ];
 
-    private const CONFIGURE_ROLES = ['super_admin', 'admin', 'coordenador'];
+    private const CONFIGURE_ROLES = ['super_admin', 'admin'];
 
     public static function allows(?User $user, string $ability): bool
     {

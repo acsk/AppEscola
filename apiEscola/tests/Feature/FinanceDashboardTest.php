@@ -137,7 +137,7 @@ class FinanceDashboardTest extends TestCase
             ->assertJsonPath('message', 'O período pode ter no máximo 366 dias.');
     }
 
-    public function test_student_and_guardian_cannot_reach_finance_or_invoices(): void
+    public function test_roles_without_finance_permission_cannot_reach_finance_or_invoices(): void
     {
         $tenant = Tenant::factory()->create();
         $invoice = Invoice::factory()->create([
@@ -145,10 +145,11 @@ class FinanceDashboardTest extends TestCase
             'student_id' => Student::factory()->create(['tenant_id' => $tenant->id])->id,
         ]);
 
-        foreach (['aluno', 'responsavel'] as $role) {
+        foreach (['aluno', 'responsavel', 'professor', 'coordenador'] as $role) {
             $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => $role, 'status' => 'active']);
 
             $this->actingAs($user)->getJson('/api/finance/dashboard')->assertForbidden();
+            $this->actingAs($user)->getJson('/api/reports/finance')->assertForbidden();
             $this->actingAs($user)->getJson('/api/invoices')->assertForbidden();
             $this->actingAs($user)->getJson('/api/invoices/summary')->assertForbidden();
             $this->actingAs($user)->getJson("/api/invoices/{$invoice->id}")->assertForbidden();
@@ -163,7 +164,7 @@ class FinanceDashboardTest extends TestCase
     {
         $tenant = Tenant::factory()->create();
 
-        foreach (['secretaria', 'professor', 'coordenador'] as $role) {
+        foreach (['admin', 'secretaria'] as $role) {
             $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => $role, 'status' => 'active']);
 
             $this->actingAs($user)->getJson('/api/invoices')->assertOk();

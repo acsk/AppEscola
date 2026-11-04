@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
+import { getApiResponseMessage } from "../../utils/apiErrors";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import Pagination from "../../components/ui/Pagination";
 import Badge from "../../components/ui/Badge";
@@ -69,6 +71,10 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
     total: 0,
   });
 
+  const { enterTenant } = useAuth();
+  const [accessingId, setAccessingId] = useState<number | null>(null);
+  const [accessError, setAccessError] = useState("");
+
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -128,6 +134,18 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
     setDeleting(false);
   };
 
+  const access = async (tenantId: number) => {
+    setAccessingId(tenantId);
+    setAccessError("");
+    try {
+      // Em caso de sucesso a página recarrega já dentro do tenant.
+      await enterTenant(tenantId);
+    } catch (e: any) {
+      setAccessError(getApiResponseMessage(e?.response?.data, "Não foi possível acessar este tenant."));
+      setAccessingId(null);
+    }
+  };
+
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
@@ -144,6 +162,16 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
           <Text className="text-on-brand font-medium text-sm ml-1.5">Novo tenant</Text>
         </TouchableOpacity>
       </View>
+
+      {!!accessError && (
+        <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3 flex-row items-start gap-2">
+          <Ionicons name="alert-circle-outline" size={16} color="var(--ds-danger)" style={{ marginTop: 1 }} />
+          <Text className="text-sm text-danger flex-1">{accessError}</Text>
+          <TouchableOpacity onPress={() => setAccessError("")} aria-label="Fechar aviso">
+            <Ionicons name="close" size={16} color="var(--ds-danger)" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {!!successMessage && (
         <View className="mb-4 rounded-ds-md border border-success bg-success-tint px-4 py-3 flex-row items-start gap-2">
@@ -221,7 +249,7 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
           <Text className={TABLE_HEADER_CELL} style={{ flex: 1.5 }}>Slug</Text>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 1.5 }}>Contato</Text>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Status</Text>
-          <View style={{ width: 90 }} />
+          <View style={{ width: 190 }} />
         </View>
 
         {loading ? (
@@ -263,7 +291,24 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
                 />
               </View>
 
-              <View className="flex-row items-center justify-end" style={{ width: 90 }}>
+              <View className="flex-row items-center justify-end" style={{ width: 190, gap: 4 }}>
+                {row.status === "active" && (
+                  <TouchableOpacity
+                    onPress={() => access(row.id)}
+                    disabled={accessingId !== null}
+                    aria-label={`Acessar ${row.name}`}
+                    className="flex-row items-center border border-brand rounded-ds-md px-3 py-1.5 mr-1"
+                    style={{ opacity: accessingId !== null && accessingId !== row.id ? 0.5 : 1 }}
+                    activeOpacity={0.7}
+                  >
+                    {accessingId === row.id ? (
+                      <ActivityIndicator size="small" color="var(--ds-brand)" />
+                    ) : (
+                      <Ionicons name="log-in-outline" size={16} color="var(--ds-brand)" />
+                    )}
+                    <Text className="text-brand font-medium text-sm ml-1.5">Acessar</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity onPress={() => navigate("tenants-form", { tenantId: row.id })} className="p-2" activeOpacity={0.7}>
                   <Ionicons name="create-outline" size={18} color="var(--ds-brand)" />
                 </TouchableOpacity>

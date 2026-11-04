@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\ClassStudentsReportService;
 use App\Services\FinanceReportService;
+use App\Support\FinancePermissions;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,8 +66,8 @@ class ReportController extends Controller
 
     public function finance(Request $request): JsonResponse
     {
-        if ($denied = $this->denyUnlessStaff($request)) {
-            return $denied;
+        if (! FinancePermissions::allows($request->user(), FinancePermissions::VIEW)) {
+            return $this->forbidden('Sem permissão para acessar o financeiro.');
         }
 
         $tenantId = $this->getTenantId($request);

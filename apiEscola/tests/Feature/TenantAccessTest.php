@@ -6,11 +6,13 @@ use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
+use Tests\Concerns\SeedsDomainLookups;
 use Tests\TestCase;
 
 class TenantAccessTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDomainLookups;
 
     public function test_super_admin_gets_token_scoped_to_tenant(): void
     {

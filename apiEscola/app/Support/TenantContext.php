@@ -28,9 +28,10 @@ class TenantContext
         return null;
     }
 
-    public static function tenantIdFromAccessToken(?PersonalAccessToken $token): ?int
+    public static function tenantIdFromAccessToken(mixed $token): ?int
     {
-        if (! $token) {
+        // Sessão (TransientToken) não carrega tenant.
+        if (! $token instanceof PersonalAccessToken) {
             return null;
         }
 

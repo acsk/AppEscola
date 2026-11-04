@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity } from "react-native";
-import { Bell, LogOut, Menu, Search, Settings } from "lucide-react-native";
+import { Bell, Building2, LogOut, Menu, Search, Settings } from "lucide-react-native";
 import { useAuth } from "../contexts/AuthContext";
 import Icon from "./ui/Icon";
 import ThemeToggle from "./ui/ThemeToggle";
@@ -15,7 +15,9 @@ type HeaderProps = {
 /** Barra superior (TopBar): busca à esquerda; utilitários e usuário (nome + papel) à direita. */
 export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
   const [search, setSearch] = useState("");
-  const { logout, user } = useAuth();
+  const { logout, leaveTenant, user } = useAuth();
+  const [leaving, setLeaving] = useState(false);
+  const accessingTenant = user?.role === "super_admin" && !!user.selected_tenant_id;
   const initials = user?.name
     ? user.name
         .split(" ")
@@ -38,56 +40,81 @@ export default function Header({ isMobile = false, onOpenMenu }: HeaderProps) {
   );
 
   return (
-    <View
-      className="bg-surface border-b border-border flex-row items-center"
-      style={{ height: size["topbar-height"], paddingHorizontal: isMobile ? 12 : 32, gap: 16 }}
-    >
-      {isMobile && <IconButton icon={Menu} label="Abrir menu" onPress={onOpenMenu} />}
-
-      {!isMobile && (
+    <View>
+      {accessingTenant && (
         <View
-          className="flex-row items-center bg-surface border border-border-strong rounded-ds-md px-3"
-          style={{ width: 320, height: size["control-sm"], gap: 8 }}
+          className="bg-warning-tint border-b border-border flex-row items-center flex-wrap"
+          style={{ paddingHorizontal: isMobile ? 12 : 32, paddingVertical: 8, gap: 12 }}
+          role="status"
         >
-          <Icon icon={Search} color={color["ink-subtle"]} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Pesquisar"
-            placeholderTextColor={color["ink-subtle"]}
-            aria-label="Pesquisar"
-            className="flex-1 text-sm text-ink"
-          />
+          <Icon icon={Building2} size={16} color={color.warning} />
+          <Text className="text-sm text-ink flex-1" style={{ minWidth: 180 }}>
+            Acessando <Text className="font-semibold">{user?.selected_tenant_name ?? `tenant #${user?.selected_tenant_id}`}</Text> como super admin
+          </Text>
+          <TouchableOpacity
+            onPress={async () => {
+              setLeaving(true);
+              await leaveTenant();
+            }}
+            disabled={leaving}
+            className="border border-border-strong bg-surface rounded-ds-md px-3 py-1.5"
+            activeOpacity={0.7}
+          >
+            <Text className="text-sm font-medium text-ink">{leaving ? "Voltando..." : "Voltar ao Super Admin"}</Text>
+          </TouchableOpacity>
         </View>
       )}
+      <View
+        className="bg-surface border-b border-border flex-row items-center"
+        style={{ height: size["topbar-height"], paddingHorizontal: isMobile ? 12 : 32, gap: 16 }}
+      >
+        {isMobile && <IconButton icon={Menu} label="Abrir menu" onPress={onOpenMenu} />}
 
-      <View className="flex-1" />
-
-      <View className="flex-row items-center" style={{ gap: 8 }}>
-        <ThemeToggle compact={isMobile} />
-        <IconButton icon={Settings} label="Configurações" />
-        <IconButton icon={Bell} label="Notificações" />
-
-        <View
-          className="flex-row items-center border-l border-border"
-          style={{ gap: 12, paddingLeft: 16, marginLeft: 8 }}
-        >
-          {!isMobile && (
-            <View className="items-end">
-              <Text className="text-sm font-medium text-ink" numberOfLines={1}>
-                {user?.name ?? "Usuário"}
-              </Text>
-              <Text className="text-xs text-ink-subtle">{roleLabel(user?.role)}</Text>
-            </View>
-          )}
+        {!isMobile && (
           <View
-            className="bg-surface-sunken border border-border rounded-ds-md items-center justify-center"
-            style={{ width: 32, height: 32 }}
-            aria-hidden
+            className="flex-row items-center bg-surface border border-border-strong rounded-ds-md px-3"
+            style={{ width: 320, height: size["control-sm"], gap: 8 }}
           >
-            <Text className="text-xs font-semibold text-ink">{initials}</Text>
+            <Icon icon={Search} color={color["ink-subtle"]} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Pesquisar"
+              placeholderTextColor={color["ink-subtle"]}
+              aria-label="Pesquisar"
+              className="flex-1 text-sm text-ink"
+            />
           </View>
-          <IconButton icon={LogOut} label="Sair" onPress={logout} />
+        )}
+
+        <View className="flex-1" />
+
+        <View className="flex-row items-center" style={{ gap: 8 }}>
+          <ThemeToggle compact={isMobile} />
+          <IconButton icon={Settings} label="Configurações" />
+          <IconButton icon={Bell} label="Notificações" />
+
+          <View
+            className="flex-row items-center border-l border-border"
+            style={{ gap: 12, paddingLeft: 16, marginLeft: 8 }}
+          >
+            {!isMobile && (
+              <View className="items-end">
+                <Text className="text-sm font-medium text-ink" numberOfLines={1}>
+                  {user?.name ?? "Usuário"}
+                </Text>
+                <Text className="text-xs text-ink-subtle">{roleLabel(user?.role)}</Text>
+              </View>
+            )}
+            <View
+              className="bg-surface-sunken border border-border rounded-ds-md items-center justify-center"
+              style={{ width: 32, height: 32 }}
+              aria-hidden
+            >
+              <Text className="text-xs font-semibold text-ink">{initials}</Text>
+            </View>
+            <IconButton icon={LogOut} label="Sair" onPress={logout} />
+          </View>
         </View>
       </View>
     </View>

@@ -87,6 +87,7 @@ export default function Sidebar({
   canManageAi = false,
   canManageExams = false,
   canSendNotifications = false,
+  canViewFinance = false,
   biSections = [],
   isMobile = false,
   onClose,
@@ -139,20 +140,24 @@ export default function Sidebar({
           },
         ]
       : []),
-    {
-      label: "Financeiro",
-      items: [
-        { id: "financeiro-visao-geral", label: "Visão geral", icon: ChartLine },
-        { id: "cobrancas", label: "Gestão de pagamentos", icon: CreditCard },
-        { id: "bancos_crud", label: "Bancos", icon: Landmark },
-        { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
-      ],
-    },
+    ...(canViewFinance
+      ? [
+          {
+            label: "Financeiro",
+            items: [
+              { id: "financeiro-visao-geral", label: "Visão geral", icon: ChartLine },
+              { id: "cobrancas", label: "Gestão de pagamentos", icon: CreditCard },
+              { id: "bancos_crud", label: "Bancos", icon: Landmark },
+              { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },
+            ],
+          },
+        ]
+      : []),
     {
       label: "Relatórios",
       items: [
         { id: "relatorios-turmas", label: "Turmas (alunos)", icon: ChartColumn },
-        { id: "relatorios-financeiro", label: "Financeiro", icon: ChartColumn },
+        ...(canViewFinance ? [{ id: "relatorios-financeiro", label: "Financeiro", icon: ChartColumn }] : []),
       ],
     },
     ...(canSendNotifications
