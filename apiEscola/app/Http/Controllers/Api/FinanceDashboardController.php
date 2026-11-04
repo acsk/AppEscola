@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\FinancialDashboardService;
+use App\Support\BusinessDate;
 use App\Support\FinancePermissions;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
@@ -39,7 +40,7 @@ class FinanceDashboardController extends Controller
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
 
-        $to = isset($validated['date_to']) ? Carbon::parse($validated['date_to']) : Carbon::today();
+        $to = isset($validated['date_to']) ? Carbon::parse($validated['date_to']) : BusinessDate::today();
         $from = isset($validated['date_from']) ? Carbon::parse($validated['date_from']) : $to->copy()->startOfMonth();
 
         if ($from->gt($to)) {

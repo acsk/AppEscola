@@ -10,8 +10,10 @@ use App\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Invoice;
 use App\Services\InvoiceLifecycleService;
+use App\Services\InvoiceListQuery;
 use App\Services\InvoiceSettlementService;
 use App\Services\PaymentGatewayFactory;
+use App\Support\BusinessDate;
 use App\Support\FinancePermissions;
 use App\Traits\ScopedByTenant;
 use Illuminate\Routing\Controllers\HasMiddleware;
@@ -33,7 +35,7 @@ class InvoiceController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware(self::requireAbility(FinancePermissions::VIEW), only: ['index', 'summary', 'show']),
+            new Middleware(self::requireAbility(FinancePermissions::VIEW), only: ['index', 'summary', 'situations', 'show']),
             new Middleware(self::requireAbility(FinancePermissions::MANAGE_INVOICES), only: ['store', 'update', 'destroy', 'cancel', 'generateCoraCharge']),
             new Middleware(self::requireAbility(FinancePermissions::SETTLE), only: ['markAsPaid']),
         ];
@@ -53,6 +55,7 @@ class InvoiceController extends Controller implements HasMiddleware
     public function __construct(
         private readonly InvoiceLifecycleService $lifecycle,
         private readonly InvoiceSettlementService $settlement,
+        private readonly InvoiceListQuery $listQuery,
     ) {
     }
 
@@ -80,7 +83,17 @@ class InvoiceController extends Controller implements HasMiddleware
     )]
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Invoice::query()->with(['student', 'guardian']);
+        $request->validate([
+            'situation' => ['nullable', 'in:' . implode(',', InvoiceListQuery::SITUATIONS)],
+            'order' => ['nullable', 'in:asc,desc'],
+        ]);
+
+        $query = Invoice::query()->with([
+            'student',
+            'guardian',
+            'enrollment.schoolClass.course',
+            'enrollment.coursePlan.course',
+        ]);
         $this->applyTenantScope($query, $request);
         $query->excludingImportedFromCoraSync();
 
@@ -92,28 +105,37 @@ class InvoiceController extends Controller implements HasMiddleware
             $query->where('status', 'paid');
         }
 
-        $query
-            ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
-            ->when($request->query('student_id'), fn ($q, $v) => $q->where('student_id', $v))
-            ->when($request->query('enrollment_id'), fn ($q, $v) => $q->where('enrollment_id', $v))
-            ->when($request->query('payment_method'), fn ($q, $v) => $q->where('payment_method', $v))
-            ->when($request->query('due_date_from'), fn ($q, $v) => $q->whereDate('due_date', '>=', $v))
-            ->when($request->query('due_date_to'), fn ($q, $v) => $q->whereDate('due_date', '<=', $v))
-            ->when($request->query('paid_at_from'), fn ($q, $v) => $q->whereDate('paid_at', '>=', $v))
-            ->when($request->query('paid_at_to'), fn ($q, $v) => $q->whereDate('paid_at', '<=', $v))
-            ->when($request->query('search'), function ($q, $v) {
-                $term = '%' . trim((string) $v) . '%';
-                $q->where(function ($inner) use ($term) {
-                    $inner->where('description', 'like', $term)
-                        ->orWhereHas('student', fn ($s) => $s->where('name', 'like', $term));
-                });
-            });
+        if ($situation = $request->query('situation')) {
+            $this->listQuery->applySituation($query, $situation);
+        }
 
-        $orderColumn = $view === 'paid' ? 'paid_at' : 'due_date';
+        $query->when($request->query('status'), fn ($q, $v) => $q->where('status', $v));
+        $this->listQuery->applyFilters($query, $request);
+
+        $orderColumn = $view === 'paid' || $request->query('situation') === 'paid' ? 'paid_at' : 'due_date';
+        $direction = $request->query('order', 'desc');
 
         return InvoiceResource::collection(
-            $query->orderByDesc($orderColumn)->paginate((int) $request->query('per_page', 20))
+            $query->orderBy($orderColumn, $direction)->orderBy('id', $direction)->paginate((int) $request->query('per_page', 20))
         );
+    }
+
+    /**
+     * Contagem e valor por situação (em aberto, vencidas, a vencer em 7 dias, pagas, canceladas)
+     * com os mesmos filtros da listagem, exceto a própria situação.
+     */
+    public function situations(Request $request): JsonResponse
+    {
+        $query = Invoice::query();
+        $this->applyTenantScope($query, $request);
+        $query->excludingImportedFromCoraSync();
+        $this->listQuery->applyFilters($query, $request);
+
+        return $this->success([
+            'situations' => $this->listQuery->situationTotals($query),
+            'due_soon_days' => InvoiceListQuery::DUE_SOON_DAYS,
+            'today' => BusinessDate::today()->toDateString(),
+        ], 'Situações carregadas com sucesso.');
     }
 
     #[OA\Get(

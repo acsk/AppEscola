@@ -74,6 +74,7 @@ export type InvoiceCoraAssets = {
   boleto_digitable?: string;
   /** Ambiente em que a cobrança foi emitida (stage|prod). */
   environment?: "stage" | "prod" | string | null;
+  last_synced_at?: string | null;
 };
 
 export type InvoiceListItem = {
@@ -94,6 +95,15 @@ export type InvoiceListItem = {
   student?: StudentRef;
   guardian?: GuardianRef;
   enrollment_id: number | null;
+  /** Resumo da matrícula (GET /invoices e /invoices/{id}). */
+  enrollment?: {
+    id: number;
+    school_class: { id: number; name: string } | null;
+    course: { id: number; name: string } | null;
+    course_plan: { id: number; name: string } | null;
+  } | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   can_edit?: boolean;
   can_cancel?: boolean;
   can_delete?: boolean;

@@ -67,6 +67,9 @@ return [
 
     'timezone' => 'UTC',
 
+    // Fuso das regras por data do negócio (vencida, a vencer, "hoje"); ver App\Support\BusinessDate.
+    'business_timezone' => env('APP_BUSINESS_TIMEZONE', 'America/Sao_Paulo'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

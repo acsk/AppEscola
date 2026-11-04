@@ -29,6 +29,17 @@ class InvoiceResource extends JsonResource
             'student' => new StudentResource($this->whenLoaded('student')),
             'guardian_id' => $this->guardian_id,
             'guardian' => new GuardianResource($this->whenLoaded('guardian')),
+            // Resumo da matrícula para a listagem e o detalhe (turma, curso e plano).
+            'enrollment' => $this->whenLoaded('enrollment', fn () => $this->enrollment ? [
+                'id' => $this->enrollment->id,
+                'school_class' => $this->enrollment->relationLoaded('schoolClass') && $this->enrollment->schoolClass
+                    ? ['id' => $this->enrollment->schoolClass->id, 'name' => $this->enrollment->schoolClass->name]
+                    : null,
+                'course' => $this->enrollmentCourse(),
+                'course_plan' => $this->enrollment->relationLoaded('coursePlan') && $this->enrollment->coursePlan
+                    ? ['id' => $this->enrollment->coursePlan->id, 'name' => $this->enrollment->coursePlan->name]
+                    : null,
+            ] : null),
             'type' => $this->type,
             'type_label' => $this->whenLoaded('invoiceType', fn () => $this->invoiceType?->name),
             'description' => $this->description,
@@ -122,5 +133,15 @@ class InvoiceResource extends JsonResource
         $resolution = $gateway->resolveProviderDueDateResolution($this->resource);
 
         return $resolution['adjusted'] ? CoraPaymentGateway::DUE_DATE_POLICY_HINT : null;
+    }
+
+    /** Curso pela turma da matrícula ou, sem turma, pelo plano. */
+    private function enrollmentCourse(): ?array
+    {
+        $enrollment = $this->enrollment;
+        $course = ($enrollment->relationLoaded('schoolClass') ? $enrollment->schoolClass?->course : null)
+            ?? ($enrollment->relationLoaded('coursePlan') ? $enrollment->coursePlan?->course : null);
+
+        return $course ? ['id' => $course->id, 'name' => $course->name] : null;
     }
 }

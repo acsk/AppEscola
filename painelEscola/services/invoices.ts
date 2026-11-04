@@ -43,3 +43,17 @@ export async function markInvoiceAsPaid(
   const { data } = await api.post(`/invoices/${invoiceId}/mark-as-paid`, payload);
   return data;
 }
+
+export type InvoiceSituation = "open" | "overdue" | "due_soon" | "paid" | "cancelled";
+
+export type InvoiceSituationTotals = {
+  situations: Record<InvoiceSituation, { count: number; amount: string }>;
+  due_soon_days: number;
+  today: string;
+};
+
+/** Contagem e valor por situação com os mesmos filtros da listagem (exceto a situação). */
+export async function fetchInvoiceSituations(params: Record<string, string | number>): Promise<InvoiceSituationTotals> {
+  const { data } = await api.get("/invoices/situations", { params });
+  return data.body ?? data;
+}

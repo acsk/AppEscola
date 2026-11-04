@@ -333,6 +333,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\IdentifyTenant::class, \
     Route::get('finance/dashboard', [FinanceDashboardController::class, 'show']);
 
     Route::get('invoices/summary', [InvoiceController::class, 'summary']);
+    Route::get('invoices/situations', [InvoiceController::class, 'situations']);
     Route::apiResource('invoices', InvoiceController::class);
     Route::post('invoices/{invoice}/mark-as-paid', [InvoiceController::class, 'markAsPaid']);
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);

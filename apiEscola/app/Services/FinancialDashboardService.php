@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\BusinessDate;
 use App\Models\Invoice;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -37,7 +38,7 @@ class FinancialDashboardService
      */
     public function build(int $tenantId, Carbon $from, Carbon $to, ?Carbon $today = null): array
     {
-        $today = ($today ?? Carbon::today())->copy()->startOfDay();
+        $today = ($today ?? BusinessDate::today())->copy()->startOfDay();
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->startOfDay();
 

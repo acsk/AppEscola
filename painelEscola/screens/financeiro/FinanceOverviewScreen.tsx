@@ -180,7 +180,7 @@ export default function FinanceOverviewScreen({ navigate }: Props) {
         description="Indicadores de recebimento do período, comparados ao período anterior."
         actions={
           <View className="flex-row" style={{ gap: 8 }}>
-            <Button label="Gestão de pagamentos" onPress={() => navigate("cobrancas")} />
+            <Button label="Contas a receber" onPress={() => navigate("cobrancas")} />
             <Button icon={RefreshCw} label="Atualizar" onPress={load} loading={loading} />
           </View>
         }

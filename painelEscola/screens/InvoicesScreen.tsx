@@ -23,7 +23,6 @@ import ConfirmModal from "../components/ui/ConfirmModal";
 import DataTableRow from "../components/ui/DataTableRow";
 import {
   TABLE_CELL,
-  TABLE_CELL_MUTED,
   TABLE_CELL_SEMIBOLD,
   TABLE_CELL_SUBLINE,
   TABLE_HEADER_CELL,
@@ -48,7 +47,13 @@ import {
 import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 import MarkInvoicePaidModal from "../components/finance/MarkInvoicePaidModal";
 import InvoiceActionsModal, { type InvoiceActionKey } from "../components/finance/InvoiceActionsModal";
-import { fetchInvoiceSummary, type InvoiceSummary } from "../services/invoices";
+import { fetchInvoiceSituations, type InvoiceSituation, type InvoiceSituationTotals } from "../services/invoices";
+import SituationStrip from "../components/finance/SituationStrip";
+import InvoiceDrawer, { type InvoiceDrawerAction } from "../components/finance/InvoiceDrawer";
+import { SITUATION_LABEL, SITUATION_TONE, dueHint, invoiceOrigin, rowSituation } from "../components/finance/receivables";
+import PageHeader from "../components/ui/PageHeader";
+import Button from "../components/ui/Button";
+import { Plus } from "lucide-react-native";
 import { paymentMethodLabel } from "../utils/paymentMethods";
 import {
   defaultPaymentEnvironment,
@@ -78,7 +83,6 @@ if (Platform.OS === "web" && pdfjs) {
 
 import type { GuardianRef, StudentRef } from "../types/entities";
 import type { Invoice, InvoiceFormValues, InvoicesScreenProps } from "../types/invoices";
-import Tabs from "../components/ui/Tabs";
 
 const canGenerateChargeForInvoice = (invoice: Invoice | null) => {
   if (!invoice) return false;
@@ -112,19 +116,6 @@ const limitText = (value: string | undefined | null, max: number) => {
   if (!value) return "—";
   const clean = value.trim();
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
-};
-
-const SUMMARY_TONES: Record<string, { bg: string; border: string; text: string }> = {
-  amber: { bg: "var(--ds-warning-tint)", border: "var(--ds-warning)", text: "var(--ds-warning)" },
-  red: { bg: "var(--ds-danger-tint)", border: "var(--ds-danger)", text: "var(--ds-danger)" },
-  emerald: { bg: "var(--ds-success-tint)", border: "var(--ds-success)", text: "var(--ds-success)" },
-};
-
-type ListView = "open" | "paid" | "all";
-
-const monthStartISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 };
 
 type ApiFieldErrorsPayload = { [field: string]: string | string[] };
@@ -179,15 +170,20 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
-  const [listView, setListView] = useState<ListView>("open");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [situation, setSituation] = useState<InvoiceSituation>("open");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
+  const [courseFilter, setCourseFilter] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [courses, setCourses] = useState<{ id: number; name: string }[]>([]);
+  const [schoolClasses, setSchoolClasses] = useState<{ id: number; name: string; course_id?: number | null }[]>([]);
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
-  const [paidAtFrom, setPaidAtFrom] = useState(monthStartISO());
+  const [paidAtFrom, setPaidAtFrom] = useState("");
   const [paidAtTo, setPaidAtTo] = useState("");
   const [search, setSearch] = useState("");
-  const [summary, setSummary] = useState<InvoiceSummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [situationTotals, setSituationTotals] = useState<InvoiceSituationTotals | null>(null);
   const [actionsInvoice, setActionsInvoice] = useState<Invoice | null>(null);
+  const [drawerInvoice, setDrawerInvoice] = useState<Invoice | null>(null);
   const [settleInvoice, setSettleInvoice] = useState<Invoice | null>(null);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, per_page: 20, total: 0 });
@@ -261,30 +257,38 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     } catch {}
   };
 
+  /** Filtros da tela (sem a situação), usados pela lista e pela faixa de situações. */
+  const filterParams = useCallback(() => {
+    const params: Record<string, string> = {};
+    if (paymentMethodFilter) params.payment_method = paymentMethodFilter;
+    if (search.trim()) params.search = search.trim();
+    if (dueFrom) params.due_date_from = dueFrom;
+    if (dueTo) params.due_date_to = dueTo;
+    if (courseFilter) params.course_id = courseFilter;
+    if (classFilter) params.school_class_id = classFilter;
+    if (situation === "paid") {
+      if (paidAtFrom) params.paid_at_from = paidAtFrom;
+      if (paidAtTo) params.paid_at_to = paidAtTo;
+    }
+    return params;
+  }, [paymentMethodFilter, search, dueFrom, dueTo, courseFilter, classFilter, situation, paidAtFrom, paidAtTo]);
+
   const fetch = useCallback(async () => {
-    if (listView === "paid") {
-      const periodErr = validatePaidPeriodFilter(paidAtFrom, paidAtTo);
-      setFilterPeriodError(periodErr);
-      if (periodErr) {
-        setRows([]);
-        setLoading(false);
-        return;
-      }
-    } else {
-      setFilterPeriodError(null);
+    const periodErr =
+      validatePaidPeriodFilter(dueFrom, dueTo) ??
+      (situation === "paid" ? validatePaidPeriodFilter(paidAtFrom, paidAtTo) : null);
+    setFilterPeriodError(periodErr);
+    if (periodErr) {
+      setRows([]);
+      setLoading(false);
+      return;
     }
 
     setLoading(true);
     try {
-      const params: Record<string, any> = { page, view: listView };
-      if (statusFilter) params.status = statusFilter;
-      if (paymentMethodFilter) params.payment_method = paymentMethodFilter;
-      if (search.trim()) params.search = search.trim();
-      if (listView === "paid") {
-        if (paidAtFrom) params.paid_at_from = paidAtFrom;
-        if (paidAtTo) params.paid_at_to = paidAtTo;
-      }
-      const { data } = await api.get("/invoices", { params });
+      // Em aberto, vencidas e a vencer: o vencimento mais próximo primeiro.
+      const order = situation === "paid" || situation === "cancelled" ? "desc" : "asc";
+      const { data } = await api.get("/invoices", { params: { ...filterParams(), page, situation, order } });
       const invoices = (data.data ?? []).filter(
         (invoice: Invoice) => invoice.imported_from_cora_sync !== true
       );
@@ -292,31 +296,34 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
       setMeta(data.meta);
     } catch {}
     setLoading(false);
-  }, [page, statusFilter, listView, paymentMethodFilter, paidAtFrom, paidAtTo, search]);
+  }, [page, situation, filterParams, dueFrom, dueTo, paidAtFrom, paidAtTo]);
 
   const loadSummary = useCallback(async () => {
-    const periodErr = validatePaidPeriodFilter(paidAtFrom, paidAtTo);
-    setFilterPeriodError(periodErr);
-    if (periodErr) {
-      setSummary(null);
+    if (validatePaidPeriodFilter(dueFrom, dueTo)) {
+      setSituationTotals(null);
       return;
     }
-
-    setSummaryLoading(true);
     try {
-      const data = await fetchInvoiceSummary({
-        paid_at_from: paidAtFrom || undefined,
-        paid_at_to: paidAtTo || undefined,
-      });
-      setSummary(data);
+      setSituationTotals(await fetchInvoiceSituations(filterParams()));
     } catch {
-      setSummary(null);
+      setSituationTotals(null);
     }
-    setSummaryLoading(false);
-  }, [paidAtFrom, paidAtTo]);
+  }, [filterParams, dueFrom, dueTo]);
 
   useEffect(() => { fetch(); }, [fetch]);
   useEffect(() => { loadSummary(); }, [loadSummary]);
+
+  useEffect(() => {
+    Promise.all([
+      api.get("/courses", { params: { per_page: 200 } }),
+      api.get("/school-classes", { params: { per_page: 200 } }),
+    ])
+      .then(([cRes, tRes]) => {
+        setCourses(cRes.data.data ?? []);
+        setSchoolClasses(tRes.data.data ?? []);
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const loadProviders = async () => {
@@ -414,6 +421,13 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     if (message) setSaveSuccess(message);
     fetch();
     loadSummary();
+  };
+
+  const handleDrawerAction = (action: InvoiceDrawerAction, inv: Invoice) => {
+    if (action === "settle") setSettleInvoice(inv);
+    if (action === "edit") openEdit(inv);
+    if (action === "generate_charge") openChargeModal(inv);
+    if (action === "cancel") setCancelId(inv.id);
   };
 
   const handleInvoiceAction = (action: InvoiceActionKey) => {
@@ -655,20 +669,26 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     { value: "boleto", label: "Boleto" },
     { value: "hybrid", label: "Boleto + PIX" },
   ];
-  const allStatusOptions = [{ value: "", label: "Todos" }, ...statusOptions];
+  const courseOptions = [{ value: "", label: "Todos os cursos" }, ...courses.map((c) => ({ value: String(c.id), label: c.name }))];
+  const classOptions = [
+    { value: "", label: "Todas as turmas" },
+    ...schoolClasses
+      .filter((c) => !courseFilter || String(c.course_id ?? "") === courseFilter)
+      .map((c) => ({ value: String(c.id), label: c.name })),
+  ];
+  const hasExtraFilters = !!(search || dueFrom || dueTo || courseFilter || classFilter || paymentMethodFilter);
+  const clearFilters = () => {
+    setSearch("");
+    setDueFrom("");
+    setDueTo("");
+    setCourseFilter("");
+    setClassFilter("");
+    setPaymentMethodFilter("");
+    setPage(1);
+  };
   const fmt = (v: string) => v ? new Date(v + "T00:00:00").toLocaleDateString("pt-BR") : "—";
   const fmtMoney = (v: string) =>
     parseFloat(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const fmtDateTime = (v: string | null | undefined) => {
-    if (!v) return "—";
-    return new Date(v).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const renderInvoiceListState = () => {
     if (loading) {
@@ -691,193 +711,180 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
     return null;
   };
 
-  const summaryCards = summary
-    ? [
-        { label: "Em aberto", value: summary.open.count, amount: summary.open.amount, tone: "amber" },
-        { label: "Vencidas", value: summary.overdue.count, amount: summary.overdue.amount, tone: "red" },
-        {
-          label: "Baixadas no período",
-          value: summary.paid_in_period.count,
-          amount: summary.paid_in_period.amount,
-          tone: "emerald",
-        },
-      ]
-    : [];
+  const changeSituation = (next: InvoiceSituation) => {
+    setSituation(next);
+    setPage(1);
+  };
+
+  const quickSettle = (item: Invoice) =>
+    rowSituation(item) !== "paid" && rowSituation(item) !== "cancelled" && item.can_manual_settle ? (
+      <TouchableOpacity
+        onPress={(event: any) => {
+          event?.stopPropagation?.();
+          setSettleInvoice(item);
+        }}
+        aria-label={`Registrar pagamento da cobrança #${item.id}`}
+        className="w-8 h-8 items-center justify-center bg-surface rounded-ds-md border border-border-strong"
+        activeOpacity={0.85}
+      >
+        <Ionicons name="checkmark" size={16} color="var(--ds-brand)" />
+      </TouchableOpacity>
+    ) : null;
+
+  const moreActions = (item: Invoice) => (
+    <TouchableOpacity
+      onPress={(event: any) => {
+        event?.stopPropagation?.();
+        setActionsInvoice(item);
+      }}
+      aria-label={`Mais ações da cobrança #${item.id}`}
+      className="w-8 h-8 items-center justify-center bg-surface-sunken rounded-ds-md border border-border"
+      activeOpacity={0.85}
+    >
+      <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
+    </TouchableOpacity>
+  );
+
+  const situationBadge = (item: Invoice) => {
+    const current = rowSituation(item);
+    return <Badge label={SITUATION_LABEL[current]} tone={SITUATION_TONE[current]} dot />;
+  };
+
+  const dueLine = (item: Invoice) => {
+    const hint = dueHint(item);
+    return hint ? (
+      <Text className={`text-xs mt-0.5 ${hint.late ? "text-danger font-medium" : "text-ink-muted"}`} numberOfLines={1}>
+        {hint.late ? `▾ ${hint.text}` : hint.text}
+      </Text>
+    ) : null;
+  };
+
+  const studentSubline = (item: Invoice) =>
+    `#${item.id}${item.student?.enrollment_number ? ` · mat. ${item.student.enrollment_number}` : ""}`;
+
+  const descriptionSubline = (item: Invoice) =>
+    item.enrollment?.course_plan?.name ?? item.enrollment?.school_class?.name ?? null;
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
-      <View
-        className="mb-6"
-        style={{
-          flexDirection: isMobile ? "column" : "row",
-          alignItems: isMobile ? "stretch" : "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <View>
-          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Gestão de pagamentos</Text>
-          <Text className="text-sm text-ink-muted">
-            Cobranças em aberto, baixas manuais e resumo financeiro
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={openCreate}
-          className="flex-row items-center justify-center bg-brand px-5 rounded-ds-md py-2 min-h-control-md"
-          activeOpacity={0.85}
-        >
-          <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
-          <Text className="text-on-brand font-medium text-sm ml-1.5">Nova cobrança</Text>
-        </TouchableOpacity>
-      </View>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40, gap: 16 }}>
+      <PageHeader
+        breadcrumb={[{ label: "Financeiro" }, { label: "Contas a receber" }]}
+        title="Contas a receber"
+        description="Mensalidades, taxas e cobranças avulsas de todos os alunos."
+        actions={<Button variant="primary" icon={Plus} label="Nova cobrança" onPress={openCreate} />}
+      />
 
-      <View className="mb-4">
-        <Tabs
-          accessibilityLabel="Situação das cobranças"
-          items={[
-            { id: "open" as ListView, label: "Em aberto" },
-            { id: "paid" as ListView, label: "Baixadas" },
-            { id: "all" as ListView, label: "Todas" },
-          ]}
-          value={listView}
-          onChange={(tab) => {
-            setListView(tab);
-            setStatusFilter("");
-            setPage(1);
-          }}
-        />
-      </View>
+      <SituationStrip totals={situationTotals} value={situation} onChange={changeSituation} />
 
-      <View className="mb-4 flex-row flex-wrap gap-3">
-        {summaryLoading ? (
-          <View className="w-full items-center py-4">
-            <ActivityIndicator color="var(--ds-brand)" />
-          </View>
-        ) : (
-          summaryCards.map((card) => (
-            <View
-              key={card.label}
-              className="bg-surface rounded-ds-md border px-4 py-3 flex-1"
-              style={{
-                minWidth: isMobile ? "100%" : 200,
-                maxWidth: isMobile ? "100%" : 280,
-                borderColor: SUMMARY_TONES[card.tone]?.border ?? "var(--ds-border)",
+      <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 16, gap: 8 }}>
+        <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+          <View style={{ flex: 2, minWidth: isMobile ? "100%" : 260 }}>
+            <FormInput
+              label="Buscar"
+              value={search}
+              onChangeText={(v) => {
+                setSearch(v);
+                setPage(1);
               }}
-            >
-              <View className="flex-row items-center justify-between">
-                <Text className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide">
-                  {card.label}
-                </Text>
-                <View
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: SUMMARY_TONES[card.tone]?.text ?? "var(--ds-ink-muted)" }}
-                />
-              </View>
-              <Text className="text-2xl font-semibold text-ink mt-1">{card.value}</Text>
-              <Text
-                className="text-sm font-semibold mt-0.5"
-                style={{ color: SUMMARY_TONES[card.tone]?.text ?? "var(--ds-ink-muted)" }}
-              >
-                {fmtMoney(card.amount)}
-              </Text>
-            </View>
-          ))
-        )}
-      </View>
-
-      {summary?.by_payment_method && summary.by_payment_method.length > 0 && listView === "paid" ? (
-        <View className="mb-4 bg-surface rounded-ds-md border border-border-strong px-4 py-2 min-h-control-md justify-center">
-          <Text className="text-xs font-semibold text-ink-muted uppercase mb-2">
-            Baixas por forma de pagamento (período)
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {summary.by_payment_method.map((row) => (
-              <View
-                key={row.payment_method}
-                className="px-3 py-2 rounded-ds-md bg-surface-sunken border border-border"
-              >
-                <Text className="text-xs font-semibold text-ink">
-                  {paymentMethodLabel(row.payment_method)}
-                </Text>
-                <Text className="text-xs text-ink-muted">
-                  {row.count} · {fmtMoney(row.amount)}
-                </Text>
-              </View>
-            ))}
+              placeholder="Aluno, responsável, matrícula ou nº da cobrança"
+            />
           </View>
-        </View>
-      ) : null}
-
-      <View className="mb-4 flex-row flex-wrap gap-3">
-        <View style={{ flex: 1, minWidth: isMobile ? "100%" : 240 }}>
-          <FormInput
-            label="Buscar"
-            value={search}
-            onChangeText={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
-            placeholder="Aluno ou descrição"
-          />
-        </View>
-        {listView !== "paid" ? (
-          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
-            <FormSelect
-              label="Status"
-              value={statusFilter}
-              options={allStatusOptions}
-              onChange={(v) => {
-                setStatusFilter(v);
+          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 150 }}>
+            <DatePickerInput
+              label="Vencimento de"
+              value={dueFrom ? isoToDisplay(dueFrom) : ""}
+              onChangeText={(v) => {
+                setDueFrom(displayToISO(v));
                 setPage(1);
               }}
             />
           </View>
-        ) : null}
-        <View style={{ flex: 1, minWidth: isMobile ? "100%" : 200 }}>
-          <FormSelect
-            label="Forma de pagamento"
-            value={paymentMethodFilter}
-            options={filterMethodOptions}
-            onChange={(v) => {
-              setPaymentMethodFilter(v);
-              setPage(1);
-            }}
-          />
+          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 150 }}>
+            <DatePickerInput
+              label="Vencimento até"
+              value={dueTo ? isoToDisplay(dueTo) : ""}
+              onChangeText={(v) => {
+                setDueTo(displayToISO(v));
+                setPage(1);
+              }}
+            />
+          </View>
         </View>
-        {listView === "paid" ? (
-          <>
-            <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
-              <DatePickerInput
-                label="Pago de"
-                value={paidAtFrom ? isoToDisplay(paidAtFrom) : ""}
-                onChangeText={(v) => {
-                  setPaidAtFrom(displayToISO(v));
-                  setPage(1);
-                }}
-              />
-            </View>
-            <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
-              <DatePickerInput
-                label="Pago até"
-                value={paidAtTo ? isoToDisplay(paidAtTo) : ""}
-                onChangeText={(v) => {
-                  setPaidAtTo(displayToISO(v));
-                  setPage(1);
-                }}
-              />
-            </View>
-          </>
+        <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
+            <FormSelect
+              label="Curso"
+              value={courseFilter}
+              options={courseOptions}
+              onChange={(v) => {
+                setCourseFilter(v);
+                setClassFilter("");
+                setPage(1);
+              }}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
+            <FormSelect
+              label="Turma"
+              value={classFilter}
+              options={classOptions}
+              onChange={(v) => {
+                setClassFilter(v);
+                setPage(1);
+              }}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
+            <FormSelect
+              label="Forma de pagamento"
+              value={paymentMethodFilter}
+              options={filterMethodOptions}
+              onChange={(v) => {
+                setPaymentMethodFilter(v);
+                setPage(1);
+              }}
+            />
+          </View>
+          {situation === "paid" ? (
+            <>
+              <View style={{ flex: 1, minWidth: isMobile ? "100%" : 150 }}>
+                <DatePickerInput
+                  label="Pago de"
+                  value={paidAtFrom ? isoToDisplay(paidAtFrom) : ""}
+                  onChangeText={(v) => {
+                    setPaidAtFrom(displayToISO(v));
+                    setPage(1);
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1, minWidth: isMobile ? "100%" : 150 }}>
+                <DatePickerInput
+                  label="Pago até"
+                  value={paidAtTo ? isoToDisplay(paidAtTo) : ""}
+                  onChangeText={(v) => {
+                    setPaidAtTo(displayToISO(v));
+                    setPage(1);
+                  }}
+                />
+              </View>
+            </>
+          ) : null}
+        </View>
+        {hasExtraFilters ? (
+          <TouchableOpacity onPress={clearFilters} className="self-start" activeOpacity={0.7}>
+            <Text className="text-sm font-medium text-brand underline">Limpar filtros</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
 
       {filterPeriodError ? (
-        <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+        <View className="rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
           <Text className="text-sm text-danger">{filterPeriodError}</Text>
         </View>
       ) : null}
 
       {saveSuccess ? (
-        <View className="mb-4 rounded-ds-md border border-success bg-success-tint px-4 py-3">
+        <View className="rounded-ds-md border border-success bg-success-tint px-4 py-3">
           <Text className="text-sm text-success">{saveSuccess}</Text>
         </View>
       ) : null}
@@ -889,66 +896,34 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
             rows.map((item) => (
               <TouchableOpacity
                 key={item.id}
-                onPress={() => setActionsInvoice(item)}
+                onPress={() => setDrawerInvoice(item)}
                 activeOpacity={0.85}
-                className="bg-surface rounded-ds-md border border-border-strong px-3 py-2 min-h-control-md justify-center"
-                style={{ }}
+                className="bg-surface rounded-ds-md border border-border-strong px-3 py-3"
               >
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1" style={{ minWidth: 0 }}>
-                    <Text className="text-xs font-mono font-semibold text-brand">
-                      #{item.id}
-                      {item.cora?.charge_id ? ` · ${item.cora.charge_id}` : ""}
-                    </Text>
-                    <Text className="text-sm font-semibold text-ink mt-0.5" numberOfLines={1}>
+                    <Text className="text-sm font-semibold text-ink" numberOfLines={1}>
                       {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
+                    </Text>
+                    <Text className="text-xs font-mono text-ink-subtle mt-0.5" numberOfLines={1}>
+                      {studentSubline(item)}
                     </Text>
                     <Text className="text-xs text-ink-muted mt-0.5" numberOfLines={2}>
                       {limitText(item.description, DESCRIPTION_LIMIT)}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={(event: any) => {
-                      event?.stopPropagation?.();
-                      setActionsInvoice(item);
-                    }}
-                    className="w-8 h-8 items-center justify-center bg-surface-sunken rounded-ds-md border border-border"
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
-                  </TouchableOpacity>
-                </View>
-
-                <View className="flex-row items-center justify-between mt-3">
-                  <Text className="text-base font-semibold text-ink">{fmtMoney(item.amount)}</Text>
-                  <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
-                </View>
-
-                <View className="flex-row flex-wrap gap-2 mt-3">
-                  <View className="rounded-ds-md bg-surface-sunken px-2.5 py-1.5">
-                    <Text className="text-xs uppercase font-semibold text-ink-muted">
-                      {listView === "paid" ? "Pago em" : "Vencimento"}
-                    </Text>
-                    <Text className="text-xs font-semibold text-ink mt-0.5">
-                      {listView === "paid" ? fmtDateTime(item.paid_at) : fmt(item.due_date)}
-                    </Text>
+                  <View className="flex-row" style={{ gap: 6 }}>
+                    {quickSettle(item)}
+                    {moreActions(item)}
                   </View>
-                  <View className="rounded-ds-md bg-surface-sunken px-2.5 py-1.5">
-                    <Text className="text-xs uppercase font-semibold text-ink-muted">Forma</Text>
-                    <Text className="text-xs font-semibold text-ink mt-0.5">
-                      {paymentMethodLabel(item.payment_method)}
-                    </Text>
+                </View>
+                <View className="flex-row items-center justify-between mt-3" style={{ gap: 8 }}>
+                  <View>
+                    <Text className="text-base font-semibold font-mono text-ink">{fmtMoney(item.amount)}</Text>
+                    <Text className="text-xs text-ink-muted">{`Vence ${fmt(item.due_date)}`}</Text>
+                    {dueLine(item)}
                   </View>
-                  {listView === "paid" ? (
-                    <View className="rounded-ds-md bg-surface-sunken px-2.5 py-1.5 flex-1 min-w-[140px]">
-                      <Text className="text-xs uppercase font-semibold text-ink-muted">
-                        Identificador
-                      </Text>
-                      <Text className="text-xs font-semibold text-ink mt-0.5" numberOfLines={1}>
-                        {item.payment_reference ?? "—"}
-                      </Text>
-                    </View>
-                  ) : null}
+                  {situationBadge(item)}
                 </View>
               </TouchableOpacity>
             ))}
@@ -974,108 +949,76 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         >
           <View
             className="bg-surface rounded-ds-md overflow-hidden border border-border"
-            style={{
-              width: "100%",
-              minWidth: tableMinWidth ?? (listView === "paid" ? 1260 : 1140),
-            }}
+            style={{ width: "100%", minWidth: tableMinWidth ?? 1180 }}
           >
             <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
-              <Text className={TABLE_HEADER_CELL} style={{ width: 88, minWidth: 88 }}>
-                ID
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.6, minWidth: 180 }}>
+                Aluno / cobrança
               </Text>
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.55, minWidth: 140 }}>
-                Aluno
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.1, minWidth: 130 }}>
+                Responsável
               </Text>
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.65, minWidth: 150 }}>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 1.4, minWidth: 160 }}>
                 Descrição
               </Text>
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.75, minWidth: 88 }}>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.8, minWidth: 100 }}>
                 Valor
               </Text>
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.85, minWidth: 96 }}>
-                {listView === "paid" ? "Pago em" : "Vencimento"}
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.95, minWidth: 130 }}>
+                {situation === "paid" ? "Vencimento / pagamento" : "Vencimento ▲"}
               </Text>
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.9, minWidth: 96 }}>
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.9, minWidth: 110 }}>
                 Forma
               </Text>
-              {listView === "paid" ? (
-                <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 110 }}>
-                  Identificador
-                </Text>
-              ) : null}
-              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.65, minWidth: 88 }}>
-                Status
+              <Text className={TABLE_HEADER_CELL} style={{ flex: 0.8, minWidth: 110 }}>
+                Situação
               </Text>
-              <View style={{ width: 42 }} />
+              <View style={{ width: 80 }} />
             </View>
 
             {renderInvoiceListState() ??
               rows.map((item, i) => (
-                <DataTableRow
-                  key={item.id}
-                  index={i}
-                  onPress={() => setActionsInvoice(item)}
-                >
-                  <View style={{ width: 88, minWidth: 88, paddingRight: 8 }}>
-                    <Text className="text-xs font-mono font-semibold text-brand" numberOfLines={1}>
-                      #{item.id}
+                <DataTableRow key={item.id} index={i} onPress={() => setDrawerInvoice(item)}>
+                  <View style={{ flex: 1.6, minWidth: 180, paddingRight: 10 }}>
+                    <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={1}>
+                      {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
                     </Text>
-                    {item.cora?.charge_id ? (
+                    <Text className={`${TABLE_CELL_SUBLINE} font-mono`} numberOfLines={1}>
+                      {studentSubline(item)}
+                    </Text>
+                  </View>
+                  <Text className={TABLE_CELL} style={{ flex: 1.1, minWidth: 130, paddingRight: 10 }} numberOfLines={1}>
+                    {item.guardian?.name ?? "o próprio aluno"}
+                  </Text>
+                  <View style={{ flex: 1.4, minWidth: 160, paddingRight: 10 }}>
+                    <Text className={TABLE_CELL} numberOfLines={1}>
+                      {limitText(item.description, DESCRIPTION_LIMIT)}
+                    </Text>
+                    {descriptionSubline(item) ? (
                       <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
-                        {item.cora.charge_id}
+                        {descriptionSubline(item)}
                       </Text>
                     ) : null}
                   </View>
-                  <Text
-                    className={TABLE_CELL_SEMIBOLD}
-                    style={{ flex: 1.55, minWidth: 140, paddingRight: 10 }}
-                    numberOfLines={1}
-                  >
-                    {limitText(item.student?.name, STUDENT_NAME_LIMIT)}
-                  </Text>
-                  <Text
-                    className={TABLE_CELL}
-                    style={{ flex: 1.65, minWidth: 150, paddingRight: 10 }}
-                    numberOfLines={1}
-                  >
-                    {limitText(item.description, DESCRIPTION_LIMIT)}
-                  </Text>
-                  <Text className={TABLE_CELL_SEMIBOLD} style={{ flex: 0.75, minWidth: 88 }}>
+                  <Text className={`${TABLE_CELL_SEMIBOLD} font-mono`} style={{ flex: 0.8, minWidth: 100 }}>
                     {fmtMoney(item.amount)}
                   </Text>
-                  <Text className={TABLE_CELL_MUTED} style={{ flex: 0.85, minWidth: 96 }}>
-                    {listView === "paid" ? fmtDateTime(item.paid_at) : fmt(item.due_date)}
-                  </Text>
-                  <Text
-                    className={TABLE_CELL}
-                    style={{ flex: 0.9, minWidth: 96 }}
-                    numberOfLines={1}
-                  >
-                    {paymentMethodLabel(item.payment_method)}
-                  </Text>
-                  {listView === "paid" ? (
-                    <Text
-                      className={TABLE_CELL_MUTED}
-                      style={{ flex: 1, minWidth: 110, paddingRight: 10 }}
-                      numberOfLines={1}
-                    >
-                      {item.payment_reference ?? "—"}
-                    </Text>
-                  ) : null}
-                  <View style={{ flex: 0.65, minWidth: 88 }}>
-                    <Badge slug={item.status} label={STATUS_LABELS[item.status] ?? item.status} />
+                  <View style={{ flex: 0.95, minWidth: 130 }}>
+                    <Text className={`${TABLE_CELL} font-mono`}>{fmt(item.due_date)}</Text>
+                    {dueLine(item)}
                   </View>
-                  <View style={{ width: 42 }} className="flex-row justify-end">
-                    <TouchableOpacity
-                      onPress={(event: any) => {
-                        event?.stopPropagation?.();
-                        setActionsInvoice(item);
-                      }}
-                      className="p-1.5 bg-surface-sunken rounded-ds-md border border-border"
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="ellipsis-horizontal" size={16} color="var(--ds-ink-muted)" />
-                    </TouchableOpacity>
+                  <View style={{ flex: 0.9, minWidth: 110, paddingRight: 8 }}>
+                    <Text className={TABLE_CELL} numberOfLines={1}>
+                      {paymentMethodLabel(item.payment_method)}
+                    </Text>
+                    <Text className={TABLE_CELL_SUBLINE} numberOfLines={1}>
+                      {`origem: ${invoiceOrigin(item).toLowerCase()}`}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 0.8, minWidth: 110 }}>{situationBadge(item)}</View>
+                  <View style={{ width: 80, gap: 6 }} className="flex-row justify-end">
+                    {quickSettle(item)}
+                    {moreActions(item)}
                   </View>
                 </DataTableRow>
               ))}
@@ -1499,6 +1442,8 @@ export default function InvoicesScreen(_props: InvoicesScreenProps) {
         iconName="close-circle-outline"
         tone="primary"
       />
+      <InvoiceDrawer invoice={drawerInvoice} onClose={() => setDrawerInvoice(null)} onAction={handleDrawerAction} />
+
       <InvoiceActionsModal
         visible={!!actionsInvoice}
         invoice={actionsInvoice}
