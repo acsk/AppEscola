@@ -137,7 +137,8 @@ class BankReconciliationTest extends TestCase
         $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-11-01', 'date_to' => '2026-11-03'])
             ->assertOk()
             ->assertJsonPath('body.created', 4)
-            ->assertJsonPath('body.auto_reconciled', 1);
+            // A cobrança citada e a tarifa da Cora (vai para a despesa de tarifas do mês).
+            ->assertJsonPath('body.auto_reconciled', 2);
 
         $auto = BankStatementEntry::where('external_id', 'ent_1')->sole();
         $this->assertSame('reconciled', $auto->status);
@@ -156,6 +157,8 @@ class BankReconciliationTest extends TestCase
 
         $fee = BankStatementEntry::where('external_id', 'ent_4')->sole();
         $this->assertSame(['debit', 'FEE', '39.90'], [$fee->direction, $fee->transaction_type, (string) $fee->amount]);
+        $this->assertSame(['reconciled', 'auto'], [$fee->status, $fee->match_type]);
+        $this->assertSame('bank_fees:cora:2026-11', $fee->expense->system_key);
 
         $this->assertDatabaseMissing('bank_statement_entries', ['external_id' => 'ent_3']);
         $this->assertStringNotContainsString('12345678901', json_encode(BankStatementEntry::all()->toArray()));

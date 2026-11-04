@@ -192,12 +192,12 @@ class CoraBankStatementSyncService
                 }
             }
 
-            // Entradas que ficaram pendentes antes (ex.: a baixa da cobrança chegou depois pelo webhook)
-            // são conferidas de novo. Movimentações já decididas não são tocadas.
+            // Entradas (e tarifas) que ficaram pendentes antes (ex.: a baixa da cobrança chegou depois pelo
+            // webhook) são conferidas de novo. Movimentações já decididas não são tocadas.
             BankStatementEntry::query()
                 ->where('tenant_id', $tenant->id)
                 ->where('environment', $environment)
-                ->where('direction', 'credit')
+                ->where(fn ($q) => $q->where('direction', 'credit')->orWhere('transaction_type', 'FEE'))
                 ->where('status', 'pending')
                 ->where(fn ($q) => $q->whereNull('sync_id')->orWhere('sync_id', '!=', $run->id))
                 ->lazyById(200)

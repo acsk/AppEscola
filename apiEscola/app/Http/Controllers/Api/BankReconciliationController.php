@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BankStatementEntry;
 use App\Models\BankStatementEntryLog;
+use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Tenant;
 use App\Services\Cora\CoraBankStatementSyncService;
@@ -92,6 +93,53 @@ class BankReconciliationController extends Controller
         return $this->success([
             'items' => $model->direction === 'credit' ? $this->query->candidates($model, $search) : [],
         ], 'Cobranças candidatas carregadas com sucesso.');
+    }
+
+    public function expenseCandidates(Request $request, int $entry): JsonResponse
+    {
+        $tenantId = $this->authorizeTenant($request, FinancePermissions::VIEW);
+        if ($tenantId instanceof JsonResponse) {
+            return $tenantId;
+        }
+
+        $model = $this->findEntry($tenantId, $entry);
+        if (! $model) {
+            return $this->error('Movimentação não encontrada.', null, 404);
+        }
+
+        $search = $request->validate(['search' => ['nullable', 'string', 'max:100']])['search'] ?? null;
+
+        return $this->success([
+            'items' => $model->direction === 'debit' ? $this->query->expenseCandidates($model, $search) : [],
+        ], 'Despesas candidatas carregadas com sucesso.');
+    }
+
+    public function reconcileExpense(Request $request, int $entry): JsonResponse
+    {
+        $tenantId = $this->authorizeTenant($request, FinancePermissions::SETTLE);
+        if ($tenantId instanceof JsonResponse) {
+            return $tenantId;
+        }
+
+        $validated = $request->validate([
+            'expense_id' => ['required', 'integer'],
+            'justification' => $this->justificationRules(),
+        ]);
+
+        $model = $this->findEntry($tenantId, $entry);
+        if (! $model) {
+            return $this->error('Movimentação não encontrada.', null, 404);
+        }
+
+        $expense = Expense::query()->where('tenant_id', $tenantId)->find($validated['expense_id']);
+        if (! $expense) {
+            return $this->error('Despesa não encontrada.', null, 404);
+        }
+
+        return $this->decide(
+            fn () => $this->reconciliation->reconcileExpense($model, $expense, trim($validated['justification']), $request->user()),
+            'Saída conciliada com a despesa.',
+        );
     }
 
     public function history(Request $request, int $entry): JsonResponse
@@ -258,7 +306,7 @@ class BankReconciliationController extends Controller
             return $this->error($e->getMessage(), null, 422);
         }
 
-        $entry->load(['invoice.student:id,name', 'reviewer:id,name']);
+        $entry->load(['invoice.student:id,name', 'expense:id,description,amount,status', 'reviewer:id,name']);
 
         return $this->success(BankReconciliationQuery::present($entry), $message);
     }
@@ -270,7 +318,7 @@ class BankReconciliationController extends Controller
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'direction' => ['nullable', Rule::in(['credit', 'debit'])],
-            'origin' => ['nullable', Rule::in(['app', 'other'])],
+            'origin' => ['nullable', Rule::in(['app', 'expense', 'other'])],
             'type' => ['nullable', Rule::in(array_keys(BankReconciliationQuery::TYPES))],
             'search' => ['nullable', 'string', 'max:100'],
         ]);

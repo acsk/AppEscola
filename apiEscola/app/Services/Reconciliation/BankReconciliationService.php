@@ -4,10 +4,13 @@ namespace App\Services\Reconciliation;
 
 use App\Models\BankStatementEntry;
 use App\Models\BankStatementEntryLog;
+use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Observers\ExpenseAuditObserver;
 use App\Services\Cora\CoraPaidInvoicesSyncService;
 use App\Services\Cora\CoraTransactionId;
+use App\Services\Payables\PayablesCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -32,8 +35,10 @@ class BankReconciliationService
     /** @var array<int, array<string, array{invoice_id: int, total_paid: int|null}>> */
     private array $paymentIndex = [];
 
-    public function __construct(private readonly CoraPaidInvoicesSyncService $coraSync)
-    {
+    public function __construct(
+        private readonly CoraPaidInvoicesSyncService $coraSync,
+        private readonly PayablesCatalog $payables,
+    ) {
     }
 
     /** Cobranças que entram na conciliação: com ID Cora e geradas por este sistema (não importadas). */
@@ -94,6 +99,11 @@ class BankReconciliationService
 
         if ($entry->direction === 'credit' && ($payment = $this->findPayment($entry)) !== null) {
             return $this->matchByPayment($entry, $payment);
+        }
+
+        // Tarifa cobrada pela própria Cora (tipo FEE no extrato): entra na despesa de tarifas do mês.
+        if ($entry->direction === 'debit' && $entry->source === 'cora' && $entry->transaction_type === 'FEE') {
+            return $this->linkBankFee($entry);
         }
 
         $chargeIds = self::chargeIdsIn($entry);
@@ -334,11 +344,139 @@ class BankReconciliationService
     /** Volta para pendente. Não desfaz a baixa da cobrança: isso continua sendo feito na própria cobrança. */
     public function undo(BankStatementEntry $entry, string $justification, User $user): BankStatementEntry
     {
-        return $this->transition($entry, ['reconciled', 'divergent', 'ignored'], 'pending', 'undone', $user, $justification, [
+        $expenseId = $entry->expense_id;
+
+        $entry = $this->transition($entry, ['reconciled', 'divergent', 'ignored'], 'pending', 'undone', $user, $justification, [
             'match_type' => null,
             'invoice_id' => null,
+            'expense_id' => null,
             'divergence' => null,
         ]);
+
+        // Tarifas do mês: o valor da despesa é a soma das saídas ligadas.
+        $expense = $expenseId ? Expense::query()->find($expenseId) : null;
+        if ($expense?->system_key !== null) {
+            $this->refreshFeeExpense($expense);
+        }
+
+        return $entry;
+    }
+
+    /**
+     * Liga uma saída a uma despesa aprovada ou paga. Se ainda não estava paga, registra o pagamento com a
+     * data do extrato (o dinheiro já saiu da conta); a justificativa vai para a auditoria da despesa.
+     */
+    public function reconcileExpense(BankStatementEntry $entry, Expense $expense, string $justification, User $user): BankStatementEntry
+    {
+        $this->assertStatus($entry, ['pending', 'divergent']);
+
+        if ($entry->direction !== 'debit') {
+            throw new RuntimeException('Só saídas podem ser conciliadas com despesas.');
+        }
+        if ((int) $expense->tenant_id !== (int) $entry->tenant_id) {
+            throw new RuntimeException('Despesa não encontrada.');
+        }
+        if ($expense->system_key !== null) {
+            throw new RuntimeException('Esta despesa é mantida pelo sistema e não recebe vínculo manual.');
+        }
+        if (! in_array($expense->status, ['approved', 'paid'], true)) {
+            throw new RuntimeException('Aprove a despesa antes de conciliar.');
+        }
+
+        $divergence = self::cents($entry->amount) !== self::cents($expense->amount)
+            ? sprintf('Pago %s · despesa %s de %s.', self::money($entry->amount), $expense->code(), self::money($expense->amount))
+            : null;
+
+        return $this->transition(
+            $entry,
+            ['pending', 'divergent'],
+            'reconciled',
+            'reconciled',
+            $user,
+            $justification,
+            ['match_type' => 'manual', 'expense_id' => $expense->id, 'invoice_id' => null, 'divergence' => $divergence],
+            function (BankStatementEntry $locked) use ($expense, $justification, $user) {
+                $lockedExpense = Expense::query()->whereKey($expense->id)->lockForUpdate()->firstOrFail();
+
+                if (BankStatementEntry::query()->where('expense_id', $lockedExpense->id)->where('id', '!=', $locked->id)->exists()) {
+                    throw new RuntimeException("A despesa {$lockedExpense->code()} já está conciliada com outra movimentação.");
+                }
+                if ($lockedExpense->status === 'paid') {
+                    return;
+                }
+                if ($lockedExpense->status !== 'approved') {
+                    throw new RuntimeException('Aprove a despesa antes de conciliar.');
+                }
+
+                ExpenseAuditObserver::withReason('Conciliação bancária: ' . $justification, fn () => $lockedExpense->update([
+                    'status' => 'paid',
+                    'paid_at' => $locked->occurred_at,
+                    'payment_method' => match ($locked->transaction_type) {
+                        'PIX' => 'pix',
+                        'PAYMENT' => 'bank_slip',
+                        default => 'transfer',
+                    },
+                    'paid_by' => $user->id,
+                    'updated_by' => $user->id,
+                ]));
+            },
+        );
+    }
+
+    /** Valor e data da despesa de tarifas = soma e última das saídas ligadas (sem auditoria por tarifa). */
+    public function refreshFeeExpense(Expense $expense): void
+    {
+        $entries = BankStatementEntry::query()->where('expense_id', $expense->id);
+        $sum = (float) (clone $entries)->sum('amount');
+        $last = (clone $entries)->max('occurred_at');
+
+        Expense::withoutEvents(fn () => $expense->forceFill([
+            'amount' => number_format($sum, 2, '.', ''),
+            'paid_at' => $last ?? $expense->paid_at,
+        ])->save());
+    }
+
+    private function linkBankFee(BankStatementEntry $entry): string
+    {
+        $tenantId = (int) $entry->tenant_id;
+        $month = $entry->occurred_at->copy()->setTimezone(config('app.business_timezone', 'America/Sao_Paulo'));
+        $key = 'bank_fees:cora:' . $month->format('Y-m');
+
+        $find = fn () => Expense::query()->where('tenant_id', $tenantId)->where('system_key', $key)->first();
+        $expense = $find();
+        if (! $expense) {
+            try {
+                $expense = ExpenseAuditObserver::withReason('Criada automaticamente a partir das tarifas do extrato Cora.', fn () => Expense::query()->create([
+                    'tenant_id' => $tenantId,
+                    'description' => 'Tarifas bancárias Cora · ' . $month->format('m/Y'),
+                    'supplier_id' => $this->payables->coraSupplier($tenantId)->id,
+                    'category_id' => $this->payables->bankFeesCategory($tenantId)->id,
+                    'amount' => 0,
+                    'due_date' => $month->copy()->endOfMonth()->toDateString(),
+                    'status' => 'paid',
+                    'auto_debit' => true,
+                    'payment_method' => 'auto_debit',
+                    'paid_at' => $entry->occurred_at,
+                    'system_key' => $key,
+                ]));
+            } catch (QueryException) {
+                $expense = $find(); // Criada ao mesmo tempo por outra sincronização.
+            }
+        }
+
+        try {
+            $this->transition($entry, ['pending'], 'reconciled', 'auto_reconciled', null, null, [
+                'match_type' => 'auto',
+                'expense_id' => $expense->id,
+                'divergence' => null,
+            ]);
+        } catch (RuntimeException) {
+            return $entry->refresh()->status;
+        }
+
+        $this->refreshFeeExpense($expense);
+
+        return 'reconciled';
     }
 
     /** @param  array<string, mixed>  $attributes  Ex.: invoice_id quando o ID prova o vínculo mas o valor não bate */

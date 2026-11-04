@@ -22,6 +22,12 @@ final class FinancePermissions
 
     public const CONFIGURE = 'finance.configure';
 
+    /** Cadastrar, editar, anexar comprovante e registrar pagamento de despesas (não movimenta dinheiro). */
+    public const MANAGE_PAYABLES = 'finance.payables.manage';
+
+    /** Aprovar despesas. */
+    public const APPROVE_PAYABLES = 'finance.payables.approve';
+
     private const STAFF_ROLES = [
         'super_admin',
         'admin',
@@ -31,6 +37,9 @@ final class FinancePermissions
     ];
 
     private const CONFIGURE_ROLES = ['super_admin', 'admin'];
+
+    /** Secretaria cadastra despesas, mas não aprova. */
+    private const APPROVE_PAYABLES_ROLES = ['super_admin', 'admin', 'manager', 'financial'];
 
     public static function allows(?User $user, string $ability): bool
     {
@@ -48,7 +57,11 @@ final class FinancePermissions
             return [];
         }
 
-        $abilities = [self::VIEW, self::MANAGE_INVOICES, self::SETTLE, self::EXPORT];
+        $abilities = [self::VIEW, self::MANAGE_INVOICES, self::SETTLE, self::EXPORT, self::MANAGE_PAYABLES];
+
+        if (in_array($role, self::APPROVE_PAYABLES_ROLES, true)) {
+            $abilities[] = self::APPROVE_PAYABLES;
+        }
 
         if (in_array($role, self::CONFIGURE_ROLES, true)) {
             $abilities[] = self::CONFIGURE;

@@ -24,6 +24,7 @@ class BankStatementEntry extends Model
         'status',
         'match_type',
         'invoice_id',
+        'expense_id',
         'divergence',
         'justification',
         'reviewed_by',
@@ -40,6 +41,11 @@ class BankStatementEntry extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class);
     }
 
     public function reviewer(): BelongsTo

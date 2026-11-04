@@ -26,3 +26,8 @@ Schedule::command('cora:sync-paid-invoices --environment=prod')
 Schedule::command('cora:sync-bank-statement --environment=prod')
     ->cron('20 */3 * * *')
     ->withoutOverlapping();
+// Contas a pagar: próximas competências das despesas mensais.
+Schedule::command('finance:generate-recurring-expenses')
+    ->dailyAt('05:30')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();

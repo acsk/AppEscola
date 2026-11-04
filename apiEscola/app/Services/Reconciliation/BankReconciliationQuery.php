@@ -4,6 +4,7 @@ namespace App\Services\Reconciliation;
 
 use App\Models\BankStatementEntry;
 use App\Models\BankStatementSync;
+use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\TenantCoraCredential;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -38,7 +39,7 @@ class BankReconciliationQuery
     public function entries(int $tenantId, string $environment, array $filters): LengthAwarePaginator
     {
         $query = $this->base($tenantId, $environment, $filters)
-            ->with(['invoice:id,tenant_id,student_id,description,amount,due_date,status,paid_at', 'invoice.student:id,name', 'reviewer:id,name'])
+            ->with(['invoice:id,tenant_id,student_id,description,amount,due_date,status,paid_at', 'invoice.student:id,name', 'expense:id,description,amount,status', 'reviewer:id,name'])
             ->orderByDesc('occurred_at')
             ->orderByDesc('id');
 
@@ -156,6 +157,57 @@ class BankReconciliationQuery
             ->all();
     }
 
+    /**
+     * Despesas que podem corresponder a uma saída: aprovadas ou pagas, ainda sem vínculo, sem as mantidas
+     * pelo sistema. Sem busca: mesmo valor; com busca: por código (D-0123), descrição ou fornecedor.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function expenseCandidates(BankStatementEntry $entry, ?string $search): array
+    {
+        $query = Expense::query()
+            ->where('tenant_id', $entry->tenant_id)
+            ->whereIn('status', ['approved', 'paid'])
+            ->whereNull('system_key')
+            ->whereDoesntHave('bankEntries', fn ($q) => $q->where('id', '!=', $entry->id))
+            ->with(['supplier:id,name', 'category:id,name']);
+
+        $search = trim((string) $search);
+        if ($search !== '') {
+            $query->where(function (Builder $q) use ($search) {
+                if (preg_match('/^(?:#|D-?)?0*(\d+)$/i', $search, $m)) {
+                    $q->orWhere('id', (int) $m[1]);
+                }
+                $q->orWhere('description', 'like', '%' . $search . '%')
+                    ->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', '%' . $search . '%'));
+            })->orderByDesc('due_date')->limit(20);
+        } else {
+            $query->where('amount', $entry->amount)->orderBy('due_date')->limit(10);
+        }
+
+        $occurred = $entry->occurred_at
+            ? Carbon::parse($entry->occurred_at->copy()->setTimezone(config('app.business_timezone', 'America/Sao_Paulo'))->toDateString())
+            : null;
+
+        return $query->get()->map(fn (Expense $expense) => [
+            'id' => $expense->id,
+            'code' => $expense->code(),
+            'description' => $expense->description,
+            'amount' => (string) $expense->amount,
+            'due_date' => $expense->due_date?->toDateString(),
+            'status' => $expense->status,
+            'supplier' => $expense->supplier ? ['id' => $expense->supplier->id, 'name' => $expense->supplier->name] : null,
+            'category' => $expense->category ? ['id' => $expense->category->id, 'name' => $expense->category->name] : null,
+            'criteria' => [
+                'amount_equal' => BankReconciliationService::cents($entry->amount) === BankReconciliationService::cents($expense->amount),
+                'date_window' => $occurred && $expense->due_date
+                    ? abs($occurred->diffInDays(Carbon::parse($expense->due_date->toDateString()), false)) <= self::DATE_WINDOW_DAYS
+                    : false,
+                'name_hint' => $this->nameHint($entry->counterparty_name, [$expense->supplier?->name]),
+            ],
+        ])->all();
+    }
+
     /** @return array<string, mixed> */
     public static function present(BankStatementEntry $entry): array
     {
@@ -180,6 +232,13 @@ class BankReconciliationQuery
             'cited_charge_ids' => BankReconciliationService::chargeIdsIn($entry),
             'reviewed_at' => $entry->reviewed_at?->toISOString(),
             'reviewed_by' => $entry->reviewer ? ['id' => $entry->reviewer->id, 'name' => $entry->reviewer->name] : null,
+            'expense' => $entry->expense ? [
+                'id' => $entry->expense->id,
+                'code' => $entry->expense->code(),
+                'description' => $entry->expense->description,
+                'amount' => (string) $entry->expense->amount,
+                'status' => $entry->expense->status,
+            ] : null,
             'invoice' => $invoice ? [
                 'id' => $invoice->id,
                 'description' => $invoice->description,
@@ -220,8 +279,10 @@ class BankReconciliationQuery
         // tarifas, transferências).
         if (($filters['origin'] ?? '') === 'app') {
             $query->whereNotNull('invoice_id');
+        } elseif (($filters['origin'] ?? '') === 'expense') {
+            $query->whereNotNull('expense_id');
         } elseif (($filters['origin'] ?? '') === 'other') {
-            $query->whereNull('invoice_id');
+            $query->whereNull('invoice_id')->whereNull('expense_id');
         }
 
         if (! empty($filters['direction'])) {

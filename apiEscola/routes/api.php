@@ -51,6 +51,8 @@ use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\Cora\CoraIntegrationController;
 use App\Http\Controllers\Api\BankReconciliationController;
+use App\Http\Controllers\Api\Payables\ExpenseController;
+use App\Http\Controllers\Api\Payables\PayablesCatalogController;
 use App\Http\Controllers\Api\Cora\CoraWebhookController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\LeadController;
@@ -354,6 +356,31 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::post('finance/reconciliation/entries/{entry}/ignore', [BankReconciliationController::class, 'ignore'])->whereNumber('entry');
     Route::post('finance/reconciliation/entries/{entry}/divergent', [BankReconciliationController::class, 'markDivergent'])->whereNumber('entry');
     Route::post('finance/reconciliation/entries/{entry}/undo', [BankReconciliationController::class, 'undo'])->whereNumber('entry');
+    Route::get('finance/reconciliation/entries/{entry}/expense-candidates', [BankReconciliationController::class, 'expenseCandidates'])->whereNumber('entry');
+    Route::post('finance/reconciliation/entries/{entry}/reconcile-expense', [BankReconciliationController::class, 'reconcileExpense'])->whereNumber('entry');
+
+    // Contas a pagar (registrar pagamento não movimenta a conta bancária).
+    Route::get('finance/payables/summary', [ExpenseController::class, 'summary']);
+    Route::get('finance/payables/options', [ExpenseController::class, 'options']);
+    Route::get('finance/payables/expenses', [ExpenseController::class, 'index']);
+    Route::post('finance/payables/expenses', [ExpenseController::class, 'store']);
+    Route::get('finance/payables/expenses/{expense}', [ExpenseController::class, 'show'])->whereNumber('expense');
+    Route::put('finance/payables/expenses/{expense}', [ExpenseController::class, 'update'])->whereNumber('expense');
+    Route::post('finance/payables/expenses/{expense}/submit', [ExpenseController::class, 'submit'])->whereNumber('expense');
+    Route::post('finance/payables/expenses/{expense}/approve', [ExpenseController::class, 'approve'])->whereNumber('expense');
+    Route::post('finance/payables/expenses/{expense}/pay', [ExpenseController::class, 'pay'])->whereNumber('expense');
+    Route::post('finance/payables/expenses/{expense}/reopen', [ExpenseController::class, 'reopen'])->whereNumber('expense');
+    Route::post('finance/payables/expenses/{expense}/cancel', [ExpenseController::class, 'cancel'])->whereNumber('expense');
+    Route::post('finance/payables/expenses/{expense}/attachments', [ExpenseController::class, 'storeAttachment'])->whereNumber('expense');
+    Route::get('finance/payables/expenses/{expense}/attachments/{attachment}', [ExpenseController::class, 'downloadAttachment'])->whereNumber(['expense', 'attachment']);
+    Route::delete('finance/payables/expenses/{expense}/attachments/{attachment}', [ExpenseController::class, 'destroyAttachment'])->whereNumber(['expense', 'attachment']);
+    Route::get('finance/payables/suppliers', [PayablesCatalogController::class, 'suppliers']);
+    Route::post('finance/payables/suppliers', [PayablesCatalogController::class, 'storeSupplier']);
+    Route::put('finance/payables/suppliers/{supplier}', [PayablesCatalogController::class, 'updateSupplier'])->whereNumber('supplier');
+    Route::post('finance/payables/categories', [PayablesCatalogController::class, 'storeCategory']);
+    Route::put('finance/payables/categories/{category}', [PayablesCatalogController::class, 'updateCategory'])->whereNumber('category');
+    Route::post('finance/payables/cost-centers', [PayablesCatalogController::class, 'storeCostCenter']);
+    Route::put('finance/payables/cost-centers/{costCenter}', [PayablesCatalogController::class, 'updateCostCenter'])->whereNumber('costCenter');
 
     Route::get('invoices/summary', [InvoiceController::class, 'summary']);
     Route::get('invoices/situations', [InvoiceController::class, 'situations']);
