@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\Cora\CoraIntegrationController;
+use App\Http\Controllers\Api\BankReconciliationController;
 use App\Http\Controllers\Api\Cora\CoraWebhookController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\LeadController;
@@ -344,6 +345,15 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::get('finance/cora/events', [CoraIntegrationController::class, 'events']);
     Route::post('finance/cora/events/{event}/retry', [CoraIntegrationController::class, 'retry'])->whereNumber('event');
     Route::post('finance/cora/invoices/{invoice}/consult', [CoraIntegrationController::class, 'consultInvoice'])->whereNumber('invoice');
+    Route::get('finance/reconciliation/summary', [BankReconciliationController::class, 'summary']);
+    Route::get('finance/reconciliation/entries', [BankReconciliationController::class, 'entries']);
+    Route::post('finance/reconciliation/sync', [BankReconciliationController::class, 'sync']);
+    Route::get('finance/reconciliation/entries/{entry}/candidates', [BankReconciliationController::class, 'candidates'])->whereNumber('entry');
+    Route::get('finance/reconciliation/entries/{entry}/history', [BankReconciliationController::class, 'history'])->whereNumber('entry');
+    Route::post('finance/reconciliation/entries/{entry}/reconcile', [BankReconciliationController::class, 'reconcile'])->whereNumber('entry');
+    Route::post('finance/reconciliation/entries/{entry}/ignore', [BankReconciliationController::class, 'ignore'])->whereNumber('entry');
+    Route::post('finance/reconciliation/entries/{entry}/divergent', [BankReconciliationController::class, 'markDivergent'])->whereNumber('entry');
+    Route::post('finance/reconciliation/entries/{entry}/undo', [BankReconciliationController::class, 'undo'])->whereNumber('entry');
 
     Route::get('invoices/summary', [InvoiceController::class, 'summary']);
     Route::get('invoices/situations', [InvoiceController::class, 'situations']);

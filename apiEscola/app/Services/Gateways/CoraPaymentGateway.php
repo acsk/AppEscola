@@ -354,6 +354,47 @@ class CoraPaymentGateway implements PaymentGatewayContract
     }
 
     /**
+     * Uma página do extrato da conta (GET /bank-statement/statement). Valores em centavos.
+     * Somente leitura: não movimenta nada na conta.
+     *
+     * @return array<string, mixed> {start, entries, end, aggregations?, header}
+     *
+     * @throws RuntimeException
+     * @throws ConnectionException
+     * @throws RequestException
+     */
+    public function getBankStatement(Tenant $tenant, string $environment, string $start, string $end, int $page = 1, int $perPage = 200): array
+    {
+        $token = $this->resolveBearerToken($tenant, $environment);
+        $baseUrl = $this->resolveApiBaseUrl($environment);
+
+        if ($token === '' || $baseUrl === '') {
+            throw new RuntimeException('Integracao Cora nao configurada para consultar extrato.');
+        }
+
+        $response = Http::timeout((int) config('services.cora.timeout', 20))
+            ->acceptJson()
+            ->withOptions($this->resolveHttpClientOptions($tenant, $environment))
+            ->withToken($token)
+            ->get($baseUrl . '/bank-statement/statement', [
+                'start' => $start,
+                'end' => $end,
+                'page' => $page,
+                'perPage' => min(max($perPage, 1), 500),
+                'aggr' => 'false',
+            ])
+            ->throw();
+
+        $body = $response->json();
+
+        if (! is_array($body) || ! isset($body['entries']) || ! is_array($body['entries'])) {
+            throw new RuntimeException('Resposta invalida da Cora ao consultar extrato.');
+        }
+
+        return $body;
+    }
+
+    /**
      * Cadastra a assinatura de webhook (POST /endpoints/). A mesma Idempotency-Key numa nova tentativa
      * da mesma operação evita assinatura duplicada.
      *
