@@ -13,6 +13,7 @@ import {
   type Rgb,
 } from "./pdfTheme";
 import { isoToDisplay } from "./masks";
+import { exportFinanceXlsx, num } from "./financeExports";
 import type { FinanceReport, FinanceReportItem } from "../services/financeReport";
 
 /** Modelos de PDF do relatório financeiro (menu "Exportar PDF" e painel "Relatórios em PDF"). */
@@ -290,32 +291,48 @@ export async function exportFinancePdf(report: FinanceReport, items: FinanceRepo
   doc.save(`relatorio-financeiro-${model.key}.pdf`);
 }
 
-/** Planilha CSV (abre no Excel: separador ";" e BOM UTF-8). */
-export function exportFinanceCsv(items: FinanceReportItem[], labels: FinanceExportLabels) {
-  const escape = (value: string) => (/[";\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
-  const header = ["Aluno", "Descrição", "Turma", "Tipo", "Forma de pagamento", "Vencimento", "Pagamento", "Situação", "Valor"];
-  const lines = items.map((item) =>
-    [
-      item.student_name ?? "",
-      item.description,
-      item.school_class_name ?? "",
-      item.type ? labels.type(item.type) : "",
-      item.payment_method ? labels.paymentMethod(item.payment_method) : "",
-      item.due_date ? formatIsoDate(item.due_date) : "",
-      item.paid_at ? formatIsoDate(item.paid_at) : "",
-      labels.status(item.status),
-      amountOf(item.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    ]
-      .map((cell) => escape(String(cell)))
-      .join(";")
-  );
-  const blob = new Blob(["﻿" + [header.join(";"), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "relatorio-financeiro.csv";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+/** Planilha Excel (.xlsx): resumo, por mês, por turma, por forma de pagamento e as cobranças do recorte. Valores como número. */
+export function exportFinanceXlsxReport(report: FinanceReport, items: FinanceReportItem[], labels: FinanceExportLabels) {
+  const totals = statusTotals(report);
+  exportFinanceXlsx("relatorio-financeiro", [
+    {
+      name: "Resumo",
+      rows: [
+        ["Relatório financeiro"],
+        [labels.scope],
+        [],
+        ["Indicador", "Quantidade", "Valor (R$)"],
+        ["Total no recorte", report.totals.count, num(report.totals.amount)],
+        ["Recebido", totals.paid.count, num(totals.paid.amount)],
+        ["A receber", totals.pending.count, num(totals.pending.amount)],
+        ["Vencido", totals.overdue.count, num(totals.overdue.amount)],
+      ],
+    },
+    {
+      name: "Por mês",
+      rows: [["Mês", "Cobranças", "Total (R$)", "Recebido (R$)", "Em aberto (R$)", "Vencido (R$)"], ...report.by_month.map((m) => [m.label, m.count, num(m.amount), num(m.paid_amount), num(m.open_amount), num(m.overdue_amount)])],
+    },
+    { name: "Por turma", rows: [["Turma", "Cobranças", "Valor (R$)"], ...report.by_class.map((c) => [c.name, c.count, num(c.amount)])] },
+    {
+      name: "Por forma de pagamento",
+      rows: [["Forma", "Cobranças", "Valor (R$)"], ...report.by_payment_method.map((b) => [b.key ? labels.paymentMethod(b.key) : "Não informada", b.count, num(b.amount)])],
+    },
+    {
+      name: "Cobranças",
+      rows: [
+        ["Aluno", "Descrição", "Turma", "Tipo", "Forma de pagamento", "Vencimento", "Pagamento", "Situação", "Valor (R$)"],
+        ...items.map((item) => [
+          item.student_name ?? "",
+          item.description,
+          item.school_class_name ?? "",
+          item.type ? labels.type(item.type) : "",
+          item.payment_method ? labels.paymentMethod(item.payment_method) : "",
+          item.due_date ? formatIsoDate(item.due_date) : "",
+          item.paid_at ? formatIsoDate(item.paid_at) : "",
+          labels.status(item.status),
+          num(item.amount),
+        ]),
+      ],
+    },
+  ]);
 }

@@ -169,6 +169,81 @@ class ExpenseController extends Controller
         return $this->act($request, $expense, FinancePermissions::MANAGE_PAYABLES, fn ($m) => $this->expenses->cancel($m, $reason, $request->user()), 'Despesa cancelada.');
     }
 
+    /**
+     * Ação em lote. Cada despesa é processada separadamente, com a mesma regra e auditoria da ação individual;
+     * as que não puderem (situação ou permissão) voltam com o motivo, sem impedir as demais.
+     */
+    public function batch(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', Rule::in(['approve', 'pay'])],
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['integer', 'distinct'],
+            'paid_at' => ['nullable', 'date'],
+            'payment_method' => ['required_if:action,pay', 'nullable', Rule::in(Expense::PAYMENT_METHODS)],
+        ]);
+
+        $ability = $data['action'] === 'approve' ? FinancePermissions::APPROVE_PAYABLES : FinancePermissions::MANAGE_PAYABLES;
+        $tenantId = $this->authorizeFinance($request, $ability);
+        if ($tenantId instanceof JsonResponse) {
+            return $tenantId;
+        }
+
+        $done = [];
+        $failed = [];
+        $models = Expense::query()->where('tenant_id', $tenantId)->whereIn('id', $data['ids'])->get()->keyBy('id');
+
+        foreach ($data['ids'] as $id) {
+            $model = $models[$id] ?? null;
+            if (! $model) {
+                $failed[] = ['id' => $id, 'code' => null, 'message' => 'Despesa não encontrada.'];
+                continue;
+            }
+            if ($reason = $this->batchBlockReason($model, $data['action'])) {
+                $failed[] = ['id' => $id, 'code' => $model->code(), 'message' => $reason];
+                continue;
+            }
+            try {
+                $data['action'] === 'approve'
+                    ? $this->expenses->approve($model, $request->user())
+                    : $this->expenses->pay($model, ['paid_at' => $data['paid_at'] ?? null, 'payment_method' => $data['payment_method']], $request->user());
+                $done[] = $id;
+            } catch (RuntimeException $e) {
+                $failed[] = ['id' => $id, 'code' => $model->code(), 'message' => $e->getMessage()];
+            }
+        }
+
+        $verb = $data['action'] === 'approve' ? 'aprovada(s)' : 'paga(s) (nenhum valor foi movimentado no banco)';
+        $message = count($done) . " despesa(s) {$verb}." . ($failed ? ' ' . count($failed) . ' não puderam ser processadas.' : '');
+
+        return $this->success(['done' => $done, 'failed' => $failed], $message);
+    }
+
+    /** Motivo claro para a despesa que não entra no lote (em vez do aviso genérico de concorrência). */
+    private function batchBlockReason(Expense $expense, string $action): ?string
+    {
+        if ($expense->system_key !== null) {
+            return 'Mantida pelo sistema a partir do extrato.';
+        }
+
+        $label = [
+            'draft' => 'em rascunho',
+            'pending_approval' => 'em aprovação',
+            'approved' => 'aprovada',
+            'paid' => 'paga',
+            'cancelled' => 'cancelada',
+        ][$expense->status] ?? $expense->status;
+
+        if ($action === 'approve' && ! in_array($expense->status, ['draft', 'pending_approval'], true)) {
+            return "Está {$label}; só rascunhos e despesas em aprovação podem ser aprovados.";
+        }
+        if ($action === 'pay' && $expense->status !== 'approved') {
+            return "Está {$label}; só despesas aprovadas podem ter o pagamento registrado.";
+        }
+
+        return null;
+    }
+
     public function storeAttachment(Request $request, int $expense): JsonResponse
     {
         $tenantId = $this->authorizeFinance($request, FinancePermissions::MANAGE_PAYABLES);

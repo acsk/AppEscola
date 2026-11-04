@@ -192,3 +192,26 @@ export async function saveCatalogItem(kind: CatalogKind, input: { name: string; 
   const { data } = id ? await api.put(`/finance/payables/${kind}/${id}`, input) : await api.post(`/finance/payables/${kind}`, input);
   return data.message;
 }
+
+export type BatchResult = { done: number[]; failed: { id: number; code: string | null; message: string }[]; message: string };
+
+/** Aprova ou registra pagamento de várias despesas; cada uma é processada separadamente no servidor. */
+export async function batchExpenses(
+  action: "approve" | "pay",
+  ids: number[],
+  payment?: { paid_at: string; payment_method: string }
+): Promise<BatchResult> {
+  const { data } = await api.post("/finance/payables/expenses/batch", { action, ids, ...(payment ?? {}) });
+  return { ...(data.body ?? data), message: data.message };
+}
+
+/** Todas as despesas do filtro (para exportar), página a página, até 2.000. */
+export async function fetchAllExpenses(filters: ExpenseFilters): Promise<Expense[]> {
+  const items: Expense[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const result = await fetchExpenses({ ...filters, page, per_page: 100 });
+    items.push(...result.items);
+    if (page >= result.meta.last_page) break;
+  }
+  return items;
+}

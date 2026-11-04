@@ -35,7 +35,7 @@ import { displayToISO, isoToDisplay } from "../../utils/masks";
 import { paymentMethodLabel } from "../../utils/paymentMethods";
 import {
   FINANCE_PDF_MODELS,
-  exportFinanceCsv,
+  exportFinanceXlsxReport,
   exportFinancePdf,
   formatBrl,
   formatIsoDate,
@@ -323,7 +323,7 @@ export default function FinanceReportScreen({ navigate }: Props) {
     if (!report || !ensureWeb()) return;
     setExporting("csv");
     try {
-      exportFinanceCsv(await fetchAllFinanceReportItems(query), exportLabels);
+      exportFinanceXlsxReport(report, await fetchAllFinanceReportItems(query), exportLabels);
     } catch (err) {
       setToast({ visible: true, type: "error", message: getApiErrorMessage(err, "Não foi possível gerar a planilha.") });
     } finally {

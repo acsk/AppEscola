@@ -170,6 +170,38 @@ class ExpenseTest extends TestCase
             ->assertJsonPath('body.by_category.0.name', 'Sem categoria');
     }
 
+    public function test_batch_approve_and_pay_process_each_expense_and_report_failures(): void
+    {
+        Http::fake();
+        $a = $this->expense(['status' => 'pending_approval']);
+        $b = $this->expense(['status' => 'draft', 'description' => 'Internet']);
+        $paid = $this->expense(['status' => 'paid', 'paid_at' => '2026-11-01 12:00:00', 'description' => 'Gráfica']);
+        $foreign = Expense::query()->create(['tenant_id' => Tenant::factory()->create()->id, 'description' => 'Alheia', 'amount' => 1, 'due_date' => '2026-11-10', 'status' => 'pending_approval']);
+
+        $secretaria = User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'secretaria', 'status' => 'active']);
+        $this->actingAs($secretaria)->postJson('/api/finance/payables/expenses/batch', ['action' => 'approve', 'ids' => [$a->id]])->assertForbidden();
+
+        $this->actingAs($this->admin)->postJson('/api/finance/payables/expenses/batch', ['action' => 'approve', 'ids' => [$a->id, $b->id, $paid->id, $foreign->id]])
+            ->assertOk()
+            ->assertJsonPath('body.done', [$a->id, $b->id])
+            ->assertJsonCount(2, 'body.failed')
+            ->assertJsonPath('body.failed.0.message', 'Está paga; só rascunhos e despesas em aprovação podem ser aprovados.')
+            ->assertJsonPath('body.failed.1.message', 'Despesa não encontrada.');
+        $this->assertSame('pending_approval', $foreign->refresh()->status);
+
+        $this->actingAs($this->admin)->postJson('/api/finance/payables/expenses/batch', ['action' => 'pay', 'ids' => [$a->id, $b->id]])
+            ->assertStatus(422); // forma de pagamento obrigatória
+
+        $this->actingAs($secretaria)->postJson('/api/finance/payables/expenses/batch', ['action' => 'pay', 'ids' => [$a->id, $b->id], 'paid_at' => '2026-11-04', 'payment_method' => 'transfer'])
+            ->assertOk()
+            ->assertJsonPath('body.done', [$a->id, $b->id])
+            ->assertJsonPath('message', '2 despesa(s) paga(s) (nenhum valor foi movimentado no banco).');
+
+        $this->assertSame(['paid', 'transfer'], [$a->refresh()->status, $a->payment_method]);
+        $this->assertSame(1, ExpenseAuditLog::query()->where('expense_id', $b->id)->where('action', 'paid')->count());
+        Http::assertNothingSent();
+    }
+
     public function test_monthly_recurrence_keeps_the_day_and_never_duplicates(): void
     {
         $root = $this->actingAs($this->admin)->postJson('/api/finance/payables/expenses', [

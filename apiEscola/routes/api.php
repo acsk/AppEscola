@@ -362,6 +362,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::post('finance/reconciliation/entries/{entry}/reconcile-expense', [BankReconciliationController::class, 'reconcileExpense'])->whereNumber('entry');
 
     Route::get('finance/cash-flow', [CashFlowController::class, 'show']);
+    Route::get('finance/reports/consolidated', [CashFlowController::class, 'consolidated']);
     Route::get('finance/settings', [FinanceSettingsController::class, 'show']);
 
     // Contas a pagar (registrar pagamento não movimenta a conta bancária).
@@ -369,6 +370,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::get('finance/payables/options', [ExpenseController::class, 'options']);
     Route::get('finance/payables/expenses', [ExpenseController::class, 'index']);
     Route::post('finance/payables/expenses', [ExpenseController::class, 'store']);
+    Route::post('finance/payables/expenses/batch', [ExpenseController::class, 'batch']);
     Route::get('finance/payables/expenses/{expense}', [ExpenseController::class, 'show'])->whereNumber('expense');
     Route::put('finance/payables/expenses/{expense}', [ExpenseController::class, 'update'])->whereNumber('expense');
     Route::post('finance/payables/expenses/{expense}/submit', [ExpenseController::class, 'submit'])->whereNumber('expense');

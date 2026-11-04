@@ -41,6 +41,7 @@ import {
   ReceiptText,
   ChartNoAxesColumn,
   Settings2,
+  FileChartColumn,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -155,6 +156,7 @@ export default function Sidebar({
               { id: "financeiro-conciliacao", label: "Conciliação bancária", icon: ArrowLeftRight },
               { id: "financeiro-contas-a-pagar", label: "Contas a pagar", icon: ReceiptText },
               { id: "financeiro-fluxo-de-caixa", label: "Fluxo de caixa", icon: ChartNoAxesColumn },
+              { id: "financeiro-relatorios", label: "Relatórios financeiros", icon: FileChartColumn },
               { id: "financeiro-cora", label: "Integração Cora", icon: Webhook },
               { id: "bancos_crud", label: "Bancos", icon: Landmark },
               { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },

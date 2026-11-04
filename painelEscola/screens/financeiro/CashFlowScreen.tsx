@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Platform, ScrollView, Text, View } from "react-native";
-import { FileDown, RefreshCw } from "lucide-react-native";
+import { FileDown, FileSpreadsheet, RefreshCw } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import FormSelect from "../../components/ui/FormSelect";
@@ -14,6 +14,7 @@ import { color } from "../../constants/theme";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { getApiResponseMessage } from "../../utils/apiErrors";
 import { displayToISO, isoToDisplay } from "../../utils/masks";
+import { brl, exportFinancePdf, exportFinanceXlsx, num } from "../../utils/financeExports";
 import { fetchCashFlow, type CashFlow, type CashFlowBucket, type CashFlowGranularity } from "../../services/cashFlow";
 import { fetchPayablesOptions, type PayablesOptions } from "../../services/payables";
 
@@ -24,22 +25,52 @@ type Props = {
 const fmtDate = (iso: string) => iso.split("-").reverse().join("/");
 const noun = { daily: "Dia", weekly: "Semana", monthly: "Mês" } as const;
 
-/** Planilha CSV (abre no Excel: separador ";" e BOM UTF-8), no mesmo formato do relatório financeiro. */
-function exportCsv(data: CashFlow) {
-  const n = (v: string | null) => (v === null ? "" : Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-  const header = [noun[data.granularity], "Situação", "Entradas previstas", "Entradas realizadas", "Saídas previstas", "Saídas realizadas", "Resultado do intervalo", "Resultado acumulado"];
-  const lines = data.buckets.map((b) =>
-    [`${fmtDate(b.start)} a ${fmtDate(b.end)}`, b.state === "future" ? "Previsto" : b.state === "current" ? "Em andamento" : "Realizado", n(b.planned_in), n(b.realized_in), n(b.planned_out), n(b.realized_out), n(b.flow), n(b.cumulative)].join(";")
-  );
-  const blob = new Blob(["﻿" + [header.join(";"), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `fluxo-de-caixa-${data.period.from}-a-${data.period.to}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+const stateLabel = (b: CashFlowBucket) => (b.state === "future" ? "Previsto" : b.state === "current" ? "Em andamento" : "Realizado");
+
+/** Fluxo de caixa em PDF ou Excel, com o mesmo recorte da tela. */
+async function exportCashFlow(data: CashFlow, format: "pdf" | "xlsx") {
+  const fileName = `fluxo-de-caixa-${data.period.from}-a-${data.period.to}`;
+  const period = `${fmtDate(data.period.from)} a ${fmtDate(data.period.to)}`;
+  const head = [noun[data.granularity], "Situação", "Entradas previstas", "Entradas realizadas", "Saídas previstas", "Saídas realizadas", "Resultado", "Acumulado"];
+
+  if (format === "xlsx") {
+    exportFinanceXlsx(fileName, [
+      {
+        name: "Fluxo de caixa",
+        rows: [
+          ["Fluxo de caixa (calculado pelo sistema, não é o saldo do banco)", period],
+          [],
+          head.map((h, i) => (i >= 2 ? `${h} (R$)` : h)),
+          ...data.buckets.map((b) => [`${fmtDate(b.start)} a ${fmtDate(b.end)}`, stateLabel(b), num(b.planned_in), num(b.realized_in), num(b.planned_out), num(b.realized_out), num(b.flow), num(b.cumulative)]),
+          ["Total do período", "", num(data.totals.planned_in), num(data.totals.realized_in), num(data.totals.planned_out), num(data.totals.realized_out), num(data.realized.net), num(data.projected_result)],
+        ],
+      },
+    ]);
+    return;
+  }
+
+  await exportFinancePdf({
+    fileName,
+    overline: "Relatório financeiro",
+    title: "Fluxo de caixa",
+    description: `${period} · calculado pelo sistema com as cobranças e despesas registradas; não é o saldo confirmado pelo banco.`,
+    landscape: true,
+    facts: [
+      { label: "Entradas realizadas", value: brl(data.realized.inflow) },
+      { label: "Saídas realizadas", value: brl(data.realized.outflow) },
+      { label: `Resultado projetado até ${fmtDate(data.period.to)}`, value: brl(data.projected_result) },
+      { label: "Saldo na Cora", value: data.bank_balance ? brl(data.bank_balance.amount) : "não informado pela Cora" },
+    ],
+    sections: [
+      {
+        title: "Previsto × realizado",
+        head,
+        body: data.buckets.map((b) => [b.label, stateLabel(b), brl(b.planned_in), brl(b.realized_in), brl(b.planned_out), brl(b.realized_out), brl(b.flow), brl(b.cumulative)]),
+        foot: ["Total", `realizado até ${fmtDate(data.realized.to)}`, brl(data.totals.planned_in), brl(data.totals.realized_in), brl(data.totals.planned_out), brl(data.totals.realized_out), brl(data.realized.net), brl(data.projected_result)],
+        numeric: [2, 3, 4, 5, 6, 7],
+      },
+    ],
+  });
 }
 
 /**
@@ -144,7 +175,12 @@ export default function CashFlowScreen({ navigate }: Props) {
               ]}
             />
             <Button icon={RefreshCw} label="Atualizar" onPress={load} loading={loading} />
-            {Platform.OS === "web" && data ? <Button icon={FileDown} label="Exportar" onPress={() => exportCsv(data)} /> : null}
+            {Platform.OS === "web" && data ? (
+              <>
+                <Button icon={FileSpreadsheet} label="Excel" onPress={() => exportCashFlow(data, "xlsx")} />
+                <Button icon={FileDown} label="PDF" onPress={() => exportCashFlow(data, "pdf")} />
+              </>
+            ) : null}
           </>
         }
       />
