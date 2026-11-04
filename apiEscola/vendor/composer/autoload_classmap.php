@@ -7,6 +7,7 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'App\\Console\\Commands\\AbandonTimedOutExamAttemptsCommand' => $baseDir . '/app/Console/Commands/AbandonTimedOutExamAttemptsCommand.php',
+    'App\\Console\\Commands\\Cora\\CheckCoraPaymentLinkCommand' => $baseDir . '/app/Console/Commands/Cora/CheckCoraPaymentLinkCommand.php',
     'App\\Console\\Commands\\Cora\\CompareTenantsCoraDebugCommand' => $baseDir . '/app/Console/Commands/Cora/CompareTenantsCoraDebugCommand.php',
     'App\\Console\\Commands\\Cora\\ProcessCoraWebhookEventsCommand' => $baseDir . '/app/Console/Commands/Cora/ProcessCoraWebhookEventsCommand.php',
     'App\\Console\\Commands\\Cora\\RegisterCoraWebhookCommand' => $baseDir . '/app/Console/Commands/Cora/RegisterCoraWebhookCommand.php',
@@ -394,6 +395,7 @@ return array(
     'App\\Services\\Cora\\CoraPaidInvoicesSyncService' => $baseDir . '/app/Services/Cora/CoraPaidInvoicesSyncService.php',
     'App\\Services\\Cora\\CoraPaymentService' => $baseDir . '/app/Services/Cora/CoraPaymentService.php',
     'App\\Services\\Cora\\CoraTokenService' => $baseDir . '/app/Services/Cora/CoraTokenService.php',
+    'App\\Services\\Cora\\CoraTransactionId' => $baseDir . '/app/Services/Cora/CoraTransactionId.php',
     'App\\Services\\Cora\\CoraWebhookInbox' => $baseDir . '/app/Services/Cora/CoraWebhookInbox.php',
     'App\\Services\\Cora\\CoraWebhookProcessor' => $baseDir . '/app/Services/Cora/CoraWebhookProcessor.php',
     'App\\Services\\Cora\\InvoiceCoraChargeAssetsService' => $baseDir . '/app/Services/Cora/InvoiceCoraChargeAssetsService.php',
@@ -7587,6 +7589,7 @@ return array(
     'Tests\\Feature\\BiStudentTest' => $baseDir . '/tests/Feature/BiStudentTest.php',
     'Tests\\Feature\\BiSubjectTest' => $baseDir . '/tests/Feature/BiSubjectTest.php',
     'Tests\\Feature\\CoordenadorRoleTest' => $baseDir . '/tests/Feature/CoordenadorRoleTest.php',
+    'Tests\\Feature\\Cora\\CheckCoraPaymentLinkCommandTest' => $baseDir . '/tests/Feature/Cora/CheckCoraPaymentLinkCommandTest.php',
     'Tests\\Feature\\Cora\\CoraIntegrationPanelTest' => $baseDir . '/tests/Feature/Cora/CoraIntegrationPanelTest.php',
     'Tests\\Feature\\Cora\\CoraWebhookTest' => $baseDir . '/tests/Feature/Cora/CoraWebhookTest.php',
     'Tests\\Feature\\Cora\\InvoiceChargeStatusTest' => $baseDir . '/tests/Feature/Cora/InvoiceChargeStatusTest.php',

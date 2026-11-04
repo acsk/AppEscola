@@ -682,6 +682,7 @@ class ComposerStaticInitc57754c93ae34ac3b9b716a0fd2f2149
 
     public static $classMap = array (
         'App\\Console\\Commands\\AbandonTimedOutExamAttemptsCommand' => __DIR__ . '/../..' . '/app/Console/Commands/AbandonTimedOutExamAttemptsCommand.php',
+        'App\\Console\\Commands\\Cora\\CheckCoraPaymentLinkCommand' => __DIR__ . '/../..' . '/app/Console/Commands/Cora/CheckCoraPaymentLinkCommand.php',
         'App\\Console\\Commands\\Cora\\CompareTenantsCoraDebugCommand' => __DIR__ . '/../..' . '/app/Console/Commands/Cora/CompareTenantsCoraDebugCommand.php',
         'App\\Console\\Commands\\Cora\\ProcessCoraWebhookEventsCommand' => __DIR__ . '/../..' . '/app/Console/Commands/Cora/ProcessCoraWebhookEventsCommand.php',
         'App\\Console\\Commands\\Cora\\RegisterCoraWebhookCommand' => __DIR__ . '/../..' . '/app/Console/Commands/Cora/RegisterCoraWebhookCommand.php',
@@ -1069,6 +1070,7 @@ class ComposerStaticInitc57754c93ae34ac3b9b716a0fd2f2149
         'App\\Services\\Cora\\CoraPaidInvoicesSyncService' => __DIR__ . '/../..' . '/app/Services/Cora/CoraPaidInvoicesSyncService.php',
         'App\\Services\\Cora\\CoraPaymentService' => __DIR__ . '/../..' . '/app/Services/Cora/CoraPaymentService.php',
         'App\\Services\\Cora\\CoraTokenService' => __DIR__ . '/../..' . '/app/Services/Cora/CoraTokenService.php',
+        'App\\Services\\Cora\\CoraTransactionId' => __DIR__ . '/../..' . '/app/Services/Cora/CoraTransactionId.php',
         'App\\Services\\Cora\\CoraWebhookInbox' => __DIR__ . '/../..' . '/app/Services/Cora/CoraWebhookInbox.php',
         'App\\Services\\Cora\\CoraWebhookProcessor' => __DIR__ . '/../..' . '/app/Services/Cora/CoraWebhookProcessor.php',
         'App\\Services\\Cora\\InvoiceCoraChargeAssetsService' => __DIR__ . '/../..' . '/app/Services/Cora/InvoiceCoraChargeAssetsService.php',
@@ -8262,6 +8264,7 @@ class ComposerStaticInitc57754c93ae34ac3b9b716a0fd2f2149
         'Tests\\Feature\\BiStudentTest' => __DIR__ . '/../..' . '/tests/Feature/BiStudentTest.php',
         'Tests\\Feature\\BiSubjectTest' => __DIR__ . '/../..' . '/tests/Feature/BiSubjectTest.php',
         'Tests\\Feature\\CoordenadorRoleTest' => __DIR__ . '/../..' . '/tests/Feature/CoordenadorRoleTest.php',
+        'Tests\\Feature\\Cora\\CheckCoraPaymentLinkCommandTest' => __DIR__ . '/../..' . '/tests/Feature/Cora/CheckCoraPaymentLinkCommandTest.php',
         'Tests\\Feature\\Cora\\CoraIntegrationPanelTest' => __DIR__ . '/../..' . '/tests/Feature/Cora/CoraIntegrationPanelTest.php',
         'Tests\\Feature\\Cora\\CoraWebhookTest' => __DIR__ . '/../..' . '/tests/Feature/Cora/CoraWebhookTest.php',
         'Tests\\Feature\\Cora\\InvoiceChargeStatusTest' => __DIR__ . '/../..' . '/tests/Feature/Cora/InvoiceChargeStatusTest.php',
