@@ -15,7 +15,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-/** Conciliação bancária: nunca concilia só por valor/data; Cora confirma antes de baixar; tudo com justificativa. */
+/**
+ * Conciliação bancária: só cobranças Cora geradas pelo sistema, a partir da primeira delas; nunca concilia
+ * só por valor/data; Cora confirma antes de baixar; tudo com justificativa.
+ */
 class BankReconciliationTest extends TestCase
 {
     use RefreshDatabase;
@@ -51,6 +54,8 @@ class BankReconciliationTest extends TestCase
             'payment_method' => 'pix',
             'cora_charge_id' => null,
             'cora_payload' => null,
+            // A escola passou a gerar cobranças na Cora pelo sistema em junho.
+            'created_at' => '2026-06-01 12:00:00',
         ], $attrs));
     }
 
@@ -59,6 +64,15 @@ class BankReconciliationTest extends TestCase
         return $this->invoice(array_merge([
             'cora_charge_id' => $chargeId,
             'cora_payload' => ['integration' => ['provider' => 'cora', 'environment' => 'stage']],
+        ], $attrs));
+    }
+
+    /** Cobrança trazida da Cora pela sincronização (não gerada pelo sistema). */
+    private function importedInvoice(string $chargeId, array $attrs = []): Invoice
+    {
+        return $this->invoice(array_merge([
+            'cora_charge_id' => $chargeId,
+            'cora_payload' => ['integration' => ['provider' => 'cora', 'environment' => 'stage', 'origin' => 'cora_sync']],
         ], $attrs));
     }
 
@@ -105,6 +119,7 @@ class BankReconciliationTest extends TestCase
     {
         $cited = $this->coraInvoice('inv_7Hq2LmZs90');
         $sameValueNoId = $this->invoice();
+        $this->importedInvoice('inv_Importada01');
 
         Http::fake([
             self::STATEMENT_URL => Http::response($this->statement([
@@ -112,13 +127,14 @@ class BankReconciliationTest extends TestCase
                 $this->raw('ent_2', 'CREDIT', 17500, 'PIX RECEBIDO'),
                 $this->raw('ent_3', 'BLOCK', 5000, 'BLOQUEIO JUDICIAL'),
                 $this->raw('ent_4', 'DEBIT', 3990, 'TARIFA PACOTE SERVICOS', ['transaction' => ['type' => 'FEE']]),
+                $this->raw('ent_5', 'CREDIT', 17500, 'PIX COBRANCA inv_Importada01'),
             ])),
             self::CORA_INVOICE_URL => Http::response(['id' => 'inv_7Hq2LmZs90', 'status' => 'PAID', 'paid_at' => '2026-11-03T08:41:00-03:00']),
         ]);
 
         $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-11-01', 'date_to' => '2026-11-03'])
             ->assertOk()
-            ->assertJsonPath('body.created', 3)
+            ->assertJsonPath('body.created', 4)
             ->assertJsonPath('body.auto_reconciled', 1);
 
         $auto = BankStatementEntry::where('external_id', 'ent_1')->sole();
@@ -133,6 +149,9 @@ class BankReconciliationTest extends TestCase
         $this->assertSame('pending', BankStatementEntry::where('external_id', 'ent_2')->sole()->status);
         $this->assertSame('pending', $sameValueNoId->refresh()->status);
 
+        // Cobrança importada pela sincronização Cora não entra na conciliação.
+        $this->assertSame('pending', BankStatementEntry::where('external_id', 'ent_5')->sole()->status);
+
         $fee = BankStatementEntry::where('external_id', 'ent_4')->sole();
         $this->assertSame(['debit', 'FEE', '39.90'], [$fee->direction, $fee->transaction_type, (string) $fee->amount]);
 
@@ -143,7 +162,7 @@ class BankReconciliationTest extends TestCase
         $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-11-01', 'date_to' => '2026-11-03'])
             ->assertOk()
             ->assertJsonPath('body.created', 0);
-        $this->assertSame(3, BankStatementEntry::count());
+        $this->assertSame(4, BankStatementEntry::count());
     }
 
     public function test_cited_charge_with_different_amount_or_on_a_debit_becomes_divergent(): void
@@ -172,35 +191,47 @@ class BankReconciliationTest extends TestCase
         Http::assertNotSent(fn ($request) => str_contains($request->url(), '/v2/invoices/'));
     }
 
-    public function test_manual_reconcile_of_local_invoice_settles_with_bank_date_and_audited_justification(): void
+    public function test_manual_reconcile_only_accepts_cora_charges_generated_by_the_system(): void
     {
-        $invoice = $this->invoice();
+        $mine = $this->coraInvoice('inv_meu');
+        $local = $this->invoice();
+        $imported = $this->importedInvoice('inv_importada');
         $entry = $this->entry();
 
         $this->actingAs($this->admin)->getJson("/api/finance/reconciliation/entries/{$entry->id}/candidates")
             ->assertOk()
-            ->assertJsonPath('body.items.0.id', $invoice->id)
+            ->assertJsonCount(1, 'body.items')
+            ->assertJsonPath('body.items.0.id', $mine->id)
             ->assertJsonPath('body.items.0.criteria.amount_equal', true)
             ->assertJsonPath('body.items.0.criteria.charge_id_cited', false)
             ->assertJsonPath('body.items.0.criteria.date_window', true)
             ->assertJsonPath('body.items.0.criteria.name_hint', true);
 
+        foreach ([$local, $imported] as $other) {
+            $this->actingAs($this->admin)->postJson("/api/finance/reconciliation/entries/{$entry->id}/reconcile", [
+                'invoice_id' => $other->id,
+                'justification' => 'Pagador confirmado pela secretaria por WhatsApp.',
+            ])->assertStatus(422)
+                ->assertJsonPath('message', 'Só cobranças geradas pelo sistema na Cora podem ser conciliadas.');
+            $this->assertSame('pending', $other->refresh()->status);
+        }
+        Http::assertNothingSent();
+
+        Http::fake([self::CORA_INVOICE_URL => Http::response(['id' => 'inv_meu', 'status' => 'PAID', 'paid_at' => '2026-11-03T08:41:00-03:00'])]);
+
         $this->actingAs($this->admin)->postJson("/api/finance/reconciliation/entries/{$entry->id}/reconcile", [
-            'invoice_id' => $invoice->id,
+            'invoice_id' => $mine->id,
             'justification' => 'Pagador confirmado pela secretaria por WhatsApp.',
         ])->assertOk()
             ->assertJsonPath('body.status', 'reconciled')
             ->assertJsonPath('body.match_type', 'manual')
             ->assertJsonPath('body.reviewed_by.id', $this->admin->id);
 
-        $invoice->refresh();
-        $this->assertSame('paid', $invoice->status);
-        $this->assertSame('pix', $invoice->payment_method);
-        $this->assertSame('2026-11-03 11:41:00', $invoice->paid_at->utc()->toDateTimeString());
-
-        $audit = InvoiceAuditLog::where('invoice_id', $invoice->id)->where('action', 'paid')->sole();
-        $this->assertSame('user', $audit->source);
-        $this->assertStringContainsString('Pagador confirmado pela secretaria', $audit->reason);
+        // A baixa veio da Cora, registrada em nome de quem conciliou.
+        $mine->refresh();
+        $this->assertSame('paid', $mine->status);
+        $this->assertSame('2026-11-03 11:41:00', $mine->paid_at->utc()->toDateTimeString());
+        $this->assertSame('user', InvoiceAuditLog::where('invoice_id', $mine->id)->where('action', 'paid')->sole()->source);
 
         $log = BankStatementEntryLog::where('entry_id', $entry->id)->sole();
         $this->assertSame(['reconciled', 'pending', 'reconciled', $this->admin->id], [$log->action, $log->from_status, $log->to_status, $log->user_id]);
@@ -208,10 +239,42 @@ class BankReconciliationTest extends TestCase
         // A mesma cobrança não pode ser conciliada com outra movimentação.
         $other = $this->entry();
         $this->actingAs($this->admin)->postJson("/api/finance/reconciliation/entries/{$other->id}/reconcile", [
-            'invoice_id' => $invoice->id,
+            'invoice_id' => $mine->id,
             'justification' => 'Tentativa de conciliar em duplicidade.',
         ])->assertStatus(422);
         $this->assertSame('pending', $other->refresh()->status);
+    }
+
+    public function test_statement_starts_at_first_cora_charge_generated_by_the_system(): void
+    {
+        // Só cobrança importada: o sistema ainda não gerou nenhuma na Cora.
+        $this->importedInvoice('inv_antiga', ['created_at' => '2026-03-01 10:00:00']);
+        Http::fake([self::STATEMENT_URL => Http::response($this->statement([]))]);
+
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-05-01', 'date_to' => '2026-06-10'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Nenhuma cobrança foi gerada na Cora por este sistema ainda; não há o que conciliar.');
+        Http::assertNothingSent();
+
+        $this->coraInvoice('inv_primeira');
+
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-05-10', 'date_to' => '2026-05-31'])
+            ->assertStatus(422);
+
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-05-01', 'date_to' => '2026-06-10'])
+            ->assertOk()
+            ->assertJsonPath('body.period_start', '2026-06-01');
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'start=2026-06-01'));
+
+        // Movimentação anterior (ex.: importada antes desta regra) não aparece nem conta.
+        $this->entry(['occurred_at' => '2026-05-20 12:00:00']);
+        $this->entry(['occurred_at' => '2026-06-02 12:00:00']);
+
+        $this->actingAs($this->admin)->getJson('/api/finance/reconciliation/entries')->assertOk()->assertJsonPath('body.meta.total', 1);
+        $this->actingAs($this->admin)->getJson('/api/finance/reconciliation/summary')
+            ->assertOk()
+            ->assertJsonPath('body.operating_since', '2026-06-01')
+            ->assertJsonPath('body.credits.count', 1);
     }
 
     public function test_manual_reconcile_of_cora_invoice_requires_cora_confirmation(): void
@@ -249,7 +312,7 @@ class BankReconciliationTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/finance/reconciliation/entries/{$entry->id}/divergent", ['justification' => 'Não pode marcar algo ignorado.'])
             ->assertStatus(422);
 
-        $invoice = $this->invoice(['status' => 'paid', 'paid_at' => '2026-11-03 11:41:00']);
+        $invoice = $this->coraInvoice('inv_pago', ['status' => 'paid', 'paid_at' => '2026-11-03 11:41:00']);
         $credit = $this->entry();
         $this->actingAs($this->admin)->postJson("/api/finance/reconciliation/entries/{$credit->id}/reconcile", [
             'invoice_id' => $invoice->id, 'justification' => 'Cobrança já baixada pelo webhook.',
@@ -265,6 +328,7 @@ class BankReconciliationTest extends TestCase
 
     public function test_summary_and_list_are_tenant_isolated_and_permission_checked(): void
     {
+        $this->coraInvoice('inv_base');
         $this->entry(['amount' => '100.00']);
         $this->entry(['amount' => '50.00', 'status' => 'reconciled']);
         $this->entry(['direction' => 'debit', 'amount' => '39.90', 'transaction_type' => 'FEE']);
@@ -298,6 +362,7 @@ class BankReconciliationTest extends TestCase
 
     public function test_sync_refused_by_cora_is_recorded_without_changes(): void
     {
+        $this->coraInvoice('inv_base');
         Http::fake([self::STATEMENT_URL => Http::response(['message' => 'forbidden'], 403)]);
 
         $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync')

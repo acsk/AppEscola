@@ -5,6 +5,8 @@ export type ReconciliationType = "pix" | "transfer" | "payment" | "fee" | "card"
 
 export type ReconciliationSummary = {
   environment: string;
+  /** Primeira cobrança Cora gerada pelo sistema; antes disso não há o que conciliar. */
+  operating_since: string | null;
   credentials_active: boolean;
   credits: { count: number; amount: string };
   debits: { count: number; amount: string };

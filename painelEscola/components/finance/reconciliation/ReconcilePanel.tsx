@@ -133,7 +133,9 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
             <ActivityIndicator color={color.brand} />
           ) : candidates.length === 0 ? (
             <Text className="text-sm text-ink-muted">
-              {search ? "Nenhuma cobrança encontrada." : "Nenhuma cobrança em aberto com este valor. Busque abaixo por número, aluno ou descrição."}
+              {search
+                ? "Nenhuma cobrança Cora gerada pelo sistema com essa busca."
+                : "Nenhuma cobrança Cora em aberto com este valor. Busque abaixo por número, aluno ou descrição."}
             </Text>
           ) : (
             candidates.map((c) => <CandidateCard key={c.id} candidate={c} selected={selected === c.id} onPress={() => setSelected(c.id)} />)
@@ -145,11 +147,14 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
             placeholder="Nº (#123), nome do aluno ou descrição"
             dense
           />
-          {selectedCandidate?.has_cora_charge && selectedCandidate.status !== "paid" ? (
+          {selectedCandidate && selectedCandidate.status !== "paid" ? (
             <Text className="text-xs text-ink-muted">
-              Cobrança emitida na Cora: o sistema consulta a Cora e só concilia se ela confirmar o pagamento.
+              Cobrança em aberto: o sistema consulta a Cora e só concilia se ela confirmar o pagamento.
             </Text>
           ) : null}
+          <Text className="text-xs text-ink-subtle">
+            Só aparecem cobranças com ID Cora geradas pelo sistema; as importadas da Cora e as sem ID ficam de fora.
+          </Text>
         </View>
       ) : null}
 
@@ -265,7 +270,7 @@ function Notice({ entry }: { entry: BankEntry }) {
     title = "Sem correspondência inequívoca.";
     body =
       entry.cited_charge_ids.length > 0
-        ? `A movimentação cita ${entry.cited_charge_ids.join(", ")}, que não está no sistema.`
+        ? `A movimentação cita ${entry.cited_charge_ids.join(", ")}, que não é uma cobrança gerada pelo sistema.`
         : "Esta entrada não traz o ID de uma cobrança. Mesmo valor e data não bastam para conciliar automaticamente.";
   } else {
     tone = "warning";

@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
-/** Leitura da conciliação bancária: lista, resumo do período e cobranças candidatas. */
+/**
+ * Leitura da conciliação bancária: lista, resumo do período e cobranças candidatas.
+ * Só a partir da primeira cobrança Cora gerada pelo sistema, e só com cobranças geradas por ele.
+ */
 class BankReconciliationQuery
 {
     /** Filtro "tipo" da tela → transaction_type da Cora. */
@@ -73,6 +76,7 @@ class BankReconciliationQuery
 
         return [
             'environment' => $environment,
+            'operating_since' => BankReconciliationService::operatingSince($tenantId)?->toDateString(),
             'credentials_active' => TenantCoraCredential::query()
                 ->where('tenant_id', $tenantId)
                 ->where('environment', $environment)
@@ -112,8 +116,7 @@ class BankReconciliationQuery
     {
         $cited = BankReconciliationService::chargeIdsIn($entry);
 
-        $base = fn () => Invoice::query()
-            ->where('tenant_id', $entry->tenant_id)
+        $base = fn () => BankReconciliationService::reconcilableInvoices($entry->tenant_id)
             ->whereIn('status', ['pending', 'overdue', 'paid'])
             ->whereNotExists(fn ($q) => $q->from('bank_statement_entries')
                 ->whereColumn('bank_statement_entries.invoice_id', 'invoices.id')
@@ -200,6 +203,12 @@ class BankReconciliationQuery
 
         // As datas do filtro são dias no fuso da operação; occurred_at está no fuso da aplicação.
         $tz = config('app.business_timezone', 'America/Sao_Paulo');
+
+        $since = BankReconciliationService::operatingSince($tenantId);
+        if ($since === null) {
+            return $query->whereRaw('1 = 0');
+        }
+        $query->where('occurred_at', '>=', Carbon::parse($since->toDateString(), $tz)->startOfDay()->setTimezone(config('app.timezone')));
         if (! empty($filters['date_from'])) {
             $query->where('occurred_at', '>=', Carbon::parse($filters['date_from'], $tz)->startOfDay()->setTimezone(config('app.timezone')));
         }

@@ -7,9 +7,9 @@ use App\Models\BankStatementEntryLog;
 use App\Models\Invoice;
 use App\Models\User;
 use App\Services\Cora\CoraPaidInvoicesSyncService;
-use App\Services\InvoiceLifecycleService;
-use App\Services\InvoiceSettlementService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -18,20 +18,41 @@ use Throwable;
 /**
  * Decisões de conciliação de uma movimentação do extrato.
  *
- * Automática: só quando a movimentação cita o ID de uma cobrança Cora do sistema e o valor é igual.
- * Valor e data iguais nunca bastam. Manual: sempre com justificativa; cobrança emitida na Cora só é
- * conciliada depois que a Cora confirma o pagamento (mesma regra da baixa manual). Nada aqui
- * movimenta a conta bancária.
+ * Só entram cobranças com ID Cora geradas por este sistema (as importadas pela sincronização Cora e
+ * as locais sem ID ficam de fora, como em Contas a receber).
+ * Automática: só quando a movimentação cita o ID de uma dessas cobranças e o valor é igual.
+ * Valor e data iguais nunca bastam. Manual: sempre com justificativa, e só depois que a Cora confirma
+ * o pagamento. Nada aqui movimenta a conta bancária.
  */
 class BankReconciliationService
 {
     public const STATUSES = ['pending', 'reconciled', 'divergent', 'ignored'];
 
-    public function __construct(
-        private readonly CoraPaidInvoicesSyncService $coraSync,
-        private readonly InvoiceSettlementService $settlement,
-        private readonly InvoiceLifecycleService $lifecycle,
-    ) {
+    public function __construct(private readonly CoraPaidInvoicesSyncService $coraSync)
+    {
+    }
+
+    /** Cobranças que entram na conciliação: com ID Cora e geradas por este sistema (não importadas). */
+    public static function reconcilableInvoices(int $tenantId): Builder
+    {
+        return Invoice::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('cora_charge_id')
+            ->where('cora_charge_id', '!=', '')
+            ->excludingImportedFromCoraSync();
+    }
+
+    /**
+     * Dia (fuso da operação) da primeira cobrança Cora gerada pelo sistema. Antes disso nenhuma
+     * movimentação pode ser pagamento de cobrança do sistema; null = ainda não opera com a Cora.
+     */
+    public static function operatingSince(int $tenantId): ?Carbon
+    {
+        $first = self::reconcilableInvoices($tenantId)->min('created_at');
+
+        return $first
+            ? Carbon::parse(Carbon::parse($first)->setTimezone(config('app.business_timezone', 'America/Sao_Paulo'))->toDateString())
+            : null;
     }
 
     /**
@@ -59,8 +80,7 @@ class BankReconciliationService
             return 'pending';
         }
 
-        $invoices = Invoice::query()
-            ->where('tenant_id', $entry->tenant_id)
+        $invoices = self::reconcilableInvoices($entry->tenant_id)
             ->whereIn('cora_charge_id', $chargeIds)
             ->get();
 
@@ -127,9 +147,8 @@ class BankReconciliationService
     }
 
     /**
-     * Concilia uma entrada com uma cobrança. Cobrança emitida na Cora: consulta a Cora e só concilia se
-     * ela confirmar o pagamento. Cobrança local em aberto: baixa pelo fluxo normal, com a justificativa
-     * registrada na auditoria da cobrança.
+     * Concilia uma entrada com uma cobrança Cora gerada pelo sistema. Se ela ainda não está paga,
+     * consulta a Cora e só concilia quando a Cora confirma o pagamento; a baixa vem dessa consulta.
      */
     public function reconcile(BankStatementEntry $entry, Invoice $invoice, string $justification, User $user): BankStatementEntry
     {
@@ -141,6 +160,9 @@ class BankReconciliationService
         if ((int) $invoice->tenant_id !== (int) $entry->tenant_id) {
             throw new RuntimeException('Cobrança não encontrada.');
         }
+        if (! self::reconcilableInvoices($entry->tenant_id)->whereKey($invoice->id)->exists()) {
+            throw new RuntimeException('Só cobranças geradas pelo sistema na Cora podem ser conciliadas.');
+        }
         if ($invoice->status === 'cancelled') {
             throw new RuntimeException('Cobrança cancelada não pode ser conciliada.');
         }
@@ -148,7 +170,7 @@ class BankReconciliationService
             throw new RuntimeException("A cobrança #{$invoice->id} já está conciliada com outra movimentação.");
         }
 
-        if ($invoice->status !== 'paid' && $this->lifecycle->hasGeneratedPaymentCharge($invoice)) {
+        if ($invoice->status !== 'paid') {
             // Consulta fora da transação; ConnectionException/RequestException sobem para o controller.
             $this->coraSync->syncOne($invoice, $this->coraSync->resolveEnvironment($invoice, $entry->environment), 'bank-reconciliation');
             if ($invoice->refresh()->status !== 'paid') {
@@ -168,25 +190,15 @@ class BankReconciliationService
             $user,
             $justification,
             ['match_type' => 'manual', 'invoice_id' => $invoice->id, 'divergence' => $divergence],
-            function (BankStatementEntry $locked) use ($invoice, $justification) {
+            function (BankStatementEntry $locked) use ($invoice) {
                 $lockedInvoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
 
                 if ($this->linkedElsewhere($lockedInvoice->id, $locked->id)) {
                     throw new RuntimeException("A cobrança #{$lockedInvoice->id} já está conciliada com outra movimentação.");
                 }
-                if ($lockedInvoice->status === 'paid') {
-                    return;
+                if ($lockedInvoice->status !== 'paid') {
+                    throw new RuntimeException("A cobrança #{$lockedInvoice->id} não está paga. Nada foi conciliado.");
                 }
-                if (! $this->settlement->allowsManualSettlement($lockedInvoice)) {
-                    throw new RuntimeException((string) ($this->settlement->manualSettlementBlockReason($lockedInvoice)
-                        ?? 'Baixa não permitida para esta cobrança.'));
-                }
-
-                $lockedInvoice->edit_reason = mb_substr('Conciliação bancária: ' . $justification, 0, 500);
-                $this->settlement->settle($lockedInvoice, [
-                    'paid_at' => $locked->occurred_at,
-                    'payment_method' => $locked->transaction_type === 'PIX' ? 'pix' : 'transfer',
-                ]);
             },
         );
     }

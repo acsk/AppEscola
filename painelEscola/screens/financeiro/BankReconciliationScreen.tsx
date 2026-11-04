@@ -440,13 +440,20 @@ function ConnectionStrip({ summary }: { summary: ReconciliationSummary | null })
           <Text className="text-sm text-ink">{`${summary.credentials_active ? "Credenciais ativas" : "Sem credenciais ativas"} · ${envLabel}`}</Text>
         </View>
         <View style={{ minWidth: 0, flexShrink: 1 }}>
+          <Text className="text-xs text-ink-muted">Operação com a Cora desde</Text>
+          <Text className="text-sm font-mono text-ink">
+            {summary.operating_since ? summary.operating_since.split("-").reverse().join("/") : "Nenhuma cobrança gerada ainda"}
+          </Text>
+        </View>
+        <View style={{ minWidth: 0, flexShrink: 1 }}>
           <Text className="text-xs text-ink-muted">Última sincronização</Text>
           <Text className={`text-sm font-mono ${last?.status === "failed" ? "text-danger" : "text-ink"}`}>{lastText}</Text>
         </View>
       </View>
       {last?.status === "failed" && last.error ? <Text className="text-sm text-danger">{last.error}</Text> : null}
       <Text className="text-xs text-ink-muted">
-        Extrato por API em validação. A conciliação automática só acontece quando a movimentação cita o ID da cobrança e o valor é igual.
+        Extrato por API em validação. Só entram movimentações a partir da primeira cobrança Cora gerada pelo sistema e só
+        cobranças geradas por ele. A conciliação automática exige o ID da cobrança na movimentação e o mesmo valor.
       </Text>
     </View>
   );

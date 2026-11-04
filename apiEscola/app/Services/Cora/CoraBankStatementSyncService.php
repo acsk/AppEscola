@@ -37,6 +37,19 @@ class CoraBankStatementSyncService
             throw new RuntimeException('Período do extrato inválido (máximo de ' . self::MAX_PERIOD_DAYS . ' dias).');
         }
 
+        // Antes da primeira cobrança Cora gerada pelo sistema não há o que conciliar (ex.: escola que
+        // passou a usar a Cora pelo app em junho não traz o extrato de maio).
+        $since = BankReconciliationService::operatingSince((int) $tenant->id);
+        if ($since === null) {
+            throw new RuntimeException('Nenhuma cobrança foi gerada na Cora por este sistema ainda; não há o que conciliar.');
+        }
+        if ($end->lt($since)) {
+            throw new RuntimeException('O período escolhido é anterior à primeira cobrança Cora gerada pelo sistema (' . $since->format('d/m/Y') . ').');
+        }
+        if ($start->lt($since)) {
+            $start = $since->copy();
+        }
+
         $lock = Cache::lock("bank-statement-sync:{$tenant->id}:{$environment}", 900);
         if (! $lock->get()) {
             throw new RuntimeException('Já existe uma sincronização do extrato em andamento.');

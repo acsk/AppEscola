@@ -64,7 +64,7 @@ export function entryDetail(entry: BankEntry): string {
     default:
       if (entry.direction === "debit") return "Saída sem despesa vinculada.";
       return entry.cited_charge_ids.length > 0
-        ? "Cita uma cobrança que não está no sistema."
+        ? "Cita uma cobrança que não foi gerada pelo sistema."
         : "Sem identificador de cobrança.";
   }
 }
