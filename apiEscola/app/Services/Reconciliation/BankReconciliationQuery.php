@@ -216,6 +216,14 @@ class BankReconciliationQuery
             $query->where('occurred_at', '<=', Carbon::parse($filters['date_to'], $tz)->endOfDay()->setTimezone(config('app.timezone')));
         }
 
+        // Origem: ligadas a uma cobrança gerada pela aplicação, ou não ligadas (emitidas direto na Cora,
+        // tarifas, transferências).
+        if (($filters['origin'] ?? '') === 'app') {
+            $query->whereNotNull('invoice_id');
+        } elseif (($filters['origin'] ?? '') === 'other') {
+            $query->whereNull('invoice_id');
+        }
+
         if (! empty($filters['direction'])) {
             $query->where('direction', $filters['direction']);
         }

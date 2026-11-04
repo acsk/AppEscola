@@ -1,5 +1,5 @@
 import type { Tone } from "../../../constants/theme";
-import type { BankEntry, ReconciliationStatus, ReconciliationType } from "../../../services/bankReconciliation";
+import type { BankEntry, ReconciliationOrigin, ReconciliationStatus, ReconciliationType } from "../../../services/bankReconciliation";
 
 export const RECONCILIATION_STATUS_LABEL: Record<ReconciliationStatus, string> = {
   pending: "Pendente",
@@ -14,6 +14,12 @@ export const RECONCILIATION_STATUS_TONE: Record<ReconciliationStatus, Tone> = {
   divergent: "danger",
   ignored: "neutral",
 };
+
+export const RECONCILIATION_ORIGIN_OPTIONS: { value: ReconciliationOrigin | ""; label: string }[] = [
+  { value: "app", label: "Cobranças da aplicação" },
+  { value: "other", label: "Fora da aplicação" },
+  { value: "", label: "Todas" },
+];
 
 export const RECONCILIATION_TYPE_OPTIONS: { value: ReconciliationType | ""; label: string }[] = [
   { value: "", label: "Todos os tipos" },
@@ -54,7 +60,7 @@ export function entryDetail(entry: BankEntry): string {
   switch (entry.status) {
     case "reconciled": {
       const target = entry.invoice ? `Cobrança #${entry.invoice.id}` : "Cobrança";
-      const who = entry.match_type === "auto" ? "pelo ID da cobrança" : entry.reviewed_by ? `por ${entry.reviewed_by.name}` : "manualmente";
+      const who = entry.match_type === "auto" ? "automaticamente" : entry.reviewed_by ? `por ${entry.reviewed_by.name}` : "manualmente";
       return `${target} · ${who}${entry.divergence ? ` · ${entry.divergence}` : ""}`;
     }
     case "divergent":
@@ -65,6 +71,6 @@ export function entryDetail(entry: BankEntry): string {
       if (entry.direction === "debit") return "Saída sem despesa vinculada.";
       return entry.cited_charge_ids.length > 0
         ? "Cita uma cobrança que não foi gerada pelo sistema."
-        : "Sem identificador de cobrança.";
+        : "Não é pagamento de cobrança gerada pela aplicação.";
   }
 }

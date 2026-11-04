@@ -7,6 +7,7 @@ use App\Models\BankStatementEntryLog;
 use App\Models\Invoice;
 use App\Models\User;
 use App\Services\Cora\CoraPaidInvoicesSyncService;
+use App\Services\Cora\CoraTransactionId;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -20,13 +21,16 @@ use Throwable;
  *
  * Só entram cobranças com ID Cora geradas por este sistema (as importadas pela sincronização Cora e
  * as locais sem ID ficam de fora, como em Contas a receber).
- * Automática: só quando a movimentação cita o ID de uma dessas cobranças e o valor é igual.
- * Valor e data iguais nunca bastam. Manual: sempre com justificativa, e só depois que a Cora confirma
+ * Automática: só por ID (o ID do pagamento no extrato ou o ID da cobrança citado), nunca por valor e
+ * data. Manual: sempre com justificativa, e só depois que a Cora confirma
  * o pagamento. Nada aqui movimenta a conta bancária.
  */
 class BankReconciliationService
 {
     public const STATUSES = ['pending', 'reconciled', 'divergent', 'ignored'];
+
+    /** @var array<int, array<string, array{invoice_id: int, total_paid: int|null}>> */
+    private array $paymentIndex = [];
 
     public function __construct(private readonly CoraPaidInvoicesSyncService $coraSync)
     {
@@ -68,11 +72,28 @@ class BankReconciliationService
         return array_values(array_unique($matches[0]));
     }
 
-    /** @return 'pending'|'reconciled'|'divergent'|'ignored' */
+    /** Esquece o índice de pagamentos (chamar no início de cada sincronização). */
+    public function forgetPaymentIndex(): void
+    {
+        $this->paymentIndex = [];
+    }
+
+    /**
+     * Tenta conciliar sozinho, sempre por ID, nunca por valor/data:
+     * 1) o ID da transação do extrato (trx_/ent_) é o pagamento registrado na cobrança (payments[].id),
+     *    confirmado em produção pelo cora:check-payment-link;
+     * 2) ou a movimentação cita o ID da cobrança (inv_...).
+     *
+     * @return 'pending'|'reconciled'|'divergent'|'ignored'
+     */
     public function autoMatch(BankStatementEntry $entry): string
     {
         if ($entry->status !== 'pending') {
             return $entry->status;
+        }
+
+        if ($entry->direction === 'credit' && ($payment = $this->findPayment($entry)) !== null) {
+            return $this->matchByPayment($entry, $payment);
         }
 
         $chargeIds = self::chargeIdsIn($entry);
@@ -99,14 +120,8 @@ class BankReconciliationService
                 ? "Saída ligada à cobrança #{$invoice->id}, que consta como paga (possível estorno)."
                 : "Saída ligada à cobrança #{$invoice->id}.");
         }
-        if ($this->coraSync->resolveEnvironment($invoice, $entry->environment) !== $entry->environment) {
-            return $this->flagDivergent($entry, "Cobrança #{$invoice->id} é de outro ambiente da Cora.");
-        }
-        if ($invoice->status === 'cancelled') {
-            return $this->flagDivergent($entry, "Cobrança #{$invoice->id} está cancelada no sistema.");
-        }
-        if ($this->linkedElsewhere($invoice->id, $entry->id)) {
-            return $this->flagDivergent($entry, "Cobrança #{$invoice->id} já está conciliada com outra movimentação (possível duplicidade).");
+        if ($reason = $this->linkBlocker($entry, $invoice)) {
+            return $this->flagDivergent($entry, $reason);
         }
         if (self::cents($entry->amount) !== self::cents($invoice->amount)) {
             return $this->flagDivergent($entry, sprintf(
@@ -117,11 +132,64 @@ class BankReconciliationService
             ));
         }
 
+        return $this->linkAuto($entry, $invoice, null);
+    }
+
+    /** @param  array{invoice_id: int, total_paid: int|null}  $payment */
+    private function matchByPayment(BankStatementEntry $entry, array $payment): string
+    {
+        $invoice = Invoice::query()->find($payment['invoice_id']);
+        if (! $invoice) {
+            return 'pending';
+        }
+        if ($reason = $this->linkBlocker($entry, $invoice)) {
+            return $this->flagDivergent($entry, $reason);
+        }
+
+        $paid = self::cents($entry->amount);
+        $sameAsInvoice = $paid === self::cents($invoice->amount);
+
+        // O ID prova que é o pagamento desta cobrança; o valor pode ter juros/multa (total pago na Cora).
+        if (! $sameAsInvoice && $paid !== $payment['total_paid']) {
+            return $this->flagDivergent($entry, sprintf(
+                'Pagamento da cobrança #%d (ID confere), mas o valor não: pago %s · cobrança de %s.',
+                $invoice->id,
+                self::money($entry->amount),
+                self::money($invoice->amount),
+            ), ['invoice_id' => $invoice->id]);
+        }
+
+        return $this->linkAuto($entry, $invoice, $sameAsInvoice ? null : sprintf(
+            'Pago %s com juros/multa · cobrança #%d de %s.',
+            self::money($entry->amount),
+            $invoice->id,
+            self::money($invoice->amount),
+        ));
+    }
+
+    /** Motivo que impede ligar a entrada à cobrança, ou null. */
+    private function linkBlocker(BankStatementEntry $entry, Invoice $invoice): ?string
+    {
+        if ($this->coraSync->resolveEnvironment($invoice, $entry->environment) !== $entry->environment) {
+            return "Cobrança #{$invoice->id} é de outro ambiente da Cora.";
+        }
+        if ($invoice->status === 'cancelled') {
+            return "Cobrança #{$invoice->id} está cancelada no sistema.";
+        }
+        if ($this->linkedElsewhere($invoice->id, $entry->id)) {
+            return "Cobrança #{$invoice->id} já está conciliada com outra movimentação (possível duplicidade).";
+        }
+
+        return null;
+    }
+
+    private function linkAuto(BankStatementEntry $entry, Invoice $invoice, ?string $note): string
+    {
         try {
             $this->transition($entry, ['pending'], 'reconciled', 'auto_reconciled', null, null, [
                 'match_type' => 'auto',
                 'invoice_id' => $invoice->id,
-                'divergence' => null,
+                'divergence' => $note,
             ]);
         } catch (QueryException) {
             // Outra movimentação conciliou a mesma cobrança ao mesmo tempo (índice único em invoice_id).
@@ -144,6 +212,54 @@ class BankReconciliationService
         }
 
         return 'reconciled';
+    }
+
+    /** @return array{invoice_id: int, total_paid: int|null}|null */
+    private function findPayment(BankStatementEntry $entry): ?array
+    {
+        $index = $this->paymentIndex((int) $entry->tenant_id);
+        if ($index === []) {
+            return null;
+        }
+
+        foreach ([$entry->transaction_id, $entry->external_id] as $id) {
+            foreach (CoraTransactionId::uuidCandidates($id) as $uuid) {
+                if (isset($index[$uuid])) {
+                    return $index[$uuid];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * payments[].id (UUID) → cobrança, só das cobranças geradas pelo sistema.
+     *
+     * @return array<string, array{invoice_id: int, total_paid: int|null}>
+     */
+    private function paymentIndex(int $tenantId): array
+    {
+        if (isset($this->paymentIndex[$tenantId])) {
+            return $this->paymentIndex[$tenantId];
+        }
+
+        $map = [];
+        self::reconcilableInvoices($tenantId)
+            ->whereNotNull('cora_payload')
+            ->select(['id', 'cora_payload'])
+            ->lazyById(500)
+            ->each(function (Invoice $invoice) use (&$map) {
+                foreach ((array) data_get($invoice->cora_payload, 'payments', []) as $payment) {
+                    $uuid = CoraTransactionId::normalizeUuid(data_get($payment, 'id'));
+                    if ($uuid !== null) {
+                        $total = data_get($payment, 'total_paid');
+                        $map[$uuid] = ['invoice_id' => (int) $invoice->id, 'total_paid' => is_numeric($total) ? (int) $total : null];
+                    }
+                }
+            });
+
+        return $this->paymentIndex[$tenantId] = $map;
     }
 
     /**
@@ -225,10 +341,14 @@ class BankReconciliationService
         ]);
     }
 
-    private function flagDivergent(BankStatementEntry $entry, string $reason): string
+    /** @param  array<string, mixed>  $attributes  Ex.: invoice_id quando o ID prova o vínculo mas o valor não bate */
+    private function flagDivergent(BankStatementEntry $entry, string $reason, array $attributes = []): string
     {
         try {
-            $this->transition($entry, ['pending'], 'divergent', 'auto_divergent', null, null, ['divergence' => $reason]);
+            $this->transition($entry, ['pending'], 'divergent', 'auto_divergent', null, null, ['divergence' => $reason] + $attributes);
+        } catch (QueryException) {
+            // Cobrança ligada a outra movimentação no meio do caminho: marca sem o vínculo.
+            return $attributes === [] ? $entry->refresh()->status : $this->flagDivergent($entry, $reason);
         } catch (RuntimeException) {
             return $entry->refresh()->status;
         }

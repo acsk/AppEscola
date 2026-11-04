@@ -85,8 +85,12 @@ export type ReconciliationHistoryItem = {
   created_at: string | null;
 };
 
+/** app = ligada a uma cobrança gerada pela aplicação; other = não ligada (emitida direto na Cora, tarifas...). */
+export type ReconciliationOrigin = "app" | "other";
+
 export type ReconciliationFilters = {
   status?: ReconciliationStatus | "";
+  origin?: ReconciliationOrigin | "";
   type?: ReconciliationType | "";
   direction?: "credit" | "debit" | "";
   date_from?: string;

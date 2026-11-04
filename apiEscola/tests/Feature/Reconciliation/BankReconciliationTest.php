@@ -13,6 +13,7 @@ use App\Models\User;
 use Database\Seeders\DomainSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -163,6 +164,84 @@ class BankReconciliationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('body.created', 0);
         $this->assertSame(4, BankStatementEntry::count());
+    }
+
+    /** ID da transação como a Cora escreve no extrato: UUID do pagamento em base64. */
+    private function trx(string $uuid): string
+    {
+        return 'trx_' . rtrim(strtr(base64_encode(hex2bin(str_replace('-', '', $uuid))), '+/', '-_'), '=');
+    }
+
+    private function paidWithPayment(string $chargeId, string $paymentId, int $totalPaidCents, array $attrs = []): Invoice
+    {
+        return $this->coraInvoice($chargeId, array_merge([
+            'status' => 'paid',
+            'paid_at' => '2026-11-02 14:00:00',
+            'cora_payload' => [
+                'integration' => ['provider' => 'cora', 'environment' => 'stage'],
+                'payments' => [['id' => $paymentId, 'total_paid' => $totalPaidCents]],
+            ],
+        ], $attrs));
+    }
+
+    public function test_payment_id_in_statement_links_app_charges_and_relinks_on_next_sync(): void
+    {
+        [$u1, $u2, $u3, $u4, $u5] = array_map(fn () => (string) Str::uuid(), range(1, 5));
+        $plain = $this->paidWithPayment('inv_a', $u1, 17500);
+        $interest = $this->paidWithPayment('inv_j', $u2, 18464);
+        $wrong = $this->paidWithPayment('inv_w', $u3, 17500);
+        $later = $this->coraInvoice('inv_l');
+        $imported = $this->importedInvoice('inv_imp', ['status' => 'paid', 'cora_payload' => [
+            'integration' => ['provider' => 'cora', 'origin' => 'cora_sync'],
+            'payments' => [['id' => $u5, 'total_paid' => 17500]],
+        ]]);
+
+        $raw = fn (string $id, string $uuid, int $cents) => [
+            'id' => $id, 'type' => 'CREDIT', 'amount' => $cents, 'createdAt' => '2026-11-03T08:41:00-03:00',
+            'transaction' => ['id' => $this->trx($uuid), 'type' => 'PAYMENT', 'description' => null, 'counterParty' => ['name' => 'Pagador', 'identity' => '12345678901']],
+        ];
+
+        Http::fake([
+            self::STATEMENT_URL => Http::response($this->statement([
+                $raw('ent_plain', $u1, 17500),
+                $raw('ent_interest', $u2, 18464),
+                $raw('ent_wrong', $u3, 15000),
+                $raw('ent_later', $u4, 17500),
+                $raw('ent_imported', $u5, 17500),
+            ])),
+            self::CORA_INVOICE_URL => Http::response(['id' => 'inv_l', 'status' => 'OPEN']),
+        ]);
+
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-11-01', 'date_to' => '2026-11-03'])
+            ->assertOk()->assertJsonPath('body.auto_reconciled', 2)->assertJsonPath('body.divergent', 1);
+
+        $entry = fn (string $id) => BankStatementEntry::where('external_id', $id)->sole();
+
+        $this->assertSame(['reconciled', 'auto', $plain->id, null], [$entry('ent_plain')->status, $entry('ent_plain')->match_type, $entry('ent_plain')->invoice_id, $entry('ent_plain')->divergence]);
+        $this->assertSame(['reconciled', $interest->id], [$entry('ent_interest')->status, $entry('ent_interest')->invoice_id]);
+        $this->assertStringContainsString('juros/multa', $entry('ent_interest')->divergence);
+        // ID confere, valor não: divergente, mas já ligada à cobrança.
+        $this->assertSame(['divergent', $wrong->id], [$entry('ent_wrong')->status, $entry('ent_wrong')->invoice_id]);
+        $this->assertSame('pending', $entry('ent_later')->status);
+        $this->assertSame(['pending', null], [$entry('ent_imported')->status, $entry('ent_imported')->invoice_id]);
+        $this->assertSame('paid', $imported->refresh()->status);
+
+        // Filtro de origem: só as ligadas a cobranças da aplicação.
+        $this->actingAs($this->admin)->getJson('/api/finance/reconciliation/entries?origin=app')
+            ->assertOk()->assertJsonPath('body.meta.total', 3);
+        $this->actingAs($this->admin)->getJson('/api/finance/reconciliation/summary?origin=other')
+            ->assertOk()->assertJsonPath('body.counts.pending', 2);
+
+        // A baixa chega depois (webhook/sincronização diária grava o pagamento); a próxima sincronização liga.
+        $later->update(['status' => 'paid', 'paid_at' => '2026-11-03 11:00:00', 'cora_payload' => [
+            'integration' => ['provider' => 'cora', 'environment' => 'stage'],
+            'payments' => [['id' => $u4, 'total_paid' => 17500]],
+        ]]);
+
+        $this->actingAs($this->admin)->postJson('/api/finance/reconciliation/sync', ['date_from' => '2026-11-01', 'date_to' => '2026-11-03'])
+            ->assertOk()->assertJsonPath('body.created', 0)->assertJsonPath('body.auto_reconciled', 1);
+        $this->assertSame(['reconciled', $later->id], [$entry('ent_later')->status, $entry('ent_later')->invoice_id]);
+        $this->assertSame('pending', $entry('ent_imported')->status);
     }
 
     public function test_cited_charge_with_different_amount_or_on_a_debit_becomes_divergent(): void

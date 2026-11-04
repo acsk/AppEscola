@@ -252,7 +252,7 @@ function Notice({ entry }: { entry: BankEntry }) {
 
   if (entry.status === "reconciled") {
     tone = "success";
-    title = entry.match_type === "auto" ? "Conciliada pelo ID da cobrança." : "Conciliada manualmente.";
+    title = entry.match_type === "auto" ? "Conciliada automaticamente pelo ID do pagamento na Cora." : "Conciliada manualmente.";
     body = entry.invoice
       ? `Cobrança #${entry.invoice.id}${entry.invoice.student ? ` · ${entry.invoice.student.name}` : ""} · ${fmtMoney(entry.invoice.amount)}.`
       : "";
@@ -267,11 +267,12 @@ function Notice({ entry }: { entry: BankEntry }) {
     body = entry.justification ?? "";
   } else if (entry.direction === "credit") {
     tone = "warning";
-    title = "Sem correspondência inequívoca.";
+    title = "Não é pagamento de cobrança da aplicação.";
     body =
       entry.cited_charge_ids.length > 0
         ? `A movimentação cita ${entry.cited_charge_ids.join(", ")}, que não é uma cobrança gerada pelo sistema.`
-        : "Esta entrada não traz o ID de uma cobrança. Mesmo valor e data não bastam para conciliar automaticamente.";
+        : "O ID deste pagamento não corresponde a nenhuma cobrança gerada pela aplicação: provavelmente foi emitida direto na Cora. " +
+          "Se a baixa da cobrança ainda vai chegar, a próxima sincronização liga sozinha. Valor e data iguais não bastam para conciliar.";
   } else {
     tone = "warning";
     title = "Saída pendente.";

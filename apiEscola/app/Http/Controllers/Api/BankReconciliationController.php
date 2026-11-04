@@ -256,6 +256,7 @@ class BankReconciliationController extends Controller
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'direction' => ['nullable', Rule::in(['credit', 'debit'])],
+            'origin' => ['nullable', Rule::in(['app', 'other'])],
             'type' => ['nullable', Rule::in(array_keys(BankReconciliationQuery::TYPES))],
             'search' => ['nullable', 'string', 'max:100'],
         ]);

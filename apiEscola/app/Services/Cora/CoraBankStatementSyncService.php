@@ -70,6 +70,8 @@ class CoraBankStatementSyncService
             'started_at' => now(),
         ]);
 
+        $this->reconciliation->forgetPaymentIndex();
+
         try {
             for ($page = 1; $page <= self::MAX_PAGES; $page++) {
                 $body = $this->gateway->getBankStatement($tenant, $environment, $start->toDateString(), $end->toDateString(), $page, self::PER_PAGE);
@@ -106,6 +108,24 @@ class CoraBankStatementSyncService
                     break;
                 }
             }
+
+            // Entradas que ficaram pendentes antes (ex.: a baixa da cobrança chegou depois pelo webhook)
+            // são conferidas de novo. Movimentações já decididas não são tocadas.
+            BankStatementEntry::query()
+                ->where('tenant_id', $tenant->id)
+                ->where('environment', $environment)
+                ->where('direction', 'credit')
+                ->where('status', 'pending')
+                ->where(fn ($q) => $q->whereNull('sync_id')->orWhere('sync_id', '!=', $run->id))
+                ->lazyById(200)
+                ->each(function (BankStatementEntry $entry) use ($run) {
+                    $status = $this->reconciliation->autoMatch($entry);
+                    if ($status === 'reconciled') {
+                        $run->auto_reconciled++;
+                    } elseif ($status === 'divergent') {
+                        $run->divergent++;
+                    }
+                });
 
             $run->fill(['status' => 'success', 'finished_at' => now()])->save();
         } catch (Throwable $e) {

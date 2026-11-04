@@ -24,6 +24,7 @@ import { fmtMoney } from "../../components/financeiro/format";
 import { fmtDateTime } from "../../components/finance/cora/coraEvents";
 import ReconcilePanel from "../../components/finance/reconciliation/ReconcilePanel";
 import {
+  RECONCILIATION_ORIGIN_OPTIONS,
   RECONCILIATION_STATUS_LABEL,
   RECONCILIATION_STATUS_TONE,
   RECONCILIATION_TYPE_OPTIONS,
@@ -40,6 +41,7 @@ import {
   syncBankStatement,
   type BankEntriesPage,
   type BankEntry,
+  type ReconciliationOrigin,
   type ReconciliationStatus,
   type ReconciliationSummary,
   type ReconciliationType,
@@ -79,9 +81,10 @@ export default function BankReconciliationScreen({ navigate }: Props) {
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [selected, setSelected] = useState<BankEntry | null>(null);
 
-  const [tab, setTab] = useState<TabId>("pending");
+  const [tab, setTab] = useState<TabId>("all");
   const [search, setSearch] = useState("");
   const [type, setType] = useState<ReconciliationType | "">("");
+  const [origin, setOrigin] = useState<ReconciliationOrigin | "">("app");
   const [dateFrom, setDateFrom] = useState(isoDaysAgo(30));
   const [dateTo, setDateTo] = useState(isoDaysAgo(0));
   const [page, setPage] = useState(1);
@@ -90,11 +93,11 @@ export default function BankReconciliationScreen({ navigate }: Props) {
 
   const loadSummary = useCallback(async () => {
     try {
-      setSummary(await fetchReconciliationSummary({ search: search.trim(), type, date_from: dateFrom, date_to: dateTo }));
+      setSummary(await fetchReconciliationSummary({ search: search.trim(), type, origin, date_from: dateFrom, date_to: dateTo }));
     } catch (err: any) {
       setError(getApiResponseMessage(err?.response?.data, "Não foi possível carregar o resumo da conciliação."));
     }
-  }, [search, type, dateFrom, dateTo]);
+  }, [search, type, origin, dateFrom, dateTo]);
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
@@ -104,6 +107,7 @@ export default function BankReconciliationScreen({ navigate }: Props) {
         status: tab === "all" ? "" : tab,
         search: search.trim(),
         type,
+        origin,
         date_from: dateFrom,
         date_to: dateTo,
         page,
@@ -116,7 +120,7 @@ export default function BankReconciliationScreen({ navigate }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [tab, search, type, dateFrom, dateTo, page]);
+  }, [tab, search, type, origin, dateFrom, dateTo, page]);
 
   useEffect(() => {
     const timer = setTimeout(loadSummary, search ? 300 : 0);
@@ -375,6 +379,14 @@ export default function BankReconciliationScreen({ navigate }: Props) {
             <View style={{ flex: 2, minWidth: isMobile ? "100%" : 240 }}>
               <FormInput label="Buscar" value={search} onChangeText={resetPage(setSearch)} placeholder="Descrição, pagador, ID ou valor" />
             </View>
+            <View style={{ flex: 1, minWidth: isMobile ? "100%" : 190 }}>
+              <FormSelect
+                label="Origem"
+                value={origin}
+                options={RECONCILIATION_ORIGIN_OPTIONS}
+                onChange={(v) => resetPage(setOrigin)(v as ReconciliationOrigin | "")}
+              />
+            </View>
             <View style={{ flex: 1, minWidth: isMobile ? "100%" : 160 }}>
               <FormSelect
                 label="Tipo"
@@ -452,8 +464,8 @@ function ConnectionStrip({ summary }: { summary: ReconciliationSummary | null })
       </View>
       {last?.status === "failed" && last.error ? <Text className="text-sm text-danger">{last.error}</Text> : null}
       <Text className="text-xs text-ink-muted">
-        Extrato por API em validação. Só entram movimentações a partir da primeira cobrança Cora gerada pelo sistema e só
-        cobranças geradas por ele. A conciliação automática exige o ID da cobrança na movimentação e o mesmo valor.
+        Pagamentos de cobranças geradas pela aplicação são conciliados automaticamente pelo ID do pagamento na Cora. Boletos
+        emitidos direto na Cora, tarifas e transferências aparecem em “Fora da aplicação”.
       </Text>
     </View>
   );
