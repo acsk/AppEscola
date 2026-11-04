@@ -18,6 +18,8 @@ class BankStatementSync extends Model
         'created',
         'auto_reconciled',
         'divergent',
+        'balance_end',
+        'balance_end_at',
         'error',
         'triggered_by',
         'started_at',
@@ -27,6 +29,8 @@ class BankStatementSync extends Model
     protected $casts = [
         'period_start' => 'date',
         'period_end' => 'date',
+        'balance_end' => 'decimal:2',
+        'balance_end_at' => 'datetime',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
     ];

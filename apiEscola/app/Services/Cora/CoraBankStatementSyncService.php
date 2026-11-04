@@ -160,6 +160,16 @@ class CoraBankStatementSyncService
                 $body = $this->gateway->getBankStatement($tenant, $environment, $start->toDateString(), $end->toDateString(), $page, self::PER_PAGE);
                 $entries = $body['entries'];
 
+                // Saldo que a própria Cora informa (end.balance, em centavos): o único tratado como confirmado.
+                if ($page === 1 && is_numeric(data_get($body, 'end.balance'))) {
+                    try {
+                        $run->balance_end_at = Carbon::parse((string) data_get($body, 'end.date'))->setTimezone(config('app.timezone'));
+                        $run->balance_end = number_format(((int) data_get($body, 'end.balance')) / 100, 2, '.', '');
+                    } catch (Throwable) {
+                        // Data inválida: sem saldo nesta execução.
+                    }
+                }
+
                 foreach ($entries as $raw) {
                     $run->fetched++;
                     $attributes = is_array($raw) ? $this->normalize($raw) : null;

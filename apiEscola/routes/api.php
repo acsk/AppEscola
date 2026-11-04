@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\Cora\CoraIntegrationController;
 use App\Http\Controllers\Api\BankReconciliationController;
+use App\Http\Controllers\Api\CashFlowController;
 use App\Http\Controllers\Api\Payables\ExpenseController;
 use App\Http\Controllers\Api\Payables\PayablesCatalogController;
 use App\Http\Controllers\Api\Cora\CoraWebhookController;
@@ -358,6 +359,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::post('finance/reconciliation/entries/{entry}/undo', [BankReconciliationController::class, 'undo'])->whereNumber('entry');
     Route::get('finance/reconciliation/entries/{entry}/expense-candidates', [BankReconciliationController::class, 'expenseCandidates'])->whereNumber('entry');
     Route::post('finance/reconciliation/entries/{entry}/reconcile-expense', [BankReconciliationController::class, 'reconcileExpense'])->whereNumber('entry');
+
+    Route::get('finance/cash-flow', [CashFlowController::class, 'show']);
 
     // Contas a pagar (registrar pagamento não movimenta a conta bancária).
     Route::get('finance/payables/summary', [ExpenseController::class, 'summary']);

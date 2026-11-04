@@ -53,6 +53,7 @@ import FinanceOverviewScreen from "./screens/financeiro/FinanceOverviewScreen";
 import CoraIntegrationScreen from "./screens/financeiro/CoraIntegrationScreen";
 import BankReconciliationScreen from "./screens/financeiro/BankReconciliationScreen";
 import PayablesScreen from "./screens/financeiro/PayablesScreen";
+import CashFlowScreen from "./screens/financeiro/CashFlowScreen";
 import {
   BiAssessmentDetailScreen,
   BiAssessmentsScreen,
@@ -327,6 +328,7 @@ function hashToNav(hash: string): NavState {
     if (seg1 === "integracao-cora") return { screen: "financeiro-cora" };
     if (seg1 === "conciliacao") return { screen: "financeiro-conciliacao" };
     if (seg1 === "contas-a-pagar") return { screen: "financeiro-contas-a-pagar" };
+    if (seg1 === "fluxo-de-caixa") return { screen: "financeiro-fluxo-de-caixa" };
     return { screen: "financeiro-visao-geral" };
   }
 
@@ -452,6 +454,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "financeiro-cora") return "#/financeiro/integracao-cora";
   if (nav.screen === "financeiro-conciliacao") return "#/financeiro/conciliacao";
   if (nav.screen === "financeiro-contas-a-pagar") return "#/financeiro/contas-a-pagar";
+  if (nav.screen === "financeiro-fluxo-de-caixa") return "#/financeiro/fluxo-de-caixa";
   if (nav.screen === "relatorios-turmas") return "#/relatorios/turmas";
   if (nav.screen === "relatorios-financeiro") return "#/relatorios/financeiro";
   return `#/${nav.screen}`;
@@ -1084,6 +1087,7 @@ function AppContent() {
       case "financeiro-cora": return <CoraIntegrationScreen navigate={navigate} />;
       case "financeiro-conciliacao": return <BankReconciliationScreen navigate={navigate} />;
       case "financeiro-contas-a-pagar": return <PayablesScreen navigate={navigate} />;
+      case "financeiro-fluxo-de-caixa": return <CashFlowScreen navigate={navigate} />;
       case "cobrancas": return <InvoicesScreen />;
       case "bancos_crud": return <PaymentProvidersCrudScreen />;
       case "pagamentos": return <PaymentProvidersScreen />;
