@@ -6,7 +6,9 @@ use App\Models\Invoice;
 use App\Models\Tenant;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -192,6 +194,39 @@ class CoraPaidInvoicesSyncService
         throw $lastException ?? new \RuntimeException('Falha ao consultar cobrança na Cora.');
     }
 
+    /**
+     * Consulta uma cobrança na Cora e aplica o estado com a mesma regra da sincronização diária.
+     * A consulta fica fora da transação; a gravação é feita sob trava da cobrança, então avisos
+     * simultâneos ou repetidos não geram baixa duplicada.
+     *
+     * @return 'paid'|'cancelled'|'unchanged'
+     */
+    public function syncOne(Invoice $invoice, string $environment, string $source): string
+    {
+        $tenant = $invoice->tenant;
+        if (! $tenant instanceof Tenant) {
+            throw new RuntimeException('Tenant da cobrança não encontrado.');
+        }
+
+        $chargeId = trim((string) $invoice->cora_charge_id);
+        if ($chargeId === '') {
+            throw new RuntimeException('Cobrança sem vínculo com a Cora.');
+        }
+
+        $external = $this->fetchInvoiceWithRetry($tenant, $chargeId, $environment);
+
+        $externalId = trim((string) ($external['id'] ?? ''));
+        if ($externalId !== '' && $externalId !== $chargeId) {
+            throw new RuntimeException('A Cora devolveu uma cobrança diferente da consultada.');
+        }
+
+        return DB::transaction(function () use ($invoice, $external, $source) {
+            $locked = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+
+            return $this->applyExternalStatus($locked, $external, false, $source);
+        });
+    }
+
     private function isCoraCharge(Invoice $invoice, Tenant $tenant): bool
     {
         $fromPayload = strtolower(trim((string) data_get($invoice->cora_payload, 'integration.provider', '')));
@@ -203,7 +238,7 @@ class CoraPaidInvoicesSyncService
         return $this->paymentSettingsResolver->defaultProviderSlug((int) $tenant->id) === 'cora';
     }
 
-    private function resolveEnvironment(Invoice $invoice, string $fallback): string
+    public function resolveEnvironment(Invoice $invoice, string $fallback): string
     {
         $payload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
         $stored = strtolower(trim((string) data_get($payload, 'integration.environment', '')));
@@ -223,7 +258,7 @@ class CoraPaidInvoicesSyncService
      * @param  array<string, mixed>  $external
      * @return 'paid'|'cancelled'|'unchanged'
      */
-    private function applyExternalStatus(Invoice $invoice, array $external, bool $dryRun): string
+    private function applyExternalStatus(Invoice $invoice, array $external, bool $dryRun, string $source = 'cora:sync-paid-invoices'): string
     {
         $providerStatus = strtoupper(trim((string) ($external['status'] ?? '')));
         $existingPayload = is_array($invoice->cora_payload) ? $invoice->cora_payload : [];
@@ -231,7 +266,7 @@ class CoraPaidInvoicesSyncService
         $updates = [
             'cora_payload' => array_replace_recursive($existingPayload, $external, [
                 'last_status_check' => [
-                    'source' => 'cora:sync-paid-invoices',
+                    'source' => $source,
                     'checked_at' => now()->toIso8601String(),
                 ],
             ]),
@@ -301,7 +336,9 @@ class CoraPaidInvoicesSyncService
             }
 
             try {
-                return Carbon::parse($candidate);
+                // A Cora manda o horário com fuso (-03:00); converte para o fuso da aplicação antes de gravar,
+                // senão o banco guarda o horário de Brasília como se fosse UTC (3 h de diferença).
+                return Carbon::parse($candidate)->setTimezone(config('app.timezone'));
             } catch (Throwable) {
                 continue;
             }

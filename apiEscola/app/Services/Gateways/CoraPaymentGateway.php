@@ -354,6 +354,47 @@ class CoraPaymentGateway implements PaymentGatewayContract
     }
 
     /**
+     * Cadastra a assinatura de webhook (POST /endpoints/). A mesma Idempotency-Key numa nova tentativa
+     * da mesma operação evita assinatura duplicada.
+     *
+     * @return array<string, mixed> Resposta da Cora (contém o id da assinatura)
+     */
+    public function registerWebhookEndpoint(
+        Tenant $tenant,
+        string $environment,
+        string $url,
+        string $resource,
+        string $trigger,
+        string $idempotencyKey,
+    ): array {
+        $token = $this->resolveBearerToken($tenant, $environment);
+        $baseUrl = $this->resolveApiBaseUrl($environment);
+
+        if ($token === '' || $baseUrl === '') {
+            throw new RuntimeException('Integracao Cora nao configurada para cadastrar webhook.');
+        }
+
+        $body = Http::timeout((int) config('services.cora.timeout', 20))
+            ->acceptJson()
+            ->withOptions($this->resolveHttpClientOptions($tenant, $environment))
+            ->withToken($token)
+            ->withHeaders(['Idempotency-Key' => $idempotencyKey])
+            ->post($baseUrl . '/endpoints/', [
+                'url' => $url,
+                'resource' => $resource,
+                'trigger' => $trigger,
+            ])
+            ->throw()
+            ->json();
+
+        if (! is_array($body)) {
+            throw new RuntimeException('Resposta invalida da Cora ao cadastrar webhook.');
+        }
+
+        return $body;
+    }
+
+    /**
      * Cancela uma cobrança na Cora via DELETE /v2/invoices/{id}.
      *
      * Lança RuntimeException se a cobrança não existir no Cora (404 é silenciado — considera cancelada).

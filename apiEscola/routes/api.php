@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\TenantAccessController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
 use App\Http\Controllers\Api\AsaasWebhookController;
+use App\Http\Controllers\Api\CoraWebhookController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\PaymentProviderController;
@@ -86,6 +87,10 @@ Route::get('/health', [HealthController::class, 'check']);
 // Webhook Asaas (público — validação por ASAAS_WEBHOOK_TOKEN)
 Route::post('/webhooks/asaas', [AsaasWebhookController::class, 'handle'])
     ->middleware('throttle:120,1');
+
+// Webhook Cora: sem sessão nem token; a chave opaca identifica a assinatura e o aviso só dispara a consulta na Cora.
+Route::post('/webhooks/cora/{callbackKey}', CoraWebhookController::class)
+    ->middleware('throttle:300,1');
 
 // Autenticação (pública)
 Route::post('/login', [AuthController::class, 'login']);

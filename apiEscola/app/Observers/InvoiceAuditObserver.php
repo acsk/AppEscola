@@ -13,6 +13,28 @@ use Illuminate\Support\Facades\Auth;
  */
 class InvoiceAuditObserver
 {
+    /** Origem forçada enquanto um processamento automático roda (ex.: webhook Cora num comando). */
+    private static ?string $forcedSource = null;
+
+    /**
+     * Executa $callback registrando as mudanças com a origem informada.
+     *
+     * @template T
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public static function asSource(string $source, callable $callback): mixed
+    {
+        $previous = self::$forcedSource;
+        self::$forcedSource = $source;
+
+        try {
+            return $callback();
+        } finally {
+            self::$forcedSource = $previous;
+        }
+    }
+
     /** Campos de negócio acompanhados no histórico. */
     private const TRACKED = [
         'student_id',
@@ -106,7 +128,7 @@ class InvoiceAuditObserver
             'user_id' => $userId,
             'support_access_id' => $supportAccess?->id,
             'action' => $action,
-            'source' => $isWebhook ? 'webhook' : ($userId ? 'user' : 'system'),
+            'source' => self::$forcedSource ?? ($isWebhook ? 'webhook' : ($userId ? 'user' : 'system')),
             'changes' => $changes ?: null,
             'reason' => $reason ? mb_substr($reason, 0, 500) : null,
             'ip' => $request?->ip(),

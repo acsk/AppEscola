@@ -17,6 +17,8 @@ Schedule::command('bi:refresh-facts')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('bi:refresh-facts --full')->dailyAt('03:30')->timezone('America/Sao_Paulo')->withoutOverlapping();
 Schedule::command('learning:generate')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('questions:index-embeddings --limit=20')->everyFiveMinutes()->withoutOverlapping();
+// Avisos do webhook Cora: retoma pendentes, retentativas e processos interrompidos.
+Schedule::command('cora:process-webhook-events')->everyMinute()->withoutOverlapping();
 Schedule::command('cora:sync-paid-invoices --environment=prod')
     ->dailyAt('06:15')
     ->withoutOverlapping();
