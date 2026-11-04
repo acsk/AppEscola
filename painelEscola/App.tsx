@@ -43,6 +43,8 @@ import TenantsScreen from "./screens/tenants/TenantsScreen";
 import ExamTypesScreen from "./screens/admin/ExamTypesScreen";
 import { QuestionBankScreen, QuestionClassifyScreen, QuestionEditScreen, QuestionTaxonomyScreen } from "./screens/banco-questoes";
 import TenantFormScreen from "./screens/tenants/TenantFormScreen";
+import SaasDashboardScreen from "./screens/saas/SaasDashboardScreen";
+import TenantDetailScreen from "./screens/saas/TenantDetailScreen";
 import { UsersScreen, UserFormScreen } from "./screens/users";
 import { AiSettingsScreen, BillingSettingsScreen, MobileThemeSettingsScreen } from "./screens/configuracoes";
 import { NotificationsScreen } from "./screens/notificacoes";
@@ -266,10 +268,13 @@ function hashToNav(hash: string): NavState {
     return { screen: "avaliacoes-oficiais" };
   }
 
+  if (seg0 === "plataforma") return { screen: "saas-dashboard" };
+
   if (seg0 === "tenants") {
     if (!seg1) return { screen: "tenants" };
     if (seg1 === "novo") return { screen: "tenants-form", params: { tenantId: null } };
     const id = parseInt(seg1, 10);
+    if (!isNaN(id) && path.split("/").filter(Boolean)[2] === "detalhes") return { screen: "tenants-detail", params: { tenantId: id } };
     if (!isNaN(id)) return { screen: "tenants-form", params: { tenantId: id } };
     return { screen: "tenants" };
   }
@@ -419,6 +424,8 @@ function navToHash(nav: NavState): string {
     const id = nav.params?.classId;
     return id != null ? `#/turmas/${id}/frequencia` : "#/turmas";
   }
+  if (nav.screen === "saas-dashboard") return "#/plataforma";
+  if (nav.screen === "tenants-detail") return `#/tenants/${nav.params?.tenantId}/detalhes`;
   if (nav.screen === "tenants-form") {
     const id = nav.params?.tenantId;
     return id != null ? `#/tenants/${id}` : "#/tenants/novo";
@@ -533,7 +540,7 @@ function AppContent() {
   // Super admin sem tenant em acesso começa pela lista de tenants (o dashboard depende de um tenant).
   useEffect(() => {
     if (user?.role === "super_admin" && !user.selected_tenant_id && nav.screen === "dashboard") {
-      navigate("tenants");
+      navigate("saas-dashboard");
     }
   }, [user?.role, user?.selected_tenant_id, nav.screen]);
 
@@ -913,7 +920,7 @@ function AppContent() {
   }
 
   const renderScreen = () => {
-    if (!canManageTenants && (nav.screen === "tenants" || nav.screen === "tenants-form" || nav.screen === "tipos-prova")) {
+    if (!canManageTenants && (nav.screen.startsWith("tenants") || nav.screen === "saas-dashboard" || nav.screen === "tipos-prova")) {
       return (
         <View className="flex-1 items-center justify-center px-6">
           <View className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5 max-w-xl w-full">
@@ -1170,6 +1177,8 @@ function AppContent() {
         );
       case "tenants": return <TenantsScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "tenants-form": return <TenantFormScreen navigate={navigate} tenantId={nav.params?.tenantId ?? null} />;
+      case "tenants-detail": return <TenantDetailScreen key={String(nav.params?.tenantId)} navigate={navigate} tenantId={Number(nav.params?.tenantId)} />;
+      case "saas-dashboard": return <SaasDashboardScreen navigate={navigate} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
       case "bi-overview": return <BiOverviewScreen navigate={navigate} />;

@@ -31,6 +31,8 @@ class TenantResource extends JsonResource
             'status'         => $this->status,
             'photo_url'      => $this->photo_url,
             'settings'       => $this->settings,
+            'students_count' => $this->whenCounted('students'),
+            'users_count'    => $this->whenCounted('users'),
             'created_at'     => $this->created_at?->toISOString(),
             'updated_at'     => $this->updated_at?->toISOString(),
         ];

@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\TenantApiTokenController;
 use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\Cora\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
+use App\Http\Controllers\Api\Saas\SaasController;
 use App\Http\Controllers\Api\TenantAccessController;
 use App\Http\Controllers\Api\TenantUploadSettingsController;
 use App\Http\Controllers\Api\AppVersionController;
@@ -242,6 +243,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackSupportAccess::clas
     Route::get('support-access/history', [TenantAccessController::class, 'history']);
     Route::post('support-access/end', [TenantAccessController::class, 'end']);
     Route::apiResource('tenants', TenantController::class);
+    Route::get('saas/dashboard', [SaasController::class, 'dashboard']);
+    Route::get('saas/tenants/{tenant}/overview', [SaasController::class, 'tenantOverview']);
     Route::get('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'show']);
     Route::put('tenants/{tenant}/upload-settings', [TenantUploadSettingsController::class, 'update']);
     Route::post('tenants/{tenant}/upload-photo', [TenantController::class, 'uploadPhoto']);

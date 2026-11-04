@@ -42,6 +42,7 @@ import {
   ChartNoAxesColumn,
   Settings2,
   FileChartColumn,
+  Gauge,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -194,9 +195,10 @@ export default function Sidebar({
     ...(canManageTenants
       ? [
           {
-            label: "Administração",
+            label: "Plataforma",
             items: [
-              { id: "tenants", label: "Tenants", icon: Building2 },
+              { id: "saas-dashboard", label: "Visão geral SaaS", icon: Gauge },
+              { id: "tenants", label: "Instituições", icon: Building2 },
               { id: "tipos-prova", label: "Tipos de prova", icon: Tags },
             ],
           },

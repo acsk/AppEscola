@@ -14,20 +14,20 @@ const fmtDateTime = (iso?: string | null) => {
     : date.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 
-/** Últimos acessos de suporte: quem, onde, por quê, quanto tempo e quantas alterações fez. */
-export default function SupportAccessHistory() {
+/** Últimos acessos de suporte: quem, onde, por quê, quanto tempo e quantas alterações fez. `tenantId` limita a uma instituição. */
+export default function SupportAccessHistory({ tenantId }: { tenantId?: number } = {}) {
   const { isMobile } = useResponsiveLayout();
   const [items, setItems] = useState<SupportAccessHistoryItem[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetchSupportAccessHistory()
+    fetchSupportAccessHistory(tenantId)
       .then(setItems)
       .catch(() => setError(true));
-  }, []);
+  }, [tenantId]);
 
   return (
-    <View style={{ marginTop: 24 }}>
+    <View style={{ marginTop: tenantId ? 0 : 24 }}>
       <Panel title="Acessos de suporte" description="Registro dos acessos de super admin às instituições, com motivo, duração e alterações feitas." flush>
         {items === null && !error ? (
           <View style={{ padding: 24, alignItems: "center" }}>

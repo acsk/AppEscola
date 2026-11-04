@@ -14,6 +14,9 @@ import SupportAccessHistory from "../../components/tenants/SupportAccessHistory"
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import Pagination from "../../components/ui/Pagination";
 import Badge from "../../components/ui/Badge";
+import FormSelect from "../../components/ui/FormSelect";
+import DatePickerInput from "../../components/ui/DatePickerInput";
+import { TENANT_STATUS_LABEL, tenantStatusTone, fmtInt } from "../../services/saas";
 import DataTableRow from "../../components/ui/DataTableRow";
 import {
   TABLE_CONTAINER,
@@ -35,6 +38,8 @@ type Tenant = {
   whatsapp: string | null;
   status: string;
   created_at: string;
+  students_count?: number;
+  users_count?: number;
 };
 
 type Meta = {
@@ -49,11 +54,13 @@ type Props = {
   flashMessage?: string;
 };
 
-function statusLabel(status: string) {
-  if (status === "active") return "Ativo";
-  if (status === "inactive") return "Inativo";
-  return status;
-}
+/** DD/MM/AAAA → AAAA-MM-DD (vazio se incompleta). */
+const toIsoDate = (value: string) => {
+  const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+};
+
+const fmtDate = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—");
 
 export default function TenantsScreen({ navigate, flashMessage }: Props) {
   const { isMobile, contentPadding, tableMinWidth } = useResponsiveLayout();
@@ -63,6 +70,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
   const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<Meta>({
     current_page: 1,
@@ -83,6 +92,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
       const params: Record<string, any> = { page };
       if (statusFilter) params.status = statusFilter;
       if (search.trim()) params.search = search.trim();
+      if (toIsoDate(createdFrom)) params.created_from = toIsoDate(createdFrom);
+      if (toIsoDate(createdTo)) params.created_to = toIsoDate(createdTo);
 
       const { data } = await api.get("/tenants", { params });
       const list = Array.isArray(data.data) ? data.data : [];
@@ -109,7 +120,7 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
       }
     }
     setLoading(false);
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, createdFrom, createdTo]);
 
   useEffect(() => {
     fetchTenants();
@@ -136,8 +147,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
     <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, paddingBottom: 40 }}>
       <View className="mb-6" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
         <View>
-          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Tenants</Text>
-          <Text className="text-sm text-ink-muted">Gestão de clientes e dados institucionais</Text>
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Instituições</Text>
+          <Text className="text-sm text-ink-muted">Tenants da plataforma: dados, uso, usuários e acesso assistido</Text>
         </View>
         <TouchableOpacity
           onPress={() => navigate("tenants-form", { tenantId: null })}
@@ -145,7 +156,7 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={18} color="var(--ds-on-brand)" />
-          <Text className="text-on-brand font-medium text-sm ml-1.5">Novo tenant</Text>
+          <Text className="text-on-brand font-medium text-sm ml-1.5">Nova instituição</Text>
         </TouchableOpacity>
       </View>
 
@@ -170,8 +181,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
         </View>
       )}
 
-      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", gap: 12 }}>
-        <View className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4" style={{ height: 44, maxWidth: isMobile ? undefined : 380 }}>
+      <View className="mb-4" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-end", flexWrap: "wrap", gap: 12 }}>
+        <View className="flex-1 flex-row items-center bg-surface border border-border rounded-ds-md px-4 mb-2" style={{ height: 38, minWidth: isMobile ? undefined : 260, maxWidth: isMobile ? undefined : 380 }}>
           <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
             value={search}
@@ -190,27 +201,29 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
           )}
         </View>
 
-        <select
-          value={statusFilter}
-          onChange={(e: any) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          style={{
-            border: "1px solid #D9DDE3",
-            borderRadius: 4,
-            padding: "0 14px",
-            fontSize: 14,
-            color: "var(--ds-ink)",
-            backgroundColor: "var(--ds-surface)",
-            height: 44,
-            minWidth: isMobile ? "100%" : 160,
-          }}
-        >
-          <option value="">Todos os status</option>
-          <option value="active">Ativo</option>
-          <option value="inactive">Inativo</option>
-        </select>
+        <View style={{ width: isMobile ? "100%" : 180 }}>
+          <FormSelect
+            label="Status"
+            value={statusFilter}
+            dense
+            options={[
+              { value: "", label: "Todos os status" },
+              { value: "active", label: "Ativo" },
+              { value: "suspended", label: "Suspenso" },
+              { value: "inactive", label: "Inativo" },
+            ]}
+            onChange={(v) => {
+              setStatusFilter(v);
+              setPage(1);
+            }}
+          />
+        </View>
+        <View style={{ width: isMobile ? "100%" : 170 }}>
+          <DatePickerInput label="Criado de" value={createdFrom} compact onChangeText={(v) => { setCreatedFrom(v); setPage(1); }} />
+        </View>
+        <View style={{ width: isMobile ? "100%" : 170 }}>
+          <DatePickerInput label="Criado até" value={createdTo} compact onChangeText={(v) => { setCreatedTo(v); setPage(1); }} />
+        </View>
       </View>
 
       <ScrollView
@@ -221,10 +234,12 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
       >
       <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: tableMinWidth, }}>
         <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
-          <Text className={TABLE_HEADER_CELL} style={{ flex: 2.2 }}>Tenant</Text>
-          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.5 }}>Slug</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 2.2 }}>Instituição</Text>
           <Text className={TABLE_HEADER_CELL} style={{ flex: 1.5 }}>Contato</Text>
-          <Text className={TABLE_HEADER_CELL} style={{ flex: 1 }}>Status</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 0.8, textAlign: "right" }}>Alunos</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 0.8, textAlign: "right" }}>Usuários</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 1, paddingLeft: 16 }}>Status</Text>
+          <Text className={TABLE_HEADER_CELL} style={{ flex: 0.9 }}>Criado em</Text>
           <View style={{ width: 190 }} />
         </View>
 
@@ -241,31 +256,27 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
         ) : (
           rows.map((row, i) => (
             <DataTableRow key={row.id} index={i}>
-              <View style={{ flex: 2.2 }}>
-                <Text className="text-sm font-semibold text-ink">{row.name}</Text>
+              <TouchableOpacity style={{ flex: 2.2 }} onPress={() => navigate("tenants-detail", { tenantId: row.id })} role="link" activeOpacity={0.7}>
+                <Text className="text-sm font-semibold text-brand">{row.name}</Text>
                 {!!row.corporate_name && (
                   <Text className="text-xs text-ink-muted">{row.corporate_name}</Text>
                 )}
-                {!!row.cnpj && (
-                  <Text className="text-xs text-ink-subtle mt-0.5">CNPJ: {row.cnpj}</Text>
-                )}
-              </View>
-
-              <View style={{ flex: 1.5 }}>
-                <Text className="text-sm text-ink">{row.slug}</Text>
-              </View>
+                <Text className="text-xs text-ink-subtle mt-0.5">{row.cnpj ? `CNPJ ${row.cnpj} · ${row.slug}` : row.slug}</Text>
+              </TouchableOpacity>
 
               <View style={{ flex: 1.5 }}>
                 <Text className="text-sm text-ink">{row.email || "—"}</Text>
                 <Text className="text-xs text-ink-muted">{row.phone || row.whatsapp || "Sem telefone"}</Text>
               </View>
 
-              <View style={{ flex: 1 }}>
-                <Badge
-                  label={statusLabel(row.status)}
-                  slug={row.status === "active" ? "active" : "inactive"}
-                />
+              <Text className="text-sm font-mono text-ink" style={{ flex: 0.8, textAlign: "right" }}>{fmtInt(row.students_count ?? 0)}</Text>
+              <Text className="text-sm font-mono text-ink" style={{ flex: 0.8, textAlign: "right" }}>{fmtInt(row.users_count ?? 0)}</Text>
+
+              <View style={{ flex: 1, paddingLeft: 16 }}>
+                <Badge label={TENANT_STATUS_LABEL[row.status] ?? row.status} tone={tenantStatusTone(row.status)} />
               </View>
+
+              <Text className="text-sm font-mono text-ink-muted" style={{ flex: 0.9 }}>{fmtDate(row.created_at)}</Text>
 
               <View className="flex-row items-center justify-end" style={{ width: 190, gap: 4 }}>
                 {row.status === "active" && (
@@ -306,8 +317,8 @@ export default function TenantsScreen({ navigate, flashMessage }: Props) {
 
       <ConfirmModal
         visible={deleteId !== null}
-        title="Excluir tenant"
-        message="Essa ação remove o tenant. Deseja continuar?"
+        title="Excluir instituição"
+        message="Essa ação remove a instituição (exclusão lógica). Para interromper o uso sem excluir, prefira Suspender no detalhe. Deseja continuar?"
         onCancel={() => setDeleteId(null)}
         onConfirm={remove}
         loading={deleting}

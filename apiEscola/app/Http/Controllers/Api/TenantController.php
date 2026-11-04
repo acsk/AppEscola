@@ -45,9 +45,25 @@ class TenantController extends Controller
     {
         $this->ensureSuperAdmin($request);
 
+        $request->validate([
+            'created_from' => ['nullable', 'date_format:Y-m-d'],
+            'created_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:created_from'],
+        ]);
+
         $tenants = Tenant::query()
+            ->withCount(['students', 'users'])
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
-            ->when($request->query('search'), fn ($q, $v) => $q->where('name', 'like', "%{$v}%"))
+            ->when($request->query('search'), fn ($q, $v) => $q->where(function ($sub) use ($v) {
+                $digits = preg_replace('/\D/', '', $v);
+                $sub->where('name', 'like', "%{$v}%")
+                    ->orWhere('corporate_name', 'like', "%{$v}%")
+                    ->orWhere('slug', 'like', "%{$v}%")
+                    ->orWhere('cnpj', 'like', "%{$v}%")
+                    // CNPJ é salvo com máscara: busca só por dígitos compara o campo sem pontuação.
+                    ->when($digits !== '', fn ($c) => $c->orWhereRaw("REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '/', ''), '-', '') LIKE ?", ["%{$digits}%"]));
+            }))
+            ->when($request->query('created_from'), fn ($q, $v) => $q->whereDate('created_at', '>=', $v))
+            ->when($request->query('created_to'), fn ($q, $v) => $q->whereDate('created_at', '<=', $v))
             ->orderBy('name')
             ->paginate(20);
 
