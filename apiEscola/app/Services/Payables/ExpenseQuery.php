@@ -181,6 +181,11 @@ class ExpenseQuery
             $this->applySituation($query, $filters['situation']);
         }
 
+        // Mesmo critério do cartão "Sem comprovante".
+        if (! empty($filters['without_receipt'])) {
+            $query->whereIn('status', ['approved', 'paid'])->whereNull('system_key')->whereDoesntHave('attachments');
+        }
+
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
             $query->where(function (Builder $q) use ($search) {

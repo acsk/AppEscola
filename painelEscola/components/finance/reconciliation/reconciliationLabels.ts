@@ -17,7 +17,8 @@ export const RECONCILIATION_STATUS_TONE: Record<ReconciliationStatus, Tone> = {
 
 export const RECONCILIATION_ORIGIN_OPTIONS: { value: ReconciliationOrigin | ""; label: string }[] = [
   { value: "app", label: "Cobranças da aplicação" },
-  { value: "other", label: "Fora da aplicação" },
+  { value: "expense", label: "Despesas" },
+  { value: "other", label: "Sem vínculo" },
   { value: "", label: "Todas" },
 ];
 
@@ -59,7 +60,11 @@ export const historyActionLabel = (action: string) => HISTORY_ACTION_LABEL[actio
 export function entryDetail(entry: BankEntry): string {
   switch (entry.status) {
     case "reconciled": {
-      const target = entry.invoice ? `Cobrança #${entry.invoice.id}` : "Cobrança";
+      const target = entry.expense
+        ? `Despesa ${entry.expense.code}`
+        : entry.invoice
+          ? `Cobrança #${entry.invoice.id}`
+          : "Cobrança";
       const who = entry.match_type === "auto" ? "automaticamente" : entry.reviewed_by ? `por ${entry.reviewed_by.name}` : "manualmente";
       return `${target} · ${who}${entry.divergence ? ` · ${entry.divergence}` : ""}`;
     }
@@ -68,7 +73,7 @@ export function entryDetail(entry: BankEntry): string {
     case "ignored":
       return entry.justification ?? "Ignorada.";
     default:
-      if (entry.direction === "debit") return "Saída sem despesa vinculada.";
+      if (entry.direction === "debit") return "Saída sem despesa vinculada: concilie com uma despesa aprovada.";
       return entry.cited_charge_ids.length > 0
         ? "Cita uma cobrança que não foi gerada pelo sistema."
         : "Não é pagamento de cobrança gerada pela aplicação.";

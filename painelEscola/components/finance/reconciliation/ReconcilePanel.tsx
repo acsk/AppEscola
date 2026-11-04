@@ -9,13 +9,16 @@ import { color } from "../../../constants/theme";
 import { getApiResponseMessage } from "../../../utils/apiErrors";
 import { historyActionLabel, transactionTypeLabel } from "./reconciliationLabels";
 import {
+  fetchExpenseCandidates,
   fetchReconciliationCandidates,
   fetchReconciliationHistory,
   ignoreBankEntry,
   markBankEntryDivergent,
   reconcileBankEntry,
+  reconcileBankEntryWithExpense,
   undoBankEntry,
   type BankEntry,
+  type ExpenseCandidate,
   type ReconciliationCandidate,
   type ReconciliationHistoryItem,
 } from "../../../services/bankReconciliation";
@@ -43,6 +46,7 @@ const fmtDate = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").rever
  */
 export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
   const [candidates, setCandidates] = useState<ReconciliationCandidate[]>([]);
+  const [expenseCandidates, setExpenseCandidates] = useState<ExpenseCandidate[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [history, setHistory] = useState<ReconciliationHistoryItem[]>([]);
   const [search, setSearch] = useState("");
@@ -54,16 +58,26 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
   const open = entry.status === "pending" || entry.status === "divergent";
   const isCredit = entry.direction === "credit";
   const canPickInvoice = canSettle && open && isCredit;
+  /** Saídas: ligação com uma despesa aprovada de Contas a pagar. */
+  const canPickExpense = canSettle && open && !isCredit;
 
   const loadCandidates = useCallback(async () => {
-    if (!isCredit) return;
     setLoadingCandidates(true);
     try {
-      const items = await fetchReconciliationCandidates(entry.id, search.trim() || undefined);
-      setCandidates(items);
-      setSelected((current) => (items.some((c) => c.id === current) ? current : null));
+      const term = search.trim() || undefined;
+      let ids: number[];
+      if (isCredit) {
+        const items = await fetchReconciliationCandidates(entry.id, term);
+        setCandidates(items);
+        ids = items.map((c) => c.id);
+      } else {
+        const items = await fetchExpenseCandidates(entry.id, term);
+        setExpenseCandidates(items);
+        ids = items.map((c) => c.id);
+      }
+      setSelected((current) => (current !== null && ids.includes(current) ? current : null));
     } catch (err: any) {
-      setError(getApiResponseMessage(err?.response?.data, "Não foi possível carregar as cobranças candidatas."));
+      setError(getApiResponseMessage(err?.response?.data, isCredit ? "Não foi possível carregar as cobranças candidatas." : "Não foi possível carregar as despesas candidatas."));
     } finally {
       setLoadingCandidates(false);
     }
@@ -78,13 +92,14 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
   }, [entry.id, entry.status]);
 
   useEffect(() => {
-    if (!canPickInvoice) {
+    if (!canPickInvoice && !canPickExpense) {
       setCandidates([]);
+      setExpenseCandidates([]);
       return;
     }
     const timer = setTimeout(loadCandidates, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [canPickInvoice, loadCandidates, search]);
+  }, [canPickInvoice, canPickExpense, loadCandidates, search]);
 
   const justificationOk = justification.trim().length >= MIN_JUSTIFICATION;
   const selectedCandidate = candidates.find((c) => c.id === selected) ?? null;
@@ -158,11 +173,27 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
         </View>
       ) : null}
 
-      {canSettle && open && !isCredit ? (
-        <Text className="text-sm text-ink-muted">
-          Saídas serão vinculadas a despesas quando Contas a pagar estiver disponível. Por enquanto, ignore com
-          justificativa (ex.: tarifa) ou marque como divergente.
-        </Text>
+      {canPickExpense ? (
+        <View style={{ gap: 8 }}>
+          <Text className="text-sm font-semibold text-ink">Despesas candidatas</Text>
+          {loadingCandidates ? (
+            <ActivityIndicator color={color.brand} />
+          ) : expenseCandidates.length === 0 ? (
+            <Text className="text-sm text-ink-muted">
+              {search
+                ? "Nenhuma despesa aprovada com essa busca."
+                : "Nenhuma despesa aprovada com este valor. Busque abaixo ou cadastre a despesa em Contas a pagar."}
+            </Text>
+          ) : (
+            expenseCandidates.map((c) => (
+              <ExpenseCandidateCard key={c.id} candidate={c} selected={selected === c.id} onPress={() => setSelected(c.id)} />
+            ))
+          )}
+          <FormInput label="Buscar outra despesa" value={search} onChangeText={setSearch} placeholder="Nº (D-0123), descrição ou fornecedor" dense />
+          <Text className="text-xs text-ink-subtle">
+            Só aparecem despesas aprovadas ou pagas, ainda sem vínculo. Se a despesa não estava paga, fica paga com a data do extrato.
+          </Text>
+        </View>
       ) : null}
 
       {canSettle ? (
@@ -219,9 +250,20 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
                 onPress={() => selected !== null && run("reconcile", () => reconcileBankEntry(entry.id, selected, text))}
               />
             ) : null}
+            {canPickExpense ? (
+              <Button
+                icon={Check}
+                label="Conciliar com despesa"
+                loading={busy === "reconcile"}
+                disabled={!!busy || selected === null}
+                onPress={() => selected !== null && run("reconcile", () => reconcileBankEntryWithExpense(entry.id, selected, text))}
+              />
+            ) : null}
           </View>
           {entry.status === "reconciled" ? (
-            <Text className="text-xs text-ink-muted">Voltar para pendente não desfaz a baixa da cobrança.</Text>
+            <Text className="text-xs text-ink-muted">
+              {`Voltar para pendente não desfaz ${entry.expense ? "o pagamento da despesa" : "a baixa da cobrança"}.`}
+            </Text>
           ) : null}
         </View>
       ) : null}
@@ -252,8 +294,16 @@ function Notice({ entry }: { entry: BankEntry }) {
 
   if (entry.status === "reconciled") {
     tone = "success";
-    title = entry.match_type === "auto" ? "Conciliada automaticamente pelo ID do pagamento na Cora." : "Conciliada manualmente.";
-    body = entry.invoice
+    title = entry.expense
+      ? entry.match_type === "auto"
+        ? "Tarifa da Cora conciliada automaticamente."
+        : "Conciliada manualmente com despesa."
+      : entry.match_type === "auto"
+        ? "Conciliada automaticamente pelo ID do pagamento na Cora."
+        : "Conciliada manualmente.";
+    body = entry.expense
+      ? `Despesa ${entry.expense.code} · ${entry.expense.description} · ${fmtMoney(entry.expense.amount)}.`
+      : entry.invoice
       ? `Cobrança #${entry.invoice.id}${entry.invoice.student ? ` · ${entry.invoice.student.name}` : ""} · ${fmtMoney(entry.invoice.amount)}.`
       : "";
     if (entry.divergence) body += ` ${entry.divergence}`;
@@ -276,7 +326,7 @@ function Notice({ entry }: { entry: BankEntry }) {
   } else {
     tone = "warning";
     title = "Saída pendente.";
-    body = "Nenhuma despesa vinculada.";
+    body = "Nenhuma despesa vinculada. Escolha uma despesa aprovada abaixo ou, se não houver, cadastre em Contas a pagar.";
   }
 
   const classes = {
@@ -351,6 +401,44 @@ function CandidateCard({ candidate, selected, onPress }: { candidate: Reconcilia
           )}
         </View>
       </View>
+    </Pressable>
+  );
+}
+
+function ExpenseCandidateCard({ candidate, selected, onPress }: { candidate: ExpenseCandidate; selected: boolean; onPress: () => void }) {
+  const chips = [
+    { ok: candidate.criteria.amount_equal, label: "Valor" },
+    { ok: candidate.criteria.date_window, label: "Vencimento ±3 dias" },
+    { ok: candidate.criteria.name_hint, label: "Fornecedor" },
+  ].filter((c) => c.ok);
+
+  return (
+    <Pressable
+      role="radio"
+      aria-checked={selected}
+      onPress={onPress}
+      className={`rounded-ds-md border px-3 py-3 ${selected ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
+      style={{ gap: 4, borderWidth: selected ? 2 : 1 }}
+    >
+      <View className="flex-row justify-between" style={{ gap: 8 }}>
+        <Text className="text-sm font-semibold text-ink" style={{ flex: 1 }} numberOfLines={1}>
+          {`${candidate.code} · ${candidate.description}`}
+        </Text>
+        <Text className="text-sm font-mono text-ink">{fmtMoney(candidate.amount)}</Text>
+      </View>
+      <Text className="text-xs text-ink-muted" numberOfLines={1}>
+        {`${candidate.supplier?.name ?? "Sem fornecedor"} · vence ${fmtDate(candidate.due_date)} · ${candidate.status === "paid" ? "paga" : "aprovada"}`}
+      </Text>
+      {chips.length > 0 ? (
+        <View className="flex-row flex-wrap" style={{ gap: 4 }}>
+          {chips.map((chip) => (
+            <View key={chip.label} className="flex-row items-center border border-success rounded-ds-sm px-1" style={{ gap: 2 }}>
+              <Check size={10} color={color.success} />
+              <Text className="text-xs text-success">{chip.label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </Pressable>
   );
 }

@@ -38,6 +38,7 @@ import {
   Users,
   Webhook,
   ArrowLeftRight,
+  ReceiptText,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -150,6 +151,7 @@ export default function Sidebar({
               { id: "financeiro-visao-geral", label: "Visão geral", icon: ChartLine },
               { id: "cobrancas", label: "Contas a receber", icon: CreditCard },
               { id: "financeiro-conciliacao", label: "Conciliação bancária", icon: ArrowLeftRight },
+              { id: "financeiro-contas-a-pagar", label: "Contas a pagar", icon: ReceiptText },
               { id: "financeiro-cora", label: "Integração Cora", icon: Webhook },
               { id: "bancos_crud", label: "Bancos", icon: Landmark },
               { id: "pagamentos", label: "Provedores de pagamento", icon: Link2 },

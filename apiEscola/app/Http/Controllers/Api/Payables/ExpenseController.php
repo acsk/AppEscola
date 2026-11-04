@@ -72,6 +72,7 @@ class ExpenseController extends Controller
             'supplier_id' => ['nullable', 'integer'],
             'recurrence' => ['nullable', Rule::in(['recurring', 'one_off'])],
             'situation' => ['nullable', Rule::in(ExpenseQuery::SITUATIONS)],
+            'without_receipt' => ['nullable', 'boolean'],
             'due_from' => ['nullable', 'date_format:Y-m-d'],
             'due_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:due_from'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],

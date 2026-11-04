@@ -156,6 +156,9 @@ class ExpenseTest extends TestCase
         $this->actingAs($this->admin)->getJson('/api/finance/payables/expenses?search=D-' . Expense::query()->where('description', 'Gráfica')->value('id'))
             ->assertOk()->assertJsonPath('body.meta.total', 1);
 
+        $this->actingAs($this->admin)->getJson('/api/finance/payables/expenses?without_receipt=1')
+            ->assertOk()->assertJsonPath('body.meta.total', 3);
+
         $this->actingAs($this->admin)->getJson('/api/finance/payables/summary?month=2026-11')
             ->assertOk()
             ->assertJsonPath('body.overdue.count', 1)

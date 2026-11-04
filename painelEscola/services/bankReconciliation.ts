@@ -45,6 +45,7 @@ export type BankEntry = {
   cited_charge_ids: string[];
   reviewed_at: string | null;
   reviewed_by: { id: number; name: string } | null;
+  expense: { id: number; code: string; description: string; amount: string; status: string } | null;
   invoice: {
     id: number;
     description: string | null;
@@ -74,6 +75,18 @@ export type ReconciliationCandidate = {
   criteria: { charge_id_cited: boolean; amount_equal: boolean; date_window: boolean; name_hint: boolean };
 };
 
+export type ExpenseCandidate = {
+  id: number;
+  code: string;
+  description: string;
+  amount: string;
+  due_date: string | null;
+  status: string;
+  supplier: { id: number; name: string } | null;
+  category: { id: number; name: string } | null;
+  criteria: { amount_equal: boolean; date_window: boolean; name_hint: boolean };
+};
+
 export type ReconciliationHistoryItem = {
   id: number;
   action: string;
@@ -86,7 +99,7 @@ export type ReconciliationHistoryItem = {
 };
 
 /** app = ligada a uma cobrança gerada pela aplicação; other = não ligada (emitida direto na Cora, tarifas...). */
-export type ReconciliationOrigin = "app" | "other";
+export type ReconciliationOrigin = "app" | "expense" | "other";
 
 export type ReconciliationFilters = {
   status?: ReconciliationStatus | "";
@@ -119,6 +132,11 @@ export async function fetchReconciliationCandidates(entryId: number, search?: st
   return (data.body ?? data).items ?? [];
 }
 
+export async function fetchExpenseCandidates(entryId: number, search?: string): Promise<ExpenseCandidate[]> {
+  const { data } = await api.get(`/finance/reconciliation/entries/${entryId}/expense-candidates`, { params: clean({ search }) });
+  return (data.body ?? data).items ?? [];
+}
+
 export async function fetchReconciliationHistory(entryId: number): Promise<ReconciliationHistoryItem[]> {
   const { data } = await api.get(`/finance/reconciliation/entries/${entryId}/history`);
   return (data.body ?? data).items ?? [];
@@ -138,6 +156,9 @@ const decide = async (path: string, payload: Record<string, unknown>): Promise<D
 
 export const reconcileBankEntry = (entryId: number, invoiceId: number, justification: string) =>
   decide(`/finance/reconciliation/entries/${entryId}/reconcile`, { invoice_id: invoiceId, justification });
+
+export const reconcileBankEntryWithExpense = (entryId: number, expenseId: number, justification: string) =>
+  decide(`/finance/reconciliation/entries/${entryId}/reconcile-expense`, { expense_id: expenseId, justification });
 
 export const ignoreBankEntry = (entryId: number, justification: string) =>
   decide(`/finance/reconciliation/entries/${entryId}/ignore`, { justification });
