@@ -234,3 +234,78 @@ export const fmtIsoDate = (value: string | null | undefined) => {
   const [y, m, d] = value.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
 };
+
+// ── Fase 3: administradores globais, monitoramento, consumo, relatórios e auditoria ──
+
+export type GlobalAdmin = {
+  id: number;
+  name: string;
+  email: string;
+  status: string;
+  password_change_required: boolean;
+  created_at: string | null;
+  sessions: number;
+  last_used_at: string | null;
+};
+
+export type AdminSession = { id: number; kind: string; created_at: string | null; last_used_at: string | null; expires_at: string | null };
+
+export async function fetchGlobalAdmins(): Promise<GlobalAdmin[]> {
+  return body((await api.get("/saas/admins")).data).items ?? [];
+}
+
+export const createGlobalAdmin = (payload: { name: string; email: string; password: string; password_confirmation: string }) => api.post("/saas/admins", payload);
+export const setGlobalAdminStatus = (id: number, status: "active" | "inactive") => api.put(`/saas/admins/${id}/status`, { status });
+export const resetGlobalAdminPassword = (id: number, password: string, password_confirmation: string) => api.put(`/saas/admins/${id}/password`, { password, password_confirmation });
+
+export async function fetchAdminSessions(id: number): Promise<AdminSession[]> {
+  return body((await api.get(`/saas/admins/${id}/sessions`)).data).items ?? [];
+}
+
+export const revokeAdminSessions = (id: number, sessionId?: number) => api.delete(`/saas/admins/${id}/sessions`, { data: sessionId ? { session_id: sessionId } : {} });
+
+export type Incident = { source: string; title: string; detail: string | null; tenant: string | null; at: string };
+
+export type Monitoring = {
+  checked_at: string;
+  api: { status: "ok" | "down"; version: string; environment: string; php: string; database_ms: number | null };
+  queue: { driver: string; pending: number | null; oldest_pending_minutes: number | null; failed_24h: number; failed_total: number; by_queue?: Record<string, number> };
+  integrations: { key: string; name: string; counts: Record<string, number>; failed: number; last_success_at: string | null }[];
+  incidents: Incident[];
+};
+
+export async function fetchMonitoring(): Promise<Monitoring> {
+  return body((await api.get("/saas/monitoring")).data);
+}
+
+export type UsageResource = { usage: number; limit: number | null; percent: number | null };
+
+export type TenantUsageRow = {
+  tenant: { id: number; name: string; status: string };
+  plan: string | null;
+  resources: Record<string, UsageResource>;
+  practice_answers_30d: number;
+  last_student_activity_at: string | null;
+  max_percent: number;
+};
+
+export async function fetchTenantUsage(): Promise<TenantUsageRow[]> {
+  return body((await api.get("/saas/usage")).data).items ?? [];
+}
+
+export type SaasReportType = "commercial" | "operational" | "retention";
+
+export type ReportEvent = { type: string; tenant: string | null; from_plan: string | null; to_plan: string | null; direction: string | null; reason: string | null; user: string | null; at: string };
+
+export async function fetchSaasReport(type: SaasReportType, dateFrom: string, dateTo: string): Promise<any> {
+  return body((await api.get(`/saas/reports/${type}`, { params: { date_from: dateFrom || undefined, date_to: dateTo || undefined } })).data);
+}
+
+export type GlobalAuditItem = AuditItem & { tenant: { id: number; name: string } | null; changes: Record<string, any> | null };
+
+export async function fetchGlobalAudit(params: { group?: string; search?: string; date_from?: string; date_to?: string; page?: number }) {
+  return body((await api.get("/saas/audit", { params })).data) as { items: GlobalAuditItem[]; meta: { current_page: number; last_page: number; per_page: number; total: number } };
+}
+
+export const fmtDateTime = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";

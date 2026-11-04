@@ -46,7 +46,9 @@ use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\Cora\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\Saas\SaasController;
+use App\Http\Controllers\Api\Saas\GlobalAdminController;
 use App\Http\Controllers\Api\Saas\SaasFeatureController;
+use App\Http\Controllers\Api\Saas\SaasOperationsController;
 use App\Http\Controllers\Api\Saas\SaasPlanController;
 use App\Http\Controllers\Api\Saas\SaasSubscriptionController;
 use App\Http\Controllers\Api\Saas\SaasTenantEntitlementController;
@@ -275,6 +277,18 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         Route::put('tenants/{tenant}/quotas/{resource}', [SaasTenantEntitlementController::class, 'setQuota']);
         Route::delete('tenants/{tenant}/quotas/{resource}', [SaasTenantEntitlementController::class, 'clearQuota']);
         Route::get('tenants/{tenant}/audit', [SaasTenantEntitlementController::class, 'audit']);
+
+        // Fase 3: monitoramento, relatórios, auditoria global e administradores globais
+        Route::get('monitoring', [SaasOperationsController::class, 'monitoring']);
+        Route::get('usage', [SaasOperationsController::class, 'usage']);
+        Route::get('reports/{type}', [SaasOperationsController::class, 'report']);
+        Route::get('audit', [SaasOperationsController::class, 'audit']);
+        Route::get('admins', [GlobalAdminController::class, 'index']);
+        Route::post('admins', [GlobalAdminController::class, 'store']);
+        Route::put('admins/{admin}/status', [GlobalAdminController::class, 'updateStatus'])->whereNumber('admin');
+        Route::put('admins/{admin}/password', [GlobalAdminController::class, 'resetPassword'])->whereNumber('admin');
+        Route::get('admins/{admin}/sessions', [GlobalAdminController::class, 'sessions'])->whereNumber('admin');
+        Route::delete('admins/{admin}/sessions', [GlobalAdminController::class, 'revokeSessions'])->whereNumber('admin');
     });
 
     // Tenant logado: status, funcionalidades e alertas de limite

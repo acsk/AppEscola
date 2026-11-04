@@ -46,6 +46,10 @@ import {
   BadgeDollarSign,
   Repeat,
   ToggleRight,
+  Activity,
+  ShieldCheck,
+  ScrollText,
+  ChartPie,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -138,9 +142,21 @@ export default function Sidebar({
       items: [{ id: "saas-features", label: "Feature flags", icon: ToggleRight }],
     },
     {
+      label: "Monitoramento",
+      items: [
+        { id: "saas-monitoring", label: "Saúde da plataforma", icon: Activity },
+        { id: "saas-usage", label: "Consumo por instituição", icon: ChartPie },
+      ],
+    },
+    {
+      label: "Relatórios",
+      items: [{ id: "saas-reports", label: "Relatórios SaaS", icon: FileChartColumn }],
+    },
+    {
       label: "Administração",
       items: [
-        { id: "users", label: "Usuários", icon: UserCog },
+        { id: "saas-admins", label: "Administradores globais", icon: ShieldCheck },
+        { id: "saas-audit", label: "Auditoria", icon: ScrollText },
         { id: "tipos-prova", label: "Tipos de prova", icon: Tags },
       ],
     },

@@ -13,6 +13,11 @@ class SaasAuditLog extends Model
 
     protected $casts = ['changes' => 'array'];
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class)->withTrashed();
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

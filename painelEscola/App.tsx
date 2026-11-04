@@ -48,6 +48,11 @@ import TenantDetailScreen from "./screens/saas/TenantDetailScreen";
 import SaasPlansScreen from "./screens/saas/SaasPlansScreen";
 import SaasSubscriptionsScreen from "./screens/saas/SaasSubscriptionsScreen";
 import SaasFeaturesScreen from "./screens/saas/SaasFeaturesScreen";
+import GlobalAdminsScreen from "./screens/saas/GlobalAdminsScreen";
+import SaasMonitoringScreen from "./screens/saas/SaasMonitoringScreen";
+import SaasUsageScreen from "./screens/saas/SaasUsageScreen";
+import SaasReportsScreen from "./screens/saas/SaasReportsScreen";
+import SaasAuditScreen from "./screens/saas/SaasAuditScreen";
 import TenantStatusBanner from "./components/saas/TenantStatusBanner";
 import { fetchTenantEntitlements, type TenantEntitlements } from "./services/saas";
 import { UsersScreen, UserFormScreen } from "./screens/users";
@@ -281,6 +286,11 @@ function hashToNav(hash: string): NavState {
     if (seg1 === "planos") return { screen: "saas-plans" };
     if (seg1 === "assinaturas") return { screen: "saas-subscriptions" };
     if (seg1 === "funcionalidades") return { screen: "saas-features" };
+    if (seg1 === "monitoramento") return { screen: "saas-monitoring" };
+    if (seg1 === "consumo") return { screen: "saas-usage" };
+    if (seg1 === "relatorios") return { screen: "saas-reports" };
+    if (seg1 === "administradores") return { screen: "saas-admins" };
+    if (seg1 === "auditoria") return { screen: "saas-audit" };
     return { screen: "saas-dashboard" };
   }
 
@@ -446,6 +456,11 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "saas-plans") return "#/plataforma/planos";
   if (nav.screen === "saas-subscriptions") return "#/plataforma/assinaturas";
   if (nav.screen === "saas-features") return "#/plataforma/funcionalidades";
+  if (nav.screen === "saas-monitoring") return "#/plataforma/monitoramento";
+  if (nav.screen === "saas-usage") return "#/plataforma/consumo";
+  if (nav.screen === "saas-reports") return "#/plataforma/relatorios";
+  if (nav.screen === "saas-admins") return "#/plataforma/administradores";
+  if (nav.screen === "saas-audit") return "#/plataforma/auditoria";
   if (nav.screen === "tenants-form") {
     const id = nav.params?.tenantId;
     return id != null ? `#/tenants/${id}` : "#/tenants/novo";
@@ -1222,6 +1237,11 @@ function AppContent() {
       case "saas-plans": return <SaasPlansScreen />;
       case "saas-subscriptions": return <SaasSubscriptionsScreen navigate={navigate} />;
       case "saas-features": return <SaasFeaturesScreen />;
+      case "saas-monitoring": return <SaasMonitoringScreen />;
+      case "saas-usage": return <SaasUsageScreen navigate={navigate} />;
+      case "saas-reports": return <SaasReportsScreen />;
+      case "saas-admins": return <GlobalAdminsScreen />;
+      case "saas-audit": return <SaasAuditScreen navigate={navigate} />;
       case "saas-dashboard": return <SaasDashboardScreen navigate={navigate} />;
       case "users": return <UsersScreen navigate={navigate} flashMessage={nav.params?.success ?? ""} />;
       case "users-form": return <UserFormScreen navigate={navigate} userId={nav.params?.userId ?? null} />;
