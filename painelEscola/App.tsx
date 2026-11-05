@@ -54,6 +54,10 @@ import SaasUsageScreen from "./screens/saas/SaasUsageScreen";
 import SaasReportsScreen from "./screens/saas/SaasReportsScreen";
 import SaasAuditScreen from "./screens/saas/SaasAuditScreen";
 import SaasAiUsageScreen from "./screens/saas/SaasAiUsageScreen";
+import SaasInsightsScreen from "./screens/saas/SaasInsightsScreen";
+import SaasHealthScreen from "./screens/saas/SaasHealthScreen";
+import SaasAlertsScreen from "./screens/saas/SaasAlertsScreen";
+import EmailSettingsScreen from "./screens/configuracoes/EmailSettingsScreen";
 import TenantStatusBanner from "./components/saas/TenantStatusBanner";
 import { fetchTenantEntitlements, type TenantEntitlements } from "./services/saas";
 import { UsersScreen, UserFormScreen } from "./screens/users";
@@ -162,6 +166,7 @@ const SCREEN_SLUGS = [
   "configuracoes-cobranca",
   "configuracoes-tema-mobile",
   "configuracoes-ia",
+  "configuracoes-email",
   "notificacoes",
   "calendario",
   "relatorios-turmas",
@@ -290,6 +295,9 @@ function hashToNav(hash: string): NavState {
     if (seg1 === "monitoramento") return { screen: "saas-monitoring" };
     if (seg1 === "consumo") return { screen: "saas-usage" };
     if (seg1 === "ia") return { screen: "saas-ai" };
+    if (seg1 === "indicadores") return { screen: "saas-insights" };
+    if (seg1 === "saude") return { screen: "saas-health" };
+    if (seg1 === "alertas") return { screen: "saas-alerts" };
     if (seg1 === "relatorios") return { screen: "saas-reports" };
     if (seg1 === "administradores") return { screen: "saas-admins" };
     if (seg1 === "auditoria") return { screen: "saas-audit" };
@@ -319,6 +327,7 @@ function hashToNav(hash: string): NavState {
   if (seg0 === "configuracoes") {
     if (seg1 === "tema-mobile") return { screen: "configuracoes-tema-mobile" };
     if (seg1 === "ia") return { screen: "configuracoes-ia" };
+    if (seg1 === "email") return { screen: "configuracoes-email" };
     if (seg1 === "cobranca") return { screen: "configuracoes-cobranca" };
     return { screen: "configuracoes-cobranca" };
   }
@@ -461,6 +470,9 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "saas-monitoring") return "#/plataforma/monitoramento";
   if (nav.screen === "saas-usage") return "#/plataforma/consumo";
   if (nav.screen === "saas-ai") return "#/plataforma/ia";
+  if (nav.screen === "saas-insights") return "#/plataforma/indicadores";
+  if (nav.screen === "saas-health") return "#/plataforma/saude";
+  if (nav.screen === "saas-alerts") return "#/plataforma/alertas";
   if (nav.screen === "saas-reports") return "#/plataforma/relatorios";
   if (nav.screen === "saas-admins") return "#/plataforma/administradores";
   if (nav.screen === "saas-audit") return "#/plataforma/auditoria";
@@ -474,6 +486,7 @@ function navToHash(nav: NavState): string {
   }
   if (nav.screen === "configuracoes-tema-mobile") return "#/configuracoes/tema-mobile";
   if (nav.screen === "configuracoes-ia") return "#/configuracoes/ia";
+  if (nav.screen === "configuracoes-email") return "#/configuracoes/email";
   if (nav.screen === "configuracoes-cobranca") return "#/configuracoes/cobranca";
   if (nav.screen === "bi-overview") return "#/inteligencia/visao-geral";
   if (nav.screen === "bi-students") return "#/inteligencia/alunos";
@@ -894,6 +907,8 @@ function AppContent() {
 
   const canManageTenants = user?.role === "super_admin";
   const canManageUsers = user?.role === "super_admin" || user?.role === "admin" || user?.role === "coordenador";
+  // E-mail de envio da escola: só admin (e super admin em acesso assistido); a API valida.
+  const canManageEmail = user?.role === "super_admin" || user?.role === "admin";
   const canManageExams = roleCanManageExams(user?.role);
   const canViewFinance = roleCanViewFinance(user?.role);
   const canSendNotifications =
@@ -1171,6 +1186,7 @@ function AppContent() {
       case "configuracoes-cobranca": return <BillingSettingsScreen />;
       case "configuracoes-tema-mobile": return <MobileThemeSettingsScreen />;
       case "configuracoes-ia": return <AiSettingsScreen />;
+      case "configuracoes-email": return canManageEmail ? <EmailSettingsScreen /> : <DashboardScreen navigate={navigate} />;
       case "notificacoes":
         if (!canSendNotifications) {
           return (
@@ -1243,6 +1259,9 @@ function AppContent() {
       case "saas-monitoring": return <SaasMonitoringScreen />;
       case "saas-usage": return <SaasUsageScreen navigate={navigate} />;
       case "saas-ai": return <SaasAiUsageScreen navigate={navigate} />;
+      case "saas-insights": return <SaasInsightsScreen />;
+      case "saas-health": return <SaasHealthScreen navigate={navigate} />;
+      case "saas-alerts": return <SaasAlertsScreen navigate={navigate} />;
       case "saas-reports": return <SaasReportsScreen />;
       case "saas-admins": return <GlobalAdminsScreen />;
       case "saas-audit": return <SaasAuditScreen navigate={navigate} />;
@@ -1317,6 +1336,7 @@ function AppContent() {
             canManageTenants={canManageTenants}
             canManageUsers={canManageUsers}
             canManageAi={canManageUsers}
+            canManageEmail={canManageEmail}
             canManageExams={canManageExams}
             canSendNotifications={canSendNotifications}
             canViewFinance={canViewFinance}
@@ -1342,6 +1362,7 @@ function AppContent() {
               canManageTenants={canManageTenants}
               canManageUsers={canManageUsers}
               canManageAi={canManageUsers}
+              canManageEmail={canManageEmail}
               canManageExams={canManageExams}
               canSendNotifications={canSendNotifications}
               canViewFinance={canViewFinance}

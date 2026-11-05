@@ -22,6 +22,8 @@ export type SidebarProps = {
   canManageUsers?: boolean;
   /** Configurações → Integração com IA (admin e super admin). */
   canManageAi?: boolean;
+  /** Configurações → E-mail (admin e super admin). */
+  canManageEmail?: boolean;
   canManageExams?: boolean;
   canSendNotifications?: boolean;
   canViewFinance?: boolean;

@@ -16,6 +16,7 @@ import DataTableRow from "../../components/ui/DataTableRow";
 import { TABLE_CONTAINER, TABLE_HEADER_CELL, TABLE_HEADER_ROW, TABLE_HEADER_ROW_STYLE } from "../../components/ui/dataTableStyles";
 import SupportAccessModal from "../../components/tenants/SupportAccessModal";
 import TenantSubscriptionTab from "../../components/saas/TenantSubscriptionTab";
+import TenantKeysTab from "../../components/saas/TenantKeysTab";
 import { TenantAuditTab, TenantFeaturesTab, TenantQuotasTab } from "../../components/saas/TenantEntitlementTabs";
 import { color } from "../../constants/theme";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
@@ -28,9 +29,9 @@ type Props = {
   initialTab?: string;
 };
 
-type TabId = "overview" | "users" | "subscription" | "features" | "usage" | "integrations" | "audit";
+type TabId = "overview" | "users" | "subscription" | "features" | "usage" | "keys" | "integrations" | "audit";
 
-const TAB_IDS: TabId[] = ["overview", "users", "subscription", "features", "usage", "integrations", "audit"];
+const TAB_IDS: TabId[] = ["overview", "users", "subscription", "features", "usage", "keys", "integrations", "audit"];
 
 type Tenant = {
   id: number;
@@ -162,6 +163,7 @@ export default function TenantDetailScreen({ navigate, tenantId, initialTab }: P
                 { id: "subscription", label: "Assinatura" },
                 { id: "features", label: "Funcionalidades" },
                 { id: "usage", label: "Consumo" },
+                { id: "keys", label: "IA e e-mail" },
                 {
                   id: "integrations",
                   label: "Integrações",
@@ -177,6 +179,7 @@ export default function TenantDetailScreen({ navigate, tenantId, initialTab }: P
             {tab === "subscription" ? <TenantSubscriptionTab tenantId={tenantId} isMobile={isMobile} setToast={setToast} onChanged={() => setPlanVersion((v) => v + 1)} /> : null}
             {tab === "features" ? <TenantFeaturesTab key={planVersion} tenantId={tenantId} isMobile={isMobile} setToast={setToast} /> : null}
             {tab === "usage" ? <TenantQuotasTab key={planVersion} tenantId={tenantId} isMobile={isMobile} setToast={setToast} /> : null}
+            {tab === "keys" ? <TenantKeysTab tenantId={tenantId} setToast={setToast} /> : null}
             {tab === "audit" ? <TenantAuditTab tenantId={tenantId} isMobile={isMobile} /> : null}
           </>
         ) : null}

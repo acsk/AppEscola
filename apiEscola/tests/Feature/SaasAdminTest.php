@@ -65,8 +65,8 @@ class SaasAdminTest extends TestCase
 
         $response = $this->getJson("/api/saas/tenants/{$tenant->id}/overview")
             ->assertOk()
-            ->assertJsonPath('body.counts.students', 1)
-            ->assertJsonPath('body.integrations.2.hint', '…0000');
+            ->assertJsonPath('body.counts.students', 1);
+        $this->assertSame('…0000', collect($response->json('body.integrations'))->firstWhere('key', 'ai:openrouter')['hint']);
 
         $this->assertStringNotContainsString('sk-or-secret', $response->getContent());
     }

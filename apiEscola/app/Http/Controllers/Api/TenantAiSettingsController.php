@@ -42,6 +42,12 @@ class TenantAiSettingsController extends Controller
         ]);
     }
 
+    /** Uso e gasto de IA desta escola (mês, 6 meses, total, por provedor, chave e recurso). */
+    public function usage(Request $request, \App\Services\Ai\TenantAiSpendService $spend): JsonResponse
+    {
+        return $this->success($spend->summary($this->authorizeManage($request)), 'Gastos de IA carregados com sucesso.');
+    }
+
     public function update(SaveTenantAiCredentialRequest $request, string $provider): JsonResponse
     {
         $tenantId = $this->authorizeManage($request);

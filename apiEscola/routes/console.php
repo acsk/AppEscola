@@ -41,3 +41,5 @@ Schedule::command('saas:measure-storage')
     ->dailyAt('02:40')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping();
+// Super Admin SaaS: alertas operacionais (filas, integrações, IA, assinaturas, limites).
+Schedule::command('saas:operational-alerts')->hourlyAt(5)->withoutOverlapping();

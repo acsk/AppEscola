@@ -331,3 +331,86 @@ export async function fetchAiUsage(dateFrom: string, dateTo: string, tenantId?: 
 }
 
 export const fmtUsd = (value: number) => `US$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2 })}`;
+
+// ── Fase 4: indicadores, projeções, saúde das instituições e alertas ──────────
+
+export type MrrMovementMonth = { month: string; label: string; new: number; expansion: number; reactivation: number; contraction: number; churn: number; net: number; churned_tenants: number };
+
+export type SaasInsights = {
+  mrr: number;
+  arpa: number;
+  paying: number;
+  mrr_growth_percent: number | null;
+  net_new_mrr: number;
+  customer_churn_percent: number;
+  revenue_churn_percent: number;
+  ltv: number | null;
+  trial_conversion: { started: number; ended: number; converted: number; percent: number | null };
+  renewals_30d: { count: number; amount: number };
+  movements: MrrMovementMonth[];
+  avg_monthly_inflow: number;
+  projection: { month: string; label: string; mrr: number; mrr_without_churn: number }[];
+};
+
+export type TenantHealth = {
+  tenant: { id: number; name: string };
+  plan: string | null;
+  subscription_status: string | null;
+  score: number;
+  level: "healthy" | "attention" | "risk";
+  reasons: string[];
+  active_students_14d: number;
+  practice_answers_30d: number;
+  practice_answers_prev_30d: number;
+  last_staff_login_at: string | null;
+};
+
+export type HealthReport = {
+  summary: { healthy: number; attention: number; risk: number };
+  items: TenantHealth[];
+  cohorts: { month: string; label: string; created: number; retained: number; percent: number }[];
+};
+
+export type SaasAlertItem = {
+  id: number;
+  rule: string;
+  severity: "critical" | "warning" | "info";
+  status: "open" | "acknowledged" | "resolved";
+  title: string;
+  detail: string | null;
+  tenant: { id: number; name: string } | null;
+  occurrences: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  resolved_at: string | null;
+  acknowledged_by: string | null;
+  acknowledged_at: string | null;
+  notified_at: string | null;
+};
+
+export async function fetchInsights(): Promise<SaasInsights> {
+  return body((await api.get("/saas/insights")).data);
+}
+
+export async function fetchHealth(): Promise<HealthReport> {
+  return body((await api.get("/saas/health")).data);
+}
+
+export async function fetchAlerts(status: string): Promise<{ items: SaasAlertItem[]; counts: Record<string, number>; emails_enabled: boolean }> {
+  return body((await api.get("/saas/alerts", { params: { status } })).data);
+}
+
+export const acknowledgeAlert = (id: number) => api.post(`/saas/alerts/${id}/acknowledge`);
+export const runAlerts = () => api.post("/saas/alerts/run");
+
+export const HEALTH_LEVEL: Record<TenantHealth["level"], { label: string; tone: "success" | "warning" | "danger" }> = {
+  healthy: { label: "Saudável", tone: "success" },
+  attention: { label: "Atenção", tone: "warning" },
+  risk: { label: "Risco", tone: "danger" },
+};
+
+export const ALERT_SEVERITY: Record<SaasAlertItem["severity"], { label: string; tone: "danger" | "warning" | "neutral" }> = {
+  critical: { label: "Crítico", tone: "danger" },
+  warning: { label: "Atenção", tone: "warning" },
+  info: { label: "Informativo", tone: "neutral" },
+};

@@ -34,4 +34,19 @@ return [
     'private_storage_paths' => [
         'finance' => ['expenses/{tenant}'],
     ],
+
+    /*
+     * Alertas operacionais (saas:operational-alerts, de hora em hora). E-mail para os administradores globais
+     * ativos quando um alerta crítico ou de atenção abre (e de novo a cada `alert_renotify_hours` se continuar).
+     */
+    'alert_emails' => (bool) env('SAAS_ALERT_EMAILS', true),
+    'alert_renotify_hours' => (int) env('SAAS_ALERT_RENOTIFY_HOURS', 24),
+    'alert_thresholds' => [
+        'failed_jobs_per_hour' => 5,
+        'webhook_failures_per_day' => 3,
+        'ai_error_rate_percent' => 20,
+        'ai_min_requests_for_error_rate' => 20,
+        'queue_oldest_pending_minutes' => 30,
+        'trial_ending_days' => 3,
+    ],
 ];

@@ -50,6 +50,9 @@ import {
   ShieldCheck,
   ScrollText,
   ChartPie,
+  Siren,
+  Mail,
+  HeartPulse,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -99,6 +102,7 @@ export default function Sidebar({
   canManageTenants = false,
   canManageUsers = false,
   canManageAi = false,
+  canManageEmail = false,
   canManageExams = false,
   canSendNotifications = false,
   canViewFinance = false,
@@ -144,6 +148,7 @@ export default function Sidebar({
     {
       label: "Monitoramento",
       items: [
+        { id: "saas-alerts", label: "Alertas", icon: Siren },
         { id: "saas-monitoring", label: "Saúde da plataforma", icon: Activity },
         { id: "saas-usage", label: "Consumo por instituição", icon: ChartPie },
         { id: "saas-ai", label: "Custos de IA", icon: Sparkles },
@@ -151,7 +156,11 @@ export default function Sidebar({
     },
     {
       label: "Relatórios",
-      items: [{ id: "saas-reports", label: "Relatórios SaaS", icon: FileChartColumn }],
+      items: [
+        { id: "saas-reports", label: "Relatórios SaaS", icon: FileChartColumn },
+        { id: "saas-insights", label: "Indicadores e projeções", icon: TrendingUp },
+        { id: "saas-health", label: "Saúde e retenção", icon: HeartPulse },
+      ],
     },
     {
       label: "Administração",
@@ -247,6 +256,7 @@ export default function Sidebar({
         { id: "configuracoes-cobranca", label: "Regras de cobrança", icon: Calculator },
         ...(has("visual_customization") ? [{ id: "configuracoes-tema-mobile", label: "Tema do app mobile", icon: Palette }] : []),
         ...(canManageAi ? [{ id: "configuracoes-ia", label: "Integração com IA", icon: Sparkles }] : []),
+        ...(canManageEmail ? [{ id: "configuracoes-email", label: "E-mail", icon: Mail }] : []),
       ],
     },
   ];

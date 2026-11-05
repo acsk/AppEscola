@@ -23,3 +23,27 @@ export async function deleteAiCredential(provider: AiProvider, tenantId?: number
   const { data } = await api.delete(`/ai-settings/${provider}`, { params: tenantParams(tenantId) });
   return data as { type: string; message: string };
 }
+
+export type AiSpend = {
+  month: {
+    requests: number;
+    errors: number;
+    tokens: number;
+    cost_usd: number;
+    embeddings_cost_usd: number;
+    tenant_key_cost_usd: number;
+    platform_key_cost_usd: number;
+    platform_key_requests: number;
+    limit: number | null;
+  };
+  total: { requests: number; tokens: number; cost_usd: number; since: string | null };
+  by_provider: { provider: string; requests: number; errors: number; tokens: number; cost_usd: number; last_used_at: string | null }[];
+  by_feature: { feature: string; requests: number; cost_usd: number }[];
+  months: { month: string; label: string; requests: number; cost_usd: number }[];
+};
+
+/** Uso e gasto de IA da escola (mês, 6 meses, total, por provedor e por recurso). */
+export async function fetchAiSpend(tenantId?: number | null): Promise<AiSpend> {
+  const { data } = await api.get("/ai-settings/usage", { params: tenantParams(tenantId) });
+  return data.body;
+}

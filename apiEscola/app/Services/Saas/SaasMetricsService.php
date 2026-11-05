@@ -238,6 +238,20 @@ class SaasMetricsService
             'hint' => null,
         ]];
 
+        $email = \App\Models\TenantEmailSetting::query()->where('tenant_id', $tenant->id)->first();
+        $emailFailures = DB::table('email_logs')->where('tenant_id', $tenant->id)->where('status', 'failed')->where('created_at', '>=', $week)->count();
+        $items[] = [
+            'key' => 'email',
+            'name' => 'E-mail · '.($email ? ucfirst($email->provider) : 'Resend'),
+            'configured' => (bool) $email,
+            'active' => (bool) $email?->active,
+            'environment' => $email?->from_email,
+            'configured_at' => $email?->configured_at?->toISOString(),
+            'last_sync' => null,
+            'recent_failures' => $emailFailures,
+            'hint' => $email?->key_hint ? '…'.$email->key_hint : null,
+        ];
+
         foreach (TenantAiCredential::query()->where('tenant_id', $tenant->id)->orderBy('provider')->get() as $ai) {
             $items[] = [
                 'key' => 'ai:'.$ai->provider,

@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\Saas\SaasController;
 use App\Http\Controllers\Api\Saas\GlobalAdminController;
 use App\Http\Controllers\Api\Saas\SaasFeatureController;
+use App\Http\Controllers\Api\Saas\SaasInsightsController;
 use App\Http\Controllers\Api\Saas\SaasOperationsController;
 use App\Http\Controllers\Api\Saas\SaasPlanController;
 use App\Http\Controllers\Api\Saas\SaasSubscriptionController;
@@ -74,6 +75,7 @@ use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\NotificationBroadcastController;
 use App\Http\Controllers\Api\TenantMobileThemeController;
 use App\Http\Controllers\Api\TenantAiSettingsController;
+use App\Http\Controllers\Api\TenantEmailSettingsController;
 use App\Http\Controllers\Api\QuestionAiController;
 use App\Http\Controllers\Api\TenantNotificationSettingsController;
 use App\Http\Controllers\Api\SiteController;
@@ -282,6 +284,11 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         Route::get('monitoring', [SaasOperationsController::class, 'monitoring']);
         Route::get('usage', [SaasOperationsController::class, 'usage']);
         Route::get('ai-usage', [SaasOperationsController::class, 'aiUsage']);
+        Route::get('insights', [SaasInsightsController::class, 'insights']);
+        Route::get('health', [SaasInsightsController::class, 'health']);
+        Route::get('alerts', [SaasInsightsController::class, 'alerts']);
+        Route::post('alerts/run', [SaasInsightsController::class, 'runAlerts']);
+        Route::post('alerts/{alert}/acknowledge', [SaasInsightsController::class, 'acknowledge'])->whereNumber('alert');
         Route::get('reports/{type}', [SaasOperationsController::class, 'report']);
         Route::get('audit', [SaasOperationsController::class, 'audit']);
         Route::get('admins', [GlobalAdminController::class, 'index']);
@@ -315,8 +322,17 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
 
     // Chaves de IA do tenant (criptografadas). Super admin usa as chaves do .env.
     Route::get('ai-settings',               [TenantAiSettingsController::class, 'index']);
+    Route::get('ai-settings/usage',         [TenantAiSettingsController::class, 'usage']);
     Route::put('ai-settings/{provider}',    [TenantAiSettingsController::class, 'update']);
     Route::delete('ai-settings/{provider}', [TenantAiSettingsController::class, 'destroy']);
+
+    // E-mail do tenant (provedor de envio: Resend). Admin no próprio tenant; super admin com tenant_id.
+    Route::get('email-settings',         [TenantEmailSettingsController::class, 'show']);
+    Route::put('email-settings',         [TenantEmailSettingsController::class, 'update']);
+    Route::delete('email-settings',      [TenantEmailSettingsController::class, 'destroy']);
+    Route::post('email-settings/verify', [TenantEmailSettingsController::class, 'verify'])->middleware('throttle:10,1');
+    Route::post('email-settings/test',   [TenantEmailSettingsController::class, 'test'])->middleware('throttle:5,1');
+    Route::get('email-settings/logs',    [TenantEmailSettingsController::class, 'logs']);
 
     // Administração de usuários (super_admin e admin)
     Route::apiResource('users', UserManagementController::class);

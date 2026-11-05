@@ -48,7 +48,7 @@ class SaasSubscriptionService
                 'trial_ends_at' => $trialDays > 0 ? $today->copy()->addDays($trialDays) : null,
                 'current_period_end' => $trialDays > 0 ? $today->copy()->addDays($trialDays) : $this->periodEnd($today, $cycle),
             ]);
-            $this->event($subscription, 'created', $actor, null, $plan->id, ['billing_cycle' => $cycle, 'trial_days' => $trialDays]);
+            $this->event($subscription, 'created', $actor, null, $plan->id, 0.0, ['billing_cycle' => $cycle, 'trial_days' => $trialDays]);
 
             return $subscription;
         });
@@ -84,13 +84,14 @@ class SaasSubscriptionService
         }
 
         $oldPrice = (float) $subscription->price;
-        DB::transaction(function () use ($subscription, $plan, $cycle, $actor, $from, $oldPrice) {
+        $before = $subscription->monthlyRevenue();
+        DB::transaction(function () use ($subscription, $plan, $cycle, $actor, $from, $oldPrice, $before) {
             $subscription->update([
                 'saas_plan_id' => $plan->id,
                 'billing_cycle' => $cycle,
                 'price' => $plan->priceFor($cycle),
             ]);
-            $this->event($subscription, 'plan_changed', $actor, $from?->id, $plan->id, [
+            $this->event($subscription, 'plan_changed', $actor, $from?->id, $plan->id, $before, [
                 'billing_cycle' => $cycle,
                 'direction' => (float) $plan->priceFor($cycle) >= $oldPrice ? 'upgrade' : 'downgrade',
                 'old_price' => $oldPrice,
@@ -113,8 +114,9 @@ class SaasSubscriptionService
             : BusinessDate::today();
         $end = $this->periodEnd($base, $subscription->billing_cycle);
 
+        $before = $subscription->monthlyRevenue();
         $subscription->update(['status' => TenantSubscription::ACTIVE, 'current_period_end' => $end, 'trial_ends_at' => $subscription->status === TenantSubscription::TRIALING ? BusinessDate::today() : $subscription->trial_ends_at]);
-        $this->event($subscription, 'renewed', $actor, null, null, ['current_period_end' => $end->toDateString()]);
+        $this->event($subscription, 'renewed', $actor, null, null, $before, ['current_period_end' => $end->toDateString()]);
         $this->audit->log($actor, $subscription->tenant_id, 'subscription.renewed', 'Assinatura renovada até '.$end->format('d/m/Y'));
         $this->entitlements->flush($subscription->tenant_id);
 
@@ -124,8 +126,9 @@ class SaasSubscriptionService
     public function cancel(TenantSubscription $subscription, string $reason, User $actor): TenantSubscription
     {
         $this->ensureStatus($subscription, [TenantSubscription::ACTIVE, TenantSubscription::PAST_DUE, TenantSubscription::TRIALING], 'A assinatura já está encerrada.');
+        $before = $subscription->monthlyRevenue();
         $subscription->update(['status' => TenantSubscription::CANCELED, 'canceled_at' => now(), 'cancel_reason' => $reason]);
-        $this->event($subscription, 'canceled', $actor, null, null, ['reason' => $reason]);
+        $this->event($subscription, 'canceled', $actor, null, null, $before, ['reason' => $reason]);
         $this->audit->log($actor, $subscription->tenant_id, 'subscription.canceled', "Assinatura cancelada: {$reason}");
         $this->entitlements->flush($subscription->tenant_id);
 
@@ -142,7 +145,7 @@ class SaasSubscriptionService
             'cancel_reason' => null,
             'current_period_end' => $this->periodEnd($today, $subscription->billing_cycle),
         ]);
-        $this->event($subscription, 'reactivated', $actor);
+        $this->event($subscription, 'reactivated', $actor, null, null, 0.0);
         $this->audit->log($actor, $subscription->tenant_id, 'subscription.reactivated', 'Assinatura reativada');
         $this->entitlements->flush($subscription->tenant_id);
 
@@ -158,7 +161,7 @@ class SaasSubscriptionService
         $end = $base->copy()->addDays($days);
 
         $subscription->update(['status' => TenantSubscription::TRIALING, 'trial_ends_at' => $end, 'current_period_end' => $end]);
-        $this->event($subscription, 'trial_extended', $actor, null, null, ['days' => $days, 'trial_ends_at' => $end->toDateString()]);
+        $this->event($subscription, 'trial_extended', $actor, null, null, $subscription->monthlyRevenue(), ['days' => $days, 'trial_ends_at' => $end->toDateString()]);
         $this->audit->log($actor, $subscription->tenant_id, 'subscription.trial_extended', "Teste estendido em {$days} dias (até {$end->format('d/m/Y')})");
         $this->entitlements->flush($subscription->tenant_id);
 
@@ -168,8 +171,9 @@ class SaasSubscriptionService
     public function setDiscount(TenantSubscription $subscription, float $percent, User $actor): TenantSubscription
     {
         $old = (float) $subscription->discount_percent;
+        $before = $subscription->monthlyRevenue();
         $subscription->update(['discount_percent' => $percent]);
-        $this->event($subscription, 'discount_changed', $actor, null, null, ['from' => $old, 'to' => $percent]);
+        $this->event($subscription, 'discount_changed', $actor, null, null, $before, ['from' => $old, 'to' => $percent]);
         $this->audit->log($actor, $subscription->tenant_id, 'subscription.discount_changed', "Desconto alterado de {$old}% para {$percent}%");
 
         return $subscription->fresh('plan');
@@ -183,13 +187,14 @@ class SaasSubscriptionService
 
         TenantSubscription::query()->where('status', TenantSubscription::TRIALING)->whereDate('trial_ends_at', '<', $today)->each(function (TenantSubscription $s) use (&$counts) {
             $s->update(['status' => TenantSubscription::EXPIRED]);
-            $this->event($s, 'trial_expired', null);
+            $this->event($s, 'trial_expired', null, null, null, 0.0);
             $this->entitlements->flush($s->tenant_id);
             $counts['expired']++;
         });
         TenantSubscription::query()->where('status', TenantSubscription::ACTIVE)->whereDate('current_period_end', '<', $today)->each(function (TenantSubscription $s) use (&$counts) {
+            $before = $s->monthlyRevenue();
             $s->update(['status' => TenantSubscription::PAST_DUE]);
-            $this->event($s, 'past_due', null);
+            $this->event($s, 'past_due', null, null, null, $before);
             $this->entitlements->flush($s->tenant_id);
             $counts['past_due']++;
         });
@@ -224,8 +229,23 @@ class SaasSubscriptionService
         return $cycle === 'yearly' ? 'anual' : 'mensal';
     }
 
-    private function event(TenantSubscription $subscription, string $type, ?User $actor, ?int $fromPlan = null, ?int $toPlan = null, ?array $data = null): void
+    /**
+     * Registra o evento com o efeito no MRR desta assinatura (mrr_delta) e o tipo de movimento
+     * (new, expansion, contraction, churn, reactivation), base dos indicadores de receita.
+     */
+    private function event(TenantSubscription $subscription, string $type, ?User $actor, ?int $fromPlan, ?int $toPlan, float $mrrBefore, ?array $data = null): void
     {
+        $delta = round($subscription->monthlyRevenue() - $mrrBefore, 2);
+        $movement = match (true) {
+            $type === 'canceled' && $delta < 0 => 'churn',
+            $type === 'reactivated' && $delta > 0 => 'reactivation',
+            in_array($type, ['created', 'renewed'], true) && $delta > 0 => 'new',
+            $delta > 0 => 'expansion',
+            $delta < 0 => 'contraction',
+            default => null,
+        };
+        $data = ($data ?? []) + ['mrr_delta' => $delta, 'movement' => $movement];
+
         TenantSubscriptionEvent::query()->create([
             'tenant_id' => $subscription->tenant_id,
             'tenant_subscription_id' => $subscription->id,
