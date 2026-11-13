@@ -5,6 +5,7 @@ import Button from "../../ui/Button";
 import FormInput from "../../ui/FormInput";
 import { fmtMoney } from "../../financeiro/format";
 import { fmtDateTime } from "../cora/coraEvents";
+import { useResponsiveLayout } from "../../../hooks/useResponsiveLayout";
 import { color } from "../../../constants/theme";
 import { getApiResponseMessage } from "../../../utils/apiErrors";
 import { historyActionLabel, transactionTypeLabel } from "./reconciliationLabels";
@@ -45,6 +46,7 @@ const fmtDate = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").rever
  * quem concilia é a pessoa, com justificativa, e a cobrança Cora só é conciliada se a Cora confirmar.
  */
 export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
+  const { isMobile } = useResponsiveLayout();
   const [candidates, setCandidates] = useState<ReconciliationCandidate[]>([]);
   const [expenseCandidates, setExpenseCandidates] = useState<ExpenseCandidate[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
@@ -52,6 +54,7 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [justification, setJustification] = useState("");
+  const [reviewing, setReviewing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -85,10 +88,14 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
 
   useEffect(() => {
     setSelected(null);
+    setReviewing(false);
     setJustification("");
     setSearch("");
     setError("");
-    fetchReconciliationHistory(entry.id).then(setHistory).catch(() => setHistory([]));
+    let active = true;
+    setHistory([]);
+    fetchReconciliationHistory(entry.id).then((items) => { if (active) setHistory(items); }).catch(() => { if (active) setHistory([]); });
+    return () => { active = false; };
   }, [entry.id, entry.status]);
 
   useEffect(() => {
@@ -140,6 +147,31 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
       </View>
 
       <Notice entry={entry} />
+
+      <View style={{ flexDirection: isMobile ? "column" : "row", gap: 16 }}>
+        <DetailBox title="Movimentação bancária" rows={[
+          ["Data", fmtDateTime(entry.occurred_at)],
+          ["Tipo", `${transactionTypeLabel(entry.transaction_type)} ${isCredit ? "recebido" : "enviado"}`],
+          ["Valor", `${sign} ${fmtMoney(entry.amount)}`],
+          [isCredit ? "Pagador" : "Favorecido", entry.counterparty_name ?? "—"],
+          ["ID externo", entry.external_id],
+          ["Descrição", entry.description ?? "—"],
+        ]} />
+        <DetailBox title={entry.expense ? "Despesa vinculada" : "Cobrança vinculada"} rows={entry.invoice ? [
+          ["Cobrança", `#${entry.invoice.id}`],
+          ["Aluno", entry.invoice.student?.name ?? "—"],
+          ["Descrição", entry.invoice.description ?? "—"],
+          ["Vencimento", fmtDate(entry.invoice.due_date)],
+          ["Valor", fmtMoney(entry.invoice.amount)],
+          ["Situação", INVOICE_STATUS_LABEL[entry.invoice.status] ?? entry.invoice.status],
+          ["Baixa", fmtDateTime(entry.invoice.paid_at)],
+        ] : entry.expense ? [
+          ["Despesa", entry.expense.code],
+          ["Descrição", entry.expense.description],
+          ["Valor", fmtMoney(entry.expense.amount)],
+          ["Situação", entry.expense.status === "paid" ? "Paga" : entry.expense.status],
+        ] : [["Vínculo", "Nenhuma cobrança ou despesa vinculada."]]} />
+      </View>
 
       {canPickInvoice ? (
         <View style={{ gap: 8 }}>
@@ -196,7 +228,14 @@ export default function ReconcilePanel({ entry, canSettle, onDecided }: Props) {
         </View>
       ) : null}
 
-      {canSettle ? (
+      {canSettle && !open && !reviewing ? (
+        <View style={{ gap: 8, alignItems: "flex-end" }}>
+          <Button size="sm" variant="secondary" label="Voltar para pendente…" onPress={() => setReviewing(true)} />
+          {entry.status === "reconciled" ? <Text className="text-xs text-ink-subtle">{`Esta ação pede justificativa e não desfaz ${entry.expense ? "o pagamento da despesa" : "a baixa da cobrança"}.`}</Text> : null}
+        </View>
+      ) : null}
+
+      {canSettle && (open || reviewing) ? (
         <View style={{ gap: 12 }}>
           <FormInput
             label="Justificativa (obrigatória)"
@@ -440,5 +479,23 @@ function ExpenseCandidateCard({ candidate, selected, onPress }: { candidate: Exp
         </View>
       ) : null}
     </Pressable>
+  );
+}
+
+function DetailBox({ title, rows }: { title: string; rows: string[][] }) {
+  return (
+    <View className="border border-border rounded-ds-sm overflow-hidden" style={{ flex: 1, minWidth: 0 }}>
+      <View className="bg-surface-sunken border-b border-border" style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+        <Text className="font-semibold text-ink-muted" style={{ fontSize: 12, lineHeight: 18 }}>{title}</Text>
+      </View>
+      <View style={{ padding: 12, gap: 8 }}>
+        {rows.map(([label, value]) => (
+          <View key={label} style={{ flexDirection: "row", gap: 10 }}>
+            <Text className="text-xs text-ink-subtle" style={{ width: 90 }}>{label}</Text>
+            <Text className={`text-xs text-ink ${["Data", "Valor", "ID externo", "Vencimento", "Baixa"].includes(label) ? "font-mono" : ""}`} style={{ flex: 1, minWidth: 0, ...({ overflowWrap: "anywhere" } as object) }}>{value}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }

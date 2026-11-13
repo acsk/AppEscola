@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
-import { RefreshCw } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Download, Link, RefreshCw } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
@@ -9,16 +9,12 @@ import FormInput from "../../components/ui/FormInput";
 import FormSelect from "../../components/ui/FormSelect";
 import DatePickerInput from "../../components/ui/DatePickerInput";
 import Pagination from "../../components/ui/Pagination";
-import DataTableRow from "../../components/ui/DataTableRow";
-import StatTile from "../../components/ui/StatTile";
+import ReconciliationTable from "../../components/finance/reconciliation/ReconciliationTable";
+import ToastBanner from "../../components/ui/ToastBanner";
 import Modal from "../../components/ui/Modal";
 import {
-  TABLE_CELL,
   TABLE_CELL_SEMIBOLD,
   TABLE_CELL_SUBLINE,
-  TABLE_HEADER_CELL,
-  TABLE_HEADER_ROW,
-  TABLE_HEADER_ROW_STYLE,
 } from "../../components/ui/dataTableStyles";
 import { fmtMoney } from "../../components/financeiro/format";
 import { fmtDateTime } from "../../components/finance/cora/coraEvents";
@@ -51,12 +47,10 @@ type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
 };
 
-type TabId = ReconciliationStatus | "all";
+type TabId = ReconciliationStatus | "all" | "outside";
 
 const SETTLE = "finance.invoices.settle";
 const EMPTY_PAGE: BankEntriesPage = { items: [], meta: { current_page: 1, last_page: 1, per_page: 25, total: 0 } };
-/** A partir desta largura o painel de decisão fica ao lado da lista; abaixo, abre em janela. */
-const SIDE_PANEL_MIN_WIDTH = 1280;
 
 const isoDaysAgo = (days: number) => {
   const d = new Date();
@@ -70,8 +64,10 @@ const isoDaysAgo = (days: number) => {
  * o resto é decidido aqui, sempre com justificativa.
  */
 export default function BankReconciliationScreen({ navigate }: Props) {
-  const { contentPadding, isMobile, width } = useResponsiveLayout();
-  const sidePanel = width >= SIDE_PANEL_MIN_WIDTH;
+  const { contentPadding, isMobile } = useResponsiveLayout();
+  const [tableWidth, setTableWidth] = useState(0);
+
+  const compactList = isMobile || (tableWidth > 0 && tableWidth < 780);
 
   const [summary, setSummary] = useState<ReconciliationSummary | null>(null);
   const [entries, setEntries] = useState<BankEntriesPage>(EMPTY_PAGE);
@@ -88,39 +84,46 @@ export default function BankReconciliationScreen({ navigate }: Props) {
   const [dateFrom, setDateFrom] = useState(isoDaysAgo(30));
   const [dateTo, setDateTo] = useState(isoDaysAgo(0));
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(100);
+  const [exporting, setExporting] = useState(false);
+  const effectiveOrigin = tab === "outside" ? "other" : origin;
+  const invalidPeriod = !!dateFrom && !!dateTo && dateFrom > dateTo;
 
   const canSettle = !!summary?.permissions.includes(SETTLE);
 
   const loadSummary = useCallback(async () => {
+    if (invalidPeriod) return;
     try {
-      setSummary(await fetchReconciliationSummary({ search: search.trim(), type, origin, date_from: dateFrom, date_to: dateTo }));
+      setSummary(await fetchReconciliationSummary({ search: search.trim(), type, origin: effectiveOrigin, date_from: dateFrom, date_to: dateTo }));
     } catch (err: any) {
       setError(getApiResponseMessage(err?.response?.data, "Não foi possível carregar o resumo da conciliação."));
     }
-  }, [search, type, origin, dateFrom, dateTo]);
+  }, [search, type, effectiveOrigin, dateFrom, dateTo, invalidPeriod]);
 
   const loadEntries = useCallback(async () => {
+    if (invalidPeriod) return;
     setLoading(true);
     setError("");
     try {
       const result = await fetchBankEntries({
-        status: tab === "all" ? "" : tab,
+        status: tab === "all" || tab === "outside" ? "" : tab,
         search: search.trim(),
         type,
-        origin,
+        origin: effectiveOrigin,
         date_from: dateFrom,
         date_to: dateTo,
         page,
+        per_page: perPage,
       });
       setEntries(result);
-      setSelected((current) => (current ? result.items.find((e) => e.id === current.id) ?? current : null));
+      setSelected((current) => (current ? result.items.find((e) => e.id === current.id) ?? null : null));
     } catch (err: any) {
       setError(getApiResponseMessage(err?.response?.data, "Não foi possível carregar as movimentações."));
       setEntries(EMPTY_PAGE);
     } finally {
       setLoading(false);
     }
-  }, [tab, search, type, origin, dateFrom, dateTo, page]);
+  }, [tab, search, type, effectiveOrigin, dateFrom, dateTo, page, perPage, invalidPeriod]);
 
   useEffect(() => {
     const timer = setTimeout(loadSummary, search ? 300 : 0);
@@ -152,9 +155,9 @@ export default function BankReconciliationScreen({ navigate }: Props) {
     }
   };
 
-  const onDecided = (message: string, entry: BankEntry) => {
+  const onDecided = (message: string) => {
     setFeedback({ tone: "success", text: message });
-    setSelected(sidePanel ? entry : null);
+    setSelected(null);
     reload();
   };
 
@@ -169,7 +172,8 @@ export default function BankReconciliationScreen({ navigate }: Props) {
     { id: "divergent", label: "Divergências", count: counts?.divergent, alert: counts?.divergent ? "Há divergências" : null },
     { id: "reconciled", label: "Conciliadas", count: counts?.reconciled },
     { id: "ignored", label: "Ignoradas", count: counts?.ignored },
-    { id: "all", label: "Todas" },
+    { id: "all", label: "Todas", count: counts ? Object.values(counts).reduce((a, b) => a + b, 0) : null },
+    { id: "outside", label: "Fora da aplicação" },
   ];
 
   const amountText = (entry: BankEntry) => `${entry.direction === "credit" ? "+" : "−"} ${fmtMoney(entry.amount)}`;
@@ -224,7 +228,7 @@ export default function BankReconciliationScreen({ navigate }: Props) {
       />
     ) : null;
 
-  const list = isMobile ? (
+  const list = compactList ? (
     <View style={{ gap: 12 }}>
       {listState() ??
         entries.items.map((entry) => (
@@ -245,91 +249,72 @@ export default function BankReconciliationScreen({ navigate }: Props) {
       {pagination ? <View className="bg-surface rounded-ds-md border border-border px-3">{pagination}</View> : null}
     </View>
   ) : (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: "100%" }} contentContainerStyle={{ width: "100%" }}>
-      <View className="bg-surface rounded-ds-md overflow-hidden border border-border" style={{ width: "100%", minWidth: sidePanel ? 600 : 760 }}>
-        <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
-          <Text className={TABLE_HEADER_CELL} style={{ width: 110 }}>
-            Data
-          </Text>
-          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.4, minWidth: 180 }}>
-            Movimentação
-          </Text>
-          {sidePanel ? null : (
-            <Text className={TABLE_HEADER_CELL} style={{ width: 110 }}>
-              Tipo
-            </Text>
-          )}
-          <Text className={TABLE_HEADER_CELL} style={{ width: 130, textAlign: "right", paddingRight: 16 }}>
-            Valor
-          </Text>
-          <Text className={TABLE_HEADER_CELL} style={{ flex: 1.2, minWidth: 180 }}>
-            Situação
-          </Text>
-        </View>
-
-        {listState() ??
-          entries.items.map((entry, i) => {
-            const active = selected?.id === entry.id;
-            return (
-              <DataTableRow
-                key={entry.id}
-                index={i}
-                onPress={() => setSelected(entry)}
-                style={active ? { backgroundColor: color["brand-tint"], borderLeftWidth: 3, borderLeftColor: color.brand } : undefined}
-              >
-                <Text className={`${TABLE_CELL} font-mono`} style={{ width: 110, paddingRight: 8 }}>
-                  {fmtDateTime(entry.occurred_at)}
-                </Text>
-                <View style={{ flex: 1.4, minWidth: 180, paddingRight: 10 }}>
-                  <Text className={TABLE_CELL_SEMIBOLD} numberOfLines={2}>
-                    {[entry.description, entry.counterparty_name].filter(Boolean).join(" · ") || "—"}
-                  </Text>
-                  <Text className={`${TABLE_CELL_SUBLINE} font-mono`} numberOfLines={1}>
-                    {`${sidePanel ? `${transactionTypeLabel(entry.transaction_type)} · ` : ""}${entry.cited_charge_ids[0] ?? entry.external_id}`}
-                  </Text>
-                </View>
-                {sidePanel ? null : (
-                  <Text className={TABLE_CELL} style={{ width: 110, paddingRight: 8 }}>
-                    {transactionTypeLabel(entry.transaction_type)}
-                  </Text>
-                )}
-                <Text
-                  className={`${TABLE_CELL} font-mono ${entry.direction === "credit" ? "" : "text-danger"}`}
-                  style={{ width: 130, textAlign: "right", paddingRight: 16 }}
-                >
-                  {amountText(entry)}
-                </Text>
-                <View style={{ flex: 1.2, minWidth: 180, paddingRight: 10 }}>{statusCell(entry)}</View>
-              </DataTableRow>
-            );
-          })}
-
-        {pagination ? <View className="px-4 border-t border-border">{pagination}</View> : null}
-      </View>
-    </ScrollView>
+    <ReconciliationTable entries={entries.items} selectedId={selected?.id} width={tableWidth}
+      onSelect={setSelected} state={listState()} />
   );
 
-  const panel = selected ? <ReconcilePanel entry={selected} canSettle={canSettle} onDecided={onDecided} /> : null;
+  const exportEntries = async () => {
+    if (invalidPeriod) return;
+    setExporting(true);
+    try {
+      const rows: BankEntry[] = [];
+      let currentPage = 1;
+      let lastPage = 1;
+      do {
+        const result = await fetchBankEntries({
+          status: tab === "all" || tab === "outside" ? "" : tab,
+          origin: effectiveOrigin, search: search.trim(), type, date_from: dateFrom, date_to: dateTo,
+          page: currentPage, per_page: 100,
+        });
+        rows.push(...result.items);
+        lastPage = result.meta.last_page;
+        currentPage++;
+      } while (currentPage <= lastPage);
+      // Protege células de texto contra fórmulas ao abrir o CSV em uma planilha.
+      const cell = (value: string) => `"${(/^[=+@\-\t\r]/.test(value) ? "'" + value : value).replace(/"/g, '\"\"')}"`;
+      const csv = [
+        ["Data", "Movimentação", "Pagador", "Tipo", "ID externo", "Valor", "Situação", "Vínculo"],
+        ...rows.map((entry) => [fmtDateTime(entry.occurred_at), entry.description ?? "", entry.counterparty_name ?? "",
+          transactionTypeLabel(entry.transaction_type), entry.external_id,
+          `${entry.direction === "debit" ? "-" : ""}${Number(entry.amount).toFixed(2).replace(".", ",")}`,
+          RECONCILIATION_STATUS_LABEL[entry.status], entry.invoice ? `Cobrança #${entry.invoice.id}` : entry.expense?.code ?? ""]),
+      ].map((row) => row.map(cell).join(";")).join("\r\n");
+      const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "conciliacao-bancaria.csv";
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err: any) {
+      setFeedback({ tone: "danger", text: getApiResponseMessage(err?.response?.data, "Não foi possível exportar as movimentações.") });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const selectedIndex = entries.items.findIndex((entry) => entry.id === selected?.id);
+  const panel = selected ? <ReconcilePanel key={selected.id} entry={selected} canSettle={canSettle} onDecided={onDecided} /> : null;
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, gap: 24 }}>
+    <>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: contentPadding, gap: 14 }}>
       <PageHeader
         breadcrumb={[{ label: "Financeiro" }, { label: "Conciliação bancária" }]}
         title="Conciliação bancária"
         description="Movimentações da conta Cora comparadas com as cobranças do sistema."
         actions={
           <>
-            <Button label="Integração Cora" onPress={() => navigate("financeiro-cora")} />
-            <Button icon={RefreshCw} label="Atualizar" onPress={reload} loading={loading} />
-            {canSettle ? <Button variant="primary" label="Sincronizar agora" onPress={sync} loading={syncing} disabled={syncing} /> : null}
+            <Button size="sm" variant="secondary" icon={Link} label="Integração Cora" onPress={() => navigate("financeiro-cora")} />
+            <Button size="sm" variant="secondary" icon={Download} label="Exportar" onPress={exportEntries} loading={exporting} disabled={invalidPeriod || loading} />
+            {canSettle ? <Button size="sm" icon={RefreshCw} variant="primary" label="Sincronizar agora" onPress={sync} loading={syncing} disabled={syncing} /> : null}
           </>
         }
       />
 
-      <ConnectionStrip summary={summary} />
+      <ConnectionStrip summary={summary} onRefresh={reload} loading={loading} />
 
       {summary ? (
-        <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+        <View className="bg-surface border border-border rounded-ds-md overflow-hidden" style={{ flexDirection: "row", flexWrap: "wrap" }}>
           {[
             { label: "Entradas no período", value: fmtMoney(summary.credits.amount), hint: `${summary.credits.count} movimentações` },
             { label: "Saídas no período", value: fmtMoney(summary.debits.amount), hint: `${summary.debits.count} movimentações` },
@@ -340,31 +325,36 @@ export default function BankReconciliationScreen({ navigate }: Props) {
               hint: `${fmtMoney(summary.reconciled.amount)} de ${fmtMoney(summary.reconciled.of_amount)}`,
             },
             { label: "Pendente", value: fmtMoney(summary.pending.amount), hint: `${summary.pending.count} movimentações` },
-            { label: "Divergências", value: String(summary.counts.divergent), hint: "precisam de decisão" },
-          ].map((tile) => (
-            <View key={tile.label} style={{ flex: 1, minWidth: isMobile ? "100%" : 180 }}>
-              <StatTile label={tile.label} value={tile.value} unit={tile.unit} hint={tile.hint} />
+            { label: "Divergências", value: String(summary.counts.divergent), hint: summary.counts.divergent ? "precisam de decisão" : "nenhuma decisão pendente" },
+          ].map((tile, i) => (
+            <View key={tile.label} className="border-border" style={{ flex: 1, minWidth: compactList ? "50%" : 0, paddingHorizontal: 14, paddingVertical: 10, borderLeftWidth: i > 0 && !compactList ? 1 : 0, borderBottomWidth: compactList ? 1 : 0 }}>
+              <Text className="text-ink-muted font-medium" style={{ fontSize: 11, lineHeight: 16 }}>{tile.label}</Text>
+              <Text className="font-mono font-semibold text-ink" style={{ fontSize: 18, lineHeight: 26 }}>{tile.value}{tile.unit}</Text>
+              <Text className="text-ink-subtle" style={{ fontSize: 11, lineHeight: 16 }}>{tile.hint}</Text>
             </View>
           ))}
         </View>
       ) : null}
 
-      {feedback ? (
-        <View
-          className={`rounded-ds-md border px-4 py-3 ${feedback.tone === "success" ? "border-success bg-success-tint" : "border-danger bg-danger-tint"}`}
-          aria-live="polite"
-        >
-          <Text className={`text-sm ${feedback.tone === "success" ? "text-success" : "text-danger"}`}>{feedback.text}</Text>
+      {summary?.last_sync?.status === "success" ? (
+        <View className="border border-success bg-success-tint rounded-ds-md" style={{ paddingHorizontal: 14, paddingVertical: 8 }} role="status">
+          <Text className="text-xs text-ink">
+            <Text className="text-success font-semibold">✓ </Text>
+            Extrato sincronizado{summary.last_sync.period_start ? ` de ${isoToDisplay(summary.last_sync.period_start.slice(0, 10))}` : ""}{summary.last_sync.period_end ? ` até ${isoToDisplay(summary.last_sync.period_end.slice(0, 10))}` : ""}: {summary.last_sync.created} movimentações novas, {summary.last_sync.auto_reconciled} conciliadas automaticamente.
+          </Text>
         </View>
       ) : null}
+
 
       {error ? (
-        <View className="rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+        <View className="rounded-ds-md border border-danger bg-danger-tint px-4 py-3" style={{ gap: 8 }}>
           <Text className="text-sm text-danger">{error}</Text>
+          <Button size="sm" variant="secondary" label="Tentar novamente" onPress={reload} disabled={invalidPeriod} />
         </View>
       ) : null}
 
-      <View style={{ gap: 16 }}>
+      <View className="bg-surface border border-border rounded-ds-md overflow-hidden" onLayout={(event) => setTableWidth(event.nativeEvent.layout.width)}>
+        <View style={{ paddingHorizontal: 12 }}>
         <Tabs
           accessibilityLabel="Situação das movimentações"
           items={tabs}
@@ -374,22 +364,26 @@ export default function BankReconciliationScreen({ navigate }: Props) {
             setPage(1);
           }}
         />
+        </View>
 
-        <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 16 }}>
+        <View className="border-b border-border" style={{ paddingHorizontal: 12, paddingTop: 8 }}>
           <View className="flex-row flex-wrap" style={{ gap: 12 }}>
             <View style={{ flex: 2, minWidth: isMobile ? "100%" : 240 }}>
-              <FormInput label="Buscar" value={search} onChangeText={resetPage(setSearch)} placeholder="Descrição, pagador, ID ou valor" />
+              <FormInput dense label="Buscar" value={search} onChangeText={resetPage(setSearch)} placeholder="Descrição, pagador, ID ou valor" />
             </View>
             <View style={{ flex: 1, minWidth: isMobile ? "100%" : 190 }}>
               <FormSelect
+                dense
+                disabled={tab === "outside"}
                 label="Origem"
-                value={origin}
+                value={effectiveOrigin}
                 options={RECONCILIATION_ORIGIN_OPTIONS}
                 onChange={(v) => resetPage(setOrigin)(v as ReconciliationOrigin | "")}
               />
             </View>
             <View style={{ flex: 1, minWidth: isMobile ? "100%" : 160 }}>
               <FormSelect
+                dense
                 label="Tipo"
                 value={type}
                 options={RECONCILIATION_TYPE_OPTIONS}
@@ -397,77 +391,62 @@ export default function BankReconciliationScreen({ navigate }: Props) {
               />
             </View>
             <View style={{ flex: 1, minWidth: isMobile ? "100%" : 140 }}>
-              <DatePickerInput label="De" value={dateFrom ? isoToDisplay(dateFrom) : ""} onChangeText={(v) => resetPage(setDateFrom)(displayToISO(v))} />
+              <DatePickerInput compact label="De" value={dateFrom ? isoToDisplay(dateFrom) : ""} onChangeText={(v) => resetPage(setDateFrom)(displayToISO(v))} />
             </View>
             <View style={{ flex: 1, minWidth: isMobile ? "100%" : 140 }}>
-              <DatePickerInput label="Até" value={dateTo ? isoToDisplay(dateTo) : ""} onChangeText={(v) => resetPage(setDateTo)(displayToISO(v))} />
+              <DatePickerInput compact error={invalidPeriod ? "A data final deve ser igual ou posterior à inicial." : undefined} label="Até" value={dateTo ? isoToDisplay(dateTo) : ""} onChangeText={(v) => resetPage(setDateTo)(displayToISO(v))} />
             </View>
           </View>
         </View>
 
-        {sidePanel ? (
-          <View className="flex-row items-start" style={{ gap: 16 }}>
-            <View style={{ flex: 1.7, minWidth: 0 }}>{list}</View>
-            <View className="bg-surface border border-border rounded-ds-md" style={{ flex: 1, minWidth: 380, maxWidth: 480, padding: 20 }}>
-              {panel ?? (
-                <Text className="text-sm text-ink-muted">Selecione uma movimentação para ver os critérios e decidir.</Text>
-              )}
-            </View>
+        <View className="flex-row items-center justify-between flex-wrap border-b border-border" style={{ gap: 8, padding: 10 }}>
+          <Text className="text-xs text-ink-subtle">{entries.meta.total} movimentações · Total da página <Text className="font-mono text-ink">{fmtMoney(entries.items.reduce((total, entry) => total + (entry.direction === "credit" ? 1 : -1) * Number(entry.amount), 0))}</Text></Text>
+          <View style={{ width: 150 }}>
+            <FormSelect label="Itens por página" hideLabel dense value={perPage} options={[25, 50, 100].map((value) => ({ value, label: `${value} por página` }))} onChange={(value) => resetPage(setPerPage)(Number(value))} />
           </View>
-        ) : (
-          <>
-            {list}
-            <Modal visible={!!selected} title="Movimentação" onClose={() => setSelected(null)} size="md">
-              {panel}
-            </Modal>
-          </>
-        )}
+        </View>
+        {list}
+        {!compactList && pagination ? <View style={{ paddingHorizontal: 12 }}>{pagination}</View> : null}
       </View>
     </ScrollView>
+    <ToastBanner visible={!!feedback} type={feedback?.tone === "success" ? "success" : "error"} message={feedback?.text ?? ""} onClose={() => setFeedback(null)} />
+    <Modal visible={!!selected} title="Detalhes da movimentação" onClose={() => setSelected(null)} size="lg" compact showScrollIndicator
+      headerContent={selected ? (
+        <View className="flex-row items-center" style={{ gap: 8, marginTop: 6 }}>
+          <Text className="font-mono text-xs text-ink-subtle" style={{ flex: 1 }}>{selectedIndex + 1} de {entries.items.length} nesta página</Text>
+          <Button size="sm" variant="ghost" icon={ChevronLeft} label="Anterior" disabled={selectedIndex <= 0} onPress={() => setSelected(entries.items[selectedIndex - 1])} />
+          <Button size="sm" variant="ghost" icon={ChevronRight} label="Próxima" disabled={selectedIndex < 0 || selectedIndex >= entries.items.length - 1} onPress={() => setSelected(entries.items[selectedIndex + 1])} />
+        </View>
+      ) : null}
+      footer={<Button size="sm" label="Fechar" onPress={() => setSelected(null)} />}>
+      {panel}
+    </Modal>
+    </>
   );
 }
 
-/** Faixa do banco: ambiente, credenciais e última busca do extrato. Nenhum dado da conta aparece aqui. */
-function ConnectionStrip({ summary }: { summary: ReconciliationSummary | null }) {
-  const { isMobile } = useResponsiveLayout();
+/** Faixa do banco: ambiente, credenciais e última busca do extrato. */
+function ConnectionStrip({ summary, onRefresh, loading }: { summary: ReconciliationSummary | null; onRefresh: () => void; loading: boolean }) {
   if (!summary) return null;
-
   const last = summary.last_sync;
-  const envLabel = summary.environment === "prod" ? "produção" : "homologação";
-  const lastText = !last
-    ? "Nenhuma sincronização ainda"
-    : last.status === "failed"
-      ? `Falhou em ${fmtDateTime(last.finished_at)}`
-      : last.status === "running"
-        ? `Em andamento desde ${fmtDateTime(last.started_at)}`
-        : `${fmtDateTime(last.finished_at)} · ${last.created} nova(s), ${last.auto_reconciled} conciliada(s) auto.`;
-
+  const lastText = !last ? "Nenhuma sincronização" : last.status === "running"
+    ? `Em andamento desde ${fmtDateTime(last.started_at)}` : fmtDateTime(last.finished_at);
   return (
-    <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 16, gap: 8 }}>
-      <View className="flex-row flex-wrap items-center" style={{ gap: isMobile ? 8 : 24 }}>
-        <View className="flex-row items-center" style={{ gap: 8 }}>
-          <View className="border border-border-strong rounded-ds-sm px-2 py-1">
-            <Text className="text-sm font-semibold text-ink">Banco Cora</Text>
-          </View>
-          <View style={{ width: 8, height: 8, backgroundColor: summary.credentials_active ? color.success : color["ink-subtle"] }} />
-          <Text className="text-sm text-ink">{`${summary.credentials_active ? "Credenciais ativas" : "Sem credenciais ativas"} · ${envLabel}`}</Text>
+    <View className="bg-surface border border-border rounded-ds-md" style={{ paddingHorizontal: 14, paddingVertical: 8, gap: 6 }}>
+      <View className="flex-row flex-wrap items-center" style={{ gap: 14 }}>
+        <View className="border border-border-strong rounded-ds-sm" style={{ paddingHorizontal: 8, paddingVertical: 2 }}>
+          <Text className="text-xs font-semibold text-ink">Banco Cora</Text>
         </View>
-        <View style={{ minWidth: 0, flexShrink: 1 }}>
-          <Text className="text-xs text-ink-muted">Operação com a Cora desde</Text>
-          <Text className="text-sm font-mono text-ink">
-            {summary.operating_since ? summary.operating_since.split("-").reverse().join("/") : "Nenhuma cobrança gerada ainda"}
-          </Text>
-        </View>
-        <View style={{ minWidth: 0, flexShrink: 1 }}>
-          <Text className="text-xs text-ink-muted">Última sincronização</Text>
-          <Text className={`text-sm font-mono ${last?.status === "failed" ? "text-danger" : "text-ink"}`}>{lastText}</Text>
+        <Text className={`text-xs font-medium ${summary.credentials_active ? "text-success" : "text-ink-subtle"}`}>
+          {`${summary.credentials_active ? "● Credenciais ativas" : "Sem credenciais ativas"} · ${summary.environment === "prod" ? "produção" : "homologação"}`}
+        </Text>
+        <Text className="text-xs text-ink-muted">Operação desde <Text className="font-mono text-ink">{summary.operating_since ? isoToDisplay(summary.operating_since) : "—"}</Text></Text>
+        <Text className="text-xs text-ink-muted">Última sincronização <Text className={`font-mono ${last?.status === "failed" ? "text-danger" : "text-ink"}`}>{lastText}</Text></Text>
+        <View style={{ marginLeft: "auto" }}>
+          <Button size="sm" variant="ghost" icon={RefreshCw} label="Atualizar" onPress={onRefresh} loading={loading} />
         </View>
       </View>
-      {last?.status === "failed" && last.error ? <Text className="text-sm text-danger">{last.error}</Text> : null}
-      <Text className="text-xs text-ink-muted">
-        Pagamentos de cobranças geradas pela aplicação são conciliados automaticamente pelo ID do pagamento na Cora. Boletos
-        emitidos direto na Cora, tarifas e transferências aparecem em “Fora da aplicação”.
-      </Text>
+      {last?.status === "failed" && last.error ? <Text className="text-xs text-danger">{last.error}</Text> : null}
     </View>
   );
 }
