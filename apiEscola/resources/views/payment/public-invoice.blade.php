@@ -20,7 +20,8 @@
         .code.boleto { font-size: 18px; font-weight: 600; letter-spacing: .02em; text-align: center; padding: 16px 12px; }
         .btn { display: block; width: 100%; margin-top: 10px; padding: 14px; font-size: 16px; border-radius: 8px; border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
         .btn.outline { background: #fff; color: #1d4ed8; }
-        .qr { display: block; width: 200px; max-width: 100%; margin: 0 auto 8px; }
+        .qr { display: block; width: 100%; height: auto; margin-top: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+        .doc { display: block; width: 100%; height: 80vh; min-height: 520px; margin-top: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
         .status { border-radius: 12px; padding: 16px; text-align: center; font-weight: 600; }
         .status.paid { background: #e8f7ee; color: #15803d; border: 1px solid #86efac; }
         .status.off { background: #f4f5f7; color: #4b5563; border: 1px solid #e5e7eb; }
@@ -54,10 +55,12 @@
         @if ($pixCopyPaste)
             <section class="card">
                 <div class="label">PIX copia e cola</div>
-                @if ($pixQrImageUrl)
-                    <img class="qr" src="{{ $pixQrImageUrl }}" alt="QR Code PIX">
-                @endif
                 <button type="button" class="btn" data-copy="pix">Copiar código PIX</button>
+                @if ($pixQrImageUrl)
+                    <a href="{{ $pixQrImageUrl }}" target="_blank" rel="noopener noreferrer">
+                        <img class="qr" src="{{ $pixQrImageUrl }}" alt="Cobrança PIX com QR Code">
+                    </a>
+                @endif
                 <div class="code" id="pix">{{ $pixCopyPaste }}</div>
             </section>
         @endif
@@ -67,6 +70,11 @@
                 <div class="label">Boleto</div>
                 @if ($boletoDigitable)
                     <button type="button" class="btn" data-copy="boleto">Copiar linha digitável</button>
+                @endif
+                @if ($boletoUrl)
+                    <iframe class="doc" src="{{ $boletoUrl }}" title="Boleto em PDF"></iframe>
+                @endif
+                @if ($boletoDigitable)
                     <div class="code boleto" id="boleto">{{ $boletoDigitable }}</div>
                 @endif
                 @if ($boletoUrl)
