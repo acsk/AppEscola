@@ -8,7 +8,7 @@
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; color: #1f2430; }
-        .wrap { max-width: 480px; margin: 0 auto; padding: 24px 16px 40px; }
+        .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 40px; }
         .school { font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
         h1 { font-size: 18px; margin: 0 0 4px; }
@@ -16,8 +16,9 @@
         .summary { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 12px; }
         .amount { font-size: 24px; font-weight: 700; color: #1d4ed8; }
         .label { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; margin-bottom: 8px; }
-        .code { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #f4f5f7; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; word-break: break-all; }
-        .btn { display: block; width: 100%; margin-top: 10px; padding: 12px; border-radius: 8px; border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; font-size: 15px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
+        .code { font-family: ui-monospace, Menlo, monospace; font-size: 15px; line-height: 1.5; background: #f4f5f7; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; word-break: break-all; margin-top: 10px; }
+        .code.boleto { font-size: 18px; font-weight: 600; letter-spacing: .02em; text-align: center; padding: 16px 12px; }
+        .btn { display: block; width: 100%; margin-top: 10px; padding: 14px; font-size: 16px; border-radius: 8px; border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
         .btn.outline { background: #fff; color: #1d4ed8; }
         .qr { display: block; width: 200px; max-width: 100%; margin: 0 auto 8px; }
         .status { border-radius: 12px; padding: 16px; text-align: center; font-weight: 600; }
@@ -56,8 +57,8 @@
                 @if ($pixQrImageUrl)
                     <img class="qr" src="{{ $pixQrImageUrl }}" alt="QR Code PIX">
                 @endif
-                <div class="code" id="pix">{{ $pixCopyPaste }}</div>
                 <button type="button" class="btn" data-copy="pix">Copiar código PIX</button>
+                <div class="code" id="pix">{{ $pixCopyPaste }}</div>
             </section>
         @endif
 
@@ -65,8 +66,8 @@
             <section class="card">
                 <div class="label">Boleto</div>
                 @if ($boletoDigitable)
-                    <div class="code" id="boleto">{{ $boletoDigitable }}</div>
                     <button type="button" class="btn" data-copy="boleto">Copiar linha digitável</button>
+                    <div class="code boleto" id="boleto">{{ $boletoDigitable }}</div>
                 @endif
                 @if ($boletoUrl)
                     <a class="btn outline" href="{{ $boletoUrl }}" target="_blank" rel="noopener noreferrer">Abrir boleto (PDF)</a>
