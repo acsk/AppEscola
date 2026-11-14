@@ -36,7 +36,7 @@ import ActionsMenu from "../../components/ui/ActionsMenu";
 import EnrollmentFacts from "../../components/matriculas/EnrollmentFacts";
 import EnrollmentInvoicesPanel from "../../components/matriculas/EnrollmentInvoicesPanel";
 import DefinitionRows from "../../components/ui/DefinitionRows";
-import { FileText, Pencil, Receipt, Trash2, UserRound } from "lucide-react-native";
+import { FileText, Lock, LockOpen, Pencil, Receipt, Trash2, UserRound } from "lucide-react-native";
 import { color, type Tone } from "../../constants/theme";
 import { INVOICE_DISPLAY, invoiceDisplayStatus, monthsBetween, nextDueDate } from "../../utils/enrollmentInvoices";
 import ConfirmModal from "../../components/ui/ConfirmModal";
@@ -243,6 +243,11 @@ export default function EnrollmentDetailScreen({
   // Delete enrollment
   const [deleteEnrollmentVisible, setDeleteEnrollmentVisible] = useState(false);
   const [deletingEnrollment, setDeletingEnrollment] = useState(false);
+  const [blockModalVisible, setBlockModalVisible] = useState(false);
+  const [unblockModalVisible, setUnblockModalVisible] = useState(false);
+  const [blockReason, setBlockReason] = useState("");
+  const [blockError, setBlockError] = useState<string | undefined>();
+  const [savingBlock, setSavingBlock] = useState(false);
 
   // Message modal
   const [msgModal, setMsgModal] = useState<{
@@ -281,6 +286,7 @@ export default function EnrollmentDetailScreen({
   const [chargeStatusResult, setChargeStatusResult] = useState<ChargeStatusResponse | null>(null);
   const [paidChargeResult, setPaidChargeResult] = useState<PaidChargeResponse | null>(null);
   const [chargeActionError, setChargeActionError] = useState<string | null>(null);
+  const [publicLinkCopied, setPublicLinkCopied] = useState(false);
 
   // Receipt modal
   const [receiptModalVisible, setReceiptModalVisible] = useState(false);
@@ -406,6 +412,7 @@ export default function EnrollmentDetailScreen({
   const isProductionHost =
     typeof window !== "undefined" && window.location.hostname !== "localhost";
   const isSuperAdmin = user?.role === "super_admin";
+  const canManageAccessBlock = ["super_admin", "admin", "coordenador", "secretaria"].includes(user?.role ?? "");
   // localhost → sempre stage; prod → sempre prod (super_admin pode escolher)
   const defaultChargeEnvironment: "stage" | "prod" = isProductionHost ? "prod" : "stage";
   const canSelectChargeEnvironment = isSuperAdmin;
@@ -554,6 +561,44 @@ export default function EnrollmentDetailScreen({
       setMsgModal({ visible: true, type: "error", title: "Não foi possível excluir a matrícula", message: detail });
     }
     setDeletingEnrollment(false);
+  };
+
+  const openBlockModal = () => {
+    setBlockReason("");
+    setBlockError(undefined);
+    setBlockModalVisible(true);
+  };
+
+  const blockEnrollment = async () => {
+    const reason = blockReason.trim();
+    if (reason.length < 3) {
+      setBlockError("Informe o motivo do bloqueio (mínimo 3 caracteres).");
+      return;
+    }
+    setSavingBlock(true);
+    try {
+      await api.post(`/enrollments/${enrollmentId}/block`, { reason });
+      setBlockModalVisible(false);
+      showToast("success", "O aluno perdeu o acesso ao app até a matrícula ser desbloqueada.", "Matrícula bloqueada");
+      fetch();
+    } catch (e: any) {
+      setBlockError(e.response?.data?.errors?.reason?.[0] ?? e.response?.data?.message ?? "Não foi possível bloquear a matrícula.");
+    }
+    setSavingBlock(false);
+  };
+
+  const unblockEnrollment = async () => {
+    setSavingBlock(true);
+    try {
+      await api.post(`/enrollments/${enrollmentId}/unblock`);
+      setUnblockModalVisible(false);
+      showToast("success", "O aluno voltou a ter acesso ao app.", "Matrícula desbloqueada");
+      fetch();
+    } catch (e: any) {
+      setUnblockModalVisible(false);
+      showToast("error", e.response?.data?.message ?? "Não foi possível desbloquear a matrícula.");
+    }
+    setSavingBlock(false);
   };
 
   // ── Invoice actions ──────────────────────────────────────────────────────────
@@ -761,6 +806,18 @@ export default function EnrollmentDetailScreen({
     setPreviewUrl(null);
     setPdfPageCount(0);
     setPdfPreviewError(null);
+  };
+
+  const copyPublicPaymentLink = async () => {
+    const url = chargePaymentOptions?.public_payment_url;
+    if (!url || typeof navigator === "undefined" || !navigator.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setPublicLinkCopied(true);
+      setTimeout(() => setPublicLinkCopied(false), 2500);
+    } catch {
+      showToast("error", "Não foi possível copiar o link. Tente novamente.");
+    }
   };
 
   const openPreviewModal = (url: string | null) => {
@@ -1438,6 +1495,7 @@ export default function EnrollmentDetailScreen({
               </Text>
               <View style={{ width: 1, height: 14, backgroundColor: color.border }} />
               <Badge tone={statusMeta.tone} dot label={statusMeta.label} />
+              {enrollment.is_blocked ? <Badge tone="danger" dot label="Acesso bloqueado" /> : null}
               {enrollment.created_at ? (
                 <>
                   <View style={{ width: 1, height: 14, backgroundColor: color.border }} />
@@ -1465,6 +1523,13 @@ export default function EnrollmentDetailScreen({
                     : []),
                   { key: "contrato", label: "Cobranças do contrato", icon: FileText, onPress: () => setContractModalVisible(true) },
                   { key: "boletos", label: "Todos os boletos", icon: Receipt, onPress: () => setCarneModalVisible(true) },
+                  ...(canManageAccessBlock && enrollment.status !== "cancelled"
+                    ? [
+                        enrollment.is_blocked
+                          ? { key: "desbloquear", label: "Desbloquear matrícula", icon: LockOpen, separatorBefore: true, onPress: () => setUnblockModalVisible(true) }
+                          : { key: "bloquear", label: "Bloquear matrícula…", icon: Lock, danger: true, separatorBefore: true, onPress: openBlockModal },
+                      ]
+                    : []),
                   { key: "excluir", label: "Excluir matrícula…", icon: Trash2, danger: true, separatorBefore: true, onPress: () => setDeleteEnrollmentVisible(true) },
                 ]}
               />
@@ -1472,6 +1537,30 @@ export default function EnrollmentDetailScreen({
           }
         />
       </View>
+
+      {enrollment.is_blocked ? (
+        <View
+          className="rounded-ds-md border px-4 py-3 flex-row items-start gap-3"
+          style={{ marginBottom: 16, backgroundColor: "var(--ds-danger-tint)", borderColor: "var(--ds-danger)" }}
+        >
+          <Lock size={16} color="var(--ds-danger)" style={{ marginTop: 2 }} />
+          <View className="flex-1" style={{ minWidth: 0 }}>
+            <Text className="text-sm font-semibold text-danger">Acesso ao app bloqueado</Text>
+            <Text className="text-xs text-ink mt-0.5">
+              {[
+                enrollment.blocked_at ? `Desde ${fmt(enrollment.blocked_at.slice(0, 10))}` : null,
+                enrollment.blocked_by_name ? `por ${enrollment.blocked_by_name}` : null,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              {enrollment.blocked_reason ? `. Motivo: ${enrollment.blocked_reason}` : ""}
+            </Text>
+          </View>
+          {canManageAccessBlock ? (
+            <Button icon={LockOpen} label="Desbloquear" onPress={() => setUnblockModalVisible(true)} />
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Faixa de resumo */}
       <EnrollmentFacts
@@ -1796,6 +1885,26 @@ export default function EnrollmentDetailScreen({
                   <Text className="text-xs font-medium text-on-brand">Ver boleto</Text>
                 </TouchableOpacity>
               )}
+              {!!chargePaymentOptions?.public_payment_url &&
+                (hasPixAssets || hasBoletoAssets) &&
+                chargeStatusResult?.status?.toUpperCase() !== "PAID" && (
+                  <TouchableOpacity
+                    onPress={copyPublicPaymentLink}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Copiar link de pagamento para o aluno"
+                    className="px-3 rounded-ds-md border border-brand bg-surface items-center flex-row justify-center gap-2 py-2 min-h-control-md"
+                    style={{ flexGrow: 1, flexBasis: checkoutActionBasis, minHeight: checkoutActionHeight }}
+                  >
+                    <Ionicons
+                      name={publicLinkCopied ? "checkmark-outline" : "link-outline"}
+                      size={15}
+                      color="var(--ds-brand)"
+                    />
+                    <Text className="text-xs font-semibold text-brand">
+                      {publicLinkCopied ? "Link copiado!" : "Copiar link para o aluno"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               {typeof window !== "undefined" && window.location.hostname === "localhost" && (
                 <TouchableOpacity
                   onPress={onPayCharge}
@@ -2454,6 +2563,46 @@ export default function EnrollmentDetailScreen({
         onConfirm={removeEnrollment}
         onCancel={() => setDeleteEnrollmentVisible(false)}
         loading={deletingEnrollment}
+      />
+      <Modal
+        visible={blockModalVisible}
+        title="Bloquear matrícula"
+        onClose={() => setBlockModalVisible(false)}
+        size="sm"
+        footer={
+          <>
+            <Button label="Cancelar" onPress={() => setBlockModalVisible(false)} disabled={savingBlock} />
+            <Button variant="danger" icon={Lock} label="Bloquear" onPress={blockEnrollment} loading={savingBlock} />
+          </>
+        }
+      >
+        <Text className="text-sm text-ink-muted mb-3">
+          O aluno é desconectado e não consegue entrar no app enquanto a matrícula estiver bloqueada. As cobranças e a
+          turma continuam como estão.
+        </Text>
+        <FormInput
+          label="Motivo do bloqueio"
+          required
+          value={blockReason}
+          onChangeText={(text) => {
+            setBlockReason(text);
+            setBlockError(undefined);
+          }}
+          error={blockError}
+          placeholder="Ex.: mensalidades em atraso"
+          maxLength={255}
+          multiline
+        />
+      </Modal>
+      <ConfirmModal
+        visible={unblockModalVisible}
+        title="Desbloquear matrícula"
+        message="O aluno volta a ter acesso ao app imediatamente."
+        confirmLabel="Desbloquear"
+        tone="primary"
+        onConfirm={unblockEnrollment}
+        onCancel={() => setUnblockModalVisible(false)}
+        loading={savingBlock}
       />
 
     </ScrollView>

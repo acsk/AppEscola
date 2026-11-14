@@ -32,6 +32,9 @@ class Enrollment extends Model
         'updated_by',
         'deleted_by',
         'charges_generated_at',
+        'blocked_at',
+        'blocked_reason',
+        'blocked_by',
     ];
 
     protected $casts = [
@@ -40,7 +43,13 @@ class Enrollment extends Model
         'monthly_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'charges_generated_at' => 'datetime',
+        'blocked_at' => 'datetime',
     ];
+
+    public function blockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'blocked_by');
+    }
 
     public function tenant(): BelongsTo
     {

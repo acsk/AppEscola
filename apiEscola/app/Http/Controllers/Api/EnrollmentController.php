@@ -17,6 +17,7 @@ use App\Models\Invoice;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Services\EnrollmentAccessBlockService;
 use App\Services\EnrollmentCarneService;
 use App\Services\EnrollmentContractChargesService;
 use App\Services\EnrollmentFinancialLockService;
@@ -172,6 +173,7 @@ class EnrollmentController extends Controller
             'schoolClasses.course',
             'coursePlan.course',
             'bundle',
+            'blockedBy:id,name',
             'invoices' => fn ($q) => $q->excludingImportedFromCoraSync()->orderBy('due_date'),
         ]);
 
@@ -791,6 +793,70 @@ class EnrollmentController extends Controller
         $enrollment->load(['student', 'schoolClass.course', 'coursePlan.course']);
 
         return response()->json(new EnrollmentResource($enrollment));
+    }
+
+    #[OA\Post(
+        path: '/api/enrollments/{id}/block',
+        tags: ['Enrollments'],
+        summary: 'Bloquear matrícula (barra o acesso do aluno ao app)',
+        security: [['sanctum' => []]],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
+            required: ['reason'],
+            properties: [new OA\Property(property: 'reason', type: 'string', example: 'Mensalidades em atraso')]
+        )),
+        responses: [
+            new OA\Response(response: 200, description: 'Matrícula bloqueada'),
+            new OA\Response(response: 422, description: 'Dados inválidos'),
+        ]
+    )]
+    public function block(Request $request, Enrollment $enrollment, EnrollmentAccessBlockService $blocks): JsonResponse
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+        $this->ensureCanManageAccessBlock($request);
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:255'],
+        ], [
+            'reason.required' => 'Informe o motivo do bloqueio.',
+            'reason.min' => 'O motivo deve ter pelo menos 3 caracteres.',
+            'reason.max' => 'O motivo deve ter no máximo 255 caracteres.',
+        ]);
+
+        if ($enrollment->status === 'cancelled') {
+            return $this->error('Matrícula cancelada não pode ser bloqueada.', null, 422);
+        }
+
+        $blocks->block($enrollment, trim($data['reason']), $request->user());
+        $enrollment->load(['student', 'schoolClass.course', 'coursePlan.course', 'blockedBy:id,name']);
+
+        return $this->success(new EnrollmentResource($enrollment), 'Matrícula bloqueada. O aluno perdeu o acesso ao app.');
+    }
+
+    #[OA\Post(
+        path: '/api/enrollments/{id}/unblock',
+        tags: ['Enrollments'],
+        summary: 'Desbloquear matrícula (devolve o acesso do aluno ao app)',
+        security: [['sanctum' => []]],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [new OA\Response(response: 200, description: 'Matrícula desbloqueada')]
+    )]
+    public function unblock(Request $request, Enrollment $enrollment, EnrollmentAccessBlockService $blocks): JsonResponse
+    {
+        $this->authorizeTenant($request, $enrollment->tenant_id);
+        $this->ensureCanManageAccessBlock($request);
+
+        $blocks->unblock($enrollment);
+        $enrollment->load(['student', 'schoolClass.course', 'coursePlan.course']);
+
+        return $this->success(new EnrollmentResource($enrollment), 'Matrícula desbloqueada. O aluno voltou a ter acesso ao app.');
+    }
+
+    private function ensureCanManageAccessBlock(Request $request): void
+    {
+        if (! in_array($request->user()?->role, ['super_admin', 'admin', 'coordenador', 'secretaria'], true)) {
+            abort(403, 'Sem permissão para bloquear ou desbloquear matrículas.');
+        }
     }
 
     #[OA\Delete(

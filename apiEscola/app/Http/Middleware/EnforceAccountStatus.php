@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Tenant;
+use App\Services\EnrollmentAccessBlockService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -12,6 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Bloqueios de conta em toda requisição autenticada (não só no login):
  * - usuário não ativo → token revogado e 401 (o painel e o app voltam para o login com a mensagem);
+ * - aluno com matrícula bloqueada → token revogado e 401;
  * - tenant suspenso → aluno e responsável sem acesso (401); equipe só leitura (escritas recebem 403).
  */
 class EnforceAccountStatus
@@ -39,6 +41,15 @@ class EnforceAccountStatus
             }
 
             return response()->json(['type' => 'error', 'code' => 'user_blocked', 'message' => 'Seu acesso foi bloqueado. Procure a administração da instituição.', 'body' => null], 401);
+        }
+
+        if ($user->role === 'aluno' && app(EnrollmentAccessBlockService::class)->isStudentUserBlocked($user)) {
+            $token = $user->currentAccessToken();
+            if ($token instanceof PersonalAccessToken) {
+                $token->delete();
+            }
+
+            return response()->json(['type' => 'error', 'code' => 'enrollment_blocked', 'message' => EnrollmentAccessBlockService::MESSAGE, 'body' => null], 401);
         }
 
         if ($user->isSuperAdmin() || ! $user->tenant_id || self::tenantStatus((int) $user->tenant_id) !== 'suspended') {

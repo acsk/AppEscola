@@ -59,6 +59,10 @@ class AuthController extends Controller
             return response()->json(['message' => 'Usuário inativo.'], 403);
         }
 
+        if ($user->role === 'aluno' && app(\App\Services\EnrollmentAccessBlockService::class)->isStudentUserBlocked($user)) {
+            return response()->json(['code' => 'enrollment_blocked', 'message' => \App\Services\EnrollmentAccessBlockService::MESSAGE], 403);
+        }
+
         // Tenant suspenso: aluno e responsável não entram; a equipe entra em modo somente leitura.
         if (in_array($user->role, \App\Http\Middleware\EnforceAccountStatus::STUDENT_ROLES, true)
             && $user->tenant_id

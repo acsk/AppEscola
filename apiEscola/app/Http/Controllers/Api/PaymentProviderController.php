@@ -16,6 +16,7 @@ use App\Services\Cora\CoraCredentialService;
 use App\Services\Cora\CoraPaidInvoicesSyncService;
 use App\Services\Cora\CoraTokenService;
 use App\Services\Gateways\CoraPaymentGateway;
+use App\Services\InvoicePublicLinkService;
 use App\Services\PaymentProviderRegistry;
 use App\Services\TenantBillingSettingsService;
 use App\Support\BusinessDate;
@@ -622,6 +623,7 @@ class PaymentProviderController extends Controller
             ],
             'cora_due_date' => $coraDueDate,
             'payment_assets' => $paymentAssets,
+            'public_payment_url' => app(InvoicePublicLinkService::class)->url($invoice),
         ], 'Opções de pagamento carregadas com sucesso.');
     }
 

@@ -140,6 +140,7 @@ export type InvoicePaymentOptionsResponse = {
     provider_due_date_preview: string;
   } | null;
   payment_assets: InvoicePaymentAssets;
+  public_payment_url?: string;
 };
 
 export type InvoiceReceiptSchool = {

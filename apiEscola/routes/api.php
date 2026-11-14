@@ -400,6 +400,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
     Route::post('enrollments/{enrollment}/contract-charges/purge-imported', [EnrollmentController::class, 'contractChargesPurgeImported']);
     Route::post('enrollments/{enrollment}/sync-cora-charges', [EnrollmentController::class, 'syncCoraCharges']);
     Route::post('enrollments/{enrollment}/generate-charges',  [EnrollmentController::class, 'generateCharges']);
+    Route::post('enrollments/{enrollment}/block', [EnrollmentController::class, 'block']);
+    Route::post('enrollments/{enrollment}/unblock', [EnrollmentController::class, 'unblock']);
     Route::get('enrollments/{enrollment}/carne/preview', [EnrollmentController::class, 'carnePreview']);
     Route::post('enrollments/{enrollment}/carne/generate', [EnrollmentController::class, 'carneGenerate']);
     Route::apiResource('enrollments', EnrollmentController::class);

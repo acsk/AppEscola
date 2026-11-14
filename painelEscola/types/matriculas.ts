@@ -62,6 +62,10 @@ export type EnrollmentDetail = EnrollmentSummary & {
   invoices?: InvoiceListItem[];
   charges_generated_at?: string | null;
   charges_batch_generated?: boolean;
+  is_blocked?: boolean;
+  blocked_at?: string | null;
+  blocked_reason?: string | null;
+  blocked_by_name?: string | null;
 };
 
 export type InvoiceCoraAssets = {
