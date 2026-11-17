@@ -82,6 +82,54 @@ class QuestionBankTest extends TestCase
             ->assertJsonCount(2, 'body.topic_ids');
     }
 
+    public function test_deactivated_subject_and_topic_leave_active_lists_and_can_be_restored(): void
+    {
+        [$math, $algebra, $geometry] = $this->subjectWithTopics('Matemática', ['Álgebra', 'Geometria']);
+        [$history] = $this->subjectWithTopics('História', ['Brasil']);
+        $question = $this->question();
+        $question->topics()->sync([$algebra->id]);
+
+        $this->putJson("/api/subjects/{$math->id}", ['status' => 'inactive'])->assertOk();
+        $this->assertSame('active', $algebra->fresh()->status);
+
+        $activeSubjects = collect($this->getJson('/api/question-bank/subjects')->assertOk()->json('body'));
+        $this->assertFalse($activeSubjects->contains('id', $math->id));
+        $this->assertTrue($activeSubjects->contains('id', $history->id));
+
+        $inactiveSubjects = collect($this->getJson('/api/question-bank/subjects?status=inactive')->assertOk()->json('body'));
+        $this->assertTrue($inactiveSubjects->contains('id', $math->id));
+
+        $taxonomy = collect($this->getJson('/api/question-bank/taxonomy')->assertOk()->json('body'));
+        $this->assertFalse($taxonomy->contains('id', $math->id));
+        $this->assertTrue($taxonomy->contains('id', $history->id));
+
+        $this->putJson("/api/subjects/{$math->id}", ['status' => 'active'])->assertOk();
+        $this->patchJson("/api/question-bank/topics/{$algebra->id}/status", ['status' => 'inactive'])
+            ->assertOk()
+            ->assertJsonPath('body.status', 'inactive');
+
+        $activeTopics = collect($this->getJson('/api/question-bank/topics')->assertOk()->json('body'));
+        $this->assertFalse($activeTopics->contains('id', $algebra->id));
+        $this->assertTrue($activeTopics->contains('id', $geometry->id));
+
+        $inactiveTopics = collect($this->getJson('/api/question-bank/topics?status=inactive')->assertOk()->json('body'));
+        $this->assertTrue($inactiveTopics->contains('id', $algebra->id));
+        $this->assertSame('MATEMÁTICA', $inactiveTopics->firstWhere('id', $algebra->id)['subject_name']);
+
+        $mathTopics = collect($this->getJson('/api/question-bank/taxonomy')->assertOk()->json('body'))
+            ->firstWhere('id', $math->id)['topics'];
+        $this->assertSame([$geometry->id], collect($mathTopics)->pluck('id')->all());
+        $this->assertDatabaseHas('exam_question_topic', [
+            'exam_question_id' => $question->id,
+            'subject_topic_id' => $algebra->id,
+        ]);
+
+        $this->patchJson("/api/question-bank/topics/{$algebra->id}/status", ['status' => 'active'])->assertOk();
+        $restored = collect($this->getJson('/api/question-bank/taxonomy')->assertOk()->json('body'))
+            ->firstWhere('id', $math->id)['topics'];
+        $this->assertEqualsCanonicalizing([$algebra->id, $geometry->id], collect($restored)->pluck('id')->all());
+    }
+
     public function test_topics_from_different_subjects_without_subject_return_422(): void
     {
         [, $algebra] = $this->subjectWithTopics('Matemática', ['Álgebra']);

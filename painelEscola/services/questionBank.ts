@@ -233,8 +233,12 @@ export async function deleteCatalogItem(catalog: CatalogKey, id: number) {
   return data;
 }
 
-export async function fetchTopics(subjectIds?: number[]): Promise<SubjectTopic[]> {
-  const params = subjectIds?.length ? { subject_id: subjectIds.join(",") } : {};
+export async function fetchTopics(
+  subjectIds?: number[],
+  status: "active" | "inactive" = "active"
+): Promise<SubjectTopic[]> {
+  const params: Record<string, string> = { status };
+  if (subjectIds?.length) params.subject_id = subjectIds.join(",");
   const { data } = await api.get("/question-bank/topics", { params });
   return data.body ?? [];
 }
@@ -254,9 +258,22 @@ export async function deleteTopic(id: number) {
   return data;
 }
 
-/** Disciplinas ativas com a contagem de questões (árvore da taxonomia). */
-export async function fetchSubjectsWithCounts(): Promise<(SubjectSummary & { questions_count: number })[]> {
-  const { data } = await api.get("/question-bank/subjects");
+/** Mesmo status de Acadêmico › Disciplinas. Desativar tira a disciplina da taxonomia em uso. */
+export async function setSubjectStatus(id: number, status: "active" | "inactive") {
+  const { data } = await api.put(`/subjects/${id}`, { status });
+  return data;
+}
+
+export async function setTopicStatus(id: number, status: "active" | "inactive") {
+  const { data } = await api.patch(`/question-bank/topics/${id}/status`, { status });
+  return data;
+}
+
+/** Disciplinas com a contagem de questões (em uso ou desativadas). */
+export async function fetchSubjectsWithCounts(
+  status: "active" | "inactive" = "active"
+): Promise<(SubjectSummary & { questions_count: number })[]> {
+  const { data } = await api.get("/question-bank/subjects", { params: { status } });
   return data.body ?? [];
 }
 

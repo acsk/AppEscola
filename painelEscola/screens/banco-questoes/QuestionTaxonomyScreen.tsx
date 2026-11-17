@@ -29,6 +29,8 @@ import {
   importDefaultTopics,
   saveCatalogItem,
   saveTopic,
+  setSubjectStatus,
+  setTopicStatus,
   type DefaultTopicsSource,
 } from "../../services/questionBank";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast } from "../../utils/apiErrors";
@@ -54,11 +56,14 @@ type EditState =
 
 type DeleteState = { kind: "topic"; id: number; name: string } | { kind: "catalog"; catalog: CatalogKey; id: number; name: string };
 
+type ArchiveState = { kind: "subject" | "topic"; id: number; name: string };
+
 const countLabel = (n: number) => `${n} ${n === 1 ? "questão" : "questões"}`;
 
 export default function QuestionTaxonomyScreen({ navigate }: Props) {
   const { isMobile, contentPadding } = useResponsiveLayout();
   const [section, setSection] = useState<"tree" | CatalogKey>("tree");
+  const [listing, setListing] = useState<"active" | "inactive">("active");
 
   const [subjects, setSubjects] = useState<SubjectRow[]>([]);
   const [topics, setTopics] = useState<SubjectTopic[]>([]);
@@ -74,6 +79,9 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<DeleteState | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [toArchive, setToArchive] = useState<ArchiveState | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [restoringKey, setRestoringKey] = useState<string | null>(null);
   const { user } = useAuth();
   const canImport = user?.role === "admin" || user?.role === "coordenador" || user?.role === "super_admin";
   const [confirmImport, setConfirmImport] = useState(false);
@@ -93,7 +101,11 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
     setLoadError(null);
     try {
       if (section === "tree") {
-        const [s, t, d] = await Promise.all([fetchSubjectsWithCounts(), fetchTopics(), fetchCatalogDefinitions()]);
+        const [s, t, d] = await Promise.all([
+          fetchSubjectsWithCounts(listing),
+          fetchTopics(undefined, listing),
+          fetchCatalogDefinitions(),
+        ]);
         setSubjects(s);
         setTopics(t);
         setDefinitions(d);
@@ -107,7 +119,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [section]);
+  }, [section, listing]);
 
   useEffect(() => {
     void load();
@@ -163,6 +175,12 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
     return map;
   }, [topics]);
 
+  const visibleTopics = useMemo(() => {
+    const q = foldText(filter);
+    if (!q) return topics;
+    return topics.filter((t) => foldText(t.name).includes(q) || foldText(t.subject_name ?? "").includes(q));
+  }, [filter, topics]);
+
   const visibleSubjects = useMemo(() => {
     const q = foldText(filter);
     if (!q) return subjects;
@@ -198,6 +216,38 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
     }
   };
 
+  const confirmArchive = async () => {
+    if (!toArchive) return;
+    setArchiving(true);
+    try {
+      const response =
+        toArchive.kind === "subject"
+          ? await setSubjectStatus(toArchive.id, "inactive")
+          : await setTopicStatus(toArchive.id, "inactive");
+      showApiToast(setToast, response, "Desativado.");
+      await load();
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível desativar.");
+    } finally {
+      setArchiving(false);
+      setToArchive(null);
+    }
+  };
+
+  const restore = async (kind: "subject" | "topic", id: number) => {
+    const key = `${kind}-${id}`;
+    setRestoringKey(key);
+    try {
+      const response = kind === "subject" ? await setSubjectStatus(id, "active") : await setTopicStatus(id, "active");
+      showApiToast(setToast, response, kind === "subject" ? "Disciplina restaurada." : "Assunto restaurado.");
+      await load();
+    } catch (error) {
+      showApiErrorToast(setToast, error, "Não foi possível restaurar.");
+    } finally {
+      setRestoringKey(null);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!toDelete) return;
     setDeleting(true);
@@ -214,6 +264,9 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
       setToDelete(null);
     }
   };
+
+  const inactiveSubjectIds = new Set(subjects.map((s) => s.id));
+  const standaloneTopics = visibleTopics.filter((t) => !inactiveSubjectIds.has(t.subject_id));
 
   const IconButton = ({ icon, label, onPress, danger }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean }) => (
     <TouchableOpacity onPress={onPress} aria-label={label} className={`p-1.5 rounded-ds-md ${danger ? "bg-danger" : ""}`}>
@@ -233,7 +286,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
           <PageHeader
             breadcrumb={[{ label: "Banco de questões", onPress: () => navigate("questoes") }, { label: "Taxonomia" }]}
             title="Taxonomia"
-            description="Disciplinas, assuntos e cadastros usados para classificar as questões. Itens em uso não podem ser excluídos."
+            description="As disciplinas são as mesmas de Acadêmico › Disciplinas. Desativar tira da lista e dos seletores; as questões e a grade permanecem e dá para restaurar."
             actions={
               canImport ? <Button icon={Download} label="Importar taxonomia padrão" onPress={() => setConfirmImport(true)} /> : undefined
             }
@@ -257,12 +310,93 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
           </View>
         ) : section === "tree" ? (
           <View style={{ gap: 10 }}>
+            <Tabs
+              accessibilityLabel="Disciplinas em uso ou desativadas"
+              items={[
+                { id: "active", label: "Em uso" },
+                { id: "inactive", label: "Desativadas" },
+              ]}
+              value={listing}
+              onChange={setListing}
+            />
             <View style={{ maxWidth: isMobile ? undefined : 360 }}>
               <FormInput label="Filtrar" value={filter} onChangeText={setFilter} placeholder="Disciplina ou assunto..." />
             </View>
-            {visibleSubjects.length === 0 ? (
+            {listing === "inactive" ? (
+              <View style={{ gap: 16 }}>
+                <View style={{ gap: 10 }}>
+                  <Text className="text-xs font-semibold text-ink-muted">Disciplinas</Text>
+                  {visibleSubjects.length === 0 ? (
+                    <Text className="text-sm text-ink-muted py-4 text-center">
+                      {subjects.length === 0 ? "Nenhuma disciplina desativada." : "Nada encontrado."}
+                    </Text>
+                  ) : (
+                    visibleSubjects.map((subject) => {
+                      const parked = (topicsBySubject.get(subject.id) ?? []).length;
+                      return (
+                        <View key={subject.id} className="bg-surface rounded-ds-md border border-border px-4 py-3 gap-2">
+                          <View className="flex-row items-center gap-3 flex-wrap">
+                            <Text className={`${TABLE_CELL_SEMIBOLD} flex-1`}>{subject.name}</Text>
+                            <Text className={TABLE_CELL_MUTED}>{countLabel(subject.questions_count)}</Text>
+                            <TouchableOpacity
+                              onPress={() => void restore("subject", subject.id)}
+                              disabled={restoringKey === `subject-${subject.id}`}
+                              className="px-3 py-1.5 rounded-ds-md border border-border"
+                            >
+                              <Text className="text-xs font-semibold text-brand">
+                                {restoringKey === `subject-${subject.id}` ? "Restaurando..." : "Restaurar"}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                          {parked > 0 ? (
+                            <Text className="text-xs text-ink-muted">
+                              {parked} assunto(s) desativado(s) desta disciplina continuam desativados depois da restauração.
+                            </Text>
+                          ) : null}
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+                <View style={{ gap: 10 }}>
+                  <Text className="text-xs font-semibold text-ink-muted">Assuntos de disciplinas em uso</Text>
+                  {standaloneTopics.length === 0 ? (
+                    <Text className="text-sm text-ink-muted py-4 text-center">
+                      {topics.every((t) => inactiveSubjectIds.has(t.subject_id))
+                        ? "Nenhum assunto desativado em disciplina que continua em uso."
+                        : "Nada encontrado."}
+                    </Text>
+                  ) : (
+                    <View className="bg-surface rounded-ds-md border border-border overflow-hidden">
+                      {standaloneTopics.map((topic, i) => (
+                        <DataTableRow key={topic.id} index={i}>
+                          <View className="flex-1">
+                            <Text className={TABLE_CELL}>{topic.name}</Text>
+                            <Text className={TABLE_CELL_MUTED}>{topic.subject_name ?? "Disciplina"}</Text>
+                          </View>
+                          <Text className={TABLE_CELL_MUTED} style={{ width: 110 }}>
+                            {countLabel(topic.questions_count)}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => void restore("topic", topic.id)}
+                            disabled={restoringKey === `topic-${topic.id}`}
+                            className="px-3 py-1.5 rounded-ds-md border border-border"
+                          >
+                            <Text className="text-xs font-semibold text-brand">
+                              {restoringKey === `topic-${topic.id}` ? "Restaurando..." : "Restaurar"}
+                            </Text>
+                          </TouchableOpacity>
+                        </DataTableRow>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
+            ) : visibleSubjects.length === 0 ? (
               <Text className="text-sm text-ink-muted py-8 text-center">
-                {subjects.length === 0 ? "Nenhuma disciplina ativa. Cadastre em Acadêmico › Disciplinas." : "Nada encontrado."}
+                {subjects.length === 0
+                  ? "Nenhuma disciplina em uso. Cadastre em Acadêmico › Disciplinas ou restaure na aba Desativadas."
+                  : "Nada encontrado."}
               </Text>
             ) : (
               visibleSubjects.map((subject) => {
@@ -270,7 +404,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                 const open = expanded.has(subject.id) || foldText(filter) !== "";
                 return (
                   <View key={subject.id} className="bg-surface rounded-ds-md border border-border overflow-hidden">
-                    <View className="flex-row items-center px-4 py-3 gap-3">
+                    <View className="flex-row items-center px-4 py-3 gap-3 flex-wrap">
                       <TouchableOpacity
                         onPress={() =>
                           setExpanded((prev) => {
@@ -294,6 +428,12 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                       >
                         <Text className="text-xs font-semibold text-brand">Liberar no banco</Text>
                       </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setToArchive({ kind: "subject", id: subject.id, name: subject.name })}
+                        className="px-3 py-1.5 rounded-ds-md border border-border"
+                      >
+                        <Text className="text-xs font-semibold text-ink-muted">Desativar</Text>
+                      </TouchableOpacity>
                     </View>
                     {open && (
                       <View className="border-t border-border">
@@ -309,6 +449,11 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                               onPress={() =>
                                 setEdit({ kind: "topic", id: topic.id, subjectId: topic.subject_id, name: topic.name, description: topic.description ?? "" })
                               }
+                            />
+                            <IconButton
+                              icon="archive-outline"
+                              label={`Desativar assunto ${topic.name}`}
+                              onPress={() => setToArchive({ kind: "topic", id: topic.id, name: topic.name })}
                             />
                             <IconButton
                               icon="trash-outline"
@@ -452,10 +597,25 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
       <ConfirmModal
         visible={!!toDelete}
         title="Excluir item"
-        message={`Excluir "${toDelete?.name ?? ""}"? Itens em uso por questões não podem ser excluídos.`}
+        message={`Excluir "${toDelete?.name ?? ""}"? Itens em uso por questões não podem ser excluídos. Para tirar da lista sem apagar, use Desativar.`}
         loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setToDelete(null)}
+      />
+
+      <ConfirmModal
+        visible={!!toArchive}
+        tone="primary"
+        title={toArchive?.kind === "subject" ? "Desativar disciplina" : "Desativar assunto"}
+        message={
+          toArchive?.kind === "subject"
+            ? `Desativar "${toArchive.name}"? Ela sai desta lista, dos seletores e fica inativa em Acadêmico › Disciplinas. As questões, a grade e o que o aluno já pratica continuam. Os assuntos não são apagados.`
+            : `Desativar o assunto "${toArchive?.name ?? ""}"? Ele sai da lista e dos seletores. As questões que já o usam continuam classificadas.`
+        }
+        confirmLabel="Desativar"
+        loading={archiving}
+        onConfirm={() => void confirmArchive()}
+        onCancel={() => setToArchive(null)}
       />
 
       <ConfirmModal

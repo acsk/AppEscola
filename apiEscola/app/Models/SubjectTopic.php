@@ -14,6 +14,7 @@ class SubjectTopic extends Model
         'subject_id',
         'name',
         'description',
+        'status',
     ];
 
     public function subject(): BelongsTo

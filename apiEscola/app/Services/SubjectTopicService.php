@@ -15,12 +15,14 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /** Assuntos de disciplina: nome único dentro da disciplina; assunto em uso não troca de disciplina nem é excluído. */
 class SubjectTopicService
 {
-    public function list(int $tenantId, ?array $subjectIds = null, ?string $search = null): Collection
+    public function list(int $tenantId, ?array $subjectIds = null, ?string $search = null, string $status = 'active'): Collection
     {
         return SubjectTopic::query()
             ->where('tenant_id', $tenantId)
+            ->when(in_array($status, ['active', 'inactive'], true), fn (Builder $q) => $q->where('status', $status))
             ->when($subjectIds, fn (Builder $q, array $ids) => $q->whereIn('subject_id', $ids))
             ->when($search, fn (Builder $q, string $v) => $q->where('name', 'like', '%'.$v.'%'))
+            ->with('subject:id,name,status')
             ->withCount(['questions' => fn (Builder $q) => $q->where('exam_questions.tenant_id', $tenantId)])
             ->orderBy('name')
             ->get();
@@ -37,7 +39,7 @@ class SubjectTopicService
         return Subject::query()
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
-            ->with(['topics:id,subject_id,name'])
+            ->with(['topics' => fn ($q) => $q->where('status', 'active')->select('id', 'subject_id', 'name')])
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (Subject $s) => [
@@ -47,12 +49,12 @@ class SubjectTopicService
             ]);
     }
 
-    /** Disciplinas ativas do tenant com a contagem de questões (árvore da taxonomia). */
-    public function subjectsWithCounts(int $tenantId): SupportCollection
+    /** Disciplinas do tenant com a contagem de questões (árvore da taxonomia, em uso ou desativadas). */
+    public function subjectsWithCounts(int $tenantId, string $status = 'active'): SupportCollection
     {
         return Subject::query()
             ->where('tenant_id', $tenantId)
-            ->where('status', 'active')
+            ->where('status', $status)
             ->select(['id', 'name'])
             ->selectSub(
                 ExamQuestion::query()
@@ -120,6 +122,20 @@ class SubjectTopicService
 
             return $topic;
         });
+    }
+
+    public function setStatus(int $tenantId, int $id, string $status): SubjectTopic
+    {
+        $topic = $this->find($tenantId, $id);
+        $topic->update(['status' => $status]);
+        $fresh = $topic->fresh();
+        if (! $fresh) {
+            throw new NotFoundHttpException('Assunto não encontrado.');
+        }
+
+        return $fresh
+            ->load('subject:id,name,status')
+            ->loadCount(['questions' => fn (Builder $q) => $q->where('exam_questions.tenant_id', $tenantId)]);
     }
 
     public function delete(int $tenantId, int $id): void

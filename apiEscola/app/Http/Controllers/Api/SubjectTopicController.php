@@ -13,6 +13,7 @@ use App\Services\SubjectTopicService;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 /** Assuntos de disciplina do banco de questões. */
@@ -28,15 +29,16 @@ class SubjectTopicController extends Controller
     public function index(Request $request): JsonResponse
     {
         $tenantId = $this->authorizeStaff($request);
+        $status = $this->statusFilter($request);
         $subjectIds = QuestionBankQueryService::idList($request->query('subject_id', []));
-        $items = $this->topics->list($tenantId, $subjectIds ?: null, $request->query('search'));
+        $items = $this->topics->list($tenantId, $subjectIds ?: null, $request->query('search'), $status);
 
         return $this->success($items->map(fn ($topic) => $this->present($topic))->values());
     }
 
     public function subjects(Request $request): JsonResponse
     {
-        return $this->success($this->topics->subjectsWithCounts($this->authorizeStaff($request)));
+        return $this->success($this->topics->subjectsWithCounts($this->authorizeStaff($request), $this->statusFilter($request)));
     }
 
     /** GET /question-bank/taxonomy — disciplinas ativas com os assuntos aninhados. */
@@ -117,6 +119,20 @@ class SubjectTopicController extends Controller
         return $this->success($this->present($topic), 'Assunto atualizado com sucesso.');
     }
 
+    public function setStatus(Request $request, int $id): JsonResponse
+    {
+        $tenantId = $this->authorizeStaff($request);
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['active', 'inactive'])],
+        ]);
+        $topic = $this->topics->setStatus($tenantId, $id, $data['status']);
+
+        return $this->success(
+            $this->present($topic),
+            $data['status'] === 'active' ? 'Assunto restaurado.' : 'Assunto desativado.',
+        );
+    }
+
     public function destroy(Request $request, int $id): JsonResponse
     {
         $tenantId = $this->authorizeStaff($request);
@@ -142,13 +158,23 @@ class SubjectTopicController extends Controller
         return Subject::query()->where('tenant_id', $this->authorizeStaff($request))->findOrFail($id);
     }
 
+    private function statusFilter(Request $request): string
+    {
+        $status = $request->query('status', 'active');
+
+        return in_array($status, ['active', 'inactive'], true) ? $status : 'active';
+    }
+
     private function present(SubjectTopic $topic): array
     {
         return [
             'id'              => $topic->id,
             'subject_id'      => $topic->subject_id,
+            'subject_name'    => $topic->relationLoaded('subject') ? $topic->subject?->name : null,
+            'subject_status'  => $topic->relationLoaded('subject') ? $topic->subject?->status : null,
             'name'            => $topic->name,
             'description'     => $topic->description,
+            'status'          => $topic->status ?? 'active',
             'questions_count' => (int) ($topic->questions_count ?? 0),
         ];
     }

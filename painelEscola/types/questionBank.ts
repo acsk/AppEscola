@@ -110,8 +110,11 @@ export type CatalogDefinition = { key: CatalogKey; label: string; editable: bool
 export type SubjectTopic = {
   id: number;
   subject_id: number;
+  subject_name?: string | null;
+  subject_status?: "active" | "inactive" | null;
   name: string;
   description: string | null;
+  status?: "active" | "inactive";
   questions_count: number;
 };
 

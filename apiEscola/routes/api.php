@@ -669,6 +669,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         Route::get('topics',            [SubjectTopicController::class, 'index']);
         Route::post('topics',           [SubjectTopicController::class, 'store']);
         Route::put('topics/{id}',       [SubjectTopicController::class, 'update'])->whereNumber('id');
+        Route::patch('topics/{id}/status', [SubjectTopicController::class, 'setStatus'])->whereNumber('id');
         Route::delete('topics/{id}',    [SubjectTopicController::class, 'destroy'])->whereNumber('id');
 
         Route::get('catalogs',                     [QuestionCatalogController::class, 'catalogs']);
