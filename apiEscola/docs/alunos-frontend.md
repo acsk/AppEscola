@@ -30,8 +30,9 @@ Authorization: Bearer {token}
 
 | Parâmetro | Tipo | Exemplo | Descrição |
 |---|---|---|---|
-| `search` | string | `João` | Busca parcial por nome |
+| `search` | string | `jose` | Pesquisa global (nome, matrícula, CPF, e-mail, telefone, curso). Ignora acento e maiúsculas. CPF e telefone também batem sem máscara |
 | `status` | string | `active` | Filtrar por status |
+| `course_id` | integer | `3` | Curso de interesse do aluno |
 | `is_minor` | boolean | `true` | Apenas menores de idade |
 | `page` | integer | `2` | Página (default: 1, 20 por página) |
 

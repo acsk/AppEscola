@@ -86,6 +86,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
       ];
   const [rows, setRows] = useState<StudentListItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [courseFilter, setCourseFilter] = useState("");
@@ -140,18 +141,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         : Array.isArray(list)
           ? list
           : [];
-      const selectedCourseId = courseFilter ? Number(courseFilter) : null;
-      const filteredRows = selectedCourseId
-        ? fetchedRows.filter((student) => {
-            const desiredIds = [
-              ...(student.desired_courses ?? []).map((course) => course.id),
-              student.desired_course_id ?? null,
-              student.desired_course?.id ?? null,
-            ].filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
-            return desiredIds.includes(selectedCourseId);
-          })
-        : fetchedRows;
-      setRows(filteredRows);
+      setRows(fetchedRows);
       setMeta(
         list?.meta ??
           data?.meta ?? {
@@ -166,6 +156,16 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
     }
     setLoading(false);
   }, [courseFilter, minorFilter, page, search, statusFilter]);
+
+  useEffect(() => {
+    const next = searchInput.trim();
+    if (next === search) return;
+    const timer = setTimeout(() => {
+      setSearch(next);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, search]);
 
   useEffect(() => {
     fetchStudents();
@@ -399,17 +399,14 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         >
           <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
           <TextInput
-            value={search}
-            onChangeText={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
-            placeholder="Buscar por nome..."
+            value={searchInput}
+            onChangeText={setSearchInput}
+            placeholder="Nome, CPF, e-mail, telefone ou matrícula"
             placeholderTextColor="var(--ds-ink-subtle)"
             className="flex-1 ml-2 text-sm text-ink"
           />
-          {!!search && (
-            <TouchableOpacity onPress={() => setSearch("")}>
+          {!!searchInput && (
+            <TouchableOpacity onPress={() => setSearchInput("")}>
               <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
             </TouchableOpacity>
           )}

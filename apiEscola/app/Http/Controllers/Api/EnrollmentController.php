@@ -23,6 +23,7 @@ use App\Services\EnrollmentContractChargesService;
 use App\Services\EnrollmentFinancialLockService;
 use App\Services\EnrollmentInvoiceAmountSyncService;
 use App\Services\EnrollmentInvoiceDescriptionService;
+use App\Support\GridSearch;
 use App\Services\InvoiceLifecycleService;
 use App\Services\InvoiceSettlementService;
 use App\Services\StudentAppAccessService;
@@ -106,19 +107,16 @@ class EnrollmentController extends Controller
             ->when($request->query('start_date'), fn ($q, $v) => $q->whereDate('start_date', '>=', $v))
             ->when($request->query('end_date'), fn ($q, $v) => $q->whereDate('start_date', '<=', $v))
             ->when($request->query('search'), function ($q, $v) {
-                $term = '%' . trim((string) $v) . '%';
-                if ($term === '%%') {
-                    return;
-                }
-
-                $q->where(function ($inner) use ($term) {
-                    $inner->where('enrollment_number', 'like', $term)
-                        ->orWhereHas('student', fn ($student) => $student->where('name', 'like', $term))
-                        ->orWhereHas('schoolClass', fn ($schoolClass) => $schoolClass->where('name', 'like', $term))
-                        ->orWhereHas('schoolClasses', fn ($schoolClass) => $schoolClass->where('name', 'like', $term))
-                        ->orWhereHas('coursePlan.course', fn ($course) => $course->where('name', 'like', $term))
-                        ->orWhereHas('bundle', fn ($bundle) => $bundle->where('name', 'like', $term));
-                });
+                GridSearch::apply($q, (string) $v, [
+                    'enrollment_number',
+                ], [
+                    'student' => ['name', 'enrollment_number', 'document', 'email', 'phone'],
+                    'schoolClass' => ['name'],
+                    'schoolClasses' => ['name'],
+                    'schoolClass.course' => ['name'],
+                    'coursePlan.course' => ['name'],
+                    'bundle' => ['name'],
+                ]);
             });
 
         $perPage = min(max((int) $request->query('per_page', 20), 1), 50);

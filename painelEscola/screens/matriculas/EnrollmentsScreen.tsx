@@ -81,6 +81,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   const { isMobile, contentPadding } = useResponsiveLayout();
   const [rows, setRows] = useState<EnrollmentSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [courseFilter, setCourseFilter] = useState("");
@@ -141,6 +142,16 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   }, [page, statusFilter, search, courseFilter, classFilter]);
 
   useEffect(() => {
+    const next = searchInput.trim();
+    if (next === search) return;
+    const timer = setTimeout(() => {
+      setSearch(next);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, search]);
+
+  useEffect(() => {
     fetchRows();
   }, [fetchRows]);
 
@@ -172,6 +183,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   });
 
   const clearFilters = () => {
+    setSearchInput("");
     setSearch("");
     setStatusFilter("");
     setCourseFilter("");
@@ -180,7 +192,7 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
   };
 
   const hasActiveFilters =
-    !!search.trim() || !!statusFilter || !!courseFilter || !!classFilter;
+    !!searchInput.trim() || !!statusFilter || !!courseFilter || !!classFilter;
 
   const filterSelectStyle = {
     border: "1px solid #D9DDE3",
@@ -473,12 +485,9 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
           >
             <Ionicons name="search-outline" size={16} color="var(--ds-ink-subtle)" />
             <input
-              placeholder="Aluno ou matrícula..."
-              value={search}
-              onChange={(e: any) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
+              placeholder="Aluno, CPF, e-mail, turma, curso ou matrícula"
+              value={searchInput}
+              onChange={(e: any) => setSearchInput(e.target.value)}
               style={{
                 flex: 1,
                 border: "none",
@@ -489,8 +498,8 @@ export default function EnrollmentsScreen({ navigate }: EnrollmentsScreenProps) 
                 backgroundColor: "transparent",
               }}
             />
-            {!!search.trim() ? (
-              <TouchableOpacity onPress={() => { setSearch(""); setPage(1); }}>
+            {!!searchInput.trim() ? (
+              <TouchableOpacity onPress={() => setSearchInput("")}>
                 <Ionicons name="close-circle" size={16} color="var(--ds-ink-subtle)" />
               </TouchableOpacity>
             ) : null}

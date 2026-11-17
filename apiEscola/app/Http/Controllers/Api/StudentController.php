@@ -11,6 +11,7 @@ use App\Models\Guardian;
 use App\Models\Student;
 use App\Services\StudentAppAccessService;
 use App\Services\TenantUploadSettingsService;
+use App\Support\GridSearch;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,8 @@ class StudentController extends Controller
         security: [['sanctum' => []]],
         parameters: [
             new OA\Parameter(name: 'status', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'search', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'search', in: 'query', required: false, schema: new OA\Schema(type: 'string'), description: 'Pesquisa global: nome, matrícula, CPF, e-mail, telefone ou curso. Ignora acento e maiúsculas.'),
+            new OA\Parameter(name: 'course_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'is_minor', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
         ],
         responses: [
@@ -44,10 +46,25 @@ class StudentController extends Controller
         $query
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
             ->when($request->query('search'), function ($q, $v) {
-                $q->where(function ($inner) use ($v) {
-                    $inner->where('name', 'like', "%{$v}%")
-                        ->orWhere('enrollment_number', 'like', "%{$v}%")
-                        ->orWhere('document', 'like', "%{$v}%");
+                GridSearch::apply($q, (string) $v, [
+                    'name',
+                    'enrollment_number',
+                    'document',
+                    'email',
+                    'phone',
+                ], [
+                    'desiredCourses' => ['name'],
+                ]);
+            })
+            ->when($request->query('course_id'), function ($q, $v) {
+                $courseId = (int) $v;
+                if ($courseId <= 0) {
+                    return;
+                }
+
+                $q->where(function ($inner) use ($courseId) {
+                    $inner->where('desired_course_id', $courseId)
+                        ->orWhereHas('desiredCourses', fn ($courses) => $courses->where('courses.id', $courseId));
                 });
             })
             ->when($request->query('is_minor'), fn ($q, $v) => $q->where('is_minor', filter_var($v, FILTER_VALIDATE_BOOLEAN)));

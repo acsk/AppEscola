@@ -1,47 +1,41 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { QuestoesStackParamList } from '../../../navigation/stacks/QuestoesStack';
 import { getApiErrorMessage } from '../../../lib/apiError';
 import type { CatalogFilters, QuestionSetSummary } from '../../../services/practice.service';
 import { usePracticeFacets, usePracticeSummary, useQuestionSets, useStartPracticeSession } from '../hooks';
+import { TopicPicker } from '../components/TopicPicker';
 import { formatPercent } from '../lib/format';
 import { useOptionalAlunoDrawer } from '../../../context/AlunoDrawerContext';
 import {
-  AppBar, BottomBar, Button, Card, Checkbox, Chip, Chips, EmptyState, Icon, IconButton, NewBanner, NewPill, Notice, Overline, PageBody,
-  PageHeader, ProgressBar, QuickAction, ScreenBody, Section, SegmentedControl, StepHeader, SubjectTile, Txt, newLabel, radius, space,
+  AppBar, BottomBar, Button, Card, Chip, Chips, Dot, EmptyState, Icon, IconButton, NewBanner, NewPill, Notice, Overline, PageBody,
+  PageHeader, QuickAction, ScreenBody, Section, SegmentedControl, StepHeader, Txt, font, newLabel, radius, space,
   subjectColor, useLayoutMode, usePalette,
 } from '../../../ui';
 
 type Nav = NativeStackNavigationProp<QuestoesStackParamList, 'BancoQuestoes'>;
-const QUANTITIES = [5, 10, 20] as const;
+const QUANTITIES = [5, 10, 20, 30] as const;
 type Quantity = (typeof QUANTITIES)[number] | 'all';
 
-/** Rótulo da opção que usa todas as questões da matéria/assunto escolhidos. */
-function totalOptionLabel(pool: number): string {
-  if (pool <= 0 || (QUANTITIES as readonly number[]).includes(pool)) return 'Todas';
-  return String(pool);
-}
-
-/**
- * Banco de questões em uma tela só (protótipos "TelaBancoQuestoes" e "DesktopBancoQuestoes"), para alunos de 10 a 14 anos:
- * 1. matéria, 2. assunto (opcional), 3. quantas questões. Por padrão só entram questões novas que o aluno ainda não respondeu.
- * A sessão mostra a resposta certa depois de cada questão.
- */
+/** Prática do aluno em quatro escolhas, com seleção de assuntos em diálogo. */
 export function BancoQuestoesScreen() {
   const p = usePalette();
   const navigation = useNavigation<Nav>();
   const drawer = useOptionalAlunoDrawer();
-  const { isMobile, isDesktop } = useLayoutMode();
+  const { isMobile, isDesktop, isWide } = useLayoutMode();
 
   const route = useRoute<RouteProp<QuestoesStackParamList, 'BancoQuestoes'>>();
   const presetSubject = route.params?.subjectId;
   const [subjectIds, setSubjectIds] = useState<number[]>(presetSubject ? [presetSubject] : []);
   const [topicIds, setTopicIds] = useState<number[]>([]);
   const [quantity, setQuantity] = useState<Quantity>(10);
-  const [onlyUnanswered, setOnlyUnanswered] = useState(true);
-  const [onlyNew, setOnlyNew] = useState(true);
+  const [situation, setSituation] = useState<'unanswered' | 'new' | 'all'>('new');
+  const onlyNew = situation === 'new';
+  const onlyUnanswered = situation === 'unanswered';
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Chegou de "Treinar estes assuntos antes": marca a matéria do simulado.
@@ -65,13 +59,12 @@ export function BancoQuestoesScreen() {
   const subjects = all.data?.subjects ?? [];
   const total = all.data?.total ?? 0;
   const totalNew = all.data?.situations.new ?? 0;
-  const topics = subjectIds.length ? (bySubject.data?.topics ?? []).filter((t) => subjectIds.includes(t.subject_id)) : [];
+  const topics = (bySubject.data?.topics ?? []).filter((t) => !subjectIds.length || subjectIds.includes(t.subject_id));
   const available = current.data?.total ?? 0;
   const availableNew = current.data?.situations.new ?? 0;
   const availableUnanswered = current.data?.situations.unanswered ?? 0;
   const pool = onlyNew ? availableNew : onlyUnanswered ? availableUnanswered : available;
   const count = quantity === 'all' ? pool : Math.min(quantity, pool);
-  const newInSession = Math.min(count, availableNew);
   const open = summary.data?.open_session ?? null;
 
   const subjectName = subjectIds.length ? subjects.filter((s) => subjectIds.includes(s.id)).map((s) => s.name).join(', ') : 'Todas as matérias';
@@ -92,10 +85,12 @@ export function BancoQuestoesScreen() {
   };
   const toggleTopic = (id: number) => setTopicIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  const filtersPending = current.isFetching || current.isPlaceholderData;
   const begin = () => {
+    if (!pool || filtersPending || start.isPending) return;
     setError(null);
-    const filters: CatalogFilters = { ...scope, situation: onlyNew ? 'new' : onlyUnanswered ? 'unanswered' : 'all' };
-    start.mutate({ filters, options: { quantity: quantity === 'all' ? pool : quantity, correction_mode: 'each', timed: false, title } }, {
+    const filters: CatalogFilters = { ...scope, situation };
+    start.mutate({ filters, options: { quantity: count, correction_mode: 'each', timed: false, title } }, {
       onSuccess: (payload) => navigation.navigate('BancoSimulado', { attemptId: payload.attempt.id, title }),
       onError: (cause) => setError(getApiErrorMessage(cause, 'Não foi possível começar. Tente de novo.')),
     });
@@ -124,91 +119,95 @@ export function BancoQuestoesScreen() {
 
   const underReview = summary.data?.questions_under_review ?? 0;
   const reviewNotice = underReview > 0 ? (
-    <Notice tone="info" icon="clock"
-      title={underReview === 1 ? '1 questão em análise pelo professor' : `${underReview} questões em análise pelo professor`}
-      text="Alunos informaram que elas têm erro. O professor está analisando e, em breve, elas voltam para você responder." />
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: 4 }}>
+      <Icon name="clock" size={16} color={p.inkSubtle} />
+      <Txt variant="bodySm" tone="subtle" style={{ flex: 1 }}>
+        {underReview} {underReview === 1 ? 'questão está' : 'questões estão'} em análise pelo professor e {underReview === 1 ? 'volta' : 'voltam'} em breve.
+      </Txt>
+      <Pressable accessibilityRole="button" onPress={() => setReviewOpen(!reviewOpen)}><Txt variant="bodySm" tone="muted" style={font.bold}>Por quê?</Txt></Pressable>
+    </View>
   ) : null;
+  const reviewExplanation = reviewOpen ? <Notice tone="info" title="Questões em análise" text="Alunos informaram que elas têm erro. O professor está analisando e, em breve, elas voltam para você responder." /> : null;
+  const topicPicker = topicsOpen ? <TopicPicker subjects={subjects} topics={topics} subjectIds={subjectIds} selected={topicIds}
+    onClose={() => setTopicsOpen(false)} onApply={(ids) => { setTopicIds(ids); setTopicsOpen(false); }} /> : null;
 
-  const tiles = [
-    <SubjectTile key="all" icon="grid" subject="Todas as matérias" count={total} newCount={totalNew} selected={!subjectIds.length}
-      onPress={() => { setSubjectIds([]); setTopicIds([]); }} />,
-    ...subjects.map((s) => (
-      <SubjectTile key={s.id} subject={s.name} dot={subjectColor(p, s.id, s.color)} count={s.total} newCount={s.new}
-        selected={subjectIds.includes(s.id)} onPress={() => toggleSubject(s.id)} />
-    )),
+  const choices = [
+    { id: null, name: 'Todas', total, new: 0, color: null },
+    ...subjects,
   ];
-  // Celular: "Todas as matérias" ocupa a linha inteira e o resto vai em 2 colunas. Desktop: 3 colunas.
-  const cols = isDesktop ? 3 : 2;
-  const [head, rest] = isDesktop ? [[] as React.ReactElement[], tiles] : [[tiles[0]], tiles.slice(1)];
-  const rows: React.ReactElement[][] = [];
-  for (let i = 0; i < rest.length; i += cols) rows.push(rest.slice(i, i + cols));
-  const tileGrid = (
-    <View style={{ gap: space[3] }}>
-      {head.map((tile) => React.cloneElement(tile, { key: tile.key, style: { minHeight: 0 } }))}
-      {rows.map((row, r) => (
-        <View key={r} style={{ flexDirection: 'row', gap: space[3] }}>
-          {row.map((tile) => <View key={tile.key} style={{ flex: 1, minWidth: 0 }}>{tile}</View>)}
-          {Array.from({ length: cols - row.length }, (_, k) => <View key={`pad${k}`} style={{ flex: 1 }} />)}
-        </View>
-      ))}
+  const subjectChoices = (
+    <View style={{ flexDirection: isDesktop ? 'row' : 'column', flexWrap: 'wrap', gap: 10 }}>
+      {choices.map((s) => {
+        const selected = s.id === null ? !subjectIds.length : subjectIds.includes(s.id);
+        return <Pressable key={s.id ?? 'all'} accessibilityRole="checkbox" accessibilityLabel={`${s.name}, ${s.total} questões`}
+          accessibilityState={{ checked: selected }} onPress={() => s.id === null ? (setSubjectIds([]), setTopicIds([])) : toggleSubject(s.id)}
+          style={{ flexGrow: isDesktop ? 1 : 0, flexBasis: isDesktop ? (isWide ? '30%' : '45%') : 'auto', minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10,
+            padding: 12, minHeight: 76, borderRadius: radius.md, borderWidth: 1, borderColor: selected ? p.ink : p.lineStrong, backgroundColor: selected ? p.surfaceSunken : p.surface }}>
+          <View style={{ width: 18, height: 18, borderRadius: 5, borderWidth: selected ? 0 : 1.5, borderColor: p.lineStrong, backgroundColor: selected ? p.surfaceInverse : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+            {selected ? <Icon name="check" size={14} color={p.onInverse} /> : null}
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {s.id === null ? <Icon name="grid" size={16} /> : <Dot color={subjectColor(p, s.id, s.color)} />}
+              <Txt variant="label" style={{ flexShrink: 1, ...font.bold }}>{s.name}</Txt>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+              <Txt variant="bodySm" tone="subtle">{s.total} questões</Txt>
+              {s.new > 0 ? <NewPill label={newLabel(s.new)} /> : null}
+            </View>
+          </View>
+        </Pressable>;
+      })}
     </View>
   );
-
+  const rowStyle = { padding: isDesktop ? 20 : 0, gap: 12, borderTopWidth: isDesktop ? 1 : 0, borderTopColor: p.line };
+  const suggestions = topics.filter((t) => t.new > 0).sort((a, b) => b.new - a.new).slice(0, 3);
+  const situationLabel = onlyNew ? 'Novas' : onlyUnanswered ? 'Não respondidas' : 'Todas';
   const steps = (
-    <>
-      <View style={{ gap: space[3] }}>
-        <StepHeader n={1} title="Escolha a matéria" />
-        {subjects.length ? tileGrid : <EmptyState icon="library" title="Nenhuma questão para praticar ainda" text="Quando a escola liberar questões no banco, elas aparecem aqui." />}
+    <View style={isDesktop ? { backgroundColor: p.surface, borderWidth: 1, borderColor: p.line, borderRadius: radius.lg, overflow: 'hidden' } : { gap: 24 }}>
+      <View style={{ ...rowStyle, borderTopWidth: 0 }}>
+        <StepHeader n={1} title="Matéria" optional="pode marcar mais de uma" />
+        {subjects.length ? subjectChoices : <EmptyState icon="library" title="Nenhuma questão para praticar ainda" text="Quando a escola liberar questões no banco, elas aparecem aqui." />}
       </View>
-      {subjects.length ? (
-        <View style={{ gap: space[3] }}>
-          <StepHeader n={2} title="Escolha o assunto" optional="opcional" />
-          {!subjectIds.length ? <Txt variant="bodySm" tone="subtle">Escolha uma matéria para ver os assuntos dela.</Txt>
-            : !topics.length ? <Txt variant="bodySm" tone="subtle">Esta matéria ainda não tem assuntos cadastrados.</Txt>
-            : (
-              <Chips>
-                <Chip label="Todos os assuntos" selected={!topicIds.length} onPress={() => setTopicIds([])} />
-                {topics.map((t) => {
-                  const on = topicIds.includes(t.id);
-                  return <Chip key={t.id} label={t.name} count={t.total} selected={on} onPress={() => toggleTopic(t.id)}
-                    trailing={t.new ? <NewPill label={newLabel(t.new)} inverse={on} /> : null} />;
-                })}
-              </Chips>
-            )}
+      {subjects.length ? <>
+        <View style={rowStyle}>
+          <StepHeader n={2} title="Assunto" optional="opcional" />
+          <Pressable accessibilityRole="button" accessibilityLabel={`Escolher assuntos: ${topicName}`} onPress={() => setTopicsOpen(true)} disabled={bySubject.isFetching}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.md, borderWidth: 1, borderColor: p.lineStrong, backgroundColor: p.surface }}>
+            <Icon name="sort" size={20} />
+            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+              <Txt variant="label" numberOfLines={2}>{topicIds.length ? `${topicIds.length} ${topicIds.length === 1 ? 'assunto selecionado' : 'assuntos selecionados'}` : 'Todos os assuntos'}</Txt>
+              <Txt variant="bodySm" tone="subtle" numberOfLines={2}>{bySubject.isFetching ? 'Carregando assuntos…' : topicIds.length ? topicName : `${topics.length} assuntos · ${topics.filter((t) => t.new > 0).length} com questões novas`}</Txt>
+            </View>
+            <Txt variant="label">Escolher</Txt><Icon name="chevron-right" size={16} />
+          </Pressable>
+          {suggestions.length ? <Chips>
+            {isDesktop ? <Txt variant="bodySm" tone="subtle" style={{ alignSelf: 'center' }}>Com novas:</Txt> : null}
+            {suggestions.map((t) => <Chip key={t.id} label={t.name} selected={topicIds.includes(t.id)} onPress={() => toggleTopic(t.id)} trailing={<NewPill label={newLabel(t.new)} inverse={topicIds.includes(t.id)} />} />)}
+          </Chips> : null}
         </View>
-      ) : null}
-      {subjects.length ? (
-        <View style={{ gap: space[3] }}>
-          <StepHeader n={3} title="Quantas questões?" />
-          <View style={{ maxWidth: isDesktop ? 480 : undefined }}>
-            <SegmentedControl
-              label="Quantidade"
-              options={[...QUANTITIES.map(String), totalOptionLabel(pool)]}
-              value={quantity === 'all' ? QUANTITIES.length : QUANTITIES.indexOf(quantity)}
-              onChange={(i) => setQuantity(i === QUANTITIES.length ? 'all' : QUANTITIES[i])}
-            />
+        <View style={{ flexDirection: isWide ? 'row' : 'column', gap: isDesktop ? 0 : 24 }}>
+          <View style={{ ...rowStyle, flex: isWide ? 1.5 : undefined, minWidth: 0 }}>
+            <StepHeader n={3} title="Quais questões" />
+            <View accessibilityRole="radiogroup" accessibilityLabel="Quais questões" style={{ flexDirection: 'row', backgroundColor: p.surfaceSunken, padding: 3, borderRadius: radius.md }}>
+              {(['unanswered', 'new', 'all'] as const).map((value, index) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: situation === value }} onPress={() => setSituation(value)}
+                style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 4, minHeight: 38, paddingVertical: 6, borderRadius: 9, backgroundColor: situation === value ? p.surface : 'transparent' }}>
+                <Txt variant="label" style={{ fontSize: 13 }} tone={situation === value ? 'ink' : 'muted'}>{['Não respondi', 'Só novas', 'Todas'][index]}</Txt>
+                {value === 'new' && availableNew > 0 ? <NewPill label={String(availableNew)} /> : null}
+              </Pressable>)}
+            </View>
+            {onlyNew && !availableNew && availableUnanswered > 0 ? <Txt variant="bodySm" tone="subtle">Não há questões novas aqui. Escolha “Não respondi” para continuar praticando.</Txt> : null}
           </View>
-          <Checkbox large label="Ainda não respondi" count={availableUnanswered} checked={onlyUnanswered}
-            onPress={() => {
-              setOnlyUnanswered((on) => {
-                if (on) setOnlyNew(false);
-                return !on;
-              });
-            }} />
-          <Checkbox large label="Só questões novas" checked={onlyNew} disabled={!availableNew && !onlyNew}
-            onPress={() => {
-              setOnlyNew((on) => {
-                if (!on) setOnlyUnanswered(true);
-                return !on;
-              });
-            }}
-            trailing={availableNew ? <NewPill label={String(availableNew)} /> : null} />
-          {onlyNew && !availableNew && availableUnanswered > 0 ? (
-            <Txt variant="bodySm" tone="subtle">Não há questões novas aqui. Desmarque “Só questões novas” para praticar as que você ainda não respondeu.</Txt>
-          ) : null}
+          <View style={{ ...rowStyle, flex: isWide ? 1 : undefined, minWidth: 0, borderLeftWidth: isWide ? 1 : 0, borderLeftColor: p.line }}>
+            <StepHeader n={4} title="Quantas" />
+            <SegmentedControl label="Quantidade" options={QUANTITIES.map(String)} value={quantity === 'all' ? -1 : QUANTITIES.indexOf(quantity)} onChange={(i) => setQuantity(QUANTITIES[i])} />
+            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: quantity === 'all' }} onPress={() => setQuantity(quantity === 'all' ? 10 : 'all')}>
+              <Txt variant="bodySm" tone={quantity === 'all' ? 'ink' : 'subtle'} style={quantity === 'all' ? font.bold : undefined}>{quantity === 'all' ? '✓ ' : ''}Usar todas ({pool})</Txt>
+            </Pressable>
+          </View>
         </View>
-      ) : null}
-    </>
+      </> : null}
+    </View>
   );
 
   const setsSection = sets.data?.length ? (
@@ -236,88 +235,71 @@ export function BancoQuestoesScreen() {
 
   // ── Desktop ───────────────────────────────────────────────────────────────
   if (isDesktop) {
-    const rows: [string, string][] = [
-      ['Matéria', subjectIds.length ? subjectName : 'Todas'],
-      ['Assunto', topicIds.length ? topicName : 'Todos'],
-      ['Questões', !pool ? '—' : onlyNew ? `${count} novas` : onlyUnanswered ? `${count} não respondidas${newInSession ? ` (${newLabel(newInSession)})` : ''}` : `${count}${newInSession ? ` (${newLabel(newInSession)})` : ''}`],
-      ['Resposta certa', 'Depois de cada questão'],
-    ];
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: p.bg }} refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={p.brand} />}>
-        <PageBody maxWidth="none">
-          <PageHeader title="Banco de questões" subtitle={`Escolha o que praticar e aperte começar. ${total.toLocaleString('pt-BR')} questões no total.`}
-            actions={
-              <View style={{ flexDirection: 'row', gap: space[3] }}>
-                <Button variant="secondary" icon="target" label="O que estudar" onPress={() => navigation.navigate('Aprendizagem')} />
-                <Button variant="secondary" icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} />
+      <View style={{ flex: 1, backgroundColor: p.bg }}>
+        <ScrollView style={{ flex: 1 }} refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={p.brand} />}>
+          <PageBody maxWidth={1184}>
+            <PageHeader title="Banco de questões" subtitle="Monte sua prática em 4 escolhas e aperte começar."
+              actions={
+                <View style={{ flexDirection: 'row', gap: space[3] }}>
+                  <Button variant="ghost" icon="target" label="O que estudar" onPress={() => navigation.navigate('Aprendizagem')} />
+                  <Button variant="ghost" icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} />
+                </View>
+              } />
+            <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
+              <View style={{ flex: 1, minWidth: 0, gap: 16 }}>
+                {banner}
+                {continueAction}
+                {steps}
+                {setsSection}
               </View>
-            } />
-          <View style={{ flexDirection: 'row', gap: space[6], alignItems: 'flex-start' }}>
-            <View style={{ flex: 1, minWidth: 0, gap: 28 }}>
-              {banner}
-              {continueAction}
-              {reviewNotice}
-              {steps}
-              {setsSection}
-            </View>
-            <View style={{ width: 360, gap: space[4] }}>
-              <Card padding="lg" style={{ gap: 4 }}>
-                <Overline>Sua prática</Overline>
-                <View style={{ height: 8 }} />
-                {rows.map(([label, value], i) => (
-                  <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3], paddingVertical: 10, borderTopWidth: 1, borderTopColor: p.line, marginBottom: i === rows.length - 1 ? 12 : 0 }}>
-                    <Txt tone="muted" style={{ fontSize: 14 }}>{label}</Txt>
-                    <Txt variant="label" style={{ flexShrink: 1, textAlign: 'right', fontSize: 14 }}>{value}</Txt>
-                  </View>
-                ))}
-                <Button block size="lg" cta iconRight="arrow-right" label={ctaLabel} disabled={!pool} loading={start.isPending} onPress={begin} />
-                {errorNotice ? <View style={{ marginTop: space[3] }}>{errorNotice}</View> : null}
-              </Card>
-              {summary.data ? (
-                <Card style={{ gap: 0 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 10 }}>
-                    <Txt tone="muted" style={{ fontSize: 14 }}>Seu acerto no banco</Txt>
-                    <Txt variant="label">{formatPercent(summary.data.accuracy)}</Txt>
-                  </View>
-                  <ProgressBar value={summary.data.accuracy ?? 0} tone="ink" size="sm" label="Acerto" />
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, marginTop: 10, borderTopWidth: 1, borderTopColor: p.line }}>
-                    <Txt tone="muted" style={{ fontSize: 14 }}>Questões respondidas</Txt>
-                    <Txt variant="label">{summary.data.answered.toLocaleString('pt-BR')}</Txt>
-                  </View>
+              <View style={{ width: isWide ? 340 : 280, gap: space[4] }}>
+                <Card padding="lg" style={{ gap: 14 }}>
+                  <Overline>Sua prática</Overline>
+                  <Txt style={{ ...font.extrabold, fontSize: 30, lineHeight: 36 }}>{filtersPending ? '…' : count} {count === 1 ? 'questão' : 'questões'}</Txt>
+                  <Txt tone="muted">{situationLabel} de <Txt style={font.bold}>{subjectName}</Txt>, {topicIds.length ? `sobre ${topicName}` : 'de todos os assuntos'}.</Txt>
+                  <Button block size="lg" cta iconRight="arrow-right" label={ctaLabel} disabled={!pool || filtersPending} loading={start.isPending} onPress={begin} />
+                  <View style={{ flexDirection: 'row', gap: 8 }}><Icon name="info" size={16} color={p.inkSubtle} /><Txt variant="bodySm" tone="subtle" style={{ flex: 1 }}>A resposta certa aparece depois de cada questão.</Txt></View>
+                  {errorNotice}
+                  {summary.data ? <View style={{ flexDirection: 'row', marginHorizontal: -20, marginBottom: -20, marginTop: 4, borderTopWidth: 1, borderTopColor: p.line }}>
+                    <View style={{ flex: 1, padding: 16, gap: 4 }}><Txt variant="caption" tone="subtle">Seu acerto no banco</Txt><Txt variant="titleSm">{formatPercent(summary.data.accuracy)}</Txt></View>
+                    <View style={{ flex: 1, padding: 16, gap: 4, borderLeftWidth: 1, borderLeftColor: p.line }}><Txt variant="caption" tone="subtle">Respondidas</Txt><Txt variant="titleSm">{summary.data.answered.toLocaleString('pt-BR')}</Txt></View>
+                  </View> : null}
                 </Card>
-              ) : null}
+                {reviewNotice}
+                {reviewExplanation}
+              </View>
             </View>
-          </View>
-        </PageBody>
-      </ScrollView>
+          </PageBody>
+        </ScrollView>
+        {topicPicker}
+      </View>
     );
   }
 
   // ── Celular / tablet ──────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <AppBar large title="Banco de questões" subtitle="Escolha o que praticar e aperte começar"
+      <AppBar large title="Banco de questões" subtitle="4 escolhas e aperte começar"
         leading={drawer && isMobile ? <IconButton icon="menu" label="Abrir menu" variant="outline" onPress={drawer.open} /> : undefined}
-        trailing={<IconButton icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} />} />
+        trailing={<View style={{ flexDirection: 'row' }}><IconButton icon="target" label="O que estudar" onPress={() => navigation.navigate('Aprendizagem')} /><IconButton icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} /></View>} />
       <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={p.brand} colors={[p.brand]} />}>
         <ScreenBody gap={22} style={{ paddingTop: space[2], width: '100%', maxWidth: 720, alignSelf: 'center' }}>
           {banner}
           {continueAction}
-          {reviewNotice}
           {steps}
-          <View style={{ flexDirection: 'row', gap: space[3] }}>
-            <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="target" label="O que estudar" onPress={() => navigation.navigate('Aprendizagem')} /></View>
-            <View style={{ flex: 1 }}><Button variant="secondary" size="sm" block icon="trophy" label="Ranking" onPress={() => navigation.navigate('BancoRanking')} /></View>
-          </View>
+          {reviewNotice}
+          {reviewExplanation}
           {errorNotice}
           {setsSection}
         </ScreenBody>
       </ScrollView>
-      <BottomBar hint="Depois de cada questão você vê a resposta certa.">
+      <BottomBar hint={`${situationLabel} · ${subjectName} · ${topicIds.length ? topicName : 'todos os assuntos'}`}>
         <View style={{ flex: 1 }}>
-          <Button block size="lg" cta iconRight="arrow-right" label={ctaLabel} disabled={!pool} loading={start.isPending} onPress={begin} />
+          <Button block size="lg" cta iconRight="arrow-right" label={ctaLabel} disabled={!pool || filtersPending} loading={start.isPending} onPress={begin} />
         </View>
       </BottomBar>
+      {topicPicker}
     </View>
   );
 }
