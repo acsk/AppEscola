@@ -39,6 +39,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import { Download } from "lucide-react-native";
 import { useAuth } from "../../contexts/AuthContext";
+import SubjectTopicReleaseModal from "../../components/banco-questoes/SubjectTopicReleaseModal";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -78,6 +79,7 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
   const [confirmImport, setConfirmImport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [topicImport, setTopicImport] = useState<{ subject: SubjectRow; sources: DefaultTopicsSource[]; source: string } | null>(null);
+  const [releaseSubject, setReleaseSubject] = useState<SubjectRow | null>(null);
   const [loadingSourcesFor, setLoadingSourcesFor] = useState<number | null>(null);
   const [importingTopics, setImportingTopics] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
@@ -268,23 +270,31 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
                 const open = expanded.has(subject.id) || foldText(filter) !== "";
                 return (
                   <View key={subject.id} className="bg-surface rounded-ds-md border border-border overflow-hidden">
-                    <TouchableOpacity
-                      onPress={() =>
-                        setExpanded((prev) => {
-                          const next = new Set(prev);
-                          next.has(subject.id) ? next.delete(subject.id) : next.add(subject.id);
-                          return next;
-                        })
-                      }
-                      aria-expanded={open}
-                      className="flex-row items-center px-4 py-3 gap-3"
-                    >
-                      <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={16} color="var(--ds-ink-muted)" />
-                      <Text className={`${TABLE_CELL_SEMIBOLD} flex-1`}>{subject.name}</Text>
-                      <Text className={TABLE_CELL_MUTED}>
-                        {subjectTopics.length} assunto(s) · {countLabel(subject.questions_count)}
-                      </Text>
-                    </TouchableOpacity>
+                    <View className="flex-row items-center px-4 py-3 gap-3">
+                      <TouchableOpacity
+                        onPress={() =>
+                          setExpanded((prev) => {
+                            const next = new Set(prev);
+                            next.has(subject.id) ? next.delete(subject.id) : next.add(subject.id);
+                            return next;
+                          })
+                        }
+                        aria-expanded={open}
+                        className="flex-row items-center gap-3 flex-1"
+                      >
+                        <Ionicons name={open ? "chevron-down" : "chevron-forward"} size={16} color="var(--ds-ink-muted)" />
+                        <Text className={`${TABLE_CELL_SEMIBOLD} flex-1`}>{subject.name}</Text>
+                        <Text className={TABLE_CELL_MUTED}>
+                          {subjectTopics.length} assunto(s) · {countLabel(subject.questions_count)}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setReleaseSubject(subject)}
+                        className="px-3 py-1.5 rounded-ds-md border border-border"
+                      >
+                        <Text className="text-xs font-semibold text-brand">Liberar no banco</Text>
+                      </TouchableOpacity>
+                    </View>
                     {open && (
                       <View className="border-t border-border">
                         {subjectTopics.map((topic, i) => (
@@ -526,6 +536,14 @@ export default function QuestionTaxonomyScreen({ navigate }: Props) {
           );
         })()}
       </Modal>
+
+      <SubjectTopicReleaseModal
+        visible={releaseSubject !== null}
+        subjectId={releaseSubject?.id ?? null}
+        subjectName={releaseSubject?.name ?? ""}
+        onClose={() => setReleaseSubject(null)}
+        onSaved={(message) => setToast({ visible: true, type: "success", message })}
+      />
 
       <ToastBanner
         visible={toast.visible}

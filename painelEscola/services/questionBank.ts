@@ -300,3 +300,46 @@ export async function fetchActiveExamTypes(): Promise<ExamTypeSummary[]> {
     logo_url: t.logo_url ?? null,
   }));
 }
+
+export type ExamTopicRelease = {
+  configured: boolean;
+  courses: { id: number; name: string }[];
+  subjects: {
+    id: number;
+    name: string;
+    topics: { id: number; name: string; questions_count: number; selected: boolean }[];
+  }[];
+};
+
+export async function fetchExamTopicRelease(examId: number): Promise<ExamTopicRelease> {
+  const { data } = await api.get(`/exams/${examId}/question-bank-release`);
+  return data.body as ExamTopicRelease;
+}
+
+export async function saveExamTopicRelease(examId: number, enabled: boolean, topicIds: number[]) {
+  const { data } = await api.put(`/exams/${examId}/question-bank-release`, { enabled, topic_ids: topicIds });
+  return data as { type: string; message: string; body: ExamTopicRelease };
+}
+
+export type SubjectTopicRelease = {
+  subject: { id: number; name: string };
+  courses: { id: number; name: string }[];
+  topics: {
+    id: number;
+    name: string;
+    releases: { course_id: number; manual: boolean; exams: { id: number; title: string }[] }[];
+  }[];
+};
+
+export async function fetchSubjectTopicRelease(subjectId: number): Promise<SubjectTopicRelease> {
+  const { data } = await api.get(`/question-bank/subjects/${subjectId}/topic-releases`);
+  return data.body as SubjectTopicRelease;
+}
+
+export async function saveSubjectTopicRelease(subjectId: number, courseId: number, topicIds: number[]) {
+  const { data } = await api.put(`/question-bank/subjects/${subjectId}/topic-releases`, {
+    course_id: courseId,
+    topic_ids: topicIds,
+  });
+  return data as { type: string; message: string; body: SubjectTopicRelease };
+}

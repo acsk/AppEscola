@@ -10,6 +10,7 @@ use App\Models\Exam;
 use App\Models\ExamStatus;
 use App\Services\ExamDeliveryReportService;
 use App\Services\ExamTypeService;
+use App\Services\QuestionBankReleaseService;
 use App\Services\ExamAttemptIntegrityService;
 use App\Services\ExamAccessService;
 use App\Services\ExamCourseService;
@@ -31,6 +32,7 @@ class ExamController extends Controller
         private readonly ExamDeliveryReportService $deliveryReportService,
         private readonly ExamQuestionErrorsReportService $questionErrorsReportService,
         private readonly ExamAccessService $examAccess,
+        private readonly QuestionBankReleaseService $topicReleases,
     ) {
     }
 
@@ -117,6 +119,7 @@ class ExamController extends Controller
 
         if ($courseIds !== null) {
             $this->examCourseService->sync($exam, $courseIds, (int) $exam->tenant_id);
+            $this->topicReleases->realignExamCourses($exam);
         }
 
         $exam->load(['course', 'courses', 'subject', 'examStatus', 'examType']);

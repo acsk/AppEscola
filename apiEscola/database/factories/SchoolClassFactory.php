@@ -14,7 +14,8 @@ class SchoolClassFactory extends Factory
             'tenant_id' => Tenant::factory(),
             'course_id' => Course::factory(),
             'name' => 'Turma ' . fake()->bothify('??-##'),
-            'year' => (int) fake()->year(),
+            // Antes de 2027 a prática libera a disciplina inteira. Ano aleatório mudaria o teste conforme o calendário.
+            'year' => 2026,
             'period' => fake()->randomElement(['morning', 'afternoon', 'night', 'full_time']),
             'capacity' => fake()->numberBetween(20, 50),
             'status' => 'active',

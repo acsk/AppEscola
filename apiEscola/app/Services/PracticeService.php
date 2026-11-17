@@ -78,6 +78,7 @@ class PracticeService
     /**
      * Questões que o aluno pode praticar (banco + simulados oficiais arquivados), somente das disciplinas
      * da grade das turmas em que ele está matriculado. Sem turma ou sem disciplina na grade, não há questão.
+     * Turma de 2027 em diante, dentro dessa grade, só vê questão de assunto liberado para o curso.
      */
     public function practicableFor(Student $student): Builder
     {
@@ -87,14 +88,50 @@ class PracticeService
         );
     }
 
-    /** Restringe a consulta às disciplinas da grade das turmas ativas do aluno. */
+    /**
+     * Disciplinas da grade das turmas vigentes.
+     * Até 2026 a disciplina inteira entra. De 2027 em diante, só questão com assunto liberado no curso da turma.
+     */
     private function onlyClassSubjects(Builder $query, Student $student): Builder
     {
-        $subjectIds = $this->enrollments->activeSubjectIdsForStudent($student);
+        $openSubjects = [];
+        $topicScopes = [];
+        foreach ($this->enrollments->activePracticeScopesForStudent($student) as $scope) {
+            if ($scope['subject_ids'] === []) {
+                continue;
+            }
+            $topicMode = $scope['year'] !== null && $scope['year'] >= QuestionBankReleaseService::TOPIC_MODE_FROM_YEAR;
+            if ($topicMode) {
+                $topicScopes[$scope['course_id']] = array_values(array_unique(array_merge(
+                    $topicScopes[$scope['course_id']] ?? [],
+                    $scope['subject_ids'],
+                )));
+            } else {
+                array_push($openSubjects, ...$scope['subject_ids']);
+            }
+        }
+        $openSubjects = array_values(array_unique($openSubjects));
+        if ($openSubjects === [] && $topicScopes === []) {
+            return $query->whereRaw('0 = 1');
+        }
 
-        return $subjectIds->isEmpty()
-            ? $query->whereRaw('0 = 1')
-            : $query->whereIn('exam_questions.subject_id', $subjectIds);
+        return $query->where(function (Builder $outer) use ($openSubjects, $topicScopes) {
+            if ($openSubjects !== []) {
+                $outer->orWhereIn('exam_questions.subject_id', $openSubjects);
+            }
+            foreach ($topicScopes as $courseId => $subjectIds) {
+                $outer->orWhere(function (Builder $inner) use ($courseId, $subjectIds) {
+                    $inner->whereIn('exam_questions.subject_id', $subjectIds)
+                        ->whereExists(function ($sub) use ($courseId) {
+                            $sub->selectRaw('1')
+                                ->from('exam_question_topic as rel_eqt')
+                                ->join('question_bank_topic_releases as rel', 'rel.subject_topic_id', '=', 'rel_eqt.subject_topic_id')
+                                ->whereColumn('rel_eqt.exam_question_id', 'exam_questions.id')
+                                ->where('rel.course_id', (int) $courseId);
+                        });
+                });
+            }
+        });
     }
 
     /** Responde uma questão avulsa: correção imediata. */

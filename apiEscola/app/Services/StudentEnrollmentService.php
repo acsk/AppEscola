@@ -177,4 +177,43 @@ class StudentEnrollmentService
             ->map(fn ($id) => (int) $id)
             ->values();
     }
+
+    /**
+     * Turmas vigentes do aluno, com o curso, o ano e as disciplinas da grade.
+     * Ano vazio ou anterior a 2027 libera a disciplina inteira. De 2027 em diante, só assuntos liberados no curso.
+     *
+     * @return Collection<int, array{course_id: int, year: int|null, subject_ids: list<int>}>
+     */
+    public function activePracticeScopesForStudent(Student $student): Collection
+    {
+        $classIds = $this->activeSchoolClassIdsForStudent($student);
+        if ($classIds->isEmpty()) {
+            return collect();
+        }
+
+        $classes = DB::table('school_classes')
+            ->whereIn('id', $classIds)
+            ->whereNull('deleted_at')
+            ->get(['id', 'course_id', 'year']);
+        $subjects = DB::table('class_schedules')
+            ->whereIn('school_class_id', $classes->pluck('id'))
+            ->where('tenant_id', $student->tenant_id)
+            ->whereNull('deleted_at')
+            ->whereNotNull('subject_id')
+            ->get(['school_class_id', 'subject_id'])
+            ->groupBy('school_class_id');
+
+        return $classes->map(function ($class) use ($subjects) {
+            return [
+                'course_id' => (int) $class->course_id,
+                'year' => $class->year !== null ? (int) $class->year : null,
+                'subject_ids' => ($subjects->get($class->id) ?? collect())
+                    ->pluck('subject_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all(),
+            ];
+        })->values();
+    }
 }

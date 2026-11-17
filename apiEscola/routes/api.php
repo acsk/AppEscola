@@ -77,6 +77,7 @@ use App\Http\Controllers\Api\TenantMobileThemeController;
 use App\Http\Controllers\Api\TenantAiSettingsController;
 use App\Http\Controllers\Api\TenantEmailSettingsController;
 use App\Http\Controllers\Api\QuestionAiController;
+use App\Http\Controllers\Api\QuestionBankReleaseController;
 use App\Http\Controllers\Api\TenantNotificationSettingsController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\StudentNotificationController;
@@ -574,6 +575,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
     // Simulados
     Route::middleware('feature:exams')->group(function () {
         Route::apiResource('exams', ExamController::class);
+        Route::get('exams/{exam}/question-bank-release', [QuestionBankReleaseController::class, 'showExam']);
+        Route::put('exams/{exam}/question-bank-release', [QuestionBankReleaseController::class, 'updateExam']);
         Route::get('exams/{exam}/stats',           [ExamController::class, 'stats']);
         Route::get('exams/{exam}/delivery-report', [ExamController::class, 'deliveryReport']);
         Route::get('exams/{exam}/question-errors-report', [ExamController::class, 'questionErrorsReport']);
@@ -656,6 +659,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
             Route::post('ai/redraw-image', [QuestionAiController::class, 'redrawImage']);
         });
 
+        Route::get('subjects/{subject}/topic-releases', [QuestionBankReleaseController::class, 'showSubject'])->whereNumber('subject');
+        Route::put('subjects/{subject}/topic-releases', [QuestionBankReleaseController::class, 'updateSubject'])->whereNumber('subject');
         Route::get('subjects',          [SubjectTopicController::class, 'subjects']);
         Route::get('taxonomy',          [SubjectTopicController::class, 'taxonomy']);
         Route::post('taxonomy/import-default', [SubjectTopicController::class, 'importDefault']);

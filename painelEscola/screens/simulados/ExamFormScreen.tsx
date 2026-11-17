@@ -25,6 +25,8 @@ import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
+import ExamBankReleaseModal from "../../components/banco-questoes/ExamBankReleaseModal";
+import { fetchExamTopicRelease } from "../../services/questionBank";
 import { useExamStatuses, useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import DateTimePickerInput from "../../components/ui/DateTimePickerInput";
 import {
@@ -277,6 +279,9 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
   });
   const [errorsReportOpen, setErrorsReportOpen] = useState(false);
   const [answerKeyOpen, setAnswerKeyOpen] = useState(false);
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const [releaseMode, setReleaseMode] = useState<"ask" | "edit">("ask");
+  const statusOnServerRef = useRef("draft");
 
   const closeToast = useCallback(() => {
     setToast((prev) => ({ ...prev, visible: false }));
@@ -337,6 +342,7 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
             exam.min_score_to_retake != null ? String(exam.min_score_to_retake) : "",
         });
         setQuestions(exam.questions ?? []);
+        statusOnServerRef.current = exam.status ?? "draft";
       } catch {}
       setLoading(false);
     })();
@@ -395,6 +401,17 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
     if (scroll) scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
+  const maybeAskBankRelease = async (id: number) => {
+    try {
+      const release = await fetchExamTopicRelease(id);
+      if (!release.subjects.some((subject) => subject.topics.length > 0)) return;
+      setReleaseMode("ask");
+      setReleaseOpen(true);
+    } catch (err: unknown) {
+      showApiErrorToast(setToast, err, "O simulado foi salvo, mas não foi possível abrir a liberação do banco.");
+    }
+  };
+
   const saveExam = async () => {
     const errs = validateExam(form);
     if (Object.keys(errs).length > 0) {
@@ -428,8 +445,13 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
       };
 
       if (canManageContent && effectiveExamId) {
+        const wasPublished = statusOnServerRef.current === "published";
         const { data } = await api.put(`/exams/${effectiveExamId}`, payload);
+        statusOnServerRef.current = form.status;
         showApiToast(setToast, data, "Operação realizada com sucesso.");
+        if (form.status === "published" && !wasPublished) {
+          void maybeAskBankRelease(effectiveExamId);
+        }
       } else {
         const { data } = await api.post("/exams", payload);
         const newId = resolveExamId(data);
@@ -1044,6 +1066,20 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
             />
           </View>
         </View>
+
+        {canManageContent ? (
+          <View className="mb-4">
+            <Button
+              variant="secondary"
+              size="sm"
+              label="Assuntos no banco de questões"
+              onPress={() => {
+                setReleaseMode("edit");
+                setReleaseOpen(true);
+              }}
+            />
+          </View>
+        ) : null}
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-ink mb-1">Cursos</Text>
@@ -2236,6 +2272,14 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
         examTitle={form.title}
         onClose={() => setErrorsReportOpen(false)}
         setToast={setToast}
+      />
+
+      <ExamBankReleaseModal
+        visible={releaseOpen}
+        examId={effectiveExamId}
+        mode={releaseMode}
+        onClose={() => setReleaseOpen(false)}
+        onSaved={(message) => setToast({ visible: true, type: "success", message })}
       />
 
       <ToastBanner
