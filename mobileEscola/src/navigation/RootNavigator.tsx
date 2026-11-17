@@ -8,6 +8,7 @@ import { AlunoStack } from './stacks/AlunoStack';
 import { AdminStack } from './stacks/AdminStack';
 import { ProfessorStack } from './stacks/ProfessorStack';
 import { ChangePasswordScreen } from '../features/auth/screens/ChangePasswordScreen';
+import { SupportAccessBanner } from '../components/SupportAccessBanner';
 import { colors } from '../theme';
 
 import * as Linking from 'expo-linking';
@@ -87,7 +88,7 @@ const linking: LinkingOptions<any> = {
 };
 
 export function RootNavigator() {
-  const { user, isLoading, requirePasswordChange } = useAuth();
+  const { user, isLoading, requirePasswordChange, supportAccess } = useAuth();
 
   if (isLoading) {
     return (
@@ -118,7 +119,10 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} linking={linking}>
-      {renderStack()}
+      <View style={{ flex: 1 }}>
+        {user && supportAccess ? <SupportAccessBanner expiresAt={supportAccess.expires_at} /> : null}
+        <View style={{ flex: 1 }}>{renderStack()}</View>
+      </View>
     </NavigationContainer>
   );
 }

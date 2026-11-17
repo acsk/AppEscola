@@ -10,6 +10,7 @@ export type StudentActionKey =
   | "history"
   | "boletim"
   | "performance"
+  | "mobile"
   | "approve"
   | "delete";
 
@@ -38,6 +39,8 @@ type Props = {
   onSelect: (action: StudentActionKey) => void;
   /** Oculta "Editar" quando já está na tela de cadastro */
   hideEdit?: boolean;
+  /** Super admin: abre o app na conta deste aluno. */
+  showMobileAccess?: boolean;
   statusLabel?: (status: string) => string;
 };
 
@@ -54,6 +57,7 @@ export default function StudentActionsModal({
   onClose,
   onSelect,
   hideEdit = false,
+  showMobileAccess = false,
   statusLabel = (s) => s,
 }: Props) {
   if (!student) return null;
@@ -95,6 +99,18 @@ export default function StudentActionsModal({
       tone: "blue",
       group: "main",
     },
+    ...(showMobileAccess
+      ? [
+          {
+            key: "mobile" as const,
+            label: "Acessar app",
+            description: "Entra na conta do aluno no app",
+            icon: "phone-portrait-outline" as const,
+            tone: "emerald" as const,
+            group: "main" as const,
+          },
+        ]
+      : []),
     ...(student.status === "inactive"
       ? [
           {

@@ -28,7 +28,7 @@ export default function SupportAccessHistory({ tenantId }: { tenantId?: number }
 
   return (
     <View style={{ marginTop: tenantId ? 0 : 24 }}>
-      <Panel title="Acessos de suporte" description="Registro dos acessos de super admin às instituições, com motivo, duração e alterações feitas." flush>
+      <Panel title="Acessos de suporte" description="Registro dos acessos de super admin às instituições e ao app do aluno, com motivo, duração e alterações feitas." flush>
         {items === null && !error ? (
           <View style={{ padding: 24, alignItems: "center" }}>
             <ActivityIndicator color={color.brand} />
@@ -47,6 +47,12 @@ export default function SupportAccessHistory({ tenantId }: { tenantId?: number }
               <View style={{ flex: 1.4, minWidth: 0, gap: 2 }}>
                 <Text className="text-sm font-semibold text-ink" numberOfLines={1}>{item.tenant.name ?? `Tenant #${item.tenant.id}`}</Text>
                 <Text className="text-xs text-ink-muted" numberOfLines={1}>{item.user.name ?? "—"}</Text>
+                {item.student?.name ? (
+                  <Text className="text-xs text-ink-muted" numberOfLines={1}>
+                    App de {item.student.name}
+                    {item.student.enrollment_number ? ` · ${item.student.enrollment_number}` : ""}
+                  </Text>
+                ) : null}
               </View>
               <View style={{ flex: 2, minWidth: 0, gap: 2 }}>
                 <Text className="text-sm text-ink" numberOfLines={1}>{item.reason ?? "—"}</Text>

@@ -15,6 +15,7 @@ import {
   getMeApi,
   AuthUser,
 } from '../services/auth.service';
+import { redeemSupportHandoff, SupportAccessInfo } from '../services/supportHandoff';
 import {
   fetchMobileVersion,
   compareBuildVersions,
@@ -46,6 +47,8 @@ interface AuthContextData {
   user: AuthUser | null;
   isLoading: boolean;
   requirePasswordChange: boolean;
+  supportAccess: SupportAccessInfo | null;
+  handoffError: string | null;
   signIn: (login: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearPasswordChangeFlag: () => void;
@@ -59,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]                           = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading]                 = useState(true);
   const [requirePasswordChange, setRequirePasswordChange] = useState(false);
+  const [supportAccess, setSupportAccess] = useState<SupportAccessInfo | null>(null);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
   const [sessionExpired, setSessionExpired]       = useState(false);
   const [sessionLostMessage, setSessionLostMessage] = useState(DEFAULT_SESSION_LOST_MESSAGE);
   const [updateAvailable, setUpdateAvailable]     = useState<{
@@ -72,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearAuthStorage();
     setUser(null);
     setRequirePasswordChange(false);
+    setSupportAccess(null);
     logAuthDebug('clearSession finalizado');
   }, []);
 
@@ -154,6 +160,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function validateStoredToken() {
       try {
+        try {
+          const handed = await redeemSupportHandoff();
+          if (handed) {
+            await Promise.all([
+              storage.setItem(STORAGE_KEYS.TOKEN, handed.token),
+              storage.setItem(STORAGE_KEYS.ROLE, handed.user.role),
+              storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(handed.user)),
+            ]);
+            setRequirePasswordChange(false);
+            setSupportAccess(handed.support_access ?? handed.user.support_access ?? null);
+            setUser(handed.user);
+            setSessionExpired(false);
+            setHandoffError(null);
+            resetUnauthorizedNotice();
+            if (handed.user.role === 'aluno') {
+              void queryClient.invalidateQueries({ queryKey: mobileThemeQueryKey });
+            }
+            return;
+          }
+        } catch (err: any) {
+          const message = err?.response?.data?.message;
+          setHandoffError(
+            typeof message === 'string' && message.trim()
+              ? message
+              : 'Não foi possível abrir o acesso de suporte. Abra de novo a partir do aluno.',
+          );
+        }
+
         const token = await storage.getItem(STORAGE_KEYS.TOKEN);
         logAuthDebug('validateStoredToken executado', { hasToken: Boolean(token) });
         if (!token) {
@@ -172,6 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const me = await getMeApi();
           logAuthDebug('Token validado com sucesso em /api/me', { userId: me.id, role: me.role });
           setUser(me);
+          setSupportAccess(me.support_access ?? null);
           // Atualiza dados locais com a resposta mais recente
           await storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(me));
           await storage.setItem(STORAGE_KEYS.ROLE, me.role);
@@ -212,6 +247,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setRequirePasswordChange(response.password_change_required);
+      setSupportAccess(null);
+      setHandoffError(null);
       setUser(response.user);
       setSessionExpired(false);
       resetUnauthorizedNotice();
@@ -254,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       storage.setItem(STORAGE_KEYS.ROLE, me.role),
     ]);
     setUser(me);
+    setSupportAccess(me.support_access ?? null);
   }, []);
 
   const authContextValue = useMemo(
@@ -261,6 +299,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       requirePasswordChange,
+      supportAccess,
+      handoffError,
       signIn,
       signOut,
       clearPasswordChangeFlag,
@@ -270,6 +310,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       requirePasswordChange,
+      supportAccess,
+      handoffError,
       signIn,
       signOut,
       clearPasswordChangeFlag,

@@ -17,6 +17,8 @@ import StudentActionsModal, {
   type StudentActionItem,
   type StudentActionKey,
 } from "../../components/alunos/StudentActionsModal";
+import StudentMobileAccessModal from "../../components/alunos/StudentMobileAccessModal";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   TABLE_CELL,
   TABLE_CELL_ENROLLMENT,
@@ -72,6 +74,8 @@ function colStyle(col: ColDef) {
 }
 
 export default function StudentsScreen({ navigate }: StudentsScreenProps) {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const { isMobile, contentPadding } = useResponsiveLayout();
   const statuses = useStatuses();
   const statusOptions = statuses.length
@@ -99,6 +103,7 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
   const [approvingId, setApprovingId] = useState<number | null>(null);
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [menuStudent, setMenuStudent] = useState<StudentActionItem | null>(null);
+  const [mobileStudent, setMobileStudent] = useState<{ id: number; name: string } | null>(null);
 
   const fetchCourses = useCallback(async () => {
     try {
@@ -244,6 +249,10 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
     }
     if (action === "performance") {
       navigate("alunos-performance", { studentId: row.id, studentName: row.name });
+      return;
+    }
+    if (action === "mobile") {
+      setMobileStudent({ id: row.id, name: row.name });
       return;
     }
     if (action === "approve") {
@@ -559,7 +568,10 @@ export default function StudentsScreen({ navigate }: StudentsScreenProps) {
         onClose={() => setMenuStudent(null)}
         onSelect={handleStudentAction}
         statusLabel={statusLabel}
+        showMobileAccess={isSuperAdmin}
       />
+
+      <StudentMobileAccessModal student={mobileStudent} onClose={() => setMobileStudent(null)} />
 
       <ConfirmModal
         visible={!!deleteId}

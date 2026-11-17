@@ -38,6 +38,8 @@ export interface AuthUser {
   updated_at: string;
   tenant?: AuthTenant | null;
   student?: AuthStudent | null;
+  /** Presente só na sessão em que o super admin entrou nesta conta. */
+  support_access?: { expires_at: string } | null;
 }
 
 export interface LoginResponse {

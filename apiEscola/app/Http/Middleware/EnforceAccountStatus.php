@@ -34,6 +34,11 @@ class EnforceAccountStatus
             return $next($request);
         }
 
+        // Acesso de suporte (painel ou app do aluno) segue a sessão própria; o bloqueio da conta não apaga esse token.
+        if (app(\App\Services\SupportAccessService::class)->accessIdFromToken($user->currentAccessToken()) !== null) {
+            return $next($request);
+        }
+
         if ($user->status !== 'active') {
             $token = $user->currentAccessToken();
             if ($token instanceof PersonalAccessToken) {

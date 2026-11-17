@@ -26,6 +26,11 @@ class RecordStudentActivity
     {
         $user = $request->user();
 
+        // Uso do super admin no app não conta como dia de atividade do aluno.
+        if ($request->attributes->get('support_access')) {
+            return;
+        }
+
         if (! $user || $user->role !== 'aluno' || ! $user->tenant_id || ! config('bi.activity_tracking', true)) {
             return;
         }

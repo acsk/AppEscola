@@ -161,6 +161,10 @@ Route::prefix('domains')->group(function () {
     Route::get('invoice-types',          [DomainController::class, 'invoiceTypes']);
 });
 
+// Código de uso único do acesso ao app do aluno (o link não carrega o token).
+Route::post('support-access/mobile/redeem', [TenantAccessController::class, 'redeemMobile'])
+    ->middleware('throttle:12,1');
+
 // Rotas autenticadas via Sanctum
 Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::class, \App\Http\Middleware\TrackSupportAccess::class, \App\Http\Middleware\IdentifyTenant::class, \App\Http\Middleware\RecordStudentActivity::class])->group(function () {
 
@@ -343,6 +347,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
     Route::get('students/{student}/academic-history', [StudentPerformanceController::class, 'academicHistory']);
     Route::post('students/{student}/upload-photo', [StudentController::class, 'uploadPhoto']);
     Route::post('students/{student}/provision-app-access', [StudentController::class, 'provisionAppAccess']);
+    Route::post('students/{student}/mobile-access', [TenantAccessController::class, 'startMobile']);
 
     // Responsáveis de um aluno (nested)
     Route::prefix('students/{student}/guardians')->group(function () {

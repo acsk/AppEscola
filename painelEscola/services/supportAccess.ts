@@ -6,6 +6,8 @@ export type SupportAccessHistoryItem = {
   id: number;
   tenant: { id: number; name: string | null };
   user: { id: number; name: string | null };
+  /** Preenchido quando o acesso foi ao app, na conta do aluno. */
+  student?: { id: number | null; name: string | null; enrollment_number: string | null } | null;
   reason: string | null;
   details: string | null;
   duration_minutes: number;
@@ -30,3 +32,12 @@ export async function fetchSupportAccessHistory(tenantId?: number): Promise<Supp
 
 /** "30 min", "1 h", "2 h", "4 h". */
 export const durationLabel = (minutes: number) => (minutes < 60 ? `${minutes} min` : `${minutes / 60} h`);
+
+/** Abre o app web na conta do aluno. A resposta traz o link de uso único, sem a senha. */
+export async function startStudentMobileAccess(
+  studentId: number,
+  request: { reason_id: number; details?: string; duration_minutes: number }
+): Promise<{ launch_url: string | null; expires_at: string }> {
+  const { data } = await api.post(`/students/${studentId}/mobile-access`, request);
+  return data.body ?? data;
+}

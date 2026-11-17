@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Student;
+use App\Models\SupportAccess;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\TenantContext;
@@ -125,6 +126,14 @@ class AuthController extends Controller
             );
         }
 
+        $access = $request->attributes->get('support_access');
+        if ($access instanceof SupportAccess && $access->impersonated_user_id) {
+            $payload['password_change_required'] = false;
+            $payload['support_access'] = [
+                'expires_at' => $access->expires_at->toIso8601String(),
+            ];
+        }
+
         return response()->json($payload);
     }
 
@@ -140,6 +149,13 @@ class AuthController extends Controller
     )]
     public function logout(Request $request): JsonResponse
     {
+        $access = $request->attributes->get('support_access');
+        if ($access instanceof SupportAccess && $access->impersonated_user_id) {
+            app(\App\Services\SupportAccessService::class)->end($access);
+
+            return response()->json(['message' => 'Acesso de suporte encerrado.']);
+        }
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logout realizado com sucesso.']);
@@ -169,6 +185,15 @@ class AuthController extends Controller
     )]
     public function updatePassword(Request $request): JsonResponse
     {
+        $access = $request->attributes->get('support_access');
+        if ($access instanceof SupportAccess && $access->impersonated_user_id) {
+            return response()->json([
+                'type' => 'error',
+                'message' => 'A senha do aluno não pode ser alterada durante o acesso de suporte.',
+                'body' => null,
+            ], 403);
+        }
+
         $request->validate([
             'current_password'      => ['required', 'string'],
             'password'              => ['required', 'string', 'min:8', 'confirmed'],

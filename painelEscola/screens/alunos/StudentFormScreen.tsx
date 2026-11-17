@@ -22,6 +22,8 @@ import Badge from "../../components/ui/Badge";
 import StudentActionsModal, {
   type StudentActionKey,
 } from "../../components/alunos/StudentActionsModal";
+import StudentMobileAccessModal from "../../components/alunos/StudentMobileAccessModal";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   maskPhone,
   maskCPF,
@@ -132,6 +134,8 @@ function CheckToggle({
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function StudentFormScreen({ studentId, navigate }: StudentFormScreenProps) {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const { contentPadding } = useResponsiveLayout();
   const isEdit = studentId !== null;
   const scrollRef = useRef<ScrollView>(null);
@@ -160,6 +164,7 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [approving, setApproving] = useState(false);
   const [studentActionsOpen, setStudentActionsOpen] = useState(false);
+  const [mobileStudent, setMobileStudent] = useState<{ id: number; name: string } | null>(null);
   const [deleteStudentOpen, setDeleteStudentOpen] = useState(false);
   const [deletingStudent, setDeletingStudent] = useState(false);
   const [deleteGuardianIndex, setDeleteGuardianIndex] = useState<number | null>(
@@ -455,6 +460,10 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
     }
     if (action === "performance") {
       navigate("alunos-performance", { studentId, studentName: form.name });
+      return;
+    }
+    if (action === "mobile") {
+      setMobileStudent({ id: studentId, name: form.name });
       return;
     }
     if (action === "approve") {
@@ -1356,10 +1365,13 @@ export default function StudentFormScreen({ studentId, navigate }: StudentFormSc
             : null
         }
         hideEdit
+        showMobileAccess={isSuperAdmin}
         statusLabel={(s) => STATUS_OPTIONS.find((o) => o.value === s)?.label ?? s}
         onClose={() => setStudentActionsOpen(false)}
         onSelect={handleFormStudentAction}
       />
+
+      <StudentMobileAccessModal student={mobileStudent} onClose={() => setMobileStudent(null)} />
 
       <ConfirmModal
         visible={deleteStudentOpen}

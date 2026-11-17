@@ -49,7 +49,7 @@ const CHECKLIST_STEPS: { key: ChecklistStepKey; label: string }[] = [
 ];
 
 export function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, handoffError } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { width, height } = useWindowDimensions();
   const p = usePalette();
@@ -337,12 +337,12 @@ export function LoginScreen() {
         <Notice tone="info" title={`Atualização recomendada${recommendedVersion ? ` para a versão ${recommendedVersion}` : ''}.`} />
       ) : null}
 
-      {erro ? (
+      {erro || handoffError ? (
         <View accessibilityRole="alert" style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingVertical: 12, paddingHorizontal: 14, borderRadius: radius.md, backgroundColor: p.dangerSoft }}>
           <Icon name="alert" size={20} color={p.dangerInk} />
           <View style={{ flex: 1 }}>
-            <Text style={{ ...font.semibold, fontSize: 14, lineHeight: 20, color: p.dangerInk }}>{erro}</Text>
-            <Txt tone="muted" style={{ fontSize: 14, lineHeight: 20, ...font.medium }}>Confira os dados e tente de novo.</Txt>
+            <Text style={{ ...font.semibold, fontSize: 14, lineHeight: 20, color: p.dangerInk }}>{erro ?? handoffError}</Text>
+            {erro ? <Txt tone="muted" style={{ fontSize: 14, lineHeight: 20, ...font.medium }}>Confira os dados e tente de novo.</Txt> : null}
           </View>
         </View>
       ) : null}
