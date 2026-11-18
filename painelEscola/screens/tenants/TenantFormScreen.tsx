@@ -30,7 +30,7 @@ import { fetchAddressByCEP } from "../../utils/cep";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { color } from "../../constants/theme";
-import { fetchPlans, fmtBrl, subscriptionAction, type QuotaResource, type SaasFeature, type SaasPlan } from "../../services/saas";
+import { clearTenantFeature, clearTenantQuota, fetchPlans, fetchTenantFeatures, fetchTenantQuotas, fetchTenantSubscription, fmtBrl, setTenantFeature, setTenantQuota, subscriptionAction, type QuotaResource, type SaasFeature, type SaasPlan } from "../../services/saas";
 
 type Props = {
   navigate: (screen: string, params?: Record<string, any>) => void;
@@ -90,7 +90,7 @@ const STEPS = [
   { title: "Administrador", hint: "acesso inicial" },
   { title: "Plano", hint: "escolha e limites" },
   { title: "Configurações", hint: "subdomínio e fuso" },
-  { title: "Confirmação", hint: "resumo e criação" },
+  { title: "Confirmação", hint: "resumo" },
 ];
 
 const TIMEZONES = [
@@ -134,6 +134,10 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   const [trialDays, setTrialDays] = useState("14");
   const [limits, setLimits] = useState<Record<string, string>>({});
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+  const [hadSubscription, setHadSubscription] = useState(false);
+  const [originalPlanKey, setOriginalPlanKey] = useState("");
+  const loadedLimits = useRef<Record<string, string>>({});
+  const loadedFeatures = useRef<string[]>([]);
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
     type: "success",
@@ -141,20 +145,6 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   });
   const logoInputRef = useRef<any>(null);
   const set = (patch: Partial<Form>) => setForm((prev) => ({ ...prev, ...patch }));
-
-  useEffect(() => {
-    if (isEdit) return;
-    fetchPlans()
-      .then((data) => {
-        const active = data.plans.filter((plan) => plan.status === "active");
-        setPlans(active);
-        setFeatures(data.features);
-        setResources(data.resources);
-        const first = active[0];
-        if (first) applyPlan(first, data.resources);
-      })
-      .catch(() => setToast({ visible: true, type: "error", message: "Não foi possível carregar os planos." }));
-  }, [isEdit]);
 
   const applyPlan = (plan: SaasPlan, catalog = resources) => {
     setPlanId(String(plan.id));
@@ -164,14 +154,32 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   };
 
   useEffect(() => {
-    if (!isEdit || !tenantId) return;
+    let cancelled = false;
     const load = async () => {
-      setLoading(true);
+      if (isEdit) setLoading(true);
       setForbidden(false);
       try {
-        const { data } = await api.get(`/tenants/${tenantId}`);
-        const tenant = data.data ?? data.body ?? data;
+        const catalog = await fetchPlans();
+        if (cancelled) return;
+        const active = catalog.plans.filter((plan) => plan.status === "active");
+        setPlans(active);
+        setFeatures(catalog.features);
+        setResources(catalog.resources);
+        if (!isEdit || !tenantId) {
+          if (active[0]) applyPlan(active[0], catalog.resources);
+          return;
+        }
+        const [tenantResponse, subscriptionBody, featureBody, quotaBody, usersResponse] = await Promise.all([
+          api.get(`/tenants/${tenantId}`),
+          fetchTenantSubscription(tenantId).catch(() => ({ subscription: null, events: [] })),
+          fetchTenantFeatures(tenantId).catch(() => null),
+          fetchTenantQuotas(tenantId).catch(() => null),
+          api.get("/users", { params: { tenant_id: tenantId, role: "admin", per_page: 1 } }).catch(() => null),
+        ]);
+        if (cancelled) return;
+        const tenant = tenantResponse.data.data ?? tenantResponse.data.body ?? tenantResponse.data;
         const address = tenant.address ?? {};
+        const admin = (Array.isArray(usersResponse?.data?.data) ? usersResponse.data.data : [])[0];
         setForm((prev) => ({
           ...prev,
           corporate_name: tenant.corporate_name ?? "",
@@ -191,14 +199,38 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
           state: address.state ?? "",
           status: tenant.status ?? "active",
           timezone: tenant.settings?.timezone ?? "America/Sao_Paulo",
+          admin_name: admin?.name ?? "",
+          admin_email: admin?.email ?? "",
         }));
         setTenantPhotoUrl(tenant.photo_url ?? null);
+        const subscription = subscriptionBody.subscription;
+        const currentPlan = catalog.plans.find((plan) => plan.id === subscription?.plan?.id) ?? null;
+        if (currentPlan && currentPlan.status !== "active") setPlans([currentPlan, ...active]);
+        if (subscription && currentPlan) {
+          setHadSubscription(true);
+          setPlanId(String(currentPlan.id));
+          setCycle(subscription.billing_cycle);
+          setOriginalPlanKey(`${currentPlan.id}:${subscription.billing_cycle}`);
+          setTrialDays(subscription.trial_ends_at ? String(currentPlan.trial_days || 14) : "0");
+        }
+        const quotaLimits = Object.fromEntries((quotaBody?.items ?? []).map((item) => [item.resource, item.limit == null ? "" : String(item.limit)]));
+        const nextLimits = Object.fromEntries(catalog.resources.map((resource) => [resource.key, quotaLimits[resource.key] ?? (currentPlan?.limits?.[resource.key] == null ? "" : String(currentPlan?.limits?.[resource.key]))]));
+        const nextFeatures = featureBody?.features?.length
+          ? featureBody.features.filter((feature) => feature.enabled).map((feature) => feature.key)
+          : (currentPlan?.features ?? []);
+        loadedLimits.current = nextLimits;
+        loadedFeatures.current = nextFeatures;
+        setLimits(nextLimits);
+        setSelectedFeatures(nextFeatures);
       } catch (error: any) {
         if (error.response?.status === 403) setForbidden(true);
+        else setToast({ visible: true, type: "error", message: "Não foi possível carregar a instituição." });
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     };
     load();
+    return () => { cancelled = true; };
   }, [isEdit, tenantId]);
 
   const selectedPlan = plans.find((plan) => String(plan.id) === planId) ?? null;
@@ -289,6 +321,10 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
       if (form.admin_password.length < 6) next.admin_password = "A senha precisa ter ao menos 6 caracteres.";
       if (form.admin_password !== form.admin_password_confirmation) next.admin_password_confirmation = "A confirmação não confere.";
     }
+    if (index === 1 && isEdit && (form.admin_password || form.admin_password_confirmation)) {
+      if (form.admin_password.length < 6) next.admin_password = "A senha precisa ter ao menos 6 caracteres.";
+      if (form.admin_password !== form.admin_password_confirmation) next.admin_password_confirmation = "A confirmação não confere.";
+    }
     if (index === 3 && !/^[a-z0-9-]+$/.test(form.slug.trim())) next.slug = "Use letras minúsculas, números e hífen.";
     return next;
   };
@@ -306,16 +342,39 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
   };
 
   const saveEdit = async () => {
-    if (!tenantId || !validateStep(0) || !validateStep(3)) return;
+    if (!tenantId) return;
+    const pending = { ...collectStepErrors(0), ...collectStepErrors(1), ...collectStepErrors(3) };
+    setErrors(pending);
+    if (Object.keys(pending).length) {
+      if (pending.admin_password || pending.admin_password_confirmation) setStep(1);
+      else if (pending.slug) setStep(3);
+      else setStep(0);
+      return;
+    }
     setSaving(true);
     try {
-      await api.put(`/tenants/${tenantId}`, buildTenantPayload());
+      const payload = buildTenantPayload();
+      if (form.admin_password) {
+        payload.admin_password = form.admin_password;
+        payload.admin_password_confirmation = form.admin_password_confirmation;
+        payload.admin_password_change_required = true;
+      }
+      await api.put(`/tenants/${tenantId}`, payload);
       if (pendingLogoFile) await uploadTenantLogo(tenantId, pendingLogoFile);
-      navigate("tenants-detail", { tenantId });
+      if (selectedPlan) {
+        const nextKey = `${selectedPlan.id}:${cycle}`;
+        if (!hadSubscription) {
+          await subscriptionAction(tenantId, "", { saas_plan_id: selectedPlan.id, billing_cycle: cycle, trial_days: Number(trialDays || 0) });
+        } else if (nextKey !== originalPlanKey) {
+          await subscriptionAction(tenantId, "change-plan", { saas_plan_id: selectedPlan.id, billing_cycle: cycle });
+        }
+        await applyNegotiatedTerms(tenantId, selectedPlan);
+      }
+      navigate("tenants-detail", { tenantId, tab: "subscription" });
     } catch (error: any) {
       if (error.response?.status === 422) setErrors(parseApiErrors(error.response.data?.errors ?? error.response.data?.body?.errors ?? {}));
       else if (error.response?.status === 403) setForbidden(true);
-      else setToast({ visible: true, type: "error", message: "Não foi possível salvar a instituição." });
+      setToast({ visible: true, type: "error", message: error?.response?.data?.message || "Não foi possível salvar a instituição." });
     } finally {
       setSaving(false);
     }
@@ -375,15 +434,18 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
       const typed = limits[resource.key] ?? "";
       const wanted = typed === "" ? null : Number(typed);
       const original = plan.limits?.[resource.key] ?? null;
-      if (wanted !== original) {
-        jobs.push(api.put(`/saas/tenants/${createdId}/quotas/${resource.key}`, { limit: wanted, reason: "Negociado no cadastro da instituição" }));
-      }
+      const changed = typed !== (loadedLimits.current[resource.key] ?? "");
+      if (wanted !== original) jobs.push(setTenantQuota(createdId, resource.key, wanted, "Negociado no cadastro da instituição"));
+      else if (isEdit && changed) jobs.push(clearTenantQuota(createdId, resource.key));
     });
     const planFeatures = new Set(plan.features ?? []);
     features.forEach((feature) => {
       const wanted = selectedFeatures.includes(feature.key);
-      if (wanted !== planFeatures.has(feature.key)) {
-        jobs.push(api.put(`/saas/tenants/${createdId}/features/${feature.key}`, { enabled: wanted, reason: "Negociado no cadastro da instituição" }));
+      const was = loadedFeatures.current.includes(feature.key);
+      if (wanted === planFeatures.has(feature.key)) {
+        if (isEdit && wanted !== was) jobs.push(clearTenantFeature(createdId, feature.key));
+      } else if (!isEdit || wanted !== was) {
+        jobs.push(setTenantFeature(createdId, feature.key, wanted, "Negociado no cadastro da instituição"));
       }
     });
     await Promise.all(jobs);
@@ -397,7 +459,11 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
 
   const summary = useMemo(() => {
     const institution = [form.name || form.corporate_name || "Ainda não informada", form.cnpj].filter(Boolean).join(" · ");
-    const admin = form.admin_name ? `${form.admin_name} · senha provisória` : "Ainda não informado";
+    const admin = !form.admin_name
+      ? "Ainda não informado"
+      : isEdit
+        ? `${form.admin_name}${form.admin_password ? " · nova senha provisória" : ""}`
+        : `${form.admin_name} · senha provisória`;
     const plan = selectedPlan ? `${selectedPlan.name} · ${cycle === "yearly" ? "anual" : "mensal"}` : "Sem plano";
     const trial = trialDays === "0" ? "Sem teste" : `${trialDays} dias`;
     return [
@@ -469,25 +535,13 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
       <PageHeader
         breadcrumb={[{ label: "Instituições", onPress: () => navigate("tenants") }, { label: isEdit ? "Editar" : "Nova instituição" }]}
         title={isEdit ? "Editar instituição" : "Nova instituição"}
-        description={isEdit ? "Dados cadastrais da instituição. O plano fica na aba Assinatura." : "Cadastro em 5 etapas. A instituição e o administrador são criados juntos; o plano é contratado em seguida."}
+        description={isEdit ? "As mesmas 5 etapas do cadastro, já preenchidas com o que a instituição tem hoje." : "Cadastro em 5 etapas. A instituição e o administrador são criados juntos; o plano é contratado em seguida."}
       />
 
       {forbidden ? <Text className="text-sm text-warning">Acesso permitido apenas para super admin.</Text> : null}
 
       {loading ? (
         <ActivityIndicator color={color.brand} style={{ marginTop: 40 }} />
-      ) : isEdit ? (
-        <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 20, gap: 8 }}>
-          <Text className="text-sm font-semibold text-ink">Dados da instituição</Text>
-          {institutionFields}
-          <FormSelect label="Status" value={form.status} onChange={(value) => set({ status: value })} options={[{ value: "active", label: "Ativa" }, { value: "inactive", label: "Inativa" }]} />
-          <FormSelect label="Fuso horário" value={form.timezone} onChange={(value) => set({ timezone: value })} options={TIMEZONES} />
-          <FormInput label="Subdomínio" required value={form.slug} onChangeText={(value) => set({ slug: value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} error={errors.slug} autoCapitalize="none" />
-          <View className="flex-row justify-end" style={{ gap: 8, marginTop: 8 }}>
-            <Button label="Cancelar" onPress={() => navigate("tenants-detail", { tenantId })} disabled={saving} />
-            <Button variant="primary" label="Salvar instituição" onPress={saveEdit} loading={saving} />
-          </View>
-        </View>
       ) : (
         <View style={{ gap: 16 }}>
           <View className="flex-row flex-wrap" style={{ gap: 8 }}>
@@ -495,7 +549,7 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
               const done = index < step;
               const current = index === step;
               return (
-                <Pressable key={item.title} onPress={() => index < step && setStep(index)} className={`flex-row items-center border rounded-ds-md ${current ? "border-brand bg-brand-tint" : "border-border bg-surface"}`} style={{ paddingHorizontal: 10, paddingVertical: 8, gap: 8, minWidth: isMobile ? "100%" : 150 }}>
+                <Pressable key={item.title} onPress={() => (isEdit || index < step) && setStep(index)} className={`flex-row items-center border rounded-ds-md ${current ? "border-brand bg-brand-tint" : "border-border bg-surface"}`} style={{ paddingHorizontal: 10, paddingVertical: 8, gap: 8, minWidth: isMobile ? "100%" : 150 }}>
                   <View className={`items-center justify-center rounded-full ${done || current ? "bg-brand" : "bg-surface-sunken"}`} style={{ width: 22, height: 22 }}>
                     {done ? <Icon icon={Check} size={16} color={color["on-brand"]} /> : <Text className={`text-xs ${current ? "text-white" : "text-ink-muted"}`} style={{ color: current ? color["on-brand"] : color["ink-muted"] }}>{index + 1}</Text>}
                   </View>
@@ -514,13 +568,13 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
 
               {step === 1 ? (
                 <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 20, gap: 4 }}>
-                  <Text className="text-sm font-semibold text-ink">Administrador inicial</Text>
-                  <Text className="text-xs text-ink-muted">A senha é provisória. No primeiro acesso o administrador precisa trocá-la.</Text>
-                  <FormInput label="Nome" required value={form.admin_name} onChangeText={(value) => set({ admin_name: value })} error={errors.admin_name} />
-                  <FormInput label="E-mail" required value={form.admin_email} onChangeText={(value) => set({ admin_email: value })} error={errors.admin_email} keyboardType="email-address" autoCapitalize="none" />
+                  <Text className="text-sm font-semibold text-ink">{isEdit ? "Administrador" : "Administrador inicial"}</Text>
+                  <Text className="text-xs text-ink-muted">{isEdit ? "O nome e o e-mail permanecem. Preencha a senha só se quiser definir uma nova, provisória." : "A senha é provisória. No primeiro acesso o administrador precisa trocá-la."}</Text>
+                  <FormInput label="Nome" required={!isEdit} editable={!isEdit} value={form.admin_name} onChangeText={(value) => set({ admin_name: value })} error={errors.admin_name} />
+                  <FormInput label="E-mail" required={!isEdit} editable={!isEdit} value={form.admin_email} onChangeText={(value) => set({ admin_email: value })} error={errors.admin_email} keyboardType="email-address" autoCapitalize="none" />
                   <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
-                    <View style={{ flex: 1, minWidth: 180 }}><FormInput label="Senha provisória" required secureTextEntry value={form.admin_password} onChangeText={(value) => set({ admin_password: value })} error={errors.admin_password} /></View>
-                    <View style={{ flex: 1, minWidth: 180 }}><FormInput label="Confirmar senha" required secureTextEntry value={form.admin_password_confirmation} onChangeText={(value) => set({ admin_password_confirmation: value })} error={errors.admin_password_confirmation} /></View>
+                    <View style={{ flex: 1, minWidth: 180 }}><FormInput label={isEdit ? "Nova senha provisória" : "Senha provisória"} required={!isEdit} secureTextEntry value={form.admin_password} onChangeText={(value) => set({ admin_password: value })} error={errors.admin_password} placeholder={isEdit ? "Em branco mantém a atual" : undefined} /></View>
+                    <View style={{ flex: 1, minWidth: 180 }}><FormInput label="Confirmar senha" required={!isEdit} secureTextEntry value={form.admin_password_confirmation} onChangeText={(value) => set({ admin_password_confirmation: value })} error={errors.admin_password_confirmation} /></View>
                   </View>
                 </View>
               ) : null}
@@ -554,12 +608,12 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                         );
                       })}
                     </View>
-                    {plans.length === 0 ? <Text className="text-sm text-ink-muted">Nenhum plano ativo. A instituição será criada sem assinatura.</Text> : null}
+                    {plans.length === 0 ? <Text className="text-sm text-ink-muted">Nenhum plano ativo.</Text> : null}
                   </View>
                   <View className={isMobile ? "" : "flex-row"} style={{ gap: 12 }}>
                     <View className="bg-surface border border-border rounded-ds-md" style={{ flex: 1, padding: 16 }}>
-                      <FormSelect label="Período de teste" value={trialDays} onChange={setTrialDays} options={TRIAL_OPTIONS} />
-                      <Text className="text-xs text-ink-muted">Durante o teste a cobrança do mês fica zerada. O uso continua sendo contado.</Text>
+                      <FormSelect label="Período de teste" value={trialDays} onChange={setTrialDays} options={TRIAL_OPTIONS} disabled={isEdit && hadSubscription} />
+                      <Text className="text-xs text-ink-muted">{isEdit && hadSubscription ? "O teste já vigente se ajusta na aba Assinatura. Trocar o plano aqui não reinicia os dias." : "Durante o teste a cobrança do mês fica zerada. O uso continua sendo contado."}</Text>
                     </View>
                     <View className="bg-surface border border-border rounded-ds-md" style={{ flex: 1.4, padding: 16, gap: 8 }}>
                       <Text className="text-sm font-semibold text-ink">Limites</Text>
@@ -600,14 +654,14 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
                   <Text className="text-sm font-semibold text-ink">Configurações</Text>
                   <FormInput label="Subdomínio" required value={form.slug} onChangeText={(value) => set({ slug: slugify(value) })} error={errors.slug} autoCapitalize="none" placeholder="ex.: conectivo" />
                   <FormSelect label="Fuso horário" value={form.timezone} onChange={(value) => set({ timezone: value })} options={TIMEZONES} />
-                  <FormSelect label="Situação inicial" value={form.status} onChange={(value) => set({ status: value })} options={[{ value: "active", label: "Ativa" }, { value: "inactive", label: "Inativa" }]} />
+                  <FormSelect label={isEdit ? "Situação" : "Situação inicial"} value={form.status} onChange={(value) => set({ status: value })} options={[{ value: "active", label: "Ativa" }, { value: "inactive", label: "Inativa" }]} />
                 </View>
               ) : null}
 
               {step === 4 ? (
                 <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 20, gap: 8 }}>
-                  <Text className="text-sm font-semibold text-ink">Confirmar criação</Text>
-                  <Text className="text-sm text-ink-muted">A instituição e o administrador são gravados na mesma operação. Se o plano falhar depois, a instituição permanece e a assinatura pode ser contratada no detalhe.</Text>
+                  <Text className="text-sm font-semibold text-ink">{isEdit ? "Confirmar alterações" : "Confirmar criação"}</Text>
+                  <Text className="text-sm text-ink-muted">{isEdit ? "Os dados cadastrais, a senha nova (se houver), o plano e as exceções de limite e funcionalidade são salvos agora." : "A instituição e o administrador são gravados na mesma operação. Se o plano falhar depois, a instituição permanece e a assinatura pode ser contratada no detalhe."}</Text>
                   {summary.map(([label, value]) => (
                     <View key={label} className="flex-row justify-between border-b border-border" style={{ paddingVertical: 8, gap: 12 }}>
                       <Text className="text-xs text-ink-muted">{label}</Text>
@@ -618,11 +672,11 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
               ) : null}
 
               <View className="flex-row justify-between" style={{ gap: 8 }}>
-                <Button label="Voltar" onPress={() => step === 0 ? navigate("tenants") : setStep((current) => current - 1)} disabled={saving} />
+                <Button label="Voltar" onPress={() => step === 0 ? navigate(isEdit ? "tenants-detail" : "tenants", isEdit ? { tenantId } : undefined) : setStep((current) => current - 1)} disabled={saving} />
                 {step < STEPS.length - 1 ? (
                   <Button variant="primary" label={step === 3 ? "Continuar para a confirmação" : "Continuar"} onPress={continueStep} />
                 ) : (
-                  <Button variant="primary" label="Criar instituição" onPress={createInstitution} loading={saving} />
+                  <Button variant="primary" label={isEdit ? "Salvar instituição" : "Criar instituição"} onPress={isEdit ? saveEdit : createInstitution} loading={saving} />
                 )}
               </View>
             </View>
