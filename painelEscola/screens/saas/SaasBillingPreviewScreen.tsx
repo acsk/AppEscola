@@ -22,6 +22,17 @@ const FILTERS = [
   { value: "uncharged", label: "Sem cobrança" },
 ];
 
+function lineAmount(row: BillingPreviewRow, label: string): string | null {
+  return row.lines.find((line) => line.label === label)?.amount ?? null;
+}
+
+function gestaoCell(row: BillingPreviewRow): string {
+  const line = row.lines.find((item) => item.label === "Módulo gestão");
+  if (!line || line.detail === "não contratado") return "—";
+  if (line.detail === "contratado grátis" || Number(line.amount) === 0) return "Grátis";
+  return fmtBrl(line.amount);
+}
+
 function toneFor(row: BillingPreviewRow): "success" | "warning" | "danger" | "neutral" | "brand" {
   if (row.status === "past_due") return "warning";
   if (row.status === "trialing") return "brand";
@@ -125,14 +136,16 @@ export default function SaasBillingPreviewScreen({ navigate }: Props) {
       ) : null}
 
       <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={isMobile}>
-        <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: isMobile ? 760 : undefined }}>
+        <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: isMobile ? 920 : undefined }}>
           <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
             <View style={{ width: 28 }} />
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 2, minWidth: 180 }}>Instituição</Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 1.4, minWidth: 140 }}>Plano</Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.8, minWidth: 80, textAlign: "right" }}>Alunos</Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1.8, minWidth: 160 }}>Instituição</Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1.2, minWidth: 120 }}>Plano</Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 0.7, minWidth: 70, textAlign: "right" }}>Alunos</Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 110, textAlign: "right" }}>App</Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 100, textAlign: "right" }}>Gestão</Text>
             <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 110, textAlign: "right" }}>Valor do mês</Text>
-            <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 120, paddingLeft: 16 }}>Situação</Text>
+            <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 110, paddingLeft: 12 }}>Situação</Text>
           </View>
           {loading ? (
             <View style={{ padding: 40, alignItems: "center" }}>
@@ -153,9 +166,11 @@ export default function SaasBillingPreviewScreen({ navigate }: Props) {
                     accessibilityState={{ expanded: open }}
                   >
                     <Icon icon={ChevronRight} size={16} color={color["ink-subtle"]} />
-                    <Text className="text-sm font-medium text-ink" style={{ flex: 2, minWidth: 180 }} numberOfLines={1}>{row.tenant.name}</Text>
-                    <Text className="text-sm text-ink-muted" style={{ flex: 1.4, minWidth: 140 }} numberOfLines={1}>{row.plan ?? "—"}</Text>
-                    <Text className="text-sm font-mono text-ink" style={{ flex: 0.8, minWidth: 80, textAlign: "right" }}>{row.app_students == null ? "—" : row.app_students.toLocaleString("pt-BR")}</Text>
+                    <Text className="text-sm font-medium text-ink" style={{ flex: 1.8, minWidth: 160 }} numberOfLines={1}>{row.tenant.name}</Text>
+                    <Text className="text-sm text-ink-muted" style={{ flex: 1.2, minWidth: 120 }} numberOfLines={1}>{row.plan ?? "—"}</Text>
+                    <Text className="text-sm font-mono text-ink" style={{ flex: 0.7, minWidth: 70, textAlign: "right" }}>{row.app_students == null ? "—" : row.app_students.toLocaleString("pt-BR")}</Text>
+                    <Text className="text-sm font-mono text-ink" style={{ flex: 1, minWidth: 110, textAlign: "right" }}>{fmtBrl(lineAmount(row, "Acesso ao app") ?? lineAmount(row, "Plano"))}</Text>
+                    <Text className="text-sm font-mono text-ink" style={{ flex: 1, minWidth: 100, textAlign: "right" }}>{gestaoCell(row)}</Text>
                     <Text className="text-sm font-mono text-ink" style={{ flex: 1, minWidth: 110, textAlign: "right" }}>{fmtBrl(row.total)}</Text>
                     <View style={{ flex: 1, minWidth: 120, paddingLeft: 16 }}>
                       <Badge label={row.status_label} tone={toneFor(row)} />
@@ -172,6 +187,7 @@ export default function SaasBillingPreviewScreen({ navigate }: Props) {
                           <Text className="text-sm font-mono text-ink">{fmtBrl(line.amount)}</Text>
                         </View>
                       ))}
+                      <Text className="text-xs font-semibold text-ink-muted">Memória de cálculo</Text>
                       <View className="flex-row justify-between border-t border-border" style={{ paddingTop: 8 }}>
                         <Text className="text-sm font-semibold text-ink">Valor da fatura</Text>
                         <Text className="text-sm font-mono font-semibold text-ink">{fmtBrl(row.total)}</Text>

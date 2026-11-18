@@ -72,6 +72,212 @@ const toForm = (plan: SaasPlan, resources: QuotaResource[]): Form => ({
   features: plan.features ?? [],
 });
 
+const BILLING_OPTIONS: { value: Form["billing_basis"]; label: string }[] = [
+  { value: "flat", label: "Valor fixo por mês" },
+  { value: "per_student", label: "Por aluno ativo" },
+];
+
+function PlanEditor({
+  form,
+  setForm,
+  errors,
+  features,
+  resources,
+  isMobile,
+  simStudents,
+  setSimStudents,
+  toggleFeature,
+}: {
+  form: Form;
+  setForm: (next: Form) => void;
+  errors: Record<string, string>;
+  features: SaasFeature[];
+  resources: QuotaResource[];
+  isMobile: boolean;
+  simStudents: string;
+  setSimStudents: (value: string) => void;
+  toggleFeature: (key: string) => void;
+}) {
+  const perStudent = form.billing_basis === "per_student";
+  const unit = currencyToFloat(form.price_monthly || "0");
+  const students = Number(simStudents || 0);
+  const gestao = form.offer_gestao ? currencyToFloat(form.gestao_price || "0") : 0;
+  const base = perStudent ? students * unit : unit;
+  const total = base + gestao;
+  const selected = form.features.length;
+
+  return (
+    <View className={isMobile ? "" : "flex-row"} style={{ gap: 16, alignItems: "flex-start" }}>
+      <View style={{ flex: 1, minWidth: 0, gap: 16 }}>
+        <View style={{ gap: 8 }}>
+          <Text className="text-sm font-semibold text-ink">Dados do plano</Text>
+          <FormInput label="Nome" required value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} error={errors.name} placeholder="Ex.: Conectivo Reforço" />
+          <FormInput label="Descrição" value={form.description} onChangeText={(v) => setForm({ ...form, description: v })} multiline placeholder="O que o plano oferece" />
+          <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
+            <View style={{ flex: 1, minWidth: 160 }}>
+              <FormSelect label="Status" value={form.status} options={[{ value: "active", label: "Ativo" }, { value: "inactive", label: "Inativo" }]} onChange={(v) => setForm({ ...form, status: v as Form["status"] })} />
+            </View>
+            <View style={{ width: 100 }}>
+              <FormInput label="Ordem" valueFormat="integer" maxDigits={3} value={form.order} onChangeText={(v) => setForm({ ...form, order: v })} />
+            </View>
+          </View>
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <Text className="text-sm font-semibold text-ink">Preço e período de teste</Text>
+          <Text className="text-xs font-medium text-ink">Cobrança</Text>
+          <View className="flex-row border border-border rounded-ds-md overflow-hidden">
+            {BILLING_OPTIONS.map((option) => {
+              const on = form.billing_basis === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => setForm({ ...form, billing_basis: option.value })}
+                  className={on ? "bg-brand" : "bg-surface"}
+                  style={{ flex: 1, height: 38, alignItems: "center", justifyContent: "center" }}
+                >
+                  <Text className="text-sm" style={{ color: on ? color["on-brand"] : color.ink, fontWeight: on ? "600" : "400" }}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text className="text-xs text-ink-muted">O painel administrativo não é cobrado.</Text>
+          <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
+            <View style={{ flex: 1, minWidth: 160 }}>
+              <FormInput
+                label={perStudent ? "Preço por aluno" : "Preço mensal"}
+                required
+                valueFormat="currency"
+                value={form.price_monthly}
+                onChangeText={(v) => setForm({ ...form, price_monthly: v })}
+                error={errors.price_monthly}
+                placeholder="0,00"
+              />
+            </View>
+            {perStudent ? null : (
+              <View style={{ flex: 1, minWidth: 160 }}>
+                <FormInput label="Preço anual" valueFormat="currency" value={form.price_yearly} onChangeText={(v) => setForm({ ...form, price_yearly: v })} error={errors.price_yearly} placeholder="Vazio = 12× o mensal" />
+              </View>
+            )}
+            <View style={{ width: 140 }}>
+              <FormInput label="Dias de teste" valueFormat="integer" maxDigits={3} value={form.trial_days} onChangeText={(v) => setForm({ ...form, trial_days: v })} error={errors.trial_days} />
+            </View>
+          </View>
+          <Pressable
+            role="switch"
+            aria-checked={form.offer_gestao}
+            onPress={() => setForm({ ...form, offer_gestao: !form.offer_gestao })}
+            className="flex-row items-center border border-border rounded-ds-md bg-surface"
+            style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 10 }}
+          >
+            <View className={`rounded-full ${form.offer_gestao ? "bg-brand" : "bg-border"}`} style={{ width: 36, height: 20, padding: 2, alignItems: form.offer_gestao ? "flex-end" : "flex-start" }}>
+              <View className="bg-surface rounded-full" style={{ width: 16, height: 16 }} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text className="text-sm text-ink">Oferecer módulo gestão</Text>
+              <Text className="text-xs text-ink-muted">{form.offer_gestao ? "Incluído no contrato. 0,00 entra grátis." : "Desligado: a gestão não entra no contrato."}</Text>
+            </View>
+          </Pressable>
+          {form.offer_gestao ? (
+            <FormInput label="Valor mensal da gestão" valueFormat="currency" value={form.gestao_price} onChangeText={(v) => setForm({ ...form, gestao_price: v })} error={errors.gestao_price_monthly} placeholder="0,00 = grátis" />
+          ) : null}
+          {perStudent ? (
+            <PriceScheduleFields tiers={form.schedule} onChange={(schedule) => setForm({ ...form, schedule })} error={errors.price_schedule} />
+          ) : null}
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <Text className="text-sm font-semibold text-ink">Limites</Text>
+          <Text className="text-xs text-ink-muted">Em branco = ilimitado. No limite, só o cadastro de novos itens é bloqueado.</Text>
+          <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
+            {resources.map((resource) => (
+              <View key={resource.key} style={{ width: isMobile ? "100%" : "31%" }}>
+                <FormInput
+                  label={resource.label}
+                  valueFormat="integer"
+                  maxDigits={8}
+                  value={form.limits[resource.key] ?? ""}
+                  onChangeText={(v) => setForm({ ...form, limits: { ...form.limits, [resource.key]: v } })}
+                  placeholder="Ilimitado"
+                  error={errors[`limits.${resource.key}`]}
+                  dense
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <Text className="text-sm font-semibold text-ink">{`Funcionalidades incluídas · ${selected} de ${features.length}`}</Text>
+          <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+            {features.map((feature) => {
+              const checked = form.features.includes(feature.key);
+              return (
+                <Pressable
+                  key={feature.key}
+                  role="checkbox"
+                  aria-checked={checked}
+                  onPress={() => toggleFeature(feature.key)}
+                  className={`flex-row items-center border rounded-ds-md ${checked ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
+                  style={{ paddingHorizontal: 10, height: 34, gap: 6, width: isMobile ? "100%" : "48.5%" }}
+                >
+                  <View className={`items-center justify-center border rounded-ds-sm ${checked ? "bg-brand border-brand" : "border-border-strong"}`} style={{ width: 16, height: 16 }}>
+                    {checked ? <Icon icon={Check} size={16} color={color["on-brand"]} /> : null}
+                  </View>
+                  <Text className="text-sm text-ink" numberOfLines={1} style={{ flex: 1 }}>{feature.name}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+
+      <View style={{ width: isMobile ? "100%" : 280, gap: 12 }}>
+        <View className="border border-border rounded-ds-md bg-surface" style={{ padding: 14, gap: 6 }}>
+          <Text className="text-xs font-medium text-ink-muted">Como o cliente vê</Text>
+          <Text className="text-base font-semibold text-ink">{form.name.trim() || "Nome do plano"}</Text>
+          <Text className="text-2xl font-mono text-ink">
+            {fmtBrl(unit)}
+            <Text className="text-sm text-ink-muted">{perStudent ? " /aluno/mês" : " /mês"}</Text>
+          </Text>
+          <Text className="text-xs text-ink-muted">{form.trial_days && form.trial_days !== "0" ? `${form.trial_days} dias grátis para testar` : "Sem período de teste"}</Text>
+          <Text className="text-xs text-ink-muted">Painel incluso, sem cobrança</Text>
+          <Text className="text-xs text-ink-muted">{form.offer_gestao ? `Gestão ${gestao === 0 ? "grátis" : `${fmtBrl(gestao)}/mês`}` : "Gestão não inclusa"}</Text>
+          <Text className="text-xs text-ink-subtle">{`${selected} funcionalidades`}</Text>
+        </View>
+
+        <View className="border border-border rounded-ds-md bg-surface-sunken" style={{ padding: 14, gap: 8 }}>
+          <Text className="text-xs font-medium text-ink-muted">Simular cobrança mensal de um cliente</Text>
+          {perStudent ? (
+            <FormInput label="Alunos com acesso ao app" valueFormat="integer" maxDigits={6} value={simStudents} onChangeText={setSimStudents} dense />
+          ) : (
+            <Text className="text-xs text-ink-muted">O valor fixo não muda com a quantidade de alunos.</Text>
+          )}
+          <SimLine label={perStudent ? `${students.toLocaleString("pt-BR")} alunos × ${fmtBrl(unit)}` : "Plano"} value={fmtBrl(base)} />
+          <SimLine label="Módulo gestão" value={form.offer_gestao ? fmtBrl(gestao) : "não contratada"} />
+          <SimLine label="Painel" value="R$ 0,00" />
+          <View className="flex-row justify-between border-t border-border" style={{ paddingTop: 8 }}>
+            <Text className="text-sm font-semibold text-ink">Fatura do mês</Text>
+            <Text className="text-sm font-mono font-semibold text-ink">{fmtBrl(total)}</Text>
+          </View>
+          {perStudent ? <Text className="text-xs text-ink-subtle">A faixa de datas da assinatura pode cobrar outro valor no mês.</Text> : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function SimLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="flex-row justify-between" style={{ gap: 8 }}>
+      <Text className="text-xs text-ink-muted" style={{ flex: 1 }}>{label}</Text>
+      <Text className="text-xs font-mono text-ink">{value}</Text>
+    </View>
+  );
+}
+
 /** Plataforma › Comercial › Planos SaaS: nomes, preços, teste, limites e funcionalidades configuráveis. */
 export default function SaasPlansScreen() {
   const { contentPadding, isMobile } = useResponsiveLayout();
@@ -262,9 +468,9 @@ export default function SaasPlansScreen() {
         visible={!!form}
         title={editing === "new" ? "Novo plano" : "Editar plano"}
         onClose={close}
-        size="lg"
+        size="xl"
         compact
-        maxHeight="88%"
+        maxHeight="92%"
         showScrollIndicator
         footer={
           <View className="flex-row justify-end" style={{ gap: 8 }}>
@@ -273,137 +479,17 @@ export default function SaasPlansScreen() {
           </View>
         }
       >
-        {form ? (
-          <View style={{ gap: 10 }}>
-            <FormInput label="Nome" required value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} error={errors.name} placeholder="Ex.: Profissional" />
-            <FormInput label="Descrição" value={form.description} onChangeText={(v) => setForm({ ...form, description: v })} multiline placeholder="O que o plano oferece" />
-            <FormSelect
-              label="Cobrança"
-              value={form.billing_basis}
-              options={[{ value: "flat", label: "Valor fixo por mês" }, { value: "per_student", label: "Por aluno com acesso ao app" }]}
-              onChange={(v) => setForm({ ...form, billing_basis: v as Form["billing_basis"] })}
-            />
-            <Text className="text-xs text-ink-muted">O painel administrativo entra sem cobrança.</Text>
-            <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
-              <View style={{ flex: 1, minWidth: 160 }}>
-                <FormInput
-                  label={form.billing_basis === "per_student" ? "Preço de referência por aluno (R$)" : "Preço mensal (R$)"}
-                  required
-                  valueFormat="currency"
-                  value={form.price_monthly}
-                  onChangeText={(v) => setForm({ ...form, price_monthly: v })}
-                  error={errors.price_monthly}
-                  placeholder="0,00"
-                />
-              </View>
-              {form.billing_basis === "flat" ? (
-                <View style={{ flex: 1, minWidth: 160 }}>
-                  <FormInput label="Preço anual (R$)" valueFormat="currency" value={form.price_yearly} onChangeText={(v) => setForm({ ...form, price_yearly: v })} error={errors.price_yearly} placeholder="Vazio = 12× o mensal" />
-                </View>
-              ) : null}
-            </View>
-            {form.billing_basis === "per_student" ? (
-              <Text className="text-xs text-ink-muted">O preço de referência vale fora das faixas. Antes da primeira faixa, a cobrança por aluno fica zerada.</Text>
-            ) : null}
-            <Pressable
-              role="checkbox"
-              aria-checked={form.offer_gestao}
-              onPress={() => setForm({ ...form, offer_gestao: !form.offer_gestao })}
-              className={`flex-row items-center border rounded-ds-md ${form.offer_gestao ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
-              style={{ paddingHorizontal: 10, height: 40, gap: 8 }}
-            >
-              <View className={`items-center justify-center border rounded-ds-sm ${form.offer_gestao ? "bg-brand border-brand" : "border-border-strong"}`} style={{ width: 16, height: 16 }}>
-                {form.offer_gestao ? <Icon icon={Check} size={16} color={color["on-brand"]} /> : null}
-              </View>
-              <Text className="text-sm text-ink" style={{ flex: 1 }}>Oferecer módulo gestão</Text>
-            </Pressable>
-            {form.offer_gestao ? (
-              <FormInput
-                label="Valor mensal da gestão (R$)"
-                valueFormat="currency"
-                value={form.gestao_price}
-                onChangeText={(v) => setForm({ ...form, gestao_price: v })}
-                error={errors.gestao_price_monthly}
-                placeholder="0,00 = grátis"
-              />
-            ) : (
-              <Text className="text-xs text-ink-muted">Sem esta opção, a gestão não entra no contrato. Com valor 0,00 ela entra grátis.</Text>
-            )}
-            {form.billing_basis === "per_student" ? (
-              <PriceScheduleFields
-                tiers={form.schedule}
-                onChange={(schedule) => setForm({ ...form, schedule })}
-                error={errors.price_schedule}
-              />
-            ) : null}
-            {form.billing_basis === "per_student" ? (
-              <View className="rounded-ds-md border border-border bg-surface-sunken" style={{ padding: 12, gap: 4 }}>
-                <Text className="text-sm font-semibold text-ink">Simular um mês</Text>
-                <FormInput label="Alunos com acesso ao app" valueFormat="integer" maxDigits={6} value={simStudents} onChangeText={setSimStudents} dense />
-                <Text className="text-sm font-mono text-ink">
-                  {`${Number(simStudents || 0).toLocaleString("pt-BR")} × ${fmtBrl(currencyToFloat(form.price_monthly || "0"))} + gestão ${form.offer_gestao ? fmtBrl(currencyToFloat(form.gestao_price || "0")) : "não contratada"} + painel grátis`}
-                </Text>
-                <Text className="text-sm font-semibold text-ink">
-                  {fmtBrl(Number(simStudents || 0) * currencyToFloat(form.price_monthly || "0") + (form.offer_gestao ? currencyToFloat(form.gestao_price || "0") : 0))}
-                </Text>
-                <Text className="text-xs text-ink-subtle">Usa o preço de referência. Na assinatura, a faixa de datas pode cobrar outro valor no mês.</Text>
-              </View>
-            ) : null}
-            <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
-              <View style={{ flex: 1, minWidth: 140 }}>
-                <FormInput label="Dias de teste" valueFormat="integer" maxDigits={3} value={form.trial_days} onChangeText={(v) => setForm({ ...form, trial_days: v })} error={errors.trial_days} />
-              </View>
-              <View style={{ flex: 1, minWidth: 140 }}>
-                <FormSelect label="Status" value={form.status} options={[{ value: "active", label: "Ativo" }, { value: "inactive", label: "Inativo (sem novas contratações)" }]} onChange={(v) => setForm({ ...form, status: v as Form["status"] })} />
-              </View>
-              <View style={{ flex: 1, minWidth: 100 }}>
-                <FormInput label="Ordem" valueFormat="integer" maxDigits={3} value={form.order} onChangeText={(v) => setForm({ ...form, order: v })} />
-              </View>
-            </View>
-
-            <Text className="text-sm font-semibold text-ink" style={{ marginTop: 8 }}>Limites</Text>
-            <Text className="text-xs text-ink-muted">Deixe em branco para ilimitado. Ao atingir o limite, só o cadastro de novos itens é bloqueado.</Text>
-            <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
-              {resources.map((r) => (
-                <View key={r.key} style={{ width: isMobile ? "100%" : "31%" }}>
-                  <FormInput
-                    label={r.label}
-                    valueFormat="integer"
-                    maxDigits={8}
-                    value={form.limits[r.key] ?? ""}
-                    onChangeText={(v) => setForm({ ...form, limits: { ...form.limits, [r.key]: v } })}
-                    placeholder="Ilimitado"
-                    error={errors[`limits.${r.key}`]}
-                    dense
-                  />
-                </View>
-              ))}
-            </View>
-
-            <Text className="text-sm font-semibold text-ink" style={{ marginTop: 8 }}>Funcionalidades incluídas</Text>
-            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-              {features.map((f) => {
-                const checked = form.features.includes(f.key);
-                return (
-                  <Pressable
-                    key={f.key}
-                    role="checkbox"
-                    aria-checked={checked}
-                    onPress={() => toggleFeature(f.key)}
-                    className={`flex-row items-center border rounded-ds-md ${checked ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
-                    style={{ paddingHorizontal: 10, height: 34, gap: 6, width: isMobile ? "100%" : "48.5%" }}
-                  >
-                    <View className={`items-center justify-center border rounded-ds-sm ${checked ? "bg-brand border-brand" : "border-border-strong"}`} style={{ width: 16, height: 16 }}>
-                      {checked ? <Icon icon={Check} size={16} color={color["on-brand"]} /> : null}
-                    </View>
-                    <Text className="text-sm text-ink" numberOfLines={1} style={{ flex: 1 }}>{f.name}</Text>
-                    {f.global_status !== "enabled" ? <Badge label={f.global_status === "beta" ? "Beta" : "Desabilitada"} tone={f.global_status === "beta" ? "warning" : "neutral"} /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
+        {form ? <PlanEditor
+          form={form}
+          setForm={setForm}
+          errors={errors}
+          features={features}
+          resources={resources}
+          isMobile={isMobile}
+          simStudents={simStudents}
+          setSimStudents={setSimStudents}
+          toggleFeature={toggleFeature}
+        /> : null}
       </Modal>
 
       <ConfirmModal
