@@ -159,13 +159,24 @@ export default function SaasBillingPreviewScreen({ navigate }: Props) {
               return (
                 <View key={row.tenant.id} className={open ? "bg-brand-tint" : ""}>
                   <Pressable
-                    onPress={() => setOpenId(open ? null : row.tenant.id)}
+                    onPress={() => navigate("tenants-detail", { tenantId: row.tenant.id, tab: "subscription" })}
                     className="flex-row items-center border-b border-border"
                     style={{ paddingVertical: 10, paddingHorizontal: 12, gap: 8 }}
                     accessibilityRole="button"
-                    accessibilityState={{ expanded: open }}
+                    accessibilityLabel={`Abrir assinatura de ${row.tenant.name}`}
                   >
-                    <Icon icon={ChevronRight} size={16} color={color["ink-subtle"]} />
+                    <Pressable
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        setOpenId(open ? null : row.tenant.id);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: open }}
+                      accessibilityLabel={open ? "Ocultar memória de cálculo" : "Ver memória de cálculo"}
+                      hitSlop={8}
+                    >
+                      <Icon icon={ChevronRight} size={16} color={color["ink-subtle"]} />
+                    </Pressable>
                     <Text className="text-sm font-medium text-ink" style={{ flex: 1.8, minWidth: 160 }} numberOfLines={1}>{row.tenant.name}</Text>
                     <Text className="text-sm text-ink-muted" style={{ flex: 1.2, minWidth: 120 }} numberOfLines={1}>{row.plan ?? "—"}</Text>
                     <Text className="text-sm font-mono text-ink" style={{ flex: 0.7, minWidth: 70, textAlign: "right" }}>{row.app_students == null ? "—" : row.app_students.toLocaleString("pt-BR")}</Text>

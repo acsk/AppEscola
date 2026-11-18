@@ -17,7 +17,10 @@ export default function DeleteIconButton({ onPress, label, disabled = false, siz
   const box = size === "sm" ? 28 : 34;
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
       disabled={disabled}
       role="button"
       aria-label={label}

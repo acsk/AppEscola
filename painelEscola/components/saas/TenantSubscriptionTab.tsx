@@ -10,7 +10,7 @@ import DefinitionRows from "../ui/DefinitionRows";
 import { color } from "../../constants/theme";
 import { currencyToFloat, floatToCurrency } from "../../utils/masks";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast, type ApiToastState } from "../../utils/apiErrors";
-import PriceScheduleFields, { type PriceTierForm } from "./PriceScheduleFields";
+import PriceScheduleFields, { scheduleDateToIso, scheduleTierInvalid, type PriceTierForm } from "./PriceScheduleFields";
 import {
   cycleLabel,
   fetchPlans,
@@ -175,8 +175,8 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
     if ((mode === "subscribe" || mode === "change") && !form.plan) local.saas_plan_id = "Selecione o plano.";
     if (mode === "cancel" && form.reason.trim().length < 3) local.reason = "Informe o motivo do cancelamento.";
     if (mode === "trial" && !Number(form.days)) local.days = "Informe quantos dias.";
-    if (mode === "pricing" && subscription?.billing_basis === "per_student" && form.tiers.some((tier) => (tier.from || tier.until || tier.price) && (!tier.from || tier.price === ""))) {
-      local.price_schedule = "Preencha a data inicial e o valor de cada faixa.";
+    if (mode === "pricing" && subscription?.billing_basis === "per_student" && form.tiers.some(scheduleTierInvalid)) {
+      local.price_schedule = "Preencha a data inicial no formato DD/MM/AAAA e o valor de cada faixa.";
     }
     if (Object.keys(local).length) {
       setErrors(local);
@@ -208,9 +208,9 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
                         gestao_price_monthly: form.gestao ? currencyToFloat(form.gestaoPrice || "0") : 0,
                         price: subscription?.billing_basis === "per_student" ? currencyToFloat(form.fallbackPrice || "0") : undefined,
                         price_schedule: subscription?.billing_basis === "per_student"
-                          ? form.tiers.filter((tier) => tier.from || tier.price).map((tier) => ({
-                              from: tier.from,
-                              until: tier.until || null,
+                          ? form.tiers.filter((tier) => scheduleDateToIso(tier.from) || tier.price).map((tier) => ({
+                              from: scheduleDateToIso(tier.from),
+                              until: scheduleDateToIso(tier.until) || null,
                               price: currencyToFloat(tier.price),
                             }))
                           : undefined,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, TextInput, View } from "react-native";
 import { Search } from "lucide-react-native";
 import PageHeader from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
@@ -123,10 +123,8 @@ export default function SaasSubscriptionsScreen({ navigate }: Props) {
               rows.map(({ tenant, subscription: s }, i) => {
                 const st = SUBSCRIPTION_STATUS[s?.status ?? "legacy"];
                 return (
-                  <DataTableRow key={tenant.id} index={i}>
-                    <TouchableOpacity style={{ flex: 2.2, minWidth: 180 }} onPress={() => navigate("tenants-detail", { tenantId: tenant.id, tab: "subscription" })} role="link">
-                      <Text className="text-sm font-medium text-brand" numberOfLines={1}>{tenant.name}</Text>
-                    </TouchableOpacity>
+                  <DataTableRow key={tenant.id} index={i} onPress={() => navigate("tenants-detail", { tenantId: tenant.id, tab: "subscription" })}>
+                    <Text className="text-sm font-medium text-ink" style={{ flex: 2.2, minWidth: 180 }} numberOfLines={1}>{tenant.name}</Text>
                     <View style={{ flex: 1.4, minWidth: 120 }}>
                       <Text className="text-sm text-ink" numberOfLines={1}>{s?.plan?.name ?? "—"}</Text>
                       {s?.billing_basis === "per_student" ? (

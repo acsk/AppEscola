@@ -52,7 +52,10 @@ export default function Button({
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress?.();
+      }}
       disabled={inactive}
       role="button"
       aria-label={accessibilityLabel ?? (iconOnly ? label : undefined)}

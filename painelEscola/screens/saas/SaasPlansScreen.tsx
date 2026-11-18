@@ -18,7 +18,7 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { currencyToFloat, floatToCurrency } from "../../utils/masks";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast, type ApiToastState } from "../../utils/apiErrors";
 import { deletePlan, fetchPlans, fmtBrl, savePlan, type QuotaResource, type SaasFeature, type SaasPlan } from "../../services/saas";
-import PriceScheduleFields, { type PriceTierForm } from "../../components/saas/PriceScheduleFields";
+import PriceScheduleFields, { scheduleDateToIso, scheduleTierInvalid, type PriceTierForm } from "../../components/saas/PriceScheduleFields";
 
 type Form = {
   name: string;
@@ -330,8 +330,8 @@ export default function SaasPlansScreen() {
     const local: Record<string, string> = {};
     if (!form.name.trim()) local.name = "Informe o nome do plano.";
     if (form.price_monthly === "") local.price_monthly = form.billing_basis === "per_student" ? "Informe o preço por aluno (pode ser 0,00)." : "Informe o preço mensal (pode ser 0,00).";
-    if (form.billing_basis === "per_student" && form.schedule.some((tier) => (tier.from || tier.until || tier.price) && (!tier.from || tier.price === ""))) {
-      local.price_schedule = "Preencha a data inicial e o valor de cada faixa.";
+    if (form.billing_basis === "per_student" && form.schedule.some(scheduleTierInvalid)) {
+      local.price_schedule = "Preencha a data inicial no formato DD/MM/AAAA e o valor de cada faixa.";
     }
     if (Object.keys(local).length) {
       setErrors(local);
@@ -349,9 +349,9 @@ export default function SaasPlansScreen() {
         offer_gestao: form.offer_gestao,
         gestao_price_monthly: form.offer_gestao ? currencyToFloat(form.gestao_price || "0") : null,
         price_schedule: form.billing_basis === "per_student"
-          ? form.schedule.filter((tier) => tier.from || tier.price).map((tier) => ({
-              from: tier.from,
-              until: tier.until || null,
+          ? form.schedule.filter((tier) => scheduleDateToIso(tier.from) || tier.price).map((tier) => ({
+              from: scheduleDateToIso(tier.from),
+              until: scheduleDateToIso(tier.until) || null,
               price: currencyToFloat(tier.price),
             }))
           : null,
@@ -437,7 +437,7 @@ export default function SaasPlansScreen() {
               </View>
             ) : (
               plans.map((plan, i) => (
-                <DataTableRow key={plan.id} index={i}>
+                <DataTableRow key={plan.id} index={i} onPress={() => open(plan)}>
                   <View style={{ flex: 2.2, minWidth: 180 }}>
                     <Text className="text-sm font-medium text-ink" numberOfLines={1}>{plan.name}</Text>
                     <Text className="text-xs text-ink-subtle" numberOfLines={1}>{`${limitSummary(plan)} · ${(plan.features ?? []).length} funcionalidades`}</Text>
