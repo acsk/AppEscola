@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Ano do contrato SaaS, mês a mês.
- * Mês fechado usa a foto gravada. Mês aberto usa os alunos com acesso ao app agora.
+ * Mês fechado usa a foto gravada. Mês aberto soma quem já estava com quem entrou no mês.
  * O custo de IA não entra: as chaves são do cliente.
  */
 class SaasCompetenceService
@@ -46,13 +46,16 @@ class SaasCompetenceService
         $rows = TenantSubscription::query()->with(['tenant', 'plan'])->get()->map(function (TenantSubscription $subscription) use ($year, $today, $closes, $testStudents) {
             $months = [];
             $totals = ['closed' => 0.0, 'preview' => 0.0, 'forecast' => 0.0];
-            $students = $subscription->isPerStudent() ? $this->billing->appStudents((int) $subscription->tenant_id) : null;
+            $byMonth = $subscription->isPerStudent()
+                ? $this->billing->appStudentsByMonth((int) $subscription->tenant_id, $year, $today)
+                : null;
             for ($month = 1; $month <= 12; $month++) {
                 $start = Carbon::create($year, $month, 1)->startOfDay();
                 $close = $closes->get($subscription->tenant_id.'|'.$start->format('Y-m'));
+                $stock = $byMonth[$month] ?? null;
                 $row = $close
-                    ? $this->closedRow($close, $start)
-                    : $this->openRow($subscription, $start, $today, $students);
+                    ? $this->closedRow($close, $start, $stock)
+                    : $this->openRow($subscription, $start, $today, $stock);
                 $months[] = $row;
                 $totals[$row['status']] += (float) $row['total'];
             }
@@ -76,7 +79,7 @@ class SaasCompetenceService
         return [
             'year' => $year,
             'ai_billed' => false,
-            'note' => 'Contrato anual cobrado mês a mês. A prévia e a previsão usam os alunos com acesso ao app de hoje, porque não há foto dos meses anteriores. Alunos marcados como teste nas configurações da instituição ficam de fora dos meses abertos. Ao fechar, essa quantidade e o valor ficam gravados. As chaves de OpenRouter e GPT são do cliente: o uso e o custo de IA não entram nesta cobrança.',
+            'note' => 'Cada mês soma quem já estava com quem entrou naquele mês. A entrada é a data da primeira matrícula de quem tem acesso ao app. Sem matrícula, vale a data em que o acesso foi criado. Alunos de teste ficam de fora. Mês futuro repete quem já está. Ao fechar, a quantidade daquele mês fica gravada. As chaves de OpenRouter e GPT são do cliente: o uso e o custo de IA não entram nesta cobrança.',
             'rows' => $rows->all(),
             'closed_total' => $this->money($sum('closed_total')),
             'preview_total' => $this->money($sum('preview_total')),
@@ -101,7 +104,10 @@ class SaasCompetenceService
             throw ValidationException::withMessages(['competence' => ['Esse mês já está fechado.']]);
         }
 
-        $amounts = $this->amounts($subscription, $start, null);
+        $stock = $subscription->isPerStudent()
+            ? $this->billing->appStudentsByMonth((int) $tenant->id, (int) $start->year, $today)[(int) $start->month]
+            : null;
+        $amounts = $this->amounts($subscription, $start, $stock['total'] ?? null);
         $close = SaasCompetenceClose::query()->create([
             'tenant_id' => $tenant->id,
             'competence' => $start->toDateString(),
@@ -118,8 +124,35 @@ class SaasCompetenceService
         return $close;
     }
 
-    /** @return array<string, mixed> */
-    private function closedRow(SaasCompetenceClose $close, Carbon $start): array
+    /**
+     * Regrava um fechamento já feito com a soma de quem estava e de quem entrou naquele mês.
+     * Usado para corrigir o fechamento que tinha copiado a quantidade de hoje.
+     */
+    public function refreshStoredClose(SaasCompetenceClose $close): void
+    {
+        $subscription = TenantSubscription::query()->with('plan')->where('tenant_id', $close->tenant_id)->first();
+        if (! $subscription) {
+            return;
+        }
+
+        $start = Carbon::parse($close->competence->toDateString())->startOfDay();
+        $stock = $subscription->isPerStudent()
+            ? $this->billing->appStudentsByMonth((int) $close->tenant_id, (int) $start->year, BusinessDate::today())[(int) $start->month]
+            : null;
+        $amounts = $this->amounts($subscription, $start, $stock['total'] ?? null);
+        $close->update([
+            'app_students' => $amounts['app_students'] ?? 0,
+            'unit_price' => $amounts['unit_price'],
+            'app_amount' => $amounts['app_amount'],
+            'gestao_amount' => $amounts['gestao_amount'],
+            'total' => $amounts['total'],
+        ]);
+    }
+
+    /** @param  array{total: int, entered: int, already: int, future: bool}|null  $stock
+     * @return array<string, mixed>
+     */
+    private function closedRow(SaasCompetenceClose $close, Carbon $start, ?array $stock): array
     {
         return [
             'competence' => $start->format('Y-m'),
@@ -131,17 +164,19 @@ class SaasCompetenceService
             'total' => $this->money($close->total),
             'status' => 'closed',
             'status_label' => 'Fechado',
-            'students_basis' => 'Foto do fechamento',
+            'students_basis' => $stock ? 'Foto do fechamento · '.$this->basis($stock) : 'Foto do fechamento',
             'closed_at' => $close->closed_at?->timezone(config('app.business_timezone', 'America/Sao_Paulo'))->format('d/m/Y H:i'),
             'can_close' => false,
         ];
     }
 
-    /** @return array<string, mixed> */
-    private function openRow(TenantSubscription $subscription, Carbon $start, Carbon $today, ?int $students): array
+    /** @param  array{total: int, entered: int, already: int, future: bool}|null  $stock
+     * @return array<string, mixed>
+     */
+    private function openRow(TenantSubscription $subscription, Carbon $start, Carbon $today, ?array $stock): array
     {
-        $future = $start->gt($today);
-        $amounts = $this->amounts($subscription, $start, $students);
+        $future = $stock['future'] ?? $start->gt($today);
+        $amounts = $this->amounts($subscription, $start, $stock['total'] ?? null);
 
         return [
             'competence' => $start->format('Y-m'),
@@ -153,10 +188,20 @@ class SaasCompetenceService
             'total' => $this->money($amounts['total']),
             'status' => $future ? 'forecast' : 'preview',
             'status_label' => $future ? 'Previsão' : 'Prévia',
-            'students_basis' => 'Alunos de hoje',
+            'students_basis' => $stock ? $this->basis($stock) : 'Valor fixo do mês',
             'closed_at' => null,
             'can_close' => ! $future,
         ];
+    }
+
+    /** @param  array{total: int, entered: int, already: int, future: bool}  $stock */
+    private function basis(array $stock): string
+    {
+        if ($stock['future']) {
+            return 'Previsão com quem já está';
+        }
+
+        return $stock['entered'].' entraram + '.$stock['already'].' já estavam';
     }
 
     /** @return array{app_students: int|null, unit_price: float, app_amount: float, gestao_amount: float, total: float} */

@@ -115,7 +115,7 @@ export default function SaasYearCloseScreen({ navigate }: Props) {
           <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={isMobile}>
             <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: isMobile ? 860 : undefined }}>
               <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
-                <Text className={TABLE_HEADER_CELL} style={{ flex: 1.1, minWidth: 110 }}>Mês</Text>
+                <Text className={TABLE_HEADER_CELL} style={{ flex: 1.4, minWidth: 180 }}>Mês</Text>
                 <Text className={TABLE_HEADER_CELL} style={{ flex: 0.7, minWidth: 70, textAlign: "right" }}>Alunos</Text>
                 <Text className={TABLE_HEADER_CELL} style={{ flex: 0.9, minWidth: 90, textAlign: "right" }}>R$/aluno</Text>
                 <Text className={TABLE_HEADER_CELL} style={{ flex: 1, minWidth: 100, textAlign: "right" }}>App</Text>
@@ -125,7 +125,7 @@ export default function SaasYearCloseScreen({ navigate }: Props) {
               </View>
               {row.months.map((month, index) => (
                 <DataTableRow key={month.competence} index={index}>
-                  <View style={{ flex: 1.1, minWidth: 110 }}>
+                  <View style={{ flex: 1.4, minWidth: 180 }}>
                     <Text className={TABLE_CELL}>{month.label}</Text>
                     <Text className="text-xs text-ink-subtle">{month.students_basis}</Text>
                   </View>

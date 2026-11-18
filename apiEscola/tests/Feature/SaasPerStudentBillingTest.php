@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Enrollment;
 use App\Models\SaasPlan;
+use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
@@ -106,10 +108,11 @@ class SaasPerStudentBillingTest extends TestCase
 
     public function test_annual_contract_closes_each_month_and_leaves_ai_to_the_client(): void
     {
-        Carbon::setTestNow('2026-11-18 15:00:00');
+        Carbon::setTestNow('2026-01-10 10:00:00');
         $tenant = Tenant::factory()->create();
         $this->studentWithApp($tenant);
         $this->studentWithApp($tenant);
+        Carbon::setTestNow('2026-11-18 15:00:00');
         Sanctum::actingAs(User::factory()->superAdmin()->create());
 
         $this->postJson('/api/saas/plans', $this->planPayload([
@@ -162,7 +165,7 @@ class SaasPerStudentBillingTest extends TestCase
 
     public function test_test_students_marked_on_the_tenant_stay_out_of_open_months(): void
     {
-        Carbon::setTestNow('2026-11-18 15:00:00');
+        Carbon::setTestNow('2026-01-10 10:00:00');
         $tenant = Tenant::factory()->create();
         $this->studentWithApp($tenant);
         $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'aluno', 'status' => 'active']);
@@ -172,6 +175,7 @@ class SaasPerStudentBillingTest extends TestCase
             'status' => 'active',
             'name' => 'Aluno Teste',
         ]);
+        Carbon::setTestNow('2026-11-18 15:00:00');
         Sanctum::actingAs(User::factory()->superAdmin()->create());
 
         $this->postJson('/api/saas/plans', $this->planPayload([
@@ -219,6 +223,52 @@ class SaasPerStudentBillingTest extends TestCase
             ->assertJsonPath('body.rows.0.months.9.app_students', 2);
     }
 
+    public function test_each_month_adds_students_who_entered_to_those_already_there(): void
+    {
+        Carbon::setTestNow('2026-11-18 15:00:00');
+        $tenant = Tenant::factory()->create();
+        $class = SchoolClass::factory()->create(['tenant_id' => $tenant->id]);
+        $first = $this->studentWithApp($tenant);
+        $second = $this->studentWithApp($tenant);
+        Enrollment::factory()->create([
+            'tenant_id' => $tenant->id,
+            'student_id' => $first->id,
+            'school_class_id' => $class->id,
+            'start_date' => '2026-01-10',
+        ]);
+        Enrollment::factory()->create([
+            'tenant_id' => $tenant->id,
+            'student_id' => $second->id,
+            'school_class_id' => $class->id,
+            'start_date' => '2026-03-02',
+        ]);
+        Sanctum::actingAs(User::factory()->superAdmin()->create());
+        $this->postJson('/api/saas/plans', $this->planPayload([
+            'name' => 'Entradas 2026',
+            'price_schedule' => [
+                ['from' => '2026-01-01', 'until' => '2026-06-30', 'price' => 15],
+                ['from' => '2026-07-01', 'until' => '2026-12-31', 'price' => 20],
+            ],
+        ]))->assertCreated();
+        $plan = SaasPlan::query()->where('name', 'Entradas 2026')->firstOrFail();
+        $this->postJson("/api/saas/tenants/{$tenant->id}/subscription", [
+            'saas_plan_id' => $plan->id,
+            'billing_cycle' => 'monthly',
+        ])->assertCreated();
+
+        $this->getJson('/api/saas/billing/year?year=2026')->assertOk()
+            ->assertJsonPath('body.rows.0.months.0.app_students', 1)
+            ->assertJsonPath('body.rows.0.months.0.students_basis', '1 entraram + 0 já estavam')
+            ->assertJsonPath('body.rows.0.months.0.total', '15.00')
+            ->assertJsonPath('body.rows.0.months.1.app_students', 1)
+            ->assertJsonPath('body.rows.0.months.1.students_basis', '0 entraram + 1 já estavam')
+            ->assertJsonPath('body.rows.0.months.2.app_students', 2)
+            ->assertJsonPath('body.rows.0.months.2.students_basis', '1 entraram + 1 já estavam')
+            ->assertJsonPath('body.rows.0.months.2.total', '30.00')
+            ->assertJsonPath('body.rows.0.months.11.students_basis', 'Previsão com quem já está')
+            ->assertJsonPath('body.rows.0.months.11.app_students', 2);
+    }
+
     public function test_overlapping_price_schedule_is_rejected(): void
     {
         Sanctum::actingAs(User::factory()->superAdmin()->create());
@@ -230,10 +280,11 @@ class SaasPerStudentBillingTest extends TestCase
         ]))->assertUnprocessable()->assertJsonValidationErrors('price_schedule');
     }
 
-    private function studentWithApp(Tenant $tenant): void
+    private function studentWithApp(Tenant $tenant): Student
     {
         $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'aluno', 'status' => 'active']);
-        Student::factory()->create(['tenant_id' => $tenant->id, 'user_id' => $user->id, 'status' => 'active']);
+
+        return Student::factory()->create(['tenant_id' => $tenant->id, 'user_id' => $user->id, 'status' => 'active']);
     }
 
     /** @param  array<string, mixed>  $override */
