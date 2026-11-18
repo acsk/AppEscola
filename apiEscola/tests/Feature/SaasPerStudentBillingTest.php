@@ -76,6 +76,34 @@ class SaasPerStudentBillingTest extends TestCase
             ->assertJsonPath('body.gestao_price_monthly', '10.00');
     }
 
+    public function test_billing_preview_explains_app_students_gestao_and_free_panel(): void
+    {
+        Carbon::setTestNow('2027-03-10 15:00:00');
+        $tenant = Tenant::factory()->create(['name' => 'Conectivo Preview']);
+        $this->studentWithApp($tenant);
+        $this->studentWithApp($tenant);
+        Sanctum::actingAs(User::factory()->superAdmin()->create());
+        $this->postJson('/api/saas/plans', $this->planPayload())->assertCreated();
+        $plan = SaasPlan::query()->where('name', 'Por aluno')->firstOrFail();
+        $this->postJson("/api/saas/tenants/{$tenant->id}/subscription", [
+            'saas_plan_id' => $plan->id,
+            'billing_cycle' => 'monthly',
+        ])->assertCreated();
+
+        $this->getJson('/api/saas/billing/preview')->assertOk()
+            ->assertJsonPath('body.competence', 'Março/2027')
+            ->assertJsonPath('body.forecast', '30.00')
+            ->assertJsonPath('body.billable_count', 1)
+            ->assertJsonPath('body.rows.0.tenant.name', 'Conectivo Preview')
+            ->assertJsonPath('body.rows.0.app_students', 2)
+            ->assertJsonPath('body.rows.0.total', '30.00')
+            ->assertJsonPath('body.rows.0.lines.0.label', 'Acesso ao app')
+            ->assertJsonPath('body.rows.0.lines.0.amount', '30.00')
+            ->assertJsonPath('body.rows.0.lines.1.label', 'Painel')
+            ->assertJsonPath('body.rows.0.lines.1.amount', '0.00')
+            ->assertJsonPath('body.rows.0.lines.2.detail', 'contratado grátis');
+    }
+
     public function test_overlapping_price_schedule_is_rejected(): void
     {
         Sanctum::actingAs(User::factory()->superAdmin()->create());

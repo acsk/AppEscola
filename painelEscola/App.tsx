@@ -46,6 +46,7 @@ import TenantFormScreen from "./screens/tenants/TenantFormScreen";
 import SaasDashboardScreen from "./screens/saas/SaasDashboardScreen";
 import TenantDetailScreen from "./screens/saas/TenantDetailScreen";
 import SaasPlansScreen from "./screens/saas/SaasPlansScreen";
+import SaasBillingPreviewScreen from "./screens/saas/SaasBillingPreviewScreen";
 import SaasSubscriptionsScreen from "./screens/saas/SaasSubscriptionsScreen";
 import SaasFeaturesScreen from "./screens/saas/SaasFeaturesScreen";
 import GlobalAdminsScreen from "./screens/saas/GlobalAdminsScreen";
@@ -291,6 +292,7 @@ function hashToNav(hash: string): NavState {
   if (seg0 === "plataforma") {
     if (seg1 === "planos") return { screen: "saas-plans" };
     if (seg1 === "assinaturas") return { screen: "saas-subscriptions" };
+    if (seg1 === "cobranca") return { screen: "saas-billing" };
     if (seg1 === "funcionalidades") return { screen: "saas-features" };
     if (seg1 === "monitoramento") return { screen: "saas-monitoring" };
     if (seg1 === "consumo") return { screen: "saas-usage" };
@@ -466,6 +468,7 @@ function navToHash(nav: NavState): string {
   if (nav.screen === "tenants-detail") return `#/tenants/${nav.params?.tenantId}/detalhes${nav.params?.tab ? `/${nav.params.tab}` : ""}`;
   if (nav.screen === "saas-plans") return "#/plataforma/planos";
   if (nav.screen === "saas-subscriptions") return "#/plataforma/assinaturas";
+  if (nav.screen === "saas-billing") return "#/plataforma/cobranca";
   if (nav.screen === "saas-features") return "#/plataforma/funcionalidades";
   if (nav.screen === "saas-monitoring") return "#/plataforma/monitoramento";
   if (nav.screen === "saas-usage") return "#/plataforma/consumo";
@@ -1255,6 +1258,7 @@ function AppContent() {
       case "tenants-detail": return <TenantDetailScreen key={String(nav.params?.tenantId)} navigate={navigate} tenantId={Number(nav.params?.tenantId)} initialTab={nav.params?.tab ? String(nav.params.tab) : undefined} />;
       case "saas-plans": return <SaasPlansScreen />;
       case "saas-subscriptions": return <SaasSubscriptionsScreen navigate={navigate} />;
+      case "saas-billing": return <SaasBillingPreviewScreen navigate={navigate} />;
       case "saas-features": return <SaasFeaturesScreen />;
       case "saas-monitoring": return <SaasMonitoringScreen />;
       case "saas-usage": return <SaasUsageScreen navigate={navigate} />;

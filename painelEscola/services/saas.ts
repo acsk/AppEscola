@@ -173,6 +173,35 @@ export type TenantEntitlements = {
 
 const body = (data: any) => data?.body ?? data;
 
+export type BillingLine = { label: string; detail: string; amount: string };
+
+export type BillingPreviewRow = {
+  tenant: { id: number; name: string };
+  plan: string | null;
+  status: string;
+  status_label: string;
+  charged: boolean;
+  app_students: number | null;
+  lines: BillingLine[];
+  total: string;
+};
+
+export type BillingPreview = {
+  competence: string;
+  preview: boolean;
+  measured_at: string;
+  forecast: string;
+  billable_count: number;
+  uncharged_count: number;
+  average: string;
+  note: string;
+  rows: BillingPreviewRow[];
+};
+
+export async function fetchBillingPreview(): Promise<BillingPreview> {
+  return body((await api.get("/saas/billing/preview")).data);
+}
+
 export async function fetchPlans(): Promise<{ plans: SaasPlan[]; features: SaasFeature[]; resources: QuotaResource[] }> {
   return body((await api.get("/saas/plans")).data);
 }

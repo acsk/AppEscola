@@ -87,6 +87,7 @@ export default function SaasPlansScreen() {
   const [toDelete, setToDelete] = useState<SaasPlan | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<ApiToastState>({ visible: false, type: "success", message: "" });
+  const [simStudents, setSimStudents] = useState("10");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -334,6 +335,19 @@ export default function SaasPlansScreen() {
                 onChange={(schedule) => setForm({ ...form, schedule })}
                 error={errors.price_schedule}
               />
+            ) : null}
+            {form.billing_basis === "per_student" ? (
+              <View className="rounded-ds-md border border-border bg-surface-sunken" style={{ padding: 12, gap: 4 }}>
+                <Text className="text-sm font-semibold text-ink">Simular um mês</Text>
+                <FormInput label="Alunos com acesso ao app" valueFormat="integer" maxDigits={6} value={simStudents} onChangeText={setSimStudents} dense />
+                <Text className="text-sm font-mono text-ink">
+                  {`${Number(simStudents || 0).toLocaleString("pt-BR")} × ${fmtBrl(currencyToFloat(form.price_monthly || "0"))} + gestão ${form.offer_gestao ? fmtBrl(currencyToFloat(form.gestao_price || "0")) : "não contratada"} + painel grátis`}
+                </Text>
+                <Text className="text-sm font-semibold text-ink">
+                  {fmtBrl(Number(simStudents || 0) * currencyToFloat(form.price_monthly || "0") + (form.offer_gestao ? currencyToFloat(form.gestao_price || "0") : 0))}
+                </Text>
+                <Text className="text-xs text-ink-subtle">Usa o preço de referência. Na assinatura, a faixa de datas pode cobrar outro valor no mês.</Text>
+              </View>
             ) : null}
             <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
               <View style={{ flex: 1, minWidth: 140 }}>

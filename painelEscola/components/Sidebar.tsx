@@ -139,6 +139,7 @@ export default function Sidebar({
       items: [
         { id: "saas-plans", label: "Planos SaaS", icon: BadgeDollarSign },
         { id: "saas-subscriptions", label: "Assinaturas", icon: Repeat },
+        { id: "saas-billing", label: "Cobrança mensal", icon: ReceiptText },
       ],
     },
     {
