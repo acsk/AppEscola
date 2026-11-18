@@ -20,7 +20,7 @@ class TenantSubscription extends Model
     protected $fillable = [
         'tenant_id', 'saas_plan_id', 'status', 'billing_cycle', 'price', 'price_schedule',
         'gestao_enabled', 'gestao_price_monthly', 'discount_percent',
-        'started_at', 'trial_ends_at', 'current_period_end', 'canceled_at', 'cancel_reason',
+        'started_at', 'trial_ends_at', 'current_period_end', 'contract_starts_at', 'contract_ends_at', 'canceled_at', 'cancel_reason',
     ];
 
     protected $casts = [
@@ -32,6 +32,8 @@ class TenantSubscription extends Model
         'started_at' => 'date',
         'trial_ends_at' => 'date',
         'current_period_end' => 'date',
+        'contract_starts_at' => 'date',
+        'contract_ends_at' => 'date',
         'canceled_at' => 'datetime',
     ];
 

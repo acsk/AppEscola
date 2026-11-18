@@ -171,6 +171,8 @@ class SaasSubscriptionController extends Controller
             'started_at' => $s->started_at?->toDateString(),
             'trial_ends_at' => $s->trial_ends_at?->toDateString(),
             'current_period_end' => $s->current_period_end?->toDateString(),
+            'contract_starts_at' => $s->contract_starts_at?->toDateString(),
+            'contract_ends_at' => $s->contract_ends_at?->toDateString(),
             'canceled_at' => $s->canceled_at?->toISOString(),
             'cancel_reason' => $s->cancel_reason,
         ];

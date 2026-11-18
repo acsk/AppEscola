@@ -129,6 +129,8 @@ export type Subscription = {
   started_at: string | null;
   trial_ends_at: string | null;
   current_period_end: string | null;
+  contract_starts_at?: string | null;
+  contract_ends_at?: string | null;
   canceled_at: string | null;
   cancel_reason: string | null;
 };
@@ -201,6 +203,51 @@ export type BillingPreview = {
 export async function fetchBillingPreview(): Promise<BillingPreview> {
   return body((await api.get("/saas/billing/preview")).data);
 }
+
+export type CompetenceMonth = {
+  competence: string;
+  label: string;
+  app_students: number | null;
+  unit_price: string;
+  app_amount: string;
+  gestao_amount: string;
+  total: string;
+  status: "closed" | "preview" | "forecast";
+  status_label: string;
+  students_basis: string;
+  closed_at: string | null;
+  can_close: boolean;
+};
+
+export type CompetenceYearRow = {
+  tenant: { id: number; name: string };
+  plan: string | null;
+  contract_starts_at: string | null;
+  contract_ends_at: string | null;
+  months: CompetenceMonth[];
+  closed_total: string;
+  preview_total: string;
+  forecast_total: string;
+  year_total: string;
+};
+
+export type CompetenceYear = {
+  year: number;
+  ai_billed: boolean;
+  note: string;
+  rows: CompetenceYearRow[];
+  closed_total: string;
+  preview_total: string;
+  forecast_total: string;
+  year_total: string;
+};
+
+export async function fetchCompetenceYear(year: number): Promise<CompetenceYear> {
+  return body((await api.get("/saas/billing/year", { params: { year } })).data);
+}
+
+export const closeCompetence = (tenantId: number, competence: string) =>
+  api.post("/saas/billing/closes", { tenant_id: tenantId, competence });
 
 export async function fetchPlans(): Promise<{ plans: SaasPlan[]; features: SaasFeature[]; resources: QuotaResource[] }> {
   return body((await api.get("/saas/plans")).data);

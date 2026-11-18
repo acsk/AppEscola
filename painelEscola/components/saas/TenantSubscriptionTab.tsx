@@ -277,6 +277,7 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
                   { label: "Painel", value: "Grátis", text: true },
                   { label: "Desconto", value: Number(s.discount_percent) ? `${Number(s.discount_percent)}%` : "Sem desconto", muted: !Number(s.discount_percent) },
                   { label: "Receita mensal (MRR)", value: fmtBrl(s.monthly_revenue) },
+                  ...(s.contract_starts_at ? [{ label: "Contrato anual", value: `${fmtIsoDate(s.contract_starts_at)} a ${fmtIsoDate(s.contract_ends_at)}`, text: true }] : []),
                   { label: "Início", value: fmtIsoDate(s.started_at) },
                   { label: "Teste até", value: s.trial_ends_at ? fmtIsoDate(s.trial_ends_at) : "Sem teste", muted: !s.trial_ends_at },
                   { label: "Próximo vencimento", value: fmtIsoDate(s.current_period_end) },

@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\Cora\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\Saas\SaasBillingPreviewController;
+use App\Http\Controllers\Api\Saas\SaasCompetenceController;
 use App\Http\Controllers\Api\Saas\SaasController;
 use App\Http\Controllers\Api\Saas\GlobalAdminController;
 use App\Http\Controllers\Api\Saas\SaasFeatureController;
@@ -271,6 +272,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         Route::put('features/{feature:key}', [SaasFeatureController::class, 'update']);
         Route::get('subscriptions', [SaasSubscriptionController::class, 'index']);
         Route::get('billing/preview', [SaasBillingPreviewController::class, 'index']);
+        Route::get('billing/year', [SaasCompetenceController::class, 'index']);
+        Route::post('billing/closes', [SaasCompetenceController::class, 'store']);
         Route::get('tenants/{tenant}/subscription', [SaasSubscriptionController::class, 'show']);
         Route::post('tenants/{tenant}/subscription', [SaasSubscriptionController::class, 'store']);
         Route::post('tenants/{tenant}/subscription/change-plan', [SaasSubscriptionController::class, 'changePlan']);

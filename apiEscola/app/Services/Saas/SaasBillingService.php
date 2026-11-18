@@ -11,12 +11,9 @@ use Illuminate\Validation\ValidationException;
  */
 class SaasBillingService
 {
-    /** @var array<int, int> */
-    private array $appStudents = [];
-
     public function appStudents(int $tenantId): int
     {
-        return $this->appStudents[$tenantId] ??= Student::query()
+        return Student::query()
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
             ->whereNotNull('user_id')

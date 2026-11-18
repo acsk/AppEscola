@@ -47,7 +47,7 @@ class SaasSubscriptionService
                 'started_at' => $today,
                 'trial_ends_at' => $trialDays > 0 ? $today->copy()->addDays($trialDays) : null,
                 'current_period_end' => $trialDays > 0 ? $today->copy()->addDays($trialDays) : $this->periodEnd($today, $cycle),
-            ] + $this->commercialTerms($plan, $cycle));
+            ] + $this->commercialTerms($plan, $cycle) + $this->annualContract($plan));
             $this->event($subscription, 'created', $actor, null, $plan->id, 0.0, ['billing_cycle' => $cycle, 'trial_days' => $trialDays]);
 
             return $subscription;
@@ -230,6 +230,16 @@ class SaasSubscriptionService
         });
 
         return $counts;
+    }
+
+    /** @return array{contract_starts_at?: string, contract_ends_at?: string} */
+    private function annualContract(SaasPlan $plan): array
+    {
+        if ($plan->slug !== 'conectivo-reforco') {
+            return [];
+        }
+
+        return ['contract_starts_at' => '2026-01-01', 'contract_ends_at' => '2026-12-31'];
     }
 
     /** @return array{price: string, price_schedule: array<int, mixed>|null, gestao_enabled: bool, gestao_price_monthly: float|string} */
