@@ -30,6 +30,7 @@ import { fetchAddressByCEP } from "../../utils/cep";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { prepareImageForUpload } from "../../utils/imageCompression";
 import { color } from "../../constants/theme";
+import TenantTestStudents from "../../components/tenants/TenantTestStudents";
 import { clearTenantFeature, clearTenantQuota, fetchPlans, fetchTenantFeatures, fetchTenantQuotas, fetchTenantSubscription, fmtBrl, setTenantFeature, setTenantQuota, subscriptionAction, type QuotaResource, type SaasFeature, type SaasPlan } from "../../services/saas";
 
 type Props = {
@@ -89,7 +90,7 @@ const STEPS = [
   { title: "Instituição", hint: "dados e endereço" },
   { title: "Administrador", hint: "acesso inicial" },
   { title: "Plano", hint: "escolha e limites" },
-  { title: "Configurações", hint: "subdomínio e fuso" },
+  { title: "Configurações", hint: "subdomínio, fuso e testes" },
   { title: "Confirmação", hint: "resumo" },
 ];
 
@@ -650,11 +651,12 @@ export default function TenantFormScreen({ navigate, tenantId }: Props) {
               ) : null}
 
               {step === 3 ? (
-                <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 20 }}>
+                <View className="bg-surface border border-border rounded-ds-md" style={{ padding: 20, gap: 8 }}>
                   <Text className="text-sm font-semibold text-ink">Configurações</Text>
                   <FormInput label="Subdomínio" required value={form.slug} onChangeText={(value) => set({ slug: slugify(value) })} error={errors.slug} autoCapitalize="none" placeholder="ex.: conectivo" />
                   <FormSelect label="Fuso horário" value={form.timezone} onChange={(value) => set({ timezone: value })} options={TIMEZONES} />
                   <FormSelect label={isEdit ? "Situação" : "Situação inicial"} value={form.status} onChange={(value) => set({ status: value })} options={[{ value: "active", label: "Ativa" }, { value: "inactive", label: "Inativa" }]} />
+                  {isEdit && tenantId ? <TenantTestStudents tenantId={tenantId} /> : <Text className="text-xs text-ink-muted">Os alunos de teste são marcados aqui depois que a instituição existir.</Text>}
                 </View>
               ) : null}
 

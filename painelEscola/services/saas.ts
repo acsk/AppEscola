@@ -224,6 +224,7 @@ export type CompetenceYearRow = {
   plan: string | null;
   contract_starts_at: string | null;
   contract_ends_at: string | null;
+  test_students?: number;
   months: CompetenceMonth[];
   closed_total: string;
   preview_total: string;
@@ -292,6 +293,23 @@ export async function fetchTenantQuotas(tenantId: number): Promise<{ legacy: boo
 
 export const setTenantQuota = (tenantId: number, resource: string, limit: number | null, reason: string) => api.put(`/saas/tenants/${tenantId}/quotas/${resource}`, { limit, reason });
 export const clearTenantQuota = (tenantId: number, resource: string) => api.delete(`/saas/tenants/${tenantId}/quotas/${resource}`);
+
+export type BillingTestStudent = {
+  id: number;
+  name: string;
+  enrollment_number: string | null;
+  email: string | null;
+  excluded: boolean;
+};
+
+export async function fetchBillingExclusions(tenantId: number, search = ""): Promise<{ excluded: BillingTestStudent[]; matches: BillingTestStudent[] }> {
+  const { data } = await api.get(`/saas/tenants/${tenantId}/billing-exclusions`, { params: search.trim() ? { search } : {} });
+  const payload = body(data);
+  return { excluded: payload.excluded ?? [], matches: payload.matches ?? [] };
+}
+
+export const setBillingExclusion = (tenantId: number, studentId: number, excluded: boolean) =>
+  api.put(`/saas/tenants/${tenantId}/billing-exclusions/${studentId}`, { excluded });
 
 export async function fetchTenantAudit(tenantId: number): Promise<AuditItem[]> {
   return body((await api.get(`/saas/tenants/${tenantId}/audit`)).data).items ?? [];

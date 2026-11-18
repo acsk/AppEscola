@@ -2,6 +2,7 @@
 
 namespace App\Services\Saas;
 
+use App\Models\SaasBillingExclusion;
 use App\Models\SaasCompetenceClose;
 use App\Models\Tenant;
 use App\Models\TenantSubscription;
@@ -37,7 +38,12 @@ class SaasCompetenceService
             ->get()
             ->keyBy(fn (SaasCompetenceClose $close) => $close->tenant_id.'|'.$close->competence->format('Y-m'));
 
-        $rows = TenantSubscription::query()->with(['tenant', 'plan'])->get()->map(function (TenantSubscription $subscription) use ($year, $today, $closes) {
+        $testStudents = SaasBillingExclusion::query()
+            ->selectRaw('tenant_id, COUNT(*) as total')
+            ->groupBy('tenant_id')
+            ->pluck('total', 'tenant_id');
+
+        $rows = TenantSubscription::query()->with(['tenant', 'plan'])->get()->map(function (TenantSubscription $subscription) use ($year, $today, $closes, $testStudents) {
             $months = [];
             $totals = ['closed' => 0.0, 'preview' => 0.0, 'forecast' => 0.0];
             $students = $subscription->isPerStudent() ? $this->billing->appStudents((int) $subscription->tenant_id) : null;
@@ -56,6 +62,7 @@ class SaasCompetenceService
                 'plan' => $subscription->plan?->name,
                 'contract_starts_at' => $subscription->contract_starts_at?->toDateString(),
                 'contract_ends_at' => $subscription->contract_ends_at?->toDateString(),
+                'test_students' => (int) ($testStudents[$subscription->tenant_id] ?? 0),
                 'months' => $months,
                 'closed_total' => $this->money($totals['closed']),
                 'preview_total' => $this->money($totals['preview']),
@@ -69,7 +76,7 @@ class SaasCompetenceService
         return [
             'year' => $year,
             'ai_billed' => false,
-            'note' => 'Contrato anual cobrado mês a mês. A prévia e a previsão usam os alunos com acesso ao app de hoje, porque não há foto dos meses anteriores. Ao fechar, essa quantidade e o valor ficam gravados. As chaves de OpenRouter e GPT são do cliente: o uso e o custo de IA não entram nesta cobrança.',
+            'note' => 'Contrato anual cobrado mês a mês. A prévia e a previsão usam os alunos com acesso ao app de hoje, porque não há foto dos meses anteriores. Alunos marcados como teste nas configurações da instituição ficam de fora dos meses abertos. Ao fechar, essa quantidade e o valor ficam gravados. As chaves de OpenRouter e GPT são do cliente: o uso e o custo de IA não entram nesta cobrança.',
             'rows' => $rows->all(),
             'closed_total' => $this->money($sum('closed_total')),
             'preview_total' => $this->money($sum('preview_total')),

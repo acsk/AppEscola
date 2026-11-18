@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\TenantBillingSettingsController;
 use App\Http\Controllers\Api\Cora\TenantCoraSettingsController;
 use App\Http\Controllers\Api\TenantController;
 use App\Http\Controllers\Api\Saas\SaasBillingPreviewController;
+use App\Http\Controllers\Api\Saas\SaasBillingExclusionController;
 use App\Http\Controllers\Api\Saas\SaasCompetenceController;
 use App\Http\Controllers\Api\Saas\SaasController;
 use App\Http\Controllers\Api\Saas\GlobalAdminController;
@@ -290,6 +291,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         Route::put('tenants/{tenant}/quotas/{resource}', [SaasTenantEntitlementController::class, 'setQuota']);
         Route::delete('tenants/{tenant}/quotas/{resource}', [SaasTenantEntitlementController::class, 'clearQuota']);
         Route::get('tenants/{tenant}/audit', [SaasTenantEntitlementController::class, 'audit']);
+        Route::get('tenants/{tenant}/billing-exclusions', [SaasBillingExclusionController::class, 'index']);
+        Route::put('tenants/{tenant}/billing-exclusions/{student}', [SaasBillingExclusionController::class, 'update'])->whereNumber('student');
 
         // Fase 3: monitoramento, relatórios, auditoria global e administradores globais
         Route::get('monitoring', [SaasOperationsController::class, 'monitoring']);

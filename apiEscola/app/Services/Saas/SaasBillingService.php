@@ -7,7 +7,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Cobrança SaaS por aluno com acesso ao app.
- * Conta aluno ativo, com usuário ativo, que não esteja com matrícula bloqueada.
+ * Conta aluno ativo, com usuário ativo, que não esteja com matrícula bloqueada
+ * e que não tenha sido marcado como teste nas configurações da instituição.
  */
 class SaasBillingService
 {
@@ -19,6 +20,7 @@ class SaasBillingService
             ->whereNotNull('user_id')
             ->whereHas('user', fn ($q) => $q->where('status', 'active'))
             ->whereDoesntHave('enrollments', fn ($q) => $q->whereNotNull('blocked_at')->where('status', '!=', 'cancelled'))
+            ->whereDoesntHave('saasBillingExclusion', fn ($q) => $q->whereColumn('saas_billing_exclusions.tenant_id', 'students.tenant_id'))
             ->count();
     }
 

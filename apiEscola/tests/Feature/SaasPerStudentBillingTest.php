@@ -160,6 +160,65 @@ class SaasPerStudentBillingTest extends TestCase
         ])->assertUnprocessable();
     }
 
+    public function test_test_students_marked_on_the_tenant_stay_out_of_open_months(): void
+    {
+        Carbon::setTestNow('2026-11-18 15:00:00');
+        $tenant = Tenant::factory()->create();
+        $this->studentWithApp($tenant);
+        $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'aluno', 'status' => 'active']);
+        $testStudent = Student::factory()->create([
+            'tenant_id' => $tenant->id,
+            'user_id' => $user->id,
+            'status' => 'active',
+            'name' => 'Aluno Teste',
+        ]);
+        Sanctum::actingAs(User::factory()->superAdmin()->create());
+
+        $this->postJson('/api/saas/plans', $this->planPayload([
+            'name' => 'Contrato testes',
+            'price_schedule' => [
+                ['from' => '2026-01-01', 'until' => '2026-06-30', 'price' => 15],
+                ['from' => '2026-07-01', 'until' => '2026-12-31', 'price' => 20],
+            ],
+        ]))->assertCreated();
+        $plan = SaasPlan::query()->where('name', 'Contrato testes')->firstOrFail();
+        $this->postJson("/api/saas/tenants/{$tenant->id}/subscription", [
+            'saas_plan_id' => $plan->id,
+            'billing_cycle' => 'monthly',
+        ])->assertCreated()->assertJsonPath('body.app_students', 2);
+
+        $this->getJson("/api/saas/tenants/{$tenant->id}/billing-exclusions?search=teste")
+            ->assertOk()
+            ->assertJsonPath('body.matches.0.id', $testStudent->id)
+            ->assertJsonPath('body.matches.0.excluded', false);
+
+        $this->putJson("/api/saas/tenants/{$tenant->id}/billing-exclusions/{$testStudent->id}", ['excluded' => true])
+            ->assertOk()
+            ->assertJsonPath('body.excluded', true);
+
+        $this->getJson("/api/saas/tenants/{$tenant->id}/subscription")
+            ->assertOk()
+            ->assertJsonPath('body.subscription.app_students', 1);
+
+        $this->getJson('/api/saas/billing/year?year=2026')->assertOk()
+            ->assertJsonPath('body.rows.0.test_students', 1)
+            ->assertJsonPath('body.rows.0.months.10.app_students', 1)
+            ->assertJsonPath('body.rows.0.months.10.total', '20.00');
+
+        $this->postJson('/api/saas/billing/closes', [
+            'tenant_id' => $tenant->id,
+            'competence' => '2026-11',
+        ])->assertOk()->assertJsonPath('body.app_students', 1);
+
+        $this->putJson("/api/saas/tenants/{$tenant->id}/billing-exclusions/{$testStudent->id}", ['excluded' => false])
+            ->assertOk();
+
+        $this->getJson('/api/saas/billing/year?year=2026')->assertOk()
+            ->assertJsonPath('body.rows.0.test_students', 0)
+            ->assertJsonPath('body.rows.0.months.10.app_students', 1)
+            ->assertJsonPath('body.rows.0.months.9.app_students', 2);
+    }
+
     public function test_overlapping_price_schedule_is_rejected(): void
     {
         Sanctum::actingAs(User::factory()->superAdmin()->create());

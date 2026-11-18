@@ -110,6 +110,7 @@ export default function SaasYearCloseScreen({ navigate }: Props) {
               <Badge label={`${fmtIsoDate(row.contract_starts_at)} a ${fmtIsoDate(row.contract_ends_at)}`} tone="brand" />
             ) : null}
             <Text className="text-sm font-mono text-ink">{`Ano ${fmtBrl(row.year_total)}`}</Text>
+            {(row.test_students ?? 0) > 0 ? <Badge label={`${row.test_students} de teste fora`} tone="neutral" /> : null}
           </View>
           <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={isMobile}>
             <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: isMobile ? 860 : undefined }}>
