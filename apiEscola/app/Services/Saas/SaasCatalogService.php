@@ -14,6 +14,7 @@ class SaasCatalogService
     public function __construct(
         private readonly SaasEntitlementService $entitlements,
         private readonly SaasAuditService $audit,
+        private readonly SaasBillingService $billing,
     ) {
     }
 
@@ -22,15 +23,22 @@ class SaasCatalogService
     {
         $data['limits'] = $this->normalizeLimits($data['limits'] ?? []);
         $data['features'] = array_values(array_unique($data['features'] ?? []));
+        $data['billing_basis'] = ($data['billing_basis'] ?? SaasPlan::FLAT) === SaasPlan::PER_STUDENT ? SaasPlan::PER_STUDENT : SaasPlan::FLAT;
+        $data['gestao_price_monthly'] = ($data['offer_gestao'] ?? false) ? ($data['gestao_price_monthly'] ?? 0) : null;
+        $data['price_schedule'] = $data['billing_basis'] === SaasPlan::PER_STUDENT
+            ? $this->billing->normalizeSchedule($data['price_schedule'] ?? null)
+            : null;
+        unset($data['offer_gestao']);
+        $tracked = ['name', 'price_monthly', 'price_yearly', 'billing_basis', 'gestao_price_monthly', 'price_schedule', 'trial_days', 'status', 'limits', 'features'];
         $creating = $plan === null;
         $plan ??= new SaasPlan(['slug' => $this->uniqueSlug($data['name'])]);
-        $before = $creating ? null : $plan->only(['name', 'price_monthly', 'price_yearly', 'trial_days', 'status', 'limits', 'features']);
+        $before = $creating ? null : $plan->only($tracked);
 
         $plan->fill($data)->save();
 
         $this->audit->log($actor, null, $creating ? 'plan.created' : 'plan.updated', ($creating ? 'Plano criado: ' : 'Plano alterado: ').$plan->name, $creating ? null : [
             'before' => $before,
-            'after' => $plan->only(['name', 'price_monthly', 'price_yearly', 'trial_days', 'status', 'limits', 'features']),
+            'after' => $plan->only($tracked),
         ]);
         $this->entitlements->flush();
 

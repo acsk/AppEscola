@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\Saas;
 
 use App\Http\Controllers\Controller;
+use App\Models\SaasPlan;
 use App\Models\Tenant;
 use App\Models\TenantSubscription;
+use App\Services\Saas\SaasBillingService;
 use App\Services\Saas\SaasSubscriptionService;
+use App\Support\BusinessDate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,7 +29,7 @@ class SaasSubscriptionController extends Controller
         ]);
 
         $page = Tenant::query()
-            ->with('subscription.plan:id,name')
+            ->with('subscription.plan:id,name,billing_basis')
             ->when($data['search'] ?? null, fn ($q, $v) => $q->where(fn ($s) => $s->where('name', 'like', "%{$v}%")->orWhere('corporate_name', 'like', "%{$v}%")))
             ->when(($data['status'] ?? null) === 'legacy', fn ($q) => $q->doesntHave('subscription'))
             ->when(($data['status'] ?? null) && $data['status'] !== 'legacy', fn ($q) => $q->whereHas('subscription', fn ($s) => $s->where('status', $data['status'])))
@@ -112,6 +115,26 @@ class SaasSubscriptionController extends Controller
         return $this->success($this->present($this->subscriptions->setDiscount($this->current($tenant), (float) $data['discount_percent'], $request->user())), 'Desconto atualizado.');
     }
 
+    public function pricing(Request $request, Tenant $tenant): JsonResponse
+    {
+        $data = $request->validate([
+            'gestao_enabled' => ['required', 'boolean'],
+            'gestao_price_monthly' => ['required', 'numeric', 'min:0', 'max:9999999'],
+            'price' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
+            'price_schedule' => ['nullable', 'array', 'max:24'],
+            'price_schedule.*.from' => ['required', 'date_format:Y-m-d'],
+            'price_schedule.*.until' => ['nullable', 'date_format:Y-m-d'],
+            'price_schedule.*.price' => ['required', 'numeric', 'min:0', 'max:9999999'],
+        ], [], [
+            'gestao_enabled' => 'módulo gestão',
+            'gestao_price_monthly' => 'valor da gestão',
+            'price' => 'preço de referência',
+            'price_schedule' => 'faixa de preço',
+        ]);
+
+        return $this->success($this->present($this->subscriptions->updatePricing($this->current($tenant), $data, $request->user())), 'Valores da assinatura atualizados.');
+    }
+
     private function current(Tenant $tenant): TenantSubscription
     {
         $subscription = TenantSubscription::query()->with('plan')->where('tenant_id', $tenant->id)->first();
@@ -122,14 +145,28 @@ class SaasSubscriptionController extends Controller
 
     private function present(TenantSubscription $s): array
     {
+        $perStudent = $s->isPerStudent();
+        $amount = $s->monthlyAmount();
+        $cycleTotal = $perStudent
+            ? ($s->billing_cycle === 'yearly' ? $amount * 12 : $amount)
+            : (float) $s->price * (1 - (float) $s->discount_percent / 100);
+
         return [
             'id' => $s->id,
             'plan' => $s->plan ? ['id' => $s->plan->id, 'name' => $s->plan->name] : null,
             'status' => $s->status,
             'billing_cycle' => $s->billing_cycle,
+            'billing_basis' => $perStudent ? SaasPlan::PER_STUDENT : SaasPlan::FLAT,
             'price' => (string) $s->price,
+            'unit_price' => $perStudent ? number_format($s->unitPriceOn(BusinessDate::today()), 2, '.', '') : null,
+            'app_students' => $perStudent ? app(SaasBillingService::class)->appStudents((int) $s->tenant_id) : null,
+            'price_schedule' => $perStudent ? ($s->price_schedule ?? []) : null,
+            'gestao_enabled' => (bool) $s->gestao_enabled,
+            'gestao_price_monthly' => number_format((float) $s->gestao_price_monthly, 2, '.', ''),
+            'painel_included' => true,
             'discount_percent' => (string) $s->discount_percent,
-            'net_price' => number_format((float) $s->price * (1 - (float) $s->discount_percent / 100), 2, '.', ''),
+            'net_price' => number_format($cycleTotal, 2, '.', ''),
+            'monthly_amount' => number_format($amount, 2, '.', ''),
             'monthly_revenue' => number_format($s->monthlyRevenue(), 2, '.', ''),
             'started_at' => $s->started_at?->toDateString(),
             'trial_ends_at' => $s->trial_ends_at?->toDateString(),

@@ -129,7 +129,11 @@ export default function SaasSubscriptionsScreen({ navigate }: Props) {
                     </TouchableOpacity>
                     <View style={{ flex: 1.4, minWidth: 120 }}>
                       <Text className="text-sm text-ink" numberOfLines={1}>{s?.plan?.name ?? "—"}</Text>
-                      {s ? <Text className="text-xs text-ink-subtle">{cycleLabel(s.billing_cycle)}</Text> : null}
+                      {s?.billing_basis === "per_student" ? (
+                        <Text className="text-xs text-ink-subtle">{`${s.app_students ?? 0} alunos · ${fmtBrl(s.unit_price)}`}</Text>
+                      ) : s ? (
+                        <Text className="text-xs text-ink-subtle">{cycleLabel(s.billing_cycle)}</Text>
+                      ) : null}
                     </View>
                     <View style={{ flex: 1.2, minWidth: 110, alignItems: "flex-end" }}>
                       <Text className="text-sm font-mono text-ink">{s ? fmtBrl(s.net_price) : "—"}</Text>

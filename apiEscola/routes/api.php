@@ -277,6 +277,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         Route::post('tenants/{tenant}/subscription/reactivate', [SaasSubscriptionController::class, 'reactivate']);
         Route::post('tenants/{tenant}/subscription/extend-trial', [SaasSubscriptionController::class, 'extendTrial']);
         Route::put('tenants/{tenant}/subscription/discount', [SaasSubscriptionController::class, 'discount']);
+        Route::post('tenants/{tenant}/subscription/pricing', [SaasSubscriptionController::class, 'pricing']);
         Route::get('tenants/{tenant}/features', [SaasTenantEntitlementController::class, 'features']);
         Route::put('tenants/{tenant}/features/{feature:key}', [SaasTenantEntitlementController::class, 'setFeature'])->withoutScopedBindings();
         Route::delete('tenants/{tenant}/features/{feature:key}', [SaasTenantEntitlementController::class, 'clearFeature'])->withoutScopedBindings();

@@ -8,6 +8,8 @@ use Illuminate\Database\Seeder;
 /**
  * Planos sugeridos (Básico, Profissional, Enterprise). Opcional: `php artisan db:seed --class=SaasPlanSeeder`.
  * Não sobrescreve planos existentes; nomes, preços e limites se ajustam depois na tela de Planos SaaS.
+ * O plano do Conectivo Reforço (por aluno, R$ 15 de jan a jun/2027 e R$ 20 depois) entra na migration
+ * 2026_11_18_120000_add_per_student_billing_to_saas_plans.
  */
 class SaasPlanSeeder extends Seeder
 {

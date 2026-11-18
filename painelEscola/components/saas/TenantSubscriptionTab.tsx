@@ -8,7 +8,9 @@ import FormInput from "../ui/FormInput";
 import FormSelect from "../ui/FormSelect";
 import DefinitionRows from "../ui/DefinitionRows";
 import { color } from "../../constants/theme";
+import { currencyToFloat, floatToCurrency } from "../../utils/masks";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast, type ApiToastState } from "../../utils/apiErrors";
+import PriceScheduleFields, { type PriceTierForm } from "./PriceScheduleFields";
 import {
   cycleLabel,
   fetchPlans,
@@ -31,7 +33,20 @@ type Props = {
   onChanged?: () => void;
 };
 
-type Mode = "subscribe" | "change" | "renew" | "cancel" | "reactivate" | "trial" | "discount";
+type Mode = "subscribe" | "change" | "renew" | "cancel" | "reactivate" | "trial" | "discount" | "pricing";
+
+type FormState = {
+  plan: string;
+  cycle: string;
+  trial: string;
+  discount: string;
+  days: string;
+  reason: string;
+  gestao: boolean;
+  gestaoPrice: string;
+  fallbackPrice: string;
+  tiers: PriceTierForm[];
+};
 
 const EVENT_LABEL: Record<string, string> = {
   created: "Assinatura contratada",
@@ -43,6 +58,7 @@ const EVENT_LABEL: Record<string, string> = {
   trial_expired: "Teste expirado",
   past_due: "Vencimento em atraso",
   discount_changed: "Desconto alterado",
+  pricing_changed: "Valores ajustados",
 };
 
 const CYCLE_OPTIONS = [
@@ -58,6 +74,7 @@ const MODE_TITLE: Record<Mode, string> = {
   reactivate: "Reativar assinatura",
   trial: "Estender período de teste",
   discount: "Alterar desconto",
+  pricing: "Ajustar valores",
 };
 
 function eventDetail(e: SubscriptionEvent): string {
@@ -68,7 +85,34 @@ function eventDetail(e: SubscriptionEvent): string {
   if (e.type === "trial_extended") return `+${d.days} dias, até ${fmtIsoDate(d.trial_ends_at)}`;
   if (e.type === "renewed") return `Vencimento em ${fmtIsoDate(d.current_period_end)}`;
   if (e.type === "discount_changed") return `${d.from}% → ${d.to}%`;
+  if (e.type === "pricing_changed") return d.gestao_enabled ? `Gestão ${fmtBrl(d.gestao_price_monthly)}` : "Gestão não contratada";
   return "";
+}
+
+function scheduleText(tiers: Subscription["price_schedule"]): string {
+  if (!tiers?.length) return "Sem faixa: vale o preço fora das faixas.";
+  return tiers
+    .map((tier) => `${fmtIsoDate(tier.from)}${tier.until ? ` até ${fmtIsoDate(tier.until)}` : " em diante"}: ${fmtBrl(tier.price)}`)
+    .join(" · ");
+}
+
+function gestaoLabel(subscription: Subscription): string {
+  if (!subscription.gestao_enabled) return "Não contratada";
+  return Number(subscription.gestao_price_monthly ?? 0) === 0 ? "Grátis" : `${fmtBrl(subscription.gestao_price_monthly)}/mês`;
+}
+
+function planOffer(plan: SaasPlan, cycle: string): string {
+  if (plan.billing_basis === "per_student") {
+    const gestao = plan.gestao_price_monthly == null
+      ? "Gestão não inclusa."
+      : Number(plan.gestao_price_monthly) === 0
+        ? "Gestão grátis."
+        : `Gestão ${fmtBrl(plan.gestao_price_monthly)}/mês.`;
+    const tiers = plan.price_schedule?.length ? ` ${plan.price_schedule.length} faixas.` : "";
+    return `${fmtBrl(plan.price_monthly)} por aluno com acesso ao app.${tiers} Painel grátis. ${gestao}`;
+  }
+  const amount = cycle === "yearly" ? (plan.price_yearly ?? Number(plan.price_monthly) * 12) : plan.price_monthly;
+  return `Valor do ciclo: ${fmtBrl(amount)}.`;
 }
 
 /** Aba Assinatura do detalhe do tenant: contratar, trocar plano, renovar, cancelar, reativar, teste e desconto. */
@@ -79,7 +123,7 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<Mode | null>(null);
-  const [form, setForm] = useState({ plan: "", cycle: "monthly", trial: "", discount: "", days: "7", reason: "" });
+  const [form, setForm] = useState<FormState>({ plan: "", cycle: "monthly", trial: "", discount: "", days: "7", reason: "", gestao: false, gestaoPrice: "", fallbackPrice: "", tiers: [] });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -103,7 +147,10 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
   }, [load]);
 
   const activePlans = plans.filter((p) => p.status === "active");
-  const planOptions = [{ value: "", label: "Selecione o plano" }, ...activePlans.map((p) => ({ value: String(p.id), label: `${p.name} · ${fmtBrl(p.price_monthly)}/mês` }))];
+  const planOptions = [{ value: "", label: "Selecione o plano" }, ...activePlans.map((p) => ({
+    value: String(p.id),
+    label: p.billing_basis === "per_student" ? `${p.name} · ${fmtBrl(p.price_monthly)}/aluno` : `${p.name} · ${fmtBrl(p.price_monthly)}/mês`,
+  }))];
 
   const open = (next: Mode) => {
     setErrors({});
@@ -114,6 +161,10 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
       discount: subscription ? String(Number(subscription.discount_percent)) : "",
       days: "7",
       reason: "",
+      gestao: !!subscription?.gestao_enabled,
+      gestaoPrice: floatToCurrency(subscription?.gestao_price_monthly ?? 0),
+      fallbackPrice: floatToCurrency(subscription?.price ?? 0),
+      tiers: (subscription?.price_schedule ?? []).map((tier) => ({ from: tier.from, until: tier.until ?? "", price: floatToCurrency(tier.price) })),
     });
     setMode(next);
   };
@@ -124,6 +175,9 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
     if ((mode === "subscribe" || mode === "change") && !form.plan) local.saas_plan_id = "Selecione o plano.";
     if (mode === "cancel" && form.reason.trim().length < 3) local.reason = "Informe o motivo do cancelamento.";
     if (mode === "trial" && !Number(form.days)) local.days = "Informe quantos dias.";
+    if (mode === "pricing" && subscription?.billing_basis === "per_student" && form.tiers.some((tier) => (tier.from || tier.until || tier.price) && (!tier.from || tier.price === ""))) {
+      local.price_schedule = "Preencha a data inicial e o valor de cada faixa.";
+    }
     if (Object.keys(local).length) {
       setErrors(local);
       setToast({ visible: true, type: "error", message: Object.values(local)[0] });
@@ -148,7 +202,20 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
                 ? await subscriptionAction(tenantId, "extend-trial", { days: Number(form.days) })
                 : mode === "discount"
                   ? await setSubscriptionDiscount(tenantId, Number(form.discount.replace(",", ".") || 0))
-                  : await subscriptionAction(tenantId, mode);
+                  : mode === "pricing"
+                    ? await subscriptionAction(tenantId, "pricing", {
+                        gestao_enabled: form.gestao,
+                        gestao_price_monthly: form.gestao ? currencyToFloat(form.gestaoPrice || "0") : 0,
+                        price: subscription?.billing_basis === "per_student" ? currencyToFloat(form.fallbackPrice || "0") : undefined,
+                        price_schedule: subscription?.billing_basis === "per_student"
+                          ? form.tiers.filter((tier) => tier.from || tier.price).map((tier) => ({
+                              from: tier.from,
+                              until: tier.until || null,
+                              price: currencyToFloat(tier.price),
+                            }))
+                          : undefined,
+                      })
+                    : await subscriptionAction(tenantId, mode);
       showApiToast(setToast, response.data, "Assinatura atualizada.");
       setMode(null);
       load();
@@ -199,7 +266,15 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
               <DefinitionRows
                 rows={[
                   { label: "Ciclo", value: cycleLabel(s.billing_cycle), text: true },
-                  { label: "Valor contratado", value: fmtBrl(s.price) },
+                  ...(s.billing_basis === "per_student"
+                    ? [
+                        { label: "Alunos com acesso ao app", value: String(s.app_students ?? 0), text: true },
+                        { label: "Valor por aluno agora", value: fmtBrl(s.unit_price) },
+                        { label: "Faixas", value: scheduleText(s.price_schedule), text: true },
+                      ]
+                    : [{ label: "Valor contratado", value: fmtBrl(s.price) }]),
+                  { label: "Módulo gestão", value: gestaoLabel(s), text: true },
+                  { label: "Painel", value: "Grátis", text: true },
                   { label: "Desconto", value: Number(s.discount_percent) ? `${Number(s.discount_percent)}%` : "Sem desconto", muted: !Number(s.discount_percent) },
                   { label: "Receita mensal (MRR)", value: fmtBrl(s.monthly_revenue) },
                   { label: "Início", value: fmtIsoDate(s.started_at) },
@@ -207,13 +282,14 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
                   { label: "Próximo vencimento", value: fmtIsoDate(s.current_period_end) },
                   ...(s.cancel_reason ? [{ label: "Motivo do cancelamento", value: s.cancel_reason, text: true }] : []),
                 ]}
-                total={{ label: "Valor por ciclo", value: fmtBrl(s.net_price) }}
+                total={{ label: s.billing_basis === "per_student" ? "Mensal estimado" : "Valor por ciclo", value: fmtBrl(s.billing_basis === "per_student" ? s.monthly_amount : s.net_price) }}
               />
             </Panel>
           </View>
           <View style={{ flex: 1, minWidth: isMobile ? "100%" : 280 }}>
             <Panel title="Ações" description="Ainda sem cobrança automática: o vencimento serve para acompanhamento e MRR.">
               <View style={{ gap: 8 }}>
+                <Button label="Ajustar valores" onPress={() => open("pricing")} fullWidth />
                 {open_ ? <Button label="Trocar plano (upgrade/downgrade)" onPress={() => open("change")} fullWidth /> : null}
                 {open_ ? <Button label="Registrar renovação" onPress={() => open("renew")} fullWidth /> : null}
                 {s.status === "trialing" || s.status === "expired" ? <Button label="Estender período de teste" onPress={() => open("trial")} fullWidth /> : null}
@@ -247,7 +323,7 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
         visible={!!mode}
         title={mode ? MODE_TITLE[mode] : ""}
         onClose={() => setMode(null)}
-        size="md"
+        size={mode === "pricing" ? "lg" : "md"}
         compact
         footer={
           <View className="flex-row justify-end" style={{ gap: 8 }}>
@@ -263,8 +339,8 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
               <FormSelect label="Ciclo de cobrança" value={form.cycle} options={CYCLE_OPTIONS} onChange={(v) => setForm({ ...form, cycle: v })} />
               {selectedPlan ? (
                 <Text className="text-xs text-ink-muted">
-                  {`Valor do ciclo: ${fmtBrl(form.cycle === "yearly" ? (selectedPlan.price_yearly ?? Number(selectedPlan.price_monthly) * 12) : selectedPlan.price_monthly)}`}
-                  {mode === "change" ? " · vale a partir de agora. Downgrade é recusado se o uso atual passar dos novos limites." : ""}
+                  {planOffer(selectedPlan, form.cycle)}
+                  {mode === "change" ? " Vale a partir de agora. Downgrade é recusado se o uso atual passar dos novos limites. A faixa e a gestão voltam ao padrão do plano." : ""}
                 </Text>
               ) : null}
             </>
@@ -280,6 +356,27 @@ export default function TenantSubscriptionTab({ tenantId, isMobile, setToast, on
             </View>
           ) : null}
           {mode === "discount" ? <FormInput label="Desconto (%)" valueFormat="decimal" value={form.discount} onChangeText={(v) => setForm({ ...form, discount: v })} error={errors.discount_percent} /> : null}
+          {mode === "pricing" ? (
+            <>
+              <FormSelect
+                label="Módulo gestão"
+                value={form.gestao ? "1" : "0"}
+                options={[{ value: "1", label: "Contratado" }, { value: "0", label: "Não contratado" }]}
+                onChange={(v) => setForm({ ...form, gestao: v === "1" })}
+              />
+              {form.gestao ? (
+                <FormInput label="Valor mensal da gestão (R$)" valueFormat="currency" value={form.gestaoPrice} onChangeText={(v) => setForm({ ...form, gestaoPrice: v })} placeholder="0,00 = grátis" error={errors.gestao_price_monthly} />
+              ) : (
+                <Text className="text-xs text-ink-muted">A gestão fica de fora do valor. O painel continua grátis.</Text>
+              )}
+              {subscription?.billing_basis === "per_student" ? (
+                <>
+                  <FormInput label="Preço por aluno fora das faixas (R$)" valueFormat="currency" value={form.fallbackPrice} onChangeText={(v) => setForm({ ...form, fallbackPrice: v })} placeholder="0,00" />
+                  <PriceScheduleFields tiers={form.tiers} onChange={(tiers) => setForm({ ...form, tiers })} error={errors.price_schedule} />
+                </>
+              ) : null}
+            </>
+          ) : null}
           {mode === "trial" ? <FormInput label="Dias a mais" valueFormat="integer" maxDigits={3} value={form.days} onChangeText={(v) => setForm({ ...form, days: v })} error={errors.days} /> : null}
           {mode === "cancel" ? (
             <>

@@ -31,7 +31,7 @@ class SaasInsightsService
     private function buildInsights(): array
     {
         $today = BusinessDate::today();
-        $subs = TenantSubscription::query()->get();
+        $subs = TenantSubscription::query()->with('plan')->get();
         $paying = $subs->filter(fn (TenantSubscription $s) => $s->monthlyRevenue() > 0);
         $mrr = round($paying->sum(fn (TenantSubscription $s) => $s->monthlyRevenue()), 2);
         $arpa = $paying->count() ? round($mrr / $paying->count(), 2) : 0.0;

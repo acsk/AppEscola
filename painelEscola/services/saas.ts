@@ -80,6 +80,8 @@ export type QuotaResource = { key: string; label: string; unit: string; monthly:
 
 export type SaasFeature = { key: string; name: string; description: string | null; global_status: "enabled" | "beta" | "disabled" };
 
+export type PriceScheduleTier = { from: string; until: string | null; price: string };
+
 export type SaasPlan = {
   id: number;
   name: string;
@@ -87,6 +89,9 @@ export type SaasPlan = {
   description: string | null;
   price_monthly: string;
   price_yearly: string | null;
+  billing_basis?: "flat" | "per_student";
+  gestao_price_monthly?: string | null;
+  price_schedule?: PriceScheduleTier[] | null;
   trial_days: number;
   status: "active" | "inactive";
   limits: Record<string, number | null> | null;
@@ -95,10 +100,14 @@ export type SaasPlan = {
   subscriptions_count: number;
 };
 
-export type SaasPlanPayload = Omit<SaasPlan, "id" | "slug" | "subscriptions_count" | "price_monthly" | "price_yearly" | "limits"> & {
+export type SaasPlanPayload = Omit<SaasPlan, "id" | "slug" | "subscriptions_count" | "price_monthly" | "price_yearly" | "limits" | "gestao_price_monthly" | "price_schedule"> & {
   price_monthly: number;
   price_yearly: number | null;
   limits: Record<string, number | null>;
+  billing_basis: "flat" | "per_student";
+  offer_gestao: boolean;
+  gestao_price_monthly: number | null;
+  price_schedule: { from: string; until: string | null; price: number }[] | null;
 };
 
 export type Subscription = {
@@ -106,7 +115,14 @@ export type Subscription = {
   plan: { id: number; name: string } | null;
   status: "trialing" | "active" | "past_due" | "canceled" | "expired";
   billing_cycle: "monthly" | "yearly";
+  billing_basis?: "flat" | "per_student";
   price: string;
+  unit_price?: string | null;
+  app_students?: number | null;
+  price_schedule?: PriceScheduleTier[] | null;
+  gestao_enabled?: boolean;
+  gestao_price_monthly?: string;
+  monthly_amount?: string;
   discount_percent: string;
   net_price: string;
   monthly_revenue: string;
@@ -182,7 +198,7 @@ export async function fetchTenantSubscription(tenantId: number): Promise<{ subsc
   return body((await api.get(`/saas/tenants/${tenantId}/subscription`)).data);
 }
 
-export const subscriptionAction = (tenantId: number, action: "" | "change-plan" | "renew" | "cancel" | "reactivate" | "extend-trial", payload: Record<string, unknown> = {}) =>
+export const subscriptionAction = (tenantId: number, action: "" | "change-plan" | "renew" | "cancel" | "reactivate" | "extend-trial" | "pricing", payload: Record<string, unknown> = {}) =>
   api.post(`/saas/tenants/${tenantId}/subscription${action ? `/${action}` : ""}`, payload);
 
 export const setSubscriptionDiscount = (tenantId: number, discount_percent: number) => api.put(`/saas/tenants/${tenantId}/subscription/discount`, { discount_percent });

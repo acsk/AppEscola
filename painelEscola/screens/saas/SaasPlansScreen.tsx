@@ -18,12 +18,17 @@ import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import { currencyToFloat, floatToCurrency } from "../../utils/masks";
 import { getApiErrorMessage, getApiValidationErrors, showApiErrorToast, showApiToast, type ApiToastState } from "../../utils/apiErrors";
 import { deletePlan, fetchPlans, fmtBrl, savePlan, type QuotaResource, type SaasFeature, type SaasPlan } from "../../services/saas";
+import PriceScheduleFields, { type PriceTierForm } from "../../components/saas/PriceScheduleFields";
 
 type Form = {
   name: string;
   description: string;
+  billing_basis: "flat" | "per_student";
   price_monthly: string;
   price_yearly: string;
+  offer_gestao: boolean;
+  gestao_price: string;
+  schedule: PriceTierForm[];
   trial_days: string;
   status: "active" | "inactive";
   order: string;
@@ -34,8 +39,12 @@ type Form = {
 const emptyForm = (resources: QuotaResource[]): Form => ({
   name: "",
   description: "",
+  billing_basis: "flat",
   price_monthly: "",
   price_yearly: "",
+  offer_gestao: false,
+  gestao_price: "",
+  schedule: [],
   trial_days: "14",
   status: "active",
   order: "0",
@@ -46,8 +55,16 @@ const emptyForm = (resources: QuotaResource[]): Form => ({
 const toForm = (plan: SaasPlan, resources: QuotaResource[]): Form => ({
   name: plan.name,
   description: plan.description ?? "",
+  billing_basis: plan.billing_basis === "per_student" ? "per_student" : "flat",
   price_monthly: floatToCurrency(plan.price_monthly),
   price_yearly: plan.price_yearly ? floatToCurrency(plan.price_yearly) : "",
+  offer_gestao: plan.gestao_price_monthly != null,
+  gestao_price: plan.gestao_price_monthly != null ? floatToCurrency(plan.gestao_price_monthly) : "",
+  schedule: (plan.price_schedule ?? []).map((tier) => ({
+    from: tier.from,
+    until: tier.until ?? "",
+    price: floatToCurrency(tier.price),
+  })),
   trial_days: String(plan.trial_days),
   status: plan.status,
   order: String(plan.order ?? 0),
@@ -105,7 +122,10 @@ export default function SaasPlansScreen() {
     if (!form) return;
     const local: Record<string, string> = {};
     if (!form.name.trim()) local.name = "Informe o nome do plano.";
-    if (form.price_monthly === "") local.price_monthly = "Informe o preço mensal (pode ser 0,00).";
+    if (form.price_monthly === "") local.price_monthly = form.billing_basis === "per_student" ? "Informe o preço por aluno (pode ser 0,00)." : "Informe o preço mensal (pode ser 0,00).";
+    if (form.billing_basis === "per_student" && form.schedule.some((tier) => (tier.from || tier.until || tier.price) && (!tier.from || tier.price === ""))) {
+      local.price_schedule = "Preencha a data inicial e o valor de cada faixa.";
+    }
     if (Object.keys(local).length) {
       setErrors(local);
       setToast({ visible: true, type: "error", message: Object.values(local)[0] });
@@ -116,8 +136,18 @@ export default function SaasPlansScreen() {
       const { data } = await savePlan(editing && editing !== "new" ? editing.id : null, {
         name: form.name.trim(),
         description: form.description.trim() || null,
+        billing_basis: form.billing_basis,
         price_monthly: currencyToFloat(form.price_monthly),
-        price_yearly: form.price_yearly ? currencyToFloat(form.price_yearly) : null,
+        price_yearly: form.billing_basis === "per_student" || !form.price_yearly ? null : currencyToFloat(form.price_yearly),
+        offer_gestao: form.offer_gestao,
+        gestao_price_monthly: form.offer_gestao ? currencyToFloat(form.gestao_price || "0") : null,
+        price_schedule: form.billing_basis === "per_student"
+          ? form.schedule.filter((tier) => tier.from || tier.price).map((tier) => ({
+              from: tier.from,
+              until: tier.until || null,
+              price: currencyToFloat(tier.price),
+            }))
+          : null,
         trial_days: Number(form.trial_days || 0),
         status: form.status,
         order: Number(form.order || 0),
@@ -165,7 +195,7 @@ export default function SaasPlansScreen() {
         <PageHeader
           breadcrumb={[{ label: "Comercial" }, { label: "Planos SaaS" }]}
           title="Planos SaaS"
-          description="Planos oferecidos às instituições: preço, teste, limites e funcionalidades incluídas."
+          description="Planos oferecidos às instituições. A cobrança pode ser um valor fixo ou por aluno com acesso ao app. O painel entra sem cobrança. O módulo gestão é opcional: grátis ou com valor à parte."
           actions={<Button variant="primary" icon={Plus} label="Novo plano" onPress={() => open("new")} disabled={loading} />}
         />
 
@@ -205,8 +235,10 @@ export default function SaasPlansScreen() {
                     <Text className="text-sm font-medium text-ink" numberOfLines={1}>{plan.name}</Text>
                     <Text className="text-xs text-ink-subtle" numberOfLines={1}>{`${limitSummary(plan)} · ${(plan.features ?? []).length} funcionalidades`}</Text>
                   </View>
-                  <Text className="text-sm font-mono text-ink" style={{ flex: 1.2, minWidth: 110, textAlign: "right" }}>{fmtBrl(plan.price_monthly)}</Text>
-                  <Text className="text-sm font-mono text-ink-muted" style={{ flex: 1.2, minWidth: 110, textAlign: "right" }}>{plan.price_yearly ? fmtBrl(plan.price_yearly) : "12× mensal"}</Text>
+                  <Text className="text-sm font-mono text-ink" style={{ flex: 1.2, minWidth: 110, textAlign: "right" }}>{plan.billing_basis === "per_student" ? `${fmtBrl(plan.price_monthly)}/aluno` : fmtBrl(plan.price_monthly)}</Text>
+                  <Text className="text-sm font-mono text-ink-muted" style={{ flex: 1.2, minWidth: 110, textAlign: "right" }}>
+                    {plan.billing_basis === "per_student" ? (plan.price_schedule?.length ? `${plan.price_schedule.length} faixas` : "Sem faixa") : plan.price_yearly ? fmtBrl(plan.price_yearly) : "12× mensal"}
+                  </Text>
                   <Text className="text-sm font-mono text-ink" style={{ flex: 0.8, minWidth: 70, textAlign: "right" }}>{plan.trial_days ? `${plan.trial_days} d` : "—"}</Text>
                   <View style={{ flex: 1, minWidth: 90, paddingLeft: 16 }}>
                     <Badge label={plan.status === "active" ? "Ativo" : "Inativo"} tone={plan.status === "active" ? "success" : "neutral"} />
@@ -244,14 +276,65 @@ export default function SaasPlansScreen() {
           <View style={{ gap: 10 }}>
             <FormInput label="Nome" required value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} error={errors.name} placeholder="Ex.: Profissional" />
             <FormInput label="Descrição" value={form.description} onChangeText={(v) => setForm({ ...form, description: v })} multiline placeholder="O que o plano oferece" />
+            <FormSelect
+              label="Cobrança"
+              value={form.billing_basis}
+              options={[{ value: "flat", label: "Valor fixo por mês" }, { value: "per_student", label: "Por aluno com acesso ao app" }]}
+              onChange={(v) => setForm({ ...form, billing_basis: v as Form["billing_basis"] })}
+            />
+            <Text className="text-xs text-ink-muted">O painel administrativo entra sem cobrança.</Text>
             <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
               <View style={{ flex: 1, minWidth: 160 }}>
-                <FormInput label="Preço mensal (R$)" required valueFormat="currency" value={form.price_monthly} onChangeText={(v) => setForm({ ...form, price_monthly: v })} error={errors.price_monthly} placeholder="0,00" />
+                <FormInput
+                  label={form.billing_basis === "per_student" ? "Preço de referência por aluno (R$)" : "Preço mensal (R$)"}
+                  required
+                  valueFormat="currency"
+                  value={form.price_monthly}
+                  onChangeText={(v) => setForm({ ...form, price_monthly: v })}
+                  error={errors.price_monthly}
+                  placeholder="0,00"
+                />
               </View>
-              <View style={{ flex: 1, minWidth: 160 }}>
-                <FormInput label="Preço anual (R$)" valueFormat="currency" value={form.price_yearly} onChangeText={(v) => setForm({ ...form, price_yearly: v })} error={errors.price_yearly} placeholder="Vazio = 12× o mensal" />
-              </View>
+              {form.billing_basis === "flat" ? (
+                <View style={{ flex: 1, minWidth: 160 }}>
+                  <FormInput label="Preço anual (R$)" valueFormat="currency" value={form.price_yearly} onChangeText={(v) => setForm({ ...form, price_yearly: v })} error={errors.price_yearly} placeholder="Vazio = 12× o mensal" />
+                </View>
+              ) : null}
             </View>
+            {form.billing_basis === "per_student" ? (
+              <Text className="text-xs text-ink-muted">O preço de referência vale fora das faixas. Antes da primeira faixa, a cobrança por aluno fica zerada.</Text>
+            ) : null}
+            <Pressable
+              role="checkbox"
+              aria-checked={form.offer_gestao}
+              onPress={() => setForm({ ...form, offer_gestao: !form.offer_gestao })}
+              className={`flex-row items-center border rounded-ds-md ${form.offer_gestao ? "border-brand bg-brand-tint" : "border-border bg-surface"}`}
+              style={{ paddingHorizontal: 10, height: 40, gap: 8 }}
+            >
+              <View className={`items-center justify-center border rounded-ds-sm ${form.offer_gestao ? "bg-brand border-brand" : "border-border-strong"}`} style={{ width: 16, height: 16 }}>
+                {form.offer_gestao ? <Icon icon={Check} size={16} color={color["on-brand"]} /> : null}
+              </View>
+              <Text className="text-sm text-ink" style={{ flex: 1 }}>Oferecer módulo gestão</Text>
+            </Pressable>
+            {form.offer_gestao ? (
+              <FormInput
+                label="Valor mensal da gestão (R$)"
+                valueFormat="currency"
+                value={form.gestao_price}
+                onChangeText={(v) => setForm({ ...form, gestao_price: v })}
+                error={errors.gestao_price_monthly}
+                placeholder="0,00 = grátis"
+              />
+            ) : (
+              <Text className="text-xs text-ink-muted">Sem esta opção, a gestão não entra no contrato. Com valor 0,00 ela entra grátis.</Text>
+            )}
+            {form.billing_basis === "per_student" ? (
+              <PriceScheduleFields
+                tiers={form.schedule}
+                onChange={(schedule) => setForm({ ...form, schedule })}
+                error={errors.price_schedule}
+              />
+            ) : null}
             <View className="flex-row flex-wrap" style={{ columnGap: 12 }}>
               <View style={{ flex: 1, minWidth: 140 }}>
                 <FormInput label="Dias de teste" valueFormat="integer" maxDigits={3} value={form.trial_days} onChangeText={(v) => setForm({ ...form, trial_days: v })} error={errors.trial_days} />

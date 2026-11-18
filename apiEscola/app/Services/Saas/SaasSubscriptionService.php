@@ -22,6 +22,7 @@ class SaasSubscriptionService
         private readonly SaasEntitlementService $entitlements,
         private readonly TenantQuotaService $quotas,
         private readonly SaasAuditService $audit,
+        private readonly SaasBillingService $billing,
     ) {
     }
 
@@ -42,12 +43,11 @@ class SaasSubscriptionService
                 'saas_plan_id' => $plan->id,
                 'status' => $trialDays > 0 ? TenantSubscription::TRIALING : TenantSubscription::ACTIVE,
                 'billing_cycle' => $cycle,
-                'price' => $plan->priceFor($cycle),
                 'discount_percent' => (float) ($data['discount_percent'] ?? 0),
                 'started_at' => $today,
                 'trial_ends_at' => $trialDays > 0 ? $today->copy()->addDays($trialDays) : null,
                 'current_period_end' => $trialDays > 0 ? $today->copy()->addDays($trialDays) : $this->periodEnd($today, $cycle),
-            ]);
+            ] + $this->commercialTerms($plan, $cycle));
             $this->event($subscription, 'created', $actor, null, $plan->id, 0.0, ['billing_cycle' => $cycle, 'trial_days' => $trialDays]);
 
             return $subscription;
@@ -89,8 +89,8 @@ class SaasSubscriptionService
             $subscription->update([
                 'saas_plan_id' => $plan->id,
                 'billing_cycle' => $cycle,
-                'price' => $plan->priceFor($cycle),
-            ]);
+            ] + $this->commercialTerms($plan, $cycle));
+            $subscription->unsetRelation('plan');
             $this->event($subscription, 'plan_changed', $actor, $from?->id, $plan->id, $before, [
                 'billing_cycle' => $cycle,
                 'direction' => (float) $plan->priceFor($cycle) >= $oldPrice ? 'upgrade' : 'downgrade',
@@ -168,6 +168,36 @@ class SaasSubscriptionService
         return $subscription->fresh('plan');
     }
 
+    /**
+     * Ajusta a faixa de preço e o módulo gestão sem trocar o plano.
+     *
+     * @param  array{gestao_enabled: bool, gestao_price_monthly: float, price?: float|null, price_schedule?: array<int, array<string, mixed>>|null}  $data
+     */
+    public function updatePricing(TenantSubscription $subscription, array $data, User $actor): TenantSubscription
+    {
+        $before = $subscription->monthlyRevenue();
+        $changes = [
+            'gestao_enabled' => (bool) $data['gestao_enabled'],
+            'gestao_price_monthly' => $data['gestao_price_monthly'],
+        ];
+        if ($subscription->isPerStudent()) {
+            $changes['price_schedule'] = $this->billing->normalizeSchedule($data['price_schedule'] ?? null);
+            if (array_key_exists('price', $data) && $data['price'] !== null && $data['price'] !== '') {
+                $changes['price'] = $data['price'];
+            }
+        }
+        $subscription->update($changes);
+        $subscription->unsetRelation('plan');
+        $this->event($subscription, 'pricing_changed', $actor, null, null, $before, [
+            'price_schedule' => $subscription->price_schedule,
+            'gestao_enabled' => (bool) $subscription->gestao_enabled,
+            'gestao_price_monthly' => (float) $subscription->gestao_price_monthly,
+        ]);
+        $this->audit->log($actor, $subscription->tenant_id, 'subscription.pricing_changed', 'Valores da assinatura ajustados: '.$subscription->plan?->name);
+
+        return $subscription->fresh('plan');
+    }
+
     public function setDiscount(TenantSubscription $subscription, float $percent, User $actor): TenantSubscription
     {
         $old = (float) $subscription->discount_percent;
@@ -200,6 +230,19 @@ class SaasSubscriptionService
         });
 
         return $counts;
+    }
+
+    /** @return array{price: string, price_schedule: array<int, mixed>|null, gestao_enabled: bool, gestao_price_monthly: float|string} */
+    private function commercialTerms(SaasPlan $plan, string $cycle): array
+    {
+        $perStudent = $plan->billing_basis === SaasPlan::PER_STUDENT;
+
+        return [
+            'price' => $plan->priceFor($cycle),
+            'price_schedule' => $perStudent ? $plan->price_schedule : null,
+            'gestao_enabled' => $plan->gestao_price_monthly !== null,
+            'gestao_price_monthly' => $plan->gestao_price_monthly ?? 0,
+        ];
     }
 
     private function activePlan(int $planId): SaasPlan

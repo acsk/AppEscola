@@ -10,14 +10,23 @@ class SaasPlan extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['name', 'slug', 'description', 'price_monthly', 'price_yearly', 'trial_days', 'status', 'limits', 'features', 'order'];
+    public const FLAT = 'flat';
+
+    public const PER_STUDENT = 'per_student';
+
+    protected $fillable = [
+        'name', 'slug', 'description', 'price_monthly', 'price_yearly', 'billing_basis',
+        'gestao_price_monthly', 'price_schedule', 'trial_days', 'status', 'limits', 'features', 'order',
+    ];
 
     protected $casts = [
         'price_monthly' => 'decimal:2',
         'price_yearly' => 'decimal:2',
+        'gestao_price_monthly' => 'decimal:2',
         'trial_days' => 'integer',
         'limits' => 'array',
         'features' => 'array',
+        'price_schedule' => 'array',
     ];
 
     public function subscriptions(): HasMany
@@ -25,9 +34,13 @@ class SaasPlan extends Model
         return $this->hasMany(TenantSubscription::class);
     }
 
-    /** Preço do ciclo; o anual cai para 12× o mensal quando o plano não tem preço anual. */
+    /** Preço do ciclo. No plano por aluno, o preço mensal é o valor de referência por aluno. */
     public function priceFor(string $cycle): string
     {
+        if ($this->billing_basis === self::PER_STUDENT) {
+            return (string) $this->price_monthly;
+        }
+
         return $cycle === 'yearly' && $this->price_yearly !== null
             ? (string) $this->price_yearly
             : ($cycle === 'yearly' ? number_format((float) $this->price_monthly * 12, 2, '.', '') : (string) $this->price_monthly);

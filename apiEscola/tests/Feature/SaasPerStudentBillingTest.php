@@ -1,0 +1,115 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\SaasPlan;
+use App\Models\Student;
+use App\Models\Tenant;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDomainLookups;
+use Tests\TestCase;
+
+class SaasPerStudentBillingTest extends TestCase
+{
+    use RefreshDatabase;
+    use SeedsDomainLookups;
+
+    protected bool $dropViews = true;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
+    public function test_app_students_follow_the_price_schedule_and_gestao_is_optional(): void
+    {
+        Carbon::setTestNow('2026-11-18 15:00:00');
+        $tenant = Tenant::factory()->create();
+        $this->studentWithApp($tenant);
+        $this->studentWithApp($tenant);
+        Student::factory()->create([
+            'tenant_id' => $tenant->id,
+            'user_id' => User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'aluno', 'status' => 'inactive'])->id,
+        ]);
+        Student::factory()->create(['tenant_id' => $tenant->id, 'user_id' => null]);
+
+        Sanctum::actingAs(User::factory()->superAdmin()->create());
+        $this->postJson('/api/saas/plans', $this->planPayload())->assertCreated()
+            ->assertJsonPath('body.billing_basis', 'per_student')
+            ->assertJsonPath('body.gestao_price_monthly', '0.00');
+
+        $plan = SaasPlan::query()->where('billing_basis', 'per_student')->where('name', 'Por aluno')->firstOrFail();
+        $this->postJson("/api/saas/tenants/{$tenant->id}/subscription", [
+            'saas_plan_id' => $plan->id,
+            'billing_cycle' => 'monthly',
+        ])->assertCreated()
+            ->assertJsonPath('body.app_students', 2)
+            ->assertJsonPath('body.unit_price', '0.00')
+            ->assertJsonPath('body.monthly_revenue', '0.00')
+            ->assertJsonPath('body.gestao_enabled', true);
+
+        Carbon::setTestNow('2027-03-10 15:00:00');
+        $this->getJson("/api/saas/tenants/{$tenant->id}/subscription")->assertOk()
+            ->assertJsonPath('body.subscription.unit_price', '15.00')
+            ->assertJsonPath('body.subscription.monthly_revenue', '30.00');
+
+        Carbon::setTestNow('2027-07-15 15:00:00');
+        $this->getJson("/api/saas/tenants/{$tenant->id}/subscription")->assertOk()
+            ->assertJsonPath('body.subscription.unit_price', '20.00')
+            ->assertJsonPath('body.subscription.monthly_revenue', '40.00');
+
+        $this->postJson("/api/saas/tenants/{$tenant->id}/subscription/pricing", [
+            'gestao_enabled' => true,
+            'gestao_price_monthly' => 10,
+            'price' => 15,
+            'price_schedule' => [
+                ['from' => '2027-01-01', 'until' => '2027-06-30', 'price' => 15],
+                ['from' => '2027-07-01', 'until' => null, 'price' => 25],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('body.unit_price', '25.00')
+            ->assertJsonPath('body.monthly_revenue', '60.00')
+            ->assertJsonPath('body.gestao_price_monthly', '10.00');
+    }
+
+    public function test_overlapping_price_schedule_is_rejected(): void
+    {
+        Sanctum::actingAs(User::factory()->superAdmin()->create());
+        $this->postJson('/api/saas/plans', $this->planPayload([
+            'price_schedule' => [
+                ['from' => '2027-01-01', 'until' => '2027-08-01', 'price' => 15],
+                ['from' => '2027-07-01', 'until' => null, 'price' => 20],
+            ],
+        ]))->assertUnprocessable()->assertJsonValidationErrors('price_schedule');
+    }
+
+    private function studentWithApp(Tenant $tenant): void
+    {
+        $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'aluno', 'status' => 'active']);
+        Student::factory()->create(['tenant_id' => $tenant->id, 'user_id' => $user->id, 'status' => 'active']);
+    }
+
+    /** @param  array<string, mixed>  $override */
+    private function planPayload(array $override = []): array
+    {
+        return $override + [
+            'name' => 'Por aluno',
+            'price_monthly' => 15,
+            'trial_days' => 0,
+            'status' => 'active',
+            'billing_basis' => 'per_student',
+            'offer_gestao' => true,
+            'gestao_price_monthly' => 0,
+            'features' => ['academic'],
+            'limits' => [],
+            'price_schedule' => [
+                ['from' => '2027-01-01', 'until' => '2027-06-30', 'price' => 15],
+                ['from' => '2027-07-01', 'until' => null, 'price' => 20],
+            ],
+        ];
+    }
+}

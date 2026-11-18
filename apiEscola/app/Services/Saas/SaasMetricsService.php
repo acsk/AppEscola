@@ -99,7 +99,7 @@ class SaasMetricsService
      */
     private function revenue(?array $tenantIds, Carbon $from, Carbon $today): array
     {
-        $subs = TenantSubscription::query()->with('plan:id,name')
+        $subs = TenantSubscription::query()->with('plan:id,name,billing_basis')
             ->when($tenantIds !== null, fn ($q) => $q->whereIn('tenant_id', $tenantIds))
             ->get();
         $paying = $subs->filter(fn (TenantSubscription $s) => $s->monthlyRevenue() > 0 || in_array($s->status, [TenantSubscription::ACTIVE, TenantSubscription::PAST_DUE], true));
@@ -116,11 +116,7 @@ class SaasMetricsService
                 && (! $s->trial_ends_at || $s->trial_ends_at->lte($end))
                 && (! $s->canceled_at || $s->canceled_at->gt($end))
                 && $s->status !== TenantSubscription::EXPIRED)
-                ->sum(function (TenantSubscription $s) {
-                    $net = (float) $s->price * (1 - (float) $s->discount_percent / 100);
-
-                    return $s->billing_cycle === 'yearly' ? $net / 12 : $net;
-                });
+                ->sum(fn (TenantSubscription $s) => $s->monthlyAmount());
             $series[] = ['month' => $cursor->format('Y-m'), 'label' => self::MONTHS[(int) $cursor->month].'/'.$cursor->format('y'), 'mrr' => round($value, 2)];
         }
 

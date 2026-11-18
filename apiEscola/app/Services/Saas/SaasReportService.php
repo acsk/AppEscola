@@ -82,7 +82,7 @@ class SaasReportService
 
     private function commercial(Carbon $from, Carbon $to): array
     {
-        $subs = TenantSubscription::query()->with(['plan:id,name', 'tenant:id,name'])->get();
+        $subs = TenantSubscription::query()->with(['plan:id,name,billing_basis', 'tenant:id,name'])->get();
         $events = $this->events($from, $to, ['created', 'canceled', 'plan_changed']);
 
         return [
@@ -102,7 +102,12 @@ class SaasReportService
             'upgrades' => $events->where('type', 'plan_changed')->where('direction', 'upgrade')->count(),
             'downgrades' => $events->where('type', 'plan_changed')->where('direction', 'downgrade')->count(),
             'overdue' => $subs->where('status', TenantSubscription::PAST_DUE)->map(fn ($s) => [
-                'tenant' => $s->tenant?->name, 'plan' => $s->plan?->name, 'due' => $s->current_period_end?->toDateString(), 'amount' => number_format((float) $s->price * (1 - (float) $s->discount_percent / 100), 2, '.', ''),
+                'tenant' => $s->tenant?->name,
+                'plan' => $s->plan?->name,
+                'due' => $s->current_period_end?->toDateString(),
+                'amount' => number_format($s->isPerStudent()
+                    ? ($s->billing_cycle === 'yearly' ? $s->monthlyAmount() * 12 : $s->monthlyAmount())
+                    : (float) $s->price * (1 - (float) $s->discount_percent / 100), 2, '.', ''),
             ])->values()->all(),
         ];
     }
