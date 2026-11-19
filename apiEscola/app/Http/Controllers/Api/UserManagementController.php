@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\Subject;
 use App\Models\User;
+use App\Support\GridSearch;
 use App\Traits\ScopedByTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -223,7 +224,7 @@ class UserManagementController extends Controller
             new OA\Parameter(name: 'tenant_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'role', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'status', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'search', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'search', in: 'query', required: false, schema: new OA\Schema(type: 'string'), description: 'Nome ou e-mail. Ignora acento e maiúsculas.'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Lista paginada de usuários'),
@@ -241,12 +242,7 @@ class UserManagementController extends Controller
         $query
             ->when($request->query('role'), fn ($q, $v) => $q->where('role', $v))
             ->when($request->query('status'), fn ($q, $v) => $q->where('status', $v))
-            ->when($request->query('search'), function ($q, $v) {
-                $q->where(function ($sub) use ($v) {
-                    $sub->where('name', 'like', "%{$v}%")
-                        ->orWhere('email', 'like', "%{$v}%");
-                });
-            });
+            ->when($request->query('search'), fn ($q, $v) => GridSearch::apply($q, (string) $v, ['name', 'email']));
 
         if (! $request->user()->isSuperAdmin()) {
             $query->where('role', '!=', 'super_admin');

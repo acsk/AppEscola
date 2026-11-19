@@ -5,6 +5,8 @@ import api from "../../services/api";
 import PageHeader from "../../components/ui/PageHeader";
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
+import FormInput from "../../components/ui/FormInput";
+import FormSelect from "../../components/ui/FormSelect";
 import Tabs from "../../components/ui/Tabs";
 import Badge from "../../components/ui/Badge";
 import StatTile from "../../components/ui/StatTile";
@@ -56,6 +58,7 @@ const ROLE_LABEL: Record<string, string> = {
   secretaria: "Secretaria",
   financeiro: "Financeiro",
   aluno: "Aluno",
+  responsavel: "Responsável",
 };
 
 const fmtDate = (iso?: string | null, withTime = false) => {
@@ -268,12 +271,20 @@ function UsersTab({ tenantId, isMobile, setToast }: { tenantId: number; isMobile
   const [error, setError] = useState("");
   const [target, setTarget] = useState<TenantUser | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [role, setRole] = useState("");
+  const [status, setStatus] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const { data } = await api.get("/users", { params: { tenant_id: tenantId, page } });
+      const params: Record<string, string | number> = { tenant_id: tenantId, page };
+      if (search) params.search = search;
+      if (role) params.role = role;
+      if (status) params.status = status;
+      const { data } = await api.get("/users", { params });
       setRows(Array.isArray(data.data) ? data.data : []);
       if (data.meta) setMeta({ current_page: data.meta.current_page, last_page: data.meta.last_page, per_page: data.meta.per_page, total: data.meta.total });
     } catch (err) {
@@ -281,7 +292,17 @@ function UsersTab({ tenantId, isMobile, setToast }: { tenantId: number; isMobile
     } finally {
       setLoading(false);
     }
-  }, [tenantId, page]);
+  }, [tenantId, page, search, role, status]);
+
+  useEffect(() => {
+    const next = searchInput.trim();
+    if (next === search) return;
+    const timer = setTimeout(() => {
+      setSearch(next);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, search]);
 
   useEffect(() => {
     load();
@@ -303,9 +324,28 @@ function UsersTab({ tenantId, isMobile, setToast }: { tenantId: number; isMobile
   };
 
   const blocking = target?.status === "active";
+  const filtering = search !== "" || role !== "" || status !== "";
+  const roleOptions = [{ value: "", label: "Todos os perfis" }, ...Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))];
 
   return (
-    <View>
+    <View style={{ gap: 12 }}>
+      <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+        <View style={{ flex: 1, minWidth: isMobile ? "100%" : 240 }}>
+          <FormInput label="Buscar" value={searchInput} onChangeText={setSearchInput} placeholder="Nome ou e-mail" autoCapitalize="none" dense />
+        </View>
+        <View style={{ width: isMobile ? "100%" : 200 }}>
+          <FormSelect label="Perfil" value={role} onChange={(value) => { setRole(value); setPage(1); }} options={roleOptions} dense />
+        </View>
+        <View style={{ width: isMobile ? "100%" : 180 }}>
+          <FormSelect
+            label="Acesso"
+            value={status}
+            onChange={(value) => { setStatus(value); setPage(1); }}
+            options={[{ value: "", label: "Todos" }, { value: "active", label: "Ativo" }, { value: "inactive", label: "Bloqueado" }]}
+            dense
+          />
+        </View>
+      </View>
       <ScrollView horizontal={isMobile} showsHorizontalScrollIndicator={isMobile} contentContainerStyle={{ width: isMobile ? undefined : "100%" }}>
         <View className={TABLE_CONTAINER} style={{ width: "100%", minWidth: isMobile ? 640 : undefined }}>
           <View className={TABLE_HEADER_ROW} style={TABLE_HEADER_ROW_STYLE}>
@@ -321,7 +361,7 @@ function UsersTab({ tenantId, isMobile, setToast }: { tenantId: number; isMobile
           ) : error ? (
             <Text className="text-sm text-danger" style={{ padding: 16 }}>{error}</Text>
           ) : rows.length === 0 ? (
-            <Text className="text-sm text-ink-muted" style={{ padding: 24, textAlign: "center" }}>Nenhum usuário vinculado.</Text>
+            <Text className="text-sm text-ink-muted" style={{ padding: 24, textAlign: "center" }}>{filtering ? "Nenhum usuário encontrado com esse filtro." : "Nenhum usuário vinculado."}</Text>
           ) : (
             rows.map((u, i) => (
               <DataTableRow key={u.id} index={i}>
