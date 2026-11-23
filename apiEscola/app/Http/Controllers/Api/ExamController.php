@@ -9,6 +9,8 @@ use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Models\ExamStatus;
 use App\Services\ExamDeliveryReportService;
+use App\Services\ExamDeliveryResetService;
+use App\Services\ExamDuplicateService;
 use App\Services\ExamTypeService;
 use App\Services\QuestionBankReleaseService;
 use App\Services\ExamAttemptIntegrityService;
@@ -33,6 +35,8 @@ class ExamController extends Controller
         private readonly ExamQuestionErrorsReportService $questionErrorsReportService,
         private readonly ExamAccessService $examAccess,
         private readonly QuestionBankReleaseService $topicReleases,
+        private readonly ExamDuplicateService $duplicates,
+        private readonly ExamDeliveryResetService $deliveryReset,
     ) {
     }
 
@@ -136,6 +140,37 @@ class ExamController extends Controller
         $exam->delete();
 
         return response()->json(['message' => 'Simulado removido com sucesso.']);
+    }
+
+    /** Cópia em rascunho, com questões e materiais, sem as entregas. */
+    public function duplicate(Request $request, Exam $exam): JsonResponse
+    {
+        $this->examAccess->assertCanManageExams($request->user());
+        $this->authorizeTenant($request, $exam->tenant_id);
+
+        if ($exam->tenant_id) {
+            app(\App\Services\Saas\TenantQuotaService::class)->assertCanAdd((int) $exam->tenant_id, 'exams');
+        }
+
+        $copy = $this->duplicates->duplicate($exam);
+
+        return $this->created(new ExamResource($copy), 'Simulado duplicado como rascunho.');
+    }
+
+    /** Remove entregas e tentativas em andamento para os alunos refazerem este simulado. */
+    public function resetDeliveries(Request $request, Exam $exam): JsonResponse
+    {
+        $this->examAccess->assertCanManageExams($request->user());
+        $this->authorizeTenant($request, $exam->tenant_id);
+
+        $count = $this->deliveryReset->reset($exam);
+
+        return $this->success(
+            ['attempts_removed' => $count],
+            $count === 0
+                ? 'Este simulado não tinha entregas.'
+                : "Entregas redefinidas. {$count} tentativa(s) removida(s); os alunos podem fazer de novo."
+        );
     }
 
     /** Relatório de entregas: alunos que finalizaram o simulado e pendentes. */

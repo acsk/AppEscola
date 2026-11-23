@@ -587,6 +587,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnforceAccountStatus::cl
         Route::get('exams/{exam}/question-bank-release', [QuestionBankReleaseController::class, 'showExam']);
         Route::put('exams/{exam}/question-bank-release', [QuestionBankReleaseController::class, 'updateExam']);
         Route::get('exams/{exam}/stats',           [ExamController::class, 'stats']);
+        Route::post('exams/{exam}/duplicate',      [ExamController::class, 'duplicate']);
+        Route::post('exams/{exam}/reset-deliveries', [ExamController::class, 'resetDeliveries']);
         Route::get('exams/{exam}/delivery-report', [ExamController::class, 'deliveryReport']);
         Route::get('exams/{exam}/question-errors-report', [ExamController::class, 'questionErrorsReport']);
     });

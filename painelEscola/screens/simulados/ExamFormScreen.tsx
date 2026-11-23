@@ -27,6 +27,7 @@ import ConfirmModal from "../../components/ui/ConfirmModal";
 import ToastBanner from "../../components/ui/ToastBanner";
 import ExamBankReleaseModal from "../../components/banco-questoes/ExamBankReleaseModal";
 import { fetchExamTopicRelease } from "../../services/questionBank";
+import { fetchExamDeliveryReport } from "../../services/examDeliveryReport";
 import { useExamStatuses, useExamTypes, domainToOptions } from "../../hooks/useDomains";
 import DateTimePickerInput from "../../components/ui/DateTimePickerInput";
 import {
@@ -187,6 +188,41 @@ function validateQuestion(form: ExamQuestionForm): Record<string, string> {
   return { ...validateQuestionEnunciado(form), ...validateQuestionAlternatives(form) };
 }
 
+const DURATION_CHIPS = [
+  { value: "30", label: "30 min" },
+  { value: "60", label: "60 min" },
+  { value: "90", label: "90 min" },
+  { value: "120", label: "2 h" },
+  { value: "", label: "Sem limite" },
+] as const;
+
+function formSnapshot(form: ExamForm): string {
+  return JSON.stringify({ ...form, course_ids: [...form.course_ids].sort((a, b) => a - b) });
+}
+
+function examWindowLabel(starts: string, ends: string): string | null {
+  if (!isValidDisplayDateTime(starts.trim()) || !isValidDisplayDateTime(ends.trim())) return null;
+  const startMs = displayDateTimeToMs(starts);
+  const endMs = displayDateTimeToMs(ends);
+  if (startMs == null || endMs == null || endMs <= startMs) return null;
+  const hours = Math.round((endMs - startMs) / 36e5);
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  const parts = [
+    days ? `${days} ${days === 1 ? "dia" : "dias"}` : "",
+    rest ? `${rest} h` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" e ") : "menos de 1 h";
+}
+
+function shortPeriod(starts: string, ends: string): string {
+  if (!starts.trim() && !ends.trim()) return "Sem prazo definido";
+  const day = (value: string) => (value.length >= 5 ? value.slice(0, 5) : value);
+  const time = ends.length >= 16 ? ends.slice(11, 16) : "";
+  if (starts.trim() && ends.trim()) return `${day(starts)} a ${day(ends)}${time ? ` · até ${time}` : ""}`;
+  return starts.trim() ? `A partir de ${day(starts)}` : `Até ${day(ends)}${time ? ` · ${time}` : ""}`;
+}
+
 function resolveExamId(data: unknown): number | null {
   const root = data as Record<string, unknown> | null | undefined;
   if (!root) return null;
@@ -198,7 +234,8 @@ function resolveExamId(data: unknown): number | null {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ExamFormScreen({ examId, navigate, listQuery = "" }: ExamFormScreenProps) {
-  const { contentPadding, isMobile } = useResponsiveLayout();
+  const { contentPadding, isMobile, width } = useResponsiveLayout();
+  const stacked = width < 1180;
   const [savedExamId, setSavedExamId] = useState<number | null>(null);
   const [postCreatePrompt, setPostCreatePrompt] = useState(false);
   const effectiveExamId = examId ?? savedExamId;
@@ -231,6 +268,8 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
   const [loading, setLoading] = useState(examId !== null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ExamForm>(EMPTY_EXAM);
+  const [savedForm, setSavedForm] = useState<ExamForm>(EMPTY_EXAM);
+  const [progress, setProgress] = useState<{ eligible: number; delivered: number; average: number | null } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Select options loaded from API
@@ -278,6 +317,8 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
     message: "",
   });
   const [errorsReportOpen, setErrorsReportOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"duplicate" | "reset" | null>(null);
+  const [acting, setActing] = useState(false);
   const [answerKeyOpen, setAnswerKeyOpen] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [releaseMode, setReleaseMode] = useState<"ask" | "edit">("ask");
@@ -318,7 +359,7 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
       try {
         const { data } = await api.get(`/exams/${examId}`);
         const exam = data.body ?? data;
-        setForm({
+        const loaded: ExamForm = {
           title: exam.title ?? "",
           exam_type: exam.exam_type ?? "custom",
           status: exam.status ?? "draft",
@@ -340,7 +381,9 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
           max_attempts: exam.max_attempts != null ? String(exam.max_attempts) : "",
           min_score_to_retake:
             exam.min_score_to_retake != null ? String(exam.min_score_to_retake) : "",
-        });
+        };
+        setForm(loaded);
+        setSavedForm(loaded);
         setQuestions(exam.questions ?? []);
         statusOnServerRef.current = exam.status ?? "draft";
       } catch {}
@@ -369,6 +412,35 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
       setSupportMaterials([]);
     }
     setLoadingSupportMaterials(false);
+  }, [effectiveExamId]);
+
+  useEffect(() => {
+    if (!effectiveExamId) {
+      setProgress(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [report, statsRes] = await Promise.all([
+          fetchExamDeliveryReport(effectiveExamId),
+          api.get(`/exams/${effectiveExamId}/stats`),
+        ]);
+        if (cancelled) return;
+        const stats = statsRes.data?.body ?? statsRes.data ?? {};
+        const average = stats.avg_percentage;
+        setProgress({
+          eligible: report.summary.eligible_students_count,
+          delivered: report.summary.delivered_students_count,
+          average: typeof average === "number" ? average : null,
+        });
+      } catch {
+        if (!cancelled) setProgress(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [effectiveExamId]);
 
   // ── Exam Save ────────────────────────────────────────────────────────────────
@@ -412,11 +484,11 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
     }
   };
 
-  const saveExam = async () => {
+  const saveExam = async (): Promise<boolean> => {
     const errs = validateExam(form);
     if (Object.keys(errs).length > 0) {
       showFormErrors(errs);
-      return;
+      return false;
     }
 
     setSaving(true);
@@ -463,7 +535,9 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
         setPostCreatePrompt(true);
         showApiToast(setToast, data, "Simulado criado com sucesso.");
       }
+      setSavedForm({ ...form, course_ids: [...form.course_ids] });
       setErrors({});
+      return true;
     } catch (err: unknown) {
       const apiErrs = getApiValidationErrors(err);
       if (Object.keys(apiErrs).length > 0) {
@@ -475,6 +549,7 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
         showApiErrorToast(setToast, err, "Não foi possível salvar o simulado.");
         scrollRef.current?.scrollTo({ y: 0, animated: true });
       }
+      return false;
     } finally {
       setSaving(false);
     }
@@ -868,6 +943,34 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
 
   const goToList = () => navigate("simulados", listQuery ? { query: listQuery } : undefined);
 
+  const runExamAction = async () => {
+    if (!confirmAction || !effectiveExamId) return;
+    setActing(true);
+    try {
+      if (confirmAction === "duplicate") {
+        const { data } = await api.post(`/exams/${effectiveExamId}/duplicate`);
+        const newId = resolveExamId(data);
+        showApiToast(setToast, data, "Simulado duplicado como rascunho.");
+        setConfirmAction(null);
+        if (newId) {
+          navigate("simulados-form", { examId: newId, ...(listQuery ? { query: listQuery } : {}) });
+        }
+      } else {
+        const { data } = await api.post(`/exams/${effectiveExamId}/reset-deliveries`);
+        showApiToast(setToast, data, "Entregas redefinidas.");
+        setConfirmAction(null);
+      }
+    } catch (error) {
+      showApiErrorToast(
+        setToast,
+        error,
+        confirmAction === "duplicate" ? "Não foi possível duplicar o simulado." : "Não foi possível redefinir as entregas."
+      );
+    } finally {
+      setActing(false);
+    }
+  };
+
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -916,390 +1019,552 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
     return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const topicNames = Array.from(new Set(questions.flatMap((q) => (q.topics ?? []).map((t) => t.name))));
+  const subjectTally = new Map<string, number>();
+  for (const question of questions) {
+    const name = question.subject?.name;
+    if (name) subjectTally.set(name, (subjectTally.get(name) ?? 0) + 1);
+  }
+  const suggestedSubject = [...subjectTally.entries()].sort((a, b) => b[1] - a[1])[0];
+  const choiceQuestions = questions.filter((q) => q.type === "multiple_choice");
+  const keyedQuestions = choiceQuestions.filter((q) => q.options.some((o) => o.is_correct));
+  const questionsReady = questions.length > 0 && keyedQuestions.length === choiceQuestions.length;
+  const windowHours = examWindowLabel(form.starts_at, form.ends_at);
+  const datesOk =
+    !errors.starts_at &&
+    !errors.ends_at &&
+    ((!form.starts_at.trim() && !form.ends_at.trim()) || windowHours != null);
+  const passingNumber = Number(form.passing_score);
+  const passingHint =
+    questions.length > 0 && form.passing_score.trim() && !Number.isNaN(passingNumber)
+      ? `Com ${questions.length} questões: acertar ${Math.ceil((questions.length * passingNumber) / 100)} ou mais`
+      : null;
+  const statusLabel = examStatuses.find((s) => s.slug === form.status)?.label ?? (form.status || "Rascunho");
+  const coursesMatchSaved =
+    [...form.course_ids].sort((a, b) => a - b).join(",") ===
+    [...savedForm.course_ids].sort((a, b) => a - b).join(",");
+  const eligibleNow = coursesMatchSaved ? progress?.eligible : null;
+  const dirty = formSnapshot(form) !== formSnapshot(savedForm);
+  const durationLabel = form.duration_minutes.trim() ? `${form.duration_minutes} minutos` : "Sem limite";
+  const attemptsLabel = form.allow_retake !== "true" ? "1" : form.max_attempts.trim() || "Sem limite";
+  const resultLabel = form.release_results_after_end === "true" ? "Depois do encerramento" : "Logo após enviar";
+  const resultHint =
+    form.release_results_after_end === "true"
+      ? "Nota e gabarito aparecem só depois do encerramento."
+      : "Nota e gabarito aparecem assim que o aluno envia.";
+  const allCoursesSelected = courseOptions.length > 0 && courseOptions.every((course) => form.course_ids.includes(course.id));
+  const approvalLabel = form.passing_score.trim()
+    ? `${form.passing_score}%${questions.length ? ` (${Math.ceil((questions.length * (Number(form.passing_score) || 0)) / 100)} de ${questions.length})` : ""}`
+    : "Sem nota mínima";
+  const visibleTopics = topicNames.slice(0, 2);
+  const hiddenTopicCount = Math.max(0, topicNames.length - visibleTopics.length);
+
   const stepItems = canManageContent
     ? [
-        { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
-        { id: 2 as const, title: "Questões", description: "Cadastro, edição e organização das questões" },
-        { id: 3 as const, title: "Materiais", description: "Links e arquivos de apoio" },
-        { id: 4 as const, title: "Testar", description: "Responder e validar o simulado" },
+        { id: 1 as const, title: "Dados gerais", description: "configuração e prazos", done: Boolean(form.title.trim() && form.exam_type) },
+        { id: 2 as const, title: "Questões", description: `${questions.length} ${questions.length === 1 ? "questão" : "questões"} · ${topicNames.length} ${topicNames.length === 1 ? "assunto" : "assuntos"}`, done: questions.length > 0 },
+        { id: 3 as const, title: "Materiais", description: `${supportMaterials.length} ${supportMaterials.length === 1 ? "arquivo de apoio" : "arquivos de apoio"}`, done: supportMaterials.length > 0 },
+        { id: 4 as const, title: "Testar", description: "responder como aluno", done: false },
       ]
-    : [
-        { id: 1 as const, title: "Dados gerais", description: "Informações e configuração do simulado" },
-      ];
+    : [];
+
+  const saveAndGoQuestions = async () => {
+    const ok = await saveExam();
+    if (!ok) return;
+    setActiveStep(2);
+    fetchQuestions();
+    scrollToTop();
+  };
+
+  const discardChanges = () => {
+    setForm({ ...savedForm, course_ids: [...savedForm.course_ids] });
+    setErrors({});
+  };
+
+  const bumpAttempts = (delta: number) => {
+    const current = Number(form.max_attempts) || (delta > 0 ? 0 : 1);
+    const next = Math.max(1, current + delta);
+    setField("max_attempts", String(next));
+  };
 
   return (
     <View className="flex-1">
     <ScrollView
       ref={scrollRef}
       className="flex-1"
-      contentContainerStyle={{ padding: contentPadding, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: contentPadding, paddingBottom: 28 }}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Cabeçalho */}
-      <View className="flex-row items-center justify-between mb-6">
-        <View className="flex-row items-center gap-3">
+      <Text className="text-xs text-ink-subtle mb-1">
+        <Text className="text-ink-muted" onPress={goToList}>Simulados</Text>
+        {" / "}
+        {canManageContent ? "Editar" : "Novo"}
+      </Text>
+      <View className="flex-row items-start flex-wrap gap-3 mb-4">
+        <View className="flex-row items-start gap-3" style={{ flexGrow: 1, flexShrink: 1, flexBasis: 360 }}>
           <TouchableOpacity
             onPress={goToList}
-            className="p-2 rounded-ds-md bg-surface border border-border"
+            accessibilityLabel="Voltar para simulados"
+            className="items-center justify-center rounded-ds-md border border-border-strong bg-surface"
+            style={{ width: 34, height: 34 }}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={18} color="var(--ds-ink)" />
+            <Ionicons name="arrow-back" size={16} color="var(--ds-ink)" />
           </TouchableOpacity>
-          <View>
-            <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">
-              {canManageContent ? "Editar simulado" : "Novo simulado"}
-            </Text>
-            <Text className="text-sm text-ink-muted">
+          <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 240 }}>
+            <View className="flex-row items-center gap-2 flex-wrap">
+              <Text className="text-[22px] leading-7 font-semibold text-ink" style={{ letterSpacing: -0.2 }}>
+                {form.title.trim() || (canManageContent ? "Editar simulado" : "Novo simulado")}
+              </Text>
+              {canManageContent ? <Badge label={statusLabel} slug={form.status} dot /> : null}
+            </View>
+            <Text className="text-[13px] text-ink-muted mt-0.5">
               {canManageContent
-                ? "Atualize as informações, questões e materiais do simulado"
+                ? [
+                    `Visível para ${form.course_ids.length} ${form.course_ids.length === 1 ? "curso" : "cursos"}`,
+                    eligibleNow != null ? `${eligibleNow} ${eligibleNow === 1 ? "aluno" : "alunos"}` : null,
+                    form.starts_at.trim() && form.ends_at.trim() ? `aberto de ${form.starts_at} a ${form.ends_at}` : null,
+                  ].filter(Boolean).join(" · ")
                 : "Informe o título e, se quiser, os demais dados do formulário"}
             </Text>
           </View>
         </View>
-        {canManageContent && (
-          <View className="flex-row items-center gap-2 flex-wrap justify-end">
+        {canManageContent ? (
+          <View className="flex-row items-center gap-2 flex-wrap" style={{ marginLeft: "auto", maxWidth: "100%" }}>
             <TouchableOpacity
               onPress={() => setErrorsReportOpen(true)}
-              className="flex-row items-center bg-surface border border-border-strong px-3 rounded-ds-md py-2 min-h-control-md justify-center"
+              className="px-3 rounded-ds-md min-h-control-md justify-center"
               activeOpacity={0.85}
             >
-              <Ionicons name="analytics-outline" size={16} color="var(--ds-brand)" />
-              <Text className="text-brand font-semibold text-xs ml-1.5">
-                Questões com mais erros
-              </Text>
+              <Text className="text-[13px] font-medium text-ink-muted">Questões com mais erros</Text>
             </TouchableOpacity>
-            <Badge
-              label={examStatuses.find((s) => s.slug === form.status)?.label ?? form.status}
-              slug={form.status}
-            />
+            <TouchableOpacity
+              onPress={() => { setActiveStep(4); scrollToTop(); }}
+              className="px-3.5 rounded-ds-md border border-border-strong bg-surface min-h-control-md justify-center"
+              activeOpacity={0.85}
+            >
+              <Text className="text-[13px] font-medium text-ink">Ver como aluno</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setConfirmAction("duplicate")}
+              disabled={acting}
+              className="px-3.5 rounded-ds-md border border-border-strong bg-surface min-h-control-md justify-center"
+              activeOpacity={0.85}
+            >
+              <Text className="text-[13px] font-medium text-ink">Duplicar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setConfirmAction("reset")}
+              disabled={acting}
+              className="px-3 rounded-ds-md min-h-control-md justify-center"
+              activeOpacity={0.85}
+            >
+              <Text className="text-[13px] font-medium text-ink-muted">Redefinir entregas</Text>
+            </TouchableOpacity>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {canManageContent && (
-        <View className="flex-row gap-3 mb-6">
-          {stepItems.map((step) => {
+      {canManageContent ? (
+        <View className="flex-row flex-wrap bg-surface border border-border rounded-ds-md overflow-hidden mb-3">
+          {stepItems.map((step, index) => {
             const active = activeStep === step.id;
             return (
               <TouchableOpacity
                 key={step.id}
                 onPress={() => setActiveStep(step.id)}
-                className={`flex-1 rounded-ds-md border px-4 py-3 ${
-                  active ? "border-brand bg-brand-tint" : "border-border bg-surface"
-                }`}
+                className={`flex-row items-center gap-2.5 px-3.5 py-2.5 ${active ? "bg-brand-tint" : "bg-surface"}`}
+                style={{
+                  width: stacked ? "50%" : "25%",
+                  borderLeftWidth: !stacked && index > 0 ? 1 : stacked && index % 2 === 1 ? 1 : 0,
+                  borderLeftColor: "var(--ds-border)",
+                  borderTopWidth: stacked && index > 1 ? 1 : 0,
+                  borderTopColor: "var(--ds-border)",
+                  borderBottomWidth: active ? 2 : 0,
+                  borderBottomColor: "var(--ds-brand)",
+                }}
                 activeOpacity={0.85}
               >
-                <View className="flex-row items-center gap-3">
-                  <View
-                    className="items-center justify-center rounded-full"
-                    style={{ width: 28, height: 28, backgroundColor: active ? "var(--ds-brand)" : "var(--ds-border)" }}
-                  >
-                    <Text className={`text-xs font-semibold ${active ? "text-on-brand" : "text-ink-muted"}`}>
-                      {step.id}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text className={`text-sm font-semibold ${active ? "text-brand" : "text-ink"}`}>
-                      {step.title}
-                    </Text>
-                    <Text className="text-xs text-ink-subtle">{step.description}</Text>
-                  </View>
+                <View
+                  className={`items-center justify-center rounded-full ${step.done ? "bg-success" : "bg-surface"}`}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderWidth: step.done ? 0 : 2,
+                    borderColor: active ? "var(--ds-brand)" : "var(--ds-border-strong)",
+                  }}
+                >
+                  <Text className={`text-[11px] font-semibold ${step.done ? "text-white" : active ? "text-brand" : "text-ink-muted"}`}>
+                    {step.done ? "✓" : step.id}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text className="text-[13px] font-semibold text-ink" numberOfLines={1}>{step.title}</Text>
+                  <Text className="text-xs text-ink-subtle" numberOfLines={1}>{step.description}</Text>
                 </View>
               </TouchableOpacity>
             );
           })}
         </View>
-      )}
+      ) : null}
 
-      {/* Formulário principal */}
       {(activeStep === 1 || !canManageContent) && (
-        <View
-          className="bg-surface rounded-ds-md p-6 mb-6 border border-border"
-          style={{ }}
-        >
-        <Text className="text-base font-semibold text-ink mb-4">Informações do simulado</Text>
-
-        {Object.keys(errors).length > 0 ? (
-          <View className="mb-4 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
-            {Object.entries(errors).map(([field, message]) => (
-              <Text key={field} className="text-sm text-danger">
-                {message}
+        <View>
+          {progress && progress.delivered > 0 ? (
+            <View className="flex-row items-start gap-2.5 rounded-ds-md border border-warning bg-warning-tint px-3.5 py-2.5 mb-3.5">
+              <Text className="text-warning font-semibold">!</Text>
+              <Text className="text-[13px] text-ink" style={{ flex: 1 }}>
+                <Text className="font-semibold">Simulado em andamento: {progress.delivered} {progress.delivered === 1 ? "aluno já entregou" : "alunos já entregaram"}.</Text>
+                {" "}Mudar datas, cursos ou retentativa vale para todos; respostas já enviadas não são alteradas.
               </Text>
-            ))}
-          </View>
-        ) : null}
+            </View>
+          ) : null}
 
-        <View className="flex-row gap-4 flex-wrap">
-          <View style={{ flex: 2, minWidth: 280 }}>
-            <FormInput
-              label="Título"
-              required
-              value={form.title}
-              onChangeText={(v) => setField("title", v)}
-              placeholder="Ex.: Simulado ENEM – Matemática"
-              error={errors.title}
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 180 }}>
-            <SearchableSelect
-              label="Modalidade"
-              required
-              modalTitle="Selecionar modalidade"
-              placeholder="Selecione a modalidade"
-              showSelectedPreview={false}
-              value={form.exam_type}
-              options={examTypeOptions}
-              onChange={(v) => setField("exam_type", v)}
-              error={errors.exam_type}
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 180 }}>
-            <SearchableSelect
-              label="Status"
-              required
-              modalTitle="Selecionar status"
-              showSelectedPreview={false}
-              value={form.status}
-              options={examStatusOptions}
-              onChange={(v) => setField("status", v)}
-              error={errors.status}
-            />
-          </View>
-        </View>
+          {Object.keys(errors).length > 0 ? (
+            <View className="mb-3 rounded-ds-md border border-danger bg-danger-tint px-4 py-3">
+              {Object.entries(errors).map(([field, message]) => (
+                <Text key={field} className="text-sm text-danger">{message}</Text>
+              ))}
+            </View>
+          ) : null}
 
-        {canManageContent ? (
-          <View className="mb-4">
-            <Button
-              variant="secondary"
-              size="sm"
-              label="Assuntos no banco de questões"
-              onPress={() => {
-                setReleaseMode("edit");
-                setReleaseOpen(true);
-              }}
-            />
-          </View>
-        ) : null}
+          <View className={stacked ? "gap-3.5" : "flex-row items-start gap-4"}>
+            <View style={{ flex: 1, minWidth: 0, gap: 14 }}>
+              <View className="bg-surface border border-border rounded-ds-md">
+                <View className="flex-row items-baseline gap-2.5 px-4 py-3 border-b border-border">
+                  <Text className="text-[15px] font-semibold text-ink">Identificação</Text>
+                  <Text className="text-xs text-ink-subtle">como o simulado aparece na lista</Text>
+                </View>
+                <View className="p-4">
+                  <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                    <View style={{ width: stacked ? "100%" : "58%", minWidth: stacked ? undefined : 240 }}>
+                      <FormInput dense required label="Título" value={form.title} onChangeText={(v) => setField("title", v)} placeholder="Ex.: Simulado ENEM – Matemática" error={errors.title} maxLength={255} />
+                      <Text className="text-xs text-ink-subtle -mt-1 mb-2">{form.title.length}/255</Text>
+                    </View>
+                    <View style={{ width: stacked ? "100%" : "38%", minWidth: stacked ? undefined : 180, flexGrow: 1 }}>
+                      <SearchableSelect dense required label="Modalidade" modalTitle="Selecionar modalidade" placeholder="Selecione a modalidade" showSelectedPreview={false} value={form.exam_type} options={examTypeOptions} onChange={(v) => setField("exam_type", v)} error={errors.exam_type} />
+                    </View>
+                    <View style={{ width: stacked ? "100%" : "58%", minWidth: stacked ? undefined : 240 }}>
+                      <SearchableSelect dense label="Matéria" value={form.subject_id} options={subjectOptions} onChange={(v) => setField("subject_id", v)} placeholder="Selecione uma matéria" modalTitle="Selecionar matéria" />
+                      {suggestedSubject ? (
+                        <Text className="text-xs text-ink-subtle -mt-1 mb-2">
+                          Sugerida pelas questões: {suggestedSubject[1]} de {questions.length} {suggestedSubject[1] === 1 ? "é" : "são"} de {suggestedSubject[0]}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={{ width: stacked ? "100%" : "38%", minWidth: stacked ? undefined : 180, flexGrow: 1 }}>
+                      <Text className="text-[13px] font-medium text-ink mb-1.5">Assuntos</Text>
+                      <View className="flex-row items-center gap-1.5 flex-wrap" style={{ minHeight: 34 }}>
+                        {visibleTopics.map((name) => (
+                          <View key={name} className="px-2 py-1 rounded-ds-sm bg-surface-sunken border border-border">
+                            <Text className="text-xs font-medium text-ink-muted">{name}</Text>
+                          </View>
+                        ))}
+                        {hiddenTopicCount > 0 ? (
+                          <View className="px-2 py-1 rounded-ds-sm bg-surface-sunken border border-border">
+                            <Text className="text-xs font-medium text-ink-muted">+{hiddenTopicCount}</Text>
+                          </View>
+                        ) : null}
+                        {topicNames.length === 0 ? <Text className="text-xs text-ink-subtle">Aparecem na classificação das questões</Text> : null}
+                        {canManageContent ? (
+                          <TouchableOpacity onPress={() => { setReleaseMode("edit"); setReleaseOpen(true); }} activeOpacity={0.7}>
+                            <Text className="text-xs text-brand">ver no banco</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    </View>
+                    <View style={{ width: stacked ? "100%" : "40%", minWidth: stacked ? undefined : 200 }}>
+                      <SearchableSelect dense required label="Status" modalTitle="Selecionar status" showSelectedPreview={false} value={form.status} options={examStatusOptions} onChange={(v) => setField("status", v)} error={errors.status} />
+                    </View>
+                    <View style={{ width: "100%" }}>
+                      <Text className="text-[13px] font-medium text-ink mb-1.5">Descrição para o aluno</Text>
+                      <textarea
+                        value={form.description}
+                        onChange={(e: any) => setField("description", e.target.value)}
+                        placeholder="Ex.: Revisão de frações e porcentagem antes da prova."
+                        style={{ ...inputStyle, minHeight: 64, backgroundColor: "var(--ds-surface)" }}
+                        rows={2}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </View>
 
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-ink mb-1">Cursos</Text>
-          <Text className="text-xs text-ink-subtle mb-3">
-            Selecione um ou mais cursos. Alunos matriculados em qualquer um deles verão o simulado.
-          </Text>
-          {courseOptions.length === 0 ? (
-            <Text className="text-sm text-ink-subtle">Nenhum curso disponível</Text>
-          ) : (
-            <View className="gap-2">
-              {courseOptions.map((course) => {
-                const selected = form.course_ids.includes(course.id);
-                return (
+              <View className="bg-surface border border-border rounded-ds-md">
+                <View className="flex-row items-center gap-2.5 px-4 py-3 border-b border-border">
+                  <Text className="text-[15px] font-semibold text-ink">Quem pode fazer</Text>
+                  <Text className="text-xs text-ink-subtle" style={{ flex: 1 }}>
+                    {form.course_ids.length} {form.course_ids.length === 1 ? "curso" : "cursos"}
+                    {eligibleNow != null ? ` · ${eligibleNow} ${eligibleNow === 1 ? "aluno" : "alunos"}` : ""}
+                  </Text>
                   <TouchableOpacity
-                    key={course.id}
-                    onPress={() => toggleCourse(course.id)}
+                    onPress={() => setForm((prev) => ({ ...prev, course_ids: allCoursesSelected ? [] : courseOptions.map((course) => course.id) }))}
+                    disabled={courseOptions.length === 0}
                     activeOpacity={0.7}
-                    className={`flex-row items-center gap-3 px-4 py-3 rounded-ds-md border ${
-                      selected ? "bg-brand-tint border-border" : "bg-surface-sunken border-border"
-                    }`}
                   >
-                    <Ionicons
-                      name={selected ? "checkbox" : "square-outline"}
-                      size={20}
-                      color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"}
-                    />
-                    <Text
-                      className={`text-sm font-medium ${
-                        selected ? "text-brand" : "text-ink"
-                      }`}
-                    >
-                      {course.name}
-                    </Text>
+                    <Text className="text-[13px] font-medium text-ink-muted">{allCoursesSelected ? "Limpar seleção" : "Selecionar todos"}</Text>
                   </TouchableOpacity>
-                );
-              })}
+                </View>
+                <View className="p-4">
+                  {courseOptions.length === 0 ? (
+                    <Text className="text-sm text-ink-subtle">Nenhum curso disponível</Text>
+                  ) : (
+                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                      {courseOptions.map((course) => {
+                        const selected = form.course_ids.includes(course.id);
+                        return (
+                          <TouchableOpacity
+                            key={course.id}
+                            onPress={() => toggleCourse(course.id)}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: selected }}
+                            activeOpacity={0.8}
+                            className={`flex-row items-center gap-2.5 px-3 py-2 rounded-ds-md border ${selected ? "bg-brand-tint border-brand" : "bg-surface border-border"}`}
+                            style={{ width: stacked ? "100%" : "32%", minWidth: stacked ? undefined : 180, flexGrow: 1 }}
+                          >
+                            <Ionicons name={selected ? "checkbox" : "square-outline"} size={16} color={selected ? "var(--ds-brand)" : "var(--ds-ink-subtle)"} />
+                            <Text className={`text-[13px] font-medium ${selected ? "text-brand" : "text-ink"}`} style={{ flex: 1 }} numberOfLines={1}>{course.name}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                  <Text className="text-xs text-ink-subtle mt-2.5">
+                    Alunos matriculados em qualquer curso marcado veem o simulado. Desmarcar um curso esconde o simulado de quem ainda não começou.
+                  </Text>
+                </View>
+              </View>
+
+              <View className="bg-surface border border-border rounded-ds-md">
+                <View className="flex-row items-baseline gap-2.5 px-4 py-3 border-b border-border">
+                  <Text className="text-[15px] font-semibold text-ink">Prazo e duração</Text>
+                  <Text className="text-xs text-ink-subtle">horário de Brasília</Text>
+                </View>
+                <View className="p-4">
+                  <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                    <View style={{ width: stacked ? "100%" : "32%", minWidth: stacked ? undefined : 200, flexGrow: 1 }}>
+                      <DateTimePickerInput label="Abre em" value={form.starts_at} onChangeText={(v) => setField("starts_at", v)} error={errors.starts_at} />
+                    </View>
+                    <View style={{ width: stacked ? "100%" : "32%", minWidth: stacked ? undefined : 200, flexGrow: 1 }}>
+                      <DateTimePickerInput label="Encerra em" value={form.ends_at} onChangeText={(v) => setField("ends_at", v)} error={errors.ends_at} />
+                    </View>
+                    <View style={{ width: stacked ? "100%" : "30%", minWidth: stacked ? undefined : 160, flexGrow: 1 }}>
+                      <Text className="text-[13px] font-medium text-ink mb-1.5">Janela</Text>
+                      <View className="justify-center" style={{ minHeight: 38 }}>
+                        <Text className="text-[13px] text-ink-subtle">
+                          {windowHours ? <>Aberto por <Text className="font-mono font-medium text-ink-muted">{windowHours}</Text></> : "Informe abertura e encerramento"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <Text className="text-[13px] font-medium text-ink mb-1.5">Tempo para responder</Text>
+                  <View className="flex-row items-center gap-2 flex-wrap">
+                    <View className="flex-row flex-wrap" style={{ gap: 6 }}>
+                      {DURATION_CHIPS.map((chip) => {
+                        const pressed = form.duration_minutes.trim() === chip.value;
+                        return (
+                          <TouchableOpacity
+                            key={chip.label}
+                            onPress={() => setField("duration_minutes", chip.value)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: pressed }}
+                            className={`px-2.5 rounded-full border min-h-[28px] justify-center ${pressed ? "bg-brand-tint border-brand" : "bg-surface border-border-strong"}`}
+                            activeOpacity={0.85}
+                          >
+                            <Text className={`text-xs font-medium ${pressed ? "text-brand" : "text-ink-muted"}`}>{chip.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <View style={{ width: 130 }}>
+                      <FormInput dense label="Minutos" value={form.duration_minutes} onChangeText={(v) => setField("duration_minutes", v)} valueFormat="integer" maxDigits={4} placeholder="90" error={errors.duration_minutes} />
+                    </View>
+                  </View>
+                  <Text className="text-xs text-ink-subtle">
+                    {form.duration_minutes.trim()
+                      ? `O aluno tem ${form.duration_minutes} minutos depois de começar; se o prazo acabar antes, o envio é automático no encerramento.`
+                      : "Sem limite de tempo: o envio acontece quando o aluno termina ou quando o prazo acaba."}
+                  </Text>
+                </View>
+              </View>
+
+              <View className="bg-surface border border-border rounded-ds-md">
+                <View className="px-4 py-3 border-b border-border">
+                  <Text className="text-[15px] font-semibold text-ink">Correção e resultado</Text>
+                </View>
+                <View className="p-4 gap-3">
+                  <View className={stacked ? "gap-3" : "flex-row gap-4"}>
+                    <View style={{ width: stacked ? "100%" : 220 }}>
+                      <FormInput dense label="Nota mínima para aprovação" value={form.passing_score} onChangeText={(v) => setField("passing_score", v)} valueFormat="decimal" decimalPlaces={2} placeholder="50" error={errors.passing_score} />
+                      {passingHint ? <Text className="text-xs text-ink-subtle -mt-1">{passingHint}</Text> : null}
+                    </View>
+                    <View style={{ flex: 1, minWidth: stacked ? undefined : 280 }}>
+                      <Text className="text-[13px] font-medium text-ink mb-1.5">Quando o aluno vê o resultado</Text>
+                      <View className="flex-row border border-border-strong rounded-ds-md overflow-hidden">
+                        {[
+                          { value: "false", label: "Logo após enviar" },
+                          { value: "true", label: "Depois do encerramento" },
+                        ].map((option, index) => {
+                          const selected = form.release_results_after_end === option.value;
+                          return (
+                            <TouchableOpacity
+                              key={option.value}
+                              onPress={() => setField("release_results_after_end", option.value)}
+                              accessibilityRole="radio"
+                              accessibilityState={{ selected }}
+                              className={`flex-1 px-2.5 py-2 items-center justify-center ${selected ? "bg-brand" : "bg-surface"}`}
+                              style={{ borderLeftWidth: index === 0 ? 0 : 1, borderLeftColor: "var(--ds-border)", minHeight: 34 }}
+                              activeOpacity={0.85}
+                            >
+                              <Text className={`text-[13px] font-medium text-center ${selected ? "text-on-brand" : "text-ink-muted"}`}>{option.label}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                      <Text className="text-xs text-ink-subtle mt-1">{resultHint}</Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row items-center gap-3 px-3 py-2.5 rounded-ds-md border border-border bg-surface-sunken">
+                    <TouchableOpacity
+                      onPress={() => setForm((prev) => ({
+                        ...prev,
+                        allow_retake: prev.allow_retake === "true" ? "false" : "true",
+                        max_attempts: prev.allow_retake === "true" ? "" : prev.max_attempts,
+                        min_score_to_retake: prev.allow_retake === "true" ? "" : prev.min_score_to_retake,
+                      }))}
+                      accessibilityRole="switch"
+                      accessibilityLabel="Permitir nova tentativa"
+                      accessibilityState={{ checked: form.allow_retake === "true" }}
+                      className={`rounded-full ${form.allow_retake === "true" ? "bg-brand" : "bg-border-strong"}`}
+                      style={{ width: 36, height: 20, padding: 3 }}
+                      activeOpacity={0.85}
+                    >
+                      <View className="bg-white rounded-full" style={{ width: 14, height: 14, marginLeft: form.allow_retake === "true" ? 16 : 0 }} />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text className="text-[13px] font-medium text-ink">Permitir nova tentativa</Text>
+                      <Text className="text-xs text-ink-subtle">
+                        {form.allow_retake === "true"
+                          ? "Ligado: o aluno pode refazer dentro das regras abaixo."
+                          : "Desligado: depois de enviar, o aluno não pode refazer."}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {form.allow_retake === "true" ? (
+                    <View className={stacked ? "gap-3" : "flex-row gap-4"}>
+                      <View style={{ width: stacked ? "100%" : 220 }}>
+                        <Text className="text-[13px] font-medium text-ink mb-1.5">Máximo de tentativas</Text>
+                        <View className="flex-row border border-border-strong rounded-ds-md overflow-hidden" style={{ height: 38 }}>
+                          <TouchableOpacity onPress={() => bumpAttempts(-1)} accessibilityLabel="Menos uma" className="w-9 items-center justify-center bg-surface-sunken" activeOpacity={0.8}>
+                            <Text className="text-base text-ink-muted">−</Text>
+                          </TouchableOpacity>
+                          <TextInput
+                            value={form.max_attempts}
+                            onChangeText={(v) => setField("max_attempts", v.replace(/\D/g, "").slice(0, 3))}
+                            keyboardType="number-pad"
+                            placeholder="∞"
+                            accessibilityLabel="Máximo de tentativas"
+                            className="flex-1 text-center font-mono text-sm text-ink bg-surface"
+                            placeholderTextColor="var(--ds-ink-subtle)"
+                            style={{ borderLeftWidth: 1, borderRightWidth: 1, borderColor: "var(--ds-border)" }}
+                          />
+                          <TouchableOpacity onPress={() => bumpAttempts(1)} accessibilityLabel="Mais uma" className="w-9 items-center justify-center bg-surface-sunken" activeOpacity={0.8}>
+                            <Text className="text-base text-ink-muted">+</Text>
+                          </TouchableOpacity>
+                        </View>
+                        {errors.max_attempts ? <Text className="text-xs text-danger mt-1">{errors.max_attempts}</Text> : <Text className="text-xs text-ink-subtle mt-1">Vazio = sem máximo</Text>}
+                      </View>
+                      <View style={{ flex: 1, minWidth: stacked ? undefined : 220 }}>
+                        <FormInput dense label="Só pode refazer quem tirou menos de" value={form.min_score_to_retake} onChangeText={(v) => setField("min_score_to_retake", v)} valueFormat="decimal" decimalPlaces={2} placeholder={form.passing_score || "50"} error={errors.min_score_to_retake} />
+                        <Text className="text-xs text-ink-subtle -mt-1">Vazio = usa a nota mínima{form.passing_score.trim() ? ` (${form.passing_score}%)` : ""}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
             </View>
-          )}
-          {form.course_ids.length > 0 && (
-            <Text className="text-xs text-success mt-2">
-              {form.course_ids.length} curso{form.course_ids.length !== 1 ? "s" : ""} selecionado
-              {form.course_ids.length !== 1 ? "s" : ""}
-            </Text>
-          )}
-        </View>
 
-        <View className="flex-row gap-4 flex-wrap">
-          <View style={{ flex: 1.2, minWidth: 240 }}>
-            <SearchableSelect
-              label="Matéria"
-              value={form.subject_id}
-              options={subjectOptions}
-              onChange={(v) => setField("subject_id", v)}
-              placeholder="Selecione uma matéria"
-              modalTitle="Selecionar matéria"
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 180 }}>
-            <FormInput
-              label="Duração (minutos)"
-              value={form.duration_minutes}
-              onChangeText={(v) => setField("duration_minutes", v)}
-              valueFormat="integer"
-              maxDigits={4}
-              placeholder="Ex.: 90"
-              error={errors.duration_minutes}
-            />
-          </View>
-        </View>
+            <View style={{ width: stacked ? "100%" : 330, gap: 14 }}>
+              <View className="bg-surface border border-border rounded-ds-md p-4">
+                <Text className="text-[11px] font-semibold text-ink-subtle" style={{ letterSpacing: 0.8 }}>COMO O ALUNO VÊ</Text>
+                <Text className="text-base font-semibold text-ink mt-1.5">{form.title.trim() || "Título do simulado"}</Text>
+                <View className="mt-1 self-start">
+                  <Badge label={form.status === "published" ? "Disponível" : statusLabel} slug={form.status === "published" ? "published" : form.status} dot />
+                </View>
+                <View className="mt-3 gap-1.5">
+                  {[
+                    ["Prazo", shortPeriod(form.starts_at, form.ends_at)],
+                    ["Tempo", durationLabel],
+                    ["Questões", String(questions.length)],
+                    ["Aprovação", approvalLabel],
+                    ["Resultado", resultLabel],
+                    ["Tentativas", attemptsLabel],
+                  ].map(([label, value]) => (
+                    <View key={label} className="flex-row items-start justify-between gap-3">
+                      <Text className="text-[13px] text-ink-subtle">{label}</Text>
+                      <Text className="text-[13px] font-medium text-ink text-right" style={{ flex: 1 }}>{value}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
 
-        <View className="flex-row gap-4 flex-wrap">
-          <View style={{ flex: 1, minWidth: 180 }}>
-            <FormInput
-              label="Nota mínima (%)"
-              value={form.passing_score}
-              onChangeText={(v) => setField("passing_score", v)}
-              valueFormat="decimal"
-              decimalPlaces={2}
-              placeholder="Ex.: 60"
-              error={errors.passing_score}
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 220 }}>
-            <DateTimePickerInput
-              label="Data de início"
-              value={form.starts_at}
-              onChangeText={(v) => setField("starts_at", v)}
-              error={errors.starts_at}
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 220 }}>
-            <DateTimePickerInput
-              label="Data de encerramento"
-              value={form.ends_at}
-              onChangeText={(v) => setField("ends_at", v)}
-              error={errors.ends_at}
-            />
-          </View>
-        </View>
+              <View className="bg-surface border border-border rounded-ds-md">
+                <View className="px-4 py-3 border-b border-border">
+                  <Text className="text-[15px] font-semibold text-ink">Antes de salvar</Text>
+                </View>
+                <View className="px-4 py-3 gap-2">
+                  {[
+                    { ok: Boolean(form.title.trim()), label: "Título preenchido" },
+                    { ok: form.course_ids.length > 0, label: form.course_ids.length > 0 ? `${form.course_ids.length} ${form.course_ids.length === 1 ? "curso" : "cursos"} com acesso` : "Nenhum curso com acesso" },
+                    { ok: datesOk, label: "Datas válidas" },
+                    { ok: !canManageContent || questionsReady, label: canManageContent ? `${keyedQuestions.length} ${keyedQuestions.length === 1 ? "questão com gabarito" : "questões com gabarito"}` : "Questões depois de criar", extra: canManageContent },
+                    { ok: true, label: "Gabarito protegido" },
+                  ].map((item) => (
+                    <View key={item.label} className="flex-row items-start gap-2">
+                      <Text className={`font-mono text-[13px] font-semibold ${item.ok ? "text-success" : "text-warning"}`}>{item.ok ? "✓" : "!"}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text className="text-[13px] text-ink">{item.label}</Text>
+                        {item.extra ? (
+                          <TouchableOpacity onPress={() => { setActiveStep(2); fetchQuestions(); scrollToTop(); }} activeOpacity={0.7}>
+                            <Text className="text-xs text-brand">revisar questões</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
 
-        <View className="flex-row gap-4 flex-wrap">
-          <View style={{ flex: 1, minWidth: 220 }}>
-            <SearchableSelect
-              label="Liberação do resultado"
-              modalTitle="Liberação do resultado"
-              showSelectedPreview={false}
-              value={form.release_results_after_end}
-              options={releaseOptions}
-              onChange={(v) => setField("release_results_after_end", v)}
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 220 }}>
-            <SearchableSelect
-              label="Permitir retentativa"
-              modalTitle="Permitir retentativa"
-              showSelectedPreview={false}
-              value={form.allow_retake}
-              options={retakeOptions}
-              onChange={(v) =>
-                setForm((prev) => ({
-                  ...prev,
-                  allow_retake: v,
-                  max_attempts: v === "true" ? prev.max_attempts : "",
-                  min_score_to_retake: v === "true" ? prev.min_score_to_retake : "",
-                }))
-              }
-            />
-          </View>
-          <View style={{ flex: 1, minWidth: 180 }}>
-            <FormInput
-              label="Máximo de tentativas"
-              value={form.max_attempts}
-              onChangeText={(v) => setField("max_attempts", v)}
-              valueFormat="integer"
-              maxDigits={3}
-              placeholder="Ex.: 3"
-              editable={form.allow_retake === "true"}
-              error={errors.max_attempts}
-            />
-          </View>
-        </View>
-
-        {form.release_results_after_end === "true" && (
-          <Text className="text-xs text-brand mb-4 -mt-2">
-            O aluno só verá nota e gabarito depois que a data final do simulado for atingida.
-          </Text>
-        )}
-
-        <View className="flex-row gap-4 flex-wrap">
-          <View style={{ flex: 1, minWidth: 240 }}>
-            <FormInput
-              label="Nota mínima para nova tentativa (%)"
-              value={form.min_score_to_retake}
-              onChangeText={(v) => setField("min_score_to_retake", v)}
-              valueFormat="decimal"
-              decimalPlaces={2}
-              placeholder="Ex.: 70 (vazio usa nota mínima do simulado)"
-              editable={form.allow_retake === "true"}
-              error={errors.min_score_to_retake}
-            />
-          </View>
-          <View style={{ flex: 1.4, minWidth: 280 }}>
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-ink mb-1.5">Descrição</Text>
-              <textarea
-                value={form.description}
-                onChange={(e: any) => setField("description", e.target.value)}
-                placeholder="Descrição opcional do simulado..."
-                style={inputStyle}
-                rows={3}
-              />
+              <View className="bg-surface border border-border rounded-ds-md">
+                <View className="px-4 py-3 border-b border-border">
+                  <Text className="text-[15px] font-semibold text-ink">Andamento</Text>
+                </View>
+                <View className="p-4">
+                  {progress ? (
+                    <>
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-[13px] text-ink-muted">Entregaram</Text>
+                        <Text className="text-[13px] font-mono font-medium text-ink">{progress.delivered} de {progress.eligible}</Text>
+                      </View>
+                      <View className="mt-1.5 mb-2.5 rounded-ds-sm bg-surface-sunken border border-border overflow-hidden" style={{ height: 6 }}>
+                        <View className="bg-brand h-full" style={{ width: `${progress.eligible > 0 ? Math.min(100, (progress.delivered / progress.eligible) * 100) : 0}%` }} />
+                      </View>
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-[13px] text-ink-muted">Média até agora</Text>
+                        <Text className="text-[13px] font-mono font-medium text-ink">{progress.average != null ? `${progress.average.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "—"}</Text>
+                      </View>
+                      {!coursesMatchSaved ? <Text className="text-xs text-ink-subtle mt-2">Os números de alunos atualizam depois de salvar os cursos.</Text> : null}
+                    </>
+                  ) : (
+                    <Text className="text-[13px] text-ink-subtle">O andamento aparece depois que o simulado existe.</Text>
+                  )}
+                </View>
+              </View>
             </View>
           </View>
         </View>
-
-        {form.allow_retake !== "true" && (
-          <Text className="text-xs text-ink-subtle mb-4 -mt-2">
-            Retentativa desativada: após concluir, o aluno não poderá iniciar nova tentativa.
-          </Text>
-        )}
-
-        <View className="flex-row gap-3 mt-2">
-          <TouchableOpacity
-            onPress={goToList}
-            className="flex-1 border border-border py-3 rounded-ds-md items-center"
-            activeOpacity={0.7}
-          >
-            <Text className="text-sm font-semibold text-ink-muted">Cancelar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={saveExam}
-            disabled={saving}
-            className="flex-1 bg-brand py-3 rounded-ds-md items-center"
-            activeOpacity={0.85}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="var(--ds-on-brand)" />
-            ) : (
-              <Text className="text-sm font-medium text-on-brand">
-                {canManageContent ? "Salvar alterações" : "Criar formulário"}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-        {canManageContent && activeStep === 1 && (
-          <View className="flex-row justify-end mt-4">
-            <TouchableOpacity
-              onPress={() => {
-                setActiveStep(2);
-                fetchQuestions();
-                scrollToTop();
-              }}
-              className="px-4 rounded-ds-md bg-brand py-2 min-h-control-md justify-center"
-              activeOpacity={0.85}
-            >
-              <Text className="text-sm font-medium text-on-brand">Ir para questões</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
       )}
 
       {/* Seção de Questões – só exibe quando o simulado já existe */}
@@ -1317,7 +1582,7 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
             <View style={{ flex: 1 }}>
               <Text className="text-base font-semibold text-ink">Questões</Text>
               <Text className="text-xs text-ink-subtle">
-                {questions.length} questão{questions.length !== 1 ? "ões" : ""} · {totalPoints.toFixed(1)} pontos no total
+                {questions.length} {questions.length === 1 ? "questão" : "questões"} · {totalPoints.toFixed(1)} pontos no total
               </Text>
             </View>
             {questions.length > 0 && (
@@ -2247,7 +2512,54 @@ export default function ExamFormScreen({ examId, navigate, listQuery = "" }: Exa
         onCancel={() => setDeleteSupportMaterialId(null)}
       />
 
+      <ConfirmModal
+        visible={confirmAction !== null}
+        tone={confirmAction === "reset" ? "danger" : "primary"}
+        title={confirmAction === "reset" ? "Redefinir entregas" : "Duplicar simulado"}
+        message={
+          confirmAction === "reset"
+            ? "Apaga as entregas e as tentativas em andamento deste simulado. Os alunos poderão fazê-lo de novo, dentro do prazo já configurado. As notas saem dos relatórios."
+            : "Cria um rascunho com os mesmos cursos, questões, alternativas e materiais. As entregas dos alunos ficam só neste simulado."
+        }
+        confirmLabel={confirmAction === "reset" ? "Redefinir" : "Duplicar"}
+        loading={acting}
+        onConfirm={() => void runExamAction()}
+        onCancel={() => setConfirmAction(null)}
+      />
+
     </ScrollView>
+
+    {(activeStep === 1 || !canManageContent) && (
+      <View className="flex-row items-center gap-2 border-t border-border bg-surface px-6 py-2.5 flex-wrap">
+        <View className="flex-row items-center gap-2">
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dirty ? "var(--ds-accent)" : "var(--ds-success)" }} />
+          <Text className="text-[13px] text-ink-muted">{dirty ? "Alterações não salvas" : "Tudo salvo"}</Text>
+        </View>
+        <View className="flex-row items-center gap-2 flex-wrap" style={{ marginLeft: "auto" }}>
+          <TouchableOpacity onPress={discardChanges} disabled={!dirty || saving} className="px-3 min-h-control-md justify-center" activeOpacity={0.7}>
+            <Text className={`text-[13px] font-medium ${dirty ? "text-ink-muted" : "text-ink-subtle"}`}>Descartar alterações</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => void saveExam()}
+            disabled={saving}
+            className="px-3.5 rounded-ds-md border border-border-strong bg-surface min-h-control-md justify-center"
+            activeOpacity={0.85}
+          >
+            {saving ? <ActivityIndicator size="small" color="var(--ds-brand)" /> : <Text className="text-[13px] font-medium text-ink">Salvar</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => void (canManageContent ? saveAndGoQuestions() : saveExam())}
+            disabled={saving}
+            className="px-3.5 rounded-ds-md bg-brand min-h-control-md justify-center"
+            activeOpacity={0.85}
+          >
+            <Text className="text-[13px] font-medium text-on-brand">
+              {canManageContent ? "Salvar e ir para questões →" : "Criar formulário"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )}
 
       {effectiveExamId != null && (
         <ExamAnswerKeyDialog
