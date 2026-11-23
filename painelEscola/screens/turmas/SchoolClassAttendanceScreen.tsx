@@ -9,11 +9,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import api from "../../services/api";
 import AttendanceDateBar from "../../components/ui/AttendanceDateBar";
+import Button from "../../components/ui/Button";
 import FormInput from "../../components/ui/FormInput";
 import ToastBanner from "../../components/ui/ToastBanner";
 import { useResponsiveLayout } from "../../hooks/useResponsiveLayout";
 import ScreenBreadcrumb from "../../components/ui/ScreenBreadcrumb";
 import Tabs from "../../components/ui/Tabs";
+import { FileDown } from "lucide-react-native";
+import { exportClassAttendanceSheetPdf } from "../../utils/classAttendanceSheetPdf";
 
 type Props = {
   classId: number | null;
@@ -135,6 +138,46 @@ const enrollmentBelongsToClass = (enrollment: any, targetClassId: number): boole
   return pivotIds.includes(Number(targetClassId));
 };
 
+const studentsFromEnrollments = (enrollmentList: any[], targetClassId: number): Student[] => {
+  const seen = new Set<number>();
+  return enrollmentList
+    .filter(
+      (enrollment: any) =>
+        enrollmentBelongsToClass(enrollment, targetClassId) && enrollment.student?.id,
+    )
+    .map((enrollment: any) => ({
+      id: Number(enrollment.student.id),
+      name: enrollment.student.name ?? `ALUNO #${enrollment.student.id}`,
+      enrollment_number:
+        enrollment.enrollment_number ?? enrollment.student.enrollment_number ?? null,
+    }))
+    .filter((student) => {
+      if (seen.has(student.id)) return false;
+      seen.add(student.id);
+      return true;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+};
+
+/** A API limita `per_page` a 50; a ficha precisa da turma inteira. */
+async function fetchAllClassStudents(targetClassId: number): Promise<Student[]> {
+  const collected: any[] = [];
+  let page = 1;
+  let lastPage = 1;
+
+  do {
+    const { data } = await api.get("/enrollments", {
+      params: { per_page: 50, status: "active", school_class_id: targetClassId, page },
+    });
+    const root = data?.body ?? data;
+    collected.push(...extractList(data));
+    lastPage = Number(root?.meta?.last_page ?? root?.last_page ?? page);
+    page += 1;
+  } while (page <= lastPage && page <= 40);
+
+  return studentsFromEnrollments(collected, targetClassId);
+}
+
 export default function SchoolClassAttendanceScreen({ classId, navigate }: Props) {
   const { contentPadding } = useResponsiveLayout();
   const scrollRef = useRef<ScrollView>(null);
@@ -144,6 +187,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
   const [attendanceDate, setAttendanceDate] = useState(todayISO());
   const [students, setStudents] = useState<Student[]>([]);
   const [rows, setRows] = useState<Record<number, AttendanceRow>>({});
+  const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState("");
   const [toast, setToast] = useState<{ visible: boolean; type: "success" | "error"; message: string }>({
     visible: false,
@@ -288,19 +332,7 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
         return;
       }
 
-      const enrollmentList = extractList(enrollmentsRaw);
-      const nextStudents = enrollmentList
-        .filter(
-          (enrollment: any) =>
-            enrollmentBelongsToClass(enrollment, classId) && enrollment.student?.id,
-        )
-        .map((enrollment: any) => ({
-          id: Number(enrollment.student.id),
-          name: enrollment.student.name ?? `ALUNO #${enrollment.student.id}`,
-          enrollment_number:
-            enrollment.enrollment_number ?? enrollment.student.enrollment_number ?? null,
-        }))
-        .sort((a: Student, b: Student) => a.name.localeCompare(b.name, "pt-BR"));
+      const nextStudents = studentsFromEnrollments(extractList(enrollmentsRaw), classId);
 
       const attendanceList = extractList(attendanceRaw);
       const attendanceMap = new Map<number, any>();
@@ -388,6 +420,33 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
     setSaving(false);
   };
 
+  const exportAttendanceSheet = async () => {
+    if (!classId) return;
+
+    setExporting(true);
+    setNotice("");
+
+    try {
+      const roster = await fetchAllClassStudents(classId);
+      if (roster.length === 0) {
+        setToast({ visible: true, type: "error", message: "Não há alunos matriculados nesta turma." });
+        return;
+      }
+
+      await exportClassAttendanceSheetPdf({
+        className: schoolClass?.name ?? `Turma #${classId}`,
+        courseName: schoolClass?.course?.name ?? null,
+        students: roster.map((student) => ({ name: student.name })),
+      });
+    } catch (e: any) {
+      const errorMessage = e?.response?.data?.message || "Não foi possível gerar a ficha de presença.";
+      setNotice(errorMessage);
+      setToast({ visible: true, type: "error", message: errorMessage });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!classId) {
     return (
       <View className="flex-1 items-center justify-center px-6">
@@ -406,11 +465,22 @@ export default function SchoolClassAttendanceScreen({ classId, navigate }: Props
       >
       <ScreenBreadcrumb items={[{ label: "Turmas", onPress: () => navigate("turmas") }, { label: "Frequência" }]} />
 
-      <View className="mb-6">
-        <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Frequência da turma</Text>
-        <Text className="text-sm text-ink-muted">
-          {schoolClass ? `${schoolClass.name} • ${schoolClass.course?.name ?? "Sem curso"}` : "Lancamento diario rapido por aluno"}
-        </Text>
+      <View className="mb-6 flex-row items-start justify-between gap-3" style={{ flexWrap: "wrap" as any }}>
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 280 }}>
+          <Text className="text-[28px] leading-9 font-semibold text-ink tracking-tight">Frequência da turma</Text>
+          <Text className="text-sm text-ink-muted">
+            {schoolClass ? `${schoolClass.name} • ${schoolClass.course?.name ?? "Sem curso"}` : "Lancamento diario rapido por aluno"}
+          </Text>
+        </View>
+        <Button
+          variant="secondary"
+          icon={FileDown}
+          label="Ficha de presença"
+          onPress={exportAttendanceSheet}
+          loading={exporting}
+          disabled={loading || saving}
+          accessibilityLabel="Baixar ficha de presença em PDF"
+        />
       </View>
 
       <View className="mb-6">
